@@ -1622,6 +1622,8 @@ export async function connectWithPAT(
           integration_status: INTEGRATION_STATUS.ACTIVE,
           auth_invalid_at: null,
           auth_invalid_reason: null,
+          suspended_at: null,
+          suspended_by: null,
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, existingIntegration.id));

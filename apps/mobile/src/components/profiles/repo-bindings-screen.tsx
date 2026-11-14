@@ -6,17 +6,19 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
+import { RepoBindingsAddForm } from '@/components/profiles/repo-bindings-add-form';
+import {
+  chosenProfileOf,
+  type ChosenRepo,
+  pickerEmptyDescriptionKey,
+} from '@/components/profiles/repo-bindings-add-model';
 import { ProfilePickerSheet } from '@/components/profiles/repo-bindings-profile-sheet';
 import {
   type RepoBindingPlatform,
   type RepoOption,
   repositoryOptionKey,
 } from '@/components/profiles/repo-bindings-model';
-import {
-  PickerField,
-  RepoBindingRow,
-  RepoBindingsSkeleton,
-} from '@/components/profiles/repo-bindings-rows';
+import { RepoBindingRow, RepoBindingsSkeleton } from '@/components/profiles/repo-bindings-rows';
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -24,11 +26,8 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { GitBranch } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
-import {
-  type OrganizationProfilePermission,
-  useOrganizationProfilePermission,
-} from '@/lib/hooks/use-can-manage-profiles';
+import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import {
   useRepoBindingMutations,
   useRepoBindings,
@@ -40,50 +39,6 @@ import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
-}
-
-/**
- * The picker's empty-state copy. It names the profile a user could select in
- * this context: a personal one, an organization one, or — without the manage
- * role — who can create an organization profile, since the server rejects the
- * create itself. While the role is still resolving it names the organization
- * profile the context lists: the read-only copy would tell an owner or admin
- * they cannot act on what they can.
- */
-const PICKER_EMPTY_DESCRIPTION_KEYS = {
-  personal: 'profiles.emptyDescription',
-  organization: 'profiles.repoBindings.pickerEmptyDescriptionOrganization',
-  organizationReadOnly: 'profiles.repoBindings.pickerEmptyDescriptionOrganizationReadOnly',
-} as const;
-
-type PickerEmptyDescriptionKey =
-  (typeof PICKER_EMPTY_DESCRIPTION_KEYS)[keyof typeof PICKER_EMPTY_DESCRIPTION_KEYS];
-
-/** What the Add form's repo field holds. */
-type ChosenRepo =
-  | { readonly kind: 'none' }
-  | { readonly kind: 'chosen'; readonly repo: RepoOption };
-
-/**
- * What the Add form's profile field holds. `missing` is a stored id whose
- * profile is no longer in the list, which is not a choice this device can
- * submit.
- */
-type ChosenProfile =
-  | { readonly kind: 'none' }
-  | { readonly kind: 'chosen'; readonly profile: AgentProfileListItem }
-  | { readonly kind: 'missing'; readonly profileId: string };
-
-function pickerEmptyDescriptionKey(
-  organizationId: string | undefined,
-  permission: OrganizationProfilePermission
-): PickerEmptyDescriptionKey {
-  if (organizationId === undefined) {
-    return PICKER_EMPTY_DESCRIPTION_KEYS.personal;
-  }
-  return permission === 'read-only'
-    ? PICKER_EMPTY_DESCRIPTION_KEYS.organizationReadOnly
-    : PICKER_EMPTY_DESCRIPTION_KEYS.organization;
 }
 
 /**
@@ -129,22 +84,11 @@ export function RepoBindingsScreen({
   const repoOptions = useRepoOptions(organizationId, isAdding);
   const profileChoices =
     organizationId === undefined ? profileList.personalProfiles : profileList.orgProfiles;
-  const selectedProfile = profileChoices.find(profile => profile.id === selectedProfileId);
   const selectedRepoKey = selectedRepo === null ? null : repositoryOptionKey(selectedRepo);
   const chosenRepo: ChosenRepo =
     selectedRepo === null ? { kind: 'none' } : { kind: 'chosen', repo: selectedRepo };
-  /* A stored id is not a choice: the list refetches when the app comes back, and
-     the profile it named can have been deleted from another device. The field
-     then names the reason and Add stays out of reach, rather than submitting an
-     id this device no longer lists. */
-  const chosenProfile: ChosenProfile =
-    selectedProfileId === ''
-      ? { kind: 'none' }
-      : selectedProfile === undefined
-        ? { kind: 'missing', profileId: selectedProfileId }
-        : { kind: 'chosen', profile: selectedProfile };
-  const canAdd =
-    chosenRepo.kind === 'chosen' && chosenProfile.kind === 'chosen' && !bind.isPending;
+  const chosenProfile = chosenProfileOf(selectedProfileId, profileChoices);
+  const canAdd = chosenRepo.kind === 'chosen' && chosenProfile.kind === 'chosen' && !bind.isPending;
   // The picker lists this context's own profiles, so its empty state names the
   // profile that would appear there.
   const pickerEmptyDescription = t(pickerEmptyDescriptionKey(organizationId, profilePermission));
@@ -258,59 +202,22 @@ export function RepoBindingsScreen({
         ) : null}
 
         {isAdding ? (
-          <View className="gap-3 rounded-lg border border-border p-3">
-            <PickerField
-              label={t('profiles.repoBindings.repo')}
-              value={chosenRepo.kind === 'chosen' ? chosenRepo.repo.fullName : null}
-              hint={null}
-              reserveHint={null}
-              accessibilityLabel={
-                chosenRepo.kind === 'chosen'
-                  ? t('profiles.repoBindings.repoValue', { name: chosenRepo.repo.fullName })
-                  : t('profiles.repoBindings.repo')
-              }
-              disabled={bind.isPending}
-              onPress={() => {
-                setRepoPickerOpen(true);
-              }}
-            />
-            <PickerField
-              label={t('profiles.repoBindings.profile')}
-              value={chosenProfile.kind === 'chosen' ? chosenProfile.profile.name : null}
-              /* A profile that left the list is said out loud, in the line this
-                 field always reserves, so the buttons under it stay put. */
-              hint={
-                chosenProfile.kind === 'missing'
-                  ? t('profiles.repoBindings.profileUnavailable')
-                  : null
-              }
-              reserveHint={t('profiles.repoBindings.profileUnavailable')}
-              accessibilityLabel={
-                chosenProfile.kind === 'chosen'
-                  ? t('profiles.repoBindings.profileValue', { name: chosenProfile.profile.name })
-                  : t('profiles.repoBindings.profile')
-              }
-              disabled={bind.isPending}
-              onPress={() => {
-                setProfilePickerOpen(true);
-              }}
-            />
-            <View className="flex-row justify-end gap-2">
-              <Button variant="ghost" disabled={bind.isPending} onPress={resetAdd}>
-                <Text>{t('common.cancel')}</Text>
-              </Button>
-              <Button
-                disabled={!canAdd}
-                loading={bind.isPending}
-                accessibilityLabel={t('profiles.repoBindings.add')}
-                onPress={() => {
-                  void handleAdd();
-                }}
-              >
-                <Text>{t('profiles.repoBindings.add')}</Text>
-              </Button>
-            </View>
-          </View>
+          <RepoBindingsAddForm
+            chosenRepo={chosenRepo}
+            chosenProfile={chosenProfile}
+            isPending={bind.isPending}
+            canAdd={canAdd}
+            onPickRepo={() => {
+              setRepoPickerOpen(true);
+            }}
+            onPickProfile={() => {
+              setProfilePickerOpen(true);
+            }}
+            onCancel={resetAdd}
+            onAdd={() => {
+              void handleAdd();
+            }}
+          />
         ) : (
           <Button
             accessibilityLabel={t('profiles.repoBindings.add')}

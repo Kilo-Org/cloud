@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { i18n } from '@/i18n';
 import {
   findAll,
   findButton,
@@ -10,6 +9,8 @@ import {
   rerenderScreen,
   type TestBinding,
 } from '@/components/profiles/repo-bindings-screen.test-helpers';
+import { pressableLabels } from '@/components/profiles/repo-bindings-screen.add-form.test-helpers';
+import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
@@ -111,35 +112,6 @@ const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDef
 // accessible name, so it is matched by that name, never the bare full name.
 const PRIVATE_REPO_LABEL = 'acme/api, private repository';
 
-/** The accessible names of every pressable the screen currently renders. */
-function pressableLabels(root: ReactTestInstance): string[] {
-  return findAll(root, 'Pressable')
-    .map(node => node.props.accessibilityLabel)
-    .filter((label): label is string => typeof label === 'string');
-}
-
-/** The empty state with this title — the screen and the picker sheet each render one. */
-function emptyStateByTitle(root: ReactTestInstance, title: string): ReactTestInstance {
-  const empty = findAll(root, 'EmptyState').find(node => node.props.title === title);
-  if (!empty) {
-    throw new Error(`empty state ${title} was not rendered`);
-  }
-  return empty;
-}
-
-/** The props `EmptyState` receives; it is a host node here, so its action stays a prop. */
-type EmptyStateNode = {
-  props: {
-    description?: string;
-    action?: { props: { onPress: () => void; children: { props: { children: string } } } };
-  };
-};
-
-function emptyStateProps(root: ReactTestInstance, title: string): EmptyStateNode['props'] {
-  // The mocked surface is a host node, so its props are untyped at the boundary.
-  return emptyStateByTitle(root, title).props as EmptyStateNode['props'];
-}
-
 describe('RepoBindingsScreen add form', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -187,108 +159,6 @@ describe('RepoBindingsScreen add form', () => {
 
     expect(pressableLabels(renderer.root)).toContain('Profile: Backend debugging');
     expect(pressableLabels(renderer.root)).not.toContain('Select profile');
-
-    unmount();
-  });
-
-  it('empty picker: create opens the profile form for this context and returns to it', async () => {
-    Object.assign(h.profileList, { personalProfiles: [] });
-
-    const { renderer, unmount } = await mountScreen();
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'Create a profile to reuse environment variables, setup commands, and skills across sessions.'
-    );
-    expect(empty.action?.props.children.props.children).toBe('Create profile');
-    act(() => {
-      empty.action?.props.onPress();
-    });
-
-    // The sheet dismisses before the push, so the form cannot render behind it.
-    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
-    expect(routerPush).toHaveBeenCalledWith(
-      '/(app)/profile-management/new?owner=personal&returnTo=back'
-    );
-
-    unmount();
-  });
-
-  it('empty picker: a screen opened from the composer hands the opener to the create form', async () => {
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1', 'composer');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    act(() => {
-      empty.action?.props.onPress();
-    });
-    // The form carries the marker, so Back returns to this screen with its
-    // picker state instead of a profiles list this screen never had.
-    expect(routerPush).toHaveBeenCalledWith(
-      '/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1&openedFrom=composer'
-    );
-
-    unmount();
-  });
-
-  it('empty picker: an organization context names an organization profile and creates one', async () => {
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'Create an organization profile to reuse environment variables, setup commands, and skills across sessions.'
-    );
-    act(() => {
-      empty.action?.props.onPress();
-    });
-    expect(routerPush).toHaveBeenCalledWith(
-      '/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1'
-    );
-
-    unmount();
-  });
-
-  it('empty picker: a read-only organization context offers no create action', async () => {
-    permissionState.permission = 'read-only';
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'An organization owner or admin can create an organization profile.'
-    );
-    expect(empty.action).toBeUndefined();
-
-    unmount();
-  });
-
-  it('empty picker: an unresolved role does not yet read as read-only', async () => {
-    permissionState.permission = 'resolving';
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'Create an organization profile to reuse environment variables, setup commands, and skills across sessions.'
-    );
-    // The action still waits for the role: a member must never be offered a
-    // create the server rejects.
-    expect(empty.action).toBeUndefined();
 
     unmount();
   });

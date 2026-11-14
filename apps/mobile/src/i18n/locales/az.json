@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Yenidən bir dəfə icazə verməyə çalış",
       "retryAlwaysAllow": "Yenidən həmişə icazə verməyə çalış",
       "unreadableTitle": "İcazə tələbi oxuna bilmədi",
-      "unreadableBody": "Agent bu tətbiqin göstərə bilmədiyi başqa bir icazə tələbini gözləyir. Davam etmək üçün tətbiqi və ya CLI-ni yeniləyin, yaxud tələbə CLI-də cavab verin."
+      "unreadableBody": "Agent bu tətbiqin göstərə bilmədiyi icazə tələbini gözləyir, ona görə də həmin tələb üçün kart görünmür. Davam etmək üçün tətbiqi və ya CLI-ni yeniləyin, yaxud tələbə CLI-də cavab verin."
     },
     "questionCard": {
       "title": "Agent cavab gözləyir",

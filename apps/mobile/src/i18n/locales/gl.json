@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Volver tentar permitir unha vez",
       "retryAlwaysAllow": "Volver tentar permitir sempre",
       "unreadableTitle": "Non se puido ler a solicitude de permiso",
-      "unreadableBody": "O agente está agardando outra solicitude de permiso que esta aplicación non pode amosar. Actualiza a aplicación ou a CLI, ou responde á solicitude na CLI para continuar."
+      "unreadableBody": "O agente está agardando unha solicitude de permiso que esta aplicación non pode amosar, polo que non aparece ningunha tarxeta para ela. Actualiza a aplicación ou a CLI, ou responde á solicitude na CLI para continuar."
     },
     "questionCard": {
       "title": "O axente precisa unha resposta",

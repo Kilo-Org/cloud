@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Yritä salli kerran uudelleen",
       "retryAlwaysAllow": "Yritä salli aina uudelleen",
       "unreadableTitle": "Lupapyyntöä ei voitu lukea",
-      "unreadableBody": "Agentti odottaa toista lupapäätöstä, jota tämä sovellus ei voi näyttää. Päivitä sovellus tai CLI tai vastaa pyyntöön CLI:ssä jatkaaksesi."
+      "unreadableBody": "Agentti odottaa lupapäätöstä, jota tämä sovellus ei voi näyttää, joten siitä ei näy korttia. Päivitä sovellus tai CLI tai vastaa pyyntöön CLI:ssä jatkaaksesi."
     },
     "questionCard": {
       "title": "Agentti tarvitsee vastauksesi",

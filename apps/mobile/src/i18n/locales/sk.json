@@ -2669,7 +2669,7 @@
       "retryAllowOnce": "Skúsiť povoliť tentoraz znova",
       "retryAlwaysAllow": "Skúsiť vždy povoliť znova",
       "unreadableTitle": "Žiadosť o povolenie sa nepodarilo prečítať",
-      "unreadableBody": "Agent čaká na ďalšiu žiadosť o povolenie, ktorú táto aplikácia nedokáže zobraziť. Aktualizujte aplikáciu alebo CLI, prípadne odpovedzte na žiadosť v CLI, aby ste mohli pokračovať."
+      "unreadableBody": "Agent čaká na žiadosť o povolenie, ktorú táto aplikácia nedokáže zobraziť, takže sa pre ňu nezobrazuje žiadna karta. Aktualizujte aplikáciu alebo CLI, prípadne odpovedzte na žiadosť v CLI, aby ste mohli pokračovať."
     },
     "questionCard": {
       "title": "Agent potrebuje odpoveď",

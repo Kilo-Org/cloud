@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Nwaa ikwe naanị otu ugboro ọzọ",
       "retryAlwaysAllow": "Nwaa ikwe mgbe niile ọzọ",
       "unreadableTitle": "Enweghị ike ịgụ arịrịọ ikike",
-      "unreadableBody": "Onye nnọchite na-eche arịrịọ ikike ọzọ nke ngwa a enweghị ike igosi. Melite ngwa ma ọ bụ CLI ahụ, ma ọ bụ zaa arịrịọ ahụ na CLI ka ị gaa n'ihu."
+      "unreadableBody": "Onye nnọchite na-eche arịrịọ ikike nke ngwa a enweghị ike igosi, ya mere ọ dịghị kaadị na-apụta maka ya. Melite ngwa ma ọ bụ CLI ahụ, ma ọ bụ zaa arịrịọ ahụ na CLI ka ị gaa n'ihu."
     },
     "questionCard": {
       "title": "Onye nnọchi anya chọrọ azịza",

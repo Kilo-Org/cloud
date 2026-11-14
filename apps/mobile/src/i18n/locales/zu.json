@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Zama ukuvumela kanye futhi",
       "retryAlwaysAllow": "Zama ukuvumela njalo futhi",
       "unreadableTitle": "Isicelo semvume asikwazile ukufundwa",
-      "unreadableBody": "I-agent ilinde esinye isicelo semvume esingakwazi ukusibonisa kule app. Buyekeza i-app noma i-CLI, noma uphendule isicelo ku-CLI ukuze uqhubeke."
+      "unreadableBody": "I-agent ilinde isicelo semvume esingakwazi ukusibonisa kule app, ngakho asikho ikhadi elivelayo kuso. Buyekeza i-app noma i-CLI, noma uphendule isicelo ku-CLI ukuze uqhubeke."
     },
     "questionCard": {
       "title": "Umenzeli udinga impendulo",

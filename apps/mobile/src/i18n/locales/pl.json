@@ -2081,7 +2081,7 @@
       "retryAllowOnce": "Ponów zezwolenie tylko tym razem",
       "retryAlwaysAllow": "Ponów zezwalanie zawsze",
       "unreadableTitle": "Nie można odczytać prośby o zgodę",
-      "unreadableBody": "Agent czeka na kolejną prośbę o zgodę, której ta aplikacja nie może pokazać. Zaktualizuj aplikację lub CLI albo odpowiedz na prośbę w CLI, aby kontynuować."
+      "unreadableBody": "Agent czeka na prośbę o zgodę, której ta aplikacja nie może pokazać, więc nie pojawia się dla niej żadna karta. Zaktualizuj aplikację lub CLI albo odpowiedz na prośbę w CLI, aby kontynuować."
     },
     "questionCard": {
       "title": "Agent czeka na odpowiedź",

@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Qayta bir marta ruxsat berish",
       "retryAlwaysAllow": "Qayta doim ruxsat berish",
       "unreadableTitle": "Ruxsat so'rovini o'qib bo'lmadi",
-      "unreadableBody": "Agent yana bir ruxsat so'rovini kutmoqda, lekin bu ilova uni ko'rsata olmaydi. Davom etish uchun ilovani yoki CLI'ni yangilang yoki so'rovga CLI'da javob bering."
+      "unreadableBody": "Agent bu ilova ko'rsata olmaydigan ruxsat so'rovini kutmoqda, shuning uchun bu so'rov uchun karta ko'rsatilmaydi. Davom etish uchun ilovani yoki CLI'ni yangilang yoki so'rovga CLI'da javob bering."
     },
     "questionCard": {
       "title": "Agentga javob kerak",

@@ -2026,7 +2026,7 @@
       "retryAllowOnce": "Riprova a consentire una volta",
       "retryAlwaysAllow": "Riprova a consentire sempre",
       "unreadableTitle": "Impossibile leggere la richiesta di autorizzazione",
-      "unreadableBody": "L'agente è in attesa di un'altra richiesta di autorizzazione che questa app non può mostrare. Aggiorna l'app o la CLI, oppure rispondi alla richiesta nella CLI per continuare."
+      "unreadableBody": "L'agente è in attesa di una richiesta di autorizzazione che questa app non può mostrare, quindi non viene visualizzata alcuna scheda per essa. Aggiorna l'app o la CLI, oppure rispondi alla richiesta nella CLI per continuare."
     },
     "questionCard": {
       "title": "Richiesta dell'agente",

@@ -2630,7 +2630,7 @@
       "retryAllowOnce": "Tentar permitir uma vez novamente",
       "retryAlwaysAllow": "Tentar permitir sempre novamente",
       "unreadableTitle": "Não foi possível ler o pedido de permissão",
-      "unreadableBody": "O agente está à espera de outro pedido de permissão que esta aplicação não consegue mostrar. Atualize a aplicação ou o CLI, ou responda ao pedido no CLI para continuar."
+      "unreadableBody": "O agente está à espera de um pedido de permissão que esta aplicação não consegue mostrar, por isso não aparece nenhum cartão para o mesmo. Atualize a aplicação ou o CLI, ou responda ao pedido no CLI para continuar."
     },
     "questionCard": {
       "title": "Resposta necessária",

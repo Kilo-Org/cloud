@@ -223,8 +223,8 @@ describe('GET /admin/api/api-request-log/download', () => {
         target: { type: 'user', id: TEST_USER_ID },
         message: 'Started API request log ZIP export',
         metadata: {
-          logId: row.id,
-          hasGenerationIdFilter: true,
+          logIds: [row.id],
+          generationIdCount: 1,
           userId: TEST_USER_ID,
           organizationId: ORGANIZATION_ID,
           startAt: '2026-08-01T12:00:00.000Z',
@@ -615,7 +615,7 @@ describe('GET /admin/api/api-request-log/download', () => {
       expect.anything(),
       expect.objectContaining({
         target: null,
-        metadata: expect.objectContaining({ logId: row.id, hasUserFilter: false }),
+        metadata: expect.objectContaining({ logIds: [row.id], hasUserFilter: false }),
       })
     );
     const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
@@ -633,9 +633,85 @@ describe('GET /admin/api/api-request-log/download', () => {
     expect(mockedRecordAdminAction).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        metadata: expect.objectContaining({ logId: null, hasGenerationIdFilter: true }),
+        metadata: expect.objectContaining({ logIds: null, generationIdCount: 1 }),
       })
     );
+  });
+
+  it.each([
+    ['repeated parameters', (ids: string[]) => ids.map(id => ['id', id])],
+    ['one comma-separated parameter', (ids: string[]) => [['id', ids.join(',')]]],
+    ['whitespace and newlines', (ids: string[]) => [['id', ` ${ids.join('\n ')} `]]],
+  ])('downloads several log IDs given as %s', async (_, toParams) => {
+    const first = await insertLog();
+    const second = await insertLog();
+    await insertLog();
+
+    const params = new URLSearchParams(toParams([first.id, second.id, first.id]));
+    const response = await GET(
+      new NextRequest(`http://localhost:3000/admin/api/api-request-log/download?${params}`)
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Disposition')).toContain('_2-ids.zip');
+    expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        metadata: expect.objectContaining({ logIds: [first.id, second.id] }),
+      })
+    );
+    const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+    expect(exportedIds(entries)).toEqual([first.id, second.id].sort());
+  });
+
+  it('downloads several generation IDs', async () => {
+    const first = await insertLog({ generation_id: 'gen-1' });
+    const second = await insertLog({ generation_id: 'gen-2' });
+    await insertLog({ generation_id: 'gen-3' });
+
+    const params = new URLSearchParams([
+      ['userId', TEST_USER_ID],
+      ['generationId', 'gen-1'],
+      ['generationId', 'gen-2'],
+    ]);
+    const response = await GET(
+      new NextRequest(`http://localhost:3000/admin/api/api-request-log/download?${params}`)
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        metadata: expect.objectContaining({ logIds: null, generationIdCount: 2 }),
+      })
+    );
+    const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+    expect(exportedIds(entries)).toEqual([first.id, second.id].sort());
+  });
+
+  it('requires a record to match both the log IDs and the generation IDs', async () => {
+    const both = await insertLog({ generation_id: 'gen-1' });
+    const idOnly = await insertLog({ generation_id: 'gen-2' });
+    await insertLog({ generation_id: 'gen-1' });
+
+    const entries = await downloadEntries({
+      id: `${both.id},${idOnly.id}`,
+      generationId: 'gen-1',
+    });
+
+    expect(exportedIds(entries)).toEqual([both.id]);
+  });
+
+  it.each(['id', 'generationId'])('rejects more than 100 values for %s', async name => {
+    const values = Array.from({ length: 101 }, () => randomUUID()).join(',');
+
+    const response = await GET(createRequest({ [name]: values }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Too many IDs. Use at most 100 log IDs and 100 generation IDs.',
+    });
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
   });
 
   it('filters by session ID', async () => {
@@ -674,15 +750,17 @@ describe('GET /admin/api/api-request-log/download', () => {
   });
 
   it.each([
-    '1',
-    'abc',
-    ' 6f2a1c9b-4d3e-4f5a-8b7c-1d2e3f4a5b6c',
-    '6f2a1c9b4d3e4f5a8b7c1d2e3f4a5b6c',
-  ])('rejects invalid log ID %j', async id => {
+    ['1', '1'],
+    ['abc', 'abc'],
+    ['6f2a1c9b4d3e4f5a8b7c1d2e3f4a5b6c', '6f2a1c9b4d3e4f5a8b7c1d2e3f4a5b6c'],
+    ['6f2a1c9b-4d3e-4f5a-8b7c-1d2e3f4a5b6c,abc', 'abc'],
+  ])('rejects invalid log ID %j', async (id, invalid) => {
     const response = await GET(createRequest({ id }));
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: 'Invalid log ID. Use the usage UUID.' });
+    expect(await response.json()).toEqual({
+      error: `Invalid log ID ${JSON.stringify(invalid)}. Use the usage UUID.`,
+    });
     expect(mockedRecordAdminAction).not.toHaveBeenCalled();
   });
 

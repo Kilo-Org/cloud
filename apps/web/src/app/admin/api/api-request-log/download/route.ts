@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { api_request_log_2 } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, like, or, type SQL } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, gt, count, inArray, like, or, type SQL } from 'drizzle-orm';
 import {
   apiRequestLogBlobKey,
   apiRequestLogBlobSchema,
@@ -24,6 +24,7 @@ import {
   type LogExportFilters,
 } from '@/lib/admin/log-export';
 import { escapeLikePattern } from '@/lib/sql-like';
+import { MAX_LOG_EXPORT_IDS, splitIdList } from '@/lib/admin/log-export-ids';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -70,15 +71,15 @@ async function loadBlob(row: Row): Promise<LoadedBlob> {
 
 function buildFilter(
   { userId, organizationId, start, end, modelPrefix, sessionId }: LogExportFilters,
-  id: string | null,
-  generationId: string | null
+  ids: string[],
+  generationIds: string[]
 ) {
   const conditions: SQL[] = [];
-  if (id !== null) {
-    conditions.push(eq(api_request_log_2.id, id));
+  if (ids.length > 0) {
+    conditions.push(inArray(api_request_log_2.id, ids));
   }
-  if (generationId !== null) {
-    conditions.push(eq(api_request_log_2.generation_id, generationId));
+  if (generationIds.length > 0) {
+    conditions.push(inArray(api_request_log_2.generation_id, generationIds));
   }
   if (userId) {
     conditions.push(eq(api_request_log_2.kilo_user_id, userId));
@@ -122,18 +123,25 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const id = searchParams.get('id') || null;
-  if (id !== null && !z.uuid().safeParse(id).success) {
-    return jsonError('Invalid log ID. Use the usage UUID.', 400);
+  const ids = splitIdList(...searchParams.getAll('id'));
+  const generationIds = splitIdList(...searchParams.getAll('generationId'));
+  if (ids.length > MAX_LOG_EXPORT_IDS || generationIds.length > MAX_LOG_EXPORT_IDS) {
+    return jsonError(
+      `Too many IDs. Use at most ${MAX_LOG_EXPORT_IDS} log IDs and ${MAX_LOG_EXPORT_IDS} generation IDs.`,
+      400
+    );
   }
-  const generationId = searchParams.get('generationId') || null;
+  const invalidId = ids.find(id => !z.uuid().safeParse(id).success);
+  if (invalidId !== undefined) {
+    return jsonError(`Invalid log ID ${JSON.stringify(invalidId)}. Use the usage UUID.`, 400);
+  }
 
   const parsedFilters = await parseLogExportFilters(searchParams);
   if (!parsedFilters.ok) {
     return parsedFilters.response;
   }
   const { filters } = parsedFilters;
-  const filter = buildFilter(filters, id, generationId);
+  const filter = buildFilter(filters, ids, generationIds);
 
   const [result] = await db.select({ total: count() }).from(api_request_log_2).where(filter);
   if (result.total === 0) {
@@ -151,8 +159,8 @@ export async function GET(request: NextRequest) {
       target: audit.target,
       message: 'Started API request log ZIP export',
       metadata: {
-        logId: id,
-        hasGenerationIdFilter: generationId !== null,
+        logIds: ids.length > 0 ? ids : null,
+        generationIdCount: generationIds.length,
         ...audit.metadata,
         matchingRows: result.total,
       },
@@ -196,6 +204,6 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const suffix = id !== null ? `_id-${id}` : '';
+  const suffix = ids.length === 1 ? `_id-${ids[0]}` : ids.length > 1 ? `_${ids.length}-ids` : '';
   return zipDownloadResponse(stream, logExportFilename('api-request-log', filters, suffix));
 }

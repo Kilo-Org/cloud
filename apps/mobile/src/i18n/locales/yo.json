@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Ìwé ẹ̀rí ìjábọ̀",
-      "description": "Ìwé ẹ̀rí fún ìjábọ̀ tí o fi ránṣẹ́. Tọ́jú id yìí láti tọ́ka sí i lẹ́yìn náà.",
+      "description": "Tọ́jú id yìí láti tọ́ka sí i lẹ́yìn náà.",
       "receiptLabel": "Ìwé ẹ̀rí",
       "appealLabel": "Ẹ̀bẹ̀",
       "triageReceived": "A ti gbà á",

@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Ontvangsbewys vir verslag",
-      "description": "Die ontvangsbewys vir die verslag wat jy ingedien het. Hou hierdie ID om later daarna te verwys.",
+      "description": "Hou hierdie ID om later daarna te verwys.",
       "receiptLabel": "Ontvangsbewys",
       "appealLabel": "Appèl",
       "triageReceived": "Ontvang",

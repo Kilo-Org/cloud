@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "ରିପୋର୍ଟ ରସିଦ",
-      "description": "ଆପଣ ଦାଖଲ କରିଥିବା ରିପୋର୍ଟର ରସିଦ। ପରେ ଏହାକୁ ଉଲ୍ଲେଖ କରିବାକୁ ଏହି id ରଖନ୍ତୁ।",
+      "description": "ପରେ ଏହାକୁ ଉଲ୍ଲେଖ କରିବାକୁ ଏହି id ରଖନ୍ତୁ।",
       "receiptLabel": "ରସିଦ",
       "appealLabel": "ଅପିଲ୍",
       "triageReceived": "ପ୍ରାପ୍ତ ହୋଇଛି",

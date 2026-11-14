@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Xustificante da denuncia",
-      "description": "O xustificante da denuncia que enviaches. Garda este ID para consultala máis adiante.",
+      "description": "Garda este ID para consultala máis adiante.",
       "receiptLabel": "Xustificante",
       "appealLabel": "Recurso",
       "triageReceived": "Recibida",

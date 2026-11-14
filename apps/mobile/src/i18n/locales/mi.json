@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Rīhīti pūrongo",
-      "description": "Te rīhīti mō te pūrongo i tukuna e koe. Puritia tēnei ID hei tohutoro ā muri ake.",
+      "description": "Puritia tēnei ID hei tohutoro ā muri ake.",
       "receiptLabel": "Rīhīti",
       "appealLabel": "Pīra",
       "triageReceived": "Kua tae mai",

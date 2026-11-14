@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "रिपोर्टको रसिद",
-      "description": "तपाईंले पेश गर्नुभएको रिपोर्टको रसिद। पछि सन्दर्भका लागि यो ID राख्नुहोस्।",
+      "description": "पछि सन्दर्भका लागि यो ID राख्नुहोस्।",
       "receiptLabel": "रसिद",
       "appealLabel": "पुनरावेदन",
       "triageReceived": "प्राप्त भयो",

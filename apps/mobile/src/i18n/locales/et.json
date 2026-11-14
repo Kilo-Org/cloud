@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Teate kinnitus",
-      "description": "Sinu esitatud teate kinnitus. Hoia see ID alles, et saaksid sellele hiljem viidata.",
+      "description": "Hoia see ID alles, et saaksid sellele hiljem viidata.",
       "receiptLabel": "Kinnitus",
       "appealLabel": "Vaidlustus",
       "triageReceived": "Vastu võetud",

@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "የሪፖርት ደረሰኝ",
-      "description": "ላስገቡት ሪፖርት የተሰጠ ደረሰኝ። በኋላ ለመጥቀስ ይህን መለያ ቁጥር ያስቀምጡ።",
+      "description": "በኋላ ለመጥቀስ ይህን መለያ ቁጥር ያስቀምጡ።",
       "receiptLabel": "ደረሰኝ",
       "appealLabel": "ይግባኝ",
       "triageReceived": "ደርሷል",

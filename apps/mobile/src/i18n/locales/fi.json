@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Ilmoituksen kuitti",
-      "description": "Lähettämäsi ilmoituksen kuitti. Säilytä tämä tunnus, jotta voit viitata siihen myöhemmin.",
+      "description": "Säilytä tämä tunnus, jotta voit viitata siihen myöhemmin.",
       "receiptLabel": "Kuitti",
       "appealLabel": "Valitus",
       "triageReceived": "Vastaanotettu",

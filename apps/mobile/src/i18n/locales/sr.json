@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Potvrda prijave",
-      "description": "Potvrda za prijavu koju si poslao. Sačuvaj ovaj ID da bi se kasnije pozvao na nju.",
+      "description": "Sačuvaj ovaj ID da bi se kasnije pozvao na nju.",
       "receiptLabel": "Potvrda",
       "appealLabel": "Žalba",
       "triageReceived": "Primljeno",

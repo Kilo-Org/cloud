@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Kvittering for anmeldelse",
-      "description": "Kvitteringen for den anmeldelse, du har indsendt. Gem dette id, så du kan henvise til det senere.",
+      "description": "Gem dette id, så du kan henvise til det senere.",
       "receiptLabel": "Kvittering",
       "appealLabel": "Klage",
       "triageReceived": "Modtaget",

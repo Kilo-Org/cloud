@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Resibo ng ulat",
-      "description": "Ang resibo para sa ulat na isinumite mo. Itago ang id na ito para magamit na sanggunian sa ibang pagkakataon.",
+      "description": "Itago ang id na ito para magamit na sanggunian sa ibang pagkakataon.",
       "receiptLabel": "Resibo",
       "appealLabel": "Apela",
       "triageReceived": "Natanggap",

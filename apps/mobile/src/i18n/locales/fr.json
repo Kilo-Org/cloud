@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Accusé de réception du signalement",
-      "description": "L'accusé de réception du signalement que vous avez envoyé. Conservez cet identifiant pour vous y référer plus tard.",
+      "description": "Conservez cet identifiant pour vous y référer plus tard.",
       "receiptLabel": "Accusé de réception",
       "appealLabel": "Recours",
       "triageReceived": "Reçu",

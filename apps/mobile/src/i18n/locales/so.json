@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Rasiidka warbixinta",
-      "description": "Rasiidka warbixinta aad gudbisay. Kaydso aqoonsigan si aad mar dambe ugu tixraacdo.",
+      "description": "Kaydso aqoonsigan si aad mar dambe ugu tixraacdo.",
       "receiptLabel": "Rasiid",
       "appealLabel": "Rafcaan",
       "triageReceived": "La helay",

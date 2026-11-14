@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "د راپور رسید",
-      "description": "د هغه راپور رسید چې تاسو سپارلی دی. دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
+      "description": "دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
       "receiptLabel": "رسید",
       "appealLabel": "استیناف",
       "triageReceived": "ترلاسه شو",

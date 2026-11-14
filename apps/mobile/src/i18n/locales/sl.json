@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Potrdilo o prijavi",
-      "description": "Potrdilo za oddano prijavo. Shrani ta ID za poznejše sklicevanje.",
+      "description": "Shrani ta ID za poznejše sklicevanje.",
       "receiptLabel": "Potrdilo",
       "appealLabel": "Pritožba",
       "triageReceived": "Prejeto",

@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Biên nhận báo cáo",
-      "description": "Biên nhận cho báo cáo bạn đã gửi. Hãy lưu lại mã này để tra cứu sau.",
+      "description": "Hãy lưu lại mã này để tra cứu sau.",
       "receiptLabel": "Biên nhận",
       "appealLabel": "Kháng nghị",
       "triageReceived": "Đã tiếp nhận",

@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Kvitto på anmälan",
-      "description": "Kvittot för anmälan som du skickade in. Spara detta id för att kunna hänvisa till den senare.",
+      "description": "Spara detta id för att kunna hänvisa till den senare.",
       "receiptLabel": "Kvitto",
       "appealLabel": "Överklagande",
       "triageReceived": "Mottagen",

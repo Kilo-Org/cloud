@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Kvittun fyrir tilkynningu",
-      "description": "Kvittunin fyrir tilkynninguna sem þú sendir inn. Geymdu þetta auðkenni til að vísa í hana síðar.",
+      "description": "Geymdu þetta auðkenni til að vísa í hana síðar.",
       "receiptLabel": "Kvittun",
       "appealLabel": "Áfrýjun",
       "triageReceived": "Móttekin",

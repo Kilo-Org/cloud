@@ -2,18 +2,19 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+
 import { MarkdownCodeFence } from './markdown-code-fence';
 
 const mocks = vi.hoisted(() => ({ performCopy: vi.fn() }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('@/components/ui/icons', () => ({ Clipboard: 'Clipboard' }));
-vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./code-block', () => ({ CodeBlock: 'CodeBlock' }));
 vi.mock('./use-message-copy', () => ({ performCopy: mocks.performCopy }));
@@ -102,7 +103,7 @@ describe('MarkdownCodeFence', () => {
     const onCopyCode = vi.fn((_code: string) => undefined);
     const renderer = await mount(fence({ onCopyCode }));
 
-    const button = hostProps(renderer, 'IconButton');
+    const button = hostProps(renderer, 'Pressable');
     expect(button).toMatchObject({ accessibilityLabel: 'common.copy' });
     act(() => {
       (button.onPress as () => void)();
@@ -114,9 +115,18 @@ describe('MarkdownCodeFence', () => {
     const renderer = await mount(fence());
 
     act(() => {
-      (hostProps(renderer, 'IconButton').onPress as () => void)();
+      (hostProps(renderer, 'Pressable').onPress as () => void)();
     });
     expect(mocks.performCopy).toHaveBeenCalledWith(LONG_LINE);
+  });
+
+  it('keeps the header row one text line tall with the shared compact box', async () => {
+    const renderer = await mount(fence());
+    const button = hostProps(renderer, 'Pressable');
+    expect(String(button.className).split(' ')).toEqual(
+      expect.arrayContaining(LINE_ACTION_BOX_CLASS.split(' '))
+    );
+    expect(button.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
   });
 
   it('passes a multi-line fence through unchanged', async () => {

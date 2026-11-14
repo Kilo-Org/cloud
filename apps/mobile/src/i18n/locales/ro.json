@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Confirmarea raportării",
-      "description": "Confirmarea de primire pentru raportul trimis. Păstrează acest ID pentru a-l putea menționa ulterior.",
+      "description": "Păstrează acest ID pentru a-l putea menționa ulterior.",
       "receiptLabel": "Confirmare",
       "appealLabel": "Contestație",
       "triageReceived": "Primit",

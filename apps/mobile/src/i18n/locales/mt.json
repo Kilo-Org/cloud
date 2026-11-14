@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Irċevuta tar-rapport",
-      "description": "L-irċevuta għar-rapport li bgħatt. Żomm dan l-id biex tirreferi għalih aktar tard.",
+      "description": "Żomm dan l-id biex tirreferi għalih aktar tard.",
       "receiptLabel": "Irċevuta",
       "appealLabel": "Appell",
       "triageReceived": "Riċevut",

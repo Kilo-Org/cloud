@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Dëftesa e raportimit",
-      "description": "Dëftesa për raportimin që dërgove. Ruaje këtë ID për t'iu referuar më vonë.",
+      "description": "Ruaje këtë ID për t'iu referuar më vonë.",
       "receiptLabel": "Dëftesa",
       "appealLabel": "Apelimi",
       "triageReceived": "U mor",

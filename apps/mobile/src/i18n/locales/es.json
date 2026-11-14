@@ -414,7 +414,7 @@
     },
     "reportReceipt": {
       "title": "Comprobante de denuncia",
-      "description": "El comprobante de la denuncia que enviaste. Guarda este ID para consultarla más adelante.",
+      "description": "Guarda este ID para consultarla más adelante.",
       "receiptLabel": "Comprobante",
       "appealLabel": "Apelación",
       "triageReceived": "Recibida",

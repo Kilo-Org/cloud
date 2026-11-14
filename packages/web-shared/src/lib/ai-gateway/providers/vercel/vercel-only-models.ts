@@ -7,39 +7,13 @@ import {
 import { getVercelModelIdOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   findVercelOnlyModels,
+  getVendorNamesByModelPrefix,
+  getVercelOnlyModelName,
   type VercelOnlyModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { getVercelInferenceProvidersExcludingIgnored } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-
-function getModelPrefix(modelId: string): string | undefined {
-  const slashIndex = modelId.indexOf('/');
-  return slashIndex > 0 ? modelId.slice(0, slashIndex) : undefined;
-}
-
-/** OpenRouter names start with the vendor, as in `Qwen: Qwen3 Max`. */
-export function getVendorNamesByModelPrefix(
-  openRouterModels: Iterable<{ id: string; name: string }>
-): ReadonlyMap<string | undefined, string> {
-  const vendorNames = new Map<string | undefined, string>();
-  for (const { id, name } of openRouterModels) {
-    const prefix = getModelPrefix(id);
-    const separatorIndex = name.indexOf(': ');
-    if (prefix && separatorIndex > 0 && !vendorNames.has(prefix)) {
-      vendorNames.set(prefix, name.slice(0, separatorIndex));
-    }
-  }
-  return vendorNames;
-}
-
-export function getVercelOnlyModelName(
-  { id, storedModel }: VercelOnlyModel,
-  vendorNames: ReadonlyMap<string | undefined, string>
-): string {
-  const vendorName = vendorNames.get(getModelPrefix(id));
-  return vendorName ? `${vendorName}: ${storedModel.name}` : storedModel.name;
-}
 
 function toVercelOnlyCatalogModel(model: VercelOnlyModel, name: string): OpenRouterModel {
   const { id, storedModel, contextWindow, modalities, pricing } = model;
@@ -112,6 +86,7 @@ export async function getVercelOnlyCatalogModels({
       ...openRouterModels.map(model => model.id),
       ...Object.keys(openRouterMetadata),
     ],
+    openRouterModels,
     vercelMetadata,
     overrides,
   })

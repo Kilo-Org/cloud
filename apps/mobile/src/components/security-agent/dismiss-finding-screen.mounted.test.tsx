@@ -499,9 +499,37 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       retryable: false,
     });
   });
+
+  it('reopening after a terminal rejection shows the stored copy and keeps the CTA down', () => {
+    // The rejection happened before a command id existed, so only the durable
+    // draft records it; the reopened sheet has no live mutation error.
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: CONFIGURATION_COPY,
+      lastErrorKey: null,
+      retryable: false,
+    };
+
+    const root = renderScreen();
+
+    expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
+    expect(buttonDisabled(root.root)).toBe(true);
+
+    // Choosing a reason is a new intent but not a new request: resubmitting the
+    // same unrecoverable dismissal cannot succeed, so the CTA stays down.
+    selectReason();
+    expect(buttonDisabled(root.root)).toBe(true);
+  });
 });
 
 describe('DismissFindingScreen draft persistence on type', () => {
+  beforeEach(() => {
+    dismissDraft.draft = null;
+    dismissDraft.hydrated = true;
+    dismissDraft.persist.mockClear();
+  });
+
   it('persists the reason as a draft on selection', () => {
     renderScreen();
     selectReason();

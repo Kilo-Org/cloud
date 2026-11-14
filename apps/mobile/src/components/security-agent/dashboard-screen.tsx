@@ -53,6 +53,7 @@ import {
   securitySyncReconcileCopy,
 } from '@/lib/security-agent-ledger';
 import { useSecurityAgentSyncRunning } from '@/lib/hooks/use-security-agent-sync-running';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
@@ -320,6 +321,17 @@ function DashboardMetricTiles({ neverSynced }: Readonly<{ neverSynced: boolean }
   );
 }
 
+/**
+ * A pull that could not read the dashboard's data. Each failed read records the
+ * version it failed at, so an unrelated read's later success cannot retire it.
+ */
+type DashboardRefreshFailure = {
+  readonly kind: 'refresh-failed';
+  readonly message: string;
+  readonly statsAt: number | null;
+  readonly syncAt: number | null;
+};
+
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
@@ -328,8 +340,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshFailed, setRefreshFailed] = useState(false);
+  const {
+    feedback: refreshPhase,
+    failure: refreshFailure,
+    begin: beginRefresh,
+    clearWhere: clearRefreshFailure,
+  } = useSurfaceFeedback<DashboardRefreshFailure>();
 
   const config = useSecurityAgentConfig(scope);
   const dashboardStats = useSecurityAgentDashboardStats(scope, repoFullName);
@@ -441,24 +457,45 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
   const handleRefresh = () => {
     void (async () => {
-      setRefreshing(true);
-      setRefreshFailed(false);
-      try {
-        // Refresh only — never triggers a new sync. Stale data stays on
-        // screen either way; a failed refresh just surfaces a brief warning.
-        const [statsResult, syncResult] = await Promise.all([
-          dashboardStats.refetch(),
-          lastSync.refetch(),
-          // The repositories fetch failure disables the filter controls until
-          // a refetch succeeds, so every dashboard refresh also retries it.
-          repositories.refetch(),
-        ]);
-        setRefreshFailed(statsResult.isError || syncResult.isError);
-      } finally {
-        setRefreshing(false);
+      const attempt = beginRefresh();
+      if (attempt === null) {
+        return;
       }
+      // Refresh only — never triggers a new sync. Stale data stays on
+      // screen either way; a failed refresh surfaces the warning below until
+      // the reads it failed on advance.
+      const [stats, sync] = await Promise.all([
+        dashboardStats.refetch(),
+        lastSync.refetch(),
+        // The repositories fetch failure disables the filter controls until
+        // a refetch succeeds, so every dashboard refresh also retries it.
+        repositories.refetch(),
+      ]);
+      if (!stats.isError && !sync.isError) {
+        attempt.succeed();
+        return;
+      }
+      attempt.fail({
+        kind: 'refresh-failed',
+        message: t('securityAgent.dashboard.refreshFailed'),
+        statsAt: stats.isError ? stats.dataUpdatedAt : null,
+        syncAt: sync.isError ? sync.dataUpdatedAt : null,
+      });
     })();
   };
+
+  // A read's `dataUpdatedAt` advances only on success, so each failed read must
+  // succeed after the failure for the warning to retire — including after a
+  // focus/foreground refresh the pull did not start.
+  const statsUpdatedAt = dashboardStats.dataUpdatedAt;
+  const syncUpdatedAt = lastSync.dataUpdatedAt;
+  useEffect(() => {
+    clearRefreshFailure(
+      f =>
+        (f.statsAt === null || statsUpdatedAt > f.statsAt) &&
+        (f.syncAt === null || syncUpdatedAt > f.syncAt)
+    );
+  }, [clearRefreshFailure, statsUpdatedAt, syncUpdatedAt]);
 
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken "All repositories
@@ -727,7 +764,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         className="flex-1"
         contentContainerClassName="px-6 gap-4"
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshPhase.status === 'pending'}
+            onRefresh={handleRefresh}
+          />
+        }
       >
         {capability.status === 'error' ? (
           <SettingsRecoveryStatus
@@ -792,8 +834,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ) : null}
 
-        {refreshFailed ? (
-          <Text className="text-xs text-warn">{t('securityAgent.dashboard.refreshFailed')}</Text>
+        {refreshFailure !== null ? (
+          <Text className="text-xs text-warn">{refreshFailure.message}</Text>
         ) : null}
 
         {syncFailure !== null && !syncFailureInProgress ? (

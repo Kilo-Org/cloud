@@ -94,6 +94,7 @@ function releaseRepo() {
     ['user.name', 'Kilo Test'],
     ['user.email', 'test@kilo.ai'],
     ['commit.gpgsign', 'false'],
+    ['tag.gpgsign', 'false'],
   ]) {
     git(repo, ['config', key, value]);
   }

@@ -6,7 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { trackSshImport } from './analytics';
-import { openSshBackup, type SshBackupFailure, sshBackupFailure } from './backup-file';
+import {
+  openSshBackup,
+  readSshBackupFile,
+  type SshBackupFailure,
+  sshBackupFailure,
+} from './backup-file';
 import { mergeSshBackup, planSshBackupMerge, type SshBackupPlan } from './backup-merge';
 import { BACKUP_COLLECTIONS } from './backup-payload';
 import { SSH_HOSTS_ROUTE } from './routes';
@@ -70,7 +75,7 @@ export function useSshBackupImport(dev?: string) {
       }
       const file = new File(asset.uri);
       try {
-        armored.current = await file.text();
+        armored.current = await readSshBackupFile(file, asset.size);
       } finally {
         if (file.exists) {
           file.delete();

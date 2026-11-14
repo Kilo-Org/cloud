@@ -208,6 +208,12 @@ export const db = primaryDb;
  */
 export type DrizzleDatabase = typeof db;
 
+/**
+ * The connection a helper accepts: the primary database, or a transaction when
+ * the caller already holds one.
+ */
+export type DrizzleConnection = typeof db | DrizzleTransaction;
+
 export { sql } from 'drizzle-orm';
 
 // Helper for automatically updating the deleted_at column with database server time

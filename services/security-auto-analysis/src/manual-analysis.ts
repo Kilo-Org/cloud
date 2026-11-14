@@ -29,6 +29,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
+import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
 import { generateControlToken } from './token.js';
 import {
   resolveSecurityAgentModels,
@@ -84,36 +85,6 @@ function findingMatchesOwner(
   return owner.type === 'org'
     ? finding.owned_by_organization_id === owner.id
     : finding.owned_by_user_id === owner.id;
-}
-
-async function interruptActiveAnalysisSession(params: {
-  env: CloudflareEnv;
-  authToken: string;
-  cloudAgentSessionId: string;
-  commandId: string;
-}): Promise<void> {
-  try {
-    const response = await params.env.CLOUD_AGENT_NEXT.fetch(
-      new Request('https://cloud-agent-next/trpc/interruptSession', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${params.authToken}`,
-        },
-        body: JSON.stringify({ sessionId: params.cloudAgentSessionId }),
-      })
-    );
-    if (!response.ok) {
-      console.warn('Cloud Agent analysis restart interrupt returned non-OK status', {
-        command_id: params.commandId,
-        status: response.status,
-      });
-    }
-  } catch {
-    console.warn('Cloud Agent analysis restart interrupt failed', {
-      command_id: params.commandId,
-    });
-  }
 }
 
 export async function processManualAnalysisStart(params: {
@@ -284,10 +255,11 @@ export async function processManualAnalysisStart(params: {
 
     claimToken = restart.claimToken;
     if (restart.oldCloudAgentSessionId) {
-      await interruptActiveAnalysisSession({
+      await interruptAnalysisCloudAgentSession({
         env: params.env,
         authToken,
         cloudAgentSessionId: restart.oldCloudAgentSessionId,
+        findingId: finding.id,
         commandId: params.command.commandId,
       });
     }

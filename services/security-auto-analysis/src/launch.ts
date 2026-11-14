@@ -17,6 +17,8 @@ import {
 import { logger } from './logger.js';
 import { generateControlToken, generateTriageToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
+import { readAnalysisCreditAdmission } from './credit-admission.js';
+import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
 import type { AnalysisMode, SecurityFindingAnalysis } from './types.js';
 
@@ -197,30 +199,53 @@ export async function startSecurityAnalysis(
   const existingTriage = params.retrySandboxOnly ? finding.analysis?.triage : undefined;
   const skipTriage = params.retrySandboxOnly === true && existingTriage !== undefined;
 
-  await setFindingPending(
-    params.db,
-    params.findingId,
-    skipTriage ? (finding.analysis ?? null) : null
-  );
+  let controlToken: string | undefined;
+  let preparedAttempt: { cloudAgentSessionId: string; kiloSessionId: string } | null = null;
 
   try {
     const environment = params.env.ENVIRONMENT === 'production' ? 'production' : 'development';
-    const [controlToken, triageToken] = await Promise.all([
-      generateControlToken(
-        params.actorUser,
-        params.nextAuthSecret,
-        environment,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
-        finding.owned_by_organization_id ?? undefined
-      ),
-      generateTriageToken(
-        params.actorUser,
-        params.nextAuthSecret,
-        environment,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
-        finding.owned_by_organization_id ?? undefined
-      ),
-    ]);
+    // The control token is minted first because the credit admission read and
+    // any cleanup interrupt authenticate with it.
+    controlToken = await generateControlToken(
+      params.actorUser,
+      params.nextAuthSecret,
+      environment,
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+      finding.owned_by_organization_id ?? undefined
+    );
+
+    const admission = await readAnalysisCreditAdmission({
+      env: params.env,
+      authToken: controlToken,
+      organizationId: finding.owned_by_organization_id ?? undefined,
+    });
+    if (admission.outcome === 'insufficient_credits') {
+      // The denial is raised before any paid work runs; the caller settles the
+      // credit-gated outcome.
+      throw new InsufficientCreditsError(admission.message);
+    }
+    if (admission.outcome === 'unavailable') {
+      // The admission read could not decide, so no paid work runs and the
+      // caller applies its usual retry classification and attempt bound.
+      return { started: false, error: admission.message, failureNeedsLifecycleTransition: true };
+    }
+
+    // The pending write follows admission, and the caller's start-failed
+    // transition releases the reservation this write records.
+    await setFindingPending(
+      params.db,
+      params.findingId,
+      skipTriage ? (finding.analysis ?? null) : null
+    );
+
+    const triageToken = await generateTriageToken(
+      params.actorUser,
+      params.nextAuthSecret,
+      environment,
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+      finding.owned_by_organization_id ?? undefined
+    );
+
     const triage = skipTriage
       ? existingTriage
       : await triageSecurityFinding({
@@ -333,6 +358,7 @@ export async function startSecurityAnalysis(
     }
 
     const { cloudAgentSessionId, kiloSessionId } = parsedPrepare.data.result.data;
+    preparedAttempt = { cloudAgentSessionId, kiloSessionId };
     const runningTransition = await transitionAnalysisStartLifecycle(params.db, {
       claim: params.lifecycleClaim,
       outcome: { type: 'sandbox-running', cloudAgentSessionId, kiloSessionId },
@@ -376,6 +402,7 @@ export async function startSecurityAnalysis(
       };
     }
 
+    preparedAttempt = null;
     return { started: true, triageOnly: false };
   } catch (error) {
     if (error instanceof InsufficientCreditsError) {
@@ -394,5 +421,17 @@ export async function startSecurityAnalysis(
       error: errorMessage,
       failureNeedsLifecycleTransition: true,
     };
+  } finally {
+    // An attempt that does not start interrupts exactly the session it
+    // prepared; no other attempt's session is touched, so a superseded or
+    // newer attempt belonging to another claim keeps running.
+    if (preparedAttempt && controlToken) {
+      await interruptAnalysisCloudAgentSession({
+        env: params.env,
+        authToken: controlToken,
+        cloudAgentSessionId: preparedAttempt.cloudAgentSessionId,
+        findingId: params.findingId,
+      });
+    }
   }
 }

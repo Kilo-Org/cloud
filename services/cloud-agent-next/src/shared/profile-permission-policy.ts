@@ -98,6 +98,90 @@ function patternsMayCover(a: string, b: string): boolean {
 }
 
 /**
+ * The positions a token sequence can sit at without reading a character. A run
+ * also matches an empty sequence, so it may advance on its own.
+ */
+function globEpsilonClosure(
+  tokens: readonly GlobToken[],
+  positions: ReadonlySet<number>
+): Set<number> {
+  const closed = new Set(positions);
+  const pending = [...positions];
+  while (pending.length > 0) {
+    const position = pending.pop() as number;
+    if (tokens[position]?.kind !== 'run' || closed.has(position + 1)) continue;
+    closed.add(position + 1);
+    pending.push(position + 1);
+  }
+  return closed;
+}
+
+/** The positions a token sequence reaches after reading one character. */
+function globAdvance(
+  tokens: readonly GlobToken[],
+  positions: ReadonlySet<number>,
+  char: string
+): Set<number> {
+  const reached = new Set<number>();
+  for (const position of positions) {
+    const token = tokens[position];
+    if (token === undefined) continue;
+    if (token.kind === 'run') reached.add(position);
+    else if (token.kind === 'one') reached.add(position + 1);
+    else if (token.value === char) reached.add(position + 1);
+  }
+  return globEpsilonClosure(tokens, reached);
+}
+
+function positionKey(positions: ReadonlySet<number>): string {
+  return [...positions].sort((left, right) => left - right).join(',');
+}
+
+/**
+ * Every command the left glob matches is also matched by the right one.
+ *
+ * The two languages are searched over the characters either glob names, plus
+ * one character neither names, which stands for every character both treat
+ * alike. A command the left reaches with nothing left of the right is a command
+ * the right misses, so the walk reports the pair as not covered; a command set
+ * that runs out without such a command is covered.
+ */
+function globCoveredBy(left: readonly GlobToken[], right: readonly GlobToken[]): boolean {
+  const literals = new Set<string>();
+  for (const token of [...left, ...right]) {
+    if (token.kind === 'literal') literals.add(token.value);
+  }
+  let spare = 1;
+  while (literals.has(String.fromCharCode(spare))) spare += 1;
+  const alphabet = [...literals, String.fromCharCode(spare)];
+
+  const visited = new Set<string>();
+  const pending: Array<[Set<number>, Set<number>]> = [
+    [globEpsilonClosure(left, new Set([0])), globEpsilonClosure(right, new Set([0]))],
+  ];
+  while (pending.length > 0) {
+    const [leftPositions, rightPositions] = pending.pop() as [Set<number>, Set<number>];
+    const key = `${positionKey(leftPositions)}/${positionKey(rightPositions)}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    if (leftPositions.has(left.length) && !rightPositions.has(right.length)) return false;
+    for (const char of alphabet) {
+      const nextLeft = globAdvance(left, leftPositions, char);
+      if (nextLeft.size === 0) continue;
+      pending.push([nextLeft, globAdvance(right, rightPositions, char)]);
+    }
+  }
+  return true;
+}
+
+/** Every command the left pattern matches is also matched by the right pattern. */
+function patternIsCoveredBy(left: string, right: string): boolean {
+  return globAlternatives(left).every(leftTokens =>
+    globAlternatives(right).some(rightTokens => globCoveredBy(leftTokens, rightTokens))
+  );
+}
+
+/**
  * Combine a session pattern map with an agent pattern map so both apply.
  *
  * The composed list keeps the agent rules in their own order, so a profile's
@@ -111,9 +195,9 @@ function patternsMayCover(a: string, b: string): boolean {
  * A kept rule carries the session refusals it can reach: a refusal is carried
  * after the profile rule when the two patterns can describe a common command,
  * so it decides one of the commands that rule covers. It is skipped only when a
- * later session allow provably covers it. The composed entry therefore never
- * takes a verdict wider than the session's, while a profile refusal keeps its
- * effect.
+ * later session allow's pattern matches every command the refusal matches. The
+ * composed entry therefore never takes a verdict wider than the session's,
+ * while a profile refusal keeps its effect.
  *
  * An ask also carries a session allow, as the profile's ask, but only when the
  * allow's own pattern satisfies the ask's pattern, so every command the allow
@@ -151,13 +235,14 @@ function composeRuleMap(
       if (denyAction !== 'deny') continue;
       if (!(index < 0 || denyIndex > index || denyPattern === pattern)) continue;
       if (!patternsMayCover(denyPattern, pattern)) continue;
-      // A later session allow for the refusal's own pattern decides it on its
-      // own, so carrying the refusal would only repeat that decision.
+      // A later session allow that matches every command of the refusal
+      // decides it on its own, so carrying the refusal would only repeat that
+      // decision.
       const overridden = entries.some(
         ([later, laterAction], laterIndex) =>
           laterIndex > denyIndex &&
           laterAction === 'allow' &&
-          matchesKiloPermissionPattern(denyPattern, later)
+          patternIsCoveredBy(denyPattern, later)
       );
       if (overridden) continue;
       refusals.push([denyPattern, 'deny']);

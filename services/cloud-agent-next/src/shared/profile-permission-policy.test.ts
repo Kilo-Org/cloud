@@ -238,6 +238,33 @@ describe('narrowProfilePermission', () => {
     expect(resolve(session, composed, 'bash', 'find . -name x')).toBe('allow');
   });
 
+  it('does not drop a refusal for a matching-looking allow', () => {
+    const session: PermissionMap = {
+      bash: { 'a*': 'allow', 'a*c': 'deny', 'a?c': 'allow' },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'a*': 'allow' },
+    }) as PermissionMap;
+    // The later allow's glob takes the refusal's pattern text, because `?`
+    // accepts the literal `*`, but it matches no command with two characters
+    // between the `a` and the `c`, so the refusal still decides `abbc`.
+    expect(composed['bash']).toEqual({ 'a*': 'allow', 'a*c': 'deny' });
+    expect(resolve(session, composed, 'bash', 'abbc')).toBe('deny');
+  });
+
+  it('drops a refusal a later allow of the same pattern covers', () => {
+    const session: PermissionMap = {
+      bash: { 'a*b': 'allow', 'a*bc': 'deny', 'a*bc*': 'allow' },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'a*b': 'allow' },
+    }) as PermissionMap;
+    // The later allow matches every command the refusal names, so it decides
+    // them on its own and the refusal is left out of the composed map.
+    expect(resolve(session, composed, 'bash', 'axbc')).toBe('allow');
+    expect(Object.keys(composed['bash'] as Record<string, string>)).not.toContain('a*bc');
+  });
+
   it('carries the bitbucket shell syntax refusals for a permitted command', () => {
     const policy = getCommandGuardPolicy('code-review', 'bitbucket', 'review-1')!;
     const session: PermissionMap = { bash: buildCommandGuardBashPermissions(policy) };

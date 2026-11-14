@@ -414,6 +414,7 @@
       "title": "Potvrdenie o nahlásení",
       "description": "Potvrdenie k nahláseniu, ktoré si odoslal. Uschovaj si toto ID, aby si sa naň mohol neskôr odvolávať.",
       "receiptLabel": "Potvrdenie",
+      "copyReceiptId": "Kopírovať ID potvrdenia",
       "appealLabel": "Odvolanie",
       "triageReceived": "Prijaté",
       "triageOpen": "Posudzuje sa",

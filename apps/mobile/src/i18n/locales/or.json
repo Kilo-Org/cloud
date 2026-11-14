@@ -414,6 +414,7 @@
       "title": "ରିପୋର୍ଟ ରସିଦ",
       "description": "ଆପଣ ଦାଖଲ କରିଥିବା ରିପୋର୍ଟର ରସିଦ। ପରେ ଏହାକୁ ଉଲ୍ଲେଖ କରିବାକୁ ଏହି id ରଖନ୍ତୁ।",
       "receiptLabel": "ରସିଦ",
+      "copyReceiptId": "ରସିଦ ଆଇଡି କପି କରନ୍ତୁ",
       "appealLabel": "ଅପିଲ୍",
       "triageReceived": "ପ୍ରାପ୍ତ ହୋଇଛି",
       "triageOpen": "ସମୀକ୍ଷାଧୀନ",

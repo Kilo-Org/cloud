@@ -414,6 +414,7 @@
       "title": "إيصال البلاغ",
       "description": "إيصال البلاغ الذي أرسلته. احتفظ بهذا المعرّف للرجوع إليه لاحقًا.",
       "receiptLabel": "الإيصال",
+      "copyReceiptId": "نسخ معرّف الإيصال",
       "appealLabel": "الطعن",
       "triageReceived": "تم الاستلام",
       "triageOpen": "قيد المراجعة",

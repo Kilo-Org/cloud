@@ -414,6 +414,7 @@
       "title": "د راپور رسید",
       "description": "د هغه راپور رسید چې تاسو سپارلی دی. دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
       "receiptLabel": "رسید",
+      "copyReceiptId": "د رسید ID کاپي کړئ",
       "appealLabel": "استیناف",
       "triageReceived": "ترلاسه شو",
       "triageOpen": "تر بیاکتنې لاندې",

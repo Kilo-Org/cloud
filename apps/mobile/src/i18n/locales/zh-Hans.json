@@ -414,6 +414,7 @@
       "title": "举报回执",
       "description": "这是你提交的举报的回执。请保留此 ID，以便日后查询。",
       "receiptLabel": "回执",
+      "copyReceiptId": "复制回执 ID",
       "appealLabel": "申诉",
       "triageReceived": "已收到",
       "triageOpen": "审核中",

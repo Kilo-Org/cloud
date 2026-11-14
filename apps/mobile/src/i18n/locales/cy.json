@@ -414,6 +414,7 @@
       "title": "Derbynneb adroddiad",
       "description": "Y dderbynneb ar gyfer yr adroddiad a gyflwynoch. Cadwch y rhif adnabod hwn i gyfeirio ato'n nes ymlaen.",
       "receiptLabel": "Derbynneb",
+      "copyReceiptId": "Copïo rhif adnabod y dderbynneb",
       "appealLabel": "Apêl",
       "triageReceived": "Wedi'i dderbyn",
       "triageOpen": "Wrthi'n cael ei adolygu",

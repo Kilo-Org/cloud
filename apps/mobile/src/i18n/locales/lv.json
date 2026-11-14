@@ -414,6 +414,7 @@
       "title": "Ziņojuma apstiprinājums",
       "description": "Apstiprinājums par tevis iesniegto ziņojumu. Saglabā šo ID, lai vēlāk uz to atsauktos.",
       "receiptLabel": "Apstiprinājums",
+      "copyReceiptId": "Kopēt apstiprinājuma ID",
       "appealLabel": "Pārsūdzība",
       "triageReceived": "Saņemts",
       "triageOpen": "Tiek izskatīts",

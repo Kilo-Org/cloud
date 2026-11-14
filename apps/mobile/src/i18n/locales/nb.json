@@ -414,6 +414,7 @@
       "title": "Rapportkvittering",
       "description": "Kvitteringen for rapporten du sendte inn. Ta vare på denne ID-en slik at du kan vise til den senere.",
       "receiptLabel": "Kvittering",
+      "copyReceiptId": "Kopier kvitterings-ID",
       "appealLabel": "Klage",
       "triageReceived": "Mottatt",
       "triageOpen": "Under behandling",

@@ -414,6 +414,7 @@
       "title": "Potrdilo o prijavi",
       "description": "Potrdilo za oddano prijavo. Shrani ta ID za poznejše sklicevanje.",
       "receiptLabel": "Potrdilo",
+      "copyReceiptId": "Kopiraj ID potrdila",
       "appealLabel": "Pritožba",
       "triageReceived": "Prejeto",
       "triageOpen": "V pregledu",

@@ -481,6 +481,7 @@
       "title": "Report receipt",
       "description": "The receipt for the report you submitted. Keep this id to refer to it later.",
       "receiptLabel": "Receipt",
+      "copyReceiptId": "Copy receipt ID",
       "appealLabel": "Appeal",
       "triageReceived": "Received",
       "triageOpen": "In review",

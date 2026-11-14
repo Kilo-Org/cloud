@@ -414,6 +414,7 @@
       "title": "Kvittun fyrir tilkynningu",
       "description": "Kvittunin fyrir tilkynninguna sem þú sendir inn. Geymdu þetta auðkenni til að vísa í hana síðar.",
       "receiptLabel": "Kvittun",
+      "copyReceiptId": "Afrita auðkenni kvittunar",
       "appealLabel": "Áfrýjun",
       "triageReceived": "Móttekin",
       "triageOpen": "Í yfirferð",

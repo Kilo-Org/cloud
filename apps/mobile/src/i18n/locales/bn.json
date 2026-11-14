@@ -414,6 +414,7 @@
       "title": "রিপোর্টের রসিদ",
       "description": "আপনার জমা দেওয়া রিপোর্টের রসিদ। পরে উল্লেখ করার জন্য এই আইডিটি রেখে দিন।",
       "receiptLabel": "রসিদ",
+      "copyReceiptId": "রসিদের আইডি কপি করুন",
       "appealLabel": "আপিল",
       "triageReceived": "প্রাপ্ত",
       "triageOpen": "রিভিউ চলছে",

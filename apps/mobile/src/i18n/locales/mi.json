@@ -414,6 +414,7 @@
       "title": "Rīhīti pūrongo",
       "description": "Te rīhīti mō te pūrongo i tukuna e koe. Puritia tēnei ID hei tohutoro ā muri ake.",
       "receiptLabel": "Rīhīti",
+      "copyReceiptId": "Tāruatia te rīhīti ID",
       "appealLabel": "Pīra",
       "triageReceived": "Kua tae mai",
       "triageOpen": "Kei te arotakengia",

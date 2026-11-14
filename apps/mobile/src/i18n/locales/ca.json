@@ -414,6 +414,7 @@
       "title": "Comprovant de la denúncia",
       "description": "El comprovant de la denúncia que has enviat. Conserva aquest identificador per consultar-la més endavant.",
       "receiptLabel": "Comprovant",
+      "copyReceiptId": "Copia l'identificador del comprovant",
       "appealLabel": "Apel·lació",
       "triageReceived": "Rebuda",
       "triageOpen": "En revisió",

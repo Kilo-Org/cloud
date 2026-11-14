@@ -414,6 +414,7 @@
       "title": "Resibo ng ulat",
       "description": "Ang resibo para sa ulat na isinumite mo. Itago ang id na ito para magamit na sanggunian sa ibang pagkakataon.",
       "receiptLabel": "Resibo",
+      "copyReceiptId": "Kopyahin ang id ng resibo",
       "appealLabel": "Apela",
       "triageReceived": "Natanggap",
       "triageOpen": "Sinusuri",

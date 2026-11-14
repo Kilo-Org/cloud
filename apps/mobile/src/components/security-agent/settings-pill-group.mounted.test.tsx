@@ -30,10 +30,11 @@ const OPTIONS = [
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderGroup(disabled = false) {
+function renderGroup(disabled = false, accessibilityLabel?: string) {
   act(() => {
     const element = createElement(PillGroup, {
       label: 'Minimum severity',
+      accessibilityLabel,
       options: OPTIONS,
       value: 'high',
       disabled,
@@ -122,5 +123,32 @@ describe('PillGroup touch target', () => {
       expect(String(row.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
       expect(row.props.hitSlop).toBeUndefined();
     }
+  });
+});
+
+describe('PillGroup accessible name', () => {
+  // Regression: two severity groups on the Automation screen rendered the same
+  // visible label, so each `radiogroup` container announced that label alone
+  // and a screen reader met two lists with identical names. The visible label
+  // stays; the container's name takes the section-qualified override.
+  it("names the radiogroup container with the caller's label when one is given", () => {
+    const groups = renderGroup(false, 'Minimum severity, Auto analysis').findAll(
+      node => node.props.accessibilityRole === 'radiogroup'
+    );
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.props.accessibilityLabel).toBe('Minimum severity, Auto analysis');
+  });
+
+  // Without an override the visible label is still the group's name, so the
+  // Notification screen's single-list pickers keep their current announcement.
+  it('falls back to the visible label when no override is given', () => {
+    const [label] = renderGroup().findAll(
+      node => Object.is(node.type, 'Text') && Object.is(node.props.children, 'Minimum severity')
+    );
+    const groups = renderGroup().findAll(node => node.props.accessibilityRole === 'radiogroup');
+
+    expect(String(label?.props.children)).toBe('Minimum severity');
+    expect(groups[0]?.props.accessibilityLabel).toBe('Minimum severity');
   });
 });

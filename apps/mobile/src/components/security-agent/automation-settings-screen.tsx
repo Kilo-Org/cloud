@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one screen: the three automation sections, the draft hydration effect, and the save/back-guard wiring stay together so a save reads end to end. */
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
@@ -68,6 +69,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     value,
     label: t(labelKey),
   }));
+  // The Auto analysis and Auto remediation sections each render a severity
+  // group and an "Include existing findings" switch, so the four controls would
+  // announce the same two names with no context. The section title goes into
+  // their accessible names only; the visible copy stays as it is.
+  const analysisSection = t('securityAgent.automation.autoAnalysis');
+  const remediationSection = t('securityAgent.automation.autoRemediation');
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   // This screen announces the outcome itself: the queued count when the save
@@ -232,7 +239,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.automation.autoAnalysis')}
+            {analysisSection}
           </Text>
           <View className="gap-3">
             <ToggleRow
@@ -246,6 +253,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               <>
                 <PillGroup
                   label={t('securityAgent.automation.minimumSeverity')}
+                  accessibilityLabel={t('securityAgent.automation.minimumSeverityA11y', {
+                    section: analysisSection,
+                  })}
                   options={minSeverityOptions}
                   value={autoAnalysisMinSeverity}
                   disabled={!canManage}
@@ -253,6 +263,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 />
                 <ToggleRow
                   title={t('securityAgent.automation.includeExistingFindings')}
+                  accessibilityLabel={t('securityAgent.automation.includeExistingFindingsA11y', {
+                    section: analysisSection,
+                  })}
                   subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
                   value={autoAnalysisIncludeExisting}
                   disabled={!canManage}
@@ -265,7 +278,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.automation.autoRemediation')}
+            {remediationSection}
           </Text>
           <View className="gap-3">
             <ToggleRow
@@ -279,6 +292,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               <>
                 <PillGroup
                   label={t('securityAgent.automation.minimumSeverity')}
+                  accessibilityLabel={t('securityAgent.automation.minimumSeverityA11y', {
+                    section: remediationSection,
+                  })}
                   options={minSeverityOptions}
                   value={autoRemediationMinSeverity}
                   disabled={!canManage}
@@ -286,6 +302,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 />
                 <ToggleRow
                   title={t('securityAgent.automation.includeExistingFindings')}
+                  accessibilityLabel={t('securityAgent.automation.includeExistingFindingsA11y', {
+                    section: remediationSection,
+                  })}
                   subtitle={t(
                     'securityAgent.automation.includeExistingFindingsRemediationSubtitle'
                   )}

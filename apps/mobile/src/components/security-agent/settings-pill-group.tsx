@@ -27,12 +27,18 @@ import { cn } from '@/lib/utils';
  *
  * An editable group keeps the selected label at full `foreground` ink and the
  * accent check, so the two states differ by more than the row's tap response.
+ *
+ * The visible label above the list stays the group's name. When two groups on
+ * one screen share that visible label, `accessibilityLabel` names the
+ * `radiogroup` container with the section that tells them apart, so the two
+ * lists do not announce identical names.
  */
 export function PillGroup<T extends string>({
   label,
   options,
   value,
   disabled,
+  accessibilityLabel,
   onChange,
 }: Readonly<{
   label: string;
@@ -40,13 +46,18 @@ export function PillGroup<T extends string>({
   /** `null` when nothing is selected yet, e.g. an unset dismissal reason. */
   value: T | null;
   disabled: boolean;
+  /** Names the group when groups on one screen share a visible `label`. Defaults to `label`. */
+  accessibilityLabel?: string;
   onChange: (value: T) => void;
 }>) {
   const colors = useThemeColors();
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-muted-foreground">{label}</Text>
-      <RadioGroup label={label} className="overflow-hidden rounded-lg bg-secondary">
+      <RadioGroup
+        label={accessibilityLabel ?? label}
+        className="overflow-hidden rounded-lg bg-secondary"
+      >
         {options.map((option, index) => {
           const active = value === option.value;
           return (

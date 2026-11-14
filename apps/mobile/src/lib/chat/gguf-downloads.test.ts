@@ -300,6 +300,41 @@ it.each([
   expect(h.files.has(ggufModelName('other'))).toBe(true);
 });
 
+describe('a storage read that fails', () => {
+  it('reports the failure instead of an empty list and clears it on a successful load', () => {
+    const h = harness();
+    h.index.fails = true;
+
+    expect(h.store.load()).toBe(false);
+    expect(h.store.snapshot()).toMatchObject({ models: [], loadFailed: true });
+
+    // A repeated failed read publishes nothing new: the render path must not see a
+    // fresh snapshot for an unchanged state.
+    const failed = h.store.snapshot();
+    expect(h.store.load()).toBe(false);
+    expect(h.store.snapshot()).toBe(failed);
+
+    h.index.fails = false;
+    h.index.text = JSON.stringify([
+      {
+        fileId: 'small',
+        name: 'Small model',
+        url: 'https://example.com/small.gguf',
+        sizeBytes: 10,
+        contextWindow: 4096,
+        tools: false,
+        vision: false,
+        thinking: false,
+      },
+    ]);
+    h.files.set(ggufModelName('small'), 10);
+
+    expect(h.store.load()).toBe(true);
+    expect(h.store.snapshot().loadFailed).toBe(false);
+    expect(h.store.snapshot().models.map(model => model.fileId)).toEqual(['small']);
+  });
+});
+
 describe('deleting a model', () => {
   it('releases the loaded context first, then the file and the list entry', async () => {
     const h = harness();

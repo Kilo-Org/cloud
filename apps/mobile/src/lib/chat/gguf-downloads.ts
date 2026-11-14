@@ -54,7 +54,8 @@ export function ggufDownloads({
   let models: readonly GgufModelRecord[] = [];
   let active: Active | undefined = undefined;
   let failure: GgufDownloadsSnapshot['failure'] = null;
-  let snapshot: GgufDownloadsSnapshot = { models, download: null, failure };
+  let loadFailed = false;
+  let snapshot: GgufDownloadsSnapshot = { models, download: null, failure, loadFailed };
   const listeners = new Set<() => void>();
 
   const publish = () => {
@@ -62,6 +63,7 @@ export function ggufDownloads({
       models,
       download: active === undefined ? null : downloadProgress(active),
       failure,
+      loadFailed,
     };
     for (const listener of listeners) {
       listener();
@@ -228,19 +230,33 @@ export function ggufDownloads({
   };
 
   return {
-    load: () => {
-      const index = storage.readIndex();
-      models = keepStoredModels({
-        storage,
-        index,
-        partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
-      });
-      // Only a list that parsed in full is written back: anything else would lose
-      // an entry, and the next launch would then delete the file it names.
-      if (modelIndexFullyParsed(index)) {
-        save(models);
+    load: (): boolean => {
+      try {
+        const index = storage.readIndex();
+        models = keepStoredModels({
+          storage,
+          index,
+          partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
+        });
+        // Only a list that parsed in full is written back: anything else would lose
+        // an entry, and the next launch would then delete the file it names.
+        if (modelIndexFullyParsed(index)) {
+          save(models);
+        }
+        if (loadFailed) {
+          loadFailed = false;
+        }
+        publish();
+        return true;
+      } catch {
+        // A storage the OS refused (permission, full disk, I/O) is a state the picker
+        // reports, not a crash: this store is read while rendering.
+        if (!loadFailed) {
+          loadFailed = true;
+          publish();
+        }
+        return false;
       }
-      publish();
     },
     snapshot: () => snapshot,
     subscribe: (listener: () => void) => {

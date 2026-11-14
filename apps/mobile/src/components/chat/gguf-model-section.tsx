@@ -259,6 +259,14 @@ export function GgufModelSection({
         <PackageSearch size={18} color={colors.primaryForeground} />
         <Text>{t('modelChat.catalog.browse')}</Text>
       </Button>
+      {snapshot.loadFailed && (
+        <View className="gap-2 rounded-xl border border-border p-4">
+          <Text className="font-semibold">{t('common.couldNotLoadModels')}</Text>
+          <Button variant="outline" onPress={() => ggufDownloadActions.retryLoad()}>
+            <Text>{t('common.tryAgain')}</Text>
+          </Button>
+        </View>
+      )}
       {rows.map(row => (
         <View key={row.fileId} className="gap-2 rounded-xl border border-border p-4">
           <BackendProviderChoice

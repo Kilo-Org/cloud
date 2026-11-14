@@ -676,11 +676,16 @@ function collectModalities(
     collectModalities(value[key], out, depth + 1, childRoles[key]);
   }
 
-  // An Anthropic `tool_result` part can list content blocks that the model
-  // receives, and those blocks can be images. A non-array `content` on a part
-  // is tool output, so the walk leaves it alone.
+  // A tool record can list content blocks that the model receives, and those
+  // blocks can be images. An Anthropic `tool_result` part holds them under
+  // `content`; an OpenAI Responses `function_call_output` item holds them
+  // under `output`. Only an array is such a list. A string or an object is
+  // tool payload, so the walk leaves it alone.
   if (role === 'part' && Array.isArray(value.content)) {
     collectModalities(value.content, out, depth + 1, 'part');
+  }
+  if (role === 'message' && Array.isArray(value.output)) {
+    collectModalities(value.output, out, depth + 1, 'part');
   }
 
   // Media detection runs only on a content part. Nothing else in the body

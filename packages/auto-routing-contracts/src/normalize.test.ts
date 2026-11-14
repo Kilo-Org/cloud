@@ -683,6 +683,39 @@ describe('detectRequiredInputModalities', () => {
     ).toEqual([]);
   });
 
+  it('detects a typed image block inside an OpenAI Responses tool output list', () => {
+    // A function tool can return images the model receives, so an output list
+    // is walked as parts.
+    expect(
+      detectRequiredInputModalities({
+        model: 'gpt-4o',
+        input: [
+          { role: 'user', content: 'Screenshot the page' },
+          {
+            type: 'function_call_output',
+            call_id: 'call_1',
+            output: [{ type: 'input_image', image_url: 'https://example.com/x.png' }],
+          },
+        ],
+      })
+    ).toEqual(['image']);
+  });
+
+  it('does not read a media key out of a tool output string', () => {
+    expect(
+      detectRequiredInputModalities({
+        model: 'gpt-4o',
+        input: [
+          {
+            type: 'function_call_output',
+            call_id: 'call_1',
+            output: '{"image_url":"https://example.com/x.png"}',
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
   it('detects a typed image block inside an Anthropic tool_result content array', () => {
     // A tool result can return images the model receives, so array content is
     // walked as parts.

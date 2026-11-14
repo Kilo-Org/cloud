@@ -65,7 +65,7 @@ const integrationDetailRegistry = {
     userSubtitle: 'Manage your personal GitLab integration',
     organizationSubtitle: organizationName =>
       `Manage GitLab OAuth integration for ${organizationName}`,
-    render: async ({ organizationId, search }) => {
+    render: async ({ organizationId, role, search }) => {
       const { GitLabIntegrationDetails } =
         await import('@/components/integrations/GitLabIntegrationDetails');
       return (
@@ -73,6 +73,7 @@ const integrationDetailRegistry = {
           organizationId={organizationId}
           success={search.success === 'connected'}
           error={search.error}
+          canManage={!role || canManageOrganizationBilling(role)}
         />
       );
     },

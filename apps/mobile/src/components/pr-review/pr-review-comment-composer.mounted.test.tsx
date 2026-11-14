@@ -74,7 +74,8 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'u1', isLoading: false }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  connectionRefusesWrites: () => connectivity.value === 'offline',
+  connectionRefusesWrites: () =>
+    connectivity.value === 'offline' || connectivity.value === 'confirming-offline',
   getCommittedConnectivityStatus: () => connectivity.value,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -318,6 +319,20 @@ describe('PrReviewCommentComposer submit phase', () => {
     });
 
     expect(createComment.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses the write while the connection is being confirmed', async () => {
+    connectivity.value = 'confirming-offline';
+    createComment.mutateAsync.mockResolvedValue({});
+    const renderer = await mountComposer();
+    typeBody(renderer, 'hello');
+    await pressAndSettle(renderer, 'Comment now');
+
+    // A write dispatched in that window waits out its deadline on a transport
+    // that just went away, so the composer fails locally like its siblings.
+    expect(createComment.mutateAsync).not.toHaveBeenCalled();
+    expect(hasCopy(renderer, 'Could not post comment.')).toBe(true);
+    expect(isDisabled(renderer, 'Comment now')).toBe(false);
   });
 
   it('fails at once with the retryable copy while confirmed offline', async () => {

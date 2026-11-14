@@ -249,9 +249,7 @@ export async function readSessionTokenIdentities(
 }
 
 /** Every recorded identity of one account, so a scope teardown can delete the rows they name. */
-export async function readSessionTokenIdentitiesForScope(
-  scope: SessionTokenScope | null
-): Promise<
+export async function readSessionTokenIdentitiesForScope(scope: SessionTokenScope | null): Promise<
   readonly {
     readonly sessionId: string;
     readonly version: number;
@@ -306,7 +304,9 @@ export function retireSessionTokenIdentities(
       return;
     }
     let changed = false;
-    for (const [sessionId, identity] of Array.from(identities)) {
+    /* A delete or a rewrite of the entry being visited is well defined for a
+       `Map` iterator, and every other entry keeps its turn. */
+    for (const [sessionId, identity] of identities) {
       if (belongsTo(identity, scope)) {
         const kept = identity.tokens.filter(token => failed.has(token));
         if (kept.length !== identity.tokens.length) {

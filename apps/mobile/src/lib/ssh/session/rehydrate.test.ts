@@ -27,7 +27,8 @@ function host(overrides: Partial<SshHost> & { id: string }): SshHost {
 
 function session(overrides: Partial<SessionInfo> & { sessionId: string }): SessionInfo {
   return {
-    appSessionId: '',
+    appSessionId: 'app-session-1',
+    viaSessionId: null,
     host: 'web.test',
     port: 22,
     username: 'igor',
@@ -81,7 +82,8 @@ describe('adopting native sessions', () => {
     expect(plan.adopt).toEqual([
       {
         native: expect.objectContaining({ sessionId: 'session-1' }),
-        appSessionId: null,
+        appSessionId: 'app-session-1',
+        jumpSessionIds: [],
         host: web,
         shellId: 'shell-1',
       },
@@ -204,4 +206,19 @@ describe('dropping sessions the registry no longer holds', () => {
   it('keeps an entry that never reached a native session', () => {
     expect(planStale([{ id: 'app-1', nativeSessionId: null }], new Set())).toEqual([]);
   });
+});
+
+it('keeps anonymous hops attached to their target without adopting phantom rows', () => {
+  const plan = planSessions(
+    [
+      session({ sessionId: 'outer', appSessionId: '', host: 'jump.test' }),
+      session({ sessionId: 'inner', appSessionId: '', host: 'jump.test', viaSessionId: 'outer' }),
+      session({ sessionId: 'target', viaSessionId: 'inner' }),
+    ],
+    [host({ id: 'web' }), host({ id: 'jump' })],
+    new Set()
+  );
+  expect(plan.adopt).toHaveLength(1);
+  expect(plan.adopt[0]?.jumpSessionIds).toEqual(['outer', 'inner']);
+  expect(plan.unmatched).toEqual([]);
 });

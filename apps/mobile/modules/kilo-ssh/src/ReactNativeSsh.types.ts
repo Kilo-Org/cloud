@@ -125,6 +125,7 @@ export type DisconnectNotice = {
  * starts while the sockets are already open reads these to rebuild its view.
  */
 export type SessionInfo = {
+  viaSessionId: string | null;
   sessionId: string;
   /** The JavaScript session that opened it, or '' for a connection with no row. */
   appSessionId: string;

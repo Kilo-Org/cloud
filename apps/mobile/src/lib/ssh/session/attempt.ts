@@ -52,7 +52,7 @@ async function openChain(
   const options: ConnectOptions = {
     // Only the session the person opened carries its row's id: a jump hop's
     // connection has no screen of its own, so a reload must not adopt it.
-    appSessionId: via === null ? entry.id : '',
+    appSessionId: hops.length === 1 ? entry.id : '',
     host: hop.hostname,
     port: hop.port,
     username: hop.username,
@@ -228,13 +228,9 @@ async function authFor(
       fail(entry, 'key-missing');
       return null;
     }
-    if (!entry.keyUnlocked) {
-      const unlocked = await requireKeyAccess(i18n.t('ssh.session.keyPrompt'));
-      if (!unlocked) {
-        fail(entry, 'AuthCancelled');
-        return null;
-      }
-      entry.keyUnlocked = true;
+    if (!(await requireKeyAccess(i18n.t('ssh.session.keyPrompt')))) {
+      fail(entry, 'AuthCancelled');
+      return null;
     }
     const passphrase = entry.passphrase ?? key.passphrase ?? undefined;
     try {
@@ -265,6 +261,13 @@ function scheduleReconnect(entry: LiveSession, reason: SshCloseReason): void {
 }
 
 function releaseShell(entry: LiveSession): void {
+  const nativeIds = [...entry.jumpSessionIds];
+  if (entry.nativeSessionId !== null) {
+    nativeIds.push(entry.nativeSessionId);
+  }
+  entry.nativeSessionId = null;
+  entry.jumpSessionIds = [];
+  void disconnectAll(nativeIds);
   const session = sessionById(entry.id);
   const shellId = session?.shellId ?? null;
   if (shellId !== null) {

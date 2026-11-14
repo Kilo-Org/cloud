@@ -3,7 +3,6 @@ import { type ForwardInfo, type SessionInfo } from '../../../../modules/kilo-ssh
 import { adoptForwards, resetSessionForwards } from '../forwards-runtime';
 import { listForwardsForHost } from '../forwards';
 import { listHosts } from '../hosts';
-import { newId } from '../id';
 import { sshPackage } from '../native';
 import { sshDatabase } from '../store';
 import { forgetIdleNotify } from './idle-notify';
@@ -83,7 +82,7 @@ async function adoptRegistrySessions(): Promise<Rehydration> {
   for (const item of plan.adopt) {
     // The row keeps the id its screen already names, so a route restored from
     // the navigation state resolves to this connection instead of a closed one.
-    const id = item.appSessionId ?? newId();
+    const id = item.appSessionId;
     live.set(id, {
       id,
       host: item.host,
@@ -95,9 +94,8 @@ async function adoptRegistrySessions(): Promise<Rehydration> {
       passwords: new Map(),
       authHostId: null,
       promptsHostId: null,
-      jumpSessionIds: [],
+      jumpSessionIds: item.jumpSessionIds,
       passphrase: null,
-      keyUnlocked: false,
       connecting: false,
       connectTargets: [],
     });

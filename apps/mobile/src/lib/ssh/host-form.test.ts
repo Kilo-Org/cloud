@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { hostFormValuesOf, jumpHostCandidates, toHostInput } from './host-form';
+import { hostFormValuesOf, jumpHostCandidates, toHostInput, validateHostInput } from './host-form';
 import { type SshHost } from './hosts';
 
 // The stores reach `expo-crypto` for ids; under Node its runtime setup reads
@@ -58,5 +58,16 @@ describe('hostFormValuesOf', () => {
 
     expect(values.password).toBe('');
     expect(values.savePassword).toBe(false);
+  });
+});
+
+describe('key authentication validation', () => {
+  it('requires a selected key and names its inline field', () => {
+    const input = toHostInput(hostFormValuesOf(hostOf('a', null)));
+    expect(validateHostInput({ ...input, authMethod: 'key' })).toEqual([
+      { field: 'keyId', kind: 'required' },
+    ]);
+    expect(validateHostInput({ ...input, authMethod: 'key', keyId: 'key-1' })).toEqual([]);
+    expect(validateHostInput(input)).toEqual([]);
   });
 });

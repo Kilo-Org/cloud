@@ -25,8 +25,6 @@ export type LiveSession = {
   jumpSessionIds: string[];
   /** Typed once for this session when the key needs one. */
   passphrase: string | null;
-  /** The device-auth gate passed for this session's key. */
-  keyUnlocked: boolean;
   connecting: boolean;
   /** Every host a host key can arrive for during the current attempt. */
   connectTargets: readonly { host: string; port: number }[];

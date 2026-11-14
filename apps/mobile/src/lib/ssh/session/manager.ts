@@ -32,7 +32,6 @@ export function openSession(host: SshHost): string {
     promptsHostId: null,
     jumpSessionIds: [],
     passphrase: null,
-    keyUnlocked: false,
     connecting: false,
     connectTargets: [],
   };
@@ -88,7 +87,6 @@ export function retrySession(id: string): void {
     return;
   }
   entry.attempt = 0;
-  entry.keyUnlocked = false;
   entry.passwords.clear();
   entry.authHostId = null;
   entry.passphrase = null;

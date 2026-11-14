@@ -37,6 +37,7 @@ const HOST: SshHost = {
 const nativeSession = (overrides: Partial<SessionInfo> = {}): SessionInfo => ({
   sessionId: 'session-1',
   appSessionId: 'app-session-1',
+  viaSessionId: null,
   host: HOST.hostname,
   port: HOST.port,
   username: HOST.username,
@@ -48,7 +49,6 @@ const nativeSession = (overrides: Partial<SessionInfo> = {}): SessionInfo => ({
 
 const state = vi.hoisted(() => ({
   sessions: [] as SessionInfo[],
-  nextId: 0,
 }));
 
 vi.mock('../../../../modules/kilo-ssh/src', () => ({}));
@@ -71,12 +71,10 @@ vi.mock('../forwards-runtime', () => ({
 }));
 vi.mock('./manager', () => ({ ensureSshEvents: () => Promise.resolve() }));
 vi.mock('./idle-notify', () => ({ forgetIdleNotify: () => undefined }));
-vi.mock('../id', () => ({ newId: () => `generated-${(state.nextId += 1)}` }));
 
 beforeEach(() => {
   vi.resetModules();
   state.sessions = [];
-  state.nextId = 0;
 });
 
 describe('rehydrating after a reload', () => {
@@ -97,16 +95,28 @@ describe('rehydrating after a reload', () => {
     expect(store.sessionList()).toHaveLength(1);
   });
 
-  it('mints an id for a connection that never had a row', async () => {
+  it('does not invent a row for an anonymous jump connection', async () => {
     state.sessions = [nativeSession({ appSessionId: '' })];
     const store = await import('./session-store');
     const { rehydrateSshSessions } = await import('./rehydrate');
 
     const result = await rehydrateSshSessions();
 
+    expect(result.adopted).toBe(0);
+    expect(store.sessionList()).toEqual([]);
+  });
+
+  it('restores the exact hop ids on the target entry', async () => {
+    state.sessions = [
+      nativeSession({ sessionId: 'hop', appSessionId: '', shellIds: [] }),
+      nativeSession({ viaSessionId: 'hop' }),
+    ];
+    const { rehydrateSshSessions } = await import('./rehydrate');
+    const { live } = await import('./live');
+    const result = await rehydrateSshSessions();
     expect(result.adopted).toBe(1);
-    expect(store.sessionList().map(entry => entry.id)).toEqual(['generated-1']);
-    expect(store.sessionById('generated-1')?.nativeSessionId).toBe('session-1');
+    expect(live.get('app-session-1')?.jumpSessionIds).toEqual(['hop']);
+    expect(live.size).toBe(1);
   });
 
   it('replaces a second row the dead runtime left under another id', async () => {

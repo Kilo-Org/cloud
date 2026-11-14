@@ -3392,7 +3392,7 @@
       "sharingUnavailable": "Kopīgošana šajā ierīcē nav pieejama.",
       "status": {
         "paid": "Apmaksāts",
-        "open": "Atvērt",
+        "open": "Atvērts",
         "void": "Anulēts",
         "uncollectible": "Nepiedzenams"
       },

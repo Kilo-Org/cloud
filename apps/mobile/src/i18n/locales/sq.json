@@ -3339,7 +3339,7 @@
       "sharingUnavailable": "Ndarja nuk është e disponueshme në këtë pajisje.",
       "status": {
         "paid": "E paguar",
-        "open": "Hapje",
+        "open": "Hapur",
         "void": "E anuluar",
         "uncollectible": "E paarkëtueshme"
       },

@@ -3551,7 +3551,7 @@
       "sharingUnavailable": "Nid yw rhannu ar gael ar y ddyfais hon.",
       "status": {
         "paid": "Wedi'i thalu",
-        "open": "Agor",
+        "open": "Ar agor",
         "void": "Wedi'i dirymu",
         "uncollectible": "Anghasgladwy"
       },

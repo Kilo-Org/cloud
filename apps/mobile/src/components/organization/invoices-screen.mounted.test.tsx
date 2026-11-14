@@ -94,7 +94,7 @@ vi.mock('sonner-native', () => ({
 
 vi.mock('@/lib/format', () => ({
   formatDate: String,
-  formatMoneyFromCents: (amount: number) => `$${amount / 100}`,
+  formatPrefixedMoney: (amount: number) => `$${amount}`,
 }));
 
 vi.mock('@/lib/utils', () => ({

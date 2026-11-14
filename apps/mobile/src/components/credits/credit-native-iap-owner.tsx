@@ -31,6 +31,8 @@ import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
 import { withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import {
   createStoreCreditPurchaseActions,
+  type CreditPurchaseFailure,
+  creditStoreTimeoutKey,
   getPurchaseCompletionId,
   getStoreCreditPurchaseErrorMessageKey,
   isRecoverableCreditPurchase,
@@ -38,6 +40,8 @@ import {
   isStoreNotReadyError,
   showDedupedPurchaseError,
 } from '@/lib/credits/use-store-credit-purchase';
+import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { type SurfaceAttempt } from '@/lib/surface-feedback';
 import { useTRPC } from '@/lib/trpc';
 
 function toCreditProductListing(product: ProductOrSubscription): StoreCreditProductListing | null {
@@ -104,15 +108,19 @@ export function useCreditNativeIap(): CreditNativeIapContextValue {
   return context;
 }
 
+/** The store key a recovery pass's own refusal uses; it names no product request. */
+const RECOVERY_ERROR_KEY = 'store';
+
 /**
- * The purchase request this owner is waiting on.
- *
- * `generation` advances with every started request, so a callback or finalizer
- * that outlives the request it belongs to releases only that one: an unrelated
- * store delivery, or a completion that resolves late, must not clear a newer
- * request that started while it was in flight.
+ * The purchase request this owner is waiting on, as a record rather than a
+ * lookup: the store SDK delivers outcomes through listeners, not through the
+ * request promise, so an attempt found by product id after a timeout could
+ * belong to a newer request. The record is the only thing a delivery settles.
  */
-type ActivePurchaseRequest = { productId: string; generation: number };
+type PurchaseRequestRecord = {
+  readonly productId: string;
+  readonly attempt: SurfaceAttempt<CreditPurchaseFailure>;
+};
 
 /**
  * The one in-flight already-owned recovery, scoped to the auth epoch that
@@ -134,17 +142,36 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // from. Read from the shared helper so the owner, the screen and the catalog
   // hook can never pick two different storefronts.
   const storefront = getCreditStorefront();
-  const [completingProductId, setCompletingProductId] = useState<string | null>(null);
-  const [errorMessageKey, setErrorMessageKey] = useState<string | null>(null);
-  const [completedPurchaseCount, setCompletedPurchaseCount] = useState(0);
+  // The purchase phase, keyed by store product id: a row is busy while its own
+  // request is pending, and the screen renders a failed entry's key.
+  const purchases = useKeyedSurfaceFeedback<string, CreditPurchaseFailure>();
+  const beginPurchase = purchases.begin;
+  const completingProductId = purchases.snapshot.pendingKeys[0] ?? null;
+  // The screen renders one error line, so the owner reads the failed entry (an
+  // absent key reads idle). A pending entry can never be disturbed by this.
+  const failedPhase = [...purchases.snapshot.states.values()].find(
+    phase => phase.status === 'failed'
+  );
+  const errorMessageKey =
+    failedPhase !== undefined && failedPhase.status === 'failed'
+      ? failedPhase.failure.messageKey
+      : null;
   const clearError = useCallback(() => {
-    setErrorMessageKey(null);
-  }, []);
+    for (const [key, phase] of purchases.snapshot.states) {
+      if (phase.status === 'failed') {
+        purchases.clearWhere(key, () => true);
+      }
+    }
+    // `snapshot.states` and `clearWhere` keep their identity until the store
+    // changes, which is what makes this safe as a dependency.
+  }, [purchases.clearWhere, purchases.snapshot.states]);
+  const [completedPurchaseCount, setCompletedPurchaseCount] = useState(0);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
   const inFlightOwnedRecoveryRef = useRef<InFlightOwnedRecovery | null>(null);
-  const activePurchaseRequestRef = useRef<ActivePurchaseRequest | null>(null);
-  const purchaseRequestGenerationRef = useRef(0);
+  const pendingPurchaseRef = useRef<PurchaseRequestRecord | null>(null);
+  // Products whose request timed out: a new charge waits for reconciliation.
+  const unreconciledProductIdsRef = useRef(new Set<string>());
   // The auth epoch this owner belongs to. Sign-out/sign-in bumps it and this
   // screen unmounts, but a store delivery or completion already in flight keeps
   // running; `isAccountCurrent` reports whether this instance is still the
@@ -174,22 +201,23 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     [serverProductsQuery.data]
   );
 
-  const releasePurchaseRequest = useCallback((generation: number) => {
-    if (activePurchaseRequestRef.current?.generation !== generation) {
-      // A newer request owns the slot (or none does). A callback or finalizer
-      // that outlived its request must never clear one it did not start.
-      return;
-    }
-    activePurchaseRequestRef.current = null;
-    setCompletingProductId(null);
+  // Reserved key for a failure that belongs to no product request (a recovery
+  // pass's refusal): the screen renders one line, so it takes one slot.
+  const toastPurchaseError = useCallback((key: string) => {
+    // Translating an existing key, not authoring copy: the screen owns the
+    // inline message and translates a failed entry's key itself.
+    showDedupedPurchaseError(i18n.t(key));
   }, []);
 
-  const showError = useCallback((key: string) => {
-    // Translating an existing key, not authoring copy: the screen owns the
-    // inline message and translates `errorMessageKey` itself.
-    showDedupedPurchaseError(i18n.t(key));
-    setErrorMessageKey(key);
-  }, []);
+  const showError = useCallback(
+    (key: string) => {
+      toastPurchaseError(key);
+      // A refusal that is not one product request's failure (a recovery pass
+      // refuses a receipt) still reaches the screen's one line.
+      beginPurchase(RECOVERY_ERROR_KEY)?.fail({ kind: 'purchase-refused', messageKey: key });
+    },
+    [beginPurchase, toastPurchaseError]
+  );
 
   const invalidateAfterCompletion = useCallback(async () => {
     await Promise.all([
@@ -210,21 +238,19 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     requestPurchase,
   } = useIAP({
     onPurchaseError: error => {
-      // A store error with no purchase in flight is the store failing to answer,
-      // not a purchase the user started: the screen's store-unavailable banner
-      // already reports that state, so a second "purchase failed" affordance
-      // beside it would contradict the banner. Only a request this owner started
-      // may surface as a purchase failure.
-      const request = activePurchaseRequestRef.current;
-      if (request === null) {
+      // A store error with no request this owner started is the store failing
+      // to answer, not a purchase the user began: the screen's store-unavailable
+      // banner already reports that state, so a second "purchase failed"
+      // affordance beside it would contradict the banner.
+      const record = pendingPurchaseRef.current;
+      if (record === null) {
         return;
       }
-      releasePurchaseRequest(request.generation);
       if (isStoreNotReadyError(error)) {
         // Play dropped its billing client after this owner connected, so every
         // later tap would fail the same way. Restore the connection for the next
-        // tap; the request itself never reached the store, so the generic copy
-        // below is still the truth for this one.
+        // tap; the request itself never reached the store, so the refusal below
+        // is still the truth for this one.
         void (async () => {
           try {
             await reconnectStore();
@@ -241,26 +267,28 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         void recoverOwnedPurchaseRef.current?.();
         return;
       }
-      // A null key means the user cancelled — not a failure.
       const key = getStoreCreditPurchaseErrorMessageKey(error, storefront);
-      if (key) {
-        showError(key);
+      if (key === null) {
+        // A user cancel or a Play pending payment: no outcome to publish, so the
+        // row goes idle rather than inventing a failure.
+        pendingPurchaseRef.current = null;
+        record.attempt.abandon();
+        return;
       }
+      pendingPurchaseRef.current = null;
+      showError(key);
+      record.attempt.fail({ kind: 'purchase-refused', messageKey: key });
     },
     onPurchaseSuccess: purchase => {
-      const request = activePurchaseRequestRef.current;
-      if (request === null || request.productId !== purchase.productId) {
-        // The store answered the in-flight request with another product's
-        // transaction, or re-delivered an unfinished one (possibly after
-        // `onPurchaseError` cleared the request). The recovery effect runs only
-        // when the store connects, so a transaction delivered mid-session must
-        // be completed here. It is not this owner's request, so completing it
-        // must not release the request that is still in flight.
+      const record = pendingPurchaseRef.current;
+      if (record === null || record.productId !== purchase.productId) {
+        // The store answered with a delivery this owner did not request (or
+        // requested before a timeout). Its transaction belongs to recovery:
+        // completing it grants the credits and touches no request.
         void completeStorePurchaseInSession(purchase);
         return;
       }
 
-      const generation = request.generation;
       void (async () => {
         try {
           const completed = await actions.handlePurchaseSuccess(purchase);
@@ -270,11 +298,16 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             // completed, so the re-delivery path skips it instead of completing
             // and announcing the same purchase twice.
             recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
+            unreconciledProductIdsRef.current.delete(record.productId);
           }
         } finally {
-          // Release only the request this delivery owns: a completion that
-          // resolves after an error released it must not clear a newer request.
-          releasePurchaseRequest(generation);
+          if (pendingPurchaseRef.current === record) {
+            pendingPurchaseRef.current = null;
+          }
+          // Single-use: `false` (and nothing published) when the deadline
+          // already settled this attempt, when a newer purchase superseded it,
+          // or when the owner unmounted.
+          record.attempt.succeed();
         }
       })();
     },
@@ -293,7 +326,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
-          setErrorMessageKey(null);
+          clearError();
           setCompletedPurchaseCount(count => count + 1);
         },
         recoverOwnedPurchase: async () => (await recoverOwnedPurchaseRef.current?.()) ?? false,
@@ -346,6 +379,9 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         });
         if (completed) {
           recoveredPurchaseIdsRef.current.add(id);
+          // A delivery that lands before the person taps again resolves the
+          // timed-out intent itself, so a same-pack retry need not reconcile.
+          unreconciledProductIdsRef.current.delete(purchase.productId);
         }
       } finally {
         recoveryInFlightPurchaseIdsRef.current.delete(id);
@@ -458,35 +494,95 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     recoverOwnedPurchaseRef.current = recoverOwnedCreditPurchase;
   }, [recoverOwnedCreditPurchase]);
 
-  const startPurchase = useCallback(
-    async (pack: StoreCreditProduct): Promise<boolean> => {
-      if (activePurchaseRequestRef.current || completingProductId) {
+  // Completes whatever the store still holds for a request that timed out. The
+  // SDK has no cancellation, so the charge may land after the row was released;
+  // buying the same pack again must finish that intent instead of charging
+  // twice. Bounded like every other store read in this flow.
+  const reconcilePurchaseIntent = useCallback(
+    async (productId: string): Promise<boolean> => {
+      try {
+        const pending = await withStoreDeadline(
+          fetchPendingStorePurchases(storefront),
+          'the pending purchase lookup'
+        );
+        for (const purchase of pending.filter(candidate =>
+          isRecoverableCreditPurchase(
+            candidate,
+            creditPackAppleProductIds,
+            creditPackGoogleProductIds
+          )
+        )) {
+          await completeStorePurchaseInSession(purchase);
+        }
+        unreconciledProductIdsRef.current.delete(productId);
+        return true;
+      } catch {
+        // The store cannot answer, so this pack may not be charged again: the
+        // copy says the store did not respond.
         return false;
       }
+    },
+    [completeStorePurchaseInSession, creditPackAppleProductIds, creditPackGoogleProductIds, storefront]
+  );
+
+  const startPurchase = useCallback(
+    async (pack: StoreCreditProduct): Promise<boolean> => {
       const storeProductId = pack.storeProductId;
       if (!storeProductId || !appAccountToken) {
         return false;
       }
-
-      // Capture the generation before any await: every finalizer below releases
-      // exactly this request, never a newer one that started in the meantime.
-      const generation = purchaseRequestGenerationRef.current + 1;
-      purchaseRequestGenerationRef.current = generation;
-      activePurchaseRequestRef.current = { productId: storeProductId, generation };
-      setCompletingProductId(storeProductId);
-      setErrorMessageKey(null);
-      try {
-        const requestStarted = await actions.purchase(pack);
-        if (!requestStarted) {
-          releasePurchaseRequest(generation);
-        }
-        return requestStarted;
-      } catch (error) {
-        releasePurchaseRequest(generation);
-        throw error;
+      if (pendingPurchaseRef.current !== null) {
+        // One purchase at a time: the store delivers an outcome, not a promise,
+        // so two open requests could not be told apart.
+        return false;
       }
+      if (unreconciledProductIdsRef.current.has(storeProductId)) {
+        // This pack's earlier request timed out and the SDK cannot cancel it, so
+        // the charge may already be at the store. Complete whatever the store
+        // still holds for it before letting a second charge start; the earlier
+        // one is finished, not bought again.
+        const reconciled = await reconcilePurchaseIntent(storeProductId);
+        if (!reconciled) {
+          toastPurchaseError(creditStoreTimeoutKey(storefront));
+        }
+        return false;
+      }
+
+      const attempt = beginPurchase(storeProductId);
+      if (attempt === null) {
+        return false;
+      }
+      const record = { productId: storeProductId, attempt };
+      pendingPurchaseRef.current = record;
+      clearError();
+      const outcome = await actions.purchase(pack);
+      if (outcome.started) {
+        return true;
+      }
+      if (pendingPurchaseRef.current === record) {
+        pendingPurchaseRef.current = null;
+      }
+      if (outcome.failure === null) {
+        // A store-side cancel or a Play pending payment: no outcome to publish,
+        // so the attempt leaves the phase idle instead of inventing a failure.
+        attempt.abandon();
+        return false;
+      }
+      if (outcome.failure.kind === 'store-timeout') {
+        unreconciledProductIdsRef.current.add(storeProductId);
+      }
+      toastPurchaseError(outcome.failure.messageKey);
+      attempt.fail(outcome.failure);
+      return false;
     },
-    [actions, appAccountToken, completingProductId, releasePurchaseRequest]
+    [
+      actions,
+      appAccountToken,
+      beginPurchase,
+      clearError,
+      reconcilePurchaseIntent,
+      toastPurchaseError,
+    ]
   );
 
   // Recover the purchases the store already charged but the backend has not

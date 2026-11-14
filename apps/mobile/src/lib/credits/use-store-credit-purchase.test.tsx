@@ -167,9 +167,7 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
     const requestPurchase = vi.fn().mockResolvedValue(null);
     const actions = createActions({ requestPurchase });
 
-    const started = await actions.purchase(creditPack);
-
-    expect(started).toBe(true);
+    expect(await actions.purchase(creditPack)).toEqual({ started: true });
     expect(requestPurchase).toHaveBeenCalledWith({
       request: {
         apple: { appAccountToken: APP_ACCOUNT_TOKEN, sku: APPLE_PRODUCT_ID },
@@ -182,9 +180,9 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
     const requestPurchase = vi.fn().mockResolvedValue(null);
     const actions = createActions({ storefront: 'play', requestPurchase });
 
-    const started = await actions.purchase({ ...creditPack, storeProductId: GOOGLE_PRODUCT_ID });
-
-    expect(started).toBe(true);
+    expect(await actions.purchase({ ...creditPack, storeProductId: GOOGLE_PRODUCT_ID })).toEqual({
+      started: true,
+    });
     expect(requestPurchase).toHaveBeenCalledWith({
       request: {
         google: {
@@ -200,11 +198,14 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
     const requestPurchase = vi.fn();
     const actions = createActions({ requestPurchase });
 
-    expect(await actions.purchase({ ...creditPack, storeProductId: null })).toBe(false);
+    expect(await actions.purchase({ ...creditPack, storeProductId: null })).toEqual({
+      started: false,
+      failure: null,
+    });
     expect(requestPurchase).not.toHaveBeenCalled();
   });
 
-  it('does not show an error when the user cancels the store sheet', async () => {
+  it('reports a user cancel as no outcome rather than a failure', async () => {
     const showError = vi.fn();
     const actions = createActions({
       requestPurchase: vi.fn().mockRejectedValue({
@@ -216,8 +217,48 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
       },
     });
 
-    expect(await actions.purchase(creditPack)).toBe(false);
+    // A cancel is not a failure: the owner leaves the row idle instead of
+    // inventing copy for a purchase the person chose not to make.
+    expect(await actions.purchase(creditPack)).toEqual({ started: false, failure: null });
     expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('returns the store-timeout failure with the storefront’s own copy key', async () => {
+    vi.useFakeTimers();
+    try {
+      const actions = createActions({
+        // A store call that never settles is what the deadline bounds.
+        requestPurchase: vi.fn(() => new Promise(() => undefined)),
+      });
+      const pending = actions.purchase(creditPack);
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      expect(await pending).toEqual({
+        started: false,
+        failure: { kind: 'store-timeout', messageKey: 'credits.storeTimedOut' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns the Play timeout copy on the Play storefront', async () => {
+    vi.useFakeTimers();
+    try {
+      const actions = createActions({
+        storefront: 'play',
+        requestPurchase: vi.fn(() => new Promise(() => undefined)),
+      });
+      const pending = actions.purchase({ ...creditPack, storeProductId: GOOGLE_PRODUCT_ID });
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      expect(await pending).toEqual({
+        started: false,
+        failure: { kind: 'store-timeout', messageKey: 'credits.storeTimedOutPlay' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('recovers the outstanding transaction when the store says the pack is already owned', async () => {
@@ -234,7 +275,7 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
       },
     });
 
-    expect(await actions.purchase(creditPack)).toBe(false);
+    expect(await actions.purchase(creditPack)).toEqual({ started: false, failure: null });
     expect(recoverOwnedPurchase).toHaveBeenCalledTimes(1);
     // The recovery completed the purchase, so no failure is reported — and never
     // the different-account copy for a purchase the same user already made.
@@ -254,8 +295,12 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
       },
     });
 
-    expect(await actions.purchase(creditPack)).toBe(false);
-    expect(showError).toHaveBeenCalledWith(CREDIT_PURCHASE_FAILED_KEY);
+    expect(await actions.purchase(creditPack)).toEqual({
+      started: false,
+      failure: { kind: 'purchase-refused', messageKey: CREDIT_PURCHASE_FAILED_KEY },
+    });
+    // The owner is the one place that toasts and publishes.
+    expect(showError).not.toHaveBeenCalled();
   });
 });
 

@@ -1,10 +1,12 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
 import { z } from 'zod';
-import {
-  CloudAgentAuthoritySchema,
-  validateCloudAgentAuthorityClaims,
-} from './cloud-agent-authority';
+import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
+import {
+  assertKiloTokenAuthorityClaims,
+  assertKiloTokenIssuedAt,
+  verifyKiloTokenSignature,
+} from './kilo-token-verification.js';
 
 export const KILO_TOKEN_VERSION = 3;
 const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
@@ -127,8 +129,7 @@ export async function verifyKiloToken(
   secret: string,
   options?: { audience?: string }
 ): Promise<KiloTokenPayload> {
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-    algorithms: ['HS256'],
+  const { payload } = await verifyKiloTokenSignature(token, secret, {
     audience: options?.audience,
   });
   if (options?.audience === undefined && payload.aud !== undefined) {
@@ -136,10 +137,8 @@ export async function verifyKiloToken(
   }
 
   if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
-    validateCloudAgentAuthorityClaims(payload);
-    if (typeof payload.iat !== 'number' || payload.iat > Math.floor(Date.now() / 1000)) {
-      throw new Error('Token issued in the future');
-    }
+    assertKiloTokenAuthorityClaims(payload);
+    assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
 
   return kiloTokenPayload.parse(payload);

@@ -33,7 +33,9 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
     }
     const title = textRef.current.trim();
     if (title.length === 0) {
-      attempt.fail({ kind: 'add-failed', message: t('todos.list.addFailed') });
+      // Done on an empty field is not an attempt: nothing failed, so the line
+      // stays silent instead of claiming a connection error.
+      attempt.abandon();
       return;
     }
     try {

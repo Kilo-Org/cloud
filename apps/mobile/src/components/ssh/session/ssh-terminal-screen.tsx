@@ -43,14 +43,14 @@ import {
 } from '@/lib/ssh/routes';
 import { type SshSnippet } from '@/lib/ssh/snippets';
 
-type SshTerminalScreenProps = Readonly<{ sessionId: string }>;
+type SshTerminalScreenProps = Readonly<{ sessionId: string; initialKeyBarEditor?: boolean }>;
 
 /**
  * One shell: the native terminal, the key bar under it, and the strip that
  * says why it is not live. The session itself outlives this screen, so every
  * decision goes through the session manager rather than local state.
  */
-export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
+export function SshTerminalScreen({ sessionId, initialKeyBarEditor }: SshTerminalScreenProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
@@ -211,6 +211,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
           {!surface?.terminal ? null : (
             <TerminalKeyBar
               disabled={!inputReady}
+              initialEditing={initialKeyBarEditor}
               onSend={text => {
                 void sendToShell(terminalRef.current, text);
               }}

@@ -264,6 +264,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // catalog keeps them as the billing pages and the invoices spell them.
   'organization.hub.planTeams',
   'organization.hub.planEnterprise',
+  // The CLI's product name, a title for a device-sessions row. A product name
+  // has nothing to translate, so every catalog keeps the published spelling.
+  'deviceSessions.kiloCli',
 ]);
 
 /**

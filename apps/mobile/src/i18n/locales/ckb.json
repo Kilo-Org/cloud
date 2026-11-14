@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "تا ئەمە بار نەکرێت، سێشنە چالاکەکانت بەردەست نابن.",
     "currentDeviceUnidentified": "نەتوانرا ئامێری ئێستا بناسرێتەوە.",
     "kiloApp": "ئەپی Kilo",
+    "kiloAppAndroid": "ئەپی Kilo · Android",
+    "kiloAppIos": "ئەپی Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "هیچ سێشنێکی چالاک نییە",
     "noSessionsDescription": "لە ئامێرێکی ترەوە بە ئەپی Kilo بچۆ ژوورەوە، تا لێرە دەربکەوێت.",
-    "onlyKiloAppSignIns": "تەنها چوونەژوورەوەکانی ئەپی Kilo لێرە دەردەکەون. چوونەژوورەوەکانی دەستکاریکەری کۆد و CLI لە لیستەکەدا نین.",
     "signedIn": "چوونەژوورەوە: {{signedIn}} · دوایین بینین: {{lastSeen}}",
+    "signInScopeNote": "چوونەژوورەوەکانی ئەپی Kilo و Kilo CLI لێرە دەردەکەون. چوونەژوورەوەکانی دەستکاریکەری کۆد لە لیستەکەدا نین.",
     "thisDevice": "ئەم ئامێرە",
     "webBrowser": "وێبگەڕ",
     "viewProfile": "بینینی پڕۆفایل",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "دەرچوون لە سێشنەکە تەواو بوو.",
     "signOutThisDeviceTitle": "دەرچوون لەم ئامێرە؟",
     "signOutThisSessionTitle": "دەرچوون لەم سێشنە؟",
-    "signOutThisSessionMessage": "{{device}} لە هەژمارەکە دەردەچێت. دەستگەیشتنی بە API دەتوانێت تا یەک کاتژمێر بەردەوام بێت.",
+    "signOutThisSessionMessage": "{{device}} لە هەژمارەکە دەردەچێت. دوایین بینین: {{lastSeen}}. دەستگەیشتنی بە API دەتوانێت تا یەک کاتژمێر بەردەوام بێت.",
     "unknownDevice": "ئامێری نەناسراو"
   },
   "forceUpdate": {

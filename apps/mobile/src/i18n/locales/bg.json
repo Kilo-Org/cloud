@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "Активните ти сесии ще са достъпни след зареждането на данните.",
     "currentDeviceUnidentified": "Не успяхме да разпознаем текущото устройство.",
     "kiloApp": "Приложение Kilo",
+    "kiloAppAndroid": "Приложение Kilo · Android",
+    "kiloAppIos": "Приложение Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Няма активни сесии",
     "noSessionsDescription": "Влез в приложението Kilo на друго устройство и то ще се появи тук.",
-    "onlyKiloAppSignIns": "Тук се показват само влизанията в приложението Kilo. Влизанията през редактора и CLI не са включени.",
     "signedIn": "Влизане: {{signedIn}} · Последна активност: {{lastSeen}}",
+    "signInScopeNote": "Тук се показват влизанията в приложението Kilo и в Kilo CLI. Влизанията през редактора не са включени.",
     "thisDevice": "Това устройство",
     "webBrowser": "Уеб браузър",
     "viewProfile": "Прегледай профила",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "Сесията е прекратена.",
     "signOutThisDeviceTitle": "Да се излезе ли от акаунта на това устройство?",
     "signOutThisSessionTitle": "Да се прекрати ли тази сесия?",
-    "signOutThisSessionMessage": "Сесията на {{device}} ще бъде прекратена. Устройството може да запази достъп до API до един час.",
+    "signOutThisSessionMessage": "Сесията на {{device}} ще бъде прекратена. Последна активност: {{lastSeen}}. Устройството може да запази достъп до API до един час.",
     "unknownDevice": "Неизвестно устройство"
   },
   "forceUpdate": {

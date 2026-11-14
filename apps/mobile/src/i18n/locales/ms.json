@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "Sesi aktif anda tidak dapat dipaparkan sehingga data ini selesai dimuatkan.",
     "currentDeviceUnidentified": "Peranti semasa tidak dapat dikenal pasti.",
     "kiloApp": "Apl Kilo",
+    "kiloAppAndroid": "Apl Kilo · Android",
+    "kiloAppIos": "Apl Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Tiada sesi aktif",
     "noSessionsDescription": "Log masuk dengan apl Kilo pada peranti lain dan ia akan muncul di sini.",
-    "onlyKiloAppSignIns": "Hanya sesi log masuk apl Kilo dipaparkan di sini. Sesi log masuk penyunting dan CLI tidak disenaraikan.",
     "signedIn": "Log masuk {{signedIn}} · Terakhir dilihat {{lastSeen}}",
+    "signInScopeNote": "Sesi log masuk daripada apl Kilo dan Kilo CLI dipaparkan di sini. Sesi log masuk penyunting tidak disenaraikan.",
     "thisDevice": "Peranti ini",
     "viewProfile": "Lihat profil",
     "webBrowser": "Pelayar web",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "Sesi dilog keluar.",
     "signOutThisDeviceTitle": "Log keluar daripada peranti ini?",
     "signOutThisSessionTitle": "Log keluar daripada sesi ini?",
-    "signOutThisSessionMessage": "{{device}} akan dilog keluar. Ia boleh mengekalkan akses API sehingga satu jam.",
+    "signOutThisSessionMessage": "{{device}} akan dilog keluar. Terakhir dilihat {{lastSeen}}. Ia boleh mengekalkan akses API sehingga satu jam.",
     "unknownDevice": "Peranti tidak diketahui"
   },
   "forceUpdate": {

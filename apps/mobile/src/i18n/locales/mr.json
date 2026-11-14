@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "हे लोड होईपर्यंत तुमची सक्रिय सत्रे अनुपलब्ध आहेत.",
     "currentDeviceUnidentified": "सध्याचे डिव्हाइस ओळखता आले नाही.",
     "kiloApp": "Kilo अ‍ॅप",
+    "kiloAppAndroid": "Kilo अ‍ॅप · Android",
+    "kiloAppIos": "Kilo अ‍ॅप · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "सक्रिय सत्रे नाहीत",
     "noSessionsDescription": "दुसऱ्या डिव्हाइसवरील Kilo अ‍ॅपमध्ये साइन इन करा. ते सत्र येथे दिसेल.",
-    "onlyKiloAppSignIns": "येथे फक्त Kilo अ‍ॅपमधील साइन इनची सत्रे दिसतात. एडिटर आणि CLI मधील सत्रे या यादीत नाहीत.",
     "signedIn": "साइन इन: {{signedIn}} · शेवटचे सक्रिय: {{lastSeen}}",
+    "signInScopeNote": "Kilo अ‍ॅप आणि Kilo CLI मधील साइन इन सत्रे येथे दिसतात. एडिटरमधील सत्रे या यादीत नाहीत.",
     "thisDevice": "हे डिव्हाइस",
     "viewProfile": "प्रोफाइल पहा",
     "webBrowser": "वेब ब्राउझर",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "सत्र साइन आउट झाले.",
     "signOutThisDeviceTitle": "या डिव्हाइसवरून साइन आउट करायचे?",
     "signOutThisSessionTitle": "या सत्रातून साइन आउट करायचे?",
-    "signOutThisSessionMessage": "{{device}} वरून साइन आउट केले जाईल. मात्र, त्याचा API प्रवेश आणखी एक तासापर्यंत चालू राहू शकतो.",
+    "signOutThisSessionMessage": "{{device}} वरून साइन आउट केले जाईल. शेवटचे सक्रिय: {{lastSeen}}. मात्र, त्याचा API प्रवेश आणखी एक तासापर्यंत चालू राहू शकतो.",
     "unknownDevice": "अज्ञात डिव्हाइस"
   },
   "forceUpdate": {

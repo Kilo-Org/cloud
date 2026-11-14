@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "Àwọn ìgbà ìwọlé rẹ tó ń ṣiṣẹ́ kò ní wà lárọ̀ọ́wọ́tó títí a ó fi gbé èyí wọlé.",
     "currentDeviceUnidentified": "A kò lè dá ẹ̀rọ lọ́wọ́lọ́wọ́ mọ̀.",
     "kiloApp": "Ohun èlò Kilo",
+    "kiloAppAndroid": "Ohun èlò Kilo · Android",
+    "kiloAppIos": "Ohun èlò Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Kò sí ìgbà ìwọlé tó ń ṣiṣẹ́",
     "noSessionsDescription": "Wọlé pẹ̀lú ohun èlò Kilo lórí ẹ̀rọ mìíràn, ẹ̀rọ náà yóò sì hàn níbí.",
-    "onlyKiloAppSignIns": "Àwọn ìwọlé ohun èlò Kilo nìkan ló hàn níbí. Àwọn ìwọlé olóòtú kóòdù àti CLI kò sí nínú àkójọ yìí.",
     "signedIn": "Wọlé {{signedIn}} · A rí i gbẹ̀yìn {{lastSeen}}",
+    "signInScopeNote": "Àwọn ìwọlé láti ohun èlò Kilo àti Kilo CLI ló hàn níbí. Àwọn ìwọlé olóòtú kóòdù kò sí nínú àkójọ yìí.",
     "thisDevice": "Ẹ̀rọ yìí",
     "webBrowser": "Aṣàwákiri ayélujára",
     "viewProfile": "Wo prófáìlì",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "A ti jáde kúrò nínú ìgbà ìwọlé náà.",
     "signOutThisDeviceTitle": "Jáde lórí ẹ̀rọ yìí?",
     "signOutThisSessionTitle": "Jáde kúrò nínú ìgbà ìwọlé yìí?",
-    "signOutThisSessionMessage": "A ó mú {{device}} jáde. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan.",
+    "signOutThisSessionMessage": "A ó mú {{device}} jáde. A rí i gbẹ̀yìn {{lastSeen}}. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan.",
     "unknownDevice": "Ẹ̀rọ àìmọ̀"
   },
   "forceUpdate": {

@@ -2961,10 +2961,13 @@
     "couldNotLoadDescription": "Tavas aktīvās sesijas būs pieejamas pēc datu ielādes.",
     "currentDeviceUnidentified": "Neizdevās identificēt pašreizējo ierīci.",
     "kiloApp": "Kilo lietotne",
+    "kiloAppAndroid": "Kilo lietotne · Android",
+    "kiloAppIos": "Kilo lietotne · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
-    "onlyKiloAppSignIns": "Šeit ir redzamas tikai Kilo lietotnes sesijas. Redaktora un CLI sesijas nav iekļautas.",
     "signedIn": "Pierakstīšanās: {{signedIn}} · Pēdējā aktivitāte: {{lastSeen}}",
+    "signInScopeNote": "Šeit ir redzamas Kilo lietotnes un Kilo CLI sesijas. Redaktora sesijas nav iekļautas.",
     "thisDevice": "Šī ierīce",
     "viewProfile": "Skatīt profilu",
     "webBrowser": "Tīmekļa pārlūks",
@@ -2973,7 +2976,7 @@
     "sessionSignedOut": "Sesija ir beigta.",
     "signOutThisDeviceTitle": "Izrakstīties šajā ierīcē?",
     "signOutThisSessionTitle": "Beigt šo sesiju?",
-    "signOutThisSessionMessage": "Ierīcē „{{device}}” tiks veikta izrakstīšanās. Tai vēl līdz stundai var saglabāties piekļuve API.",
+    "signOutThisSessionMessage": "Tiks veikta izrakstīšanās no „{{device}}”. Pēdējā aktivitāte: {{lastSeen}}. Piekļuve API tai vēl līdz stundai var saglabāties.",
     "unknownDevice": "Nezināma ierīce"
   },
   "forceUpdate": {

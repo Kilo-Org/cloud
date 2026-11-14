@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "Məlumatlar yüklənənədək aktiv sessiyaların əlçatan deyil.",
     "currentDeviceUnidentified": "Cari cihazı müəyyən etmək mümkün olmadı.",
     "kiloApp": "Kilo tətbiqi",
+    "kiloAppAndroid": "Kilo tətbiqi · Android",
+    "kiloAppIos": "Kilo tətbiqi · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Aktiv sessiya yoxdur",
     "noSessionsDescription": "Başqa cihazda Kilo tətbiqində hesabına daxil ol. Həmin cihaz burada görünəcək.",
-    "onlyKiloAppSignIns": "Burada yalnız Kilo tətbiqində açılan sessiyalar görünür. Redaktor və CLI sessiyaları siyahıda göstərilmir.",
     "signedIn": "Giriş: {{signedIn}} · Son fəaliyyət: {{lastSeen}}",
+    "signInScopeNote": "Burada Kilo tətbiqində və Kilo CLI-də açılan sessiyalar görünür. Redaktor sessiyaları siyahıda göstərilmir.",
     "thisDevice": "Bu cihaz",
     "webBrowser": "Veb brauzer",
     "viewProfile": "Profilə bax",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "Sessiyadan çıxıldı.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
-    "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Cihazın API-yə girişi bir saata qədər davam edə bilər.",
+    "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Son fəaliyyət: {{lastSeen}}. Cihazın API-yə girişi bir saata qədər davam edə bilər.",
     "unknownDevice": "Naməlum cihaz"
   },
   "forceUpdate": {

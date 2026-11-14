@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "এটি লোড না হওয়া পর্যন্ত আপনার সক্রিয় সেশনগুলো দেখা যাবে না।",
     "currentDeviceUnidentified": "বর্তমান ডিভাইস শনাক্ত করা যায়নি।",
     "kiloApp": "Kilo অ্যাপ",
+    "kiloAppAndroid": "Kilo অ্যাপ · Android",
+    "kiloAppIos": "Kilo অ্যাপ · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "কোনো সক্রিয় সেশন নেই",
     "noSessionsDescription": "অন্য ডিভাইসে Kilo অ্যাপ দিয়ে সাইন ইন করলে সেটি এখানে দেখা যাবে।",
-    "onlyKiloAppSignIns": "এখানে শুধু Kilo অ্যাপ দিয়ে সাইন ইন করা সেশনগুলো দেখা যায়। এডিটর ও CLI দিয়ে সাইন ইন করা সেশনগুলো এই তালিকায় থাকে না।",
     "signedIn": "সাইন ইন {{signedIn}} · সর্বশেষ দেখা {{lastSeen}}",
+    "signInScopeNote": "এখানে Kilo অ্যাপ ও Kilo CLI দিয়ে সাইন ইন করা সেশনগুলো দেখা যায়। এডিটর দিয়ে সাইন ইন করা সেশনগুলো এই তালিকায় থাকে না।",
     "thisDevice": "এই ডিভাইস",
     "webBrowser": "ওয়েব ব্রাউজার",
     "viewProfile": "প্রোফাইল দেখুন",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "সেশন সাইন আউট হয়েছে।",
     "signOutThisDeviceTitle": "এই ডিভাইস থেকে সাইন আউট করবেন?",
     "signOutThisSessionTitle": "এই সেশন থেকে সাইন আউট করবেন?",
-    "signOutThisSessionMessage": "{{device}} থেকে সাইন আউট করা হবে। এরপরও ডিভাইসটি সর্বোচ্চ এক ঘণ্টা API অ্যাক্সেস করতে পারবে।",
+    "signOutThisSessionMessage": "{{device}} থেকে সাইন আউট করা হবে। সর্বশেষ দেখা {{lastSeen}}। এরপরও ডিভাইসটি সর্বোচ্চ এক ঘণ্টা API অ্যাক্সেস করতে পারবে।",
     "unknownDevice": "অজানা ডিভাইস"
   },
   "forceUpdate": {

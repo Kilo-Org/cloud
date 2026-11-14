@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { SECURITY_COMMAND_TYPES } from '@kilocode/app-shared/security-agent';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
@@ -34,6 +34,7 @@ import {
   SESSION_CREATED_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   SESSION_VIEWED_EVENT,
+  SSH_AUTH_METHODS,
   SSH_CONNECT_FAILED_EVENT,
   SSH_CONNECT_SUCCEEDED_EVENT,
   SSH_EXPORT_EVENT,
@@ -48,6 +49,7 @@ import {
   SSH_SFTP_TRANSFER_EVENT,
   TERMINAL_PHASE_EVENTS,
   analyticsCarveOutKeys,
+  deriveDenyListCarveOuts,
   type AcceptedPhaseEventName,
   type TerminalOutcomeEventName,
 } from './event-map';
@@ -575,6 +577,26 @@ describe('privacy deny-list', () => {
     for (const name of [SESSION_VIEWED_EVENT, SSH_RECONNECT_EVENT, APP_STARTUP_EVENT]) {
       expect(analyticsCarveOutKeys(name).size).toBe(0);
     }
+  });
+
+  it('carves out a denied key only when its schema is a closed enum', () => {
+    const open = 'ssh_connect_open_text';
+    const carveOuts = deriveDenyListCarveOuts({
+      [SSH_CONNECT_SUCCEEDED_EVENT]: z
+        .object({
+          category: z.enum(SSH_FAILURE_CATEGORIES),
+          authMethod: z.enum(SSH_AUTH_METHODS),
+        })
+        .strict(),
+      [open]: z.object({ authMethod: z.string() }).strict(),
+    });
+
+    expect([...carveOuts.keys()]).toEqual([SSH_CONNECT_SUCCEEDED_EVENT]);
+    expect([...(carveOuts.get(SSH_CONNECT_SUCCEEDED_EVENT) ?? [])]).toEqual(['auth_method']);
+    expect(carveOuts.has(open)).toBe(false);
+
+    const textPayload = { authMethod: 'free text, not an auth method' };
+    expect(redactProhibitedProperties(textPayload, carveOuts.get(open))).toEqual({});
   });
 
   it('walks every schema property key and finds none prohibited beyond its carve-outs', () => {

@@ -420,23 +420,72 @@ export const ANALYTICS_EVENT_SCHEMAS = {
 
 const NO_CARVE_OUTS: ReadonlySet<string> = new Set();
 
+/** The zod definition fields the closed-enum check reads, matching the probe
+ *  `event-map.test.ts` uses. */
+type ZodDefProbe = {
+  type?: string;
+  shape?: Record<string, z.ZodType>;
+  innerType?: z.ZodType;
+  options?: readonly z.ZodType[];
+};
+
+/** Reads a schema's definition. Zod exposes no public accessor for it, so the
+ *  cast is the only way to inspect the field kinds this module classifies. */
+function defOf(schema: z.ZodType): ZodDefProbe {
+  return (schema as unknown as { _def: ZodDefProbe })._def;
+}
+
+/** Whether `schema` accepts only a fixed set of literal values, so a payload
+ *  value under that key can never be free text. Optional, nullable, default
+ *  and readonly wrappers are unwrapped; a `z.string()` or any other open
+ *  schema is not a closed enum. */
+function isClosedEnum(schema: z.ZodType): boolean {
+  const def = defOf(schema);
+  switch (def.type) {
+    case 'enum':
+    case 'literal':
+      return true;
+    case 'union':
+      return def.options !== undefined && def.options.length > 0 && def.options.every(isClosedEnum);
+    case 'optional':
+    case 'nullable':
+    case 'default':
+    case 'readonly':
+      return def.innerType !== undefined && isClosedEnum(def.innerType);
+    default:
+      return false;
+  }
+}
+
 /**
- * The deny-list terms an event's own schema declares as a closed enum —
+ * The deny-list terms a schema declares as a closed enum —
  * `auth_method` on the SSH connect events. Keyed by event name so runtime
- * redaction allows them only there: the same key on another event, or on an
- * uncataloged dynamic payload, is still scrubbed.
+ * redaction allows them only there: the same key on another event, on a
+ * free-text property carrying that name, or on an uncataloged dynamic payload
+ * is still scrubbed.
  */
-export const ANALYTICS_DENY_LIST_CARVE_OUTS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
-  Object.entries(ANALYTICS_EVENT_SCHEMAS).flatMap(([name, schema]) => {
-    if (!(schema instanceof z.ZodObject)) {
-      return [];
-    }
-    const carvedOut = Object.keys(schema.shape).filter(key => isProhibitedPropertyKey(key));
-    return carvedOut.length === 0
-      ? []
-      : [[name, new Set(carvedOut.map(normalizePropertyKey))] as const];
-  })
-);
+export function deriveDenyListCarveOuts(
+  schemas: Record<string, z.ZodType>
+): ReadonlyMap<string, ReadonlySet<string>> {
+  return new Map(
+    Object.entries(schemas).flatMap(([name, schema]) => {
+      const { type, shape } = defOf(schema);
+      if (type !== 'object' || !shape) {
+        return [];
+      }
+      const carvedOut = Object.entries(shape)
+        .filter(([key, value]) => isProhibitedPropertyKey(key) && isClosedEnum(value))
+        .map(([key]) => normalizePropertyKey(key));
+      return carvedOut.length === 0 ? [] : [[name, new Set(carvedOut)] as const];
+    })
+  );
+}
+
+/** Deny-list carve-outs of the cataloged events, derived from their schemas. */
+export const ANALYTICS_DENY_LIST_CARVE_OUTS: ReadonlyMap<
+  string,
+  ReadonlySet<string>
+> = deriveDenyListCarveOuts(ANALYTICS_EVENT_SCHEMAS);
 
 /** The deny-list terms `name`'s schema declares, empty for every other event. */
 export function analyticsCarveOutKeys(name: string): ReadonlySet<string> {

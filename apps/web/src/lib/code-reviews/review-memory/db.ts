@@ -1,6 +1,5 @@
 import { createHash } from 'crypto';
 import { and, asc, count, desc, eq, gte, inArray, lt, or, type SQL } from 'drizzle-orm';
-import { TRPCError } from '@trpc/server';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -53,6 +52,14 @@ export class ReviewMemoryProposalConflictError extends Error {
   constructor() {
     super(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_conflict);
     this.name = 'ReviewMemoryProposalConflictError';
+  }
+}
+
+/** Raised for an undecodable cursor; the router maps it to a transport status. */
+export class ReviewMemoryInvalidCursorError extends Error {
+  constructor() {
+    super('Invalid Review Memory proposal cursor.');
+    this.name = 'ReviewMemoryInvalidCursorError';
   }
 }
 
@@ -362,10 +369,7 @@ export async function listProposalsPage(input: {
   if (input.cursor) {
     const cursor = decodeProposalCursor(input.cursor);
     if (!cursor) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Invalid Review Memory proposal cursor.',
-      });
+      throw new ReviewMemoryInvalidCursorError();
     }
     const sameTimestamp = and(
       eq(code_review_memory_proposals.updated_at, cursor.updatedAt),

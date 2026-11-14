@@ -414,6 +414,7 @@
       "title": "Meldebestätigung",
       "description": "Die Bestätigung für deine eingereichte Meldung. Bewahre diese ID auf, um später darauf Bezug zu nehmen.",
       "receiptLabel": "Bestätigung",
+      "copyReceiptId": "Bestätigungs-ID kopieren",
       "appealLabel": "Einspruch",
       "triageReceived": "Eingegangen",
       "triageOpen": "In Prüfung",

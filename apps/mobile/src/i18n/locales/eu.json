@@ -414,6 +414,7 @@
       "title": "Salaketaren agiria",
       "description": "Bidali duzun salaketaren agiria. Gorde ID hau geroago aipatzeko.",
       "receiptLabel": "Agiria",
+      "copyReceiptId": "Kopiatu agiriaren IDa",
       "appealLabel": "Helegitea",
       "triageReceived": "Jasota",
       "triageOpen": "Berrikusten",

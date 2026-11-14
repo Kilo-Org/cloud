@@ -4,7 +4,7 @@ import {
   type EnvironmentBuildLogs,
   type EnvironmentBuildRequestResult,
   type EnvironmentBuildStatus,
-} from '../../../../../services/cloud-agent-next/src/shared/environment-build-status';
+} from '@cloud-agent-shared/environment-build-status';
 import {
   createCloudAgentNextClient,
   rethrowCloudAgentError,

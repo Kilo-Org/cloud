@@ -414,6 +414,7 @@
       "title": "Ontvangsbewys vir verslag",
       "description": "Die ontvangsbewys vir die verslag wat jy ingedien het. Hou hierdie ID om later daarna te verwys.",
       "receiptLabel": "Ontvangsbewys",
+      "copyReceiptId": "Kopieer ontvangsbewys-ID",
       "appealLabel": "Appèl",
       "triageReceived": "Ontvang",
       "triageOpen": "Word hersien",

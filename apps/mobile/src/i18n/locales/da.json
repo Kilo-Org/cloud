@@ -414,6 +414,7 @@
       "title": "Kvittering for anmeldelse",
       "description": "Kvitteringen for den anmeldelse, du har indsendt. Gem dette id, så du kan henvise til det senere.",
       "receiptLabel": "Kvittering",
+      "copyReceiptId": "Kopier kvitterings-id",
       "appealLabel": "Klage",
       "triageReceived": "Modtaget",
       "triageOpen": "Under behandling",

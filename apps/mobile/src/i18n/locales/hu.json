@@ -414,6 +414,7 @@
       "title": "Bejelentés visszaigazolása",
       "description": "Az általad beküldött bejelentés visszaigazolása. Őrizd meg ezt az azonosítót, hogy később hivatkozhass rá.",
       "receiptLabel": "Visszaigazolás",
+      "copyReceiptId": "Visszaigazolás azonosítójának másolása",
       "appealLabel": "Fellebbezés",
       "triageReceived": "Beérkezett",
       "triageOpen": "Felülvizsgálat alatt",

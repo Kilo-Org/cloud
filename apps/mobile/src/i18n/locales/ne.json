@@ -414,6 +414,7 @@
       "title": "रिपोर्टको रसिद",
       "description": "तपाईंले पेश गर्नुभएको रिपोर्टको रसिद। पछि सन्दर्भका लागि यो ID राख्नुहोस्।",
       "receiptLabel": "रसिद",
+      "copyReceiptId": "रसिद ID कपी गर्नुहोस्",
       "appealLabel": "पुनरावेदन",
       "triageReceived": "प्राप्त भयो",
       "triageOpen": "समीक्षामा",

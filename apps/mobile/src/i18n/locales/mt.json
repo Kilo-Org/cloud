@@ -414,6 +414,7 @@
       "title": "Irċevuta tar-rapport",
       "description": "L-irċevuta għar-rapport li bgħatt. Żomm dan l-id biex tirreferi għalih aktar tard.",
       "receiptLabel": "Irċevuta",
+      "copyReceiptId": "Ikkopja l-id tal-irċevuta",
       "appealLabel": "Appell",
       "triageReceived": "Riċevut",
       "triageOpen": "Qed jiġi rieżaminat",

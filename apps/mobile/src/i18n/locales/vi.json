@@ -414,6 +414,7 @@
       "title": "Biên nhận báo cáo",
       "description": "Biên nhận cho báo cáo bạn đã gửi. Hãy lưu lại mã này để tra cứu sau.",
       "receiptLabel": "Biên nhận",
+      "copyReceiptId": "Sao chép mã biên nhận",
       "appealLabel": "Kháng nghị",
       "triageReceived": "Đã tiếp nhận",
       "triageOpen": "Đang xem xét",

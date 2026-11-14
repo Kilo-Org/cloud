@@ -12,11 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  PREVIEW_PORT_MAX,
-  PREVIEW_PORT_MIN,
-} from '../../../../../services/cloud-agent-next/src/shared/preview-port';
-import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
+import { PREVIEW_PORT_MAX, PREVIEW_PORT_MIN } from '@cloud-agent-shared/preview-port';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
 import { useOpenPreview, usePreviewServices } from './use-preview';
 
 export function PreviewPortDialog({

@@ -15,4 +15,6 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   models: cachedDirectByokModelList('morph-byok'),
+  // Morph serves Chat Completions only; its model names otherwise classify as OpenAI.
+  getAiSdkProvider: () => ({ aiSdkProvider: undefined }),
 } satisfies DirectByokProvider;

@@ -414,6 +414,7 @@
       "title": "ໃບຮັບການລາຍງານ",
       "description": "ໃບຮັບສຳລັບການລາຍງານທີ່ທ່ານສົ່ງ. ເກັບ ID ນີ້ໄວ້ເພື່ອອ້າງອີງໃນພາຍຫຼັງ.",
       "receiptLabel": "ໃບຮັບ",
+      "copyReceiptId": "ຄັດລອກ ID ຂອງໃບຮັບ",
       "appealLabel": "ການອຸທອນ",
       "triageReceived": "ໄດ້ຮັບແລ້ວ",
       "triageOpen": "ກຳລັງກວດສອບ",

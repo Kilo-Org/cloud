@@ -414,6 +414,7 @@
       "title": "檢舉回執",
       "description": "這是你所提交檢舉的回執。請保留此 ID，以便日後查詢。",
       "receiptLabel": "回執",
+      "copyReceiptId": "複製回執 ID",
       "appealLabel": "申訴",
       "triageReceived": "已收到",
       "triageOpen": "審查中",

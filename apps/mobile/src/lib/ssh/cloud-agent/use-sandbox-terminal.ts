@@ -1,8 +1,11 @@
 import { createFeedSource, type FeedSource } from '../../../../modules/kilo-ssh/src';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { type SshTerminalOutcome } from '@kilocode/app-shared/analytics';
+
 import { CLOUD_AGENT_WS_URL } from '@/lib/config';
 
+import { trackSshSandboxTerminal } from '../analytics';
 import { TerminalConnection, type TerminalState } from './terminal-connection';
 import { terminalOperations } from './terminal-operations';
 
@@ -53,6 +56,10 @@ export function useSandboxTerminal({
       operations: terminalOperations({ cloudAgentSessionId, organizationId }),
       onState: next => {
         setState(next);
+        const outcome = terminalOutcome(next);
+        if (outcome !== null) {
+          trackSshSandboxTerminal(outcome);
+        }
       },
       onData: bytes => {
         feed.feed(bytes);
@@ -84,4 +91,23 @@ export function useSandboxTerminal({
   }, []);
 
   return { sourceId: feed?.sourceId ?? null, state, retry };
+}
+
+/** A terminal state worth reporting, or null while it is still in motion. */
+function terminalOutcome(state: TerminalState): SshTerminalOutcome | null {
+  switch (state.kind) {
+    case 'connected':
+    case 'stopped':
+    case 'exited':
+    case 'failed': {
+      return state.kind;
+    }
+    case 'connecting':
+    case 'reconnecting': {
+      return null;
+    }
+    default: {
+      return null;
+    }
+  }
 }

@@ -12,6 +12,8 @@ export type LiveSession = {
   nativeSessionId: string | null;
   /** The attempt in flight or last finished; the next one is one higher. */
   attempt: number;
+  /** The attempt in flight retries a dropped connection, not a session start. */
+  reconnecting: boolean;
   timer: ReturnType<typeof setTimeout> | null;
   hostKey: SshHostKeyAwaiting | null;
   prompts: SshPromptsAwaiting | null;

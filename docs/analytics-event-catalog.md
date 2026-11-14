@@ -44,6 +44,13 @@ segment named `email`, `url`, `repo`, `prompt`, `content`, `token`, `secret`,
 `repo_count` and `auth_ready` metrics are explicit carve-outs. Allowed: stable
 enum strings, integer counts, `duration_ms` integers, and booleans.
 
+A cataloged event's own schema may declare a denied term as a closed enum, and
+runtime redaction reads those carve-outs from the schema: `auth_method` on
+`ssh_connect_succeeded` and `ssh_connect_failed` is the only one. The carve-out
+requires a closed enum (`z.enum`, a literal, or a union of those); a free-text
+property that happens to carry a denied name is not carved out. The same key on
+another event, or on an uncataloged dynamic payload, is still scrubbed.
+
 Two enforcement layers:
 
 - Compile time: the strict object schemas cannot carry a prohibited key.
@@ -136,6 +143,25 @@ best-effort.
 | `notification_permission_responded` | Notifications (mobile) | Permission grant/deny | Client: live permission request returned | Enum (`outcome`) | Best-effort (SDK) |
 | `notification_token_updated` | Notifications (mobile) | Token register/unregister | Client: mutate succeeded | Enum (`action`) | Best-effort (SDK) |
 | `organization_member_joined` | Organizations (web) | Invite accepted into membership | Server: `acceptOrganizationInvite` when `membershipInserted` | Enum (`role`) | Best-effort (server) |
+
+### SSH client events (privacy-minimal)
+
+The SSH events carry closed allowlists only: a failure category, a credential
+kind, a direction, and an outcome. No host, username, target, path, command, or
+key material is part of any payload. Reconnect spans report automatic recovery;
+session establishment reports only the initial connect and a manual retry.
+
+| Event | Owner | Business question | Source boundary | Privacy class | Delivery |
+|---|---|---|---|---|---|
+| `ssh_connect_succeeded` | SSH (mobile) | Are sessions established, and with which credential kind? | Client: shell opened after the hop chain authenticated | Enums (`category`, `authMethod`) | Best-effort (SDK) |
+| `ssh_connect_failed` | SSH (mobile) | Why do connection attempts end? | Client: attempt ended closed (retries exhausted or non-retryable) | Enums (`category`, `authMethod`) | Best-effort (SDK) |
+| `ssh_reconnect` | SSH (mobile) | How often does automatic recovery succeed, stop for input, or give up? | Client: a dropped session's retry sequence ends | Enum (`outcome`) | Best-effort (SDK) |
+| `ssh_sftp_transfer` | SSH (mobile) | Which transfers and failures does the file browser see? | Client: a transfer run ends (completed, failed, cancelled) | Enums (`direction`, `outcome`, `category`) | Best-effort (SDK) |
+| `ssh_forward_started` | SSH (mobile) | Which forwards start, by direction? | Client: `startForward` returned a listener | Enums (`direction`, `category: none`) | Best-effort (SDK) |
+| `ssh_forward_failed` | SSH (mobile) | Which forward starts fail, by direction and category? | Client: `startForward` rejected | Enums (`direction`, `category`) | Best-effort (SDK) |
+| `ssh_export` | SSH (mobile) | Did a backup export settle? | Client: export flow ended | Enums (`outcome`, `category`) | Best-effort (SDK) |
+| `ssh_import` | SSH (mobile) | Did a backup import settle? | Client: import flow ended | Enums (`outcome`, `category`) | Best-effort (SDK) |
+| `ssh_sandbox_terminal` | SSH (mobile) | How does a Cloud Agent terminal end? | Client: terminal state published (connected, stopped, exited, failed) | Enum (`outcome`) | Best-effort (SDK) |
 
 ### Terminal outcome events (durable outbox, Wave 2)
 

@@ -3,6 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import { getSafeCacheFilename } from '@/lib/share-remote-file';
 
+import { trackSshSftpTransfer } from '../analytics';
 import { nativeErrorCode, sshPackage } from '../native';
 
 type TransferKind = 'upload' | 'download';
@@ -145,13 +146,17 @@ async function perform(id: string, call: TransferCall, controller: AbortControll
       status: 'done',
       bytes: transfers.get(id)?.total ?? transfers.get(id)?.bytes ?? 0,
     });
+    trackSshSftpTransfer(call.kind, 'completed', null);
   } catch (error) {
     jobs.delete(id);
     if (controller.signal.aborted) {
       update(id, { status: 'cancelled' });
+      trackSshSftpTransfer(call.kind, 'cancelled', null);
       return;
     }
-    update(id, { status: 'failed', code: errorCodeOf(error) });
+    const code = errorCodeOf(error);
+    update(id, { status: 'failed', code });
+    trackSshSftpTransfer(call.kind, 'failed', code);
   }
 }
 

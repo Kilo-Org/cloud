@@ -88,6 +88,7 @@ async function adoptRegistrySessions(): Promise<Rehydration> {
       host: item.host,
       nativeSessionId: item.native.sessionId,
       attempt: 1,
+      reconnecting: false,
       timer: null,
       hostKey: null,
       prompts: null,

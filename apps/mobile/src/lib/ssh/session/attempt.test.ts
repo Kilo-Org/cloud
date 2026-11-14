@@ -1,11 +1,18 @@
+import { SSH_RECONNECT_EVENT } from '@kilocode/app-shared/analytics';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+
+import { captureEvent } from '@/lib/analytics/posthog';
 
 import { type SshHost } from '../hosts';
 import type * as Biometric from './biometric';
 import { attempt, fail } from './attempt';
-import { live, type LiveSession } from './live';
+import { createLiveSession } from './attempt.test-helpers';
+import { MAX_RECONNECT_ATTEMPTS } from './backoff';
+import { live } from './live';
 import { closeSession, resumeSshSessions, retrySession } from './manager';
 import { patchSession, sessionById, writeSession } from './session-store';
+
+vi.mock('@/lib/analytics/posthog', () => ({ captureEvent: vi.fn() }));
 
 const state = vi.hoisted(() => ({
   remove: vi.fn<() => void>(),
@@ -69,32 +76,13 @@ vi.mock('../native', () => ({
     }),
 }));
 
-function createEntry(): LiveSession {
-  return {
-    id: 'app',
-    host: state.host,
-    nativeSessionId: 'target',
-    jumpSessionIds: ['outer', 'inner'],
-    attempt: 10,
-    timer: null,
-    hostKey: null,
-    prompts: null,
-    passwords: new Map(),
-    authHostId: null,
-    passphrase: null,
-    connecting: false,
-    attemptAbort: null,
-    connectAttemptId: null,
-  };
-}
-
-let entry = createEntry();
+let entry = createLiveSession(state.host);
 beforeEach(() => {
   vi.clearAllMocks();
   state.app.currentState = 'active';
   state.app.addEventListener.mockImplementation(() => ({ remove: state.remove }));
   live.clear();
-  entry = createEntry();
+  entry = createLiveSession(state.host);
   live.set(entry.id, entry);
   writeSession({
     id: 'app',
@@ -314,3 +302,16 @@ it.each(['close', 'failure'])(
     }
   }
 );
+
+it('reports a failed reconnect when the last retry ends with a session disconnect', () => {
+  entry.attempt = MAX_RECONNECT_ATTEMPTS;
+  entry.reconnecting = true;
+
+  fail(entry, 'disconnected', { origin: 'session' });
+
+  expect(vi.mocked(captureEvent)).toHaveBeenCalledWith(SSH_RECONNECT_EVENT, {
+    outcome: 'failed',
+  });
+  expect(entry.reconnecting).toBe(false);
+  expect(sessionById('app')?.phase.kind).toBe('closed');
+});

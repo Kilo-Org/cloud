@@ -7,6 +7,8 @@ export const SSH_KNOWN_HOSTS_ROUTE = '/(app)/ssh/known-hosts' as Href;
 export const SSH_KEY_NEW_ROUTE = '/(app)/ssh/key/new' as Href;
 export const SSH_KEY_IMPORT_ROUTE = '/(app)/ssh/key/import' as Href;
 export const SSH_SNIPPETS_ROUTE = '/(app)/ssh/snippets' as Href;
+export const SSH_BACKUP_EXPORT_ROUTE = '/(app)/ssh/backup/export' as Href;
+export const SSH_BACKUP_IMPORT_ROUTE = '/(app)/ssh/backup/import' as Href;
 
 export function sshHostPath(hostId: string): Href {
   return `/(app)/ssh/host/${encodeURIComponent(hostId)}` as Href;

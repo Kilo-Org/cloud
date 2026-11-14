@@ -8,10 +8,11 @@ import { hostPattern } from '../known-host-pattern';
 import { findKnownHost, trustHostKey } from '../known-hosts';
 import { sshPackage } from '../native';
 import { sshDatabase } from '../store';
-import { fail, forgetSession } from './attempt';
+import { fail } from './attempt';
+import { forgetSession } from './connection';
 import { type HostKeyVerdict, judgeHostKey } from './host-key';
 import { live, type LiveSession, setPhase, stillOpen } from './live';
-import { patchSession } from './session-store';
+import { patchSession, sessionById } from './session-store';
 import { type SshHostKeyAwaiting, type SshHostKeyDecision } from './types';
 
 /** A host key was offered: judge it against the store and ask if it is new. */
@@ -49,7 +50,7 @@ export function handleDisconnect(notice: DisconnectNotice): void {
       // attempt to the same host waits on. Closing it is what lets a retry
       // reach the network again.
       void forgetSession(notice.sessionId);
-      fail(entry, 'disconnected');
+      fail(entry, 'disconnected', { origin: dropOrigin(entry) });
       return;
     }
     const hop = entry.jumpSessionIds.indexOf(notice.sessionId);
@@ -58,10 +59,21 @@ export function handleDisconnect(notice: DisconnectNotice): void {
       // is retried from the outermost surviving session.
       entry.jumpSessionIds.splice(hop, 1);
       void forgetSession(notice.sessionId);
-      fail(entry, 'disconnected');
+      fail(entry, 'disconnected', { origin: dropOrigin(entry) });
       return;
     }
   }
+}
+
+/**
+ * Whether a drop ended an established session or one still opening. The target
+ * id is set before the shell opens, so the phase — not the id — tells them
+ * apart: a drop in that window is the connection's own failure, not a
+ * reconnect.
+ */
+function dropOrigin(entry: LiveSession): 'connect' | 'session' {
+  const established = entry.reconnecting || sessionById(entry.id)?.phase.kind === 'connected';
+  return established ? 'session' : 'connect';
 }
 
 /** A keyboard-interactive round the server is waiting on. */

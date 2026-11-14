@@ -9,6 +9,8 @@ import {
   stopForwardEverywhere,
 } from './forwards-runtime';
 
+vi.mock('@/lib/analytics/posthog', () => ({ captureEvent: vi.fn() }));
+
 const native = vi.hoisted(() => ({ stopForwardById: vi.fn(), startLocalForward: vi.fn() }));
 vi.mock('./native', () => ({
   sshPackage: () => Promise.resolve(native),

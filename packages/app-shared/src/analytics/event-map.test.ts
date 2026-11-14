@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { SECURITY_COMMAND_TYPES } from '@kilocode/app-shared/security-agent';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
 import {
+  ANALYTICS_DENY_LIST_CARVE_OUTS,
   ANALYTICS_EVENT_SCHEMAS,
   APP_STARTUP_EVENT,
   CLAW_WEATHER_LOCATION_SELECTED_EVENT,
@@ -33,7 +34,22 @@ import {
   SESSION_CREATED_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   SESSION_VIEWED_EVENT,
+  SSH_AUTH_METHODS,
+  SSH_CONNECT_FAILED_EVENT,
+  SSH_CONNECT_SUCCEEDED_EVENT,
+  SSH_EXPORT_EVENT,
+  SSH_FAILURE_CATEGORIES,
+  SSH_FORWARD_DIRECTIONS,
+  SSH_FORWARD_FAILED_EVENT,
+  SSH_FORWARD_STARTED_EVENT,
+  SSH_IMPORT_EVENT,
+  SSH_RECONNECT_EVENT,
+  SSH_RECONNECT_OUTCOMES,
+  SSH_SANDBOX_TERMINAL_EVENT,
+  SSH_SFTP_TRANSFER_EVENT,
   TERMINAL_PHASE_EVENTS,
+  analyticsCarveOutKeys,
+  deriveDenyListCarveOuts,
   type AcceptedPhaseEventName,
   type TerminalOutcomeEventName,
 } from './event-map';
@@ -59,6 +75,15 @@ const ALL_EVENT_CONSTANTS = [
   NOTIFICATION_PERMISSION_RESPONDED_EVENT,
   NOTIFICATION_TOKEN_UPDATED_EVENT,
   ORGANIZATION_MEMBER_JOINED_EVENT,
+  SSH_CONNECT_SUCCEEDED_EVENT,
+  SSH_CONNECT_FAILED_EVENT,
+  SSH_RECONNECT_EVENT,
+  SSH_SFTP_TRANSFER_EVENT,
+  SSH_FORWARD_STARTED_EVENT,
+  SSH_FORWARD_FAILED_EVENT,
+  SSH_EXPORT_EVENT,
+  SSH_IMPORT_EVENT,
+  SSH_SANDBOX_TERMINAL_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
@@ -296,6 +321,103 @@ describe('organization_member_joined role schema', () => {
   });
 });
 
+describe('SSH client schemas', () => {
+  const sshEvents = [
+    SSH_CONNECT_SUCCEEDED_EVENT,
+    SSH_CONNECT_FAILED_EVENT,
+    SSH_RECONNECT_EVENT,
+    SSH_SFTP_TRANSFER_EVENT,
+    SSH_FORWARD_STARTED_EVENT,
+    SSH_FORWARD_FAILED_EVENT,
+    SSH_EXPORT_EVENT,
+    SSH_IMPORT_EVENT,
+    SSH_SANDBOX_TERMINAL_EVENT,
+  ] as const;
+
+  it('accepts the allowlisted payload for every event', () => {
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_CONNECT_SUCCEEDED_EVENT].safeParse({
+        category: 'none',
+        authMethod: 'key',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_CONNECT_FAILED_EVENT].safeParse({
+        category: 'auth_failed',
+        authMethod: 'password',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_RECONNECT_EVENT].safeParse({ outcome: 'succeeded' }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_SFTP_TRANSFER_EVENT].safeParse({
+        direction: 'upload',
+        outcome: 'failed',
+        category: 'permission_denied',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_FORWARD_STARTED_EVENT].safeParse({
+        direction: 'local',
+        category: 'none',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_FORWARD_FAILED_EVENT].safeParse({
+        direction: 'remote',
+        category: 'forwarding',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_EXPORT_EVENT].safeParse({
+        outcome: 'completed',
+        category: 'none',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_IMPORT_EVENT].safeParse({
+        outcome: 'failed',
+        category: 'invalid_export',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_SANDBOX_TERMINAL_EVENT].safeParse({ outcome: 'connected' })
+        .success
+    ).toBe(true);
+  });
+
+  it('cannot carry free text in any property', () => {
+    const freeText = 'user@host:/home/user cat secrets';
+    for (const name of sshEvents) {
+      const schema = ANALYTICS_EVENT_SCHEMAS[name];
+      const shape = (defOf(schema).shape ?? {}) as Record<string, z.ZodType>;
+      const valid = Object.fromEntries(
+        Object.entries(shape).map(([key, value]) => [key, sampleValue(value)])
+      );
+      expect(schema.safeParse(valid).success, `${name} valid payload`).toBe(true);
+      for (const key of Object.keys(shape)) {
+        expect(
+          schema.safeParse({ ...valid, [key]: freeText }).success,
+          `${name}.${key} must reject free text`
+        ).toBe(false);
+      }
+      for (const extra of ['host', 'username', 'path', 'command']) {
+        expect(
+          schema.safeParse({ ...valid, [extra]: freeText }).success,
+          `${name}.${extra} must be unknown`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('keeps every SSH enum closed to the shared allowlists', () => {
+    expect(new Set(SSH_FAILURE_CATEGORIES).size).toBe(SSH_FAILURE_CATEGORIES.length);
+    expect(new Set(SSH_RECONNECT_OUTCOMES).size).toBe(SSH_RECONNECT_OUTCOMES.length);
+    expect(new Set(SSH_FORWARD_DIRECTIONS)).toEqual(new Set(['local', 'remote']));
+  });
+});
+
 describe('app_startup validation', () => {
   const startupSchema = ANALYTICS_EVENT_SCHEMAS[APP_STARTUP_EVENT];
 
@@ -435,14 +557,58 @@ describe('privacy deny-list', () => {
     }
   });
 
-  it('walks every schema property key and finds none prohibited', () => {
+  it('rejects the SSH credential-kind key unless the event declares it', () => {
+    for (const key of ['auth_method', 'authMethod', 'Auth_Method']) {
+      expect(isProhibitedPropertyKey(key), key).toBe(true);
+      expect(isProhibitedPropertyKey(key, analyticsCarveOutKeys(SSH_CONNECT_SUCCEEDED_EVENT))).toBe(
+        false
+      );
+    }
+  });
+
+  it('derives the carve-outs from the schemas that declare them', () => {
+    expect([...ANALYTICS_DENY_LIST_CARVE_OUTS.keys()]).toEqual([
+      SSH_CONNECT_SUCCEEDED_EVENT,
+      SSH_CONNECT_FAILED_EVENT,
+    ]);
+    for (const name of [SSH_CONNECT_SUCCEEDED_EVENT, SSH_CONNECT_FAILED_EVENT]) {
+      expect([...analyticsCarveOutKeys(name)]).toEqual(['auth_method']);
+    }
+    for (const name of [SESSION_VIEWED_EVENT, SSH_RECONNECT_EVENT, APP_STARTUP_EVENT]) {
+      expect(analyticsCarveOutKeys(name).size).toBe(0);
+    }
+  });
+
+  it('carves out a denied key only when its schema is a closed enum', () => {
+    const open = 'ssh_connect_open_text';
+    const carveOuts = deriveDenyListCarveOuts({
+      [SSH_CONNECT_SUCCEEDED_EVENT]: z
+        .object({
+          category: z.enum(SSH_FAILURE_CATEGORIES),
+          authMethod: z.enum(SSH_AUTH_METHODS),
+        })
+        .strict(),
+      [open]: z.object({ authMethod: z.string() }).strict(),
+    });
+
+    expect([...carveOuts.keys()]).toEqual([SSH_CONNECT_SUCCEEDED_EVENT]);
+    expect([...(carveOuts.get(SSH_CONNECT_SUCCEEDED_EVENT) ?? [])]).toEqual(['auth_method']);
+    expect(carveOuts.has(open)).toBe(false);
+
+    const textPayload = { authMethod: 'free text, not an auth method' };
+    expect(redactProhibitedProperties(textPayload, carveOuts.get(open))).toEqual({});
+  });
+
+  it('walks every schema property key and finds none prohibited beyond its carve-outs', () => {
     for (const [name, schema] of Object.entries(ANALYTICS_EVENT_SCHEMAS)) {
       const def = defOf(schema);
       if (def.type !== 'object' || !def.shape) {
         continue;
       }
       for (const key of Object.keys(def.shape)) {
-        expect(isProhibitedPropertyKey(key), `${name}.${key}`).toBe(false);
+        expect(isProhibitedPropertyKey(key, analyticsCarveOutKeys(name)), `${name}.${key}`).toBe(
+          false
+        );
       }
     }
   });
@@ -485,6 +651,8 @@ describe('privacy deny-list', () => {
       repo_count: 3,
       duration_ms: 42,
       event_uuid: 'abc',
+      auth_method: 'password',
+      authMethod: 'password',
     };
     const copy = { ...input };
 
@@ -496,5 +664,17 @@ describe('privacy deny-list', () => {
       event_uuid: 'abc',
     });
     expect(input).toEqual(copy);
+  });
+
+  it('keeps auth_method only for an event whose schema declares it', () => {
+    const payload = { authMethod: 'password' as const, category: 'none' as const };
+
+    expect(
+      redactProhibitedProperties(payload, analyticsCarveOutKeys(SSH_CONNECT_SUCCEEDED_EVENT))
+    ).toEqual(payload);
+    expect(redactProhibitedProperties(payload)).toEqual({ category: 'none' });
+    expect(
+      redactProhibitedProperties(payload, analyticsCarveOutKeys(SESSION_VIEWED_EVENT))
+    ).toEqual({ category: 'none' });
   });
 });

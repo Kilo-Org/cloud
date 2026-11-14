@@ -147,8 +147,14 @@ describe('IntegrationProviderRow body press', () => {
     const root = renderRow({ row: integrationRow(), scope: 'personal' });
 
     // The trailing button stays the row's one named control, so the wrapper
-    // must not become a focus stop of its own.
-    expect(bodyPresses(root)[0]?.props.accessible).toBe(false);
+    // must not become a focus stop of its own: iOS drops it with `accessible`,
+    // and Android keeps it out of the tree without hiding its children.
+    const [body] = bodyPresses(root);
+    if (!body) {
+      throw new Error('the uninstalled row rendered no body press');
+    }
+    expect(body.props.accessible).toBe(false);
+    expect(body.props.importantForAccessibility).toBe('no');
   });
 
   it('blocks a second mint while the launch is in flight', () => {

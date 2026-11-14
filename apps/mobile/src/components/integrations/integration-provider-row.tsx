@@ -142,9 +142,11 @@ export function IntegrationProviderRow({
   // never take a destructive action by accident — and a pending row has no
   // action to offer yet.
   //
-  // The wrapper is not an accessibility element (`accessible={false}`): the
-  // trailing Button is the row's single named control and carries the busy
-  // state, so a second stop here would read the same provider twice.
+  // The wrapper is not an accessibility element (`accessible={false}`, and on
+  // Android `importantForAccessibility="no"` keeps the row out of the tree while
+  // its children stay in it): the trailing Button is the row's single named
+  // control and carries the busy state, so a second stop here would read the
+  // same provider twice — once unnamed of an action.
   const rowStartsConnect = !row.installed && !row.actionPending && canConnect;
   const configuredRow = (
     <ConfigureRow
@@ -165,6 +167,7 @@ export function IntegrationProviderRow({
       // A second tap while the browser is on its way must not mint again.
       disabled={connecting}
       accessible={false}
+      importantForAccessibility="no"
       className={cn('active:opacity-70', connecting && 'opacity-70')}
     >
       {configuredRow}

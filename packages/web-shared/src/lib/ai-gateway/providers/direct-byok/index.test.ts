@@ -330,19 +330,20 @@ describe('getDirectByokModel', () => {
     const { getAiSdkProvider } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
     const provider: DirectByokProvider = directByokProviders[0];
+    const previousGetAiSdkProvider = provider.getAiSdkProvider;
     jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
     jest.mocked(getAiSdkProvider).mockReturnValue('anthropic');
 
     try {
       // The module under test reads its own default export, so the stub has to live on that
-      // shared definition; the finally block removes it again.
+      // shared definition; the finally block restores the value the definition had before.
       provider.getAiSdkProvider = () => ({ aiSdkProvider: undefined });
       const models = await getDirectByokModelsForUser('user-id');
 
       expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual([undefined, undefined]);
       expect(getAiSdkProvider).not.toHaveBeenCalled();
     } finally {
-      delete provider.getAiSdkProvider;
+      provider.getAiSdkProvider = previousGetAiSdkProvider;
       jest.mocked(getAiSdkProvider).mockReset();
     }
   });
@@ -353,17 +354,18 @@ describe('getDirectByokModel', () => {
     const { getAiSdkProvider } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
     const provider: DirectByokProvider = directByokProviders[0];
-    provider.getModelChatApi = model =>
-      model.id === 'supported-model' ? 'responses' : 'chat_completions';
+    const previousGetModelChatApi = provider.getModelChatApi;
     jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
 
     try {
+      provider.getModelChatApi = model =>
+        model.id === 'supported-model' ? 'responses' : 'chat_completions';
       const models = await getDirectByokModelsForUser('user-id');
 
       expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['openai', undefined]);
       expect(getAiSdkProvider).not.toHaveBeenCalled();
     } finally {
-      delete provider.getModelChatApi;
+      provider.getModelChatApi = previousGetModelChatApi;
     }
   });
 

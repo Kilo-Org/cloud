@@ -130,7 +130,7 @@ export function SessionShareSection({
     if (link.publicId === null) {
       return true;
     }
-    const read = await shareStateQuery.refetch({ cancelRefetch: false });
+    const read = await shareStateQuery.refetch({ cancelRefetch: true });
     const settled = freshnessOf(link, read);
     setFreshness(settled);
     return settled.kind === 'current';

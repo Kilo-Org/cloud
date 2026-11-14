@@ -933,6 +933,8 @@ async function expireOrganizationInvitation(
     .update(organization_invitations)
     .set({ expires_at: sql`NOW()` })
     .where(eq(organization_invitations.id, invitation.id));
+  // A delivery already recorded as delivered or failed keeps its own history;
+  // only a delivery still owed for this invitation is stopped.
   await tx
     .update(external_side_effect_outbox)
     .set({
@@ -941,7 +943,12 @@ async function expireOrganizationInvitation(
       next_attempt_at: null,
       last_error: 'revoked',
     })
-    .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    .where(
+      and(
+        eq(external_side_effect_outbox.invitation_id, invitation.id),
+        inArray(external_side_effect_outbox.status, ['pending', 'sending'])
+      )
+    );
 }
 
 async function revokeStaleOrganizationInvitation(

@@ -1644,6 +1644,19 @@ describe('Organizations', () => {
         .update(organizations)
         .set({ sso_domain: 'example.com' })
         .where(eq(organizations.id, organization.id));
+      await db.insert(external_side_effect_outbox).values({
+        invitation_id: invitation.id,
+        payload: {
+          invitationId: invitation.id,
+          to: invitee.google_user_email,
+          organizationName: organization.name,
+          inviterName: 'Owner',
+          acceptInviteUrl: 'https://example.com/accept-invite',
+        },
+        status: 'delivered',
+        attempts: 1,
+        delivered_at: sql`NOW()`,
+      });
       const result = await acceptOrganizationInvite(invitee.id, invitation.token, {
         provider: 'workos',
         ssoSourceOrganizationId: organization.id,
@@ -1659,6 +1672,10 @@ describe('Organizations', () => {
       expect(new Date(storedInvitation?.expires_at ?? '').getTime()).toBeLessThanOrEqual(
         Date.now()
       );
+      const storedOutbox = await db.query.external_side_effect_outbox.findFirst({
+        where: eq(external_side_effect_outbox.invitation_id, invitation.id),
+      });
+      expect(storedOutbox).toMatchObject({ status: 'delivered', last_error: null });
 
       const retry = await acceptOrganizationInvite(invitee.id, invitation.token, {
         provider: 'workos',

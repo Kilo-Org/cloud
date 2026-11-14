@@ -47,11 +47,11 @@ export function MarkdownCodeFence({
   const copy = onCopyCode ?? ((source: string) => void performCopy(source));
   return (
     <View
-      className="my-1 overflow-hidden rounded-lg px-3 pt-2 pb-3"
+      className="my-1 overflow-hidden rounded-lg px-3 pb-3"
       // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the card color is the markdown variant's runtime palette
       style={{ backgroundColor: palette.codeBackground }}
     >
-      <View className="mb-1 flex-row items-center justify-between">
+      <View className="mb-1 flex-row items-center justify-between pt-2">
         <Text
           className="text-[11px] font-medium"
           // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the label tracks the markdown variant's palette
@@ -64,7 +64,9 @@ export function MarkdownCodeFence({
         {/* The header is the language's one text line, so the copy control
             floats the shared 28dp line-action box over it and its negative
             margin cancels back to that line; `LINE_ACTION_HIT_SLOP` carries
-            the touch target past 44dp (apps/mobile/AGENTS.md:211). */}
+            the touch target past 44dp (apps/mobile/AGENTS.md:211). The card's
+            top inset sits on the row, not on the card, so the box that floats
+            above the line stays inside the card that clips it. */}
         <Pressable
           className={cn(
             LINE_ACTION_BOX_CLASS,

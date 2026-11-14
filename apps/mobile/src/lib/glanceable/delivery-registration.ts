@@ -32,7 +32,8 @@ import {
 } from './session-activity-tokens-android';
 import {
   _resetSessionTokenIdentityForTests,
-  clearSessionTokenIdentities,
+  readSessionTokenIdentitiesForScope,
+  retireSessionTokenIdentities,
 } from './session-token-identity';
 import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
 import {
@@ -254,17 +255,25 @@ const delivery: GlanceableDelivery = {
         sessionActivityTokens,
         androidSessionActivityTokens,
       ];
-      const tokens = unionTokens(includeScope ? records : [activityTokens]);
+      /* A row a previous process wrote is named only by its recorded token: the
+         sets above are this process's. Without these the teardown reports a
+         clean delete and erases the identity of a row it never touched. */
+      const recorded = includeScope ? await readSessionTokenIdentitiesForScope(null) : [];
+      const tokens = unionTokens(
+        includeScope
+          ? [...records, new Set(recorded.flatMap(identity => identity.tokens))]
+          : [activityTokens]
+      );
       // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
       const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;
       if (authToken === null) {
         return { ok: tokens.length === 0, tokens };
       }
       const failed = await deleteActivityTokens(tokens, authToken, records);
-      if (includeScope && failed.length === 0) {
-        /* Every row for the scope is gone, so the tokens a row was written with
-           are history: a later follow must not delete with them. */
-        clearSessionTokenIdentities();
+      if (includeScope) {
+        /* Retire only the identities whose rows this delete removed; one whose
+           token failed still names a row the next cleanup has to delete. */
+        retireSessionTokenIdentities(null, new Set(failed));
       }
       // Keep Android's existing successful-cleanup result contract.
       return {

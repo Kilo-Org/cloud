@@ -96,6 +96,11 @@ import {
   _resetDeliveryRegistrationForTests,
   _setGetDevicePushTokenForTests,
 } from './delivery-registration';
+import {
+  _setSessionTokenIdentityStoreForTests,
+  readSessionTokenIdentities,
+} from './session-token-identity';
+import { SESSION_TOKEN_IDENTITY_KEY } from './widget-store';
 import { registerSessionActivityToken } from './session-activity-tokens';
 /* eslint-enable import/first */
 
@@ -230,6 +235,67 @@ describe('delivery registerTokens', () => {
     });
 
     expect(trpcMock.registerActivityToken.mutate).not.toHaveBeenCalled();
+  });
+
+  it('deletes the rows a previous process recorded, and keeps an identity whose delete failed', async () => {
+    platformMock.OS = 'android';
+    /* A previous process's identities: the token sets this process holds name
+       neither of these rows, so only the record can. */
+    const recordStore = new Map<string, string>();
+    recordStore.set('widget-store-accessibility', 'after-first-unlock');
+    recordStore.set(
+      SESSION_TOKEN_IDENTITY_KEY,
+      JSON.stringify({
+        version: 1,
+        sessions: {
+          'session-a': {
+            userId: 'u1',
+            organizationId: null,
+            version: 1,
+            tokens: ['ExponentPushToken[kept-row]'],
+          },
+          'session-b': {
+            userId: 'u1',
+            organizationId: null,
+            version: 2,
+            tokens: ['ExponentPushToken[failed-row]'],
+          },
+        },
+      })
+    );
+    _setSessionTokenIdentityStoreForTests({
+      getItemAsync: (key: string) => Promise.resolve(recordStore.get(key) ?? null),
+      setItemAsync: (key: string, value: string) => {
+        recordStore.set(key, value);
+        return Promise.resolve();
+      },
+    });
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setGetDevicePushTokenForTests(() => Promise.resolve('android-token-now'));
+    getGlanceableDelivery().registerTokens(snapshot(), null, 'u1');
+    await vi.waitFor(() => {
+      expect(trpcMock.registerActivityToken.mutate).toHaveBeenCalled();
+    });
+    trpcMock.unregisterActivityToken.mutate.mockImplementation(async (input: { token: string }) => {
+      await Promise.resolve();
+      if (input.token === 'ExponentPushToken[failed-row]') {
+        throw new Error('Request timed out');
+      }
+      return { success: true };
+    });
+
+    const result = await getGlanceableDelivery().unregisterTokens('scope');
+
+    const sent = trpcMock.unregisterActivityToken.mutate.mock.calls.map(call => call[0]?.token);
+    expect(sent).toContain('ExponentPushToken[kept-row]');
+    expect(sent).toContain('ExponentPushToken[failed-row]');
+    expect(result.ok).toBe(false);
+    /* The deleted row's identity is retired; the one whose delete failed still
+       names a row the next cleanup has to remove. */
+    expect(await readSessionTokenIdentities('session-a', null)).toEqual([]);
+    expect(await readSessionTokenIdentities('session-b', null)).toEqual([
+      'ExponentPushToken[failed-row]',
+    ]);
   });
 
   it('unregisters the recorded android_ongoing token and clears it on success', async () => {

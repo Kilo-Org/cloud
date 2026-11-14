@@ -93,7 +93,12 @@ export type CreditNativeIapContextValue = {
   clearError: () => void;
 };
 
-const CreditNativeIapContext = createContext<CreditNativeIapContextValue | null>(null);
+/**
+ * The provider's value, exported so a development-only fixture can mount the
+ * credits screen against fixed store answers. Product code always reaches it
+ * through `useCreditNativeIap`.
+ */
+export const CreditNativeIapContext = createContext<CreditNativeIapContextValue | null>(null);
 
 export function useCreditNativeIap(): CreditNativeIapContextValue {
   const context = useContext(CreditNativeIapContext);

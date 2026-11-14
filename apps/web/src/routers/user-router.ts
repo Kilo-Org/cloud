@@ -57,6 +57,7 @@ import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provider-metadata';
+import { classifyDeviceSessionClient } from '@/lib/auth/device-session-client';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
@@ -851,7 +852,7 @@ export const userRouter = createTRPCRouter({
 
     return rows.map(row => ({
       id: row.id,
-      user_agent: row.user_agent,
+      ...classifyDeviceSessionClient(row.user_agent),
       // Normalize PostgreSQL timestamp text (e.g. `2026-04-29 01:16:12.945+00`)
       // to UTC ISO before returning it over the tRPC JSON boundary.
       created_at: new Date(row.created_at).toISOString(),

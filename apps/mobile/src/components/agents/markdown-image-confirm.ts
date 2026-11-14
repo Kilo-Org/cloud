@@ -109,6 +109,8 @@ export function requestMarkdownImageTrust(uri: string): void {
           trustImageHost(host);
         },
       },
-    ]
+    ],
+    // Android back dismisses, which equals Cancel: no image loads and no host is trusted.
+    { cancelable: true }
   );
 }

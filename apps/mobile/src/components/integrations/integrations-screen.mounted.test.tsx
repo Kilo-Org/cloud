@@ -184,7 +184,7 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },

@@ -344,8 +344,6 @@
       "rowSubtitle": "Gebruik jou eie verskaffer se fakturering",
       "manageOnWebReason": "Hierdie verskaffers benodig gestruktureerde geloofsbriewe.",
       "description": "Versoeke via hierdie sleutels word aan jou verskafferrekening gefaktureer in plaas van van jou Kilo-saldo afgetrek.",
-      "enabled": "In gebruik",
-      "disabled": "Afgeskakel",
       "managedByPlan": "Bestuur deur jou koderingsplan",
       "enableKey": "Aktiveer die {{provider}}-sleutel",
       "test": "Toets sleutel",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "Jou aktiewe sessies is nie beskikbaar voordat die data gelaai is nie.",
     "currentDeviceUnidentified": "Die huidige toestel kon nie geïdentifiseer word nie.",
     "kiloApp": "Kilo-toep",
+    "kiloAppAndroid": "Kilo-toep · Android",
+    "kiloAppIos": "Kilo-toep · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Geen aktiewe sessies nie",
     "noSessionsDescription": "Teken op 'n ander toestel met die Kilo-toep in en dit sal hier verskyn.",
-    "onlyKiloAppSignIns": "Slegs sessies wat met die Kilo-toep begin is, verskyn hier. Redigeerder- en CLI-sessies word nie gelys nie.",
     "signedIn": "Ingeteken {{signedIn}} · Laas gesien {{lastSeen}}",
+    "signInScopeNote": "Sessies wat met die Kilo-toep en die Kilo CLI begin is, verskyn hier. Redigeerder-sessies word nie gelys nie.",
     "thisDevice": "Hierdie toestel",
     "webBrowser": "Webblaaier",
     "viewProfile": "Bekyk profiel",
@@ -2921,7 +2922,7 @@
     "sessionSignedOut": "Sessie uitgeteken.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",
-    "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Dit kan nog tot 'n uur lank API-toegang behou.",
+    "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Laas gesien {{lastSeen}}. Dit kan nog tot 'n uur lank API-toegang behou.",
     "unknownDevice": "Onbekende toestel"
   },
   "forceUpdate": {
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Invoertekens",
-      "last30Days": "Laaste 30 dae",
+      "orgLast30Days": "Alle lede · Laaste 30 dae",
       "outputTokens": "Uitsettekens",
       "requests": "Versoeke"
     },

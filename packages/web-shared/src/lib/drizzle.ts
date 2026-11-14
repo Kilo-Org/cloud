@@ -164,9 +164,6 @@ pool.on('error', (err: Error) => {
 if (usesSeparateReplica) {
   replicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
-    if (shouldExitOnPoolError('replica')) {
-      process.exit(-1);
-    }
   });
 }
 
@@ -207,6 +204,12 @@ export const db = primaryDb;
  * connection a transaction hands to its callback.
  */
 export type DrizzleDatabase = typeof db;
+
+/**
+ * The connection a helper accepts: the primary database, or a transaction when
+ * the caller already holds one.
+ */
+export type DrizzleConnection = typeof db | DrizzleTransaction;
 
 export { sql } from 'drizzle-orm';
 

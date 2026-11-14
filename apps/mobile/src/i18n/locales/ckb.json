@@ -344,8 +344,6 @@
       "rowSubtitle": "پارەدانی دابینکەری خۆت بەکاربهێنە",
       "manageOnWebReason": "ئەم دابینکەرانە پێویستیان بە زانیاریی چوونەژوورەوەی پێکهاتەدار هەیە.",
       "description": "تێچووی ئەو داواکارییانەی بەم کلیلانە دەکرێن لەسەر هەژماری دابینکەرەکەت حیساب دەکرێت، نەک لە باڵانسی Kilo.",
-      "enabled": "لە بەکارهێناندایە",
-      "disabled": "ناچالاککراوە",
       "managedByPlan": "لەلایەن پلانی کۆدنووسینەکەتەوە بەڕێوەدەبرێت",
       "enableKey": "چالاککردنی کلیلی {{provider}}",
       "test": "تاقیکردنەوەی کلیل",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "تا ئەمە بار نەکرێت، سێشنە چالاکەکانت بەردەست نابن.",
     "currentDeviceUnidentified": "نەتوانرا ئامێری ئێستا بناسرێتەوە.",
     "kiloApp": "ئەپی Kilo",
+    "kiloAppAndroid": "ئەپی Kilo · Android",
+    "kiloAppIos": "ئەپی Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "هیچ سێشنێکی چالاک نییە",
     "noSessionsDescription": "لە ئامێرێکی ترەوە بە ئەپی Kilo بچۆ ژوورەوە، تا لێرە دەربکەوێت.",
-    "onlyKiloAppSignIns": "تەنها چوونەژوورەوەکانی ئەپی Kilo لێرە دەردەکەون. چوونەژوورەوەکانی دەستکاریکەری کۆد و CLI لە لیستەکەدا نین.",
     "signedIn": "چوونەژوورەوە: {{signedIn}} · دوایین بینین: {{lastSeen}}",
+    "signInScopeNote": "چوونەژوورەوەکانی ئەپی Kilo و Kilo CLI لێرە دەردەکەون. چوونەژوورەوەکانی دەستکاریکەری کۆد لە لیستەکەدا نین.",
     "thisDevice": "ئەم ئامێرە",
     "webBrowser": "وێبگەڕ",
     "viewProfile": "بینینی پڕۆفایل",
@@ -2921,7 +2922,7 @@
     "sessionSignedOut": "دەرچوون لە سێشنەکە تەواو بوو.",
     "signOutThisDeviceTitle": "دەرچوون لەم ئامێرە؟",
     "signOutThisSessionTitle": "دەرچوون لەم سێشنە؟",
-    "signOutThisSessionMessage": "{{device}} لە هەژمارەکە دەردەچێت. دەستگەیشتنی بە API دەتوانێت تا یەک کاتژمێر بەردەوام بێت.",
+    "signOutThisSessionMessage": "{{device}} لە هەژمارەکە دەردەچێت. دوایین بینین: {{lastSeen}}. دەستگەیشتنی بە API دەتوانێت تا یەک کاتژمێر بەردەوام بێت.",
     "unknownDevice": "ئامێری نەناسراو"
   },
   "forceUpdate": {
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "تۆکنەکانی تێدراو",
-      "last30Days": "دوایین ٣٠ ڕۆژ",
+      "orgLast30Days": "هەموو ئەندامەکان · دوایین ٣٠ ڕۆژ",
       "outputTokens": "تۆکنەکانی دەرئەنجام",
       "requests": "داواکارییەکان"
     },

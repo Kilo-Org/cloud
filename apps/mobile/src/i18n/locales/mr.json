@@ -344,8 +344,6 @@
       "rowSubtitle": "तुमचे स्वतःचे प्रदाता बिलिंग वापरा",
       "manageOnWebReason": "या प्रदात्यांना संरचित क्रेडेन्शियल्स आवश्यक आहेत.",
       "description": "या कींद्वारे केलेल्या विनंत्यांचे बिल तुमच्या Kilo शिलकीऐवजी तुमच्या प्रदाता खात्यावर आकारले जाते.",
-      "enabled": "वापरात",
-      "disabled": "बंद केली",
       "managedByPlan": "तुमच्या कोडिंग प्लॅनद्वारे व्यवस्थापित",
       "enableKey": "{{provider}} की सक्षम करा",
       "test": "की तपासा",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "हे लोड होईपर्यंत तुमची सक्रिय सत्रे अनुपलब्ध आहेत.",
     "currentDeviceUnidentified": "सध्याचे डिव्हाइस ओळखता आले नाही.",
     "kiloApp": "Kilo अ‍ॅप",
+    "kiloAppAndroid": "Kilo अ‍ॅप · Android",
+    "kiloAppIos": "Kilo अ‍ॅप · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "सक्रिय सत्रे नाहीत",
     "noSessionsDescription": "दुसऱ्या डिव्हाइसवरील Kilo अ‍ॅपमध्ये साइन इन करा. ते सत्र येथे दिसेल.",
-    "onlyKiloAppSignIns": "येथे फक्त Kilo अ‍ॅपमधील साइन इनची सत्रे दिसतात. एडिटर आणि CLI मधील सत्रे या यादीत नाहीत.",
     "signedIn": "साइन इन: {{signedIn}} · शेवटचे सक्रिय: {{lastSeen}}",
+    "signInScopeNote": "Kilo अ‍ॅप आणि Kilo CLI मधील साइन इन सत्रे येथे दिसतात. एडिटरमधील सत्रे या यादीत नाहीत.",
     "thisDevice": "हे डिव्हाइस",
     "viewProfile": "प्रोफाइल पहा",
     "webBrowser": "वेब ब्राउझर",
@@ -2921,7 +2922,7 @@
     "sessionSignedOut": "सत्र साइन आउट झाले.",
     "signOutThisDeviceTitle": "या डिव्हाइसवरून साइन आउट करायचे?",
     "signOutThisSessionTitle": "या सत्रातून साइन आउट करायचे?",
-    "signOutThisSessionMessage": "{{device}} वरून साइन आउट केले जाईल. मात्र, त्याचा API प्रवेश आणखी एक तासापर्यंत चालू राहू शकतो.",
+    "signOutThisSessionMessage": "{{device}} वरून साइन आउट केले जाईल. शेवटचे सक्रिय: {{lastSeen}}. मात्र, त्याचा API प्रवेश आणखी एक तासापर्यंत चालू राहू शकतो.",
     "unknownDevice": "अज्ञात डिव्हाइस"
   },
   "forceUpdate": {
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",
-      "last30Days": "मागील 30 दिवस",
+      "orgLast30Days": "सर्व सदस्य · मागील 30 दिवस",
       "outputTokens": "आउटपुट टोकन",
       "requests": "विनंत्या"
     },

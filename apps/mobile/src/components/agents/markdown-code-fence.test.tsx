@@ -84,10 +84,17 @@ describe('MarkdownCodeFence', () => {
 
   it('keeps the fence language in the header and leaves it blank when unnamed', async () => {
     const named = await mount(fence());
-    expect(hostProps(named, 'Text').children).toBe('ts');
+    expect(hostProps(named, 'Text')).toMatchObject({
+      children: 'ts',
+      accessible: true,
+      accessibilityLabel: 'ts',
+    });
 
     const unnamed = await mount(fence({ language: null }));
-    expect(hostProps(unnamed, 'Text').children).toBe('');
+    const chip = hostProps(unnamed, 'Text');
+    expect(chip.children).toBe('');
+    expect(chip).not.toHaveProperty('accessible');
+    expect(chip).not.toHaveProperty('accessibilityLabel');
     expect(hostProps(unnamed, 'CodeBlock')).toMatchObject({ language: null });
   });
 

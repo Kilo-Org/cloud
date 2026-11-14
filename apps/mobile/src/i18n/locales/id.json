@@ -344,8 +344,6 @@
       "rowSubtitle": "Gunakan penagihan penyedia milikmu sendiri",
       "manageOnWebReason": "Penyedia ini memerlukan kredensial terstruktur.",
       "description": "Permintaan melalui kunci ini ditagihkan ke akun penyediamu, bukan ke saldo Kilo-mu.",
-      "enabled": "Digunakan",
-      "disabled": "Dinonaktifkan",
       "managedByPlan": "Dikelola oleh paket coding-mu",
       "enableKey": "Aktifkan kunci {{provider}}",
       "test": "Uji kunci",
@@ -2366,10 +2364,13 @@
     "couldNotLoadDescription": "Sesi aktifmu tidak dapat ditampilkan sampai data selesai dimuat.",
     "currentDeviceUnidentified": "Perangkat ini tidak dapat diidentifikasi.",
     "kiloApp": "Aplikasi Kilo",
+    "kiloAppAndroid": "Aplikasi Kilo · Android",
+    "kiloAppIos": "Aplikasi Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Tidak ada sesi aktif",
     "noSessionsDescription": "Masuk ke aplikasi Kilo di perangkat lain agar perangkat tersebut muncul di sini.",
-    "onlyKiloAppSignIns": "Hanya sesi masuk melalui aplikasi Kilo yang muncul di sini. Sesi masuk melalui editor dan CLI tidak ditampilkan.",
     "signedIn": "Masuk {{signedIn}} · Terakhir aktif {{lastSeen}}",
+    "signInScopeNote": "Sesi masuk melalui aplikasi Kilo dan Kilo CLI muncul di sini. Sesi masuk melalui editor tidak ditampilkan.",
     "thisDevice": "Perangkat ini",
     "viewProfile": "Lihat profil",
     "signOutThisDevice": "Keluar dari perangkat ini",
@@ -2377,7 +2378,7 @@
     "sessionSignedOut": "Sesi masuk telah diakhiri.",
     "signOutThisDeviceTitle": "Keluar dari perangkat ini?",
     "signOutThisSessionTitle": "Keluar dari sesi ini?",
-    "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Perangkat tersebut masih dapat mengakses API hingga satu jam.",
+    "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Terakhir aktif {{lastSeen}}. Perangkat tersebut masih dapat mengakses API hingga satu jam.",
     "webBrowser": "Peramban web",
     "unknownDevice": "Perangkat tidak dikenal"
   },
@@ -3344,7 +3345,7 @@
       "sharingUnavailable": "Fitur berbagi tidak tersedia di perangkat ini.",
       "status": {
         "paid": "Lunas",
-        "open": "Buka",
+        "open": "Terbuka",
         "void": "Batal",
         "uncollectible": "Tidak tertagih"
       },
@@ -3426,7 +3427,7 @@
     },
     "usageStats": {
       "inputTokens": "Token masukan",
-      "last30Days": "30 Hari terakhir",
+      "orgLast30Days": "Semua anggota · 30 Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
     },

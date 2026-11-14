@@ -344,8 +344,6 @@
       "rowSubtitle": "Defnyddio bilio eich darparwr eich hun",
       "manageOnWebReason": "Mae angen manylion adnabod strwythuredig ar y darparwyr hyn.",
       "description": "Codir tâl am geisiadau drwy'r allweddi hyn ar eich cyfrif darparwr yn lle eich balans Kilo.",
-      "enabled": "Yn cael ei defnyddio",
-      "disabled": "Wedi'i diffodd",
       "managedByPlan": "Wedi'i rheoli gan eich cynllun codio",
       "enableKey": "Galluogi allwedd {{provider}}",
       "test": "Profi'r allwedd",
@@ -3117,10 +3115,13 @@
     "couldNotLoadDescription": "Nid yw eich sesiynau gweithredol ar gael nes bod y data hwn wedi llwytho.",
     "currentDeviceUnidentified": "Methu adnabod y ddyfais gyfredol.",
     "kiloApp": "Ap Kilo",
+    "kiloAppAndroid": "Ap Kilo · Android",
+    "kiloAppIos": "Ap Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Dim sesiynau gweithredol",
     "noSessionsDescription": "Mewngofnodwch i ap Kilo ar ddyfais arall a bydd y sesiwn yn ymddangos yma.",
-    "onlyKiloAppSignIns": "Dim ond sesiynau ap Kilo sy'n ymddangos yma. Nid yw sesiynau'r golygydd na'r CLI wedi'u rhestru.",
     "signedIn": "Wedi mewngofnodi {{signedIn}} · Gwelwyd ddiwethaf {{lastSeen}}",
+    "signInScopeNote": "Mae sesiynau ap Kilo a Kilo CLI yn ymddangos yma. Nid yw sesiynau'r golygydd wedi'u rhestru.",
     "thisDevice": "Y ddyfais hon",
     "viewProfile": "Gweld y proffil",
     "signOutThisDevice": "Allgofnodi'r ddyfais hon",
@@ -3128,7 +3129,7 @@
     "sessionSignedOut": "Allgofnodwyd y sesiwn.",
     "signOutThisDeviceTitle": "Allgofnodi'r ddyfais hon?",
     "signOutThisSessionTitle": "Allgofnodi'r sesiwn hon?",
-    "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gall gadw mynediad at yr API am hyd at awr.",
+    "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gwelwyd ddiwethaf {{lastSeen}}. Gall gadw mynediad at yr API am hyd at awr.",
     "webBrowser": "Porwr gwe",
     "unknownDevice": "Dyfais anhysbys"
   },
@@ -3551,7 +3552,7 @@
       "sharingUnavailable": "Nid yw rhannu ar gael ar y ddyfais hon.",
       "status": {
         "paid": "Wedi'i thalu",
-        "open": "Agor",
+        "open": "Ar agor",
         "void": "Wedi'i dirymu",
         "uncollectible": "Anghasgladwy"
       },
@@ -3633,7 +3634,7 @@
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
-      "last30Days": "Y 30 diwrnod diwethaf",
+      "orgLast30Days": "Holl aelodau · Y 30 diwrnod diwethaf",
       "outputTokens": "Tocynnau allbwn",
       "requests": "Ceisiadau"
     },

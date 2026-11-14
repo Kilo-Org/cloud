@@ -78,6 +78,10 @@ type CallerRoleRowWithOrganization = CallerRoleRow & { organization: Organizatio
  * live-organization and inheritable-role rules live only here, so the role
  * check and the organization fetch cannot drift.
  *
+ * {@link loadEffectiveMembershipRows} and
+ * {@link loadEffectiveMembershipRowsWithOrganization} both read through this
+ * selection; they differ only in the projection.
+ *
  * The selection is a compile-time argument: Drizzle cannot build its query
  * types from a generic selection, so the overloads declare the projection and
  * the implementation takes the selection loosely. The organization overload
@@ -196,43 +200,12 @@ export async function loadEffectiveMembershipRows(
 export async function loadEffectiveMembershipRowsWithOrganization(
   userId: string,
   organizationId: Organization['id']
-): Promise<{ role: OrganizationRole; organization: Organization }[]> {
-  const [directRows, inheritedRows] = await Promise.all([
-    db
-      .select({ role: organization_memberships.role, organization: organizations })
-      .from(organization_memberships)
-      .innerJoin(
-        organizations,
-        activeOrganizationJoinCondition(organization_memberships.organization_id)
-      )
-      .where(
-        and(
-          eq(organization_memberships.kilo_user_id, userId),
-          eq(organization_memberships.organization_id, organizationId)
-        )
-      ),
-    db
-      .select({ role: organization_memberships.role, organization: organizations })
-      .from(organizations)
-      .innerJoin(
-        parentOrganizations,
-        and(
-          eq(parentOrganizations.id, organizations.parent_organization_id),
-          isNull(parentOrganizations.deleted_at)
-        )
-      )
-      .innerJoin(
-        organization_memberships,
-        and(
-          eq(organization_memberships.organization_id, organizations.parent_organization_id),
-          eq(organization_memberships.kilo_user_id, userId),
-          inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
-        )
-      )
-      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at))),
-  ]);
-
-  return [...directRows, ...inheritedRows];
+): Promise<CallerRoleRowWithOrganization[]> {
+  return selectCallerRoleRows(
+    userId,
+    column => eq(column, organizationId),
+    callerRoleWithOrganizationFields
+  );
 }
 
 export type OrganizationAccessContext = Pick<

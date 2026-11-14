@@ -344,8 +344,6 @@
       "rowSubtitle": "Utilitza la facturació del teu proveïdor",
       "manageOnWebReason": "Aquests proveïdors necessiten credencials estructurades.",
       "description": "Les sol·licituds fetes amb aquestes claus es facturen al teu compte del proveïdor en lloc del saldo de Kilo.",
-      "enabled": "En ús",
-      "disabled": "Desactivada",
       "managedByPlan": "Gestionada pel teu pla de programació",
       "enableKey": "Activa la clau de {{provider}}",
       "test": "Prova la clau",
@@ -2961,10 +2959,13 @@
     "couldNotLoadDescription": "Les teves sessions actives no estaran disponibles fins que s'hagin carregat les dades.",
     "currentDeviceUnidentified": "No s'ha pogut identificar el dispositiu actual.",
     "kiloApp": "Aplicació de Kilo",
+    "kiloAppAndroid": "Aplicació de Kilo · Android",
+    "kiloAppIos": "Aplicació de Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "No hi ha sessions actives",
     "noSessionsDescription": "Inicia la sessió a l'aplicació de Kilo en un altre dispositiu i apareixerà aquí.",
-    "onlyKiloAppSignIns": "Aquí només apareixen els inicis de sessió de l'aplicació de Kilo. No es mostren els de l'editor ni els del CLI.",
     "signedIn": "Inici de sessió: {{signedIn}} · Última activitat: {{lastSeen}}",
+    "signInScopeNote": "Aquí apareixen els inicis de sessió de l'aplicació de Kilo i del Kilo CLI. No es mostren els de l'editor.",
     "thisDevice": "Aquest dispositiu",
     "webBrowser": "Navegador web",
     "viewProfile": "Mostra el perfil",
@@ -2973,7 +2974,7 @@
     "sessionSignedOut": "Sessió tancada.",
     "signOutThisDeviceTitle": "Vols tancar la sessió d'aquest dispositiu?",
     "signOutThisSessionTitle": "Vols tancar aquesta sessió?",
-    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Pot mantenir l'accés a l'API fins a una hora.",
+    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Última activitat: {{lastSeen}}. Pot mantenir l'accés a l'API fins a una hora.",
     "unknownDevice": "Dispositiu desconegut"
   },
   "forceUpdate": {
@@ -3392,7 +3393,7 @@
       "sharingUnavailable": "Aquest dispositiu no permet compartir contingut.",
       "status": {
         "paid": "Pagada",
-        "open": "Obertura",
+        "open": "Oberta",
         "void": "Anul·lada",
         "uncollectible": "Incobrable"
       },
@@ -3474,7 +3475,7 @@
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",
-      "last30Days": "Últims 30 dies",
+      "orgLast30Days": "Tots els membres · Últims 30 dies",
       "outputTokens": "Tòkens de sortida",
       "requests": "Sol·licituds"
     },

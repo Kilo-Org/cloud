@@ -344,8 +344,6 @@
       "rowSubtitle": "Facturering via je eigen provider",
       "manageOnWebReason": "Deze providers hebben gestructureerde inloggegevens nodig.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
-      "enabled": "In gebruik",
-      "disabled": "Uitgeschakeld",
       "managedByPlan": "Beheerd door je codeerabonnement",
       "enableKey": "Sleutel van {{provider}} inschakelen",
       "test": "Sleutel testen",
@@ -2366,10 +2364,13 @@
     "couldNotLoadDescription": "Je actieve sessies zijn pas beschikbaar nadat de gegevens zijn geladen.",
     "currentDeviceUnidentified": "Het huidige apparaat kon niet worden herkend.",
     "kiloApp": "Kilo-app",
+    "kiloAppAndroid": "Kilo-app · Android",
+    "kiloAppIos": "Kilo-app · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Geen actieve sessies",
     "noSessionsDescription": "Meld je in de Kilo-app aan op een ander apparaat. Dat apparaat verschijnt dan hier.",
-    "onlyKiloAppSignIns": "Alleen aanmeldingen van de Kilo-app verschijnen hier. Editor- en CLI-aanmeldingen worden niet vermeld.",
     "signedIn": "Aangemeld {{signedIn}} · Laatst gezien {{lastSeen}}",
+    "signInScopeNote": "Aanmeldingen van de Kilo-app en de Kilo CLI verschijnen hier. Aanmeldingen van de editor worden niet vermeld.",
     "thisDevice": "Dit apparaat",
     "viewProfile": "Profiel bekijken",
     "signOutThisDevice": "Dit apparaat afmelden",
@@ -2377,7 +2378,7 @@
     "sessionSignedOut": "Sessie afgemeld.",
     "signOutThisDeviceTitle": "Dit apparaat afmelden?",
     "signOutThisSessionTitle": "Deze sessie afmelden?",
-    "signOutThisSessionMessage": "{{device}} wordt afgemeld. Het apparaat kan daarna nog maximaal een uur toegang tot de API hebben.",
+    "signOutThisSessionMessage": "{{device}} wordt afgemeld. Laatst gezien {{lastSeen}}. Het apparaat kan daarna nog maximaal een uur toegang tot de API hebben.",
     "webBrowser": "Webbrowser",
     "unknownDevice": "Onbekend apparaat"
   },
@@ -3344,7 +3345,7 @@
       "sharingUnavailable": "Op dit apparaat kun je geen bestanden delen.",
       "status": {
         "paid": "Betaald",
-        "open": "Openen",
+        "open": "Open",
         "void": "Vervallen",
         "uncollectible": "Oninbaar"
       },
@@ -3426,7 +3427,7 @@
     },
     "usageStats": {
       "inputTokens": "Invoertokens",
-      "last30Days": "Laatste 30 dagen",
+      "orgLast30Days": "Alle leden · Laatste 30 dagen",
       "outputTokens": "Uitvoertokens",
       "requests": "Verzoeken"
     },

@@ -344,8 +344,6 @@
       "rowSubtitle": "Use o faturamento do seu próprio provedor",
       "manageOnWebReason": "Esses provedores precisam de credenciais estruturadas.",
       "description": "As solicitações feitas com essas chaves são cobradas na sua conta do provedor, e não no seu saldo Kilo.",
-      "enabled": "Em uso",
-      "disabled": "Desativada",
       "managedByPlan": "Gerenciada pelo seu plano de programação",
       "enableKey": "Ativar a chave do {{provider}}",
       "test": "Testar chave",
@@ -2401,9 +2399,12 @@
     "couldNotLoadDescription": "Você só poderá ver suas sessões ativas após o carregamento dos dados.",
     "currentDeviceUnidentified": "Não foi possível identificar o dispositivo atual.",
     "kiloApp": "App Kilo",
+    "kiloAppAndroid": "App Kilo · Android",
+    "kiloAppIos": "App Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Nenhuma sessão ativa",
     "noSessionsDescription": "Entre na sua conta pelo app Kilo em outro dispositivo para que ele apareça aqui.",
-    "onlyKiloAppSignIns": "Apenas os acessos pelo app Kilo aparecem aqui. Os acessos pelo editor e pela CLI não são listados.",
+    "signInScopeNote": "Apenas os acessos pelo app Kilo e pela Kilo CLI aparecem aqui. Os acessos pelo editor não são listados.",
     "signedIn": "Entrada: {{signedIn}} · Último acesso: {{lastSeen}}",
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
@@ -2412,7 +2413,7 @@
     "sessionSignedOut": "Sessão encerrada.",
     "signOutThisDeviceTitle": "Sair deste dispositivo?",
     "signOutThisSessionTitle": "Encerrar esta sessão?",
-    "signOutThisSessionMessage": "{{device}} será desconectado. Ele pode manter o acesso à API por até uma hora.",
+    "signOutThisSessionMessage": "{{device}} será desconectado. Último acesso: {{lastSeen}}. Ele pode manter o acesso à API por até uma hora.",
     "webBrowser": "Navegador",
     "unknownDevice": "Dispositivo desconhecido"
   },
@@ -3403,7 +3404,7 @@
       "sharingUnavailable": "O compartilhamento não está disponível neste dispositivo.",
       "status": {
         "paid": "Paga",
-        "open": "Abrir",
+        "open": "Em aberto",
         "void": "Cancelada",
         "uncollectible": "Incobrável"
       },
@@ -3485,7 +3486,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 dias",
+      "orgLast30Days": "Todos os membros · Últimos 30 dias",
       "outputTokens": "Tokens de saída",
       "requests": "Solicitações"
     },

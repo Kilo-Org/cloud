@@ -344,8 +344,6 @@
       "rowSubtitle": "Usa a faturação do teu próprio fornecedor",
       "manageOnWebReason": "Estes fornecedores precisam de credenciais estruturadas.",
       "description": "Os pedidos feitos com estas chaves são faturados na tua conta do fornecedor em vez de no teu saldo Kilo.",
-      "enabled": "Em uso",
-      "disabled": "Desativada",
       "managedByPlan": "Gerida pelo teu plano de programação",
       "enableKey": "Ativar a chave de {{provider}}",
       "test": "Testar chave",
@@ -2967,9 +2965,12 @@
     "couldNotLoadDescription": "As suas sessões ativas só ficam disponíveis após o carregamento.",
     "currentDeviceUnidentified": "Não foi possível identificar o dispositivo atual.",
     "kiloApp": "Aplicação Kilo",
+    "kiloAppAndroid": "Aplicação Kilo · Android",
+    "kiloAppIos": "Aplicação Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Sem sessões ativas",
     "noSessionsDescription": "Inicie sessão na aplicação Kilo noutro dispositivo. A sessão aparecerá aqui.",
-    "onlyKiloAppSignIns": "Apenas os inícios de sessão na aplicação Kilo aparecem aqui. Os inícios de sessão no editor e na CLI não são listados.",
+    "signInScopeNote": "Aqui aparecem os inícios de sessão na aplicação Kilo e na Kilo CLI. Os inícios de sessão no editor não são listados.",
     "signedIn": "Início de sessão: {{signedIn}} · Última atividade: {{lastSeen}}",
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
@@ -2978,7 +2979,7 @@
     "sessionSignedOut": "Sessão terminada.",
     "signOutThisDeviceTitle": "Terminar sessão neste dispositivo?",
     "signOutThisSessionTitle": "Terminar esta sessão?",
-    "signOutThisSessionMessage": "A sessão em {{device}} será terminada. O dispositivo pode manter o acesso à API durante até uma hora.",
+    "signOutThisSessionMessage": "A sessão em {{device}} será terminada. Última atividade: {{lastSeen}}. O dispositivo pode manter o acesso à API durante até uma hora.",
     "webBrowser": "Navegador web",
     "unknownDevice": "Dispositivo desconhecido"
   },
@@ -3398,7 +3399,7 @@
       "sharingUnavailable": "A partilha não está disponível neste dispositivo.",
       "status": {
         "paid": "Paga",
-        "open": "Abrir",
+        "open": "Em aberto",
         "void": "Anulada",
         "uncollectible": "Incobrável"
       },
@@ -3480,7 +3481,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 dias",
+      "orgLast30Days": "Todos os membros · Últimos 30 dias",
       "outputTokens": "Tokens de saída",
       "requests": "Pedidos"
     },

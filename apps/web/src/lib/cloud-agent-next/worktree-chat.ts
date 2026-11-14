@@ -8,12 +8,14 @@ import {
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import type { TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
 import { createCloudAgentNextClient, type CreateWorktreeChatOutput } from './cloud-agent-client';
+import { readCloudAgentErrorCode } from './cloud-agent-error';
 
 type CreateWorktreeChatOptions = {
   user: User;
@@ -24,42 +26,21 @@ type CreateWorktreeChatOptions = {
   organizationId?: string;
 };
 
-type WorktreeUpstreamErrorShape = {
-  data?: { code?: unknown; httpStatus?: unknown };
-  shape?: { data?: { code?: unknown; httpStatus?: unknown } } | null;
-};
-
-type WorktreeErrorCode =
-  | 'BAD_REQUEST'
-  | 'UNAUTHORIZED'
-  | 'PAYMENT_REQUIRED'
-  | 'FORBIDDEN'
-  | 'NOT_FOUND'
-  | 'TIMEOUT'
-  | 'CONFLICT'
-  | 'PRECONDITION_FAILED'
-  | 'UNPROCESSABLE_CONTENT'
-  | 'TOO_MANY_REQUESTS'
-  | 'INTERNAL_SERVER_ERROR'
-  | 'BAD_GATEWAY'
-  | 'SERVICE_UNAVAILABLE'
-  | 'GATEWAY_TIMEOUT';
-
-const worktreeErrorCodesByHttpStatus = new Map<number, WorktreeErrorCode>([
-  [400, 'BAD_REQUEST'],
-  [401, 'UNAUTHORIZED'],
-  [402, 'PAYMENT_REQUIRED'],
-  [403, 'FORBIDDEN'],
-  [404, 'NOT_FOUND'],
-  [408, 'TIMEOUT'],
-  [409, 'CONFLICT'],
-  [412, 'PRECONDITION_FAILED'],
-  [422, 'UNPROCESSABLE_CONTENT'],
-  [429, 'TOO_MANY_REQUESTS'],
-  [500, 'INTERNAL_SERVER_ERROR'],
-  [502, 'BAD_GATEWAY'],
-  [503, 'SERVICE_UNAVAILABLE'],
-  [504, 'GATEWAY_TIMEOUT'],
+const WORKTREE_TRPC_CODES = new Set<TRPC_ERROR_CODE_KEY>([
+  'BAD_REQUEST',
+  'UNAUTHORIZED',
+  'PAYMENT_REQUIRED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'TIMEOUT',
+  'CONFLICT',
+  'PRECONDITION_FAILED',
+  'UNPROCESSABLE_CONTENT',
+  'TOO_MANY_REQUESTS',
+  'INTERNAL_SERVER_ERROR',
+  'BAD_GATEWAY',
+  'SERVICE_UNAVAILABLE',
+  'GATEWAY_TIMEOUT',
 ]);
 
 const safeWorktreeErrorMessages = new Set([
@@ -70,33 +51,11 @@ const safeWorktreeErrorMessages = new Set([
   'worktree_chat_registration_failed',
 ]);
 
-function getWorktreeErrorCode(error: WorktreeUpstreamErrorShape): WorktreeErrorCode | undefined {
-  const code = error.data?.code ?? error.shape?.data?.code;
-  if (
-    code === 'BAD_REQUEST' ||
-    code === 'UNAUTHORIZED' ||
-    code === 'PAYMENT_REQUIRED' ||
-    code === 'FORBIDDEN' ||
-    code === 'NOT_FOUND' ||
-    code === 'TIMEOUT' ||
-    code === 'CONFLICT' ||
-    code === 'PRECONDITION_FAILED' ||
-    code === 'UNPROCESSABLE_CONTENT' ||
-    code === 'TOO_MANY_REQUESTS' ||
-    code === 'INTERNAL_SERVER_ERROR' ||
-    code === 'BAD_GATEWAY' ||
-    code === 'SERVICE_UNAVAILABLE' ||
-    code === 'GATEWAY_TIMEOUT'
-  ) {
-    return code;
-  }
-
-  const status = error.data?.httpStatus ?? error.shape?.data?.httpStatus;
-  return typeof status === 'number' ? worktreeErrorCodesByHttpStatus.get(status) : undefined;
-}
-
 function rejectsProposedSessionId(error: unknown): boolean {
-  if (!(error instanceof TRPCClientError) || getWorktreeErrorCode(error) !== 'BAD_REQUEST') {
+  if (
+    !(error instanceof TRPCClientError) ||
+    readCloudAgentErrorCode(error, WORKTREE_TRPC_CODES) !== 'BAD_REQUEST'
+  ) {
     return false;
   }
   try {
@@ -200,7 +159,7 @@ export async function createWorktreeChat({
       });
   } catch (error) {
     if (error instanceof TRPCClientError) {
-      const code = getWorktreeErrorCode(error);
+      const code = readCloudAgentErrorCode(error, WORKTREE_TRPC_CODES);
       if (code) {
         throw new TRPCError({
           code,

@@ -344,8 +344,6 @@
       "rowSubtitle": "اپنے فراہم کنندہ کی بلنگ استعمال کریں",
       "manageOnWebReason": "ان فراہم کنندگان کو منظم اسناد درکار ہیں۔",
       "description": "ان کلیدوں کے ذریعے کی گئی درخواستوں کا بل آپ کے Kilo بیلنس کے بجائے آپ کے فراہم کنندہ اکاؤنٹ پر آتا ہے۔",
-      "enabled": "زیر استعمال",
-      "disabled": "بند ہے",
       "managedByPlan": "آپ کے کوڈنگ پلان کے زیر انتظام",
       "enableKey": "{{provider}} کلید فعال کریں",
       "test": "کلید آزمائیں",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "آپ کے فعال سیشن اس وقت تک دستیاب نہیں ہیں جب تک یہ لوڈ نہ ہو۔",
     "currentDeviceUnidentified": "موجودہ ڈیوائس کی شناخت نہیں ہو سکی۔",
     "kiloApp": "Kilo ایپ",
+    "kiloAppAndroid": "Kilo ایپ · Android",
+    "kiloAppIos": "Kilo ایپ · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "کوئی فعال سیشن نہیں",
     "noSessionsDescription": "کسی دوسری ڈیوائس پر Kilo ایپ سے سائن ان کریں۔ اس کا سیشن یہاں نظر آئے گا۔",
-    "onlyKiloAppSignIns": "صرف Kilo ایپ کے سائن ان یہاں ظاہر ہوتے ہیں۔ ایڈیٹر اور CLI سائن ان درج نہیں ہیں۔",
     "signedIn": "سائن ان: {{signedIn}} · آخری سرگرمی: {{lastSeen}}",
+    "signInScopeNote": "یہاں Kilo ایپ اور Kilo CLI کے سائن ان ظاہر ہوتے ہیں۔ ایڈیٹر کے سائن ان درج نہیں ہوتے۔",
     "thisDevice": "یہ ڈیوائس",
     "webBrowser": "ویب براؤزر",
     "viewProfile": "پروفائل دیکھیں",
@@ -2921,7 +2922,7 @@
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
-    "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔",
+    "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ آخری سرگرمی: {{lastSeen}}۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔",
     "unknownDevice": "نامعلوم ڈیوائس"
   },
   "forceUpdate": {
@@ -3339,7 +3340,7 @@
       "sharingUnavailable": "اس ڈیوائس پر شیئر کرنے کی سہولت دستیاب نہیں ہے۔",
       "status": {
         "paid": "ادا شدہ",
-        "open": "کھولیں",
+        "open": "کھلا",
         "void": "منسوخ",
         "uncollectible": "ناقابل وصول"
       },
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",
-      "last30Days": "پچھلے 30 دن",
+      "orgLast30Days": "تمام اراکین · پچھلے 30 دن",
       "outputTokens": "آؤٹ پٹ ٹوکن",
       "requests": "درخواستیں"
     },

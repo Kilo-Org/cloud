@@ -705,6 +705,11 @@ export function planAndroidChannelWrite(
   return { bypassDnd: dndAccessGranted !== false };
 }
 
+// The typechecked half of the silent-channel contract: the JSDoc type in the
+// plain-JS list is only a cast, so this binding is what fails if it goes away.
+const silentAndroidChannelIds: readonly AndroidNotificationChannelId[] =
+  SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS;
+
 /** Every channel re-write (create and rename) must pass the same sound policy. */
 function androidChannelConfiguration(
   channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number],
@@ -721,9 +726,7 @@ function androidChannelConfiguration(
     bypassDnd,
     // An absent sound is the system default; an explicit null is silence, and a
     // silent channel must not vibrate either (the default is enabled).
-    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(channel.id)
-      ? { sound: null, enableVibrate: false }
-      : {}),
+    ...(silentAndroidChannelIds.includes(channel.id) ? { sound: null, enableVibrate: false } : {}),
   };
 }
 

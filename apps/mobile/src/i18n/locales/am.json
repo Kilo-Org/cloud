@@ -344,8 +344,6 @@
       "rowSubtitle": "የራስዎን የአቅራቢ ክፍያ ይጠቀሙ",
       "manageOnWebReason": "እነዚህ አቅራቢዎች የተዋቀሩ የማረጋገጫ መረጃዎችን ይፈልጋሉ።",
       "description": "በእነዚህ ቁልፎች የሚላኩ ጥያቄዎች ከKilo ቀሪ ሂሳብዎ ይልቅ በአቅራቢ መለያዎ ይከፈላሉ።",
-      "enabled": "በጥቅም ላይ",
-      "disabled": "ጠፍቷል",
       "managedByPlan": "በኮዲንግ ዕቅድዎ የሚተዳደር",
       "enableKey": "የ{{provider}} ቁልፍን አንቃ",
       "test": "ቁልፉን ሞክር",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "ይህ እስኪጫን ድረስ ንቁ ክፍለ ጊዜዎችዎ አይገኙም።",
     "currentDeviceUnidentified": "የአሁኑን መሣሪያ መለየት አልተቻለም።",
     "kiloApp": "የKilo መተግበሪያ",
+    "kiloAppAndroid": "የKilo መተግበሪያ · Android",
+    "kiloAppIos": "የKilo መተግበሪያ · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "ንቁ ክፍለ ጊዜዎች የሉም",
     "noSessionsDescription": "በሌላ መሣሪያ ላይ በKilo መተግበሪያ ይግቡ፤ እዚህ ይታያል።",
-    "onlyKiloAppSignIns": "የKilo መተግበሪያ መግቢያዎች ብቻ እዚህ ይታያሉ። የአርታዒ እና የCLI መግቢያዎች አይዘረዘሩም።",
     "signedIn": "የገቡበት ጊዜ፦ {{signedIn}} · ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}",
+    "signInScopeNote": "የKilo መተግበሪያ እና የKilo CLI መግቢያዎች እዚህ ይታያሉ። የአርታዒ መግቢያዎች አይዘረዘሩም።",
     "thisDevice": "ይህ መሣሪያ",
     "webBrowser": "የድር አሳሽ",
     "viewProfile": "መገለጫ ይመልከቱ",
@@ -2921,7 +2922,7 @@
     "sessionSignedOut": "ከክፍለ ጊዜው ወጥተዋል።",
     "signOutThisDeviceTitle": "ከዚህ መሣሪያ መውጣት ይፈልጋሉ?",
     "signOutThisSessionTitle": "ከዚህ ክፍለ ጊዜ መውጣት ይፈልጋሉ?",
-    "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።",
+    "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።",
     "unknownDevice": "ያልታወቀ መሣሪያ"
   },
   "forceUpdate": {
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
-      "last30Days": "ያለፉት 30 ቀናት",
+      "orgLast30Days": "ሁሉም አባላት · ያለፉት 30 ቀናት",
       "outputTokens": "የውጤት ቶከኖች",
       "requests": "ጥያቄዎች"
     },

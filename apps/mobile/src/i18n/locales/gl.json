@@ -344,8 +344,6 @@
       "rowSubtitle": "Usa a facturación do teu propio provedor",
       "manageOnWebReason": "Estes provedores necesitan credenciais estruturadas.",
       "description": "As solicitudes feitas con estas claves facúranse na túa conta do provedor en lugar de descontarse do teu saldo de Kilo.",
-      "enabled": "En uso",
-      "disabled": "Desactivada",
       "managedByPlan": "Xestionada polo teu plan de programación",
       "enableKey": "Activar a clave de {{provider}}",
       "test": "Probar a clave",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "Non se poden mostrar as túas sesións activas ata que se carguen os datos.",
     "currentDeviceUnidentified": "Non se puido identificar o dispositivo actual.",
     "kiloApp": "Aplicación de Kilo",
+    "kiloAppAndroid": "Aplicación de Kilo · Android",
+    "kiloAppIos": "Aplicación de Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Non hai sesións activas",
     "noSessionsDescription": "Inicia sesión coa aplicación de Kilo noutro dispositivo e aparecerá aquí.",
-    "onlyKiloAppSignIns": "Aquí só aparecen os inicios de sesión da aplicación de Kilo. Non se inclúen os do editor nin os do CLI.",
     "signedIn": "Inicio de sesión: {{signedIn}} · Última actividade: {{lastSeen}}",
+    "signInScopeNote": "Aquí aparecen os inicios de sesión da aplicación de Kilo e da CLI de Kilo. Os inicios de sesión do editor non se inclúen.",
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver o perfil",
     "signOutThisDevice": "Pechar a sesión deste dispositivo",
@@ -2920,7 +2921,7 @@
     "sessionSignedOut": "Sesión pechada.",
     "signOutThisDeviceTitle": "Pechar a sesión deste dispositivo?",
     "signOutThisSessionTitle": "Pechar esta sesión?",
-    "signOutThisSessionMessage": "Pecharase a sesión en {{device}}. O dispositivo pode conservar o acceso á API durante unha hora como máximo.",
+    "signOutThisSessionMessage": "Pecharase a sesión en {{device}}. Última actividade: {{lastSeen}}. O dispositivo pode conservar o acceso á API durante unha hora como máximo.",
     "webBrowser": "Navegador web",
     "unknownDevice": "Dispositivo descoñecido"
   },
@@ -3339,7 +3340,7 @@
       "sharingUnavailable": "Non se pode compartir contido neste dispositivo.",
       "status": {
         "paid": "Pagada",
-        "open": "Apertura",
+        "open": "Aberta",
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 días",
+      "orgLast30Days": "Todos os membros · Últimos 30 días",
       "outputTokens": "Tokens de saída",
       "requests": "Solicitudes"
     },

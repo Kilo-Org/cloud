@@ -344,8 +344,6 @@
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
       "manageOnWebReason": "Dawn il-fornituri jeħtieġu kredenzjali strutturati.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
-      "enabled": "Qed tintuża",
-      "disabled": "Mitfija",
       "managedByPlan": "Immaniġġjata mill-pjan tal-ikkowdjar tiegħek",
       "enableKey": "Attiva ċ-ċavetta ta' {{provider}}",
       "test": "Ittestja ċ-ċavetta",
@@ -3065,10 +3063,13 @@
     "couldNotLoadDescription": "Is-sessjonijiet attivi tiegħek ma jkunux disponibbli sakemm titgħabba d-dejta.",
     "currentDeviceUnidentified": "L-apparat attwali ma setax jiġi identifikat.",
     "kiloApp": "Applikazzjoni ta' Kilo",
+    "kiloAppAndroid": "Applikazzjoni ta' Kilo · Android",
+    "kiloAppIos": "Applikazzjoni ta' Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "L-ebda sessjoni attiva",
     "noSessionsDescription": "Idħol bl-applikazzjoni ta' Kilo fuq apparat ieħor u s-sessjoni tidher hawn.",
-    "onlyKiloAppSignIns": "Hawn jidhru biss is-sessjonijiet tal-applikazzjoni ta' Kilo. Is-sessjonijiet tal-editur u tal-CLI mhumiex elenkati.",
     "signedIn": "Dħul: {{signedIn}} · L-aħħar attività: {{lastSeen}}",
+    "signInScopeNote": "Hawn jidhru s-sessjonijiet tal-applikazzjoni ta' Kilo u tal-Kilo CLI. Is-sessjonijiet tal-editur mhumiex elenkati.",
     "thisDevice": "Dan l-apparat",
     "viewProfile": "Ara l-profil",
     "webBrowser": "Brawżer tal-web",
@@ -3077,7 +3078,7 @@
     "sessionSignedOut": "Il-ħruġ mill-kont f'din is-sessjoni tlesta.",
     "signOutThisDeviceTitle": "Toħroġ mill-kont fuq dan l-apparat?",
     "signOutThisSessionTitle": "Toħroġ mill-kont f'din is-sessjoni?",
-    "signOutThisSessionMessage": "Se toħroġ mill-kont fuq {{device}}. L-apparat jista' jibqa' jaċċessa l-API sa siegħa.",
+    "signOutThisSessionMessage": "Se toħroġ mill-kont fuq {{device}}. L-aħħar attività: {{lastSeen}}. L-apparat jista' jibqa' jaċċessa l-API sa siegħa.",
     "unknownDevice": "Apparat mhux magħruf"
   },
   "forceUpdate": {
@@ -3498,7 +3499,7 @@
       "sharingUnavailable": "Il-qsim mhux disponibbli fuq dan l-apparat.",
       "status": {
         "paid": "Imħallsa",
-        "open": "Ftuħ",
+        "open": "Miftuħa",
         "void": "Annullata",
         "uncollectible": "Ma tistax tinġabar"
       },
@@ -3580,7 +3581,7 @@
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
-      "last30Days": "L-aħħar 30 ġurnata",
+      "orgLast30Days": "Il-membri kollha · L-aħħar 30 ġurnata",
       "outputTokens": "Unitajiet tat-test tar-riżultat",
       "requests": "Talbiet"
     },

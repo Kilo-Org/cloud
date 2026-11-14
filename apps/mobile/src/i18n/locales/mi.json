@@ -344,8 +344,6 @@
       "rowSubtitle": "Whakamahia te pire o tō ake kaiwhakarato",
       "manageOnWebReason": "E hiahia ana ēnei kaiwhakarato ki ngā tohu tuakiri whai hanganga.",
       "description": "Ko ngā tono mā ēnei kī ka pirehia ki tō pūkete kaiwhakarato, kaua ki tō toenga Kilo.",
-      "enabled": "E whakamahia ana",
-      "disabled": "Kua whakawetohia",
       "managedByPlan": "Kei tō mahere waehere e whakahaere",
       "enableKey": "Whakahohea te kī {{provider}}",
       "test": "Whakamātauhia te kī",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "Kāore ō wātū hohe e wātea kia oti rā anō te uta.",
     "currentDeviceUnidentified": "Kāore i taea te tautohu i te pūrere o nāianei.",
     "kiloApp": "Taupānga Kilo",
+    "kiloAppAndroid": "Taupānga Kilo · Android",
+    "kiloAppIos": "Taupānga Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Kāore he wātū hohe",
     "noSessionsDescription": "Takiuru mā te taupānga Kilo ki tētahi atu pūrere, ka puta taua pūrere ki konei.",
-    "onlyKiloAppSignIns": "Ko ngā takiuru ki te taupānga Kilo anake ka puta ki konei. Kāore ngā takiuru ki te ētita me te CLI e rārangitia.",
     "signedIn": "I takiuru i te {{signedIn}} · I kitea whakamutungatia i te {{lastSeen}}",
+    "signInScopeNote": "Ka puta ki konei ngā takiuru mā te taupānga Kilo me te Kilo CLI. Kāore ngā takiuru mā te ētita e rārangitia.",
     "thisDevice": "Tēnei pūrere",
     "viewProfile": "Tirohia te kōtaha",
     "webBrowser": "Pūtirotiro tukutuku",
@@ -2921,7 +2922,7 @@
     "sessionSignedOut": "Kua takiputaina te wātū.",
     "signOutThisDeviceTitle": "Takiputa i tēnei pūrere?",
     "signOutThisSessionTitle": "Takiputa i tēnei wātū?",
-    "signOutThisSessionMessage": "Ka takiputaina a {{device}}. Ka taea tonu e taua pūrere te uru ki te API mō te kotahi hāora te mōrahi.",
+    "signOutThisSessionMessage": "Ka takiputaina a {{device}}. I kitea whakamutungatia i te {{lastSeen}}. Ka taea tonu e taua pūrere te uru ki te API mō te kotahi hāora te mōrahi.",
     "unknownDevice": "Pūrere kāore e mōhiotia"
   },
   "forceUpdate": {
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",
-      "last30Days": "Ngā rā e 30 kua hipa",
+      "orgLast30Days": "Ngā mema katoa · Ngā rā e 30 kua hipa",
       "outputTokens": "Ngā tōkena tāputa",
       "requests": "Ngā tono"
     },

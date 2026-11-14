@@ -344,8 +344,6 @@
       "rowSubtitle": "നിങ്ങളുടെ സ്വന്തം പ്രൊവൈഡർ ബില്ലിംഗ് ഉപയോഗിക്കുക",
       "manageOnWebReason": "ഈ പ്രൊവൈഡറുകൾക്ക് ഘടനാപരമായ ക്രെഡൻഷ്യലുകൾ ആവശ്യമാണ്.",
       "description": "ഈ കീകളിലൂടെയുള്ള അഭ്യർത്ഥനകൾ നിങ്ങളുടെ Kilo ബാലൻസിന് പകരം പ്രൊവൈഡർ അക്കൗണ്ടിലേക്ക് ബിൽ ചെയ്യും.",
-      "enabled": "ഉപയോഗത്തിലുണ്ട്",
-      "disabled": "ഓഫാക്കിയിരിക്കുന്നു",
       "managedByPlan": "നിങ്ങളുടെ കോഡിംഗ് പ്ലാൻ നിയന്ത്രിക്കുന്നു",
       "enableKey": "{{provider}} കീ പ്രവർത്തനക്ഷമമാക്കുക",
       "test": "കീ പരിശോധിക്കുക",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "ഇത് ലോഡ് ആകുന്നതുവരെ നിങ്ങളുടെ സജീവ സെഷനുകൾ ലഭ്യമല്ല.",
     "currentDeviceUnidentified": "നിലവിലെ ഉപകരണം തിരിച്ചറിയാൻ കഴിഞ്ഞില്ല.",
     "kiloApp": "Kilo ആപ്പ്",
+    "kiloAppAndroid": "Kilo ആപ്പ് · Android",
+    "kiloAppIos": "Kilo ആപ്പ് · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "സജീവ സെഷനുകളൊന്നുമില്ല",
     "noSessionsDescription": "മറ്റൊരു ഉപകരണത്തിലെ Kilo ആപ്പിൽ സൈൻ ഇൻ ചെയ്താൽ ആ ഉപകരണം ഇവിടെ കാണാം.",
-    "onlyKiloAppSignIns": "Kilo ആപ്പിൽ സൈൻ ഇൻ ചെയ്ത സെഷനുകൾ മാത്രമേ ഇവിടെ കാണൂ. എഡിറ്ററിലെയും CLI-യിലെയും സെഷനുകൾ ഇവിടെ കാണിക്കില്ല.",
     "signedIn": "സൈൻ ഇൻ ചെയ്തത് {{signedIn}} · അവസാനം സജീവമായത് {{lastSeen}}",
+    "signInScopeNote": "Kilo ആപ്പിലും Kilo CLI-യിലും സൈൻ ഇൻ ചെയ്ത സെഷനുകൾ ഇവിടെ കാണാം. എഡിറ്ററിലെ സെഷനുകൾ ഇവിടെ കാണിക്കില്ല.",
     "thisDevice": "ഈ ഉപകരണം",
     "viewProfile": "പ്രൊഫൈൽ കാണുക",
     "webBrowser": "വെബ് ബ്രൗസർ",
@@ -2921,7 +2922,7 @@
     "sessionSignedOut": "സെഷൻ സൈൻ ഔട്ട് ചെയ്തു.",
     "signOutThisDeviceTitle": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
     "signOutThisSessionTitle": "ഈ സെഷനിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
-    "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ആകും. അതിൽ നിന്ന് ഒരു മണിക്കൂർ വരെ API ഉപയോഗിക്കാൻ കഴിഞ്ഞേക്കാം.",
+    "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ആകും. അവസാനം സജീവമായത് {{lastSeen}}. അതിൽ നിന്ന് ഒരു മണിക്കൂർ വരെ API ഉപയോഗിക്കാൻ കഴിഞ്ഞേക്കാം.",
     "unknownDevice": "അജ്ഞാത ഉപകരണം"
   },
   "forceUpdate": {
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "ഇൻപുട്ട് ടോക്കണുകൾ",
-      "last30Days": "കഴിഞ്ഞ 30 ദിവസം",
+      "orgLast30Days": "എല്ലാ അംഗങ്ങളും · കഴിഞ്ഞ 30 ദിവസം",
       "outputTokens": "ഔട്ട്പുട്ട് ടോക്കണുകൾ",
       "requests": "അഭ്യർത്ഥനകൾ"
     },

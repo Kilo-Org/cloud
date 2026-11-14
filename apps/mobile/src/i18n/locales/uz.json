@@ -344,8 +344,6 @@
       "rowSubtitle": "O'z provayderingiz orqali to'lash",
       "manageOnWebReason": "Bu provayderlar tuzilgan hisob ma'lumotlarini talab qiladi.",
       "description": "Bu kalitlar orqali yuborilgan so'rovlar uchun to'lov Kilo balansingizdan emas, provayder hisobingizdan olinadi.",
-      "enabled": "Foydalanilmoqda",
-      "disabled": "O'chirilgan",
       "managedByPlan": "Kodlash tarifingiz orqali boshqariladi",
       "enableKey": "{{provider}} kalitini yoqish",
       "test": "Kalitni sinash",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "Ma'lumotlar yuklanmaguncha faol sessiyalaringizni ko'rsatib bo'lmaydi.",
     "currentDeviceUnidentified": "Joriy qurilmani aniqlab bo'lmadi.",
     "kiloApp": "Kilo ilovasi",
+    "kiloAppAndroid": "Kilo ilovasi · Android",
+    "kiloAppIos": "Kilo ilovasi · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Faol sessiyalar yo'q",
     "noSessionsDescription": "Boshqa qurilmadagi Kilo ilovasida tizimga kiring. Shunda u shu yerda ko'rinadi.",
-    "onlyKiloAppSignIns": "Bu yerda faqat Kilo ilovasidagi sessiyalar ko'rsatiladi. Muharrir va CLI orqali kirilgan sessiyalar ko'rsatilmaydi.",
     "signedIn": "Kirilgan vaqt: {{signedIn}} · Oxirgi faollik: {{lastSeen}}",
+    "signInScopeNote": "Bu yerda Kilo ilovasi va Kilo CLI orqali kirilgan sessiyalar ko'rsatiladi. Muharrir orqali kirilgan sessiyalar ko'rsatilmaydi.",
     "thisDevice": "Bu qurilma",
     "webBrowser": "Veb-brauzer",
     "viewProfile": "Profilni ko'rish",
@@ -2921,7 +2922,7 @@
     "sessionSignedOut": "Sessiyadan chiqildi.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
-    "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",
+    "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Oxirgi faollik: {{lastSeen}}. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",
     "unknownDevice": "Noma'lum qurilma"
   },
   "forceUpdate": {
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",
-      "last30Days": "Oxirgi 30 kun",
+      "orgLast30Days": "Barcha a'zolar · Oxirgi 30 kun",
       "outputTokens": "Chiqish tokenlari",
       "requests": "So'rovlar"
     },

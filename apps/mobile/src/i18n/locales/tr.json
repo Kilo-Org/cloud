@@ -344,8 +344,6 @@
       "rowSubtitle": "Kendi sağlayıcı faturalandırmanı kullan",
       "manageOnWebReason": "Bu sağlayıcılar yapılandırılmış kimlik bilgileri gerektirir.",
       "description": "Bu anahtarlar üzerinden yapılan istekler Kilo bakiyen yerine sağlayıcı hesabına faturalandırılır.",
-      "enabled": "Kullanımda",
-      "disabled": "Kapalı",
       "managedByPlan": "Kodlama planın tarafından yönetiliyor",
       "enableKey": "{{provider}} anahtarını etkinleştir",
       "test": "Anahtarı test et",
@@ -2366,10 +2364,13 @@
     "couldNotLoadDescription": "Liste yüklenene kadar etkin oturumların görüntülenemez.",
     "currentDeviceUnidentified": "Bu cihaz tanınamadı.",
     "kiloApp": "Kilo uygulaması",
+    "kiloAppAndroid": "Kilo uygulaması · Android",
+    "kiloAppIos": "Kilo uygulaması · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Etkin oturum yok",
     "noSessionsDescription": "Başka bir cihazda Kilo uygulamasıyla oturum açtığında o cihaz burada görünür.",
-    "onlyKiloAppSignIns": "Burada yalnızca Kilo uygulaması oturumları görünür. Editör ve CLI oturumları listelenmez.",
     "signedIn": "Giriş: {{signedIn}} · Son görülme: {{lastSeen}}",
+    "signInScopeNote": "Burada Kilo uygulaması ve Kilo CLI oturumları görünür. Editör oturumları listelenmez.",
     "thisDevice": "Bu cihaz",
     "webBrowser": "Web tarayıcısı",
     "viewProfile": "Profili görüntüle",
@@ -2378,7 +2379,7 @@
     "sessionSignedOut": "Oturum kapatıldı.",
     "signOutThisDeviceTitle": "Bu cihazın oturumu kapatılsın mı?",
     "signOutThisSessionTitle": "Bu oturum kapatılsın mı?",
-    "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Cihazın API erişimi bir saat daha devam edebilir.",
+    "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Son görülme: {{lastSeen}}. Cihazın API erişimi bir saat daha devam edebilir.",
     "unknownDevice": "Bilinmeyen cihaz"
   },
   "forceUpdate": {
@@ -3426,7 +3427,7 @@
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
-      "last30Days": "Son 30 gün",
+      "orgLast30Days": "Tüm üyeler · Son 30 gün",
       "outputTokens": "Çıktı tokenları",
       "requests": "İstekler"
     },

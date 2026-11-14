@@ -13,8 +13,7 @@ jest.mock('@/lib/auth/device-sessions', () => ({
   cleanupExpiredDeviceRefreshTokens: jest.fn(),
 }));
 jest.mock('@/lib/auth/passkey', () => ({
-  cleanupExpiredPasskeyChallenges: jest.fn(),
-  cleanupExpiredPasskeySignInTickets: jest.fn(),
+  cleanupExpiredPasskeyRows: jest.fn(),
 }));
 jest.mock('@/lib/kiloclaw/access-codes', () => ({ cleanupExpiredAccessCodes: jest.fn() }));
 jest.mock('@/lib/integrations/github/install-state', () => ({
@@ -30,10 +29,7 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
 import { cleanupExpiredDeviceRefreshTokens } from '@/lib/auth/device-sessions';
-import {
-  cleanupExpiredPasskeyChallenges,
-  cleanupExpiredPasskeySignInTickets,
-} from '@/lib/auth/passkey';
+import { cleanupExpiredPasskeyRows } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
 import { cleanupExpiredSessionStepUpRows } from '@kilocode/web-shared/lib/admin/step-up-store';
@@ -49,8 +45,7 @@ describe('GET /api/cron/cleanup-device-auth', () => {
     jest.mocked(cleanupExpiredDeviceAuthRequests).mockResolvedValue(2);
     jest.mocked(cleanupExpiredDeviceRefreshTokens).mockResolvedValue(7);
     jest.mocked(cleanupExpiredAdmissionChallenges).mockResolvedValue(1);
-    jest.mocked(cleanupExpiredPasskeyChallenges).mockResolvedValue(5);
-    jest.mocked(cleanupExpiredPasskeySignInTickets).mockResolvedValue(6);
+    jest.mocked(cleanupExpiredPasskeyRows).mockResolvedValue({ challenges: 5, tickets: 6 });
     jest.mocked(cleanupExpiredAccessCodes).mockResolvedValue(3);
     jest.mocked(cleanupExpiredInstallStates).mockResolvedValue(4);
     jest.mocked(cleanupExpiredSessionStepUpRows).mockResolvedValue({ challenges: 8, proofs: 9 });

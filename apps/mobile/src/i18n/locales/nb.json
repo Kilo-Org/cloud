@@ -344,8 +344,6 @@
       "rowSubtitle": "Bruk din egen leverandørfakturering",
       "manageOnWebReason": "Disse leverandørene trenger strukturert legitimasjon.",
       "description": "Forespørsler via disse nøklene faktureres leverandørkontoen din i stedet for Kilo-saldoen din.",
-      "enabled": "I bruk",
-      "disabled": "Slått av",
       "managedByPlan": "Administreres av kodeabonnementet ditt",
       "enableKey": "Aktiver {{provider}}-nøkkelen",
       "test": "Test nøkkel",
@@ -2909,10 +2907,13 @@
     "couldNotLoadDescription": "De aktive øktene dine kan ikke vises før innlastingen er fullført.",
     "currentDeviceUnidentified": "Kunne ikke identifisere denne enheten.",
     "kiloApp": "Kilo-app",
+    "kiloAppAndroid": "Kilo-app · Android",
+    "kiloAppIos": "Kilo-app · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Ingen aktive økter",
     "noSessionsDescription": "Logg inn med Kilo-appen på en annen enhet, så vises den her.",
-    "onlyKiloAppSignIns": "Her vises bare innlogginger i Kilo-appen. Innlogginger i kodeeditoren og CLI-en vises ikke.",
     "signedIn": "Logget inn {{signedIn}} · Sist sett {{lastSeen}}",
+    "signInScopeNote": "Her vises innlogginger i Kilo-appen og i Kilo CLI. Innlogginger i kodeeditoren vises ikke.",
     "thisDevice": "Denne enheten",
     "viewProfile": "Vis profil",
     "signOutThisDevice": "Logg ut denne enheten",
@@ -2920,7 +2921,7 @@
     "sessionSignedOut": "Økten er logget ut.",
     "signOutThisDeviceTitle": "Logge ut denne enheten?",
     "signOutThisSessionTitle": "Logge ut denne økten?",
-    "signOutThisSessionMessage": "{{device}} vil bli logget ut. Den kan beholde API-tilgang i opptil en time.",
+    "signOutThisSessionMessage": "{{device}} vil bli logget ut. Sist sett {{lastSeen}}. Den kan beholde API-tilgang i opptil en time.",
     "webBrowser": "Nettleser",
     "unknownDevice": "Ukjent enhet"
   },
@@ -3339,7 +3340,7 @@
       "sharingUnavailable": "Deling er ikke tilgjengelig på denne enheten.",
       "status": {
         "paid": "Betalt",
-        "open": "Åpne",
+        "open": "Åpen",
         "void": "Annullert",
         "uncollectible": "Uinnkrevbar"
       },
@@ -3421,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",
-      "last30Days": "Siste 30 dager",
+      "orgLast30Days": "Alle medlemmer · Siste 30 dager",
       "outputTokens": "Utdatatokener",
       "requests": "Forespørsler"
     },

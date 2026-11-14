@@ -23,6 +23,7 @@ import {
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+import { isolateLtrBidiText } from '@/lib/bidi';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -655,6 +656,102 @@ describe('ProfileMcpScreen', () => {
     expect(h.confirm).not.toHaveBeenCalled();
     expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
     expect(h.mutations.setMcpEnabled.mutate).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+/** The server name the fixture row holds; the dialog must isolate exactly this run. */
+const SERVER_NAME = 'docs';
+
+/** The confirm sheet's request, as the screen hands it to `useConfirmDialog`. */
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+/** Read the request the screen raised, without answering it. */
+function deleteRequest(): ConfirmRequest {
+  const request = h.confirm.mock.calls[0]?.[0] as ConfirmRequest | undefined;
+  if (!request) {
+    throw new Error('the screen asked for no confirmation');
+  }
+  return request;
+}
+
+describe('ProfileMcpScreen delete confirmation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    h.query.data = testProfile([testServer({ name: SERVER_NAME })]);
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  // The dialog used to read "Delete" as both its title and its confirm label,
+  // with the bare name as the message, so the reader was never told what
+  // removing the server would do.
+  it('asks for consent with the server name in the title and states the consequence', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete MCP server ${SERVER_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.mcp.deleteTitle', { name: isolateLtrBidiText(SERVER_NAME) }),
+      message: i18n.t('profiles.mcp.deleteMessage'),
+      confirmLabel: i18n.t('profiles.mcp.deleteConfirm'),
+    });
+    expect(request.confirmLabel).not.toBe(i18n.t('common.delete'));
+    expect(request.title).not.toBe(request.message);
+    expect(request.title).not.toBe(SERVER_NAME);
+    expect(request.message).not.toBe(SERVER_NAME);
+
+    unmount();
+  });
+
+  // A server name is compared character by character, so a right-to-left
+  // sentence must not reorder it: one explicit left-to-right run, no more.
+  it('keeps the server name in exactly one left-to-right isolate pair', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete MCP server ${SERVER_NAME}`);
+    const { title } = deleteRequest();
+
+    expect(title).toContain(`\u2066${SERVER_NAME}\u2069`);
+    expect(title.split('\u2066')).toHaveLength(2);
+    expect(title.split('\u2069')).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('deletes nothing until the reader confirms, then deletes that server', async () => {
+    h.mutations.deleteMcp.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete MCP server ${SERVER_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.mutations.deleteMcp.mutateAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.onConfirm();
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteMcp.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.mutations.deleteMcp.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      mcpServerId: 'mcp-1',
+    });
+
     unmount();
   });
 });

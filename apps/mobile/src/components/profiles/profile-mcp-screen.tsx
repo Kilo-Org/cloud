@@ -28,6 +28,7 @@ import {
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -117,9 +118,10 @@ export function ProfileMcpScreen({
 
   const confirmDelete = (target: McpServerSource) => {
     confirm({
-      title: t('common.delete'),
-      message: target.name,
-      confirmLabel: t('common.delete'),
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.mcp.deleteTitle', { name: isolateLtrBidiText(target.name) }),
+      message: t('profiles.mcp.deleteMessage'),
+      confirmLabel: t('profiles.mcp.deleteConfirm'),
       onConfirm: () => {
         void runDelete(target.id);
       },

@@ -8,9 +8,6 @@ export function usageRetryDelaySeconds(
     typeof attempts === 'number' && Number.isSafeInteger(attempts) && attempts > 0
       ? Math.min(attempts, 21)
       : 1;
-  if (attempt === 1 && admissionRejected) {
-    return 1 + Math.floor(random() * 4);
-  }
   let base = Math.min(300, 2 ** Math.min(attempt - 1, 9));
   if (!admissionRejected) base = Math.max(60, base);
   return base + Math.floor(random() * (base + 1));

@@ -1770,6 +1770,8 @@
       "events": "நிகழ்வுகள்",
       "eventConfidence": "நம்பிக்கை: {{confidence}}",
       "eventReason": "காரணம்: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} நிகழ்வு",
       "eventsCount_other": "{{displayCount}} நிகழ்வுகள்",
       "generated": "உருவாக்கப்பட்ட நேரம்: {{generatedAt}}.",

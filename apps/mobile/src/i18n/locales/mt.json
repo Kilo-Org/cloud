@@ -1878,6 +1878,8 @@
       "events": "Avvenimenti",
       "eventConfidence": "Kunfidenza: {{confidence}}",
       "eventReason": "Raġuni: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} avveniment",
       "eventsCount_two": "{{displayCount}} avvenimenti",
       "eventsCount_few": "{{displayCount}} avvenimenti",

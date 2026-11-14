@@ -1770,6 +1770,8 @@
       "events": "Իրադարձություններ",
       "eventConfidence": "Վստահություն: {{confidence}}",
       "eventReason": "Պատճառ: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} իրադարձություն",
       "eventsCount_other": "{{displayCount}} իրադարձություն",
       "generated": "Ստեղծվել է {{generatedAt}}։",

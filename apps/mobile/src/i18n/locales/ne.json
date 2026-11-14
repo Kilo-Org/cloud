@@ -1770,6 +1770,8 @@
       "events": "घटनाहरू",
       "eventConfidence": "विश्वास: {{confidence}}",
       "eventReason": "कारण: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} घटना",
       "eventsCount_other": "{{displayCount}} घटना",
       "generated": "{{generatedAt}} मा तयार गरिएको हो।",

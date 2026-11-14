@@ -986,6 +986,8 @@
       "events": "Olaylar",
       "eventConfidence": "Güven: {{confidence}}",
       "eventReason": "Neden: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} olay",
       "eventsCount_other": "{{displayCount}} olay",
       "generated": "Raporun oluşturulma zamanı: {{generatedAt}}.",

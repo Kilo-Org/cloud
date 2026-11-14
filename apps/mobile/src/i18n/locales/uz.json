@@ -1770,6 +1770,8 @@
       "events": "Hodisalar",
       "eventConfidence": "Ishonch: {{confidence}}",
       "eventReason": "Sabab: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ta hodisa",
       "eventsCount_other": "{{displayCount}} ta hodisa",
       "generated": "Yaratilgan vaqt: {{generatedAt}}.",

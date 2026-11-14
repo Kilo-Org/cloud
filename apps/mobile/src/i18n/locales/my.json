@@ -1770,6 +1770,8 @@
       "events": "အဖြစ်အပျက်များ",
       "eventConfidence": "ယုံကြည်မှု: {{confidence}}",
       "eventReason": "အကြောင်းရင်း: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} အဖြစ်အပျက်များ",
       "eventsCount_other": "{{displayCount}} အဖြစ်အပျက်များ",
       "generated": "{{generatedAt}} တွင် ထုတ်ပေးထားသည်။",

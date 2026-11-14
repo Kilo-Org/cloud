@@ -1770,6 +1770,8 @@
       "events": "ເຫດການ",
       "eventConfidence": "ຄວາມໝັ້ນໃຈ: {{confidence}}",
       "eventReason": "ເຫດຜົນ: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ເຫດການ",
       "eventsCount_other": "{{displayCount}} ເຫດການ",
       "generated": "ສ້າງເມື່ອ {{generatedAt}}.",

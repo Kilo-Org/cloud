@@ -1770,6 +1770,8 @@
       "events": "Események",
       "eventConfidence": "Megbízhatóság: {{confidence}}",
       "eventReason": "Indok: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} esemény",
       "eventsCount_other": "{{displayCount}} esemény",
       "generated": "A jelentés elkészült: {{generatedAt}}.",

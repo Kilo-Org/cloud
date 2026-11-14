@@ -1770,6 +1770,8 @@
       "events": "เหตุการณ์",
       "eventConfidence": "ความเชื่อมั่น: {{confidence}}",
       "eventReason": "เหตุผล: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} เหตุการณ์",
       "eventsCount_other": "{{displayCount}} เหตุการณ์",
       "generated": "สร้างเมื่อ {{generatedAt}}",

@@ -1770,6 +1770,8 @@
       "events": "Eventos",
       "eventConfidence": "Confianza: {{confidence}}",
       "eventReason": "Motivo: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} evento",
       "eventsCount_other": "{{displayCount}} eventos",
       "generated": "O informe xerouse o {{generatedAt}}.",

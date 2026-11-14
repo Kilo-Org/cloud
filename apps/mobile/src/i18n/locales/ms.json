@@ -1770,6 +1770,8 @@
       "events": "Peristiwa",
       "eventConfidence": "Keyakinan: {{confidence}}",
       "eventReason": "Sebab: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} peristiwa",
       "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dijana pada {{generatedAt}}.",

@@ -1770,6 +1770,8 @@
       "events": "Συμβάντα",
       "eventConfidence": "Βεβαιότητα: {{confidence}}",
       "eventReason": "Λόγος: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} συμβάν",
       "eventsCount_other": "{{displayCount}} συμβάντα",
       "generated": "Η αναφορά δημιουργήθηκε: {{generatedAt}}.",

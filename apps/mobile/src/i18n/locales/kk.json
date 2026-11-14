@@ -1770,6 +1770,8 @@
       "events": "Оқиғалар",
       "eventConfidence": "Сенімділік: {{confidence}}",
       "eventReason": "Себеп: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} оқиға",
       "eventsCount_other": "{{displayCount}} оқиға",
       "generated": "Жасалған уақыты: {{generatedAt}}.",

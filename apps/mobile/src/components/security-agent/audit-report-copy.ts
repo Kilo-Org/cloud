@@ -9,15 +9,18 @@ import { i18n } from '@/i18n';
 // fields it records.
 type AuditReportEventEvidence = {
   action: string;
+  beforeState: Record<string, unknown> | null;
   afterState: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
 };
 
-// The evidence is JSON the server assembled; decode the two fields this screen
+// The evidence is JSON the server assembled; decode the fields this screen
 // renders and drop anything else it carries.
 const EVIDENCE_SCHEMA = z.object({
   reason_code: z.string().optional(),
   confidence: z.string().optional(),
+  status: z.string().optional(),
+  severity: z.string().optional(),
 });
 
 // Only the two actions whose reason is a dismissal reason. A status change or
@@ -48,6 +51,29 @@ export const SEVERITY_LABEL_KEYS = {
   unknown: 'common.unknown',
 } as const;
 
+// The status words the finding surfaces already use for a stored status code,
+// so the audit row and the finding detail name the same state with one word.
+const STATUS_LABEL_KEYS = {
+  open: 'securityAgent.filter.statusOpen',
+  fixed: 'securityAgent.filter.fixed',
+  ignored: 'common.dismissed',
+} as const;
+
+/**
+ * The catalog key a stored status or severity code names, or null when this app
+ * has no word for it. The server can record a code before the app learns it,
+ * and a raw code never reaches translated copy.
+ */
+function labelKey(
+  dictionary: Readonly<Record<string, string>>,
+  code: string | undefined
+): string | null {
+  if (code === undefined || !Object.hasOwn(dictionary, code)) {
+    return null;
+  }
+  return dictionary[code] ?? null;
+}
+
 function confidenceLine(confidence: string | undefined, t: TFunction): string | null {
   if (confidence !== 'high' && confidence !== 'medium' && confidence !== 'low') {
     return null;
@@ -58,11 +84,13 @@ function confidenceLine(confidence: string | undefined, t: TFunction): string | 
 }
 
 /**
- * The evidence lines an audit event adds under its action label: the
- * dismissal reason for a dismissal, the confidence for an auto-dismiss that
- * met the threshold or for a finished analysis. Every other action has none.
+ * The evidence lines an audit event adds under its action label: the previous
+ * and new value of a status or severity change, the dismissal reason for a
+ * dismissal, the confidence for an auto-dismiss that met the threshold or for a
+ * finished analysis. Every other action has none.
  */
 export function eventEvidenceLines(event: AuditReportEventEvidence, t: TFunction): string[] {
+  const beforeState = EVIDENCE_SCHEMA.safeParse(event.beforeState ?? {}).data;
   const afterState = EVIDENCE_SCHEMA.safeParse(event.afterState ?? {}).data;
   const metadata = EVIDENCE_SCHEMA.safeParse(event.metadata ?? {}).data;
 
@@ -89,6 +117,37 @@ export function eventEvidenceLines(event: AuditReportEventEvidence, t: TFunction
       lines.push(confidence);
     }
     return lines;
+  }
+
+  // A change event records both values. A missing or unknown one leaves the row
+  // as it was before the app knew how to read the change, rather than printing a
+  // raw code or half a comparison.
+  if (event.action === 'security.finding.status_change') {
+    const previous = labelKey(STATUS_LABEL_KEYS, beforeState?.status);
+    const next = labelKey(STATUS_LABEL_KEYS, afterState?.status);
+    if (previous === null || next === null) {
+      return [];
+    }
+    return [
+      t('securityAgent.auditReport.eventStatusChange', {
+        previous: t(previous),
+        next: t(next),
+      }),
+    ];
+  }
+
+  if (event.action === 'security.finding.severity_changed') {
+    const previous = labelKey(SEVERITY_LABEL_KEYS, beforeState?.severity);
+    const next = labelKey(SEVERITY_LABEL_KEYS, afterState?.severity);
+    if (previous === null || next === null) {
+      return [];
+    }
+    return [
+      t('securityAgent.auditReport.eventSeverityChange', {
+        previous: t(previous),
+        next: t(next),
+      }),
+    ];
   }
 
   if (event.action !== 'security.finding.analysis_completed') {

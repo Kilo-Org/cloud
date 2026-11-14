@@ -1770,6 +1770,8 @@
       "events": "Gebeure",
       "eventConfidence": "Vertroue: {{confidence}}",
       "eventReason": "Rede: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} gebeurtenis",
       "eventsCount_other": "{{displayCount}} gebeurtenisse",
       "generated": "Die verslag is op {{generatedAt}} gegenereer.",

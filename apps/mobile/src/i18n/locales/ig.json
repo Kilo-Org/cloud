@@ -1770,6 +1770,8 @@
       "events": "Ihe omume",
       "eventConfidence": "Ntụkwasị obi: {{confidence}}",
       "eventReason": "Ihe kpatara ya: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ihe omume",
       "eventsCount_other": "{{displayCount}} ihe omume",
       "generated": "E mepụtara ya {{generatedAt}}.",

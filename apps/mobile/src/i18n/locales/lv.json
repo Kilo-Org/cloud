@@ -1806,6 +1806,8 @@
       "events": "Notikumi",
       "eventConfidence": "Ticamība: {{confidence}}",
       "eventReason": "Iemesls: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_zero": "{{displayCount}} notikumu",
       "eventsCount_one": "{{displayCount}} notikums",
       "eventsCount_other": "{{displayCount}} notikumi",

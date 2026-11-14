@@ -1770,6 +1770,8 @@
       "events": "Izehlakalo",
       "eventConfidence": "Ukuzethemba: {{confidence}}",
       "eventReason": "Isizathu: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} isehlakalo",
       "eventsCount_other": "{{displayCount}} izehlakalo",
       "generated": "Umbiko wenziwe ngo-{{generatedAt}}.",

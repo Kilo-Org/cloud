@@ -986,6 +986,8 @@
       "events": "Gebeurtenissen",
       "eventConfidence": "Vertrouwen: {{confidence}}",
       "eventReason": "Reden: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} gebeurtenis",
       "eventsCount_other": "{{displayCount}} gebeurtenissen",
       "generated": "Dit rapport is gegenereerd op {{generatedAt}}.",

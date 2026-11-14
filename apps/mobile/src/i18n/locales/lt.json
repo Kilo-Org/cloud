@@ -1842,6 +1842,8 @@
       "events": "Įvykiai",
       "eventConfidence": "Pasitikėjimas: {{confidence}}",
       "eventReason": "Priežastis: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} įvykis",
       "eventsCount_few": "{{displayCount}} įvykiai",
       "eventsCount_many": "{{displayCount}} įvykio",

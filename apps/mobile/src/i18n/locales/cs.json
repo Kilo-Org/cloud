@@ -1842,6 +1842,8 @@
       "events": "Události",
       "eventConfidence": "Spolehlivost: {{confidence}}",
       "eventReason": "Důvod: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} událost",
       "eventsCount_few": "{{displayCount}} události",
       "eventsCount_many": "{{displayCount}} události",

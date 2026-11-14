@@ -1770,6 +1770,8 @@
       "events": "Ngjarjet",
       "eventConfidence": "Besueshmëria: {{confidence}}",
       "eventReason": "Arsyeja: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ngjarje",
       "eventsCount_other": "{{displayCount}} ngjarje",
       "generated": "Raporti u gjenerua më {{generatedAt}}.",

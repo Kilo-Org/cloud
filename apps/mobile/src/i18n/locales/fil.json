@@ -1770,6 +1770,8 @@
       "events": "Mga kaganapan",
       "eventConfidence": "Kumpiyansa: {{confidence}}",
       "eventReason": "Dahilan: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} kaganapan",
       "eventsCount_other": "{{displayCount}} kaganapan",
       "generated": "Nabuo noong {{generatedAt}}.",

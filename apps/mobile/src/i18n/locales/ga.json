@@ -1878,6 +1878,8 @@
       "events": "Imeachtaí",
       "eventConfidence": "Muinín: {{confidence}}",
       "eventReason": "Cúis: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} imeacht",
       "eventsCount_two": "{{displayCount}} imeacht",
       "eventsCount_few": "{{displayCount}} imeacht",

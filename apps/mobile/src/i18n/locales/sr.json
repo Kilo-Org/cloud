@@ -1806,6 +1806,8 @@
       "events": "Događaji",
       "eventConfidence": "Pouzdanost: {{confidence}}",
       "eventReason": "Razlog: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} događaj",
       "eventsCount_few": "{{displayCount}} događaja",
       "eventsCount_other": "{{displayCount}} događaja",

@@ -1770,6 +1770,8 @@
       "events": "Händelser",
       "eventConfidence": "Konfidens: {{confidence}}",
       "eventReason": "Orsak: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} händelse",
       "eventsCount_other": "{{displayCount}} händelser",
       "generated": "Rapporten skapades {{generatedAt}}",

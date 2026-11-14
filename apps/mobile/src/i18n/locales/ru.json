@@ -990,6 +990,8 @@
       "events": "События",
       "eventConfidence": "Уверенность: {{confidence}}",
       "eventReason": "Причина: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} событие",
       "eventsCount_few": "{{displayCount}} события",
       "eventsCount_many": "{{displayCount}} событий",

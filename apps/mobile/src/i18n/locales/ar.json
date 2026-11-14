@@ -994,6 +994,8 @@
       "events": "الأحداث",
       "eventConfidence": "الثقة: {{confidence}}",
       "eventReason": "السبب: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): من {{previous}} إلى {{next}}",
+      "eventStatusChange": "$t(common.status): من {{previous}} إلى {{next}}",
       "eventsCount_zero": "{{displayCount}} حدث",
       "eventsCount_one": "{{displayCount}} حدث",
       "eventsCount_two": "{{displayCount}} حدثان",

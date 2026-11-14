@@ -1770,6 +1770,8 @@
       "events": "Ngā takahanga",
       "eventConfidence": "Te whakawhirinaki: {{confidence}}",
       "eventReason": "Te take: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} takahanga",
       "eventsCount_other": "{{displayCount}} takahanga",
       "generated": "I hangaia i te {{generatedAt}}.",

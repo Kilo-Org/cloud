@@ -1770,6 +1770,8 @@
       "events": "ইভেন্ট",
       "eventConfidence": "আত্মবিশ্বাস: {{confidence}}",
       "eventReason": "কারণ: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}}টি ইভেন্ট",
       "eventsCount_other": "{{displayCount}}টি ইভেন্ট",
       "generated": "তৈরির সময়: {{generatedAt}}।",

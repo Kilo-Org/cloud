@@ -1770,6 +1770,8 @@
       "events": "ઘટનાઓ",
       "eventConfidence": "વિશ્વાસ: {{confidence}}",
       "eventReason": "કારણ: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ઘટના",
       "eventsCount_other": "{{displayCount}} ઘટનાઓ",
       "generated": "{{generatedAt}} ના રોજ તૈયાર કર્યો.",

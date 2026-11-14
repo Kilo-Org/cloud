@@ -120,12 +120,13 @@ describe('useFetchToCompletion failure phase', () => {
   });
 
   it('leaves a background refetch alone: Load all while the query is fetching runs nothing', async () => {
-    const fetchNextPage = vi.fn(async () => ({
+    const fetchNextPage = vi.fn<() => Promise<Record<string, unknown>>>();
+    fetchNextPage.mockResolvedValue({
       data: PAGE,
       hasNextPage: false,
       error: null,
       dataUpdatedAt: 200,
-    }));
+    });
     const { holder } = await mountProbe({ isFetching: true, fetchNextPage });
 
     await act(async () => {

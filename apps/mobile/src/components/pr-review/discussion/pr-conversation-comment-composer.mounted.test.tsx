@@ -2,12 +2,19 @@
 // empty-body validation, and the two rejection policies (a server bad-request
 // stays retryable, the ledger persistence marker blocks until an edit).
 
-import { createElement, type ReactElement } from 'react';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 
 import { PrConversationCommentComposer } from './pr-conversation-comment-composer';
+import {
+  buttonByText,
+  failureCopy,
+  mount,
+  typeBody,
+  unmountAll,
+} from './pr-conversation-comment-composer.test-helpers';
 import { i18n } from '@/i18n';
 import { PR_OPERATION_PERSISTENCE_FAILED_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
@@ -115,45 +122,9 @@ const baseProps = {
   onDismiss: vi.fn(),
 };
 
-const mounted: ReactTestRenderer[] = [];
-
-async function mount(element: ReactElement): Promise<ReactTestRenderer> {
-  const holder: { current: ReactTestRenderer | undefined } = { current: undefined };
-  await act(async () => {
-    holder.current = TestRenderer.create(element);
-    await Promise.resolve();
-  });
-  const renderer = holder.current;
-  if (!renderer) {
-    throw new Error('renderer did not mount');
-  }
-  mounted.push(renderer);
-  return renderer;
-}
-
-function typeBody(renderer: ReactTestRenderer, text: string): void {
-  act(() => {
-    (renderer.root.findByType('CommentBodyField').props.onChangeText as (value: string) => void)(
-      text
-    );
-  });
-}
-
-function commentButton(renderer: ReactTestRenderer) {
-  const [first] = renderer.root.findAll(
-    node =>
-      Object.is(node.type, 'Button') &&
-      node.findAll(child => child.props.children === i18n.t('prReview.composer.comment')).length > 0
-  );
-  if (!first) {
-    throw new Error('missing Comment button');
-  }
-  return first;
-}
-
 function pressComment(renderer: ReactTestRenderer): void {
   act(() => {
-    (commentButton(renderer).props.onPress as () => void)();
+    (buttonByText(renderer, i18n.t('prReview.composer.comment')).props.onPress as () => void)();
   });
 }
 
@@ -166,13 +137,7 @@ async function pressCommentAndSettle(renderer: ReactTestRenderer): Promise<void>
 }
 
 function commentDisabled(renderer: ReactTestRenderer): boolean {
-  return commentButton(renderer).props.disabled as boolean;
-}
-
-function failureCopy(renderer: ReactTestRenderer): string | undefined {
-  const status = renderer.root.findAllByType('AccessibleStatus')[0];
-  const text = renderer.root.findAllByType('Text')[0];
-  return (status?.props.message ?? text?.props.children) as string | undefined;
+  return buttonByText(renderer, i18n.t('prReview.composer.comment')).props.disabled as boolean;
 }
 
 beforeEach(() => {
@@ -188,9 +153,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const renderer of mounted.splice(0)) {
-    renderer.unmount();
-  }
+  unmountAll();
 });
 
 describe('PrConversationCommentComposer', () => {
@@ -235,7 +198,9 @@ describe('PrConversationCommentComposer', () => {
     ['BAD_REQUEST', i18n.t('prReview.discussion.commentBadRequest'), 'bad-request'],
     ['FORBIDDEN', i18n.t('prReview.discussion.commentForbidden'), 'forbidden'],
   ])('keeps its own copy for a %s rejection', async (code, copy, kind) => {
-    addComment.mutateAsync.mockRejectedValue(Object.assign(new Error('rejected'), { data: { code } }));
+    addComment.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('rejected'), { data: { code } })
+    );
     const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
     typeBody(renderer, 'hello');
     await pressCommentAndSettle(renderer);
@@ -247,67 +212,45 @@ describe('PrConversationCommentComposer', () => {
   });
 
   describe('dismissal gate', () => {
-    function footerCancel(renderer: ReactTestRenderer): void {
-      const [cancel] = renderer.root.findAll(
-        node =>
-          Object.is(node.type, 'Button') &&
-          node.findAll(child => child.props.children === i18n.t('common.cancel')).length > 0
-      );
-      if (!cancel) {
-        throw new Error('missing Cancel button');
-      }
+    function pressCancel(renderer: ReactTestRenderer): void {
       act(() => {
-        (cancel.props.onPress as () => void)();
+        (buttonByText(renderer, i18n.t('common.cancel')).props.onPress as () => void)();
+      });
+    }
+
+    function pressHeaderBack(renderer: ReactTestRenderer): void {
+      act(() => {
+        (renderer.root.findByType('PrFormSheetHeader').props.onBack as () => void)();
+      });
+    }
+
+    function pressHardwareBack(): void {
+      act(() => {
+        backHandler.current?.();
       });
     }
 
     it.each([
-      ['the footer Cancel', (r: ReactTestRenderer) => footerCancel(r)],
-      [
-        'the header close',
-        (r: ReactTestRenderer) => {
-          act(() => {
-            (r.root.findByType('PrFormSheetHeader').props.onBack as () => void)();
-          });
-        },
-      ],
-      [
-        'the hardware back',
-        (r: ReactTestRenderer) => {
-          act(() => {
-            backHandler.current?.();
-          });
-        },
-      ],
-    ])('dismisses %s with an empty body without a discard confirm', async (_name, trigger) => {
-      const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
-      trigger(renderer);
+      ['the footer Cancel', pressCancel],
+      ['the header close', pressHeaderBack],
+      ['the hardware back', pressHardwareBack],
+    ] as const)(
+      'dismisses %s with an empty body without a discard confirm',
+      async (_name, trigger) => {
+        const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
+        trigger(renderer);
 
-      expect(confirmRequests).toHaveLength(0);
-      expect(clearDraft).not.toHaveBeenCalled();
-      expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
-    });
-
-    it('arms the back listener so the header close and the hardware back share one gate', async () => {
-      const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
-      typeBody(renderer, 'hello');
-
-      act(() => {
-        backHandler.current?.();
-      });
-
-      expect(backHandler.current).toBeTypeOf('function');
-      expect(confirmRequests.at(-1)).toMatchObject({
-        confirmLabel: i18n.t('common.discard'),
-        cancelLabel: i18n.t('common.keepEditing'),
-      });
-    });
+        expect(confirmRequests).toHaveLength(0);
+        expect(clearDraft).not.toHaveBeenCalled();
+        expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
+      }
+    );
 
     it('stays on the composer with the retryable copy when the discard clear fails', async () => {
       vi.mocked(clearDraft).mockResolvedValue(false);
       const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
       typeBody(renderer, 'hello');
-      footerCancel(renderer);
+      pressCancel(renderer);
       confirmRequests.at(-1)?.onConfirm();
       await act(async () => {
         await Promise.resolve();

@@ -4675,7 +4675,7 @@
       "unlock": "Ontsluit rugsteun",
       "apply": "Voer rugsteun in",
       "mergeStrategy": "Slaan duplikate oor",
-      "mergeDescription": "Hou bestaande gashere volgens etiket, sleutels volgens vingerafdruk en bekende gashere volgens patroon. Ooreenstemmende brokkies en oordragbindings word ook behou.",
+      "mergeDescription": "Hou gashere met dieselfde etiket, gasheernaam, poort en gebruiker, sleutels met dieselfde vingerafdruk, en bekende gashere met dieselfde patroon en sleutelalgoritme. Ooreenstemmende brokkies en oordragbindings word ook behou.",
       "conflicts": "Op hierdie toestel behou",
       "outcomeTitle": "Invoeruitkoms",
       "toSkip": "Om oor te slaan",

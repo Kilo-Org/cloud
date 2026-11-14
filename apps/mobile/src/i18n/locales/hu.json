@@ -4675,7 +4675,7 @@
       "unlock": "Biztonsági mentés feloldása",
       "apply": "Biztonsági mentés importálása",
       "mergeStrategy": "Ismétlődők kihagyása",
-      "mergeDescription": "A meglévő gazdagépeket címke szerint, a kulcsokat ujjlenyomat szerint tartja meg; az ismert gazdagépek esetében a mintát követi. Az egyező kódrészletek és továbbítási kötések is megmaradnak.",
+      "mergeDescription": "A gazdagépeket akkor tartja meg, ha a címke, a gazdagépnév, a port és a felhasználó is egyezik, a kulcsokat ujjlenyomat egyezése esetén, az ismert gazdagépeket pedig minta és kulcsalgoritmus egyezése esetén. Az egyező kódrészletek és továbbítási kötések is megmaradnak.",
       "conflicts": "Megtartva ezen az eszközön",
       "outcomeTitle": "Importálás eredménye",
       "toSkip": "Kihagyandó",

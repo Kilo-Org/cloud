@@ -4740,7 +4740,7 @@
       "unlock": "Atbloķēt dublējumu",
       "apply": "Importēt dublējumu",
       "mergeStrategy": "Izlaist dublikātus",
-      "mergeDescription": "Esošie resursdatori tiek saglabāti pēc apzīmējuma, atslēgas pēc kontrolnospieduma un zināmie resursdatori pēc modeļa. Atbilstošie fragmenti un pāradresāciju saistījumi arī tiek saglabāti.",
+      "mergeDescription": "Resursdatori tiek saglabāti, ja sakrīt apzīmējums, resursdatora nosaukums, ports un lietotājs, atslēgas, ja sakrīt kontrolnospiedums, un zināmie resursdatori, ja sakrīt modelis un atslēgas algoritms. Atbilstošie fragmenti un pāradresāciju saistījumi arī tiek saglabāti.",
       "conflicts": "Paturēts šajā ierīcē",
       "outcomeTitle": "Importa rezultāts",
       "toSkip": "Jāizlaiž",

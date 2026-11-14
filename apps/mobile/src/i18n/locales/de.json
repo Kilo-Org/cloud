@@ -4675,7 +4675,7 @@
       "unlock": "Backup entsperren",
       "apply": "Backup importieren",
       "mergeStrategy": "Duplikate überspringen",
-      "mergeDescription": "Vorhandene Hosts werden nach Label, Schlüssel nach Fingerabdruck und bekannte Hosts nach Muster beibehalten. Übereinstimmende Snippets und Weiterleitungsbindungen werden ebenfalls beibehalten.",
+      "mergeDescription": "Hosts werden beibehalten, wenn Label, Hostname, Port und Benutzer übereinstimmen, Schlüssel, wenn der Fingerabdruck übereinstimmt, und bekannte Hosts, wenn Muster und Schlüsselalgorithmus übereinstimmen. Übereinstimmende Snippets und Weiterleitungsbindungen werden ebenfalls beibehalten.",
       "conflicts": "Auf diesem Gerät behalten",
       "outcomeTitle": "Importergebnis",
       "toSkip": "Zu überspringen",

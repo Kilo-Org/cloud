@@ -4675,7 +4675,7 @@
       "unlock": "Unlock backup",
       "apply": "Import backup",
       "mergeStrategy": "Skip duplicates",
-      "mergeDescription": "Keep existing hosts by label, keys by fingerprint and known hosts by pattern. Matching snippets and forward bindings are also kept.",
+      "mergeDescription": "Keep hosts with the same label, hostname, port and user, keys with the same fingerprint, and known hosts with the same pattern and key algorithm. Matching snippets and forward bindings are also kept.",
       "conflicts": "Kept on this device",
       "outcomeTitle": "Import outcome",
       "toSkip": "To skip",

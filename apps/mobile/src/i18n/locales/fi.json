@@ -4675,7 +4675,7 @@
       "unlock": "Avaa varmuuskopio",
       "apply": "Tuo varmuuskopio",
       "mergeStrategy": "Ohita kaksoiskappaleet",
-      "mergeDescription": "Säilytä olemassa olevat isännät tunnisteen perusteella, avaimet sormenjäljen perusteella ja tunnetut isännät kuvion perusteella. Vastaavat komennonpätkät ja ohjausmääritykset säilytetään myös.",
+      "mergeDescription": "Säilytä isännät, joilla on sama tunniste, isäntänimi, portti ja käyttäjä, avaimet, joilla on sama sormenjälki, ja tunnetut isännät, joilla on sama kuvio ja avainalgoritmi. Vastaavat komennonpätkät ja ohjausmääritykset säilytetään myös.",
       "conflicts": "Säilytetään tällä laitteella",
       "outcomeTitle": "Tuonnin tulos",
       "toSkip": "Ohitettavat",

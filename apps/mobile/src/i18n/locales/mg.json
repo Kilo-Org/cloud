@@ -4675,7 +4675,7 @@
       "unlock": "Sokafy ny tahiry",
       "apply": "Ento ny tahiry",
       "mergeStrategy": "Tsidiho ny dika mitovy",
-      "mergeDescription": "Tehirizo ny host efa misy araka ny label, ny fanalahidy araka ny fingerprint ary ny host fantatra araka ny pattern. Voatahiry koa ny sombin-baiko mifanaraka sy ny fifamatorana fandefasana.",
+      "mergeDescription": "Tehirizo ny host mitovy label, hostname, port ary user, ny fanalahidy mitovy fingerprint ary ny host fantatra mitovy pattern sy algorithm-n'ny fanalahidy. Voatahiry koa ny sombin-baiko mifanaraka sy ny fifamatorana fandefasana.",
       "conflicts": "Voatahiry eto amin'ity fitaovana ity",
       "outcomeTitle": "Vokatry ny fampidirana",
       "toSkip": "Ho tsidihina",

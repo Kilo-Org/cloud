@@ -4675,7 +4675,7 @@
       "unlock": "Ehtiyat nüsxənin kilidini aç",
       "apply": "Ehtiyat nüsxəni idxal et",
       "mergeStrategy": "Dublikatları keç",
-      "mergeDescription": "Mövcud hostlar etiketə görə, açarlar barmaq izinə görə, tanınan hostlar isə şablona görə saxlanılır. Uyğun gələn fraqmentlər və yönləndirmə bağlantıları da saxlanılır.",
+      "mergeDescription": "Eyni etiket, host adı, port və istifadəçiyə malik hostlar, eyni barmaq izinə malik açarlar, eyni şablon və açar alqoritminə malik tanınan hostlar saxlanılır. Uyğun gələn fraqmentlər və yönləndirmə bağlantıları da saxlanılır.",
       "conflicts": "Bu cihazda saxlanıldı",
       "outcomeTitle": "İdxal nəticəsi",
       "toSkip": "Keçiləcək",

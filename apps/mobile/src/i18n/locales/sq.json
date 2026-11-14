@@ -4675,7 +4675,7 @@
       "unlock": "Zhblloko kopjen rezervë",
       "apply": "Importo kopjen rezervë",
       "mergeStrategy": "Anashkalo dublikatat",
-      "mergeDescription": "Mbaji hostet ekzistues sipas etiketës, çelësat sipas gjurmës së gishtash dhe hostet e njohur sipas modelit. Snippet-et dhe lidhjet e përcjelljes që përputhen mbaben gjithashtu.",
+      "mergeDescription": "Mbaji hostet kur etiketa, emri i hostit, porti dhe përdoruesi përputhen, çelësat kur përputhet gjurma e gishtash, dhe hostet e njohur kur përputhen modeli dhe algoritmi i çelësit. Snippet-et dhe lidhjet e përcjelljes që përputhen mbaben gjithashtu.",
       "conflicts": "Të mbajtura në këtë pajisje",
       "outcomeTitle": "Rezultati i importimit",
       "toSkip": "Për t'u anashkaluar",

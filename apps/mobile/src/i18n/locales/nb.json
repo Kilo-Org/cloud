@@ -4675,7 +4675,7 @@
       "unlock": "Lås opp sikkerhetskopi",
       "apply": "Importer sikkerhetskopi",
       "mergeStrategy": "Hopp over duplikater",
-      "mergeDescription": "Behold eksisterende verter etter etikett, nøkler etter fingeravtrykk og kjente verter etter mønster. Matchende snutter og videresendingsbindinger beholdes også.",
+      "mergeDescription": "Behold verter med samme etikett, vertsnavn, port og bruker, nøkler med samme fingeravtrykk og kjente verter med samme mønster og nøkkelalgoritme. Matchende snutter og videresendingsbindinger beholdes også.",
       "conflicts": "Beholdt på denne enheten",
       "outcomeTitle": "Resultat av import",
       "toSkip": "Å hoppe over",

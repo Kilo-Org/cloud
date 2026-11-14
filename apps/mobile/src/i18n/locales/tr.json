@@ -4675,7 +4675,7 @@
       "unlock": "Yedeğin kilidini aç",
       "apply": "Yedeği içe aktar",
       "mergeStrategy": "Yinelenenleri atla",
-      "mergeDescription": "Mevcut hostları etikete, anahtarları parmak izine göre, bilinen hostları ise desene göre koruyun. Eşleşen snippet'ler ve yönlendirme bağlamaları da korunur.",
+      "mergeDescription": "Etiket, hostname, port ve kullanıcısı aynı olan hostları, parmak izi aynı olan anahtarları ve desen ile anahtar algoritması aynı olan bilinen hostları koruyun. Eşleşen snippet'ler ve yönlendirme bağlamaları da korunur.",
       "conflicts": "Bu cihazda korundu",
       "outcomeTitle": "İçe aktarma sonucu",
       "toSkip": "Atlanacak",

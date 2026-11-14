@@ -4935,7 +4935,7 @@
       "unlock": "Datgloi copi wrth gefn",
       "apply": "Mewnforio copi wrth gefn",
       "mergeStrategy": "Hepgor dyblygiadau",
-      "mergeDescription": "Cadwch westeiwyr presennol yn ôl label, allweddi yn ôl ôl bys a gwesteiwyr hysbys yn ôl patrwm. Mae tameidiau a rhwymiadau anfoniadau cyfatebol yn cael eu cadw hefyd.",
+      "mergeDescription": "Cadwch westeiwyr gyda'r un label, enw gwesteiwr, porth a defnyddiwr, allweddi gyda'r un ôl bys, a gwesteiwyr hysbys gyda'r un patrwm ac algorithm allwedd. Mae tameidiau a rhwymiadau anfoniadau cyfatebol yn cael eu cadw hefyd.",
       "conflicts": "Wedi'u cadw ar y ddyfais hon",
       "outcomeTitle": "Canlyniad mewnforio",
       "toSkip": "I'w hepgor",

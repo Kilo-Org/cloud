@@ -4740,7 +4740,7 @@
       "unlock": "Deblochează backupul",
       "apply": "Importă backupul",
       "mergeStrategy": "Omite duplicatele",
-      "mergeDescription": "Păstrează gazdele existente după etichetă, cheile după amprentă și gazdele cunoscute după model. Snippeturile și legăturile de redirecționare care corespund sunt, de asemenea, păstrate.",
+      "mergeDescription": "Păstrează gazdele care au aceeași etichetă, nume de gazdă, port și utilizator, cheile cu aceeași amprentă și gazdele cunoscute cu același model și algoritm de cheie. Snippeturile și legăturile de redirecționare care corespund sunt, de asemenea, păstrate.",
       "conflicts": "Păstrate pe acest dispozitiv",
       "outcomeTitle": "Rezultatul importului",
       "toSkip": "De omis",

@@ -4805,7 +4805,7 @@
       "unlock": "Odkleni varnostno kopijo",
       "apply": "Uvozi varnostno kopijo",
       "mergeStrategy": "Preskoči dvojnike",
-      "mergeDescription": "Obstoječi gostitelji se ohranijo po oznaki, ključi po odtisu in znani gostitelji po vzorcu. Ustrezni odrezki in povezave preusmeritev se prav tako ohranijo.",
+      "mergeDescription": "Gostitelji se ohranijo, če se ujemajo oznaka, ime gostitelja, vrata in uporabnik, ključi, če se ujema odtis, in znani gostitelji, če se ujemata vzorec in algoritem ključa. Ustrezni odrezki in povezave preusmeritev se prav tako ohranijo.",
       "conflicts": "Ohranjeno na tej napravi",
       "outcomeTitle": "Rezultat uvoza",
       "toSkip": "Za preskočitev",

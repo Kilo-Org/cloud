@@ -4675,7 +4675,7 @@
       "unlock": "Mở khóa bản sao lưu",
       "apply": "Nhập bản sao lưu",
       "mergeStrategy": "Bỏ qua các mục trùng lặp",
-      "mergeDescription": "Giữ các máy chủ hiện có theo nhãn, khóa theo dấu vân tay và máy chủ đã biết theo mẫu. Các đoạn lệnh và liên kết chuyển tiếp trùng khớp cũng được giữ lại.",
+      "mergeDescription": "Giữ các máy chủ có cùng nhãn, tên máy chủ, cổng và người dùng, các khóa có cùng dấu vân tay, và các máy chủ đã biết có cùng mẫu và thuật toán khóa. Các đoạn lệnh và liên kết chuyển tiếp trùng khớp cũng được giữ lại.",
       "conflicts": "Được giữ trên thiết bị này",
       "outcomeTitle": "Kết quả nhập",
       "toSkip": "Sẽ bỏ qua",

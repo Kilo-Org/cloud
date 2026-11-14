@@ -4675,7 +4675,7 @@
       "unlock": "Kpọghee ndabere",
       "apply": "Bubata ndabere",
       "mergeStrategy": "Wụfuo ihe megharịrị",
-      "mergeDescription": "Debe host ndị dị adị site na akara, igodo site na mkpịsị aka na host ndị amaara site na ụkpụrụ. A na-edebekwa snippet na njikọ nbuga ndị kwekọrọ.",
+      "mergeDescription": "Debe host ndị nwere otu akara, hostname, port na onye ọrụ, igodo ndị nwere otu mkpịsị aka, na host ndị amaara ndị nwere otu ụkpụrụ na algọridim igodo. A na-edebekwa snippet na njikọ nbuga ndị kwekọrọ.",
       "conflicts": "Edebere na ngwaọrụ a",
       "outcomeTitle": "Nsonaazụ nbubata",
       "toSkip": "Ihe a ga-ewụfu",

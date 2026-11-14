@@ -4740,7 +4740,7 @@
       "unlock": "Otključaj sigurnosnu kopiju",
       "apply": "Uvezi sigurnosnu kopiju",
       "mergeStrategy": "Preskoči duplikate",
-      "mergeDescription": "Postojeći hostovi, ključevi i poznati hostovi zadržavaju se prema oznaci, otisku prsta, odnosno obrascu. Podudarajući isječci i povezivanja prosljeđivanja također se zadržavaju.",
+      "mergeDescription": "Hostovi se zadržavaju kada se podudaraju oznaka, naziv hosta, port i korisnik, ključevi kada se podudara otisak prsta, a poznati hostovi kada se podudaraju obrazac i algoritam ključa. Podudarajući isječci i povezivanja prosljeđivanja također se zadržavaju.",
       "conflicts": "Zadržano na ovom uređaju",
       "outcomeTitle": "Ishod uvoza",
       "toSkip": "Za preskočiti",

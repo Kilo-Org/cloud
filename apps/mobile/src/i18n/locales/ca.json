@@ -4740,7 +4740,7 @@
       "unlock": "Desbloqueja la còpia de seguretat",
       "apply": "Importa la còpia de seguretat",
       "mergeStrategy": "Omet els duplicats",
-      "mergeDescription": "Conserva els amfitrions existents per etiqueta, les claus per empremta i els amfitrions coneguts per patró. Els fragments i les vinculacions de redirecció coincidents també es conserven.",
+      "mergeDescription": "Conserva els amfitrions que tinguin la mateixa etiqueta, nom d'amfitrió, port i usuari, les claus amb la mateixa empremta i els amfitrions coneguts amb el mateix patró i algorisme de clau. Els fragments i les vinculacions de redirecció coincidents també es conserven.",
       "conflicts": "Conservats en aquest dispositiu",
       "outcomeTitle": "Resultat de la importació",
       "toSkip": "Per ometre",

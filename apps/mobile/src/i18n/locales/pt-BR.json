@@ -4746,7 +4746,7 @@
       "unlock": "Desbloquear backup",
       "apply": "Importar backup",
       "mergeStrategy": "Ignorar duplicados",
-      "mergeDescription": "Mantém hosts existentes por rótulo, chaves por impressão digital e hosts conhecidos pelo padrão. Snippets e vínculos de encaminhamento correspondentes também são mantidos.",
+      "mergeDescription": "Mantém hosts quando o rótulo, o nome do host, a porta e o usuário coincidem, chaves quando a impressão digital coincide, e hosts conhecidos quando o padrão e o algoritmo da chave coincidem. Snippets e vínculos de encaminhamento correspondentes também são mantidos.",
       "conflicts": "Mantidos neste dispositivo",
       "outcomeTitle": "Resultado da importação",
       "toSkip": "Para ignorar",

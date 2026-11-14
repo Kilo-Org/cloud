@@ -4675,7 +4675,7 @@
       "unlock": "Vula isipele",
       "apply": "Ngenisa isipele",
       "mergeStrategy": "Yeqa okuphindayo",
-      "mergeDescription": "Gcina amahosthi akhona ngokwelebula, okhiye ngeFingerprint, futhi ugcine amahosthi aziwayo ngephethini. Iziqeshana ezihambisanayo nezibopho zamafowodi nakho kuyagcinwa.",
+      "mergeDescription": "Gcina amahosthi anelebula elifanayo, igama lehosthi elifanayo, iphothi elifanayo nomsebenzisi ofanayo, okhiye abaneFingerprint efanayo, namahosthi aziwayo anephethini efanayo ne-aligorithimi yokhiye efanayo. Iziqeshana ezihambisanayo nezibopho zamafowodi nakho kuyagcinwa.",
       "conflicts": "Kugcinwe kule divayisi",
       "outcomeTitle": "Umphumela wokungenisa",
       "toSkip": "Okuzoyeqwa",

@@ -4675,7 +4675,7 @@
       "unlock": "Lukusta varukoopia lahti",
       "apply": "Impordi varukoopia",
       "mergeStrategy": "Jäta duplikaadid vahele",
-      "mergeDescription": "Säilita olemasolevad hostid sildi järgi, võtmed sõrmejälje järgi ja tuntud hostide mustri järgi. Sobivad käsujupid ja suunamissidemed säilitatakse samuti.",
+      "mergeDescription": "Säilita hostid sama sildi, hostinime, pordi ja kasutajaga, võtmed sama sõrmejäljega ja tuntud hostid sama mustri ja võtme algoritmiga. Sobivad käsujupid ja suunamissidemed säilitatakse samuti.",
       "conflicts": "Säilitatud selles seadmes",
       "outcomeTitle": "Importimise tulemus",
       "toSkip": "Vahele jäetavad",

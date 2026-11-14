@@ -4675,7 +4675,7 @@
       "unlock": "Lås upp säkerhetskopia",
       "apply": "Importera säkerhetskopia",
       "mergeStrategy": "Hoppa över dubbletter",
-      "mergeDescription": "Behåll befintliga värdar per etikett, nycklar per fingeravtryck och kända värdar per mönster. Matchande kommandon och vidarebefordringskopplingar behålls också.",
+      "mergeDescription": "Behåll värdar med samma etikett, värdnamn, port och användare, nycklar med samma fingeravtryck och kända värdar med samma mönster och nyckelalgoritm. Matchande kommandon och vidarebefordringskopplingar behålls också.",
       "conflicts": "Behålls på den här enheten",
       "outcomeTitle": "Importresultat",
       "toSkip": "Att hoppa över",

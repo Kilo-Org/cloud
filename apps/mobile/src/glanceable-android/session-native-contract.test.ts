@@ -240,6 +240,9 @@ describe('the quiet moment of a Working card', () => {
   it('draws the expanded-only line in the big-text style alone, never in the header', () => {
     const build = body(NOTIFICATIONS, 'private fun builder(');
     const anchor = build.indexOf('PromotionGate.request(context, builder, card.compactText)');
+    // indexOf answers -1 for a missing anchor, and slice(-1) would start at the
+    // end and pass on an empty fallback, so the anchor must be found first.
+    expect(anchor, 'the promotion gate call is missing').toBeGreaterThan(-1);
     const fallback = build.slice(build.indexOf('} else {', anchor));
     expect(fallback).toContain('card.expandedText?.let');
     expect(fallback).toContain('Notification.BigTextStyle().bigText(');

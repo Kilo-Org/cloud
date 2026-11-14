@@ -355,6 +355,36 @@ describe('a call that could not reach the server', () => {
 
     expect(kiloMcpState()).toEqual({ status: 'idle' });
   });
+
+  it('does not let a late failure from a replaced discovery invalidate the newer answer', async () => {
+    /* A tool call keeps the deps of the discovery that made it, so a call from
+       a discovery that a Retry already replaced can fail after the newer one
+       answered. Its failure contradicts an answer that is no longer on screen. */
+    await ensureKiloMcp(place);
+    const replaced = lost();
+    replaced?.(new RemoteMcpError({ serverId: 'kilo', kind: 'unreachable', cause: 'it is gone' }));
+    await ensureKiloMcp(place, 'retry');
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+
+    replaced?.(new RemoteMcpError({ serverId: 'kilo', kind: 'unreachable', cause: 'it is gone' }));
+
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+    expect(kiloMcpTools()).toEqual([tool]);
+    expect(kiloMcpToolNames()).toEqual(['mcp_kilo_read-file']);
+  });
+
+  it('leaves another scope answer and tools intact when one scope call fails', async () => {
+    await ensureKiloMcp(place);
+    const failing = lost();
+    const other: ChatPlace = { ...place, chatScope: 'user-1:org-1' };
+    await ensureKiloMcp(other);
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+
+    failing?.(new RemoteMcpError({ serverId: 'kilo', kind: 'unreachable', cause: 'it is gone' }));
+
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+    expect(kiloMcpTools()).toEqual([tool]);
+  });
 });
 
 describe('the per-chat setting', () => {

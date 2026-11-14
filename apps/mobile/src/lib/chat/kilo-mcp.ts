@@ -113,8 +113,18 @@ function publish(state: KiloMcpState): void {
   }
 }
 
-/** The answer already discovered for one account and one auth epoch. */
-let cached: { readonly key: string; readonly state: KiloMcpState } | undefined = undefined;
+/** The answer already discovered for one account and one auth epoch, and the discovery that produced it. */
+let cached:
+  | { readonly key: string; readonly discovery: number; readonly state: KiloMcpState }
+  | undefined = undefined;
+
+/**
+ * The discovery that owns the state the screens draw, so a call failure can
+ * invalidate only its own answer: a tool call keeps the deps it was discovered
+ * with (`packages/harness-sdk/src/plugins/remote-mcp/client.ts:124-130`), so an
+ * outstanding call from a replaced discovery outlives its replacement.
+ */
+let published: { readonly key: string; readonly discovery: number } | undefined = undefined;
 
 /**
  * The discovery already running for one key and one deadline, so two callers
@@ -156,12 +166,19 @@ const keyFor = (place: ChatPlace): string =>
  * failure is not published under the new one, exactly as its tools are not.
  */
 const lostConnection =
-  (started: number) =>
+  (started: number, discovery: number) =>
   (error: RemoteMcpError): void => {
+    /* A sign-out of the account that made the call wins. */
     if (started !== generation) {
       return;
     }
+    /* A replacement discovery owns the screens now: its answer is not the one
+       this call contradicts, so the failure is not published for it. */
+    if (published === undefined || published.discovery !== discovery) {
+      return;
+    }
     cached = undefined;
+    published = undefined;
     publish(failed(error));
   };
 
@@ -195,7 +212,7 @@ async function connect(place: ChatPlace, timeoutMs: number, id: number): Promise
       fetch,
       token: kiloToken,
       discoverTimeoutMs: timeoutMs,
-      onCallFailure: lostConnection(started),
+      onCallFailure: lostConnection(started, id),
     }).pipe(
       Effect.match({ onFailure: failed, onSuccess: ready }),
       Effect.catchCause(cause =>
@@ -210,7 +227,8 @@ async function connect(place: ChatPlace, timeoutMs: number, id: number): Promise
      A later discovery answers for the screen now, so this one answers only its
      own caller. */
   if (started === generation && id === nextAttempt) {
-    cached = reusable(state) ? { key, state } : undefined;
+    cached = reusable(state) ? { key, discovery: id, state } : undefined;
+    published = { key, discovery: id };
     publish(state);
   }
   return state;
@@ -223,6 +241,7 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
        discovery may have published over it since, so the answer served is
        published too. */
     if (snapshot !== cached.state) {
+      published = { key: cached.key, discovery: cached.discovery };
       publish(cached.state);
     }
     return cached.state;
@@ -237,6 +256,7 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
     return { status: 'idle' };
   }
   publish({ status: 'connecting' });
+  published = undefined;
   const id = (nextAttempt += 1);
   const promise = connect(place, timeoutMs, id);
   const entry = { id, key, timeoutMs, promise };
@@ -320,6 +340,7 @@ export function watchKiloMcp(listener: () => void): () => void {
 export function forgetKiloMcp(): void {
   generation += 1;
   cached = undefined;
+  published = undefined;
   inFlight = undefined;
   publish({ status: 'idle' });
 }

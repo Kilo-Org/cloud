@@ -196,18 +196,18 @@ export async function mountScreen(
 export function rerenderScreen(
   renderer: ReactTestRenderer,
   queryClient: QueryClient,
-  organizationId?: string
+  // The stack the screen was mounted in: a screen that leaves a dead profile
+  // route behaves differently per stack, so a test can bring the same one back.
+  options: { organizationId?: string; stack?: 'app' | 'profileTab' } = {}
 ): void {
   renderer.update(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      // The rerender helpers serve the Profile tab stack; an app-stack mount is
-      // a single-shot read, so it never needs one.
       createElement(ProfileOverviewScreen, {
         profileId: 'profile-1',
-        organizationId,
-        stack: 'profileTab',
+        organizationId: options.organizationId,
+        stack: options.stack ?? 'profileTab',
       })
     )
   );

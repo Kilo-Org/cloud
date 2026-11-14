@@ -42,6 +42,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useLeaveMissingProfileRoute } from '@/lib/hooks/use-leave-missing-profile-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { usePopOnce } from '@/lib/navigation/pop-once';
@@ -161,6 +162,9 @@ export function ProfileOverviewScreen({
   // same way). A retryable failure keeps the cached profile usable under the
   // banner.
   const showContent = profile !== undefined && (errorView === null || errorView.showRetry);
+  // A terminal refusal of a profile this screen already painted returns the tab
+  // to its root; see the hook for why the marker is the painted content.
+  useLeaveMissingProfileRoute(showContent, errorView !== null && !errorView.showRetry, stack);
 
   const saveMetadata = async ({ name, description }: { name: string; description: string }) => {
     try {

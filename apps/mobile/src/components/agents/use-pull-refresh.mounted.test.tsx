@@ -166,6 +166,33 @@ describe('usePullRefresh feedback budget', () => {
     unmount();
   });
 
+  it('keeps the failure line off after a settle inside the rejection beat', async () => {
+    const { state, unmount } = renderPullRefresh(settlesWith(false));
+    act(() => {
+      state().startPull();
+    });
+    await flush();
+    expect(state().refreshing).toBe(true);
+
+    // A focus return or foreground refresh reports success while the rejected
+    // run still holds its failure through the beat: that run is superseded, so
+    // neither the beat nor the budget may turn the line back on.
+    act(() => {
+      state().markSettled();
+    });
+    expect(state().failed).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(PULL_FEEDBACK_MIN_BEAT_MS);
+    });
+    expect(state().failed).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(PULL_FEEDBACK_BUDGET_MS);
+    });
+    expect(state().failed).toBe(false);
+    expect(state().refreshing).toBe(false);
+    unmount();
+  });
+
   it('treats an accepted resolution as settled, not failed', async () => {
     const { state, unmount } = renderPullRefresh(settlesWith(true));
     act(() => {

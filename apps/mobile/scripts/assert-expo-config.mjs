@@ -319,9 +319,10 @@ check(
   splashOptions?.ios === undefined && splashOptions?.android === undefined,
   'the branded splash must not fork its options by platform'
 );
-// Same reason one layer down: EAS only builds and signs the extension from its
-// `appExtensions` entry, and the evaluated config is the only place that shows
-// the entry the plugin composed.
+// The `./plugins/withArtifactFileProvider` registration is only the first
+// layer: EAS builds and signs the extension from its `appExtensions` entry, and
+// the evaluated config is the only place that shows the entry the plugin
+// composed.
 const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
 check(
   appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),

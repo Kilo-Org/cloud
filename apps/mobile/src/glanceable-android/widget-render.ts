@@ -30,16 +30,16 @@ export function translate(key: string): string {
   return i18n.t(key);
 }
 
-const lastWidgetSnapshotRef: { current: GlanceableAgentsSnapshot | null } = { current: null };
+let lastPublishedSnapshot: GlanceableAgentsSnapshot | null = null;
 
 /** Remember the snapshot the last publication carried, for a later redraw. */
 export function noteWidgetSnapshot(snapshot: GlanceableAgentsSnapshot): void {
-  lastWidgetSnapshotRef.current = snapshot;
+  lastPublishedSnapshot = snapshot;
 }
 
 /** The last published snapshot, or the one the native mirror holds after a JS restart. */
 export function lastWidgetSnapshot(): GlanceableAgentsSnapshot | null {
-  return lastWidgetSnapshotRef.current ?? getStoredWidgetSnapshot();
+  return lastPublishedSnapshot ?? getStoredWidgetSnapshot();
 }
 
 /** The widget props for `snapshot`, with the deadline and staleness checks every redraw runs. */
@@ -56,7 +56,7 @@ export function widgetPropsFor(snapshot: GlanceableAgentsSnapshot): AndroidWidge
 
 /** A delayed render must check the current snapshot and its deadline, not cached props. */
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
-  const snapshot = lastWidgetSnapshotRef.current ?? getLastHomeWidgetData()?.snapshot ?? null;
+  const snapshot = lastPublishedSnapshot ?? getLastHomeWidgetData()?.snapshot ?? null;
   return snapshot === null ? null : widgetPropsFor(snapshot);
 }
 
@@ -70,5 +70,5 @@ export function renderWidgetNow(props: AndroidWidgetProps): void {
 
 /** Test-only: drop the remembered snapshot without touching the native mirror. */
 export function _resetWidgetRenderForTests(): void {
-  lastWidgetSnapshotRef.current = null;
+  lastPublishedSnapshot = null;
 }

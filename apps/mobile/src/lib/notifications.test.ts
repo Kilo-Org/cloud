@@ -2593,7 +2593,7 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows a foreground attention push whose app-owned notification the user dismissed', async () => {
-    const { needsInput, presentation, registration } = await loadHandler();
+    const { needsInput, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
@@ -2679,7 +2679,7 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows an ordinary agent progress push even while the raise is posted', async () => {
-    const { needsInput, presentation, registration } = await loadHandler();
+    const { needsInput, registration } = await loadHandler();
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],

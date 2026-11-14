@@ -78,7 +78,7 @@ export type HookResult = ManageRepositoryAccess | undefined;
 
 export type Handlers = { onOpen?: () => void; onReturn?: (opened: boolean) => void };
 
-export function Harness({
+function Harness({
   scope,
   platform,
   handlers,

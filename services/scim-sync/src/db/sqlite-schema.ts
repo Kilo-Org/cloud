@@ -43,7 +43,10 @@ export const eventFailures = sqliteTable('event_failures', {
  * their stream time, and its later conflicts park at once.
  *
  * The window belongs to the one event that opened it and closes when that event
- * applies. Nothing else clears it.
+ * applies. Nothing else removes it: not another event of the directory
+ * applying, and not a `dsync.activated` that binds the directory's
+ * organization. Only an operator cursor reset clears every window, so the
+ * directory's stream time stays what it has already spent.
  */
 export const directoryConflicts = sqliteTable('directory_conflicts', {
   directory_id: text('directory_id').primaryKey(),

@@ -6,8 +6,8 @@ import { ENV_KEYS } from '../src/lib/env-keys.js';
 import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '../src/lib/android-notification-channels.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
-// orientation, associated domain, app name, blocked and requested permissions,
-// and Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and
+// orientation, associated domain, blocked and requested permissions, and
+// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and
 // the silent channel list from src/lib/android-notification-channels.js. The
 // script runs the full evaluated config, so these must match the resolved
 // build-time output, not the raw app.config.ts source.
@@ -29,10 +29,6 @@ const HEAD_ORIGIN = 'https://app.kilo.ai';
 // Time Sensitive Notifications capability: the iOS half of the needs-input
 // raise's `interruptionLevel: 'timeSensitive'` break-through contract.
 const TIME_SENSITIVE_ENTITLEMENT = 'com.apple.developer.usernotifications.time-sensitive';
-// The app name (app.config.ts `name`). `$(PRODUCT_NAME)` resolves to this in
-// the base Info.plist, but `.lproj/InfoPlist.strings` is compiled verbatim, so
-// the localized copy has to spell it out.
-const APP_NAME = 'Kilo';
 const BLOCKED_PERMISSIONS = [
   'android.permission.READ_MEDIA_IMAGES',
   'android.permission.READ_MEDIA_VIDEO',
@@ -46,7 +42,6 @@ const BLOCKED_PERMISSIONS = [
 // FINE_LOCATION, AD_ID), so the evaluated array is never exactly this list.
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
-const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
 const BUILD_PROPERTIES_PLUGIN = 'expo-build-properties';
 const NOTIFICATIONS_PLUGIN = 'expo-notifications';
 // The Android channel Firebase falls back to when an FCM message omits
@@ -61,29 +56,49 @@ const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
 // the class and a background FCM data message crashes TaskService.executeTask.
 const HEADLESS_APP_LOADER_KEEP_RULE =
   '-keep class expo.modules.adapters.react.apploader.RNHeadlessAppLoader { <init>(); }';
-// The manifest fix carries the native alert title override beside the backup
-// rules and optional-feature declarations. React Native's bundled
-// `alert_title_layout.xml` pins the title to `viewStart`; without this plugin
-// the Arabic discard confirm's title sits on the opposite edge from its message.
-const ANDROID_MANIFEST_FIX_PLUGIN = './plugins/withAndroidManifestFix';
-// Android-only by capability: AppCompat's stock button-bar text appearance
-// forces ALL-CAPS, while iOS's `UIAlertController` draws the same shared
-// `Alert.alert` copy as given and exposes no casing transform. The plugin's one
-// platform piece is the AppTheme override; it is registered once for both
-// prebuilds, so the fix behaves the same on iOS and Android.
-const ALERT_DIALOG_BUTTON_CASE_PLUGIN = './plugins/withAndroidAlertDialogButtonCase';
-// The alert dialog theme points AppCompat's DayNight defaults
-// (`colorBackgroundFloating`, `colorAccent`) at the app's surfaces; without it
-// every `Alert.alert()` confirmation renders as a foreign grey/teal panel.
-const ALERT_DIALOG_THEME_PLUGIN = './plugins/withAndroidAlertDialogTheme';
 // One entry configures Expo's native splash on both platforms. Its internal
 // Android backing-surface adapter is a documented native capability exception,
 // not a separate launch lifecycle. The wrapper owns the mod ordering.
 const BRANDED_SPLASH_PLUGIN = './plugins/withBrandedSplash';
-const ARTIFACT_FILE_PROVIDER_PLUGIN = './plugins/withArtifactFileProvider';
-// The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
-// Intent copy plus the appended Focus-filter catalog.
-const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
+// The native plugin registrations this app cannot ship without, in the order
+// they are checked. Each reason names the failure the registration prevents.
+const REQUIRED_PLUGINS = [
+  {
+    name: SENTRY_PLUGIN,
+    reason:
+      'Without it the app has no Sentry native integration, so crash reports and symbol upload never register.',
+  },
+  {
+    name: './plugins/withAndroidRotationSurface',
+    reason:
+      "The rotation surface plugin pins the Android window background to the theme background; without it a rotation paints the AppCompat DayNight default until React's first frame lands in the new orientation.",
+  },
+  {
+    name: './plugins/withAndroidManifestFix',
+    reason:
+      "The manifest fix plugin writes the native alert title override (plus the backup rules and optional hardware features); without it React Native's bundled `viewStart` title layout returns and the Arabic discard confirm's title no longer shares its message's start edge.",
+  },
+  {
+    name: './plugins/withAndroidAlertDialogButtonCase',
+    reason:
+      "Android alert-dialog actions must render in the app's sentence case: the AppCompat button bar draws them ALL-CAPS, which contradicts the app's copy (DESIGN.md:350). The plugin re-cases them from the activity theme.",
+  },
+  {
+    name: './plugins/withAndroidAlertDialogTheme',
+    reason:
+      "The alert dialog theme repaints AppCompat's stock dialog surface and accent with the app's own tokens; without it the sign-out confirmation (and every other Alert.alert) is the DayNight default grey/teal.",
+  },
+  {
+    name: './plugins/withArtifactFileProvider',
+    reason:
+      'The iOS File Provider extension target and the Pods integration behind it are created by this plugin alone; without it the Files-app location has no extension to serve it.',
+  },
+  {
+    name: './plugins/withAppIntentLocalizations',
+    reason:
+      "The app target's one `Localizable.strings` (the App Intent copy plus the appended Focus-filter catalog) is written by this plugin; without it the Shortcuts actions and the Focus filter stay English on a localized device.",
+  },
+];
 // The developer menu is not the product. On iOS `DevMenuManager` auto-shows it
 // over the app at launch while onboarding is unfinished or EXDevMenuShowsAtLaunch
 // is set, and its SwiftUI icons carry raw SF Symbol names as accessibility labels
@@ -276,42 +291,15 @@ const pluginEntries = (config.plugins ?? []).map(plugin =>
 const pluginNames = pluginEntries.map(entry => entry.name);
 /** The first entry for a plugin name, with the options it was configured with. */
 const pluginEntry = name => pluginEntries.find(entry => entry.name === name);
-check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGIN}"`);
+for (const { name } of REQUIRED_PLUGINS) {
+  check(pluginNames.includes(name), `plugins must include "${name}"`);
+}
 // Without the Sentry Android Gradle Plugin a release build uploads no NDK
 // symbols or R8 mapping, and Android native crashes reach Sentry unsymbolicated.
 const sentryPlugin = pluginEntry(SENTRY_PLUGIN);
 check(
   sentryPlugin?.options?.experimental_android?.enableAndroidGradlePlugin === true,
   `"${SENTRY_PLUGIN}" must set experimental_android.enableAndroidGradlePlugin`
-);
-// The rotation surface plugin pins the Android window background to the theme
-// background; without it a rotation paints the AppCompat DayNight default
-// until React's first frame lands in the new orientation.
-check(
-  pluginNames.includes(ROTATION_SURFACE_PLUGIN),
-  `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
-);
-// The manifest fix plugin writes the native alert title override (plus the
-// backup rules and optional hardware features); without it React Native's
-// bundled `viewStart` title layout returns and the Arabic discard confirm's
-// title no longer shares its message's start edge.
-check(
-  pluginNames.includes(ANDROID_MANIFEST_FIX_PLUGIN),
-  `plugins must include "${ANDROID_MANIFEST_FIX_PLUGIN}"`
-);
-// Android alert-dialog actions must render in the app's sentence case: the
-// AppCompat button bar draws them ALL-CAPS, which contradicts the app's copy
-// (DESIGN.md:350). The plugin re-cases them from the activity theme.
-check(
-  pluginNames.includes(ALERT_DIALOG_BUTTON_CASE_PLUGIN),
-  `plugins must include "${ALERT_DIALOG_BUTTON_CASE_PLUGIN}"`
-);
-// The alert dialog theme repaints AppCompat's stock dialog surface and accent
-// with the app's own tokens; without it the sign-out confirmation (and every
-// other Alert.alert) is the DayNight default grey/teal.
-check(
-  pluginNames.includes(ALERT_DIALOG_THEME_PLUGIN),
-  `plugins must include "${ALERT_DIALOG_THEME_PLUGIN}"`
 );
 const splashEntries = pluginEntries.filter(entry => entry.name === BRANDED_SPLASH_PLUGIN);
 check(splashEntries.length === 1, `plugins must include exactly one "${BRANDED_SPLASH_PLUGIN}"`);
@@ -330,13 +318,6 @@ check(
 check(
   splashOptions?.ios === undefined && splashOptions?.android === undefined,
   'the branded splash must not fork its options by platform'
-);
-// The iOS File Provider extension target and the Pods integration behind it are
-// created by this plugin alone; without it the Files-app location has no
-// extension to serve it.
-check(
-  pluginNames.includes(ARTIFACT_FILE_PROVIDER_PLUGIN),
-  `plugins must include "${ARTIFACT_FILE_PROVIDER_PLUGIN}"`
 );
 // Same reason one layer down: EAS only builds and signs the extension from its
 // `appExtensions` entry, and the evaluated config is the only place that shows
@@ -369,13 +350,6 @@ if (process.env.EAS_BUILD_PROFILE === 'production') {
     `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} extension entitlement`
   );
 }
-// The app target's one `Localizable.strings` (the App Intent copy plus the
-// appended Focus-filter catalog) is written by this plugin; without it the
-// Shortcuts actions and the Focus filter stay English on a localized device.
-check(
-  pluginNames.includes(APP_INTENT_LOCALIZATIONS_PLUGIN),
-  `plugins must include "${APP_INTENT_LOCALIZATIONS_PLUGIN}"`
-);
 
 // Asserted on the EVALUATED config, not on app.config.ts's source: options that
 // never reach the plugin still evaluate to the dev-menu defaults (auto-show on,

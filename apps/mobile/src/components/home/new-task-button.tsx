@@ -18,6 +18,9 @@ export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) 
 
   return (
     <View className="mx-4">
+      {/* The screen's one primary action, so it keeps the palette's primary
+          pair in both schemes: the fill and the ink come from one token pair,
+          and the default variant supplies the fill. */}
       <Button
         variant="default"
         size="lg"
@@ -27,7 +30,9 @@ export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) 
         }}
       >
         <Plus size={18} color={colors.primaryForeground} />
-        <Text className="shrink text-center font-semibold">{t('home.newCodingTask')}</Text>
+        <Text className="shrink text-center font-semibold text-primary-foreground">
+          {t('home.newCodingTask')}
+        </Text>
       </Button>
     </View>
   );

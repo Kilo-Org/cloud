@@ -115,6 +115,7 @@ export function AgentSessionsSection({
                 }
                 briefing={briefingCard ?? undefined}
                 showBriefing={showBriefing}
+                reserveMinimumFrame={content !== 'empty'}
               />
             </Animated.View>
           )}

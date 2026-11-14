@@ -93,8 +93,9 @@ export function GlanceableActiveCard({
       className={cn(
         CARD_CLASS,
         embedded && 'rounded-none border-0 bg-transparent',
-        // The frame reserves the counts card's height, so the zero state fills
-        // that height with its one message instead of leaving a band below it.
+        // The frame can be taller than this card: a briefing beside it sets the
+        // row height. The zero state then fills that row and centres its
+        // message inside it, instead of sitting at the top over a blank band.
         empty && 'flex-1'
       )}
     >
@@ -174,10 +175,12 @@ export function GlanceableActiveCard({
           </View>
         </CardControl>
       ) : (
-        <View key="no-session" className="flex-1 justify-center">
-          {/* The card keeps its reserved frame with nothing live, so the zero
-              state fills that frame with the shared empty state's icon, title
-              and one-line hint instead of a lone line in a blank card. */}
+        <View key="no-session" className="flex-1 justify-center py-6">
+          {/* The zero state carries its own 24 dp above and below, and the frame
+              no longer reserves the counts card's height behind it, so on a
+              compact window this card is as tall as its message. A briefing in
+              the same frame can still be taller: the card then fills the row and
+              centres the message. */}
           <EmptyState
             placement="static"
             icon={Bot}

@@ -1,15 +1,17 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
 /* eslint-disable max-lines -- the compose, payload-store, eviction, and normalize suites share one module. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __resetSharePayloadStoreForTests,
   __setCheckFileExistsForTests,
   __setDeleteCachedFileForTests,
+  clearAccountStagedSharePayloads,
   clearPendingShareIdDraft,
   clearSharePayload,
   composeShareText,
   discardUnstoredSharePayload,
+  isSharePayloadStagedUnder,
   normalizeShareIntent,
   peekSharePayload,
   persistSharePayloadsNow,
@@ -19,10 +21,12 @@ import {
   setSharePersistUserId,
   SHARE_PAYLOAD_MAX_ENTRIES,
   SHARE_TEXT_MAX_CHARS,
+  subscribeAccountStagedShareClear,
   takeSharePayload,
 } from './share-payload';
 import {
   flushDraft,
+  isSharePayloadsDraft,
   isStringDraft,
   loadDraft,
   PENDING_SHARE_ID_DRAFT_KEY,
@@ -120,6 +124,31 @@ async function withDeleteTracking(run: (deleted: string[]) => Promise<void>): Pr
   }
 }
 
+/**
+ * Points the encrypted-KV mock at the in-memory store, so `saveDraft`,
+ * `flushDraft` and `loadDraft` round-trip like the real storage layer.
+ */
+function armDraftStorage(): void {
+  kvStore.clear();
+  nextUpdatedAt = 1;
+  kvMock.getItem.mockImplementation(
+    async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
+  );
+  kvMock.setItem.mockImplementation(async (scope, k, v) => {
+    kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
+    nextUpdatedAt += 1;
+  });
+  kvMock.removeItem.mockImplementation(async (scope, k) => {
+    kvStore.delete(storageKey(scope, k));
+  });
+  kvMock.listEntries.mockImplementation(async scope =>
+    [...kvStore.values()]
+      .filter(entry => entry.scope === scope)
+      .toSorted((a, b) => a.updatedAt - b.updatedAt)
+      .map(entry => ({ k: entry.k, updatedAt: entry.updatedAt }))
+  );
+}
+
 describe('composeShareText', () => {
   it('returns trimmed text', () => {
     expect(composeShareText({ text: '  hello  ', webUrl: null, meta: null, files: null })).toBe(
@@ -215,7 +244,10 @@ describe('share payload store', () => {
 
   it('take is read-and-clear and returns null on second read or unknown id', () => {
     const id = putSharePayload({ text: 'once', files: [], failedFiles: [] });
-    expect(takeSharePayload(id)).toEqual({ text: 'once', files: [], failedFiles: [] });
+    expect(takeSharePayload(id)).toEqual({
+      payload: { text: 'once', files: [], failedFiles: [] },
+      stagedUserId: null,
+    });
     expect(takeSharePayload(id)).toBeNull();
     expect(takeSharePayload('missing')).toBeNull();
   });
@@ -224,7 +256,7 @@ describe('share payload store', () => {
     const id = putSharePayload({ text: 'peek', files: [], failedFiles: [] });
     expect(peekSharePayload(id)?.text).toBe('peek');
     expect(peekSharePayload(id)?.text).toBe('peek');
-    expect(takeSharePayload(id)?.text).toBe('peek');
+    expect(takeSharePayload(id)?.payload.text).toBe('peek');
   });
 
   it('clear is id-scoped', () => {
@@ -246,18 +278,18 @@ describe('share payload store', () => {
     expect(peekSharePayload(id)).toBeNull();
 
     if (taken !== null) {
-      restoreSharePayload(id, taken);
+      restoreSharePayload(id, taken.payload, taken.stagedUserId);
     }
     expect(peekSharePayload(id)?.text).toBe('restored');
     expect(peekSharePayload(id)?.files).toEqual([
       { name: 'photo.jpg', uri: 'file:///cache/photo.jpg' },
     ]);
     // The retry takes it exactly as staged, and the second take empties it.
-    expect(takeSharePayload(id)?.text).toBe('restored');
+    expect(takeSharePayload(id)?.payload.text).toBe('restored');
     expect(takeSharePayload(id)).toBeNull();
 
     const live = putSharePayload({ text: 'live', files: [], failedFiles: [] });
-    restoreSharePayload(live, { text: 'stale', files: [], failedFiles: [] });
+    restoreSharePayload(live, { text: 'stale', files: [], failedFiles: [] }, null);
     expect(peekSharePayload(live)?.text).toBe('live');
   });
 
@@ -269,7 +301,7 @@ describe('share payload store', () => {
       others.push(putSharePayload({ text: `t-${i}`, files: [], failedFiles: [] }));
     }
     if (taken !== null) {
-      restoreSharePayload(id, taken);
+      restoreSharePayload(id, taken.payload, taken.stagedUserId);
     }
     expect(peekSharePayload(id)?.text).toBe('restored');
     const oldest = others[0];
@@ -278,6 +310,36 @@ describe('share payload store', () => {
     expect(newest).toBeDefined();
     expect(peekSharePayload(oldest ?? '')).toBeNull();
     expect(peekSharePayload(newest ?? '')?.text).toBe(`t-${SHARE_PAYLOAD_MAX_ENTRIES - 1}`);
+  });
+
+  it('keeps a failed delivery inside the account that staged it', async () => {
+    armDraftStorage();
+    const deleted: string[] = [];
+    __setDeleteCachedFileForTests(uri => {
+      deleted.push(uri);
+    });
+    setSharePersistUserId('userA');
+    const id = putSharePayload({
+      text: 'staged-by-a',
+      files: [{ name: 'a.jpg', uri: 'file:///cache/a.jpg' }],
+      failedFiles: [],
+    });
+    const taken = takeSharePayload(id);
+
+    // The account boundary runs while the upload is still in flight, so the
+    // taken entry is not in the store when the boundary sweeps it.
+    clearAccountStagedSharePayloads();
+    setSharePersistUserId('userB');
+    if (taken !== null) {
+      restoreSharePayload(id, taken.payload, taken.stagedUserId);
+    }
+
+    expect(peekSharePayload(id)).toBeNull();
+    // Nothing delivers the cache copy now, so the restore drops it.
+    expect(deleted).toEqual(['file:///cache/a.jpg']);
+    await persistSharePayloadsNow();
+    const draftB = await loadDraft('userB', SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
+    expect(draftB?.entries[id]).toBeUndefined();
   });
 
   it('evicts oldest first beyond the cap', () => {
@@ -339,7 +401,7 @@ describe('share payload store', () => {
         files: [{ name: 'kept.bin', uri: 'file:///cache/share-kept.bin' }],
         failedFiles: [],
       });
-      expect(takeSharePayload(id)?.files[0]?.uri).toBe('file:///cache/share-kept.bin');
+      expect(takeSharePayload(id)?.payload.files[0]?.uri).toBe('file:///cache/share-kept.bin');
       await Promise.resolve();
       expect(deleted).toEqual([]);
     });
@@ -352,7 +414,7 @@ describe('share payload store', () => {
         files: [{ name: 'upload-me.bin', uri: 'file:///cache/share-upload-me.bin' }],
         failedFiles: [],
       });
-      expect(takeSharePayload(id)?.files[0]?.uri).toBe('file:///cache/share-upload-me.bin');
+      expect(takeSharePayload(id)?.payload.files[0]?.uri).toBe('file:///cache/share-upload-me.bin');
       expect(peekSharePayload(id)).toBeNull();
       // Composer may still be uploading; clear after take must not delete uris.
       clearSharePayload(id);
@@ -394,32 +456,17 @@ describe('share payload durable persistence', () => {
   beforeEach(() => {
     __resetSharePayloadStoreForTests();
     vi.clearAllMocks();
-    kvStore.clear();
-    nextUpdatedAt = 1;
-    kvMock.getItem.mockImplementation(
-      async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
-    );
-    kvMock.setItem.mockImplementation(async (scope, k, v) => {
-      kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
-      nextUpdatedAt += 1;
-    });
-    kvMock.removeItem.mockImplementation(async (scope, k) => {
-      kvStore.delete(storageKey(scope, k));
-    });
-    kvMock.listEntries.mockImplementation(async scope =>
-      [...kvStore.values()]
-        .filter(entry => entry.scope === scope)
-        .toSorted((a, b) => a.updatedAt - b.updatedAt)
-        .map(entry => ({ k: entry.k, updatedAt: entry.updatedAt }))
-    );
+    armDraftStorage();
   });
 
   it('put then restore fills peek', async () => {
     setSharePersistUserId('u1');
     const id = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
     await persistSharePayloadsNow();
-    __resetSharePayloadStoreForTests();
     // simulate process death (clears memory)
+    __resetSharePayloadStoreForTests();
+    // the identity resolves again before the restore runs
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(id)?.text).toBe('hello');
   });
@@ -428,9 +475,10 @@ describe('share payload durable persistence', () => {
     setSharePersistUserId('u1');
     const id = putSharePayload({ text: 'consumed', files: [], failedFiles: [] });
     await persistSharePayloadsNow();
-    expect(takeSharePayload(id)?.text).toBe('consumed');
+    expect(takeSharePayload(id)?.payload.text).toBe('consumed');
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(id)).toBeNull();
   });
@@ -442,6 +490,7 @@ describe('share payload durable persistence', () => {
     clearSharePayload(id);
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(id)).toBeNull();
   });
@@ -454,6 +503,7 @@ describe('share payload durable persistence', () => {
     }
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(ids[0] ?? '')).toBeNull();
     expect(peekSharePayload(ids[1] ?? '')).toBeNull();
@@ -472,6 +522,7 @@ describe('share payload durable persistence', () => {
     });
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
     __setCheckFileExistsForTests(uri => uri.includes('present'));
     await restoreSharePayloads('u1');
     const restored = peekSharePayload(id);
@@ -485,8 +536,57 @@ describe('share payload durable persistence', () => {
     await persistSharePayloadsNow();
     expect(kvMock.setItem).not.toHaveBeenCalled();
     __resetSharePayloadStoreForTests();
+    // A signed-in restore finds no draft for the share staged while signed out.
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(id)).toBeNull();
+  });
+
+  it('writes no account draft for a capture staged before an account resolved', async () => {
+    const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+
+    // The identity resolves and the flush that follows it runs.
+    setSharePersistUserId('u1');
+    await persistSharePayloadsNow();
+
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
+    await restoreSharePayloads('u1');
+    expect(peekSharePayload(stagedOut)).toBeNull();
+  });
+
+  it('persists only the account entries when a signed-out capture shares the store', async () => {
+    const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+    setSharePersistUserId('u1');
+    const owned = putSharePayload({ text: 'by-u1', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
+    await restoreSharePayloads('u1');
+
+    expect(peekSharePayload(stagedOut)).toBeNull();
+    expect(peekSharePayload(owned)?.text).toBe('by-u1');
+  });
+
+  it('never restores one capture under a second account', async () => {
+    const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+
+    setSharePersistUserId('userA');
+    await persistSharePayloadsNow();
+    clearAccountStagedSharePayloads();
+    setSharePersistUserId('userB');
+    await persistSharePayloadsNow();
+
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('userA');
+    await restoreSharePayloads('userA');
+    expect(peekSharePayload(stagedOut)).toBeNull();
+
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('userB');
+    await restoreSharePayloads('userB');
+    expect(peekSharePayload(stagedOut)).toBeNull();
   });
 
   it('a put landing during the restore read wins over the draft', async () => {
@@ -539,6 +639,8 @@ describe('share payload durable persistence', () => {
     });
     await flushDraft('userB', SHARE_PAYLOADS_DRAFT_KEY);
 
+    // The identity resolves to B before B's restore runs.
+    setSharePersistUserId('userB');
     await restoreSharePayloads('userB');
 
     expect(peekSharePayload(liveId)?.text).toBe('live-a');
@@ -573,11 +675,11 @@ describe('share payload durable persistence', () => {
     saveDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, b);
     await flushDraft('u1', PENDING_SHARE_ID_DRAFT_KEY);
 
-    expect(takeSharePayload(a)?.text).toBe('a');
+    expect(takeSharePayload(a)?.payload.text).toBe('a');
     await drainAsync();
     expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBe(b);
 
-    expect(takeSharePayload(b)?.text).toBe('b');
+    expect(takeSharePayload(b)?.payload.text).toBe('b');
     await vi.waitFor(async () => {
       expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBeNull();
     });
@@ -626,6 +728,126 @@ describe('share payload durable persistence', () => {
     await vi.waitFor(async () => {
       expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBe(b);
     });
+  });
+});
+
+describe('share payload account boundary', () => {
+  beforeEach(() => {
+    __resetSharePayloadStoreForTests();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    __resetSharePayloadStoreForTests();
+  });
+
+  it('drops a payload staged under an account', () => {
+    setSharePersistUserId('userA');
+    const id = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+
+    clearAccountStagedSharePayloads();
+
+    expect(peekSharePayload(id)).toBeNull();
+    expect(takeSharePayload(id)).toBeNull();
+  });
+
+  it('deletes the cache copies of each dropped payload', async () => {
+    await withDeleteTracking(async deleted => {
+      setSharePersistUserId('userA');
+      const id = putSharePayload({
+        text: 'by-a',
+        files: [
+          { name: 'one.jpg', uri: 'file:///cache/one.jpg' },
+          { name: 'two.png', uri: 'file:///cache/two.png' },
+        ],
+        failedFiles: [],
+      });
+
+      clearAccountStagedSharePayloads();
+      await drainAsync();
+
+      expect(deleted).toEqual(['file:///cache/one.jpg', 'file:///cache/two.png']);
+      expect(peekSharePayload(id)).toBeNull();
+    });
+  });
+
+  it('keeps a payload staged while signed out so a same-process sign-in still opens the gate', () => {
+    const id = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+
+    clearAccountStagedSharePayloads();
+
+    expect(peekSharePayload(id)?.text).toBe('captured-out');
+  });
+
+  it('drops the account payload and keeps the signed-out one in the same store', () => {
+    const signedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+    setSharePersistUserId('userA');
+    const accountId = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+
+    clearAccountStagedSharePayloads();
+
+    expect(peekSharePayload(accountId)).toBeNull();
+    expect(peekSharePayload(signedOut)?.text).toBe('captured-out');
+  });
+
+  it('notifies subscribers only when it dropped a staged payload', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeAccountStagedShareClear(listener);
+    try {
+      // Nothing staged: the boundary stays silent, so a share staged before an
+      // account resolves keeps its pending slot in the root layout.
+      clearAccountStagedSharePayloads();
+      expect(listener).not.toHaveBeenCalled();
+
+      setSharePersistUserId('userA');
+      putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+      clearAccountStagedSharePayloads();
+      expect(listener).toHaveBeenCalledTimes(1);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('reports which staged id belongs to the account', () => {
+    const signedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+    setSharePersistUserId('userA');
+    const owned = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+
+    expect(isSharePayloadStagedUnder(owned, 'userA')).toBe(true);
+    expect(isSharePayloadStagedUnder(owned, 'userB')).toBe(false);
+    expect(isSharePayloadStagedUnder(signedOut, 'userA')).toBe(false);
+    expect(isSharePayloadStagedUnder('missing', 'userA')).toBe(false);
+  });
+
+  it('stops notifying after the subscriber leaves', () => {
+    setSharePersistUserId('userA');
+    putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+    const listener = vi.fn<() => void>();
+    subscribeAccountStagedShareClear(listener)();
+
+    clearAccountStagedSharePayloads();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('stops filling the store when the account changes during the read', async () => {
+    setSharePersistUserId('userA');
+    saveDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, {
+      order: ['a-id'],
+      entries: { 'a-id': { text: 'draft-a', files: [], failedFiles: [] } },
+    });
+    await flushDraft('userA', SHARE_PAYLOADS_DRAFT_KEY);
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('userA');
+
+    // The restore suspends on the draft read; the account changes before it
+    // fills.
+    const restore = restoreSharePayloads('userA');
+    clearAccountStagedSharePayloads();
+    setSharePersistUserId('userB');
+    await restore;
+
+    expect(peekSharePayload('a-id')).toBeNull();
   });
 });
 

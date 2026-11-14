@@ -149,6 +149,7 @@ import { useRecordLastRoute } from '@/lib/hooks/use-record-last-route';
 import {
   clearSharePayload,
   discardUnstoredSharePayload,
+  isSharePayloadStagedUnder,
   normalizeShareIntent,
   peekSharePayload,
   persistSharePayloadsNow,
@@ -157,6 +158,7 @@ import {
   setSharePersistUserId,
   type ShareId,
   type SharePayload,
+  subscribeAccountStagedShareClear,
 } from '@/lib/share-payload';
 import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
 import { captureSystemSearchLaunch } from '@/lib/system-search-route';
@@ -602,19 +604,42 @@ function RootLayoutNav({
   // detect any live arm/consume during its async reads and skip the fill.
   const pendingShareIdEpochRef = useRef(0);
 
+  // Staged share deliveries belong to the account that staged them. The shared
+  // account boundary drops them, and this subscription resets the pending slot
+  // in step, so the slot always describes a staged share that exists. The
+  // epoch bump also abandons a cold-start restore that is in flight. The
+  // notification fires only when a stamped entry was dropped, so a share staged
+  // before an account resolves keeps its slot for a same-process sign-in
+  // (DEC-01).
+  useEffect(
+    () =>
+      subscribeAccountStagedShareClear(() => {
+        pendingShareIdEpochRef.current += 1;
+        setPendingShareId(null);
+      }),
+    []
+  );
+
   // Flush a share staged while the account id was still loading: the ingest
   // effect persisted nothing (userId was falsy), so once userId resolves the
   // staged payload map, navigation queue, and pending id are written to durable
-  // drafts. A signed-out share never reaches this branch (userId stays null),
-  // so it remains in-memory only. Declared after `pendingShareIdRef` so the
-  // closure references an already-declared const.
+  // drafts. Each draft write holds only the entries staged under this account,
+  // and the pending-id hint is written only when this account staged the
+  // pending share: a capture from before an account resolved stays in memory
+  // (DEC-01) instead of reaching the account's draft. Declared after
+  // `pendingShareIdRef` so the closure references an already-declared const.
   useEffect(() => {
-    if (userId && pendingShareIdRef.current !== null) {
-      void persistSharePayloadsNow();
-      void persistShareNavigationNow();
-      saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingShareIdRef.current);
-      void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+    const pendingId = pendingShareIdRef.current;
+    if (!userId || pendingId === null) {
+      return;
     }
+    void persistSharePayloadsNow();
+    void persistShareNavigationNow();
+    if (!isSharePayloadStagedUnder(pendingId, userId)) {
+      return;
+    }
+    saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingId);
+    void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
   }, [userId]);
 
   // Cold-start share restore. Order matters: payloads first, then the

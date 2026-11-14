@@ -9,6 +9,13 @@ type AdaptiveHomeCardFrameProps = {
   live: ReactNode;
   briefing?: ReactNode;
   showBriefing: boolean;
+  /**
+   * Whether the frame keeps the counts card's height behind its cards. The live
+   * card's zero state sizes to its own message instead: a compact screen has no
+   * room for a reserved band, and the frame held there pushed the rows below the
+   * card under the tab bar (design-gate finding on the compact cell).
+   */
+  reserveMinimumFrame?: boolean;
 };
 
 /**
@@ -86,6 +93,7 @@ export function AdaptiveHomeCardFrame({
   live,
   briefing,
   showBriefing,
+  reserveMinimumFrame = true,
 }: Readonly<AdaptiveHomeCardFrameProps>) {
   return (
     <View className="flex-row items-stretch overflow-hidden rounded-2xl border border-border bg-card">
@@ -96,24 +104,26 @@ export function AdaptiveHomeCardFrame({
       <CardLayer reserved={!showBriefing} className="-ms-[100%] w-full shrink-0">
         {briefing}
       </CardLayer>
-      <View
-        className="-ms-[100%] w-full shrink-0 opacity-0"
-        pointerEvents="none"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        <View className="px-4 py-3">
-          {[0, 1, 2, 3].map(row => (
-            <View key={row} className={`${DENSE_ROW_FRAME_CLASS} justify-center`}>
-              <Text className="text-sm">{'\u200B'}</Text>
-            </View>
-          ))}
+      {reserveMinimumFrame ? (
+        <View
+          className="-ms-[100%] w-full shrink-0 opacity-0"
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <View className="px-4 py-3">
+            {[0, 1, 2, 3].map(row => (
+              <View key={row} className={`${DENSE_ROW_FRAME_CLASS} justify-center`}>
+                <Text className="text-sm">{'\u200B'}</Text>
+              </View>
+            ))}
+          </View>
+          <View className="h-px bg-border" />
+          <View className="min-h-[68px] justify-center px-4 py-3">
+            <Text className="text-sm">{'\u200B\n\u200B'}</Text>
+          </View>
         </View>
-        <View className="h-px bg-border" />
-        <View className="min-h-[68px] justify-center px-4 py-3">
-          <Text className="text-sm">{'\u200B\n\u200B'}</Text>
-        </View>
-      </View>
+      ) : null}
     </View>
   );
 }

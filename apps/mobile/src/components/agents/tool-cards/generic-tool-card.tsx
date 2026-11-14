@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
+import { ltrValueTextStyle } from '@/lib/rtl-text';
 
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
@@ -66,7 +67,7 @@ export function GenericToolCardBody({
       {detail.fields.map((field, index) => (
         <View key={`${field.key}-${index}`} className="gap-1">
           <Text className="text-xs text-muted-foreground">{toolFieldLabel(t, field.key)}</Text>
-          <SelectableText className="font-mono text-xs text-foreground">
+          <SelectableText className="font-mono text-xs text-foreground" style={ltrValueTextStyle()}>
             {field.value}
           </SelectableText>
         </View>

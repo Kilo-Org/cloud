@@ -5,13 +5,17 @@ import {
   containsJoinedScript,
   hasRtlScript,
   JOINED_SCRIPT,
+  ltrValueTextStyle,
   rtlBlockTextAlign,
   withoutMonoFamily,
 } from './rtl-text';
 
 // `rtl-text` imports `I18nManager` for its direction helpers; the real module
-// is Flow-syntax source this node project cannot load.
-vi.mock('react-native', () => ({ I18nManager: { isRTL: false } }));
+// is Flow-syntax source this node project cannot load. Hoisted so a test can
+// flip the interface direction between calls.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+
+vi.mock('react-native', () => ({ I18nManager: i18nManager }));
 
 // U+0870 and U+089F are the first and last characters of Arabic Extended-B,
 // the block between Arabic Supplement (ends U+077F) and Arabic Extended-A
@@ -202,5 +206,28 @@ describe('rtlBlockTextAlign', () => {
 
   it('leaves the renderer its natural alignment in a left-to-right interface', () => {
     expect(rtlBlockTextAlign(false)).toEqual({});
+  });
+});
+
+describe('ltrValueTextStyle', () => {
+  it('keeps a value in its natural left alignment in a left-to-right interface', () => {
+    expect(ltrValueTextStyle()).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
+  });
+
+  // A path starts with a neutral character and a number can carry a sign, so a
+  // right-to-left paragraph would move either to the other end of the run. The
+  // alignment puts the block under its label, which already uses that edge.
+  it('pins a value to left-to-right order on the interface start edge in a right-to-left interface', () => {
+    i18nManager.isRTL = true;
+    try {
+      expect(ltrValueTextStyle()).toEqual({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+        textAlign: 'right',
+      });
+    } finally {
+      i18nManager.isRTL = false;
+    }
+    expect(ltrValueTextStyle().textAlign).toBeUndefined();
   });
 });

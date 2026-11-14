@@ -16,7 +16,11 @@ import { TodoToolCardBody } from './todo-tool-card';
 import { WebSearchToolCardBody } from './web-search-tool-card';
 import { prepareMonoScrollContent } from '../mono-scroll-block-model';
 
-vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  View: 'View',
+  TextInput: 'TextInput',
+}));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {

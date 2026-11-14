@@ -51,7 +51,7 @@ type CliLiveTransportConfig = {
    * Page-aware root snapshot fetch. When provided, every `replayCurrentSnapshot`
    * (initial bounded read AND reconnect immediate + delayed resync) uses it
    * so the transport never overwrites older messages already loaded via
-   * `loadOlderMessages`. The initial read additionally fires
+   * `loadOlderMessages`. The first page that applies additionally fires
    * `onInitialPageLoaded` so the manager can record the cursor.
    */
   fetchSnapshotPage?: (
@@ -59,8 +59,9 @@ type CliLiveTransportConfig = {
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome | null>;
   /**
-   * Called after a successful initial bounded page read. Reconnect and
-   * delayed-resync replays do NOT call this so the user's already-advanced
+   * Called once per attach with the first successful page that applies — the
+   * connect() read, a reconnect catch-up that supersedes it, or the delayed
+   * resync. Later replays do NOT call this so the user's already-advanced
    * older-messages cursor is never reset to the latest 50.
    */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
@@ -788,6 +789,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         let bufferedCliEvents: UserWebCliEvent[] | null = [];
         let bufferedEventsFromSupersededSnapshot: UserWebCliEvent[] = [];
         let snapshotReplayGeneration = 0;
+        // One page per attach seeds the manager. Whichever page applies first
+        // wins — the connect() read, a reconnect catch-up, or a delayed resync
+        // — so a slower read cannot reset an already-recorded cursor.
+        let initialPageRecorded = false;
 
         const drainBufferedCliEvents = (): void => {
           const events = bufferedCliEvents;
@@ -801,11 +806,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         const replayCurrentSnapshot = (reportError: boolean): void => {
           snapshotReplayGeneration += 1;
           const expectedSnapshotReplayGeneration = snapshotReplayGeneration;
-          // The very first call (from `connect()`) is the initial bounded
-          // read and fires `onInitialPageLoaded`; reconnect and delayed
-          // resync calls deliberately do not, so the manager's already-
-          // advanced older-messages cursor is never reset on reconnect.
-          const isInitial = reportError;
           if (bufferedCliEvents !== null) {
             bufferedEventsFromSupersededSnapshot.push(...bufferedCliEvents);
           }
@@ -825,7 +825,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             ) {
               return;
             }
-            if (isInitial) {
+            if (!initialPageRecorded) {
+              initialPageRecorded = true;
               config.onInitialPageLoaded?.(page);
             }
             bufferedEventsFromSupersededSnapshot = [];

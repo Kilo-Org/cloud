@@ -283,6 +283,9 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
     val emulator = session.emulator
     if (next != null && emulator != null) next.resize(emulator.mColumns, emulator.mRows)
     updateFocus()
+    if (next != null) {
+      TerminalViewEvents.emit(this, "onSourceBound", Bundle().apply { putString("sourceId", sourceId) })
+    }
   }
 
   private fun changeFontSize(deltaDp: Int) {

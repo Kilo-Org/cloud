@@ -25,6 +25,7 @@ use crate::shell::{ByteSink, ShellChannel};
 const KEEPALIVE_MAX: usize = 3;
 /// Unprocessed packets russh buffers per channel before backpressure.
 const CHANNEL_BUFFER_SIZE: usize = 256;
+const EXEC_OUTPUT_LIMIT: usize = 16 * 1024 * 1024;
 
 #[derive(Debug, uniffi::Record)]
 pub struct ConnectConfig {
@@ -208,6 +209,8 @@ impl SshSession {
     }
 
     /// Runs one command against a fresh session channel.
+    /// Combined stdout and stderr are limited to 16 MiB; excess output closes
+    /// the channel and returns `OutputLimit` without disconnecting the session.
     pub async fn exec(&self, command: String) -> Result<ExecResult, SshError> {
         let mut channel = self.handle.channel_open_session().await?;
         channel.exec(true, command.into_bytes()).await?;
@@ -218,7 +221,16 @@ impl SshSession {
             exit_status: None,
         };
 
-        while !exec_message(&mut result, channel.wait().await)? {}
+        loop {
+            match exec_message(&mut result, channel.wait().await) {
+                Ok(true) => break,
+                Ok(false) => {}
+                Err(error) => {
+                    let _ = channel.close().await;
+                    return Err(error);
+                }
+            }
+        }
 
         Ok(result)
     }
@@ -573,13 +585,9 @@ async fn await_success(channel: &mut Channel<russh::client::Msg>) -> Result<(), 
 /// whether the channel finished.
 fn exec_message(result: &mut ExecResult, message: Option<ChannelMsg>) -> Result<bool, SshError> {
     match message {
-        Some(ChannelMsg::Data { data }) => result.stdout.extend_from_slice(&data),
+        Some(ChannelMsg::Data { data }) => append_exec_output(result, &data, false)?,
         Some(ChannelMsg::ExtendedData { data, ext }) => {
-            if ext == STDERR_EXTENDED_DATA {
-                result.stderr.extend_from_slice(&data);
-            } else {
-                result.stdout.extend_from_slice(&data);
-            }
+            append_exec_output(result, &data, ext == STDERR_EXTENDED_DATA)?;
         }
         Some(ChannelMsg::ExitStatus { exit_status }) => result.exit_status = Some(exit_status),
         Some(ChannelMsg::Failure) => {
@@ -592,6 +600,20 @@ fn exec_message(result: &mut ExecResult, message: Option<ChannelMsg>) -> Result<
     }
 
     Ok(false)
+}
+
+fn append_exec_output(result: &mut ExecResult, data: &[u8], stderr: bool) -> Result<(), SshError> {
+    if data.len() > EXEC_OUTPUT_LIMIT - result.stdout.len() - result.stderr.len() {
+        return Err(SshError::OutputLimit {
+            message: format!("combined exec output exceeds {EXEC_OUTPUT_LIMIT} bytes"),
+        });
+    }
+    if stderr {
+        result.stderr.extend_from_slice(data);
+    } else {
+        result.stdout.extend_from_slice(data);
+    }
+    Ok(())
 }
 
 pub(crate) struct ClientHandler {
@@ -668,14 +690,14 @@ impl russh::client::Handler for ClientHandler {
     async fn server_channel_open_forwarded_tcpip(
         &mut self,
         channel: Channel<Msg>,
-        _connected_address: &str,
+        connected_address: &str,
         connected_port: u32,
         _originator_address: &str,
         _originator_port: u32,
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        let Some(destination) = self.forwards.destination(connected_port) else {
+        let Some(destination) = self.forwards.destination(connected_address, connected_port) else {
             reply.reject(ChannelOpenFailure::ConnectFailed).await;
             return Ok(());
         };
@@ -744,6 +766,33 @@ mod tests {
             stdout: Vec::new(),
             stderr: Vec::new(),
             exit_status: None,
+        }
+    }
+
+    #[test]
+    fn exec_caps_combined_output_without_appending_the_overflow() {
+        for ext in [STDERR_EXTENDED_DATA, 2] {
+            let mut result = empty_result();
+            result.stdout.resize(EXEC_OUTPUT_LIMIT - 1, 0);
+            assert!(
+                !exec_message(
+                    &mut result,
+                    Some(ChannelMsg::ExtendedData {
+                        data: vec![0].into(),
+                        ext,
+                    })
+                )
+                .unwrap()
+            );
+            let error = exec_message(
+                &mut result,
+                Some(ChannelMsg::Data {
+                    data: vec![0].into(),
+                }),
+            )
+            .unwrap_err();
+            assert_eq!(error.category(), "OutputLimit");
+            assert_eq!(result.stdout.len() + result.stderr.len(), EXEC_OUTPUT_LIMIT);
         }
     }
 

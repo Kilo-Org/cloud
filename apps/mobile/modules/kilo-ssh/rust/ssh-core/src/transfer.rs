@@ -27,7 +27,7 @@ pub(crate) async fn download(
     cancel: &CancelToken,
 ) -> Result<u64, SshError> {
     let attributes = session
-        .symlink_metadata(remote.to_string())
+        .metadata(remote.to_string())
         .await
         .map_err(|error| sftp_error(remote, error))?;
     let staged = staging_path(local);
@@ -63,6 +63,7 @@ pub(crate) async fn download(
             reporter.advance(transferred);
         }
 
+        validate_download_size(transferred, attributes.size, remote)?;
         target
             .flush()
             .await
@@ -73,19 +74,43 @@ pub(crate) async fn download(
     }
     .await;
 
-    let transferred = match result {
-        Ok(transferred) => transferred,
-        Err(error) => {
-            let _ = tokio::fs::remove_file(&staged).await;
-            return Err(error);
+    finish_download(result, &staged, local).await
+}
+
+fn validate_download_size(
+    transferred: u64,
+    expected: Option<u64>,
+    remote: &str,
+) -> Result<(), SshError> {
+    if let Some(expected) = expected
+        && transferred < expected
+    {
+        return Err(SshError::Protocol {
+            message: format!(
+                "short read for {remote}: expected {expected} bytes, received {transferred}"
+            ),
+        });
+    }
+    Ok(())
+}
+
+async fn finish_download(
+    result: Result<u64, SshError>,
+    staged: &Path,
+    local: &Path,
+) -> Result<u64, SshError> {
+    match result {
+        Ok(transferred) => {
+            tokio::fs::rename(staged, local)
+                .await
+                .map_err(|error| local_io(local, error))?;
+            Ok(transferred)
         }
-    };
-
-    tokio::fs::rename(&staged, local)
-        .await
-        .map_err(|error| local_io(local, error))?;
-
-    Ok(transferred)
+        Err(error) => {
+            let _ = tokio::fs::remove_file(staged).await;
+            Err(error)
+        }
+    }
 }
 
 /// Copies a file from the app sandbox to the server.
@@ -247,6 +272,32 @@ impl Reporter {
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
+    #[tokio::test]
+    async fn short_download_preserves_destination_and_removes_staging() {
+        let directory = std::env::temp_dir().join(format!(
+            "ssh-short-download-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        tokio::fs::create_dir(&directory).await.unwrap();
+        let local = directory.join("download");
+        let staged = staging_path(&local);
+        tokio::fs::write(&local, b"original").await.unwrap();
+        tokio::fs::write(&staged, b"short").await.unwrap();
+        let result = validate_download_size(5, Some(10), "/remote").map(|()| 5);
+        let error = finish_download(result, &staged, &local).await.unwrap_err();
+        assert_eq!(error.category(), "Protocol");
+        assert_eq!(tokio::fs::read(&local).await.unwrap(), b"original");
+        assert!(!staged.exists());
+        assert!(validate_download_size(0, None, "/remote").is_ok());
+        assert!(validate_download_size(10, Some(10), "/remote").is_ok());
+        assert!(validate_download_size(11, Some(10), "/remote").is_ok());
+        tokio::fs::remove_dir_all(directory).await.unwrap();
+    }
 
     struct RecordingSink {
         reports: Mutex<Vec<(u64, Option<u64>)>>,

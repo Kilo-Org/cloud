@@ -29,6 +29,38 @@ async fn sftp(server: &Server) -> (Arc<SshSession>, Arc<SftpClient>) {
 }
 
 #[tokio::test]
+async fn sftp_downloads_a_symlink_to_a_small_file() {
+    let server = server!();
+    let (session, sftp) = sftp(&server).await;
+    let remote = format!("/home/user/symlink-target-{}", std::process::id());
+    let link = format!("{remote}-link");
+    let result = session
+        .exec(format!("printf x > {remote} && ln -s {remote} {link}"))
+        .await
+        .expect("create remote symlink");
+    assert_eq!(result.exit_status, Some(0));
+    let local = temp_path("symlink-download");
+    let progress = Arc::new(RecordingProgress::new());
+    let read = sftp
+        .download(
+            link.clone(),
+            local_url(&local),
+            Some(Arc::clone(&progress) as Arc<dyn TransferProgress>),
+            CancelToken::new(),
+        )
+        .await
+        .expect("download symlink target");
+    assert_eq!(read, 1);
+    assert_eq!(std::fs::read(&local).unwrap(), b"x");
+    assert_eq!(progress.reports().last(), Some(&(1, Some(1))));
+    sftp.remove_file(link).await.expect("remove symlink");
+    sftp.remove_file(remote).await.expect("remove target");
+    std::fs::remove_file(local).unwrap();
+    sftp.shutdown().await.expect("shutdown");
+    session.disconnect().await.expect("disconnect");
+}
+
+#[tokio::test]
 async fn sftp_manages_remote_paths() {
     let server = server!();
     let (session, sftp) = sftp(&server).await;
@@ -301,6 +333,21 @@ async fn a_remote_forward_reaches_a_device_server() {
         .await
         .expect("remote forward");
     assert_eq!(forward.actual_port(), bind_port);
+    let duplicate = session
+        .start_remote_forward(
+            ForwardConfig {
+                bind_host: "0.0.0.0".into(),
+                bind_port,
+                dest_host: "127.0.0.1".into(),
+                dest_port: echo_port,
+            },
+            Arc::clone(&events) as Arc<dyn ForwardSink>,
+        )
+        .await;
+    match duplicate {
+        Err(error) => assert_eq!(error.category(), "Forwarding"),
+        Ok(_) => panic!("duplicate remote forward succeeded"),
+    }
 
     let mut stream = tokio::net::TcpStream::connect((server.host.as_str(), bind_port))
         .await

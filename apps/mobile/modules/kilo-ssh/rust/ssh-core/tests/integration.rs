@@ -282,6 +282,22 @@ async fn exec_reports_stdout_stderr_and_exit_status() {
 }
 
 #[tokio::test]
+async fn exec_rejects_output_over_the_limit_and_keeps_the_session_usable() {
+    let server = server!();
+    let (session, _handler) = password_session(&server).await;
+    let error = session
+        .exec(format!("head -c {} /dev/zero", 16 * 1024 * 1024 + 1))
+        .await
+        .expect_err("oversized output");
+    assert_eq!(error.category(), "OutputLimit");
+    assert_eq!(
+        session.exec("printf alive".into()).await.unwrap().stdout,
+        b"alive"
+    );
+    session.disconnect().await.unwrap();
+}
+
+#[tokio::test]
 async fn keepalive_keeps_an_idle_session_connected() {
     let server = server!();
     let mut config = server.password_config();

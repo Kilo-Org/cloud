@@ -31,6 +31,8 @@ extension SshError {
       return "ChannelClosed"
     case .Protocol:
       return "Protocol"
+    case .OutputLimit:
+      return "OutputLimit"
     case .KeyGeneration:
       return "KeyGeneration"
     case .NotFound:
@@ -56,6 +58,7 @@ extension SshError {
       .InvalidExport(let message),
       .ChannelClosed(let message),
       .Protocol(let message),
+      .OutputLimit(let message),
       .KeyGeneration(let message),
       .Forwarding(let message),
       .LocalIo(let message):

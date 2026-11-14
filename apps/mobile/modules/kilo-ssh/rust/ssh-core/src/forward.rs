@@ -76,6 +76,7 @@ enum Stopper {
         forwards: Arc<RemoteForwards>,
         address: String,
         port: u32,
+        destination: Arc<Destination>,
     },
 }
 
@@ -92,8 +93,10 @@ impl Stopper {
                 forwards,
                 address,
                 port,
+                destination,
             } => {
-                forwards.remove(port);
+                let _starting = forwards.starting.lock().await;
+                forwards.remove(&address, port, &destination);
 
                 session
                     .cancel_tcpip_forward(address, port)
@@ -119,34 +122,59 @@ impl Destination {
     }
 }
 
-/// The destinations of the remote forwards this session asked the server for,
-/// keyed by the port the server bound.
+/// Destinations keyed by the exact address and port requested from the server.
 #[derive(Default)]
 pub(crate) struct RemoteForwards {
-    targets: Mutex<HashMap<u32, Destination>>,
+    targets: Mutex<HashMap<(String, u32), Arc<Destination>>>,
+    starting: tokio::sync::Mutex<()>,
 }
 
 impl RemoteForwards {
-    pub(crate) fn insert(&self, port: u32, destination: Destination) {
-        self.targets
+    pub(crate) fn insert(
+        &self,
+        address: &str,
+        port: u32,
+        destination: Arc<Destination>,
+    ) -> Result<(), SshError> {
+        let mut targets = self
+            .targets
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .insert(port, destination);
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match targets.entry((address.to_owned(), port)) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(destination);
+                Ok(())
+            }
+            std::collections::hash_map::Entry::Occupied(_) => Err(duplicate_forward(address, port)),
+        }
     }
 
-    pub(crate) fn remove(&self, port: u32) {
-        self.targets
+    pub(crate) fn remove(&self, address: &str, port: u32, destination: &Arc<Destination>) {
+        let mut targets = self
+            .targets
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .remove(&port);
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let key = (address.to_owned(), port);
+        if targets
+            .get(&key)
+            .is_some_and(|target| Arc::ptr_eq(target, destination))
+        {
+            targets.remove(&key);
+        }
     }
 
-    pub(crate) fn destination(&self, port: u32) -> Option<Destination> {
+    pub(crate) fn destination(&self, address: &str, port: u32) -> Option<Destination> {
         self.targets
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .get(&port)
-            .cloned()
+            .get(&(address.to_owned(), port))
+            .map(|target| target.as_ref().clone())
+    }
+}
+
+fn duplicate_forward(address: &str, port: u32) -> SshError {
+    SshError::Forwarding {
+        message: format!("a remote forward already owns {address}:{port}"),
     }
 }
 
@@ -188,6 +216,17 @@ pub(crate) async fn start_remote(
     config: ForwardConfig,
     events: Arc<dyn ForwardSink>,
 ) -> Result<Arc<ForwardHandle>, SshError> {
+    let starting = forwards.starting.lock().await;
+    if config.bind_port != 0
+        && forwards
+            .destination(&config.bind_host, u32::from(config.bind_port))
+            .is_some()
+    {
+        return Err(duplicate_forward(
+            &config.bind_host,
+            u32::from(config.bind_port),
+        ));
+    }
     let reported = session
         .tcpip_forward(config.bind_host.clone(), u32::from(config.bind_port))
         .await
@@ -199,14 +238,13 @@ pub(crate) async fn start_remote(
         })?;
     let bound = port_bound(reported, config.bind_port)?;
 
-    forwards.insert(
-        bound,
-        Destination {
-            host: config.dest_host,
-            port: config.dest_port,
-            events,
-        },
-    );
+    let destination = Arc::new(Destination {
+        host: config.dest_host,
+        port: config.dest_port,
+        events,
+    });
+    forwards.insert(&config.bind_host, bound, Arc::clone(&destination))?;
+    drop(starting);
 
     Ok(Arc::new(ForwardHandle {
         actual_port: u16::try_from(bound).map_err(|_| SshError::Forwarding {
@@ -217,6 +255,7 @@ pub(crate) async fn start_remote(
             forwards,
             address: config.bind_host,
             port: bound,
+            destination,
         })),
     }))
 }
@@ -321,6 +360,49 @@ fn binding_error(config: &ForwardConfig, error: std::io::Error) -> SshError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct Sink;
+    impl ForwardSink for Sink {
+        fn on_error(&self, _message: String) {}
+    }
+
+    fn target(host: &str) -> Arc<Destination> {
+        Arc::new(Destination {
+            host: host.into(),
+            port: 80,
+            events: Arc::new(Sink),
+        })
+    }
+
+    #[test]
+    fn remote_routes_are_address_scoped_and_owned() {
+        let routes = RemoteForwards::default();
+        let first = target("first");
+        let second = target("second");
+        routes.insert("127.0.0.1", 8080, first.clone()).unwrap();
+        routes.insert("127.0.0.2", 8080, second.clone()).unwrap();
+        assert_eq!(
+            routes
+                .insert("127.0.0.1", 8080, second.clone())
+                .unwrap_err()
+                .category(),
+            "Forwarding"
+        );
+        assert_eq!(routes.destination("127.0.0.1", 8080).unwrap().host, "first");
+        assert_eq!(
+            routes.destination("127.0.0.2", 8080).unwrap().host,
+            "second"
+        );
+        assert!(routes.destination("0.0.0.0", 8080).is_none());
+        routes.remove("127.0.0.1", 8080, &second);
+        assert!(routes.destination("127.0.0.1", 8080).is_some());
+        routes.remove("127.0.0.1", 8080, &first);
+        assert!(routes.destination("127.0.0.1", 8080).is_none());
+        assert!(routes.destination("127.0.0.2", 8080).is_some());
+        routes.insert("127.0.0.1", 8080, second.clone()).unwrap();
+        routes.remove("127.0.0.1", 8080, &first);
+        assert!(routes.destination("127.0.0.1", 8080).is_some());
+    }
 
     #[test]
     fn a_server_that_answers_zero_bound_the_requested_port() {

@@ -15,6 +15,7 @@ const NativeTerminalView = requireNativeView<
 export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
   {
     sourceId,
+    onSourceBound,
     autoFocus,
     fontFamily,
     fontSize,
@@ -44,6 +45,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       cursorStyle={cursorStyle}
       theme={nativeTheme}
       onResize={onResize && (event => onResize(event.nativeEvent))}
+      onSourceBound={onSourceBound && (event => onSourceBound(event.nativeEvent.sourceId))}
       onLinkPress={onLinkPress && (event => onLinkPress(event.nativeEvent.url))}
       onBell={onBell}
       onTitleChange={onTitleChange && (event => onTitleChange(event.nativeEvent.title))}

@@ -24,6 +24,7 @@ final class SshTerminalView: TerminalView {
 
 public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, TerminalSink {
   public let onResize = EventDispatcher()
+  public let onSourceBound = EventDispatcher()
   public let onLinkPress = EventDispatcher()
   public let onBell = EventDispatcher()
   public let onTitleChange = EventDispatcher()
@@ -382,6 +383,9 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
       next?.resize(cols: appliedCols, rows: appliedRows)
     }
     updateFocus()
+    if next != nil, let sourceId {
+      onSourceBound(["sourceId": sourceId])
+    }
   }
 
   private func updateFocus() {

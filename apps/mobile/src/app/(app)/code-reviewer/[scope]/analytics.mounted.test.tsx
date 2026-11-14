@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive mounted suite for the analytics screen's states */
 // The analytics screen reads one organization's dashboard. A reader who is not
 // a member of that organization cannot see it, so the screen must say so on the
 // same surface the platform list paints — naming the scope, offering Retry and a
@@ -58,6 +59,19 @@ const dashboard: Dashboard = {
 };
 
 const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
+
+// The scope-name store is device storage behind a native module; the screen
+// only needs the remembered name and the remember call, so the module is faked
+// here with a map the tests seed.
+const rememberedNames = vi.hoisted(() => new Map<string, string>());
+
+vi.mock('@/lib/code-reviewer-scope-name', () => ({
+  readScopeName: (scopeId: string) => rememberedNames.get(scopeId),
+  rememberScopeName: (scopeId: string, name: string) => {
+    rememberedNames.set(scopeId, name);
+  },
+  subscribeScopeNames: () => () => undefined,
+}));
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: { queryKey: readonly unknown[] }) =>
@@ -165,6 +179,7 @@ beforeEach(() => {
   queries.dashboard.isFetching = false;
   queries.dashboard.error = undefined;
   queries.dashboard.refetch.mockReset();
+  rememberedNames.clear();
 });
 
 describe('CodeReviewerAnalytics denied scope', () => {
@@ -177,10 +192,29 @@ describe('CodeReviewerAnalytics denied scope', () => {
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
     expect(denied?.props.kind).toBe('denied');
     expect(denied?.props.title).toBe('Drain Labs');
-    expect(denied?.props.eyebrow).toBe('Code Reviewer');
+    // Header parity with the granted state below: the lost membership keeps the
+    // same eyebrow the dashboard's own header carries, so the denial reads as
+    // this screen rather than as the product in general.
+    expect(denied?.props.eyebrow).toBe('Analytics');
     expect(denied?.props.backFallback).toBe('/(app)/(tabs)/(0_home)');
     expect(findByType(renderer.root, 'QueryErrorMock')).toHaveLength(0);
     expect(findByType(renderer.root, 'SegmentedControlMock')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('names the scope from the remembered name once the membership is gone', () => {
+    queries.organizations.data = [];
+    queries.dashboard.data = undefined;
+    queries.dashboard.isError = true;
+    queries.dashboard.error = denial;
+    rememberedNames.set('org-drain', 'Drain Labs');
+    const renderer = mountScreen();
+
+    const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
+    expect(denied?.props.title).toBe('Drain Labs');
 
     act(() => {
       renderer.unmount();
@@ -341,6 +375,9 @@ describe('CodeReviewerAnalytics header', () => {
 
     expect(header?.props.title).toBe('Drain Labs');
     expect(header?.props.eyebrow).toBe('Analytics');
+    // The screen remembers the name the membership read delivered, which is
+    // what titles the denial once that membership is lost.
+    expect(rememberedNames.get('org-drain')).toBe('Drain Labs');
 
     act(() => {
       renderer.unmount();

@@ -18,6 +18,7 @@ export function PlatformErrorScreen({
   backFallback,
   errorTitle,
   message,
+  descriptionClassName,
   variant = 'server',
   onRetry,
   isRetrying = false,
@@ -35,6 +36,12 @@ export function PlatformErrorScreen({
   /** QueryError's own title override — independent of the ScreenHeader title above. */
   errorTitle?: string;
   message?: string;
+  /**
+   * Constrains the description's own box. A caller whose copy is long enough to
+   * leave one word alone on its last line caps the measure here so the text
+   * breaks into balanced lines instead.
+   */
+  descriptionClassName?: string;
   variant?: QueryErrorVariant;
   /** Omit to render a non-retriable state (e.g. permission/not-found errors). */
   onRetry?: () => void;
@@ -49,6 +56,7 @@ export function PlatformErrorScreen({
         variant={variant}
         title={errorTitle}
         message={message}
+        descriptionClassName={descriptionClassName}
         onRetry={onRetry}
         isRetrying={isRetrying}
         action={action}

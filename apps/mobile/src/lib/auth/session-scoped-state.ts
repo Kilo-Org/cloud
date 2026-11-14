@@ -13,6 +13,7 @@ import { clearChatBackends } from '@/lib/chat/backend-store';
 import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
+import { clearScopeNames } from '@/lib/code-reviewer-scope-name';
 import { clearFormDrafts } from '@/lib/form-draft';
 import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
@@ -94,8 +95,8 @@ function clearRecentPrsBestEffort(): void {
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
  * PR discussion conversation, the phone's own search index, the OS launcher
- * shortcuts and tile, and the durable last-opened-session and last-route
- * records. Every member is
+ * shortcuts and tile, the durable last-opened-session and last-route
+ * records, and the remembered Code Reviewer scope names. Every member is
  * best-effort; one member's throw falls through to the members after it, and to
  * the caller's own sign-in/sign-out state reset. The recents delete and OS
  * search clear are fired without awaiting, so the function stays synchronous;
@@ -185,6 +186,11 @@ export function clearSessionScopedState(): void {
   // to the account that is signed in.
   runClear(clearLastOpenedSession);
   runClear(clearLastRoute);
+  // The remembered scope names title a header by organization id, and an
+  // organization the next account does not belong to must never keep painting
+  // the previous account's name, so they go with the other account-bound
+  // records.
+  runClear(clearScopeNames);
 }
 
 /** One best-effort clear: a throw never stops the clears that follow it. */

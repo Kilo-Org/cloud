@@ -27,14 +27,19 @@ vi.mock('@/components/query-error', () => ({
   QueryError: (props: {
     variant?: string;
     message?: string;
+    descriptionClassName?: string;
     action?: ReactNode;
     onRetry?: () => void;
   }) =>
-    createElement(
-      'QueryErrorMock',
-      { variant: props.variant, message: props.message },
-      props.action ?? (props.onRetry ? 'BUILT_IN_RETRY' : null)
-    ),
+    createElement('QueryErrorMock', { variant: props.variant }, [
+      // The description's own node, carrying the class list the real state
+      // composes: the shared measure plus whatever cap the caller adds.
+      createElement('QueryErrorMessageMock', {
+        className: `text-center text-sm ${props.descriptionClassName ?? ''}`,
+        message: props.message,
+      }),
+      props.action ?? (props.onRetry ? 'BUILT_IN_RETRY' : null),
+    ]),
 }));
 
 vi.mock('@/components/ui/button', () => ({
@@ -120,9 +125,16 @@ describe('ScopeAccessDeniedScreen', () => {
   it('states who can grant access and leads with Back to profile', () => {
     const renderer = mountScreen({});
     const error = findByType(renderer.root, 'QueryErrorMock')[0];
+    const description = error ? findByType(error, 'QueryErrorMessageMock')[0] : undefined;
 
     expect(error?.props.variant).toBe('permission');
-    expect(error?.props.message).toBe('Ask an organization owner or admin to grant you access.');
+    expect(description?.props.message).toBe(
+      'Ask an organization owner or admin to grant you access.'
+    );
+    // In the compact cell this sentence wrapped with one word alone on its last
+    // line, so the description carries a capped measure that breaks it into
+    // balanced lines instead.
+    expect(description?.props.className).toContain('max-w-[205px]');
     const back = button('Back to profile', renderer.root);
     const retry = button('Retry', renderer.root);
     expect(back).toBeDefined();
@@ -181,7 +193,8 @@ describe('ScopeAccessDeniedScreen', () => {
     const error = findByType(renderer.root, 'QueryErrorMock')[0];
 
     expect(error?.props.variant).toBe('not-found');
-    expect(error?.props.message).toBe(
+    const description = error ? findByType(error, 'QueryErrorMessageMock')[0] : undefined;
+    expect(description?.props.message).toBe(
       'This organization is no longer available. Choose another account from the account picker to continue.'
     );
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.eyebrow).toBe('Code Reviewer');

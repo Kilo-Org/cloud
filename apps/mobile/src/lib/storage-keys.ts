@@ -180,6 +180,14 @@ export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
 export const LAST_ROUTE_KEY = 'last-route';
 
 /**
+ * The scope names the app last showed behind the Code Reviewer headers. Holds
+ * `{ version, userId, entries }`; the account id inside the record scopes it,
+ * so one account's names never paint under another account's header (see
+ * `lib/code-reviewer-scope-name.ts`).
+ */
+export const REVIEWER_SCOPE_NAMES_KEY = 'reviewer-scope-names';
+
+/**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,
  * no collisions. Shared by the analytics, voice-network consent, and
  * tour-completion records.

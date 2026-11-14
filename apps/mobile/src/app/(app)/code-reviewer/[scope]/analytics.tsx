@@ -19,6 +19,7 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
+import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { useTRPC } from '@/lib/trpc';
@@ -98,10 +99,18 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   // itself with. The route already rejected the personal scope, so this read
   // always has an organization to look up.
   const organizations = useQuery(trpc.organizations.list.queryOptions());
-  const scopeTitle = reviewerScopeTitle(scope, organizations.data, {
-    personal: t('common.personal'),
-    organization: t('common.organization'),
-  });
+  // The name this app last showed stands in once the reader loses the
+  // membership, so the denial below still names the organization it is about.
+  const knownScopeName = useReviewerScopeName(scope, organizations.data);
+  const scopeTitle = reviewerScopeTitle(
+    scope,
+    organizations.data,
+    {
+      personal: t('common.personal'),
+      organization: t('common.organization'),
+    },
+    knownScopeName
+  );
 
   const dashboard = useQuery(
     trpc.codeReviews.analytics.getDashboard.queryOptions({
@@ -130,7 +139,10 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     return (
       <ScopeAccessDeniedScreen
         title={scopeTitle}
-        eyebrow={t('common.codeReviewer')}
+        // The denied header carries the granted header's identity: this
+        // screen's own name over the organization, so a lost membership still
+        // reads as the analytics screen the reader tried to open.
+        eyebrow={t('codeReviewer.analytics.title')}
         backFallback={CODE_REVIEWER_HOME_PATH}
         kind={access}
         onRetry={() => {

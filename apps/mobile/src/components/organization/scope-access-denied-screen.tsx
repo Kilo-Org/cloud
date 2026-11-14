@@ -53,6 +53,11 @@ export function ScopeAccessDeniedScreen({
           ? 'organization.boundary.unavailableDescription'
           : 'organization.boundary.accessDeniedDescription'
       )}
+      // The access-denied sentence runs just past the width the compact cell
+      // gives this state, so it wrapped with one word alone on its last line.
+      // At this measure it breaks into two lines that each carry a whole
+      // phrase. The longer unavailable sentence keeps the shared measure.
+      descriptionClassName={notFound ? undefined : 'max-w-[205px]'}
       action={
         <View className="gap-3">
           {/* Leaving is the recovery this surface leads with, so it holds the

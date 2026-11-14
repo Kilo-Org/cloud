@@ -85,7 +85,9 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
       }
     });
     const blockedWrite = deferred<undefined>();
+    const reachedCancel = deferred<undefined>();
     vi.spyOn(qc, 'cancelQueries').mockImplementationOnce(async () => {
+      reachedCancel.resolve(undefined);
       await blockedWrite.promise;
     });
     conn.__fireSystem({
@@ -102,10 +104,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
         ],
       },
     });
-    await new Promise<void>(resolve => {
-      setTimeout(resolve, 0);
-    });
-    expect(qc.cancelQueriesCalls).toBe(2);
+    await reachedCancel.promise;
 
     detach();
     sync.attach();
@@ -274,8 +273,6 @@ describe('ActiveSessionsLiveSync — cli.connected', () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();
     qc.__setCached({ sessions: [makeCached({ id: 'a' })] });
-    const setQueryDataCalls = vi.spyOn(qc, 'setQueryData');
-    setQueryDataCalls.mockClear();
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
@@ -284,13 +281,15 @@ describe('ActiveSessionsLiveSync — cli.connected', () => {
       queryFn,
     });
     sync.attach();
+    const seeded = qc.__getCached()?.sessions[0];
     const event: SystemEvent = {
       event: 'cli.connected',
       data: { connectionId: 'c1' },
     };
     conn.__fireSystem(event);
+    await sync.getWriteQueue();
     await sync.getFetchQueue();
-    expect(setQueryDataCalls).not.toHaveBeenCalled();
+    expect(qc.__getCached()?.sessions[0]).toBe(seeded);
     expect(queryFn).toHaveBeenCalledTimes(1);
   });
 

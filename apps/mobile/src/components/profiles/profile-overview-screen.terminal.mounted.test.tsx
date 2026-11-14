@@ -288,4 +288,28 @@ describe('ProfileOverviewScreen terminal error states', () => {
 
     unmount();
   });
+
+  it('other profile: an instance that served another profile keeps the refusal', async () => {
+    Object.assign(h.query, { data: testProfile(), isPending: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
+
+    // The navigator reuses this instance when it opens the same route name with
+    // other params, so it now serves a profile it never painted.
+    Object.assign(h.query, {
+      data: testProfile({ id: 'profile-2', name: 'Second profile' }),
+      isError: true,
+      error: { data: { code: 'NOT_FOUND', httpStatus: 404 } },
+    });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient, { profileId: 'profile-2' });
+      await Promise.resolve();
+    });
+
+    expect(queryErrorProps(renderer.root).variant).toBe('not-found');
+    expect(h.dismissAll).not.toHaveBeenCalled();
+
+    unmount();
+  });
 });

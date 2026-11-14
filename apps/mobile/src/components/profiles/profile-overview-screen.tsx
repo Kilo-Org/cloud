@@ -163,8 +163,12 @@ export function ProfileOverviewScreen({
   // banner.
   const showContent = profile !== undefined && (errorView === null || errorView.showRetry);
   // A terminal refusal of a profile this screen already painted returns the tab
-  // to its root; see the hook for why the marker is the painted content.
-  useLeaveMissingProfileRoute(showContent, errorView !== null && !errorView.showRetry, stack);
+  // to its root, keyed to the profile it serves; see the hook for the rule.
+  useLeaveMissingProfileRoute(profileId, {
+    contentShown: showContent,
+    terminalRefusal: errorView !== null && !errorView.showRetry,
+    stack,
+  });
 
   const saveMetadata = async ({ name, description }: { name: string; description: string }) => {
     try {

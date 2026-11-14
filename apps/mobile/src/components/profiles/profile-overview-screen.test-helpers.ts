@@ -196,16 +196,16 @@ export async function mountScreen(
 export function rerenderScreen(
   renderer: ReactTestRenderer,
   queryClient: QueryClient,
-  // The stack the screen was mounted in: a screen that leaves a dead profile
-  // route behaves differently per stack, so a test can bring the same one back.
-  options: { organizationId?: string; stack?: 'app' | 'profileTab' } = {}
+  // The stack the screen was mounted in, and the profile it serves: a reused
+  // route instance answers per destination, so a test can bring either back.
+  options: { organizationId?: string; profileId?: string; stack?: 'app' | 'profileTab' } = {}
 ): void {
   renderer.update(
     createElement(
       QueryClientProvider,
       { client: queryClient },
       createElement(ProfileOverviewScreen, {
-        profileId: 'profile-1',
+        profileId: options.profileId ?? 'profile-1',
         organizationId: options.organizationId,
         stack: options.stack ?? 'profileTab',
       })

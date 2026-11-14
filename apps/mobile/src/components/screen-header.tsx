@@ -8,7 +8,7 @@ import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { Text } from '@/components/ui/text';
+import { EYEBROW_RTL_SCRIPT_DISPLAY, Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useHeaderBack } from '@/lib/hooks/use-header-back';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -476,11 +476,28 @@ export function ScreenHeader({
     );
   }
 
+  // The reserve cannot know the arriving label's script: a caller that passes
+  // only `reserveEyebrow` — the session-changes `asOf` timestamp, which lands
+  // after the first render — leaves the reserve laying out the mono 10px
+  // no-break space, and an Arabic-script label's 13px line box
+  // (`EYEBROW_RTL_SCRIPT_DISPLAY`) is taller than that, so the header grew by
+  // the difference the moment the label arrived: exactly the shift the reserve
+  // exists to prevent. Such a reserve therefore holds the tallest eyebrow line
+  // the token can paint; a caller that knows the label passes `reservedEyebrow`
+  // and gets that label's own line box instead. The cost: a screen that
+  // reserves a line it never fills is 3dp taller in its header.
+  const reserveTallestEyebrowLine = !eyebrow && !reservedEyebrow;
+
   const heading = (
     <View className="min-w-0 flex-1">
       {eyebrow || reserveEyebrow ? (
         <Eyebrow
-          className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+          className={cn(
+            'mb-0.5',
+            centerTitle && 'text-center',
+            !eyebrow && 'opacity-0',
+            reserveTallestEyebrowLine && EYEBROW_RTL_SCRIPT_DISPLAY
+          )}
           // A status line is one line: a narrow window truncates it rather than
           // stacking it into a column beside the title. A caller that raises
           // `eyebrowNumberOfLines` opts into the extra lines and the middle
@@ -495,8 +512,10 @@ export function ScreenHeader({
             Before the caller's label exists the slot holds the label that will
             fill it (`reservedEyebrow`), not a bare space: the space's mono 10px
             line box is shorter than Arabic-script copy's 13px one, so the
-            header grew the moment the label arrived. The text is transparent
-            and hidden from assistive readers until `eyebrow` itself is set.
+            header grew the moment the label arrived. With no label to go on the
+            slot holds the tallest eyebrow line instead
+            (`reserveTallestEyebrowLine`). The copy stays transparent and hidden
+            from assistive readers until `eyebrow` itself is set.
           */}
           {eyebrow ?? reservedEyebrow ?? '\u00A0'}
         </Eyebrow>
@@ -553,7 +572,9 @@ export function ScreenHeader({
   const reservedTitleBand = reserveTitleSpace ? (
     <View className="w-0 overflow-hidden" aria-hidden>
       {eyebrow || reserveEyebrow ? (
-        <Eyebrow className="mb-0.5">{reservedEyebrow ?? eyebrow ?? blankEyebrow}</Eyebrow>
+        <Eyebrow className={cn('mb-0.5', reserveTallestEyebrowLine && EYEBROW_RTL_SCRIPT_DISPLAY)}>
+          {reservedEyebrow ?? eyebrow ?? blankEyebrow}
+        </Eyebrow>
       ) : null}
       <View className={reservedTitleHeightClass(size, titleLines)} />
     </View>

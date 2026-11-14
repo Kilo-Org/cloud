@@ -79,6 +79,17 @@ export const DRAIN_BUDGET_MS = 20_000;
  */
 export const CONFLICT_RETRY_BUDGET_MS = 60 * 60 * 1000;
 
+/**
+ * How long a `parked_events` row is kept, measured from its `parked_at`. The
+ * owner approved 30 days.
+ *
+ * Expiry removes the local recovery record only. The service stores no
+ * directory data, so nothing at WorkOS or in any other table changes, and an
+ * expired row is not a promise that WorkOS still returns the event: its own
+ * event history has its own retention.
+ */
+export const PARKED_EVENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 /** Re-arm delay when a full page says events probably remain. */
 export const CATCH_UP_DELAY_SECONDS = 1;
 

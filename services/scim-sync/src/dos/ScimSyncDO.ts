@@ -77,6 +77,18 @@ export class ScimSyncDO extends DurableObject<Env> {
   }
 
   override async alarm(): Promise<void> {
+    // Retention rides on the poll loop rather than a second schedule: the alarm
+    // already ticks here, so expiry needs no cron entry and no extra timer, and
+    // running it before the poll means it cannot delay or replace the
+    // reschedule below. A failed prune is logged and retried on the next tick,
+    // whose cutoff is later.
+    try {
+      this.pruneParkedEvents();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('SCIM sync parked-event prune failed', { error: message });
+    }
+
     // `poll` reports failures rather than throwing, so the chain survives a
     // WorkOS outage: Cloudflare retries a failed alarm a bounded number of
     // times and then stops, which would strand the loop until the next cron.
@@ -283,6 +295,16 @@ export class ScimSyncDO extends DurableObject<Env> {
         error: message,
       };
     }
+  }
+
+  /**
+   * Expires the parked rows past `PARKED_EVENT_RETENTION_MS`. One statement, so
+   * a failed tick removes nothing and the next one retries with a later cutoff;
+   * the alarm's guard owns the logging.
+   */
+  private pruneParkedEvents(): void {
+    const removed = state.pruneParkedEvents(this.db, Date.now());
+    if (removed > 0) logger.info('SCIM sync expired parked events', { removed });
   }
 
   /**

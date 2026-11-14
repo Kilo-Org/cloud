@@ -1,9 +1,9 @@
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, lt, sql } from 'drizzle-orm';
 
 import type { AttemptClass, AttemptOutcome } from '../dispatch/app-client';
 import type { CursorSource, EventFailureState } from '../types';
-import { CURSOR_KEY, SEED_CURSOR_KEY } from '../util/constants';
+import { CURSOR_KEY, PARKED_EVENT_RETENTION_MS, SEED_CURSOR_KEY } from '../util/constants';
 import {
   directoryConflicts,
   eventFailures,
@@ -230,6 +230,11 @@ export function parkEvent(
   clearFailure(db, event.id);
 }
 
+/**
+ * Counts the parked rows still retained. Expiry is a range delete from the
+ * alarm, so this is the number of rows inside the retention window, which is
+ * the number an operator can still act on.
+ */
 export function parkedCount(db: Db): number {
   return (
     db
@@ -237,6 +242,43 @@ export function parkedCount(db: Db): number {
       .from(parkedEvents)
       .get()?.count ?? 0
   );
+}
+
+/**
+ * Expires parked rows older than the retention window and reports how many it
+ * removed.
+ *
+ * The comparison is strictly older than the cutoff: a row parked exactly
+ * `PARKED_EVENT_RETENTION_MS` ago is kept by this tick and removed by a later
+ * one. Every row carries the `parked_at` its window is measured from, so a row
+ * written before this policy expires once its cutoff passes. The comparison is
+ * a range on `parked_at`, which the table's index serves, so neither statement
+ * scans the table.
+ *
+ * Only `parked_events` is affected. The cursor, `event_failures`,
+ * `directory_conflicts`, `parked_activations`, and every directory row at
+ * WorkOS are untouched, so expiry drops a recovery record and never data the
+ * loop applied.
+ *
+ * The count is read before the delete because drizzle's durable-sqlite `run()`
+ * returns `void`, and asking the delete to `returning` the removed ids would
+ * hold one id per deleted row in memory for a tick that removes many. The two
+ * statements run back to back inside one synchronous Durable Object turn, so
+ * nothing can park a row between the count and the delete. A throw between them
+ * propagates to the alarm's guard, which logs it, and the next tick counts and
+ * deletes again with a later cutoff: a lost count costs a log line, never a
+ * missed row.
+ */
+export function pruneParkedEvents(db: Db, now: number): number {
+  const cutoff = now - PARKED_EVENT_RETENTION_MS;
+  const removed =
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(parkedEvents)
+      .where(lt(parkedEvents.parked_at, cutoff))
+      .get()?.count ?? 0;
+  db.delete(parkedEvents).where(lt(parkedEvents.parked_at, cutoff)).run();
+  return removed;
 }
 
 /** The conflict window a directory has open, keyed on the event that opened it. */

@@ -112,6 +112,36 @@ applies, when it is parked, or when `WORKOS_EVENT_CURSOR` resets the stream.
 `/status` reports it, which is the thing to look at when the cursor stops
 moving.
 
+### Retention
+
+A parked row is kept for **30 days from its `parked_at`**, the window the owner
+approved. The alarm expires rows on every tick: before the poll, it deletes the
+rows parked **strictly** earlier than that cutoff, so a row exactly 30 days old
+is kept by this tick and goes on the next one. Expiry rides on the existing
+alarm rather than a second cron or timer, so it cannot delay or replace the
+reschedule, and a poll that never runs is already visible as a stopped cursor.
+
+The policy covers the rows written before it: every row carries the `parked_at`
+its window is measured from, so an older row expires on the first tick whose
+cutoff is past it. An empty table and a repeated prune delete nothing, and the
+table has an index on `parked_at` so the delete is a range query.
+
+Only the local recovery record goes. The cursor, `event_failures`,
+`directory_conflicts`, `parked_activations`, and every directory, group, user
+and account row at WorkOS are untouched: nothing in this service holds
+directory data, so expiry cannot drop something the loop applied.
+
+WorkOS keeps its own event history, and an `after` cursor is bounded by that
+history's retention — the same 90-day window that decides when recovery needs
+`range_start` (see "Cursor"). So an expired row is **not** a replay promise: it
+records what this service skipped. Recovering an event whose row has expired
+depends on whether WorkOS still returns that event, which is outside this
+service's control.
+
+A prune that fails is logged as `SCIM sync parked-event prune failed` and
+nothing else: the alarm still polls, still persists the last poll and still
+arms the next tick, which retries the delete with a later cutoff.
+
 ### Per-directory budget
 
 A conflict is retried within two budgets, because the namespace holds one
@@ -147,7 +177,7 @@ acts on.
 | Route | Purpose |
 |---|---|
 | `GET /health` | Worker liveness. Does not touch the Durable Object. |
-| `GET /status` | Environment, interval, cursor and its source, the held failure, the parked count, next alarm time, and the last poll result. |
+| `GET /status` | Environment, interval, cursor and its source, the held failure, the parked count — retained rows only, since expired ones are deleted — next alarm time, and the last poll result. |
 
 Both routes are unauthenticated, so the Worker has no *HTTP* ingress: no
 `workers_dev` hostname, no `routes`, and no service binding. Neither route is

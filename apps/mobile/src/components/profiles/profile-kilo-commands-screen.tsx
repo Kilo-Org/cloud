@@ -28,6 +28,7 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -143,9 +144,10 @@ export function ProfileKiloCommandsScreen({
 
   const confirmDelete = (source: KiloCommandSource) => {
     confirm({
-      title: t('common.delete'),
-      message: source.name,
-      confirmLabel: t('common.delete'),
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.slashCommands.deleteTitle', { name: isolateLtrBidiText(source.name) }),
+      message: t('profiles.slashCommands.deleteMessage'),
+      confirmLabel: t('profiles.slashCommands.deleteConfirm'),
       onConfirm: () => {
         void runDelete(source.id);
       },

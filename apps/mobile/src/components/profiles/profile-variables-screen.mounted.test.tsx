@@ -22,6 +22,7 @@ import {
 } from '@/components/profiles/profile-variables-screen.test-helpers';
 import { SECRET_MASK } from '@/components/profiles/profile-variables-model';
 import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -742,5 +743,99 @@ describe('ProfileVariablesScreen', () => {
     pressButton(second.renderer.root, 'Add variable');
     expect(findField(second.renderer.root, 'Key').props.defaultValue).toBe('');
     second.unmount();
+  });
+});
+
+/** The key the fixture row holds; the dialog must isolate exactly this run. */
+const VARIABLE_KEY = 'API_KEY';
+
+/** The confirm sheet's request, as the screen hands it to `useConfirmDialog`. */
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+/** Read the request the screen raised, without answering it. */
+function deleteRequest(): ConfirmRequest {
+  const request = h.confirm.mock.calls[0]?.[0] as ConfirmRequest | undefined;
+  if (!request) {
+    throw new Error('the screen asked for no confirmation');
+  }
+  return request;
+}
+
+describe('ProfileVariablesScreen delete confirmation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.permission = 'allowed';
+    h.query.data = testVars([{ key: VARIABLE_KEY, value: '1', isSecret: false }]);
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    Object.assign(h.mutations.deleteVar, { isPending: false });
+  });
+
+  // The dialog used to read "Delete" as both its title and its confirm label,
+  // with the bare key as the message, so the reader was never told what removing
+  // the value would do.
+  it('asks for consent with the key in the title and states the consequence', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete variable ${VARIABLE_KEY}`);
+    const request = deleteRequest();
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.variableDeleteTitle', { key: isolateLtrBidiText(VARIABLE_KEY) }),
+      message: i18n.t('profiles.variableDeleteMessage'),
+      confirmLabel: i18n.t('profiles.variableDeleteConfirm'),
+    });
+    expect(request.confirmLabel).not.toBe(i18n.t('common.delete'));
+    expect(request.title).not.toBe(request.message);
+    expect(request.title).not.toBe(VARIABLE_KEY);
+    expect(request.message).not.toBe(VARIABLE_KEY);
+
+    unmount();
+  });
+
+  // A variable key is compared character by character, so a right-to-left
+  // sentence must not reorder it: one explicit left-to-right run, no more.
+  it('keeps the key in exactly one left-to-right isolate pair', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete variable ${VARIABLE_KEY}`);
+    const { title } = deleteRequest();
+
+    expect(title).toContain(`\u2066${VARIABLE_KEY}\u2069`);
+    expect(title.split('\u2066')).toHaveLength(2);
+    expect(title.split('\u2069')).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('deletes nothing until the reader confirms, then deletes that variable', async () => {
+    h.mutations.deleteVar.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete variable ${VARIABLE_KEY}`);
+    const request = deleteRequest();
+
+    expect(h.mutations.deleteVar.mutateAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.onConfirm();
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteVar.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.mutations.deleteVar.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      key: VARIABLE_KEY,
+    });
+
+    unmount();
   });
 });

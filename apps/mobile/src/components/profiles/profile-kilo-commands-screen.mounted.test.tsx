@@ -7,6 +7,7 @@ import { ProfileKiloCommandsScreen } from '@/components/profiles/profile-kilo-co
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -542,6 +543,103 @@ describe('ProfileKiloCommandsScreen without the manage role', () => {
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.organizationRoleRequired')
     );
+
+    unmount();
+  });
+});
+
+/** The command name the fixture row holds; the dialog must isolate exactly this run. */
+const COMMAND_NAME = 'release-notes';
+
+/** The confirm sheet's request, as the screen hands it to `useConfirmDialog`. */
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+/** Read the request the screen raised, without answering it. */
+function deleteRequest(): ConfirmRequest {
+  const request = h.confirm.mock.calls[0]?.[0] as ConfirmRequest | undefined;
+  if (!request) {
+    throw new Error('the screen asked for no confirmation');
+  }
+  return request;
+}
+
+describe('ProfileKiloCommandsScreen delete confirmation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.query.data = [testCommand({ name: COMMAND_NAME })];
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    permissionState.permission = 'allowed';
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  // The dialog used to read "Delete" as both its title and its confirm label,
+  // with the bare name as the message, so the reader was never told what
+  // removing the command would do.
+  it('asks for consent with the command name in the title and states the consequence', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressRow(renderer.root, `Delete slash command ${COMMAND_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.slashCommands.deleteTitle', {
+        name: isolateLtrBidiText(COMMAND_NAME),
+      }),
+      message: i18n.t('profiles.slashCommands.deleteMessage'),
+      confirmLabel: i18n.t('profiles.slashCommands.deleteConfirm'),
+    });
+    expect(request.confirmLabel).not.toBe(i18n.t('common.delete'));
+    expect(request.title).not.toBe(request.message);
+    expect(request.title).not.toBe(COMMAND_NAME);
+    expect(request.message).not.toBe(COMMAND_NAME);
+
+    unmount();
+  });
+
+  // A command name is compared character by character, so a right-to-left
+  // sentence must not reorder it: one explicit left-to-right run, no more.
+  it('keeps the command name in exactly one left-to-right isolate pair', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressRow(renderer.root, `Delete slash command ${COMMAND_NAME}`);
+    const { title } = deleteRequest();
+
+    expect(title).toContain(`\u2066${COMMAND_NAME}\u2069`);
+    expect(title.split('\u2066')).toHaveLength(2);
+    expect(title.split('\u2069')).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('deletes nothing until the reader confirms, then deletes that command', async () => {
+    h.mutations.deleteKiloCommand.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+
+    pressRow(renderer.root, `Delete slash command ${COMMAND_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.mutations.deleteKiloCommand.mutateAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.onConfirm();
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.mutations.deleteKiloCommand.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      commandId: 'cmd-1',
+    });
 
     unmount();
   });

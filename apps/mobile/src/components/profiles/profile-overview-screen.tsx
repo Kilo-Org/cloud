@@ -199,7 +199,7 @@ export function ProfileOverviewScreen({
     confirm({
       title: t('profiles.deleteTitle'),
       message: t('profiles.deleteMessage'),
-      confirmLabel: t('common.delete'),
+      confirmLabel: t('profiles.deleteConfirm'),
       onConfirm: () => {
         void runDelete(profileName);
       },

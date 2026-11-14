@@ -28,6 +28,7 @@ import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 
@@ -162,9 +163,10 @@ export function ProfileVariablesScreen({
       return;
     }
     confirm({
-      title: t('common.delete'),
-      message: key,
-      confirmLabel: t('common.delete'),
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.variableDeleteTitle', { key: isolateLtrBidiText(key) }),
+      message: t('profiles.variableDeleteMessage'),
+      confirmLabel: t('profiles.variableDeleteConfirm'),
       onConfirm: () => {
         void runDelete(key);
       },

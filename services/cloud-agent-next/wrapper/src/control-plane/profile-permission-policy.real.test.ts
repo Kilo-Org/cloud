@@ -150,10 +150,9 @@ suite('pinned Kilo profile permission narrowing', () => {
       runtimeAgents: [profileAgent('profile-runner', { bash: { '*': 'allow' } })],
     });
     try {
-      // The session policy decides every command, so its refusal is written.
-      expect((await writtenAgent(fixture, 'profile-runner'))?.permission).toEqual({
-        bash: { 'npm *': 'deny' },
-      });
+      // The session policy covers every pattern the agent permitted, so the
+      // written entry carries no allowance and the session map decides.
+      expect((await writtenAgent(fixture, 'profile-runner'))?.permission).toBeUndefined();
       requestToolOnce(fixture, [{ name: 'bash', arguments: { command: 'npm test' } }]);
       const sessionID = await fixture.session();
       await fixture.prompt(sessionID, 'run the package tests', fixture.directory, 'profile-runner');
@@ -180,10 +179,9 @@ suite('pinned Kilo profile permission narrowing', () => {
       runtimeAgents: [profileAgent('profile-mapper', { edit: { '*': 'allow' } })],
     });
     try {
-      // The session states edit as one flat action, so the entry carries it.
-      expect((await writtenAgent(fixture, 'profile-mapper'))?.permission).toEqual({
-        edit: { '*': 'deny' },
-      });
+      // The session states edit as one flat action, so it covers every pattern
+      // and the written entry carries no allowance.
+      expect((await writtenAgent(fixture, 'profile-mapper'))?.permission).toBeUndefined();
       const target = path.join(fixture.directory, 'mapped.txt');
       await fs.writeFile(target, 'fixture-original\n');
       requestToolOnce(fixture, [

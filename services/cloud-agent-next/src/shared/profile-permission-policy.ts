@@ -9,21 +9,10 @@ type AgentPermission = NonNullable<RuntimeAgentInput['config']['permission']>;
 
 // A profile agent's permission map is reconciled with the session command
 // policy before it is stored, so the session policy and every stricter agent
-// restriction both apply. Resolution keeps the agent's restrictions, takes an
-// agent allowance only where the session permits the same pattern, and ends
-// with the session's own refusals.
+// restriction both apply.
 
 function isPermissionAction(value: unknown): value is PermissionAction {
   return value === 'allow' || value === 'ask' || value === 'deny';
-}
-
-function isRuleMap(value: unknown): value is PermissionRuleMap {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.values(value).every(isPermissionAction)
-  );
 }
 
 /**
@@ -43,58 +32,60 @@ export function matchesKiloPermissionPattern(input: string, pattern: string): bo
   return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
 }
 
-/** Resolve one pattern with the CLI's rules: the last matching rule wins. */
-function resolveRuleAction(
+/** The last rule that matches `pattern`, with the position it holds. */
+function lastMatchingRule(
   rules: PermissionRuleMap,
   pattern: string
-): PermissionAction | undefined {
-  let result: PermissionAction | undefined;
-  for (const [candidate, action] of Object.entries(rules)) {
-    if (matchesKiloPermissionPattern(pattern, candidate)) result = action;
-  }
-  return result;
-}
-
-function lastAllowIndex(rules: PermissionRuleMap): number {
+): { action: PermissionAction; index: number } | undefined {
   const entries = Object.entries(rules);
   for (let index = entries.length - 1; index >= 0; index--) {
-    if (entries[index]?.[1] === 'allow') return index;
+    const entry = entries[index];
+    if (entry === undefined) continue;
+    if (matchesKiloPermissionPattern(pattern, entry[0])) {
+      return { action: entry[1], index };
+    }
   }
-  return -1;
+  return undefined;
+}
+
+/** Two patterns overlap when either one matches the other written as a value. */
+function patternsOverlap(left: string, right: string): boolean {
+  return matchesKiloPermissionPattern(right, left) || matchesKiloPermissionPattern(left, right);
 }
 
 /**
- * Combine a session pattern map with an agent pattern map so both apply. Every
- * agent restriction survives, an agent allowance survives only where the
- * session resolves the same pattern to allow, and the session's own refusals
- * are placed last so they decide over any surviving allowance.
+ * Keep an agent allowance only when the session permits the same patterns. The
+ * session's rule for the pattern must be an allow, and no later session
+ * refusal may cover that pattern.
  */
-function narrowRuleMap(
+function sessionPermitsPattern(session: PermissionRuleMap | undefined, pattern: string): boolean {
+  if (session === undefined) return true;
+  const permitted = lastMatchingRule(session, pattern);
+  if (permitted?.action !== 'allow') return false;
+  const entries = Object.entries(session);
+  for (let index = permitted.index + 1; index < entries.length; index++) {
+    const entry = entries[index];
+    if (entry === undefined) continue;
+    if (entry[1] === 'deny' && patternsOverlap(entry[0], pattern)) return false;
+  }
+  return true;
+}
+
+/**
+ * Combine a session pattern map with an agent pattern map. Every agent
+ * restriction survives, and an agent allowance survives only where the session
+ * permits those patterns.
+ */
+function composeRuleMap(
   session: PermissionRuleMap | undefined,
   agent: PermissionRuleMap
 ): PermissionRuleMap | undefined {
-  // An empty agent map declares no restriction, so the session policy governs
-  // and the entry carries nothing.
-  if (Object.keys(agent).length === 0) return undefined;
-  const narrowed: PermissionRuleMap = {};
+  const composed: PermissionRuleMap = {};
   for (const [pattern, action] of Object.entries(agent)) {
-    if (action === 'deny' || session === undefined) {
-      narrowed[pattern] = action;
-      continue;
-    }
-    const verdict = resolveRuleAction(session, pattern);
-    if (verdict === 'allow') narrowed[pattern] = action;
-    else if (verdict === 'ask' && action === 'allow') narrowed[pattern] = 'ask';
+    if (action !== 'deny' && !sessionPermitsPattern(session, pattern)) continue;
+    composed[pattern] = action;
   }
-  if (session !== undefined) {
-    const protectedFrom = lastAllowIndex(session);
-    Object.entries(session).forEach(([pattern, action], index) => {
-      if (action === 'deny' && index > protectedFrom && narrowed[pattern] === undefined) {
-        narrowed[pattern] = 'deny';
-      }
-    });
-  }
-  return Object.keys(narrowed).length > 0 ? narrowed : undefined;
+  return Object.keys(composed).length > 0 ? composed : undefined;
 }
 
 /** A single tool value denies when it is `deny` or holds a `deny` rule. */
@@ -113,9 +104,7 @@ export function narrowProfilePermission(
     // no restriction. Otherwise the entry is omitted and the session policy
     // governs the agent.
     if (agent === 'deny') return 'deny';
-    return Object.values(session).some(value => valueHasDenial(value)) || agent === 'ask'
-      ? undefined
-      : 'allow';
+    return Object.values(session).some(value => valueHasDenial(value)) ? undefined : agent;
   }
   if (typeof agent !== 'object' || agent === null) return undefined;
   const narrowed: PermissionMap = {};
@@ -126,16 +115,23 @@ export function narrowProfilePermission(
       narrowed[tool] = sessionValue === 'ask' && agentValue === 'allow' ? 'ask' : agentValue;
       continue;
     }
-    if (!isRuleMap(agentValue)) continue;
-    // A flat session action covers every pattern, so it narrows the agent map as
-    // the single wildcard rule and both policies apply to each call.
+    if (typeof agentValue !== 'object' || agentValue === null) continue;
+    const agentRules: PermissionRuleMap = {};
+    // A value that carries no rule, such as the null sentinel an editor writes,
+    // is ignored; the remaining rules of the tool still apply.
+    for (const [pattern, value] of Object.entries(agentValue)) {
+      if (isPermissionAction(value)) agentRules[pattern] = value;
+    }
+    if (Object.keys(agentRules).length === 0) continue;
+    // A flat session action covers every pattern, so it composes as the single
+    // wildcard rule and both policies apply to each call.
     const sessionRules =
       typeof sessionValue === 'string'
         ? { '*': sessionValue }
         : typeof sessionValue === 'object'
           ? sessionValue
           : undefined;
-    const rules = narrowRuleMap(sessionRules, agentValue);
+    const rules = composeRuleMap(sessionRules, agentRules);
     if (rules !== undefined) narrowed[tool] = rules;
   }
   return Object.keys(narrowed).length > 0 ? narrowed : undefined;

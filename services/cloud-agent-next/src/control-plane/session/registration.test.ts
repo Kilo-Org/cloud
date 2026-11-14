@@ -449,15 +449,13 @@ describe('migrated origin permissions', () => {
     const permission = spec.runtimeAgents?.[0]?.config.permission as
       | Record<string, unknown>
       | undefined;
-    expect(permission).not.toHaveProperty('edit');
-    const bash = permission?.bash as Record<string, string> | undefined;
-    expect(bash).toBeDefined();
-    expect(bash?.['*']).not.toBe('allow');
-    expect(Object.values(bash ?? {}).every(action => action === 'deny')).toBe(true);
+    // The session policy covers every pattern the agent permitted, so the entry
+    // carries no allowance and the session map governs the agent.
+    expect(permission).toBeUndefined();
     const guardBash = spec.permission?.bash as Record<string, string>;
-    // The guard's own rules decide these commands.
-    expect(resolveBashPermission(guardBash, bash ?? {}, 'npm test')).toBe('deny');
-    expect(resolveBashPermission(guardBash, bash ?? {}, 'git push')).toBe('deny');
+    expect(resolveBashPermission(guardBash, {}, 'npm test')).toBe('deny');
+    expect(resolveBashPermission(guardBash, {}, 'git push')).toBe('deny');
+    expect(resolveBashPermission(guardBash, {}, 'git log --oneline')).toBe('allow');
   });
 
   it('narrows a pattern-map agent allow against the guard flat denial', () => {
@@ -474,20 +472,14 @@ describe('migrated origin permissions', () => {
     });
     input.identity.createdOnPlatform = 'code-review';
     const { spec } = buildControlPlaneSessionRegistration(input, selection);
-    const guardEdit = spec.permission?.edit;
-    expect(guardEdit).toBe('deny');
+    expect(spec.permission?.edit).toBe('deny');
     const permission = spec.runtimeAgents?.[0]?.config.permission as
       | Record<string, unknown>
       | undefined;
-    // The session states its policy as one flat action, so the entry carries it.
-    expect(permission?.edit).toEqual({ '*': 'deny' });
-    expect(
-      resolveBashPermission(
-        { '*': guardEdit as string },
-        permission?.edit as Record<string, string>,
-        '*'
-      )
-    ).toBe('deny');
+    // The session states its policy as one flat action, so it covers every
+    // pattern and the agent entry carries no allowance.
+    expect(permission).toBeUndefined();
+    expect(resolveBashPermission({ '*': 'deny' }, {}, '*')).toBe('deny');
   });
 
   it('keeps a profile agent permission map unchanged without a command guard', () => {

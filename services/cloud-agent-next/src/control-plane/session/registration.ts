@@ -39,7 +39,7 @@ import { sessionWorkspace } from './workspace-roots.js';
 import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session/command-guard.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
-import { narrowProfileAgents } from '../../shared/profile-permission-policy.js';
+import { narrowProfileAgents, type PermissionMap } from '../../shared/profile-permission-policy.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -284,7 +284,7 @@ export function buildControlPlaneSessionRegistration(
   const guardPermissions = commandGuard
     ? getCommandGuardPermissions(commandGuard, payload.directory, bitbucketReviewId)
     : undefined;
-  const permission = {
+  const permission: PermissionMap = {
     ...(!isInteractiveSessionOrigin(createdOnPlatform) ? { question: 'deny' } : {}),
     ...(guardPermissions ?? {}),
   };
@@ -297,7 +297,7 @@ export function buildControlPlaneSessionRegistration(
       ? runtimeProfile
       : {
           ...runtimeProfile,
-          runtimeAgents: narrowProfileAgents(guardPermissions, runtimeProfile.runtimeAgents),
+          runtimeAgents: narrowProfileAgents(permission, runtimeProfile.runtimeAgents),
         };
   const spec = controlPlaneRouteSpecSchema.parse({
     ...effectiveProfile,

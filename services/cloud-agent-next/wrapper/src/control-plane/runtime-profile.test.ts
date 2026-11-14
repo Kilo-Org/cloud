@@ -747,7 +747,7 @@ describe('runtime profile permission narrowing', () => {
       // The agent's own denial survives and the session's denial reaches the
       // file too, which a verbatim copy of the agent map cannot produce.
       expect(entries.reviewer?.permission).toEqual({
-        bash: { 'git push': 'deny', 'rm *': 'deny' },
+        bash: { 'git push': 'deny' },
       });
     } finally {
       await fs.rm(home, { recursive: true, force: true });

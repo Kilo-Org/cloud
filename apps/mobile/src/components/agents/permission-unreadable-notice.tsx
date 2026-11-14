@@ -22,8 +22,9 @@ import { cn } from '@/lib/utils';
  * no live region, so the same copy is announced once there. Announcing on both
  * would read it twice on Android.
  *
- * The body takes the warning ink because the muted neutral does not clear
- * small-text contrast on the warning tint in the dark theme.
+ * The body reads at the same size as the copy beside it and takes the standard
+ * ink: the warning amber marks the title, while the muted neutral and the amber
+ * both fail body-text contrast on the warning tint.
  */
 export function PermissionUnreadableNotice({ inset = true }: { inset?: boolean }) {
   const { t } = useTranslation();
@@ -45,10 +46,10 @@ export function PermissionUnreadableNotice({ inset = true }: { inset?: boolean }
         inset && 'mx-4'
       )}
     >
-      <Text className="text-sm font-medium text-warn">
+      <Text className="text-base font-medium text-warn">
         {t('agentChat.permissionCard.unreadableTitle')}
       </Text>
-      <Text className="mt-1 text-xs text-warn">{announcement}</Text>
+      <Text className="mt-1 text-base text-foreground">{announcement}</Text>
     </View>
   );
 }

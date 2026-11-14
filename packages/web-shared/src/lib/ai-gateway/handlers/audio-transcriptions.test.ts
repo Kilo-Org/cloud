@@ -21,6 +21,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('next/server', () => {
@@ -354,7 +355,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
-        provider: { only: ['azure'], zdr: true },
+        provider: { only: ['openai', 'azure'], zdr: true },
       }) as never
     );
 
@@ -366,6 +367,28 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       zdr: true,
     });
   });
+
+  it.each([{ provider: { only: ['azure'], zdr: true } }, { provider: { ignore: ['openai'] } }])(
+    'rejects a request whose providers the member routes exclude: %j',
+    async ({ provider }) => {
+      setOrganizationMemberAuth(new Set(['openai']));
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(
+        makeRequest({
+          model: 'openai/gpt-4o-mini-transcribe',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+          provider,
+        }) as never
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.model_not_allowed,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
 
   it('limits a multipart request to the organization member provider routes', async () => {
     setOrganizationMemberAuth(new Set(['openai']));

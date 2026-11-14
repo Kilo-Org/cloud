@@ -2852,7 +2852,7 @@ describe.each([
       });
       mockedGetProvider.mockImplementationOnce(async ({ request, getRoutingProviderConfig }) => {
         expect(request.body.provider).toEqual({ only: ['azure'], ...expectedPrivacy });
-        expect(await getRoutingProviderConfig?.()).toEqual(expectedPrivacy);
+        expect(await getRoutingProviderConfig?.()).toEqual({ only: ['azure'], ...expectedPrivacy });
         return providerResult({
           provider,
           userByok: null,
@@ -2871,6 +2871,7 @@ describe.each([
 
       expect(response.status).toBe(200);
       const expectedProvider = {
+        only: ['azure'],
         ...expectedPrivacy,
         order: ['openai'],
         ignore: ['amazon-bedrock'],
@@ -2907,7 +2908,7 @@ describe.each([
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
       makeRequest(
-        { model: 'openai/gpt-4o', ...input, provider: { only: ['azure'], ...privacy } },
+        { model: 'openai/gpt-4o', ...input, provider: { only: ['openai', 'azure'], ...privacy } },
         undefined,
         path
       )
@@ -2921,6 +2922,165 @@ describe.each([
       ...privacy,
     };
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(expectedProvider);
+  });
+
+  it('forwards the request provider lists with an organization data collection policy', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'deny' },
+      plan: 'teams',
+    });
+    const requestProvider: OpenRouterProviderConfig = {
+      only: ['openai', 'azure'],
+      ignore: ['azure'],
+      order: ['openai', 'azure'],
+    };
+    mockedGetProvider.mockImplementationOnce(async ({ request, getRoutingProviderConfig }) => {
+      const expected = { ...requestProvider, data_collection: 'deny' };
+      expect(request.body.provider).toEqual(expected);
+      expect(await getRoutingProviderConfig?.()).toEqual(expected);
+      return providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      });
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest({ model: 'openai/gpt-4o', ...input, provider: requestProvider }, undefined, path)
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+      ...requestProvider,
+      ignore: ['azure', 'amazon-bedrock'],
+      data_collection: 'deny',
+    });
+  });
+
+  it('forwards exactly the providers the request and the organization both allow', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { provider_allow_list: ['openai', 'google-vertex'] },
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['openai', 'google-vertex']),
+    });
+    mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
+      expect(await getRoutingProviderConfig?.()).toEqual({
+        only: ['openai'],
+        ignore: ['google-vertex'],
+      });
+      return providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      });
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(
+        {
+          model: 'openai/gpt-4o',
+          ...input,
+          provider: { only: ['openai', 'azure'], ignore: ['google-vertex'] },
+        },
+        undefined,
+        path
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+      only: ['openai'],
+      ignore: ['google-vertex', 'amazon-bedrock'],
+      order: ['openai'],
+    });
+  });
+
+  it('keeps the request ignore list under an organization data collection policy', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'deny' },
+      plan: 'teams',
+    });
+    mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
+      expect(await getRoutingProviderConfig?.()).toEqual({
+        ignore: ['azure'],
+        zdr: true,
+        data_collection: 'deny',
+      });
+      return providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      });
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(
+        { model: 'openai/gpt-4o', ...input, provider: { ignore: ['azure'], zdr: true } },
+        undefined,
+        path
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+      ignore: ['azure', 'amazon-bedrock'],
+      zdr: true,
+      data_collection: 'deny',
+      order: ['openai'],
+    });
+  });
+
+  it('rejects a request whose providers the organization routes exclude', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { provider_allow_list: ['openai'], data_collection: 'allow' },
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['openai']),
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(
+        { model: 'openai/gpt-4o', ...input, provider: { only: ['azure'], zdr: true } },
+        undefined,
+        path
+      )
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'model_not_allowed' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 });
 
@@ -3329,6 +3489,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       'openai/gpt-4o'
     );
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+      only: ['openai'],
       ...expectedPrivacy,
       order: ['openai'],
       ignore: ['amazon-bedrock'],

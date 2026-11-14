@@ -240,7 +240,9 @@ export async function handleEmbeddingsRequest(
       requestProvider: requestPrivacy.data,
     });
     if (preferences.kind === 'rejected') return preferences.response;
-    if (preferences.provider) requestBodyParsed.provider = preferences.provider;
+    if (preferences.provider) {
+      requestBodyParsed.provider = { ...requestBodyParsed.provider, ...preferences.provider };
+    }
   }
 
   // The usage row reports the payer the balance check resolved: the root organization for an

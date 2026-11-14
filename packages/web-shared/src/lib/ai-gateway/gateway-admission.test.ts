@@ -240,6 +240,46 @@ describe('organizationProviderPreferences', () => {
     });
   });
 
+  it('keeps the request provider options while the organization limits the routes', () => {
+    expect(
+      organizationProviderPreferences({
+        decision: {
+          allowed: true,
+          eligibleProviderRoutes: new Set(['openai', 'azure', 'virtual']),
+        },
+        settings: { data_collection: 'deny' },
+        requestProvider: {
+          only: ['openai', 'anthropic'],
+          ignore: ['azure'],
+          order: ['openai', 'azure'],
+          zdr: true,
+        },
+      })
+    ).toEqual({
+      kind: 'allowed',
+      provider: {
+        only: ['openai'],
+        ignore: ['azure'],
+        order: ['openai', 'azure'],
+        zdr: true,
+        data_collection: 'deny',
+      },
+    });
+  });
+
+  it('rejects a request whose providers the organization routes exclude', () => {
+    const preferences = organizationProviderPreferences({
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+      settings: { data_collection: 'allow' },
+      requestProvider: { only: ['anthropic'], zdr: true },
+    });
+
+    expect(preferences.kind).toBe('rejected');
+    if (preferences.kind === 'rejected') {
+      expect(preferences.response.status).toBe(404);
+    }
+  });
+
   it.each([
     { organization: 'allow', request: 'deny' },
     { organization: 'deny', request: 'allow' },

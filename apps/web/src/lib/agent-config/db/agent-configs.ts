@@ -6,7 +6,10 @@ import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
-import { withPlatformRepositoryMode } from '@/lib/code-reviews/core/repository-mode';
+import {
+  repositoryModeForPlatform,
+  withPlatformRepositoryMode,
+} from '@/lib/code-reviews/core/repository-mode';
 
 export type AgentConfigOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
 
@@ -277,9 +280,8 @@ export async function resetCodeReviewConfigForOwner(
       ...existingConfig,
       selected_repository_ids: [],
       manually_added_repositories: [],
-      // GitLab code review has no 'all' repository mode, so the reset keeps the
-      // platform's only valid mode rather than writing an unsupported one.
-      repository_selection_mode: platform === 'gitlab' ? 'selected' : 'all',
+      // repositoryModeForPlatform owns the GitLab-only mode rule.
+      repository_selection_mode: repositoryModeForPlatform(platform, 'all'),
     },
     isEnabled: false,
     createdBy: 'system',

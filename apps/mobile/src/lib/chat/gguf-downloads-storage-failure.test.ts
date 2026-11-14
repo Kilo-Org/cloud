@@ -2,7 +2,7 @@
 // list: the store's load publishes it and clears it on the next successful read.
 import { describe, expect, it } from 'vitest';
 
-import { harness } from './gguf-downloads.test-helpers';
+import { CATALOG, harness } from './gguf-downloads.test-helpers';
 import { ggufModelName } from './gguf-records';
 
 describe('a storage read that fails', () => {
@@ -37,5 +37,41 @@ describe('a storage read that fails', () => {
     expect(h.store.load()).toBe(true);
     expect(h.store.snapshot().loadFailed).toBe(false);
     expect(h.store.snapshot().models.map(model => model.fileId)).toEqual(['small']);
+  });
+
+  it('keeps a saved model entry and file when a download is attempted after a failed read', async () => {
+    const h = harness();
+    const saved = JSON.stringify([
+      {
+        fileId: 'saved',
+        name: 'Saved model',
+        url: 'https://example.com/saved.gguf',
+        sizeBytes: 10,
+        contextWindow: 4096,
+        tools: false,
+        vision: false,
+        thinking: false,
+      },
+    ]);
+    h.index.text = saved;
+    h.files.set(ggufModelName('saved'), 10);
+    h.index.fails = true;
+
+    expect(h.store.load()).toBe(false);
+    expect(h.store.snapshot().loadFailed).toBe(true);
+
+    // The store never read the list, so it must not write it back: a download that
+    // finished here would rewrite the index with only the new model, and the next
+    // load would delete the saved one's file as an orphan.
+    expect(h.store.start(CATALOG)).toBe(false);
+    expect(h.tasks).toHaveLength(0);
+    expect(h.index.text).toBe(saved);
+    expect(h.files.has(ggufModelName('saved'))).toBe(true);
+
+    // A removal would rewrite the same list.
+    await h.store.remove('saved');
+    expect(h.released).toEqual([]);
+    expect(h.index.text).toBe(saved);
+    expect(h.files.has(ggufModelName('saved'))).toBe(true);
   });
 });

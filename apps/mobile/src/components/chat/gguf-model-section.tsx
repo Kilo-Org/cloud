@@ -169,7 +169,7 @@ export function GgufDownloadControls({
       {record === undefined && download === undefined && onDownload !== undefined && (
         <Button
           variant="outline"
-          disabled={snapshot.download !== null}
+          disabled={snapshot.download !== null || snapshot.loadFailed}
           onPress={onDownload}
           accessibilityLabel={namedWithDetail(downloadText, detail)}
         >
@@ -220,7 +220,7 @@ function DirectLinkForm({ snapshot }: Readonly<{ snapshot: GgufDownloadsSnapshot
       <Text className="text-sm text-muted-foreground">{t('modelChat.gguf.urlHelp')}</Text>
       <Button
         variant="outline"
-        disabled={snapshot.download !== null}
+        disabled={snapshot.download !== null || snapshot.loadFailed}
         onPress={() => {
           void start();
         }}

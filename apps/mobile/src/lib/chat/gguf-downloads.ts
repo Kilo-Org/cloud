@@ -253,6 +253,12 @@ export function ggufDownloads({
       return record === undefined ? undefined : modelFileOf(storage, record);
     },
     start: (source: GgufDownloadSource) => {
+      // A finished download writes the whole list back, so it must not run while the
+      // saved one is unread: that write would drop every model it names, and the next
+      // load would then delete their files.
+      if (loadFailed) {
+        return false;
+      }
       const fileId = source.kind === 'catalog' ? source.model.fileId : source.fileId;
       if (active !== undefined || models.some(model => model.fileId === fileId)) {
         return false;
@@ -322,6 +328,10 @@ export function ggufDownloads({
       publish();
     },
     remove: async (fileId: string) => {
+      // Same list, same rule: a removal rewrites the index it could not read.
+      if (loadFailed) {
+        return;
+      }
       const record = models.find(model => model.fileId === fileId);
       if (record === undefined) {
         return;

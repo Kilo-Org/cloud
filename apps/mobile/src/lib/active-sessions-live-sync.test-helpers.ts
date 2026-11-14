@@ -148,7 +148,6 @@ export function makeFakeQueryClient(
     pendingFetch = null;
     await cancel(...args);
   });
-  vi.spyOn(qc, 'setQueryData');
   Object.assign(qc, {
     __setCached(data: CachedActiveSessionsData | undefined) {
       if (data === undefined) {

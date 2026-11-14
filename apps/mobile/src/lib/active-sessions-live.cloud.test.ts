@@ -8,7 +8,6 @@ import {
   mergeSnapshotForActiveSessions,
   removeActiveSessionsForConnection,
 } from '@/lib/active-sessions-live';
-import { buildActiveSessionsInput } from '@/lib/agent-session-input';
 
 function makeCached(over: Partial<CachedActiveSession> = {}): CachedActiveSession {
   return {
@@ -130,19 +129,32 @@ describe('cloud sentinel merge (wipe guard)', () => {
 });
 
 describe('buildActiveSessionsTrayInput', () => {
-  it('wraps buildActiveSessionsInput and opts into cloud merge', () => {
+  it('builds the tray input literally and opts into cloud merge', () => {
     expect(buildActiveSessionsTrayInput(null)).toEqual({
-      ...buildActiveSessionsInput(null),
+      organizationId: null,
       includeCloudAgentSessions: true,
     });
     expect(buildActiveSessionsTrayInput('org-1')).toEqual({
-      ...buildActiveSessionsInput('org-1'),
+      organizationId: 'org-1',
       includeCloudAgentSessions: true,
     });
     expect(buildActiveSessionsTrayInput(undefined)).toEqual({
-      ...buildActiveSessionsInput(undefined),
+      organizationId: null,
       includeCloudAgentSessions: true,
     });
+  });
+
+  it('produces the literal activeSessions.list key the live-sync owner writes into', () => {
+    // active-sessions-live-sync-mount.tsx and hooks/use-agent-sessions.ts both
+    // register trpc.activeSessions.list.queryKey(buildActiveSessionsTrayInput(org));
+    // a drifted input or key wrapper splits the cache the socket owner writes into.
+    expect([
+      ['activeSessions', 'list'],
+      { input: buildActiveSessionsTrayInput('org-1'), type: 'query' },
+    ]).toEqual([
+      ['activeSessions', 'list'],
+      { input: { organizationId: 'org-1', includeCloudAgentSessions: true }, type: 'query' },
+    ]);
   });
 
   it('collapses absent org context to personal (parity with buildActiveSessionsInput)', () => {

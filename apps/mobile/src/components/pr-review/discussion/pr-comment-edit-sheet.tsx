@@ -35,7 +35,7 @@ import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/re
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { classifyPrInlineFailure, type PrInlineFailure } from '@/lib/pr-review/inline-failure';
 import { type PrCommentKind } from '@/lib/pr-review/discussion/review-discussion-types';
@@ -124,8 +124,9 @@ export function PrCommentEditSheet({
     // indefinite spinner with a disabled Cancel and no explanation behind the
     // full-height sheet (ux1 spot check, e6-offline-hang). The edited body
     // stays intact, nothing is pending, and the same tap retries once the
-    // banner clears.
-    if (getCommittedConnectivityStatus() === 'offline') {
+    // banner clears. A local rejection with no toast owner, so it announces
+    // through AccessibleStatus.
+    if (connectionRefusesWrites()) {
       attempt.fail({
         kind: 'retryable',
         message: t('prReview.discussion.commentEditFailed'),

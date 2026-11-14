@@ -189,34 +189,65 @@ describe('OpenCode Go session headers', () => {
   });
 });
 
-describe('getAiSdkProvider', () => {
+describe('OpenCode Go Chat Completions client headers', () => {
+  const upstream = {
+    apiUrl: 'https://opencode.ai/zen/go/v1',
+    apiUrlOverrides: {},
+    disableUrlSuffix: false,
+    apiKey: 'test-api-key',
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: null,
+  } as const;
+
+  test('sends its own session header and the credential as a bearer token', () => {
+    const headers = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+
+    expect(headers['x-opencode-session']).toEqual(expect.any(String));
+    expect(headers.authorization).toBeUndefined();
+    expect(headers['x-api-key']).toBeUndefined();
+  });
+
+  test('adds the credential header when the upstream does not take a bearer token', () => {
+    const headers = openCodeGo.chatCompletionsHeaders({
+      ...upstream,
+      apiUrlOverrides: {},
+      apiKeyHeader: 'x-api-key',
+    });
+
+    expect(headers['x-api-key']).toBe('test-api-key');
+    expect(headers['x-opencode-session']).toEqual(expect.any(String));
+  });
+
+  test('gives each client its own session', () => {
+    const first = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+    const second = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+
+    expect(first['x-opencode-session']).not.toBe(second['x-opencode-session']);
+  });
+});
+
+describe('OpenCode Go AI SDK provider', () => {
   test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus'])(
     'uses the Anthropic Messages API for OpenCode Go model %s',
     model => {
-      expect(getAiSdkProvider(model, 'opencode-go')).toBe('anthropic');
+      expect(openCodeGo.getAiSdkProvider?.(model)).toEqual({ aiSdkProvider: 'anthropic' });
     }
   );
 
   test.each(['opencode-go/muse-spark-1.2-contributor', 'opencode-go/muse-spark-1.3-contributor'])(
-    'uses the Responses API for OpenCode Go model %s',
+    'leaves OpenCode Go model %s to the model-name classification',
     model => {
-      expect(getAiSdkProvider(model, 'opencode-go')).toBe('openai');
+      expect(openCodeGo.getAiSdkProvider?.(model)).toBeNull();
+      expect(getAiSdkProvider(model)).toBe('openai');
     }
   );
 
   test('uses the Responses API for Muse models through the gateway', () => {
-    expect(getAiSdkProvider('meta/muse-spark-1.2', null)).toBe('openai');
+    expect(getAiSdkProvider('meta/muse-spark-1.2')).toBe('openai');
   });
 
-  test('uses Chat Completions for MiniMax models from other direct providers', () => {
-    expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();
-  });
-
-  test('uses Chat Completions for Morph direct BYOK models', () => {
-    expect(getAiSdkProvider('morph/morph-gpt-compatible', 'morph-byok')).toBeUndefined();
-  });
-
-  test('uses Chat Completions for MiniMax models through the gateway', () => {
-    expect(getAiSdkProvider('minimax/minimax-m2.5', null)).toBeUndefined();
+  test('uses Chat Completions for MiniMax models that a provider does not reassign', () => {
+    expect(getAiSdkProvider('minimax/minimax-m2.5')).toBeUndefined();
   });
 });

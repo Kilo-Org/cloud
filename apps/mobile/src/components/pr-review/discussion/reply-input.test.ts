@@ -36,6 +36,7 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 
+
 vi.mock('react-native', () => ({
   Alert: {
     alert: (title: string, message: string, buttons: AlertButton[]) => {

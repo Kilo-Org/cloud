@@ -344,8 +344,6 @@
       "rowSubtitle": "Defnyddio bilio eich darparwr eich hun",
       "manageOnWebReason": "Mae angen manylion adnabod strwythuredig ar y darparwyr hyn.",
       "description": "Codir tâl am geisiadau drwy'r allweddi hyn ar eich cyfrif darparwr yn lle eich balans Kilo.",
-      "enabled": "Yn cael ei defnyddio",
-      "disabled": "Wedi'i diffodd",
       "managedByPlan": "Wedi'i rheoli gan eich cynllun codio",
       "enableKey": "Galluogi allwedd {{provider}}",
       "test": "Profi'r allwedd",
@@ -416,6 +414,7 @@
       "title": "Derbynneb adroddiad",
       "description": "Y dderbynneb ar gyfer yr adroddiad a gyflwynoch. Cadwch y rhif adnabod hwn i gyfeirio ato'n nes ymlaen.",
       "receiptLabel": "Derbynneb",
+      "copyReceiptId": "Copïo rhif adnabod y dderbynneb",
       "appealLabel": "Apêl",
       "triageReceived": "Wedi'i dderbyn",
       "triageOpen": "Wrthi'n cael ei adolygu",
@@ -3621,6 +3620,7 @@
     },
     "settingsOnWeb": {
       "title": "Gosodiadau'r sefydliad ar y we",
+      "integrations": "Integreiddiadau ar y we",
       "usageDetails": "Manylion defnydd",
       "providersAndModels": "Darparwyr a modelau",
       "groups": "Grwpiau",
@@ -3636,7 +3636,7 @@
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
-      "last30Days": "Y 30 diwrnod diwethaf",
+      "orgLast30Days": "Holl aelodau · Y 30 diwrnod diwethaf",
       "outputTokens": "Tocynnau allbwn",
       "requests": "Ceisiadau"
     },
@@ -4672,7 +4672,6 @@
     "sectionTitle": "Gwasanaethau cysylltiedig",
     "entrySubtitle": "GitHub, Slack, Linear a mwy",
     "subtitle": "Cysylltwch eich offer datblygu a'ch llifoedd gwaith â Kilo",
-    "emptyHint": "Does dim integreiddiadau wedi'u cysylltu eto.",
     "disconnect": "Datgysylltu",
     "disconnectTitle": "Datgysylltu {{provider}}?",
     "disconnectMessage": "Bydd Kilo yn peidio ag ymateb yn {{provider}}. Gallwch ailgysylltu unrhyw bryd.",

@@ -2,7 +2,10 @@ import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script'
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
-import { ParentCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  ParentCallbackTargetSchema,
+  requestedEnvironmentSchema,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   cloudSessionMetadataSchema,
@@ -13,8 +16,8 @@ import {
   cloudToolPartDetailInputSchema,
   cloudToolPartDetailWireSchema,
 } from '@kilocode/cloud-agent-sdk/tool-part-detail';
-import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
-import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
+import { SandboxStatusSessionIdSchema } from '@cloud-agent-shared/sandbox-status';
+import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
 import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -35,31 +38,25 @@ import {
   CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX,
   CLOUD_AGENT_ATTACHMENT_RELAXED_FILENAME_REGEX,
 } from '@/lib/cloud-agent/constants';
-import {
-  PREVIEW_PORT_MAX,
-  PREVIEW_PORT_MIN,
-} from '../../../../services/cloud-agent-next/src/shared/preview-port';
-import {
-  previewTargetSchema,
-  type PreviewTarget,
-} from '../../../../services/cloud-agent-next/src/shared/preview-target';
+import { PREVIEW_PORT_MAX, PREVIEW_PORT_MIN } from '@cloud-agent-shared/preview-port';
+import { previewTargetSchema, type PreviewTarget } from '@cloud-agent-shared/preview-target';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
-} from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+} from '@cloud-agent-shared/sandbox-status';
 export {
   ListPreviewServicesOutputSchema as baseListPreviewServicesNextOutputSchema,
   type ListPreviewServicesOutput,
   type PreviewService,
-} from '../../../../services/cloud-agent-next/src/shared/preview-services';
+} from '@cloud-agent-shared/preview-services';
 export { GetEgressAuditResponseSchema as baseGetEgressAuditNextOutputSchema } from '@kilocode/worker-utils/egress-audit';
 export type {
   SandboxLifecycleStatus,
   SandboxProviderLabel,
   SandboxStatusDetailCode,
   SandboxStatusSnapshot,
-} from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+} from '@cloud-agent-shared/sandbox-status';
 
 /**
  * Shared schemas for cloud-agent-next routers
@@ -379,28 +376,6 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
   }),
   sendMessageNextPayloadSchema.options[1],
 ]);
-
-/**
- * The environment the user selected, and the branch of each additional
- * repository of a multi-repository environment. The worker checks both against
- * the owner and the launch repository, and validates each branch.
- */
-const requestedEnvironmentSchema = z
-  .object({
-    id: z.uuid(),
-    repositories: z
-      .array(
-        z
-          .object({
-            repoFullName: z.string().min(1).max(500),
-            branch: z.string().min(1).max(255).optional(),
-          })
-          .strict()
-      )
-      .max(100)
-      .optional(),
-  })
-  .strict();
 
 /**
  * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:

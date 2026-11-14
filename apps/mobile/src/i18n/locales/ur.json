@@ -344,8 +344,6 @@
       "rowSubtitle": "اپنے فراہم کنندہ کی بلنگ استعمال کریں",
       "manageOnWebReason": "ان فراہم کنندگان کو منظم اسناد درکار ہیں۔",
       "description": "ان کلیدوں کے ذریعے کی گئی درخواستوں کا بل آپ کے Kilo بیلنس کے بجائے آپ کے فراہم کنندہ اکاؤنٹ پر آتا ہے۔",
-      "enabled": "زیر استعمال",
-      "disabled": "بند ہے",
       "managedByPlan": "آپ کے کوڈنگ پلان کے زیر انتظام",
       "enableKey": "{{provider}} کلید فعال کریں",
       "test": "کلید آزمائیں",
@@ -416,6 +414,7 @@
       "title": "رپورٹ کی رسید",
       "description": "آپ کی جمع کرائی گئی رپورٹ کی رسید۔ بعد میں حوالے کے لیے یہ آئی ڈی محفوظ رکھیں۔",
       "receiptLabel": "رسید",
+      "copyReceiptId": "رسید کی آئی ڈی کاپی کریں",
       "appealLabel": "اپیل",
       "triageReceived": "موصول ہو گئی",
       "triageOpen": "زیرِ جائزہ",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "ویب پر تنظیم کی سیٹنگز",
+      "integrations": "ویب پر انٹیگریشنز",
       "usageDetails": "استعمال کی تفصیلات",
       "providersAndModels": "فراہم کنندگان اور ماڈلز",
       "groups": "گروپس",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",
-      "last30Days": "پچھلے 30 دن",
+      "orgLast30Days": "تمام اراکین · پچھلے 30 دن",
       "outputTokens": "آؤٹ پٹ ٹوکن",
       "requests": "درخواستیں"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "منسلک سروسز",
     "entrySubtitle": "GitHub، Slack، Linear اور مزید",
     "subtitle": "اپنے ڈیولپمنٹ ٹولز اور ورک فلوز کو Kilo سے منسلک کریں",
-    "emptyHint": "ابھی تک کوئی انٹیگریشن منسلک نہیں ہے۔",
     "disconnect": "منقطع کریں",
     "disconnectTitle": "{{provider}} کو منقطع کریں؟",
     "disconnectMessage": "Kilo اب {{provider}} میں جواب نہیں دے گا۔ آپ کسی بھی وقت دوبارہ منسلک کر سکتے ہیں۔",

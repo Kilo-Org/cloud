@@ -344,8 +344,6 @@
       "rowSubtitle": "Folosește facturarea propriului furnizor",
       "manageOnWebReason": "Acești furnizori necesită date de autentificare structurate.",
       "description": "Solicitările făcute cu aceste chei sunt facturate în contul tău de furnizor, nu din soldul Kilo.",
-      "enabled": "În uz",
-      "disabled": "Dezactivată",
       "managedByPlan": "Gestionată de planul tău de coding",
       "enableKey": "Activează cheia {{provider}}",
       "test": "Testează cheia",
@@ -416,6 +414,7 @@
       "title": "Confirmarea raportării",
       "description": "Confirmarea de primire pentru raportul trimis. Păstrează acest ID pentru a-l putea menționa ulterior.",
       "receiptLabel": "Confirmare",
+      "copyReceiptId": "Copiază ID-ul confirmării",
       "appealLabel": "Contestație",
       "triageReceived": "Primit",
       "triageOpen": "În analiză",
@@ -3462,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Setările organizației pe web",
+      "integrations": "Integrări pe web",
       "usageDetails": "Detalii de utilizare",
       "providersAndModels": "Furnizori și modele",
       "groups": "Grupuri",
@@ -3477,7 +3477,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
-      "last30Days": "Ultimele 30 de zile",
+      "orgLast30Days": "Toți membrii · Ultimele 30 de zile",
       "outputTokens": "Tokenuri de ieșire",
       "requests": "Cereri"
     },
@@ -4477,7 +4477,6 @@
     "sectionTitle": "Servicii conectate",
     "entrySubtitle": "GitHub, Slack, Linear și altele",
     "subtitle": "Conectează-ți instrumentele și fluxurile de lucru pentru dezvoltare la Kilo",
-    "emptyHint": "Nicio integrare conectată încă.",
     "disconnect": "Deconectează",
     "disconnectTitle": "Deconectezi {{provider}}?",
     "disconnectMessage": "Kilo nu va mai răspunde în {{provider}}. Te poți reconecta oricând.",

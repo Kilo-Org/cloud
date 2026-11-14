@@ -96,7 +96,12 @@ export function validateCloudAgentAuthorityClaims(claims: unknown): CloudAgentAu
   return scopedTokenClaimsSchema.parse(claims).cloudAgentAuthority;
 }
 
-const requestedEnvironmentSchema = z
+/**
+ * The environment the user selected, and the branch of each additional
+ * repository of a multi-repository environment. The worker checks both against
+ * the owner and the launch repository, and validates each branch.
+ */
+export const requestedEnvironmentSchema = z
   .object({
     id: z.uuid(),
     repositories: z

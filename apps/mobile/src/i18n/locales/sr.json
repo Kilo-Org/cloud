@@ -344,8 +344,6 @@
       "rowSubtitle": "Koristi naplatu preko svog provajdera",
       "manageOnWebReason": "Ovim provajderima su potrebni strukturirani akreditivi.",
       "description": "Zahtevi poslati preko ovih ključeva naplaćuju se na tvom nalogu kod provajdera umesto sa tvog Kilo salda.",
-      "enabled": "U upotrebi",
-      "disabled": "Isključeno",
       "managedByPlan": "Upravlja se kroz tvoj plan za kodiranje",
       "enableKey": "Omogući ključ za {{provider}}",
       "test": "Testiraj ključ",
@@ -416,6 +414,7 @@
       "title": "Potvrda prijave",
       "description": "Potvrda za prijavu koju si poslao. Sačuvaj ovaj ID da bi se kasnije pozvao na nju.",
       "receiptLabel": "Potvrda",
+      "copyReceiptId": "Kopiraj ID potvrde",
       "appealLabel": "Žalba",
       "triageReceived": "Primljeno",
       "triageOpen": "U razmatranju",
@@ -3462,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Podešavanja organizacije na vebu",
+      "integrations": "Integracije na vebu",
       "usageDetails": "Detalji potrošnje",
       "providersAndModels": "Provajderi i modeli",
       "groups": "Grupe",
@@ -3477,7 +3477,7 @@
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
-      "last30Days": "Poslednjih 30 dana",
+      "orgLast30Days": "Svi članovi · Poslednjih 30 dana",
       "outputTokens": "Izlazni tokeni",
       "requests": "Zahtevi"
     },
@@ -4477,7 +4477,6 @@
     "sectionTitle": "Povezane usluge",
     "entrySubtitle": "GitHub, Slack, Linear i drugo",
     "subtitle": "Povežite svoje razvojne alate i tokove rada sa platformom Kilo",
-    "emptyHint": "Još nema povezanih integracija.",
     "disconnect": "Prekini vezu",
     "disconnectTitle": "Prekinuti vezu sa uslugom {{provider}}?",
     "disconnectMessage": "Kilo više neće odgovarati u usluzi {{provider}}. Možete se ponovo povezati u bilo kom trenutku.",

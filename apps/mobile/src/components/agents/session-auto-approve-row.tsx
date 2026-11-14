@@ -28,7 +28,7 @@ export function SessionAutoApproveRow({
       testID="session-auto-approve-row"
       className="flex-row items-center justify-between rounded-lg bg-secondary p-4"
     >
-      <View className="flex-1 pr-3">
+      <View className="min-w-0 flex-1 pe-3">
         <Text className="text-sm font-medium">{title}</Text>
         <Text variant="muted" className="text-xs">
           {state === 'unavailable'

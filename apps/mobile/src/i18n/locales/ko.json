@@ -344,8 +344,6 @@
       "rowSubtitle": "내 제공업체 결제 사용",
       "manageOnWebReason": "이 제공업체에는 구조화된 자격 증명이 필요합니다.",
       "description": "이 키를 통한 요청은 Kilo 잔액 대신 제공업체 계정으로 청구됩니다.",
-      "enabled": "사용 중",
-      "disabled": "꺼짐",
       "managedByPlan": "코딩 플랜에서 관리됨",
       "enableKey": "{{provider}} 키 사용",
       "test": "키 테스트",
@@ -416,6 +414,7 @@
       "title": "신고 접수증",
       "description": "제출한 신고의 접수증입니다. 나중에 참조할 수 있도록 이 ID를 보관하세요.",
       "receiptLabel": "접수증",
+      "copyReceiptId": "접수증 ID 복사",
       "appealLabel": "이의 제기",
       "triageReceived": "접수됨",
       "triageOpen": "검토 중",
@@ -3414,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "웹에서 조직 설정",
+      "integrations": "웹에서 연동",
       "usageDetails": "사용량 세부정보",
       "providersAndModels": "제공업체 및 모델",
       "groups": "그룹",
@@ -3429,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "입력 토큰",
-      "last30Days": "최근 30일",
+      "orgLast30Days": "전체 멤버 · 최근 30일",
       "outputTokens": "출력 토큰",
       "requests": "요청"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "연결된 서비스",
     "entrySubtitle": "GitHub, Slack, Linear 등",
     "subtitle": "개발 도구와 워크플로를 Kilo에 연결하세요",
-    "emptyHint": "아직 연결된 서비스가 없습니다.",
     "disconnect": "연결 해제",
     "disconnectTitle": "{{provider}} 연결을 해제할까요?",
     "disconnectMessage": "Kilo가 더 이상 {{provider}}에서 응답하지 않습니다. 언제든지 다시 연결할 수 있습니다.",

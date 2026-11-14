@@ -344,8 +344,6 @@
       "rowSubtitle": "የራስዎን የአቅራቢ ክፍያ ይጠቀሙ",
       "manageOnWebReason": "እነዚህ አቅራቢዎች የተዋቀሩ የማረጋገጫ መረጃዎችን ይፈልጋሉ።",
       "description": "በእነዚህ ቁልፎች የሚላኩ ጥያቄዎች ከKilo ቀሪ ሂሳብዎ ይልቅ በአቅራቢ መለያዎ ይከፈላሉ።",
-      "enabled": "በጥቅም ላይ",
-      "disabled": "ጠፍቷል",
       "managedByPlan": "በኮዲንግ ዕቅድዎ የሚተዳደር",
       "enableKey": "የ{{provider}} ቁልፍን አንቃ",
       "test": "ቁልፉን ሞክር",
@@ -416,6 +414,7 @@
       "title": "የሪፖርት ደረሰኝ",
       "description": "ላስገቡት ሪፖርት የተሰጠ ደረሰኝ። በኋላ ለመጥቀስ ይህን መለያ ቁጥር ያስቀምጡ።",
       "receiptLabel": "ደረሰኝ",
+      "copyReceiptId": "የደረሰኙን መለያ ቁጥር ይቅዱ",
       "appealLabel": "ይግባኝ",
       "triageReceived": "ደርሷል",
       "triageOpen": "በግምገማ ላይ",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "በድር ላይ ያሉ የድርጅት ቅንብሮች",
+      "integrations": "በድር ላይ ውህደቶች",
       "usageDetails": "የአጠቃቀም ዝርዝሮች",
       "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
       "groups": "ቡድኖች",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
-      "last30Days": "ያለፉት 30 ቀናት",
+      "orgLast30Days": "ሁሉም አባላት · ያለፉት 30 ቀናት",
       "outputTokens": "የውጤት ቶከኖች",
       "requests": "ጥያቄዎች"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "የተገናኙ አገልግሎቶች",
     "entrySubtitle": "GitHub፣ Slack፣ Linear እና ሌሎችም",
     "subtitle": "የልማት መሣሪያዎችዎን እና የሥራ ሂደቶችዎን ከKilo ጋር ያገናኙ",
-    "emptyHint": "እስካሁን ምንም የተገናኘ ውህደት የለም።",
     "disconnect": "ግንኙነት አቋርጥ",
     "disconnectTitle": "የ{{provider}} ግንኙነት ይቋረጥ?",
     "disconnectMessage": "Kilo በ{{provider}} ውስጥ ምላሽ መስጠት ያቆማል። በማንኛውም ጊዜ እንደገና ማገናኘት ይችላሉ።",

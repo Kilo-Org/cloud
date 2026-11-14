@@ -344,8 +344,6 @@
       "rowSubtitle": "استخدم الفوترة الخاصة بمزوّدك",
       "manageOnWebReason": "تتطلب هؤلاء المزوّدون بيانات اعتماد منظّمة.",
       "description": "تُحتسب تكلفة الطلبات المُرسلة عبر هذه المفاتيح على حسابك لدى المزوّد بدلًا من رصيدك في Kilo.",
-      "enabled": "قيد الاستخدام",
-      "disabled": "متوقف",
       "managedByPlan": "تتم إدارته عبر خطة البرمجة الخاصة بك",
       "enableKey": "تفعيل مفتاح {{provider}}",
       "test": "اختبار المفتاح",
@@ -416,6 +414,7 @@
       "title": "إيصال البلاغ",
       "description": "إيصال البلاغ الذي أرسلته. احتفظ بهذا المعرّف للرجوع إليه لاحقًا.",
       "receiptLabel": "الإيصال",
+      "copyReceiptId": "نسخ معرّف الإيصال",
       "appealLabel": "الطعن",
       "triageReceived": "تم الاستلام",
       "triageOpen": "قيد المراجعة",
@@ -3626,6 +3625,7 @@
     },
     "settingsOnWeb": {
       "title": "إعدادات المؤسسة على الويب",
+      "integrations": "التكاملات على الويب",
       "usageDetails": "تفاصيل الاستخدام",
       "providersAndModels": "المزوّدون والنماذج",
       "groups": "المجموعات",
@@ -3641,7 +3641,7 @@
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",
-      "last30Days": "آخر 30 يومًا",
+      "orgLast30Days": "كل الأعضاء · آخر 30 يومًا",
       "outputTokens": "رموز الإخراج",
       "requests": "الطلبات"
     },
@@ -4672,7 +4672,6 @@
     "sectionTitle": "الخدمات المتصلة",
     "entrySubtitle": "GitHub وSlack وLinear والمزيد",
     "subtitle": "اربط أدوات التطوير ومسارات العمل لديك بـ Kilo",
-    "emptyHint": "لا توجد تكاملات متصلة بعد.",
     "disconnect": "قطع الاتصال",
     "disconnectTitle": "هل تريد قطع الاتصال بـ {{provider}}؟",
     "disconnectMessage": "سيتوقف Kilo عن الرد في {{provider}}. يمكنك إعادة الاتصال في أي وقت.",

@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   canViewOrgAuditLog,
+  type OrgInAppSettingsGate,
   type OrgSettingsGate,
+  visibleInAppSettingsRows,
   visibleOrgSettingsRows,
 } from '@/components/organization/organization-settings-rows';
 
@@ -39,6 +41,12 @@ function areas(overrides: Partial<OrgSettingsGate> = {}) {
   return visibleOrgSettingsRows(gate(overrides), 'org_1').map(row => row.area);
 }
 
+function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
+  return visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise', ...overrides }).map(
+    row => row.area
+  );
+}
+
 describe('visibleOrgSettingsRows', () => {
   it('lists every area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
@@ -50,7 +58,6 @@ describe('visibleOrgSettingsRows', () => {
       'byok',
       'ssoAndDomain',
       'emailPreferences',
-      'auditLogs',
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -108,7 +115,6 @@ describe('visibleOrgSettingsRows', () => {
     expect(rows).not.toContain('guardrails');
     expect(rows).not.toContain('emailPreferences');
     expect(rows).toContain('providersAndModels');
-    expect(rows).toContain('auditLogs');
   });
 
   it('opens the web page that owns each setting', () => {
@@ -130,14 +136,31 @@ describe('visibleOrgSettingsRows', () => {
     // Data collection is the teams dashboard's card, in place of providers and
     // models, so it appears on that plan only.
     const teams = visibleOrgSettingsRows(gate({ plan: 'teams' }), 'org_1');
-    expect(teams.find(row => row.area === 'dataCollection')?.web).toBe(true);
+    expect(
+      teams.find(row => row.area === 'dataCollection')?.url.endsWith('/organizations/org_1')
+    ).toBe(true);
   });
 
-  it('marks the audit log as the one area the app reads itself', () => {
-    const rows = visibleOrgSettingsRows(gate(), 'org_1');
-    const byArea = new Map(rows.map(row => [row.area, row]));
-    expect(byArea.get('auditLogs')?.web).toBe(false);
-    expect(rows.filter(row => !row.web)).toHaveLength(1);
+  it('keeps every in-app area out of the web group', () => {
+    for (const role of ['owner', 'admin', 'billing_manager', 'member', undefined] as const) {
+      for (const plan of ['enterprise', 'teams'] as const) {
+        expect(areas({ role, plan })).not.toContain('auditLogs');
+      }
+    }
+  });
+});
+
+describe('visibleInAppSettingsRows', () => {
+  it('returns the audit log to every billing role on the enterprise plan', () => {
+    for (const role of ['owner', 'admin', 'billing_manager'] as const) {
+      expect(inAppAreas({ role })).toEqual(['auditLogs']);
+    }
+  });
+
+  it('returns nothing to a member, an unknown role or a teams plan', () => {
+    expect(inAppAreas({ role: 'member' })).toEqual([]);
+    expect(inAppAreas({ role: undefined })).toEqual([]);
+    expect(inAppAreas({ plan: 'teams' })).toEqual([]);
   });
 });
 

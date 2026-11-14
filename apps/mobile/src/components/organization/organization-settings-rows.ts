@@ -3,6 +3,7 @@ import {
   canManageOrganizationBilling,
   type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
+import { type Href } from 'expo-router';
 
 import {
   Building2,
@@ -25,23 +26,22 @@ import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 
 /**
- * The organization destinations this app does not reimplement. Each row opens
- * the page that already owns the setting on the web.
+ * The organization destinations the hub lists, in the two shapes it opens
+ * them: the web pages this app does not reimplement, and the one area the app
+ * reads itself.
  *
- * The list, its role and plan gates, and its destinations follow
+ * Every web row opens the page that already owns the setting. The list, its
+ * role and plan gates, and its destinations follow
  * `apps/web/src/app/(app)/components/OrganizationAppSidebar.tsx` plus the gate
  * each web page applies to itself, so a member never sees a row that would
  * bounce them off the page it opened:
  *
- * - the sidebar hides Model Access, Audit logs, Request logs, Invoices,
- *   Sub-organizations and BYOK from a role without billing authority
+ * - the sidebar hides Model Access, Request logs, Invoices, Sub-organizations
+ *   and BYOK from a role without billing authority
  *   (`canManageOrganizationBilling`);
- * - the sidebar hides Model Access, Groups and Audit logs below the enterprise
- *   plan;
+ * - the sidebar hides Model Access and Groups below the enterprise plan;
  * - `sub-organizations` and `distribute-funds` additionally redirect for a
  *   child organization (`parent_organization_id !== null`);
- * - `audit-logs` renders for a member, but its procedure answers only a
- *   billing role, so the row keeps the billing gate;
  * - `guardrails` requires `owner`/`admin` and the organization's Kilo Encrypt
  *   setting;
  * - `providers-and-models`, `custom-modes`, `byok`, `integrations` and
@@ -51,6 +51,10 @@ import { WEB_BASE_URL } from '@/lib/config';
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
  *   the organization dashboard rather than pages of their own, so they open
  *   `/organizations/<id>`.
+ *
+ * The audit log is the exception neither table shares with the other: the app
+ * reads it natively, so it is an in-app destination, and its gate is the one
+ * its procedure applies (billing role and the enterprise plan).
  */
 type OrgSettingsArea =
   | 'usageDetails'
@@ -62,7 +66,6 @@ type OrgSettingsArea =
   | 'ssoAndDomain'
   | 'emailPreferences'
   | 'dataCollection'
-  | 'auditLogs'
   | 'requestLogs'
   | 'integrations'
   | 'subOrganizations'
@@ -83,11 +86,22 @@ export type OrgSettingsRow = Readonly<{
   icon: LucideIcon;
   /** The web page that owns the setting. */
   url: string;
-  /**
-   * Whether the row opens the web page. `false` opens the in-app screen, which
-   * only the audit log has: every other area is edited nowhere but the web.
-   */
-  web: boolean;
+}>;
+
+/** The one area the app reads itself instead of opening its web page. */
+export type OrgInAppSettingsArea = 'auditLogs';
+
+export type OrgInAppSettingsRow = Readonly<{
+  area: OrgInAppSettingsArea;
+  title: string;
+  icon: LucideIcon;
+  /** The in-app screen that shows the area. */
+  href: Href;
+}>;
+
+export type OrgInAppSettingsGate = Readonly<{
+  role: OrganizationRole | undefined;
+  plan: 'teams' | 'enterprise';
 }>;
 
 type OrgSettingsRowSpec = Readonly<{
@@ -96,8 +110,6 @@ type OrgSettingsRowSpec = Readonly<{
   /** The page's path after `/organizations/<id>`. Empty for a dashboard card. */
   suffix: string;
   visible: (gate: OrgSettingsGate) => boolean;
-  /** `false` for the area this app reads natively. */
-  web?: boolean;
 }>;
 
 const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
@@ -151,15 +163,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
   // Data collection card: the teams dashboard shows it in place of providers
   // and models.
   { area: 'dataCollection', icon: Server, suffix: '', visible: gate => gate.plan === 'teams' },
-  // "Audit Logs": billing role and the enterprise plan. This one area is read
-  // in the app, so the row opens the native screen instead of the web page.
-  {
-    area: 'auditLogs',
-    icon: ScrollText,
-    suffix: '/audit-logs',
-    visible: gate => canViewOrgAuditLog(gate.role, gate.plan),
-    web: false,
-  },
   // "Request Logs": billing role.
   {
     area: 'requestLogs',
@@ -196,7 +199,6 @@ const TITLE_KEYS = {
   ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
   emailPreferences: 'organization.settingsOnWeb.emailPreferences',
   dataCollection: 'organization.settingsOnWeb.dataCollection',
-  auditLogs: 'organization.settingsOnWeb.auditLogs',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
   integrations: 'integrations.title',
   subOrganizations: 'organization.settingsOnWeb.subOrganizations',
@@ -215,6 +217,28 @@ export function canViewOrgAuditLog(
   return canManageOrganizationBilling(role) && plan === 'enterprise';
 }
 
+type OrgInAppSettingsRowSpec = Readonly<{
+  area: OrgInAppSettingsArea;
+  icon: LucideIcon;
+  href: Href;
+  visible: (gate: OrgInAppSettingsGate) => boolean;
+}>;
+
+const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
+  // "Audit logs": the gate its procedure applies, which the screen repeats to
+  // itself. The row opens the screen rather than the web page.
+  {
+    area: 'auditLogs',
+    icon: ScrollText,
+    href: '/(app)/(tabs)/(3_profile)/organization/audit-log',
+    visible: gate => canViewOrgAuditLog(gate.role, gate.plan),
+  },
+];
+
+const IN_APP_TITLE_KEYS = {
+  auditLogs: 'organization.settingsOnWeb.auditLogs',
+} satisfies Record<OrgInAppSettingsArea, string>;
+
 /**
  * The rows this role and plan may open, in the order the section shows them.
  * A row whose gate fails is absent rather than disabled: the web page would
@@ -229,6 +253,26 @@ export function visibleOrgSettingsRows(
     title: i18n.t(TITLE_KEYS[spec.area]),
     icon: spec.icon,
     url: `${WEB_BASE_URL}/organizations/${organizationId}${spec.suffix}`,
-    web: spec.web !== false,
+  }));
+}
+
+/**
+ * The in-app rows this role and plan may open, in the order the card shows
+ * them.
+ *
+ * The gate reads only the role and the plan, both of which arrive on the
+ * organization row that decides whether the hub renders at all. So the hub
+ * paints these rows on its first frame while the web rows below wait for the
+ * membership payload: a row inserted above them later would move the group
+ * under it, which the design gate's layout-shift rule refuses.
+ */
+export function visibleInAppSettingsRows(
+  gate: OrgInAppSettingsGate
+): readonly OrgInAppSettingsRow[] {
+  return IN_APP_ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => ({
+    area: spec.area,
+    title: i18n.t(IN_APP_TITLE_KEYS[spec.area]),
+    icon: spec.icon,
+    href: spec.href,
   }));
 }

@@ -28,7 +28,10 @@ import {
   type OrgKiloPassRowState,
 } from '@/components/organization/org-kilo-pass-row-state';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
-import { visibleOrgSettingsRows } from '@/components/organization/organization-settings-rows';
+import {
+  visibleInAppSettingsRows,
+  visibleOrgSettingsRows,
+} from '@/components/organization/organization-settings-rows';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
@@ -192,11 +195,17 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     ? t('organization.hub.planEnded')
     : t('common.organizationTrialEnded');
 
-  // The organization dashboard's own settings, one row per area. The group
-  // waits for the membership payload because the parent link decides whether
-  // the sub-organization rows exist: painting them on the cached list entry's
-  // `null` and removing them a request later would move every row under them.
-  // It is the last group on the screen, so its arrival pushes nothing above it.
+  // The in-app destinations the hub opens itself, and the only card rows that
+  // need no payload: their gate reads the role and the plan, which the
+  // organization row decides before this screen renders.
+  const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan });
+
+  // The organization dashboard's own settings on the web, one row per area.
+  // The group waits for the membership payload because the parent link decides
+  // whether the sub-organization rows exist: painting them on the cached list
+  // entry's `null` and removing them a request later would move every row
+  // under them. It is the last group on the screen, so its arrival pushes
+  // nothing above it.
   const settingsRows =
     orgWithMembers.data == null && !membershipUnavailable
       ? null
@@ -339,7 +348,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <ConfigureRow
             icon={Plug}
             title={t('integrations.title')}
-            last={!showMoney}
+            last={!showMoney && inAppSettingsRows.length === 0}
             onPress={() => {
               router.push(`/(app)/(tabs)/(3_profile)/integrations?org=${organizationId}` as Href);
             }}
@@ -419,7 +428,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               <ConfigureRow
                 icon={Wallet}
                 title={t('notifications.channel.spend')}
-                last
+                last={inAppSettingsRows.length === 0}
                 onPress={() => {
                   router.push(
                     `/(app)/(tabs)/(3_profile)/spend-alerts?org=${organizationId}` as Href
@@ -428,6 +437,20 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
             </>
           )}
+          {/* The one destination this app reads itself. It closes the card, and
+              it is painted before any web row because its gate needs no
+              payload — see `visibleInAppSettingsRows`. */}
+          {inAppSettingsRows.map((row, index) => (
+            <ConfigureRow
+              key={row.area}
+              icon={row.icon}
+              title={row.title}
+              last={index === inAppSettingsRows.length - 1}
+              onPress={() => {
+                router.push(row.href);
+              }}
+            />
+          ))}
         </View>
 
         {/* The areas this app does not reimplement. Each row opens the page
@@ -446,11 +469,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                   title={row.title}
                   last={index === settingsRows.length - 1}
                   onPress={() => {
-                    if (row.web) {
-                      void openExternalUrl(row.url, { label: row.title });
-                      return;
-                    }
-                    router.push('/(app)/(tabs)/(3_profile)/organization/audit-log' as Href);
+                    void openExternalUrl(row.url, { label: row.title });
                   }}
                 />
               ))}

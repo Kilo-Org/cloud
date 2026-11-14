@@ -1,15 +1,17 @@
 import 'server-only';
 import {
+  type EnvironmentBuildCancelResult,
+  type EnvironmentBuildLogs,
+  type EnvironmentBuildRequestResult,
+  type EnvironmentBuildStatus,
+} from '../../../../../services/cloud-agent-next/src/shared/environment-build-status';
+import {
   createCloudAgentNextClient,
   rethrowCloudAgentError,
   type EnvironmentBuildCancelInput,
-  type EnvironmentBuildCancelResult,
-  type EnvironmentBuildLogs,
   type EnvironmentBuildLogsInput,
   type EnvironmentBuildRequestInput,
-  type EnvironmentBuildRequestResult,
   type EnvironmentBuildScope,
-  type EnvironmentBuildStatus,
 } from './cloud-agent-client';
 
 /**

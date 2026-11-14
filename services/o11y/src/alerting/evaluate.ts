@@ -20,6 +20,7 @@ import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-
 import { evaluateContainerCapacity } from './container-capacity-evaluate';
 import { evaluateContainerAllocations } from './container-allocations';
 import { evaluateQueueBacklogAlert } from './queue-backlog-evaluate';
+import { evaluateDeadLetterQueueAlert } from './dead-letter-queue-evaluate';
 
 /**
  * Compute the burn rate from an observed bad-event fraction and the SLO.
@@ -325,6 +326,12 @@ export async function evaluateAlerts(env: Env): Promise<void> {
     await evaluateQueueBacklogAlert(env);
   } catch (err) {
     errors.push(new Error('queue_backlog evaluation', { cause: err }));
+  }
+
+  try {
+    await evaluateDeadLetterQueueAlert(env);
+  } catch (err) {
+    errors.push(new Error('dead_letter_queue evaluation', { cause: err }));
   }
 
   if (errors.length > 0) {

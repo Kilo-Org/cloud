@@ -45,7 +45,12 @@ export function allocatePreviewCache(name: string): PreviewCacheFile {
     getSafeCacheFilename({ id: `preview-${Date.now()}-${counter}`, filename: name })
   ).uri;
   liveUris.add(uri);
-  return { uri, release: () => deletePreviewFile(uri) };
+  return {
+    uri,
+    release: () => {
+      deletePreviewFile(uri);
+    },
+  };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+import { fakeFs } from './fake-file-system.test-helpers';
 import { useFileActions } from './use-file-actions';
 import { type FilePreview } from '@/components/ssh/files/file-preview-sheet';
 
@@ -11,80 +12,10 @@ vi.mock('../native', () => ({
   nativeErrorCode: () => 'Protocol',
 }));
 
-const fakeFs = vi.hoisted(() => {
-  const files = new Map<string, string>();
-  const directories = new Set<string>();
-
-  function uriOf(base: string | { uri: string }, names: readonly string[]): string {
-    const root = typeof base === 'string' ? base : base.uri;
-    return names.length === 0 ? root : `${root}/${names.join('/')}`;
-  }
-
-  class File {
-    readonly uri: string;
-
-    constructor(base: string | { uri: string }, ...names: string[]) {
-      this.uri = uriOf(base, names);
-    }
-
-    get exists(): boolean {
-      return files.has(this.uri);
-    }
-
-    text(): Promise<string> {
-      return Promise.resolve(files.get(this.uri) ?? '');
-    }
-
-    delete(): void {
-      files.delete(this.uri);
-    }
-  }
-
-  class Directory {
-    readonly uri: string;
-
-    constructor(base: string | { uri: string }, ...names: string[]) {
-      this.uri = uriOf(base, names);
-    }
-
-    get exists(): boolean {
-      return directories.has(this.uri);
-    }
-
-    create(): void {
-      directories.add(this.uri);
-    }
-
-    list(): File[] {
-      const prefix = `${this.uri}/`;
-      return [...files.keys()]
-        .filter(uri => uri.startsWith(prefix) && !uri.slice(prefix.length).includes('/'))
-        .map(uri => new File(uri));
-    }
-
-    delete(): void {
-      directories.delete(this.uri);
-    }
-  }
-
-  return {
-    files,
-    directories,
-    reset: () => {
-      files.clear();
-      directories.clear();
-    },
-    Directory,
-    File,
-    Paths: { cache: { uri: 'file:///cache' } },
-  };
+vi.mock('expo-file-system', async () => {
+  const { fakeFs: fake } = await import('./fake-file-system.test-helpers');
+  return { Directory: fake.Directory, File: fake.File, Paths: fake.Paths };
 });
-
-vi.mock('expo-file-system', () => ({
-  Directory: fakeFs.Directory,
-  File: fakeFs.File,
-  Paths: fakeFs.Paths,
-}));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/lib/share-remote-file', () => ({
@@ -172,8 +103,9 @@ function unmountAll(): void {
 beforeEach(() => {
   fakeFs.reset();
   native.download.mockReset();
-  native.download.mockImplementation(async (_channel, _remote, local) => {
+  native.download.mockImplementation((_channel, _remote, local) => {
     fakeFs.files.set(local, 'bytes');
+    return Promise.resolve();
   });
 });
 
@@ -289,9 +221,9 @@ it('deletes the preview copy when a fixture preview replaces it', async () => {
 });
 
 it('drops the copy a failed download left behind', async () => {
-  native.download.mockImplementationOnce(async (_channel, _remote, local) => {
+  native.download.mockImplementationOnce((_channel, _remote, local) => {
     fakeFs.files.set(local, 'partial');
-    throw new Error('boom');
+    return Promise.reject(new Error('boom'));
   });
   await mountProbe();
 

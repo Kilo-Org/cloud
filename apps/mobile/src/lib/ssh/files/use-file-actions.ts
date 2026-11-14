@@ -10,7 +10,7 @@ import { shareLocalFile } from '@/lib/share-remote-file';
 import { type FilePreview } from '@/components/ssh/files/file-preview-sheet';
 import { nativeErrorCode, sshPackage } from '../native';
 import { joinRemotePath, previewKindOf } from './paths';
-import { type PreviewCacheFile, allocatePreviewCache, sweepPreviewCache } from './preview-cache';
+import { allocatePreviewCache, type PreviewCacheFile, sweepPreviewCache } from './preview-cache';
 import {
   downloadedFileUri,
   type SshTransfer,

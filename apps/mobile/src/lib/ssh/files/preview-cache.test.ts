@@ -1,95 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fakeFs } from './fake-file-system.test-helpers';
 import { allocatePreviewCache, sweepPreviewCache } from './preview-cache';
 
-const fakeFs = vi.hoisted(() => {
-  const files = new Map<string, string>();
-  const directories = new Set<string>();
-  const refusedDeletes = new Set<string>();
-  let listFails = false;
-
-  function uriOf(base: string | { uri: string }, names: readonly string[]): string {
-    const root = typeof base === 'string' ? base : base.uri;
-    return names.length === 0 ? root : `${root}/${names.join('/')}`;
-  }
-
-  class File {
-    readonly uri: string;
-
-    constructor(base: string | { uri: string }, ...names: string[]) {
-      this.uri = uriOf(base, names);
-    }
-
-    get exists(): boolean {
-      return files.has(this.uri);
-    }
-
-    text(): Promise<string> {
-      return Promise.resolve(files.get(this.uri) ?? '');
-    }
-
-    delete(): void {
-      if (refusedDeletes.delete(this.uri)) {
-        throw new Error('delete refused');
-      }
-      files.delete(this.uri);
-    }
-  }
-
-  class Directory {
-    readonly uri: string;
-
-    constructor(base: string | { uri: string }, ...names: string[]) {
-      this.uri = uriOf(base, names);
-    }
-
-    get exists(): boolean {
-      return directories.has(this.uri);
-    }
-
-    create(): void {
-      directories.add(this.uri);
-    }
-
-    list(): File[] {
-      if (listFails) {
-        throw new Error('unreadable directory');
-      }
-      const prefix = `${this.uri}/`;
-      return [...files.keys()]
-        .filter(uri => uri.startsWith(prefix) && !uri.slice(prefix.length).includes('/'))
-        .map(uri => new File(uri));
-    }
-
-    delete(): void {
-      directories.delete(this.uri);
-    }
-  }
-
-  return {
-    files,
-    directories,
-    refusedDeletes,
-    failListing: () => {
-      listFails = true;
-    },
-    reset: () => {
-      files.clear();
-      directories.clear();
-      refusedDeletes.clear();
-      listFails = false;
-    },
-    Directory,
-    File,
-    Paths: { cache: { uri: 'file:///cache' } },
-  };
+vi.mock('expo-file-system', async () => {
+  const { fakeFs: fake } = await import('./fake-file-system.test-helpers');
+  return { Directory: fake.Directory, File: fake.File, Paths: fake.Paths };
 });
-
-vi.mock('expo-file-system', () => ({
-  Directory: fakeFs.Directory,
-  File: fakeFs.File,
-  Paths: fakeFs.Paths,
-}));
 
 vi.mock('@/lib/share-remote-file', () => ({
   getSafeCacheFilename: ({ id, filename }: { id: string; filename: string }) => `${id}-${filename}`,

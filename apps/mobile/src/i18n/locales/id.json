@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Perubahan",
     "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
+    "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
     "privateRepositoryA11y": "{{name}}, repositori pribadi"
   },
   "language": {

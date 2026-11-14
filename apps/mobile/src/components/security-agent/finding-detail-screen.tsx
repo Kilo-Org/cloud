@@ -30,6 +30,8 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
+import { useBillingAction } from '@/lib/trial-refusal';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
@@ -84,6 +86,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const capability = useSecurityAgentCapability(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
   const { refresh: refreshDismissDraft } = dismissDraft;
+  // The step a stored trial refusal offers this reader. The draft keeps the
+  // copy key, so the card re-translates the sentence and this decides whether
+  // the same reader is offered the plan step under it.
+  const billingAction = useBillingAction(scope);
 
   // The detail screen stays mounted while the dismiss sheet is open, so
   // re-read the draft on focus: a fresh failure must show the retry card and
@@ -276,6 +282,11 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           <SecurityCommandRetryCard
             lastError={dismissFailure}
             retryable={dismissDraft.draft.retryable === true}
+            action={
+              isSecurityTrialRefusalCopyKey(dismissDraft.draft.lastErrorKey)
+                ? billingAction
+                : undefined
+            }
             onRetry={() => {
               pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
             }}

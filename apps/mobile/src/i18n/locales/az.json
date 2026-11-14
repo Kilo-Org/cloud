@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
     "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
+    "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
     "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya"
   },
   "language": {

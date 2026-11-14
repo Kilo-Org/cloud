@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Zmiany",
     "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
     "privateRepositoryA11y": "{{name}}, prywatne repozytorium"
   },
   "language": {

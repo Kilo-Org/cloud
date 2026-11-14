@@ -37,6 +37,16 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
+// The dismissal hook reads the reader's role through the organization query
+// chain, which reaches expo-router and the Expo runtime this pure project has
+// no build for. No test here resolves a role: the mapper takes it as an
+// argument, and these suites assert the wiring around it.
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  isMoneyRole: () => false,
+  useOrgBoundary: () => ({ role: undefined }),
+}));
+
 vi.mock('@/lib/query/schedule-cache-maintenance', () => ({ scheduleCacheMaintenance: vi.fn() }));
 
 vi.mock('@/lib/operation-key', async importOriginal => {

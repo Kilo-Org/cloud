@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Endringer",
     "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
+    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen.",
     "privateRepositoryA11y": "{{name}}, privat repository"
   },
   "language": {

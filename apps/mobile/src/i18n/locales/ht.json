@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Chanjman",
     "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
+    "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò.",
     "privateRepositoryA11y": "{{name}}, repòsitwa prive"
   },
   "language": {

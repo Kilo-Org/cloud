@@ -17,6 +17,7 @@ import { getNewAgentSessionPath } from '@/components/agents/session-list-routes'
 import { DestinationOptionRow } from '@/components/destination-option-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
@@ -35,6 +36,7 @@ import {
 } from '@/lib/share-payload';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { useTRPC } from '@/lib/trpc';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 
 import {
   resolveShareDestinationAdmission,
@@ -84,6 +86,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   });
 
   const { spawn } = useRemoteInstanceSpawn();
+  // The reader's part in a trial refusal: the sentence follows the role, and
+  // the billing step exists only for a role the server would let change the
+  // plan. The plan's refusal is the only one that offers it.
+  const canManageBilling = useCanManageBilling(organizationId);
+  const billingAction = useBillingAction(organizationId);
   const [spawningConnectionId, setSpawningConnectionId] = useState<string | null>(null);
   // P1-A-08b: one `operationKey` per share-spawn intent (share + instance), so
   // a retryable failure keeps the key and the relay dedupes the retry.
@@ -345,13 +352,22 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       // The remote start is a relay command, so the organization subscription
       // gate never runs for it and the session would be created before the
       // model request was refused. Refuse here, before the spawn, in the same
-      // words the cloud start path uses for the same organization state.
+      // words the cloud start path uses for the same organization state, and
+      // with the step that ends it for the reader who may change the plan. A
+      // toast takes sonner's action shape, so the step is reachable from here
+      // like it is from the inline refusal on the new-session form.
       const plan = resolveRemoteStartPlan({
         organizationId: organizationId ?? null,
         organizations: memberships,
+        canManageBilling,
       });
       if (!plan.allowed) {
-        toast.error(plan.toast);
+        announcingToast.error(
+          plan.toast,
+          billingAction === undefined
+            ? undefined
+            : { action: { label: billingAction.label, onClick: billingAction.onPress } }
+        );
         return;
       }
 
@@ -426,6 +442,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       })();
     },
     [
+      billingAction,
+      canManageBilling,
       commit,
       commitEnabled,
       getKey,

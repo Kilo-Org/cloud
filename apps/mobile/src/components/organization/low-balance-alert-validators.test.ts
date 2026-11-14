@@ -78,4 +78,19 @@ describe('saveErrorCopy', () => {
       message: i18n.t('common.organizationTrialEnded'),
     });
   });
+
+  it('gives a billing role the plan refusal that offers the step', () => {
+    const error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+    });
+    expect(saveErrorCopy(error, true)).toEqual({
+      field: 'form',
+      message: i18n.t('common.organizationTrialEndedBilling'),
+    });
+    // The reader who cannot change the plan keeps the copy that names the owner.
+    expect(saveErrorCopy(error, false)).toEqual({
+      field: 'form',
+      message: i18n.t('common.organizationTrialEnded'),
+    });
+  });
 });

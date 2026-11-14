@@ -28,9 +28,15 @@ const REPOSITORY_AUTHORIZATION_REFUSAL_MESSAGE =
  * alone does not identify the failure. Prepare resolves the requested profile
  * before it registers the session, so its only `NOT_FOUND` is a profile that
  * no longer exists: the reader refreshes the selection instead of retrying.
+ *
+ * `canManageBilling` selects the sentence of the organization trial refusal and
+ * defaults to the reader who cannot change the plan. Every caller here reports
+ * through a toast that carries no step, so they leave the default: the copy must
+ * not offer an action the reader cannot reach from where it is painted. A
+ * surface that resolves the role for a refusal it can also act on passes it.
  */
-export function cloudPrepareFailureMessage(error: unknown): string {
-  const known = knownServerErrorMessage(error);
+export function cloudPrepareFailureMessage(error: unknown, canManageBilling = false): string {
+  const known = knownServerErrorMessage(error, canManageBilling);
   if (known != null) {
     return known;
   }

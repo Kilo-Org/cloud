@@ -177,6 +177,7 @@
     "durationHourShort": "giờ",
     "changes": "Thay đổi",
     "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
+    "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại.",
     "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư"
   },
   "language": {

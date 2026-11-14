@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Modifiche",
     "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
+    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova.",
     "privateRepositoryA11y": "{{name}}, repository privato"
   },
   "language": {

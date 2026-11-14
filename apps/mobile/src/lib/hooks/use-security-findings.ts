@@ -16,6 +16,7 @@ import { useHoistedOperationKey } from '@/lib/operation-key';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
+import { useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 // Personal and org procedures resolve to nominally distinct tRPC option
@@ -142,6 +143,9 @@ export function dismissFindingIntentFingerprint(
 export function useDismissSecurityFinding(scope: string) {
   const queryClient = useQueryClient();
   const { getKey, rotateKey } = useHoistedOperationKey();
+  // The scope is the organization id for an organization scope, so the
+  // dismissal's copy follows this reader's role in the organization it acts on.
+  const canManageBilling = useCanManageBilling(scope);
   return useMutation({
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]
@@ -163,7 +167,7 @@ export function useDismissSecurityFinding(scope: string) {
         }
         // Map the raw `operation_in_progress` CONFLICT marker onto retryable
         // dismissal copy before the form renders it inline (P2).
-        throw mapSecurityDismissOperationError(error);
+        throw mapSecurityDismissOperationError(error, canManageBilling);
       }
     },
     onSuccess: result => {

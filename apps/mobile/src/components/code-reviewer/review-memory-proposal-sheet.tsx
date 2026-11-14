@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { RefusalStatus } from '@/components/refusal-status';
 import { SheetHeader } from '@/components/sheet-header';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
@@ -26,6 +26,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
     dirty,
     valid,
     failure,
+    failureAction,
     pending,
     canEdit,
     busy,
@@ -146,7 +147,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
             <Text>{t('common.openPullRequest')}</Text>
           </Button>
         ) : null}
-        <AccessibleStatus message={failure?.message ?? null} />
+        <RefusalStatus message={failure?.message ?? null} action={failureAction} />
         {failure && canEdit ? (
           <Button
             variant="outline"

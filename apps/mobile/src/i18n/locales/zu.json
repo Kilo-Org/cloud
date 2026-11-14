@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Izinguquko",
     "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi.",
+    "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi.",
     "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo"
   },
   "language": {

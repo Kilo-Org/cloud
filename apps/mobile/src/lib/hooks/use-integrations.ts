@@ -11,7 +11,9 @@ import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
-import { knownServerErrorMessage } from '@/lib/server-error-copy';
+import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -93,6 +95,8 @@ function disconnectIntegration(
 export function useDisconnectIntegration(organizationId: string | undefined) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const canManageBilling = useCanManageBilling(organizationId);
+  const billingAction = useBillingAction(organizationId);
   const input = organizationId ? { organizationId } : {};
 
   return useMutation({
@@ -114,11 +118,13 @@ export function useDisconnectIntegration(organizationId: string | undefined) {
       ]);
     },
     onError: (error, variables) => {
-      announcingToast.error(
-        knownServerErrorMessage(error) ??
+      announceTrialRefusal(
+        knownServerErrorMessage(error, canManageBilling) ??
           i18n.t('integrations.disconnectFailed', {
             provider: i18n.t(providerLabelKey(variables.provider)),
-          })
+          }),
+        billingAction,
+        isTrialExpiredRefusal(error)
       );
     },
   });
@@ -185,6 +191,8 @@ export function useIntegrationConnect(params: {
   onReturned: () => Promise<void>;
 }): IntegrationConnect {
   const [pendingProvider, setPendingProvider] = useState<IntegrationProvider | null>(null);
+  const canManageBilling = useCanManageBilling(params.organizationId);
+  const billingAction = useBillingAction(params.organizationId);
 
   async function connect(provider: IntegrationProvider) {
     setPendingProvider(provider);
@@ -198,7 +206,11 @@ export function useIntegrationConnect(params: {
       });
       await params.onReturned();
     } catch (error) {
-      announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('integrations.connectFailed'));
+      announceTrialRefusal(
+        knownServerErrorMessage(error, canManageBilling) ?? i18n.t('integrations.connectFailed'),
+        billingAction,
+        isTrialExpiredRefusal(error)
+      );
     } finally {
       setPendingProvider(null);
     }

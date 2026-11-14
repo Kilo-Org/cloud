@@ -4,7 +4,10 @@
 // dashboard banner, the failure toast, and the dismiss sheet all read the
 // reader's language. The raw marker stays on the mapped error's `cause`, and
 // the retryability decision is carried on the error itself so a translated
-// message still drives the key-rotation and disabled-control contracts.
+// message still drives the key-rotation and disabled-control contracts. The
+// reader's role reaches the mapping as well: the organization trial refusal is
+// the one sentence whose copy depends on it, and only a role that can change
+// the plan is offered the step that ends it.
 //
 // The same pattern as `@/lib/pr-review/merge/pr-operation-ledger`, which maps
 // the PR surface's share of these markers.
@@ -21,7 +24,8 @@ import {
   OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
 } from '@/lib/operation-markers';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { knownServerErrorCopyKey } from '@/lib/server-error-copy';
+import { isTrialExpiredRefusal, knownServerErrorCopyKey } from '@/lib/server-error-copy';
+import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** A settled `failed` row replayed under the same key: no recovery, fresh key. */
@@ -181,8 +185,14 @@ export function securitySyncPreconditionFor(error: unknown): SecuritySyncPrecond
   return securitySyncPreconditionForCode(readTrpcErrorField(source, 'upstreamCode'));
 }
 
-/** The catalog key each known server marker's copy comes from, or null. */
-function markerKeyFor(error: Error): string | null {
+/**
+ * The catalog key each known server marker's copy comes from, or null.
+ *
+ * `canManageBilling` reaches the trial refusal, whose explanation depends on
+ * the reader: a role that can change the plan reads the step, everyone else
+ * reads who can take it.
+ */
+function markerKeyFor(error: Error, canManageBilling: boolean): string | null {
   const precondition = securitySyncPreconditionFor(error);
   if (precondition !== null) {
     return SECURITY_SYNC_PRECONDITION_COPY_KEYS[precondition];
@@ -210,7 +220,7 @@ function markerKeyFor(error: Error): string | null {
       // The subscription gate and the organization procedures refuse a write
       // with their own sentence and no ledger marker: a lapsed trial is the
       // reason the reader needs, not the generic "could not complete" line.
-      return knownServerErrorCopyKey(error);
+      return knownServerErrorCopyKey(error, canManageBilling);
     }
   }
 }
@@ -240,10 +250,14 @@ function fallbackKeyFor(retryable: boolean): string {
     : 'securityAgent.mutations.actionBlocked';
 }
 
-function mapSecurityOperationError(error: unknown, surface: SecurityErrorSurface): Error {
+function mapSecurityOperationError(
+  error: unknown,
+  surface: SecurityErrorSurface,
+  canManageBilling: boolean
+): Error {
   const retryable = isSecuritySyncRetryable(error);
   const retainsOperationKey = securityRetainsOperationKey(error);
-  const markerKey = error instanceof Error ? markerKeyFor(error) : null;
+  const markerKey = error instanceof Error ? markerKeyFor(error, canManageBilling) : null;
   const fallbackKey = isOperationInProgress(error)
     ? IN_PROGRESS_KEY_BY_SURFACE[surface]
     : fallbackKeyFor(retryable);
@@ -264,12 +278,12 @@ function mapSecurityOperationError(error: unknown, surface: SecurityErrorSurface
  * language's sentence. Returns null for a message the mapper does not
  * recognise: the stored English sentence renders verbatim there.
  */
-export function securityMutationCopyKey(error: unknown): string | null {
+export function securityMutationCopyKey(error: unknown, canManageBilling = false): string | null {
   if (error instanceof SecurityMutationError) {
     return error.copyKey;
   }
   if (error instanceof Error) {
-    const markerKey = markerKeyFor(error);
+    const markerKey = markerKeyFor(error, canManageBilling);
     if (markerKey !== null) {
       return markerKey;
     }
@@ -285,8 +299,11 @@ export function securityMutationCopyKey(error: unknown): string | null {
  * server's own sentence otherwise (the analysis and remediation toasts). Null
  * for an unrecognised message, so the caller keeps the server's text.
  */
-export function localizedSecurityMarkerMessage(error: unknown): string | null {
-  const markerKey = error instanceof Error ? markerKeyFor(error) : null;
+export function localizedSecurityMarkerMessage(
+  error: unknown,
+  canManageBilling = false
+): string | null {
+  const markerKey = error instanceof Error ? markerKeyFor(error, canManageBilling) : null;
   return markerKey === null ? null : i18n.t(markerKey);
 }
 
@@ -317,24 +334,48 @@ function configMutationCopyKeyFor(error: unknown): string | null {
  * (the enable toggle and the settings save). A refusal the server marked with a
  * stable code reads the catalog copy that names it; a rejection carrying one of
  * the organization sentences the app already explains keeps that reason (the
- * lapsed-trial gate is the one a settings save hits). Anything else reads the
- * localized generic sentence, because the server's own English explanation
- * cannot be translated on the device. The fallback follows the retry class, as
- * the ledger mapper's does.
+ * lapsed-trial gate is the one a settings save hits, and its copy follows the
+ * reader's role). Anything else reads the localized generic sentence, because
+ * the server's own English explanation cannot be translated on the device. The
+ * fallback follows the retry class, as the ledger mapper's does.
  */
-export function securityConfigMutationMessage(error: unknown): string {
-  const copyKey = configMutationCopyKeyFor(error) ?? knownServerErrorCopyKey(error);
+export function securityConfigMutationMessage(error: unknown, canManageBilling = false): string {
+  const copyKey =
+    configMutationCopyKeyFor(error) ?? knownServerErrorCopyKey(error, canManageBilling);
   return i18n.t(copyKey ?? fallbackKeyFor(isSecuritySyncRetryable(error)));
 }
 
+/**
+ * Whether a security failure is the organization trial refusal, which is the
+ * one refusal whose copy and step depend on the reader's role.
+ *
+ * The mappers re-wrap the raw rejection on the mapped error's `cause`, and the
+ * surfaces hold the mapped error, so the refusal has to be read through it;
+ * `isTrialExpiredRefusal` reads the message the server sent, which only the raw
+ * error carries.
+ */
+export function isSecurityTrialRefusal(error: unknown): boolean {
+  return isTrialExpiredRefusal(error instanceof SecurityMutationError ? error.cause : error);
+}
+
+/**
+ * Whether a stored failure's catalog key is the trial refusal. A durable card
+ * stores `securityMutationCopyKey` and re-translates it at render, so the key —
+ * not the sentence, which the reader's language may have changed since — is
+ * what tells the card it is holding a refusal that offers a step.
+ */
+export function isSecurityTrialRefusalCopyKey(key: string | null | undefined): boolean {
+  return key === trialRefusalCopyKey(true) || key === trialRefusalCopyKey(false);
+}
+
 /** Maps a sync failure onto retryable or terminal security copy. */
-export function mapSecuritySyncOperationError(error: unknown): Error {
-  return mapSecurityOperationError(error, 'sync');
+export function mapSecuritySyncOperationError(error: unknown, canManageBilling = false): Error {
+  return mapSecurityOperationError(error, 'sync', canManageBilling);
 }
 
 /** Same markers, dismissal copy: the dismiss sheet must not talk about a sync. */
-export function mapSecurityDismissOperationError(error: unknown): Error {
-  return mapSecurityOperationError(error, 'dismiss');
+export function mapSecurityDismissOperationError(error: unknown, canManageBilling = false): Error {
+  return mapSecurityOperationError(error, 'dismiss', canManageBilling);
 }
 
 /** Intent fingerprint for a manual sync: a changed scope or repo is a new intent. */

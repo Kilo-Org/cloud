@@ -244,6 +244,7 @@
     "durationHourShort": "h",
     "changes": "Changes",
     "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
+    "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
     "privateRepositoryA11y": "{{name}}, private repository"
   },
   "language": {

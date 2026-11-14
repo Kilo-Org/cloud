@@ -52,7 +52,7 @@ describe('announcingToast', () => {
     const result = announcingToast.success('Session renamed');
 
     expect(sonnerMock.success).toHaveBeenCalledTimes(1);
-    expect(sonnerMock.success).toHaveBeenCalledWith('Session renamed', undefined);
+    expect(sonnerMock.success).toHaveBeenCalledWith('Session renamed');
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(1);
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Session renamed');
     expect(result).toBe('success-id');
@@ -62,7 +62,7 @@ describe('announcingToast', () => {
     const result = announcingToast.error('Network request failed');
 
     expect(sonnerMock.error).toHaveBeenCalledTimes(1);
-    expect(sonnerMock.error).toHaveBeenCalledWith('Network request failed', undefined);
+    expect(sonnerMock.error).toHaveBeenCalledWith('Network request failed');
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(1);
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith(
       'Network request failed'
@@ -74,7 +74,7 @@ describe('announcingToast', () => {
     const result = announcingToast.warning('Webhook sync partially failed');
 
     expect(sonnerMock.warning).toHaveBeenCalledTimes(1);
-    expect(sonnerMock.warning).toHaveBeenCalledWith('Webhook sync partially failed', undefined);
+    expect(sonnerMock.warning).toHaveBeenCalledWith('Webhook sync partially failed');
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(1);
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith(
       'Webhook sync partially failed'
@@ -97,7 +97,7 @@ describe('announcingToast', () => {
   it('drops empty messages instead of announcing blank speech', () => {
     announcingToast.success('');
 
-    expect(sonnerMock.success).toHaveBeenCalledWith('', undefined);
+    expect(sonnerMock.success).toHaveBeenCalledWith('');
     expect(accessibilityMock.announceForAccessibility).not.toHaveBeenCalled();
   });
 

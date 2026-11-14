@@ -5,7 +5,11 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OptionList } from '@/components/code-reviewer/option-list';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { GATE_THRESHOLDS, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import {
+  reviewerOrganizationId,
+  useReviewConfig,
+  useSaveReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
@@ -64,6 +68,7 @@ function GateThresholdScreen({
       labels={labels}
       descriptions={descriptions}
       disabled={configBody.body.status !== 'ready'}
+      organizationId={reviewerOrganizationId(scope)}
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       onSelect={value => save.mutateAsync({ gateThreshold: value })}
     />

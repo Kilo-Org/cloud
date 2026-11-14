@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Canvis",
     "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
+    "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar.",
     "privateRepositoryA11y": "{{name}}, repositori privat"
   },
   "language": {

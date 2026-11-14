@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Alterações",
     "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
+    "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente.",
     "privateRepositoryA11y": "{{name}}, repositório privado"
   },
   "language": {

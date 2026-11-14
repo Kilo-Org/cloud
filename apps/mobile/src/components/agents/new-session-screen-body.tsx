@@ -127,6 +127,7 @@ import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
 import { useTRPC } from '@/lib/trpc';
+import { useCanManageBilling, useTrialRefusalAction } from '@/lib/trial-refusal';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
 /** The ingest rejection code for a fork cut missing from the cloud source. */
@@ -1110,10 +1111,16 @@ export function NewSessionScreenBody() {
   // the footer therefore names no other blocker while it shows. A personal
   // start, an unsettled list, and a list without the organization stay allowed
   // — the app never blocks a start on a verdict it does not have.
+  const canManageBilling = useCanManageBilling(organizationId);
   const planRefusal = startPlanRefusal({
     organizationId,
     organizations: useOrganizationsList().data,
+    canManageBilling,
   });
+  // The plan's refusal is the only one whose reader can end it from here, and
+  // only a role the server would let change the plan is handed the step: the
+  // block keeps its copy alone for everyone else.
+  const planRefusalAction = useTrialRefusalAction(planRefusal !== null, organizationId);
   // The composer only takes focus on arrival when the form already has its
   // repository. Focusing raises the keyboard, which shrinks the scroll frame past
   // the repository picker, Changes, Environment and Advanced Configuration while
@@ -1347,6 +1354,8 @@ export function NewSessionScreenBody() {
             // The cut message is not in the saved source yet: say so, Start stays enabled.
             message = i18n.t(FORK_CUT_NOT_SYNCED_KEY);
           } else if (!isCloudPrepareRetryableError(error)) {
+            // Copy only: this toast carries no step, so it keeps the sentence
+            // that names who can change the plan.
             message = cloudPrepareFailureMessage(error);
           }
           toast.error(message);
@@ -1490,6 +1499,7 @@ export function NewSessionScreenBody() {
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
         planRefusal={planRefusal}
+        planRefusalAction={planRefusalAction}
         remoteSpawnFailure={remoteSpawn.remoteSpawnFailure}
         onRetryRemoteSpawn={handleStartSession}
       />

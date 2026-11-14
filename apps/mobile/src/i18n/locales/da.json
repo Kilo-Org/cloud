@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Ændringer",
     "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
+    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
     "privateRepositoryA11y": "{{name}}, privat repository"
   },
   "language": {

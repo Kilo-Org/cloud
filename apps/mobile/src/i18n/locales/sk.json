@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Zmeny",
     "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
+    "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova.",
     "privateRepositoryA11y": "{{name}}, súkromné úložisko"
   },
   "language": {

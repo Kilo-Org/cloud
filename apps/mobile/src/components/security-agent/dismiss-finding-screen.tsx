@@ -7,6 +7,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { RefusalStatus } from '@/components/refusal-status';
 import { ScreenHeader } from '@/components/screen-header';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
@@ -14,11 +15,16 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
-import { isSecuritySyncRetryable, securityMutationCopyKey } from '@/lib/security-agent-ledger';
+import {
+  isSecuritySyncRetryable,
+  isSecurityTrialRefusal,
+  securityMutationCopyKey,
+} from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
@@ -77,6 +83,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const commentRef = useRef('');
   const dismissFinding = useDismissSecurityFinding(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
+  // The step a refused dismissal offers this reader, and the role its stored
+  // failure is keyed by. The mapping that built `dismissFinding.error` took the
+  // same role read, so the sentence, the step and the key it survives by all
+  // describe one reader.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   // Restore the reason and comment from the stored draft once, so a retry
   // reopens the form with the user's last intent. The form renders only after
@@ -120,7 +132,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             reason,
             comment,
             lastError: error.message,
-            lastErrorKey: securityMutationCopyKey(error),
+            lastErrorKey: securityMutationCopyKey(error, canManageBilling),
             retryable: isSecuritySyncRetryable(error),
           });
         },
@@ -150,15 +162,21 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const errorCode = findingQuery.error?.data?.code;
   const notFound = findingQuery.isError && (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN');
 
+  // Every state of this sheet carries one header: the title, the sheet chrome,
+  // and the top clearance the formSheet route owns.
+  const sheetHeader = (
+    <ScreenHeader
+      className="px-6"
+      title={t('securityAgent.dismiss.title')}
+      modal
+      modalTopInset={modalTopInset}
+    />
+  );
+
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
-        />
+        {sheetHeader}
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
@@ -171,12 +189,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (findingQuery.isError && !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
-        />
+        {sheetHeader}
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
@@ -188,12 +201,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (capability.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
-        />
+        {sheetHeader}
         <QueryError
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
@@ -216,12 +224,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (!capability.canManage) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
-        />
+        {sheetHeader}
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
@@ -234,12 +237,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (finding.status !== 'open') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          className="px-6"
-          title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
-        />
+        {sheetHeader}
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
@@ -250,17 +248,17 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   // A terminal rejection ended the intent, so disable the CTA and let the
-  // inline copy explain the outcome.
+  // inline copy explain the outcome. The lapsed-trial refusal is the one where
+  // the reader can end the state from here, so a reader who can change the plan
+  // is offered that step under the sentence.
   const dismissBlocked = dismissFinding.isError && !isSecuritySyncRetryable(dismissFinding.error);
+  const dismissRefusalAction = isSecurityTrialRefusal(dismissFinding.error)
+    ? billingAction
+    : undefined;
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        className="px-6"
-        title={t('securityAgent.dismiss.title')}
-        modal
-        modalTopInset={modalTopInset}
-      />
+      {sheetHeader}
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pb-8 pt-4"
@@ -328,9 +326,16 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           />
         </View>
 
-        {dismissFinding.isError && (
-          <Text className="text-sm text-destructive">{dismissFinding.error.message}</Text>
-        )}
+        {dismissFinding.isError &&
+          (dismissRefusalAction === undefined ? (
+            <Text className="text-sm text-destructive">{dismissFinding.error.message}</Text>
+          ) : (
+            <RefusalStatus
+              message={dismissFinding.error.message}
+              action={dismissRefusalAction}
+              className="text-sm"
+            />
+          ))}
 
         <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
           {dismissFinding.isPending ? (

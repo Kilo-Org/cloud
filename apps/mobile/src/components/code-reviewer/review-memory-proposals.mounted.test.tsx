@@ -81,6 +81,7 @@ vi.mock('expo-router', () => ({
   useFocusEffect: (effect: () => (() => void) | undefined) => {
     h.focusEffect = effect;
   },
+  useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -107,6 +108,21 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: h.success, error: h.error },
+}));
+// The proposal sheet reads the reader's organization role for its refusal line
+// (`@/lib/trial-refusal`), which resolves the membership list; only the list and
+// the persisted selection are faked here.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: h.openUrl }));
 vi.mock('@/lib/trpc', () => ({

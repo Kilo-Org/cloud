@@ -8,6 +8,7 @@ import {
   useResendInvite,
 } from '@/components/organization/invited-member-row-state';
 import { i18n } from '@/i18n';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 // The state module now imports the resend mutation hook, which pulls in
 // `@/lib/trpc` (native modules) and `@tanstack/react-query`. Mock those so the
@@ -43,6 +44,24 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: toast }));
+
+// The role read lives beside the refusal hooks; this suite drives the role
+// directly so the toast's copy and step are the only things under test.
+type BillingAction = { label: string; onPress: () => void };
+type RoleState = { canManageBilling: boolean; action: BillingAction | undefined };
+
+const role = vi.hoisted(() => {
+  const state: RoleState = {
+    canManageBilling: true,
+    action: { label: 'Manage billing', onPress: vi.fn<() => void>() },
+  };
+  return state;
+});
+
+vi.mock('@/lib/trial-refusal', () => ({
+  useCanManageBilling: () => role.canManageBilling,
+  useBillingAction: () => role.action,
+}));
 
 describe('emailStatusLabel', () => {
   it('maps pending and sending to Pending', () => {
@@ -106,6 +125,8 @@ describe('useResendInvite', () => {
   beforeEach(() => {
     resendInviteMutateMock.mockClear();
     capturedOptions = null;
+    role.canManageBilling = true;
+    role.action = { label: i18n.t('organization.hub.manageBilling'), onPress: vi.fn<() => void>() };
   });
 
   it('delegates the mutation to members.resendInvite with the org id', async () => {
@@ -137,5 +158,44 @@ describe('useResendInvite', () => {
 
     expect(toast.error).toHaveBeenCalledWith(i18n.t('organization.members.resendInviteError'));
     expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
+  });
+
+  const trialRefusal = () =>
+    Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+    });
+
+  it('offers a billing role the plan refusal and the toast step that ends it', () => {
+    toast.error.mockClear();
+    const onPress = vi.fn<() => void>();
+    role.canManageBilling = true;
+    role.action = { label: i18n.t('organization.hub.manageBilling'), onPress };
+    useResendInvite('org-1');
+
+    capturedOptions?.onError?.(trialRefusal());
+
+    expect(toast.error).toHaveBeenCalledWith(i18n.t('common.organizationTrialEndedBilling'), {
+      action: { label: i18n.t('organization.hub.manageBilling'), onClick: expect.any(Function) },
+    });
+    const options = toast.error.mock.calls[0]?.[1] as
+      | { action: { onClick: () => void } }
+      | undefined;
+    if (!options) {
+      throw new Error('the toast carried no step');
+    }
+    options.action.onClick();
+    expect(onPress).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a member on the owner-naming copy with no step', () => {
+    toast.error.mockClear();
+    role.canManageBilling = false;
+    role.action = undefined;
+    useResendInvite('org-1');
+
+    capturedOptions?.onError?.(trialRefusal());
+
+    // One argument: a reader who cannot end the refusal is offered nothing.
+    expect(toast.error.mock.calls[0]).toEqual([i18n.t('common.organizationTrialEnded')]);
   });
 });

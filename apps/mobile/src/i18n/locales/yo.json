@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Àwọn àyípadà",
     "organizationTrialEnded": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. Ẹnìkan tí ó ni àjọ lè ṣe àtúnṣe ìsanwó ní kilo.ai, kí ó sì tún gbìyànjú.",
+    "organizationTrialEndedBilling": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. O lè ṣe àtúnṣe ìsanwó, kí o sì tún gbìyànjú.",
     "privateRepositoryA11y": "{{name}}, ibi ìpamọ́ kòòdù ikọkọ"
   },
   "language": {

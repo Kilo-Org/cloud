@@ -177,6 +177,7 @@
     "durationHourShort": "orë",
     "changes": "Ndryshimet",
     "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri.",
+    "organizationTrialEndedBilling": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin dhe më pas të provoni përsëri.",
     "privateRepositoryA11y": "{{name}}, repozitor privat"
   },
   "language": {

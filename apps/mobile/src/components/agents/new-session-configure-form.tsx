@@ -172,6 +172,7 @@ export function NewSessionConfigureForm({
   cloudCreateError = null,
   onRetryCloudCreate,
   planRefusal = null,
+  planRefusalAction,
   remoteSpawnFailure = null,
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
@@ -328,7 +329,11 @@ export function NewSessionConfigureForm({
             content under the composer rather than in the pinned footer: it
             never takes height from the fields, the launch folder included. */}
         {planRefusal !== null ? (
-          <OrganizationPlanRefusal message={planRefusal} className="mt-5" />
+          <OrganizationPlanRefusal
+            message={planRefusal}
+            action={planRefusalAction}
+            className="mt-5"
+          />
         ) : null}
         {accountSection}
         <NewSessionRunTarget

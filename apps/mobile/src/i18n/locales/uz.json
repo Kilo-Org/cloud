@@ -177,6 +177,7 @@
     "durationHourShort": "soat",
     "changes": "O'zgarishlar",
     "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
+    "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
     "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya"
   },
   "language": {

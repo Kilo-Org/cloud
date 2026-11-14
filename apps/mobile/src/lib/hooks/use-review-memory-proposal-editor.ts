@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next';
 
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { type PermissionState } from '@/lib/code-reviewer-status';
-import { useReviewMemoryProposalActions } from '@/lib/hooks/use-review-memory';
+import {
+  reviewMemoryOrganizationId,
+  useReviewMemoryProposalActions,
+} from '@/lib/hooks/use-review-memory';
 import { isLeaveAction } from '@/lib/navigation/leave-actions';
 import {
   isProposalActionable,
@@ -14,10 +17,16 @@ import {
   sameProposalDraft,
   validProposalDraft,
 } from '@/lib/review-memory-proposals';
-import { knownServerErrorMessage } from '@/lib/server-error-copy';
+import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
+import { useCanManageBilling, useTrialRefusalAction } from '@/lib/trial-refusal';
 
 type ProposalAction = 'save' | 'reject' | 'approve';
-type ProposalFailure = { action: ProposalAction; message: string };
+type ProposalFailure = {
+  action: ProposalAction;
+  message: string;
+  /** The rejection was the organization subscription gate's trial refusal. */
+  isTrialRefusal: boolean;
+};
 
 export type ProposalEditorInput = Readonly<{
   scope: string;
@@ -36,6 +45,8 @@ export function useReviewMemoryProposalEditor({
 }: ProposalEditorInput) {
   const { t } = useTranslation();
   const actions = useReviewMemoryProposalActions(scope);
+  const organizationId = reviewMemoryOrganizationId(scope);
+  const canManageBilling = useCanManageBilling(organizationId);
   const [record, setRecord] = useState(proposal);
   const baseline = useRef(proposalDraft(proposal));
   const draft = useRef(baseline.current);
@@ -154,13 +165,18 @@ export function useReviewMemoryProposalEditor({
     } catch (error) {
       setFailure({
         action,
-        message: knownServerErrorMessage(error) ?? t('common.somethingWentWrong'),
+        message: knownServerErrorMessage(error, canManageBilling) ?? t('common.somethingWentWrong'),
+        isTrialRefusal: isTrialExpiredRefusal(error),
       });
     } finally {
       pendingRef.current = false;
       setPending(null);
     }
   };
+
+  // The step the failure offers: only the trial refusal has one, and the hook
+  // withholds it from a role the server would refuse.
+  const failureAction = useTrialRefusalAction(failure?.isTrialRefusal === true, organizationId);
 
   return {
     record,
@@ -169,6 +185,7 @@ export function useReviewMemoryProposalEditor({
     dirty,
     valid,
     failure,
+    failureAction,
     pending,
     canEdit,
     busy,

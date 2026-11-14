@@ -15,7 +15,7 @@ import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -23,8 +23,8 @@ vi.mock('react-i18next', async importOriginal => {
   return {
     ...actual,
     useTranslation: () => {
-      const i18n = actual.getI18n();
-      return { t: i18n.t.bind(i18n), i18n };
+      const instance = actual.getI18n();
+      return { t: instance.t.bind(instance), i18n: instance };
     },
   };
 });
@@ -444,6 +444,50 @@ describe('NewSessionConfigureForm', () => {
     expect(footer).toBeDefined();
     expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
     expect(findElementByComponent(footer, OrganizationPlanRefusal)).toBeNull();
+  });
+
+  it('hands the plan refusal the billing step for a reader who may change the plan', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const onPress = (): void => undefined;
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: i18n.t('common.organizationTrialEndedBilling'),
+      planRefusalAction: { label: i18n.t('organization.hub.manageBilling'), onPress },
+    }) as Node;
+
+    // The caller owns the role read, so the block paints exactly the reader it
+    // is handed: the copy that offers the step, and the step itself.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(findElementByComponent(scrollBody, OrganizationPlanRefusal)).toMatchObject({
+      message: i18n.t('common.organizationTrialEndedBilling'),
+      action: { label: i18n.t('organization.hub.manageBilling'), onPress },
+    });
+    // The pinned footer still takes no copy of the refusal.
+    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    expect(findElementByComponent(lift, OrganizationPlanRefusal)).toBeNull();
+  });
+
+  it('keeps the plan refusal actionless for a reader who cannot change the plan', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: i18n.t('common.organizationTrialEnded'),
+    }) as Node;
+
+    const block = findElementByComponent(
+      findElement(element, 'ScrollView'),
+      OrganizationPlanRefusal
+    );
+    expect(block).toMatchObject({ message: i18n.t('common.organizationTrialEnded') });
+    expect(block?.action).toBeUndefined();
   });
 
   // ── Case 1: Cloud, selector shown ──

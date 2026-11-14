@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Änderungen",
     "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
+    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
     "privateRepositoryA11y": "{{name}}, privates Repository"
   },
   "language": {

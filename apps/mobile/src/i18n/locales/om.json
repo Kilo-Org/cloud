@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "Jijjiiramoota",
     "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali.",
+    "organizationTrialEndedBilling": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
     "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa"
   },
   "language": {

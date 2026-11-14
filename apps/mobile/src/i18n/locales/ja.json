@@ -177,6 +177,7 @@
     "durationHourShort": "h",
     "changes": "変更内容",
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
+    "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
     "privateRepositoryA11y": "{{name}}、プライベートリポジトリ"
   },
   "language": {

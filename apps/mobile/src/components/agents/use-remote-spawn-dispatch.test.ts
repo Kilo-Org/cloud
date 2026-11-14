@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSessionId, type ModelSelection } from '@kilocode/cloud-agent-sdk';
 import { CommandDeliveredError } from '@kilocode/cloud-agent-sdk/user-web-connection';
 
+import type * as ReactI18next from 'react-i18next';
+
 import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
@@ -41,10 +43,11 @@ const useRemoteInstanceSpawnMock = vi.hoisted(() =>
 );
 
 const routerReplace = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: routerReplace }),
+  useRouter: () => ({ replace: routerReplace, push: routerPush }),
 }));
 
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -113,6 +116,30 @@ const organizationsListMock = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({ data: organizationsListMock.data }),
 }));
+
+// The fake hook dispatcher below has no context dispatcher, so `useTranslation`
+// stands in for the catalog read the billing step's label needs. Everything else
+// is the real module, so `@/i18n` still initializes.
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => i18n.t(key), i18n }),
+  };
+});
+
+// The role read behind the trial refusal's sentence and its billing step. The
+// real hooks reach the navigation stack and the Expo runtime, so this suite
+// stands in for the two primitives `useCanManageBilling` needs and keeps the
+// predicate the app itself classifies with.
+const orgRoleMock = vi.hoisted(() => ({ role: undefined as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await import('@kilocode/app-shared/organizations');
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: orgRoleMock.role }),
+  };
+});
 
 type ReactInternals = {
   __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
@@ -338,6 +365,8 @@ function rerenderLastHook() {
 
 beforeEach(() => {
   organizationsListMock.data = undefined;
+  orgRoleMock.role = undefined;
+  routerPush.mockClear();
 });
 
 describe('useRemoteSpawnDispatch spawn input chain', () => {
@@ -596,7 +625,57 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       retryable: false,
       message: i18n.t('common.organizationTrialEnded'),
     });
+    // The reader who cannot change the plan keeps the copy alone.
+    expect(rerenderLastHook().remoteSpawnFailure?.action).toBeUndefined();
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('hands a billing role the refusal that carries the plan step', () => {
+    organizationsListMock.data = [
+      { organizationId: 'org-xyz', isTrialExpiredForEnforcement: true },
+    ];
+    orgRoleMock.role = 'owner';
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    onStart();
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(onSpawnAdmitted).not.toHaveBeenCalled();
+    const failure = rerenderLastHook().remoteSpawnFailure;
+    expect(failure).toEqual({
+      retryable: false,
+      message: i18n.t('common.organizationTrialEndedBilling'),
+      action: { label: i18n.t('organization.hub.manageBilling'), onPress: expect.any(Function) },
+    });
+    // The step opens the in-app billing screen.
+    failure?.action?.onPress();
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/billing');
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the attachments refusal actionless for a billing role', () => {
+    orgRoleMock.role = 'owner';
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      getSubmitPayload: () => filesPayload,
+      runOnInstance: { ...INSTANCE, capabilities: { attachments: false } },
+    });
+
+    onStart();
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: false,
+      message: remoteSpawnFilesNotSupportedToast(),
+    });
+    expect(rerenderLastHook().remoteSpawnFailure?.action).toBeUndefined();
+    expect(routerPush).not.toHaveBeenCalled();
   });
 
   it('spawns for an organization the gate keeps entitled', async () => {

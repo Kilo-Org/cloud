@@ -239,6 +239,10 @@ export async function prepareAgentSession(
     return { ok: true, sessionId: result.kiloSessionId };
   } catch (error) {
     const retryable = isCloudPrepareRetryableError(error);
+    // Copy only, on purpose: this path reports through a toast raised by an OS
+    // start action, which has no room for the billing step, so the sentence
+    // stays the one that names who can change the plan. A surface that can
+    // offer the step resolves the role and passes it.
     const message = cloudPrepareFailureMessage(error);
     // A typed terminal rejection ends the intent; a retryable one keeps the key.
     if (!retryable) {

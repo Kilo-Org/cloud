@@ -55,6 +55,14 @@ const ACTION_FEEDBACK_KEYS = {
   couldNotApprove: 'glanceable.couldNotApprove',
 } as const;
 
+/**
+ * The name a content surface draws for one agent: the title it carries, or the
+ * shared generic agent label when the title is absent or empty.
+ */
+function agentName(title: string | null, translate: (key: string) => string): string {
+  return title === null || title === '' ? translate('common.agent') : title;
+}
+
 function wakeLine(
   home: HomeWidgetPresentation,
   translate: (key: string) => string,
@@ -132,9 +140,7 @@ export function buildAndroidHomeCopy(
   const wake =
     content && home.primaryKind === 'scheduled' ? wakeLine(home, translate, formatClock) : null;
   const actionLine = feedback === null ? null : translate(ACTION_FEEDBACK_KEYS[feedback]);
-  // A content surface always names its agent: an absent title draws the same
-  // generic label the session card uses, never a blank line.
-  const title = content ? home.primaryTitle || translate('common.agent') : null;
+  const title = content ? agentName(home.primaryTitle, translate) : null;
   const counts =
     home.primaryKind === null
       ? []
@@ -162,11 +168,11 @@ export function buildAndroidHomeCopy(
     },
     secondaryCounts,
     waitingAgents: home.waitingAgents.map(agent => ({
-      title: agent.title || translate('common.agent'),
+      title: agentName(agent.title, translate),
       reason: translate(WAIT_REASON_KEYS[agent.kind]),
     })),
     scheduledAgents: home.scheduledAgents.map(agent => ({
-      title: agent.title || translate('common.agent'),
+      title: agentName(agent.title, translate),
       time: scheduledAgentTime(agent.scheduledAt, translate, formatClock),
     })),
     accessibilityLabel: [

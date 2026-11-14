@@ -69,7 +69,6 @@
     "@lottiefiles/dotlottie-react": "0.17.15",
     "@mdx-js/loader": "3.1.1",
     "@mdx-js/react": "3.1.1",
-    "@mdxeditor/editor": "3.55.0",
     "@mistralai/mistralai": "1.15.1",
     "@monaco-editor/react": "4.7.0",
     "@next/bundle-analyzer": "16.3.3",

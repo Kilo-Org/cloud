@@ -2,7 +2,7 @@ import type {
   EnvironmentBuildRequestResult,
   EnvironmentBuildStatus,
   EnvironmentBuildSummary,
-} from '../../../../../services/cloud-agent-next/src/shared/environment-build-status';
+} from '@cloud-agent-shared/environment-build-status';
 
 /**
  * Presentation rules for environment snapshot builds, kept free of React so

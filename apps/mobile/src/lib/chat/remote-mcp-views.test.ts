@@ -9,6 +9,7 @@ import {
   type RemoteMcpServer,
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
+import { MAX_VIEW_BYTES } from './remote-mcp-app';
 import { place, server, tool, viewTool } from './remote-mcp.test-helpers';
 import { type StoredRemoteMcpServer } from './remote-mcp-store';
 
@@ -234,6 +235,22 @@ describe('the document a view is drawn from', () => {
     const view = await discoveredWithChart();
 
     expect(await readRemoteMcpView(view)).toEqual({ kind: 'unavailable' });
+  });
+
+  it('is unavailable when the document is larger than the cap', async () => {
+    answering('x'.repeat(MAX_VIEW_BYTES + 1), undefined);
+    const view = await discoveredWithChart();
+
+    expect(await readRemoteMcpView(view)).toEqual({ kind: 'unavailable' });
+  });
+
+  it('is drawn when the document is exactly at the cap', async () => {
+    answering('x'.repeat(MAX_VIEW_BYTES), undefined);
+    const view = await discoveredWithChart();
+
+    const read = await readRemoteMcpView(view);
+    expect(read.kind).toBe('ready');
+    expect(read.kind === 'ready' ? read.html : '').toContain('Content-Security-Policy');
   });
 });
 

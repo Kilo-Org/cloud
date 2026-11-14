@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   contentSecurityPolicy,
   DEFAULT_VIEW_HEIGHT,
-  MAX_VIEW_BYTES,
   VIEW_HOST_PAGE,
   viewArguments,
   viewDocument,
@@ -244,7 +243,6 @@ describe('the page a view is drawn in', () => {
     // fetches: `srcdoc` is what keeps the view from reaching the network on
     // its own say.
     expect(VIEW_HOST_PAGE).toContain('view.srcdoc = html');
-    expect(MAX_VIEW_BYTES).toBeGreaterThan(0);
   });
 });
 

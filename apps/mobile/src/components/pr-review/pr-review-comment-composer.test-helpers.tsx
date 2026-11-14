@@ -31,7 +31,7 @@ export function unmountAll(): void {
   }
 }
 
-export function button(renderer: ReactTestRenderer, label: string): ReactTestInstance | undefined {
+function button(renderer: ReactTestRenderer, label: string): ReactTestInstance | undefined {
   return renderer.root
     .findAllByType('Button')
     .find(node => node.props.accessibilityLabel === label);

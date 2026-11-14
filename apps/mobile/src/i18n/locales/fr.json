@@ -4482,7 +4482,7 @@
     "disconnectFailed": "Impossible de déconnecter {{provider}}",
     "couldNotLoad": "Impossible de charger les intégrations",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
-    "memberHint": "Demandez à un propriétaire ou à un administrateur de l'organisation de modifier ces connexions.",
+    "managedByOwner": "Demandez à un propriétaire de l'organisation de modifier une connexion que vous ne pouvez pas modifier.",
     "connectFailed": "Impossible d'ouvrir la page de connexion"
   },
   "invoices": {

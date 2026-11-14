@@ -4612,7 +4612,7 @@
     "disconnectFailed": "L-iskonnettjar ta' {{provider}} ma rnexxiex",
     "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
     "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
-    "memberHint": "Itlob lil sid jew amministratur tal-organizzazzjoni biex ibiddel dawn il-konnessjonijiet.",
+    "managedByOwner": "Itlob lil sid tal-organizzazzjoni biex ibiddel konnessjoni li ma tistax tbiddel.",
     "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
   },
   "invoices": {

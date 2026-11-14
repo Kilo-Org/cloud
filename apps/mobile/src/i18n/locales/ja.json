@@ -4417,7 +4417,7 @@
     "disconnectFailed": "{{provider}} の接続を解除できませんでした",
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
-    "memberHint": "これらの接続を変更するには、組織のオーナーまたは管理者に依頼してください。",
+    "managedByOwner": "変更できない接続については、組織のオーナーに変更を依頼してください。",
     "connectFailed": "接続ページを開けませんでした"
   },
   "invoices": {

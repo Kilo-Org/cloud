@@ -4417,7 +4417,7 @@
     "disconnectFailed": "Tidak dapat memutuskan {{provider}}",
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
-    "memberHint": "Minta pemilik atau admin organisasi untuk mengubah koneksi ini.",
+    "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
     "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {

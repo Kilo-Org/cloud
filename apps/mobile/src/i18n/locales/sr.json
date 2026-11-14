@@ -4482,7 +4482,7 @@
     "disconnectFailed": "Prekidanje veze sa uslugom {{provider}} nije uspelo",
     "couldNotLoad": "Učitavanje integracija nije uspelo",
     "permissionDenied": "Nemate dozvolu da upravljate ovim integracijama.",
-    "memberHint": "Zamolite vlasnika ili administratora organizacije da promeni ove veze.",
+    "managedByOwner": "Zamolite vlasnika organizacije da promeni vezu koju ne možete da promenite.",
     "connectFailed": "Otvaranje stranice za povezivanje nije uspelo"
   },
   "invoices": {

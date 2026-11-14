@@ -4417,7 +4417,7 @@
     "disconnectFailed": "Pa t ka dekonekte {{provider}}",
     "couldNotLoad": "Pa t ka chaje entegrasyon yo",
     "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
-    "memberHint": "Mande yon pwopriyetè oswa yon administratè òganizasyon an pou chanje koneksyon sa yo.",
+    "managedByOwner": "Mande yon pwopriyetè òganizasyon pou chanje yon koneksyon ou pa ka chanje.",
     "connectFailed": "Pa t ka louvri paj koneksyon an"
   },
   "invoices": {

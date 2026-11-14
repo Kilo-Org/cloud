@@ -4482,7 +4482,7 @@
     "disconnectFailed": "No s'ha pogut desconnectar {{provider}}",
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
-    "memberHint": "Demana a un propietari o administrador de l'organització que canviï aquestes connexions.",
+    "managedByOwner": "Demana a un propietari de l'organització que canviï una connexió que no pots canviar.",
     "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
   },
   "invoices": {

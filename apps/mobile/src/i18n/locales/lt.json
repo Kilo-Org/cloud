@@ -4547,7 +4547,7 @@
     "disconnectFailed": "Nepavyko atjungti {{provider}}",
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
-    "memberHint": "Paprašykite organizacijos savininko arba administratoriaus pakeisti šias jungtis.",
+    "managedByOwner": "Paprašykite organizacijos savininko pakeisti jungtį, kurios negalite pakeisti.",
     "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {

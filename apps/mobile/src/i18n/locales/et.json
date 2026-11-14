@@ -4417,7 +4417,7 @@
     "disconnectFailed": "Ühendust teenusega {{provider}} ei õnnestunud katkestada",
     "couldNotLoad": "Integratsioone ei õnnestunud laadida",
     "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
-    "memberHint": "Nende ühenduste muutmiseks pöördu organisatsiooni omaniku või administraatori poole.",
+    "managedByOwner": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku poole.",
     "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },
   "invoices": {

@@ -4417,7 +4417,7 @@
     "disconnectFailed": "Ekki tókst að aftengja {{provider}}",
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
-    "memberHint": "Biddu eiganda eða stjórnanda stofnunarinnar um að breyta þessum tengingum.",
+    "managedByOwner": "Biddu eiganda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {

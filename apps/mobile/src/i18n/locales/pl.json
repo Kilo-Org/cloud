@@ -4547,7 +4547,7 @@
     "disconnectFailed": "Nie udało się odłączyć usługi {{provider}}",
     "couldNotLoad": "Nie udało się wczytać integracji",
     "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
-    "memberHint": "Poproś właściciela lub administratora organizacji o zmianę tych połączeń.",
+    "managedByOwner": "Poproś właściciela organizacji o zmianę połączenia, którego nie możesz zmienić.",
     "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {

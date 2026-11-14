@@ -4547,7 +4547,7 @@
     "disconnectFailed": "Službu {{provider}} sa nepodarilo odpojiť",
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
-    "memberHint": "Požiadajte vlastníka alebo správcu organizácie, aby tieto pripojenia zmenil.",
+    "managedByOwner": "Požiadajte vlastníka organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
     "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
   },
   "invoices": {

@@ -4417,7 +4417,7 @@
     "disconnectFailed": "{{provider}} bağlantısı kesilemedi",
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
-    "memberHint": "Bu bağlantıları değiştirmek için bir kuruluş sahibine veya yöneticisine başvurun.",
+    "managedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibine başvurun.",
     "connectFailed": "Bağlantı sayfası açılamadı"
   },
   "invoices": {

@@ -4417,7 +4417,7 @@
     "disconnectFailed": "Enweghị ike ịkwụsị njikọ {{provider}}",
     "couldNotLoad": "Enweghị ike ibudata njikọ",
     "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
-    "memberHint": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ọ gbanwee njikọ ndị a.",
+    "managedByOwner": "Gwa onye nwe nzukọ ka ọ gbanwee njikọ ị na-enweghị ike ịgbanwe.",
     "connectFailed": "Enweghị ike imepe ibe njikọ"
   },
   "invoices": {

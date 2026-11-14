@@ -4417,7 +4417,7 @@
     "disconnectFailed": "Ezin izan da {{provider}} deskonektatu",
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
-    "memberHint": "Eskatu erakundearen jabe edo administratzaile bati konexio hauek aldatzeko.",
+    "managedByOwner": "Eskatu erakundearen jabe bati aldatu ezin duzun konexio bat alda dezan.",
     "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {

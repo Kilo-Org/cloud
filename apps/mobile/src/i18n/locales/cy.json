@@ -4677,7 +4677,7 @@
     "disconnectFailed": "Methu datgysylltu {{provider}}",
     "couldNotLoad": "Methu llwytho'r integreiddiadau",
     "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
-    "memberHint": "Gofynnwch i berchennog neu weinyddwr y sefydliad newid y cysylltiadau hyn.",
+    "managedByOwner": "Gofynnwch i berchennog y sefydliad newid cysylltiad na allwch ei newid.",
     "connectFailed": "Methu agor y dudalen gysylltu"
   },
   "invoices": {

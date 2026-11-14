@@ -4417,7 +4417,7 @@
     "disconnectFailed": "Det gick inte att koppla från {{provider}}",
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
-    "memberHint": "Be en ägare eller administratör i organisationen att ändra de här anslutningarna.",
+    "managedByOwner": "Be en ägare i organisationen att ändra en anslutning som du inte kan ändra.",
     "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {

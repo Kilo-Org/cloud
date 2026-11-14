@@ -4417,7 +4417,7 @@
     "disconnectFailed": "{{provider}} xizmatini uzib boʻlmadi",
     "couldNotLoad": "Integratsiyalarni yuklab boʻlmadi",
     "permissionDenied": "Sizda bu integratsiyalarni boshqarish uchun ruxsat yoʻq.",
-    "memberHint": "Bu ulanishlarni oʻzgartirish uchun tashkilot egasi yoki administratoriga murojaat qiling.",
+    "managedByOwner": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasiga murojaat qiling.",
     "connectFailed": "Ulanish sahifasini ochib boʻlmadi"
   },
   "invoices": {

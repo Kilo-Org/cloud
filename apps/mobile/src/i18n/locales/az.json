@@ -4417,7 +4417,7 @@
     "disconnectFailed": "{{provider}} bağlantısını kəsmək mümkün olmadı",
     "couldNotLoad": "İnteqrasiyaları yükləmək mümkün olmadı",
     "permissionDenied": "Bu inteqrasiyaları idarə etmək üçün icazəniz yoxdur.",
-    "memberHint": "Bu bağlantıları dəyişmək üçün təşkilatın sahibinə və ya administratoruna müraciət edin.",
+    "managedByOwner": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə müraciət edin.",
     "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {

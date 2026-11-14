@@ -4417,7 +4417,7 @@
     "disconnectFailed": "{{provider}} konnte nicht getrennt werden",
     "couldNotLoad": "Integrationen konnten nicht geladen werden",
     "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
-    "memberHint": "Bitte eine Person mit Inhaber- oder Admin-Rechten in der Organisation, diese Verbindungen zu ändern.",
+    "managedByOwner": "Bitte einen Inhaber der Organisation, eine Verbindung zu ändern, die du nicht ändern kannst.",
     "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
   },
   "invoices": {

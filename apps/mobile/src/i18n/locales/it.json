@@ -4482,7 +4482,7 @@
     "disconnectFailed": "Impossibile scollegare {{provider}}",
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
-    "memberHint": "Chiedi a un proprietario o a un amministratore dell'organizzazione di modificare questi collegamenti.",
+    "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",
     "connectFailed": "Impossibile aprire la pagina di collegamento"
   },
   "invoices": {

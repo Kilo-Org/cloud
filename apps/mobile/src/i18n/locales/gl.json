@@ -4417,7 +4417,7 @@
     "disconnectFailed": "Non se puido desconectar {{provider}}",
     "couldNotLoad": "Non se puideron cargar as integracións",
     "permissionDenied": "Non tes permiso para xestionar estas integracións.",
-    "memberHint": "Pídelle a unha persoa propietaria ou administradora da organización que cambie estas conexións.",
+    "managedByOwner": "Pídelle a unha persoa propietaria da organización que cambie unha conexión que non poidas cambiar.",
     "connectFailed": "Non se puido abrir a páxina de conexión"
   },
   "invoices": {

@@ -4482,7 +4482,7 @@
     "disconnectFailed": "{{provider}} nu a putut fi deconectat",
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
-    "memberHint": "Cere unui proprietar sau administrator al organizației să modifice aceste conexiuni.",
+    "managedByOwner": "Cere unui proprietar al organizației să modifice o conexiune pe care nu o poți modifica.",
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {

@@ -4417,7 +4417,7 @@
     "disconnectFailed": "የ{{provider}} ግንኙነትን ማቋረጥ አልተቻለም",
     "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
     "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
-    "memberHint": "እነዚህን ግንኙነቶች ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
+    "managedByOwner": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ይጠይቁ።",
     "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
   },
   "invoices": {

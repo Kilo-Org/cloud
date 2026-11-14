@@ -2,10 +2,26 @@ import { describe, expect, it } from 'vitest';
 import { buildBuiltinAgentEntries } from './runtime-profile-config.js';
 import { RuntimeBuiltinAgentsSchema } from './runtime-profile.js';
 import {
+  matchesKiloPermissionPattern,
   narrowProfileAgents,
   narrowProfilePermission,
   type PermissionMap,
 } from './profile-permission-policy.js';
+
+function resolve(session: PermissionMap, composed: PermissionMap, tool: string, command: string) {
+  const rules = [session[tool], composed[tool]].flatMap(value =>
+    typeof value === 'string'
+      ? [{ pattern: '*', action: value }]
+      : typeof value === 'object'
+        ? Object.entries(value).map(([pattern, action]) => ({ pattern, action }))
+        : []
+  );
+  let action: string | undefined;
+  for (const rule of rules) {
+    if (matchesKiloPermissionPattern(command, rule.pattern)) action = rule.action;
+  }
+  return action;
+}
 
 const reviewSession: PermissionMap = {
   edit: 'deny',
@@ -54,9 +70,7 @@ describe('narrowProfilePermission', () => {
   it('keeps an agent allowance the session writes and omits one it does not', () => {
     expect(
       narrowProfilePermission(reviewSession, { bash: { 'git log *': 'allow', 'ls *': 'allow' } })
-    ).toEqual({
-      bash: { 'git log *': 'allow', 'git push': 'deny', 'git push *': 'deny' },
-    });
+    ).toEqual({ bash: { 'git log *': 'allow' } });
     expect(narrowProfilePermission(reviewSession, { bash: { '*': 'allow' } })).toBeUndefined();
   });
 
@@ -78,6 +92,52 @@ describe('narrowProfilePermission', () => {
     expect(narrowProfilePermission(session, { bash: { '*': 'deny', 'find *': 'allow' } })).toEqual({
       bash: { '*': 'deny', 'find *': 'allow', 'find *-delete*': 'deny' },
     });
+  });
+
+  it('applies the session verdicts for the commands a kept allowance covers', () => {
+    const session: PermissionMap = {
+      bash: {
+        find: 'allow',
+        'find *': 'allow',
+        'find *-delete*': 'deny',
+        'git status': 'allow',
+      },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'find *': 'allow' },
+    }) as PermissionMap;
+    // The refusal is written after the allowance, so it decides the delete form.
+    expect(Object.keys(composed['bash'] as Record<string, string>)).toEqual([
+      'find *',
+      'find *-delete*',
+    ]);
+    expect(resolve(session, composed, 'bash', 'find . -name x')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'find . -name x -delete')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'git status')).toBe('allow');
+  });
+
+  it('leaves out a session refusal that a later session allow overrides', () => {
+    const session: PermissionMap = {
+      bash: {
+        'git *': 'deny',
+        'git log': 'allow',
+        'git log *': 'allow',
+        'git log *--output*': 'deny',
+        'git push': 'deny',
+      },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'git log *': 'allow' },
+    }) as PermissionMap;
+    // The broad git refusal is overridden by the session's later read allows, so
+    // it is not written; the specific refusal is.
+    expect(Object.keys(composed['bash'] as Record<string, string>)).toEqual([
+      'git log *',
+      'git log *--output*',
+    ]);
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git log --output=/tmp/x')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'git push origin main')).toBe('deny');
   });
 
   it('carries the session refusals for commands inside a kept allowance', () => {

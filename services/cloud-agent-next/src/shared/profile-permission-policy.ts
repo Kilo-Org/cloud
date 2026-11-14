@@ -38,8 +38,10 @@ export function matchesKiloPermissionPattern(input: string, pattern: string): bo
  * Agent rules keep their order, so a profile's own exception after its own
  * refusal survives. An agent allowance is kept only where the session writes an
  * allow for that same pattern, because the session decides every other pattern.
- * The session's refusals that follow that allow are placed after it, so a
- * command the guard refuses still ends in a refusal.
+ * Each kept allowance is followed by the session's refusals for the commands it
+ * covers, so a command the guard refuses still ends in a refusal; a refusal that
+ * a later session allow overrides is left out, so the session's own exceptions
+ * keep working.
  */
 function composeRuleMap(
   session: PermissionRuleMap | undefined,
@@ -48,7 +50,7 @@ function composeRuleMap(
   if (session === undefined) return { ...agent };
   const sessionEntries = Object.entries(session);
   const composed: PermissionRuleMap = {};
-  const protectedFrom: number[] = [];
+  const allowances: number[] = [];
   for (const [pattern, action] of Object.entries(agent)) {
     // A refusal and an ask apply as written; an allowance needs the session to
     // write the same pattern, which is what the session permits.
@@ -56,17 +58,28 @@ function composeRuleMap(
     composed[pattern] = action;
     if (action === 'allow') {
       const index = sessionEntries.findIndex(([key]) => key === pattern);
-      if (index >= 0) protectedFrom.push(index);
+      if (index >= 0) allowances.push(index);
     }
   }
-  if (protectedFrom.length > 0) {
-    const from = Math.min(...protectedFrom);
+  allowances.forEach(allowIndex => {
+    const allowance = sessionEntries[allowIndex]?.[0];
+    if (allowance === undefined) return;
     sessionEntries.forEach(([pattern, action], index) => {
-      if (action === 'deny' && index > from && composed[pattern] === undefined) {
-        composed[pattern] = 'deny';
-      }
+      if (action !== 'deny' || index <= allowIndex) return;
+      if (composed[pattern] !== undefined) return;
+      const insideAllowance =
+        matchesKiloPermissionPattern(pattern, allowance) ||
+        matchesKiloPermissionPattern(allowance, pattern);
+      if (!insideAllowance) return;
+      const overriddenLater = sessionEntries.some(
+        ([later, laterAction], laterIndex) =>
+          laterAction === 'allow' &&
+          laterIndex > index &&
+          matchesKiloPermissionPattern(later, pattern)
+      );
+      if (!overriddenLater) composed[pattern] = 'deny';
     });
-  }
+  });
   return Object.keys(composed).length > 0 ? composed : undefined;
 }
 

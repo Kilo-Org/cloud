@@ -134,6 +134,21 @@ afterEach(() => {
 });
 
 describe('TerminalConnection', () => {
+  it('does not open a refreshed socket after unmount during ticket refresh', async () => {
+    const ticket = Promise.withResolvers<{ wsUrl: string }>();
+    const refreshTicket = vi.fn(() => ticket.promise);
+    const harness = createHarness({ operations: { refreshTicket } });
+    harness.connection.start();
+    await flush();
+    harness.connection.retry();
+    expect(refreshTicket).toHaveBeenCalledOnce();
+    harness.connection.stop();
+    ticket.resolve({ wsUrl: '/terminal?ticket=late' });
+    await flush();
+    expect(harness.sockets).toHaveLength(1);
+    expect(harness.operations.close).toHaveBeenCalledExactlyOnceWith({ ptyId: 'pty_1' });
+  });
+
   it('creates a pty, opens its socket, and feeds the bytes the shell prints', async () => {
     const harness = createHarness();
 

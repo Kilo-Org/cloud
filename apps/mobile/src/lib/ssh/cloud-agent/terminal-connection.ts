@@ -179,6 +179,9 @@ export class TerminalConnection {
 
     try {
       const result = await this.options.operations.refreshTicket({ ptyId });
+      if (this.stoppedBy !== null) {
+        return;
+      }
       this.connectSocket(result.wsUrl);
     } catch (error) {
       this.applyFailure(error);

@@ -2624,7 +2624,7 @@
       "retryAllowOnce": "Pokušaj ponovo da dozvoliš jednom",
       "retryAlwaysAllow": "Pokušaj ponovo da uvek dozvoliš",
       "unreadableTitle": "Zahtev za dozvolu nije mogao da se pročita",
-      "unreadableBody": "Agent čeka odluku o dozvoli koju ova aplikacija ne može da prikaže. Ažurirajte aplikaciju ili CLI, ili odgovorite na zahtev u CLI-ju da biste nastavili."
+      "unreadableBody": "Agent čeka na zahtev za dozvolu koji ova aplikacija ne može da prikaže, pa se za taj zahtev ne prikazuje nikakva kartica. Ažurirajte aplikaciju ili CLI, ili odgovorite na zahtev u CLI-ju da biste nastavili."
     },
     "questionCard": {
       "title": "Agent čeka odgovor",

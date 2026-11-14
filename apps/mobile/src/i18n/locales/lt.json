@@ -2669,7 +2669,7 @@
       "retryAllowOnce": "Bandyti leisti vieną kartą iš naujo",
       "retryAlwaysAllow": "Bandyti visada leisti iš naujo",
       "unreadableTitle": "Nepavyko nuskaityti leidimo užklausos",
-      "unreadableBody": "Agentas laukia sprendimo dėl leidimo, kurio ši programa negali parodyti. Atnaujinkite programą arba CLI arba atsakykite į užklausą CLI, kad galėtumėte tęsti."
+      "unreadableBody": "Agentas laukia leidimo užklausos, kurios ši programa negali parodyti, todėl jai nerodoma jokia kortelė. Atnaujinkite programą arba CLI arba atsakykite į užklausą CLI, kad galėtumėte tęsti."
     },
     "questionCard": {
       "title": "Agentui reikia atsakymo",

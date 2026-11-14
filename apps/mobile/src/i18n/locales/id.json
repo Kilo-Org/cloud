@@ -2037,7 +2037,7 @@
       "retryAllowOnce": "Coba izinkan sekali lagi",
       "retryAlwaysAllow": "Coba selalu izinkan lagi",
       "unreadableTitle": "Permintaan izin tidak dapat dibaca",
-      "unreadableBody": "Agen sedang menunggu keputusan izin yang tidak dapat ditampilkan oleh aplikasi ini. Perbarui aplikasi atau CLI, atau jawab permintaan tersebut di CLI untuk melanjutkan."
+      "unreadableBody": "Agen sedang menunggu permintaan izin yang tidak dapat ditampilkan oleh aplikasi ini, sehingga tidak ada kartu yang muncul untuk permintaan tersebut. Perbarui aplikasi atau CLI, atau jawab permintaan tersebut di CLI untuk melanjutkan."
     },
     "questionCard": {
       "title": "Agen membutuhkan masukan",

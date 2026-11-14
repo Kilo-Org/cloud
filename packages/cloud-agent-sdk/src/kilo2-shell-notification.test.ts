@@ -174,7 +174,7 @@ test('native live events and reloaded snapshots use the same display while prese
     connection: 'connected',
     runnerConnected: true,
     events: [],
-    pending: { permissions: [], questions: [] },
+    pending: { permissions: [], questions: [], unreadablePermissions: [] },
     commands: {},
   };
   const live = readNativeConversation(state);

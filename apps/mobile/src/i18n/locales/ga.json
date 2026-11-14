@@ -2714,7 +2714,7 @@
       "retryAllowOnce": "Bain triail eile as ceadú uair amháin",
       "retryAlwaysAllow": "Bain triail eile as ceadú i gcónaí",
       "unreadableTitle": "Níorbh fhéidir an t-iarratas ceada a léamh",
-      "unreadableBody": "Tá an gníomhaire ag fanacht le cinneadh ceada nach féidir leis an aip seo a thaispeáint. Nuashonraigh an aip nó an CLI, nó freagair an t-iarratas sa CLI chun leanúint ar aghaidh."
+      "unreadableBody": "Tá an gníomhaire ag fanacht le hiarratas ceada nach féidir leis an aip seo a thaispeáint, mar sin ní thaispeántar aon chárta dó. Nuashonraigh an aip nó an CLI, nó freagair an t-iarratas sa CLI chun leanúint ar aghaidh."
     },
     "questionCard": {
       "title": "Tá ionchur ag teastáil ón ngníomhaire",

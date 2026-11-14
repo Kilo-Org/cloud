@@ -28,7 +28,7 @@ export const readySession: NativeSessionState = {
       seq: 1,
     },
   ],
-  pending: { permissions: [], questions: [] },
+  pending: { permissions: [], questions: [], unreadablePermissions: [] },
   events: [],
   commands: {},
 };

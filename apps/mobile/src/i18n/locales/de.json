@@ -2037,7 +2037,7 @@
       "retryAllowOnce": "Erneut einmal erlauben",
       "retryAlwaysAllow": "Erneut immer erlauben",
       "unreadableTitle": "Berechtigungsanfrage konnte nicht gelesen werden",
-      "unreadableBody": "Der Agent wartet auf eine Berechtigungsentscheidung, die diese App nicht anzeigen kann. Aktualisiere die App oder die CLI oder beantworte die Anfrage in der CLI, um fortzufahren."
+      "unreadableBody": "Der Agent wartet auf eine Berechtigungsanfrage, die diese App nicht anzeigen kann, sodass dafür keine Karte angezeigt wird. Aktualisiere die App oder die CLI oder beantworte die Anfrage in der CLI, um fortzufahren."
     },
     "questionCard": {
       "title": "Der Agent braucht deine Antwort",

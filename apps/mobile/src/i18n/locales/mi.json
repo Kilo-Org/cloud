@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Whakamātau anō ki te whakaaetia mō tēnei wā anake",
       "retryAlwaysAllow": "Whakamātau anō ki te whakaaetia i ngā wā katoa",
       "unreadableTitle": "Kāore i taea te pānui te tono whakaaetanga",
-      "unreadableBody": "E tatari ana te māngai ki tētahi whakataunga whakaaetanga kāore e taea e tēnei taupānga te whakaatu. Whakahōuhia te taupānga, te CLI rānei, whakautua rānei te tono ki te CLI kia haere tonu ai."
+      "unreadableBody": "E tatari ana te māngai ki tētahi tono whakaaetanga kāore e taea e tēnei taupānga te whakaatu, nō reira kāore he kāri e puta ana mō taua tono. Whakahōuhia te taupānga, te CLI rānei, whakautua rānei te tono ki te CLI kia haere tonu ai."
     },
     "questionCard": {
       "title": "E hiahia ana te māngai ki tō whakautu",

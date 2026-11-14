@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { type TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -50,6 +51,13 @@ export function NativeRemoteTranscript({
         (conversation.messages.length > 0 || conversation.incompleteMessageIDs.length === 0) && (
           <NativeRemoteMessages messages={conversation.messages} />
         )}
+      {pending.unreadablePermissions.length > 0 ? (
+        // No consent card for these: the app never read the request's scope, so
+        // offering allow/deny would decide a permission nobody parsed. The
+        // notice points the user at the CLI, which can still answer it. The
+        // screen already pads this column, so the notice drops its own margin.
+        <PermissionUnreadableNotice inset={false} />
+      ) : null}
       {pending.permissions.map(permission => (
         <View key={permission.id} className="gap-2 rounded-lg border border-border p-3">
           <Text>{permission.action}</Text>

@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Gbìyànjú láti gba láyè lẹ́ẹ̀kan sí i",
       "retryAlwaysAllow": "Gbìyànjú láti gba láyè ní gbogbo ìgbà lẹ́ẹ̀kan sí i",
       "unreadableTitle": "A kò lè ka ìbéèrè ìyọ̀ǹda",
-      "unreadableBody": "Aṣojú náà ń dúró de ìpinnu ìyọ̀ǹda tí ápù yìí kò lè fi hàn. Ṣe àtúnṣe ápù náà tàbí CLI, tàbí dáhùn ìbéèrè náà nínú CLI kí o lè tẹ̀síwájú."
+      "unreadableBody": "Aṣojú náà ń dúró de ìbéèrè ìyọ̀ǹda tí ápù yìí kò lè fi hàn, nítorí náà kò sí kárì kankan tí ó farahàn fún un. Ṣe àtúnṣe ápù náà tàbí CLI, tàbí dáhùn ìbéèrè náà nínú CLI kí o lè tẹ̀síwájú."
     },
     "questionCard": {
       "title": "Aṣojú nílò ìdáhùn",

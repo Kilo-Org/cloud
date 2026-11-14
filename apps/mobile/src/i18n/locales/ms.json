@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Cuba benarkan sekali semula",
       "retryAlwaysAllow": "Cuba sentiasa benarkan semula",
       "unreadableTitle": "Permintaan kebenaran tidak dapat dibaca",
-      "unreadableBody": "Ejen sedang menunggu keputusan kebenaran yang tidak dapat ditunjukkan oleh aplikasi ini. Kemas kini aplikasi atau CLI, atau jawab permintaan itu dalam CLI untuk meneruskan."
+      "unreadableBody": "Ejen sedang menunggu permintaan kebenaran yang tidak dapat ditunjukkan oleh aplikasi ini, jadi tiada kad dipaparkan untuknya. Kemas kini aplikasi atau CLI, atau jawab permintaan itu dalam CLI untuk meneruskan."
     },
     "questionCard": {
       "title": "Ejen memerlukan maklumat",

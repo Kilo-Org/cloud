@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Försök tillåta en gång igen",
       "retryAlwaysAllow": "Försök tillåta alltid igen",
       "unreadableTitle": "Behörighetsförfrågan kunde inte läsas",
-      "unreadableBody": "Agenten väntar på ett beslut om behörighet som den här appen inte kan visa. Uppdatera appen eller CLI, eller svara på förfrågan i CLI för att fortsätta."
+      "unreadableBody": "Agenten väntar på en behörighetsförfrågan som den här appen inte kan visa, så inget kort visas för den. Uppdatera appen eller CLI, eller svara på förfrågan i CLI för att fortsätta."
     },
     "questionCard": {
       "title": "Agenten behöver inmatning",

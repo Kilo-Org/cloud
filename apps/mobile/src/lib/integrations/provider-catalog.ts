@@ -37,15 +37,13 @@ type ProviderDefinition = {
 const BITBUCKET_ROLES = ['owner', 'billing_manager'] as const satisfies readonly OrganizationRole[];
 
 /**
- * Mirrors the server, per action, instead of one role set per provider:
- * `githubApps.uninstallApp` and `slack.uninstallApp` name
- * `ORGANIZATION_MANAGE_ROLES`, while the `slack`, `linear`, `discord` and
- * `gitlab` connects and the `gitlab`/`discord`/`linear` disconnects run
- * through `resolveAuthorizedOwner`, whose default is
- * `ORGANIZATION_BILLING_ROLES`. Every organization GitLab connect starts at
- * `resolveGitLabOAuthOwner`. That resolver asks for `ORGANIZATION_BILLING_ROLES`
- * on the OAuth start and on the callback, for a first connect and for a
- * replacement.
+ * Mirrors the server, per action, instead of one role set per provider. The
+ * Slack connect, the Slack uninstall and the GitHub uninstall ask for
+ * `ORGANIZATION_MANAGE_ROLES`. The Linear, Discord and GitLab connects and the
+ * `gitlab`/`discord`/`linear` disconnects ask for `ORGANIZATION_BILLING_ROLES`.
+ * Every organization GitLab connect starts at `resolveGitLabOAuthOwner`, which
+ * requires `ORGANIZATION_BILLING_ROLES` at the OAuth start and at the callback,
+ * for a first connect and for a replacement.
  */
 const PROVIDERS = {
   github: {

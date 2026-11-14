@@ -73,7 +73,12 @@ const integrationDetailRegistry = {
           organizationId={organizationId}
           success={search.success === 'connected'}
           error={search.error}
-          canManage={!role || canManageOrganizationBilling(role)}
+          // An organization render names the viewer's role, and the controls
+          // appear for a role that may manage billing. The personal page has no
+          // organization to govern, so it keeps its own controls.
+          canManage={
+            organizationId === undefined || (role != null && canManageOrganizationBilling(role))
+          }
         />
       );
     },

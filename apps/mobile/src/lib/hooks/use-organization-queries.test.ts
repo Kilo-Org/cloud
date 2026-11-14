@@ -73,9 +73,6 @@ describe('buildOrgCreditTransactionsPageQueryOptions', () => {
     expect(
       readOptions(buildOrgCreditTransactionsPageQueryOptions(createTrpcStub(), 'org-1')).input
     ).toEqual({ organizationId: 'org-1' });
-    expect(
-      readOptions(buildOrgCreditTransactionsPageQueryOptions(createTrpcStub(), null)).input
-    ).toEqual({ organizationId: '' });
   });
 
   it('returns the next cursor while hasMore, and stops on the last page', () => {

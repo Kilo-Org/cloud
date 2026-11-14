@@ -41,45 +41,90 @@ export function matchesKiloPermissionPattern(input: string, pattern: string): bo
   return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
 }
 
-function literalPrefix(pattern: string): string {
-  const wildcard = pattern.search(/[*?]/);
-  return wildcard < 0 ? pattern : pattern.slice(0, wildcard);
+type GlobToken = { kind: 'literal'; value: string } | { kind: 'one' } | { kind: 'run' };
+
+/**
+ * The token sequence a pattern stands for. The matcher treats a trailing ` *`
+ * as an optional group, so such a pattern is one of two plain globs.
+ */
+function globAlternatives(pattern: string): GlobToken[][] {
+  const texts = pattern.endsWith(' *') ? [pattern.slice(0, -2), pattern] : [pattern];
+  return texts.map(text => {
+    const tokens: GlobToken[] = [];
+    for (const char of text.replaceAll('\\', '/')) {
+      if (char === '*') {
+        if (tokens.at(-1)?.kind !== 'run') tokens.push({ kind: 'run' });
+        continue;
+      }
+      tokens.push(char === '?' ? { kind: 'one' } : { kind: 'literal', value: char });
+    }
+    return tokens;
+  });
 }
 
-/** Two anchored patterns can describe a common command only if one literal prefix starts with the other. */
+function globsOverlap(left: GlobToken[], right: GlobToken[]): boolean {
+  const memo = new Map<string, boolean>();
+  const walk = (i: number, j: number): boolean => {
+    const key = `${i},${j}`;
+    const cached = memo.get(key);
+    if (cached !== undefined) return cached;
+    let result: boolean;
+    if (i === left.length || j === right.length) {
+      const rest = i === left.length ? right.slice(j) : left.slice(i);
+      result = rest.every(token => token.kind === 'run');
+    } else {
+      const a: GlobToken = left[i];
+      const b: GlobToken = right[j];
+      if (a.kind === 'run' || b.kind === 'run') {
+        // A run absorbs nothing, or it absorbs the one character the other
+        // token produces; either way one side advances.
+        result = walk(i + 1, j) || walk(i, j + 1);
+      } else {
+        const compatible = a.kind !== 'literal' || b.kind !== 'literal' || a.value === b.value;
+        result = compatible && walk(i + 1, j + 1);
+      }
+    }
+    memo.set(key, result);
+    return result;
+  };
+  return walk(0, 0);
+}
+
+/** Two anchored patterns describe a common command only when their globs overlap. */
 function patternsMayCover(a: string, b: string): boolean {
-  const left = literalPrefix(a);
-  const right = literalPrefix(b);
-  return left.startsWith(right) || right.startsWith(left);
+  return globAlternatives(a).some(left =>
+    globAlternatives(b).some(right => globsOverlap(left, right))
+  );
 }
 
 /**
  * Combine a session pattern map with an agent pattern map so both apply.
  *
- * The composed rule list is built by order rather than by comparing pattern
- * text. Agent rules come first in their own order, so a profile's exception
- * after its own refusal survives.
+ * The composed list keeps the agent rules in their own order, so a profile's
+ * exception written after its own refusal survives, and each session decision it
+ * carries follows it.
  *
- * An agent refusal applies as written. An agent ask applies as written too. It
- * carries every session refusal it can reach, so a refusal stays a refusal. It
- * carries a session allow as the profile's ask only for the commands the ask
- * covers, so a wider session allow keeps its own effect where the ask does not
- * reach. The ask is omitted where the session refuses the same pattern, because
- * that refusal already decides it. A session refusal can therefore never become
- * a prompt.
- *
- * An agent allowance is kept only where the session writes an allow for that
+ * A profile refusal applies as written. A profile ask applies as written too.
+ * A profile allowance is kept only where the session writes an allow for that
  * same pattern, because the session decides every other pattern.
  *
- * A kept allowance is followed by each later session refusal that can decide a
- * command it covers. Only refusals are carried: an appended allow would lift a
- * refusal the profile wrote, while a session refusal whose literal prefix is
- * disjoint from the allowance cannot match any command the allowance matches,
- * so the session map already governs it. A refusal is never dropped in favour of
- * a later session allow, because the allowance would otherwise decide a command
- * the session refuses. The composed map is therefore never wider than the
- * session map, so a session verdict still governs every command the profile
- * permits.
+ * A kept rule carries the session refusals it can reach: a refusal is carried
+ * after the profile rule when the two patterns can describe a common command,
+ * so it decides one of the commands that rule covers. It is skipped only when a
+ * later session allow provably covers it. The composed entry therefore never
+ * takes a verdict wider than the session's, while a profile refusal keeps its
+ * effect.
+ *
+ * An ask also carries a session allow, as the profile's ask, but only when the
+ * allow's own pattern satisfies the ask's pattern, so every command the allow
+ * permits is one the profile asked about; a wider session allow keeps its own
+ * verdict for the commands the ask does not cover.
+ *
+ * A session refusal on the ask's own key comes before the carried allows,
+ * because the session writes those allows to refine that refusal and they are
+ * its later word. Every other carried refusal comes after the carried allows,
+ * because it names a command the profile never asked about, so it keeps the last
+ * word and an ask never lifts a refusal the session wrote.
  *
  * Every pattern appears once, at the position of its last decision, so the
  * rendered map follows the order the decisions were made in.
@@ -89,43 +134,49 @@ function composeRuleMap(
   agent: PermissionRuleMap
 ): PermissionRuleMap | undefined {
   if (session === undefined) return { ...agent };
-  const sessionEntries = Object.entries(session);
+  const entries = Object.entries(session);
   const composed: Array<[string, PermissionAction]> = [];
   for (const [pattern, action] of Object.entries(agent)) {
     // A refusal and an ask apply as written; an allowance needs the session to
     // write the same pattern, which is what the session permits.
     if (action === 'allow' && session[pattern] !== 'allow') continue;
-    if (action === 'ask') {
-      // A session refusal on this same pattern decides the ask, so the ask adds
-      // nothing and the session map governs the agent.
-      if (session[pattern] === 'deny') continue;
-      composed.push([pattern, 'ask']);
-      const askPrefix = literalPrefix(pattern);
-      for (const [sessionPattern, sessionAction] of sessionEntries) {
-        if (sessionPattern === pattern) continue;
-        if (!patternsMayCover(pattern, sessionPattern)) continue;
-        if (sessionAction === 'deny') {
-          // A session refusal stays a refusal wherever it can reach the ask.
-          composed.push([sessionPattern, 'deny']);
-          continue;
-        }
-        // A session allow applies as the profile's ask only where the ask reaches
-        // it; a wider session allow keeps its own effect for the commands the ask
-        // does not cover.
-        if (sessionAction === 'allow' && literalPrefix(sessionPattern).startsWith(askPrefix))
-          composed.push([sessionPattern, 'ask']);
-      }
-      continue;
-    }
     composed.push([pattern, action]);
     if (action === 'deny') continue;
-    const index = sessionEntries.findIndex(([key]) => key === pattern);
-    if (index < 0) continue;
-    for (const [denyIndex, [denyPattern, denyAction]] of sessionEntries.entries()) {
-      if (denyIndex <= index || denyAction !== 'deny') continue;
-      if (!patternsMayCover(pattern, denyPattern)) continue;
-      composed.push([denyPattern, 'deny']);
+    // The profile rule sits after every session rule from this index on, so a
+    // session refusal written earlier cannot follow it, unless it names the
+    // same key.
+    const index = entries.findIndex(([key]) => key === pattern);
+    const refusals: Array<[string, 'deny']> = [];
+    for (const [denyIndex, [denyPattern, denyAction]] of entries.entries()) {
+      if (denyAction !== 'deny') continue;
+      if (!(index < 0 || denyIndex > index || denyPattern === pattern)) continue;
+      if (!patternsMayCover(denyPattern, pattern)) continue;
+      // A later session allow for the refusal's own pattern decides it on its
+      // own, so carrying the refusal would only repeat that decision.
+      const overridden = entries.some(
+        ([later, laterAction], laterIndex) =>
+          laterIndex > denyIndex &&
+          laterAction === 'allow' &&
+          matchesKiloPermissionPattern(denyPattern, later)
+      );
+      if (overridden) continue;
+      refusals.push([denyPattern, 'deny']);
     }
+    if (action !== 'ask') {
+      composed.push(...refusals);
+      continue;
+    }
+    // The session's own refusal on the ask's key states the whole pattern, and
+    // the session refines it with the allows carried below, so that refusal
+    // stays before them. A refusal on another key names commands the profile
+    // never asked about, so it keeps the last word over the ask.
+    composed.push(...refusals.filter(([refusalPattern]) => refusalPattern === pattern));
+    for (const [allowPattern, allowAction] of entries) {
+      if (allowAction !== 'allow' || allowPattern === pattern) continue;
+      if (!matchesKiloPermissionPattern(allowPattern, pattern)) continue;
+      composed.push([allowPattern, 'ask']);
+    }
+    composed.push(...refusals.filter(([refusalPattern]) => refusalPattern !== pattern));
   }
   const lastIndex = new Map<string, number>();
   composed.forEach(([pattern], index) => {

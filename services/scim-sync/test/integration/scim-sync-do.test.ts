@@ -1203,6 +1203,39 @@ describe('parked-event retention', () => {
       expect(state.parked).toEqual(['evt_parked']);
     });
   });
+
+  it('refreshes a re-parked row so the record and the window follow the latest park', async () => {
+    const target = stub('retention-repark');
+    // Frozen, so the seeded row is 40 days old at the instant the loop parks.
+    // That is outside the window: only a refresh of `parked_at` keeps the row.
+    steppingClock(0);
+    const now = Date.now();
+
+    await seedParked(target, [
+      {
+        eventId: 'evt_reparked',
+        parkedAt: now - 40 * 24 * 60 * 60 * 1_000,
+        error: 'stale first park',
+      },
+    ]);
+
+    // A rewind replays the event and it parks again, so the decision made now
+    // is the one the row has to carry.
+    harness({ pages: [[activationWithRejectedBody('evt_reparked')]] });
+    const parked = await runInDurableObject(target, instance => instance.poll());
+    expect(parked.eventsParked).toBe(1);
+
+    // The alarm prunes before it polls. A row still carrying the seeded date is
+    // deleted on this tick; a refreshed `parked_at` is inside the window.
+    harness({ pages: [[]] });
+    await runInDurableObject(target, instance => instance.alarm());
+
+    const state = await readState(target);
+    expect(state.parked).toEqual(['evt_reparked']);
+    expect((await target.getStatus()).parkedCount).toBe(1);
+    expect(state.parkedReasons['evt_reparked']).toContain('body rejected by the request contract');
+    expect(state.parkedReasons['evt_reparked']).not.toBe('stale first park');
+  });
 });
 
 /**
@@ -1212,7 +1245,7 @@ describe('parked-event retention', () => {
  */
 async function seedParked(
   target: DurableObjectStub<ScimSyncDO>,
-  rows: { eventId: string; parkedAt: number }[]
+  rows: { eventId: string; parkedAt: number; error?: string }[]
 ): Promise<void> {
   await runInDurableObject(target, (_instance, instanceState) => {
     const db = drizzle(instanceState.storage);
@@ -1223,7 +1256,7 @@ async function seedParked(
           event_type: 'dsync.user.created',
           class: 'terminal',
           status: 400,
-          error: 'seeded',
+          error: row.error ?? 'seeded',
           attempts: 1,
           parked_at: row.parkedAt,
         }))

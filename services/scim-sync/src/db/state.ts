@@ -206,6 +206,13 @@ function clearAllDirectoryLimits(db: Db): void {
  * not always the attempt's own: a conflict can be parked as terminal when no
  * later event can clear it, and its reason then names the directory rule rather
  * than only the app's answer.
+ *
+ * The row describes the **latest** park decision. An operator who rewinds
+ * `WORKOS_EVENT_CURSOR` and parks the same event again gets this park's class,
+ * status, reason and attempt count, so the record names the current failure
+ * instead of the first one, and the retention window is measured from this
+ * `parked_at`, so the row keeps a full window rather than inheriting the age of
+ * a park from weeks earlier.
  */
 export function parkEvent(
   db: Db,
@@ -215,17 +222,29 @@ export function parkEvent(
   attempts: number,
   now: number
 ): void {
+  const row = {
+    event_id: event.id,
+    event_type: event.event,
+    class: record.class,
+    status: outcome.status,
+    error: record.reason ?? '',
+    attempts,
+    parked_at: now,
+  };
+
   db.insert(parkedEvents)
-    .values({
-      event_id: event.id,
-      event_type: event.event,
-      class: record.class,
-      status: outcome.status,
-      error: record.reason ?? '',
-      attempts,
-      parked_at: now,
+    .values(row)
+    .onConflictDoUpdate({
+      target: parkedEvents.event_id,
+      set: {
+        event_type: row.event_type,
+        class: row.class,
+        status: row.status,
+        error: row.error,
+        attempts: row.attempts,
+        parked_at: row.parked_at,
+      },
     })
-    .onConflictDoNothing()
     .run();
   clearFailure(db, event.id);
 }

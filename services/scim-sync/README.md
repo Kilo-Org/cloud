@@ -115,7 +115,10 @@ moving.
 ### Retention
 
 A parked row is kept for **30 days from its `parked_at`**, the window the owner
-approved. The alarm expires rows on every tick: before the poll, it deletes the
+approved. The window follows the **most recent** park: when a cursor rewind makes
+the loop park the same event again, the new park replaces the row's contents and
+restarts its window, so the row names the current failure and gets the full 30
+days. The alarm expires rows on every tick: before the poll, it deletes the
 rows parked **strictly** earlier than that cutoff, so a row exactly 30 days old
 is kept by this tick and goes on the next one. Expiry rides on the existing
 alarm rather than a second cron or timer, so it cannot delay or replace the

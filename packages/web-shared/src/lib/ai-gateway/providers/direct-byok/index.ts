@@ -317,14 +317,17 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
   return { provider: null, model: null };
 }
 
+/** Models the owner's enabled keys serve. */
+export async function getDirectByokModelsForOwner(owner: ByokOwner) {
+  return getDirectByokModels(await getEnabledByokProviders(readDb, owner));
+}
+
 export async function getDirectByokModelsForOrganization(organizationId: string) {
-  const keys = await getEnabledByokProviders(readDb, { type: 'organization', id: organizationId });
-  return keys.length === 0 ? [] : await getDirectByokModels(keys);
+  return getDirectByokModelsForOwner({ type: 'organization', id: organizationId });
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
-  const keys = await getEnabledByokProviders(readDb, { type: 'user', id: userId });
-  return keys.length === 0 ? [] : await getDirectByokModels(keys);
+  return getDirectByokModelsForOwner({ type: 'user', id: userId });
 }
 
 /**

@@ -4496,6 +4496,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opcions SSH",
       "emptyTitle": "Encara no hi ha cap amfitrió",
       "emptyDescription": "Els amfitrions desats obren un terminal al teu servidor.",
       "addHost": "Afegeix amfitrió",
@@ -4652,6 +4653,48 @@
       "createdTitle": "Clau creada",
       "createdDescription": "Afegeix aquesta clau pública a l'authorized_keys del servidor i, després, connecta't amb aquesta clau.",
       "copyPublicKey": "Copia la clau"
+    },
+    "backup": {
+      "exportTitle": "Exporta una còpia de seguretat xifrada",
+      "importTitle": "Importa una còpia de seguretat xifrada",
+      "exportDescription": "Els amfitrions, les claus privades, les contrasenyes desades, els amfitrions de confiança, els fragments i les redireccions es xifren junts. Guarda la frase de contrasenya a part.",
+      "importDescription": "Obre una còpia de seguretat SSH de Kilo per revisar-ne el contingut abans d'importar-la.",
+      "confirmPassphrase": "Confirma la frase de contrasenya",
+      "strengthShort": "Massa curta · utilitza com a mínim 8 caràcters",
+      "strengthGood": "Bona longitud · 12 caràcters o més és més segur",
+      "strengthLong": "Frase de contrasenya llarga · guarda-la en un lloc segur",
+      "mismatch": "Les frases de contrasenya no coincideixen.",
+      "share": "Xifra i comparteix",
+      "unlock": "Desbloqueja la còpia de seguretat",
+      "apply": "Importa la còpia de seguretat",
+      "mergeStrategy": "Omet els duplicats",
+      "mergeDescription": "Conserva els amfitrions existents per etiqueta, les claus per empremta i els amfitrions de confiança per patró. Els fragments i les vinculacions de redirecció coincidents també es conserven.",
+      "conflicts": "Conservats en aquest dispositiu",
+      "counts": {
+        "hosts": "Amfitrions SSH",
+        "keys": "Claus privades",
+        "snippets": "Fragments de comandes"
+      },
+      "wrongPassphrase": "Aquesta frase de contrasenya no ha desbloquejat la còpia de seguretat. Torna-ho a provar.",
+      "invalidExport": "Aquesta no és una còpia de seguretat SSH de Kilo vàlida i compatible. Tria un altre fitxer.",
+      "fileError": "No s'ha pogut llegir el fitxer de còpia de seguretat.",
+      "storageError": "No s'ha pogut desar la còpia de seguretat. No s'ha importat res.",
+      "unavailable": "L'operació de còpia de seguretat xifrada ha fallat. Torna-ho a provar.",
+      "empty": "No hi ha res per fer una còpia de seguretat",
+      "previewTitle": "Contingut de la còpia de seguretat",
+      "imported": "S'ha importat la còpia de seguretat SSH.",
+      "nothingNew": "Tot el que hi ha en aquesta còpia de seguretat ja és en aquest dispositiu."
+    },
+    "keyBar": {
+      "title": "Barra de claus",
+      "subtitle": "Arrossega una clau per moure-la o desactiva-la per amagar-la.",
+      "editHint": "Mantén premut per triar i reordenar les claus",
+      "restoreDefault": "Restaura el valor predeterminat",
+      "moveUp": "Mou {{label}} amunt",
+      "moveDown": "Mou {{label}} avall",
+      "show": "Mostra {{label}}",
+      "keepOne": "Com a mínim una clau es queda a la barra.",
+      "loadFailed": "No s'ha pogut carregar la barra de claus."
     },
     "sandbox": {
       "title": "Terminal",

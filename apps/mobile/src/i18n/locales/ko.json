@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH 선택지",
       "emptyTitle": "아직 호스트 없음",
       "emptyDescription": "저장된 호스트는 서버에서 터미널을 엽니다.",
       "addHost": "호스트 추가",
@@ -4587,6 +4588,48 @@
       "createdTitle": "키 생성 완료",
       "createdDescription": "이 공개 키를 서버의 authorized_keys에 추가한 다음, 이 키로 연결하세요.",
       "copyPublicKey": "키 복사"
+    },
+    "backup": {
+      "exportTitle": "암호화된 백업 내보내기",
+      "importTitle": "암호화된 백업 가져오기",
+      "exportDescription": "호스트, 개인 키, 저장된 비밀번호, 신뢰하는 호스트, 스니펫 및 포워드는 함께 암호화됩니다. 패스프레이즈는 별도로 보관하세요.",
+      "importDescription": "가져오기 전에 내용을 검토하려면 Kilo SSH 백업을 여세요.",
+      "confirmPassphrase": "패스프레이즈 확인",
+      "strengthShort": "너무 짧음 · 8자 이상 사용하세요",
+      "strengthGood": "적당한 길이 · 12자 이상이 더 안전합니다",
+      "strengthLong": "긴 패스프레이즈 · 안전한 곳에 보관하세요",
+      "mismatch": "패스프레이즈가 일치하지 않습니다.",
+      "share": "암호화하여 공유",
+      "unlock": "백업 잠금 해제",
+      "apply": "백업 가져오기",
+      "mergeStrategy": "중복 건너뛰기",
+      "mergeDescription": "기존 호스트는 레이블로, 키는 지문으로, 신뢰하는 호스트는 패턴으로 유지합니다. 일치하는 스니펫과 포워드 바인딩도 유지됩니다.",
+      "conflicts": "이 기기에 유지됨",
+      "counts": {
+        "hosts": "SSH 호스트",
+        "keys": "개인 키",
+        "snippets": "명령 스니펫"
+      },
+      "wrongPassphrase": "해당 패스프레이즈로 백업의 잠금을 해제하지 못했습니다. 다시 시도하세요.",
+      "invalidExport": "지원되는 유효한 Kilo SSH 백업이 아닙니다. 다른 파일을 선택하세요.",
+      "fileError": "백업 파일을 읽을 수 없습니다.",
+      "storageError": "백업을 저장할 수 없습니다. 가져온 항목이 없습니다.",
+      "unavailable": "암호화된 백업 작업에 실패했습니다. 다시 시도하세요.",
+      "empty": "백업할 항목 없음",
+      "previewTitle": "백업 내용",
+      "imported": "SSH 백업을 가져왔습니다.",
+      "nothingNew": "이 백업의 모든 항목이 이미 이 기기에 있습니다."
+    },
+    "keyBar": {
+      "title": "키 바",
+      "subtitle": "키를 드래그하여 이동하거나 끄면 숨길 수 있습니다.",
+      "editHint": "길게 눌러 키를 선택하고 순서를 바꾸세요",
+      "restoreDefault": "기본값 복원",
+      "moveUp": "{{label}} 위로 이동",
+      "moveDown": "{{label}} 아래로 이동",
+      "show": "{{label}} 표시",
+      "keepOne": "키 바에는 최소 하나의 키가 유지됩니다.",
+      "loadFailed": "키 바를 불러올 수 없습니다."
     },
     "sandbox": {
       "title": "터미널",

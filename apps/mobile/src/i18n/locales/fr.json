@@ -4496,6 +4496,7 @@
       "value": "{{label}} : {{value}}"
     },
     "hosts": {
+      "menuTitle": "Options SSH",
       "emptyTitle": "Aucun hôte pour l’instant",
       "emptyDescription": "Les hôtes enregistrés ouvrent un terminal sur votre serveur.",
       "addHost": "Ajouter un hôte",
@@ -4652,6 +4653,48 @@
       "createdTitle": "Clé créée",
       "createdDescription": "Ajoutez cette clé publique au fichier authorized_keys du serveur, puis connectez-vous avec cette clé.",
       "copyPublicKey": "Copier la clé"
+    },
+    "backup": {
+      "exportTitle": "Exporter une sauvegarde chiffrée",
+      "importTitle": "Importer une sauvegarde chiffrée",
+      "exportDescription": "Les hôtes, les clés privées, les mots de passe enregistrés, les hôtes de confiance, les extraits et les redirections sont chiffrés ensemble. Conservez la phrase secrète séparément.",
+      "importDescription": "Ouvrez une sauvegarde SSH Kilo pour vérifier son contenu avant de l’importer.",
+      "confirmPassphrase": "Confirmer la phrase secrète",
+      "strengthShort": "Trop court · utilisez au moins 8 caractères",
+      "strengthGood": "Longueur correcte · 12 caractères ou plus est plus sûr",
+      "strengthLong": "Phrase secrète longue · conservez-la en lieu sûr",
+      "mismatch": "Les phrases secrètes ne correspondent pas.",
+      "share": "Chiffrer et partager",
+      "unlock": "Déverrouiller la sauvegarde",
+      "apply": "Importer la sauvegarde",
+      "mergeStrategy": "Ignorer les doublons",
+      "mergeDescription": "Conservez les hôtes existants par libellé, les clés par empreinte et les hôtes de confiance par motif. Les extraits et les liaisons de redirection correspondants sont également conservés.",
+      "conflicts": "Conservé sur cet appareil",
+      "counts": {
+        "hosts": "Hôtes SSH",
+        "keys": "Clés privées",
+        "snippets": "Extraits de commandes"
+      },
+      "wrongPassphrase": "Cette phrase secrète n’a pas déverrouillé la sauvegarde. Réessayez.",
+      "invalidExport": "Ce n’est pas une sauvegarde SSH Kilo valide et prise en charge. Choisissez un autre fichier.",
+      "fileError": "Le fichier de sauvegarde n’a pas pu être lu.",
+      "storageError": "La sauvegarde n’a pas pu être enregistrée. Rien n’a été importé.",
+      "unavailable": "L’opération de sauvegarde chiffrée a échoué. Réessayez.",
+      "empty": "Rien à sauvegarder",
+      "previewTitle": "Contenu de la sauvegarde",
+      "imported": "Sauvegarde SSH importée.",
+      "nothingNew": "Tout ce qui se trouve dans cette sauvegarde est déjà sur cet appareil."
+    },
+    "keyBar": {
+      "title": "Barre de clés",
+      "subtitle": "Faites glisser une clé pour la déplacer, ou désactivez-la pour la masquer.",
+      "editHint": "Appuyez longuement pour choisir et réorganiser les clés",
+      "restoreDefault": "Rétablir par défaut",
+      "moveUp": "Déplacer {{label}} vers le haut",
+      "moveDown": "Déplacer {{label}} vers le bas",
+      "show": "Afficher {{label}}",
+      "keepOne": "Au moins une clé reste sur la barre.",
+      "loadFailed": "La barre de clés n’a pas pu être chargée."
     },
     "sandbox": {
       "title": "Terminal",

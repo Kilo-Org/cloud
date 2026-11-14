@@ -4431,6 +4431,7 @@
       "value": "{{label}}：{{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH 选项",
       "emptyTitle": "还没有主机",
       "emptyDescription": "已保存的主机会在你的服务器上打开终端。",
       "addHost": "添加主机",
@@ -4587,6 +4588,48 @@
       "createdTitle": "密钥已创建",
       "createdDescription": "将此公钥添加到服务器的 authorized_keys，然后使用此密钥连接。",
       "copyPublicKey": "复制公钥"
+    },
+    "backup": {
+      "exportTitle": "导出加密备份",
+      "importTitle": "导入加密备份",
+      "exportDescription": "主机、私钥、保存的密码、受信任的主机、片段和转发会一起加密。请单独保管口令。",
+      "importDescription": "打开 Kilo SSH 备份，在导入前查看其内容。",
+      "confirmPassphrase": "确认口令",
+      "strengthShort": "太短 · 请至少使用 8 个字符",
+      "strengthGood": "长度良好 · 12 个或更多字符更安全",
+      "strengthLong": "口令较长 · 请妥善保管",
+      "mismatch": "两次输入的口令不一致。",
+      "share": "加密并分享",
+      "unlock": "解锁备份",
+      "apply": "导入备份",
+      "mergeStrategy": "跳过重复项",
+      "mergeDescription": "按标签保留现有主机、按指纹保留密钥、按模式保留受信任的主机。匹配的片段和转发绑定也会保留。",
+      "conflicts": "保留在此设备上",
+      "counts": {
+        "hosts": "SSH 主机",
+        "keys": "私钥",
+        "snippets": "命令片段"
+      },
+      "wrongPassphrase": "该口令未能解锁备份。请重试。",
+      "invalidExport": "这不是有效的受支持 Kilo SSH 备份。请选择其他文件。",
+      "fileError": "无法读取备份文件。",
+      "storageError": "无法保存备份。未导入任何内容。",
+      "unavailable": "加密备份操作失败。请重试。",
+      "empty": "没有可备份的内容",
+      "previewTitle": "备份内容",
+      "imported": "已导入 SSH 备份。",
+      "nothingNew": "此备份中的所有内容都已在此设备上。"
+    },
+    "keyBar": {
+      "title": "密钥栏",
+      "subtitle": "拖动密钥即可移动，或将其关闭以隐藏。",
+      "editHint": "长按以选择并重新排序密钥",
+      "restoreDefault": "恢复默认",
+      "moveUp": "向上移动 {{label}}",
+      "moveDown": "向下移动 {{label}}",
+      "show": "显示 {{label}}",
+      "keepOne": "栏上至少保留一个密钥。",
+      "loadFailed": "无法加载密钥栏。"
     },
     "sandbox": {
       "title": "终端",

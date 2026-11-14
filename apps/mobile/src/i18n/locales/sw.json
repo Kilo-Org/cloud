@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Chaguo za SSH",
       "emptyTitle": "Bado hakuna wenyeji",
       "emptyDescription": "Wenyeji waliohifadhiwa hufungua terminal kwenye seva yako.",
       "addHost": "Ongeza mwenyeji",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Ufunguo umetengenezwa",
       "createdDescription": "Ongeza ufunguo huu wa umma kwenye authorized_keys ya seva, kisha unganisha ukitumia ufunguo huu.",
       "copyPublicKey": "Nakili ufunguo"
+    },
+    "backup": {
+      "exportTitle": "Hamisha nakala rudufu iliyosimbwa",
+      "importTitle": "Leta nakala rudufu iliyosimbwa",
+      "exportDescription": "Wenyeji, funguo za faragha, manenosiri yaliyohifadhiwa, wenyeji wanaotumainiwa, vipande na vipitisho husimbwa pamoja. Hifadhi kifungu cha siri kivyake.",
+      "importDescription": "Fungua nakala rudufu ya Kilo SSH ili kukagua yaliyomo kabla ya kuleta.",
+      "confirmPassphrase": "Thibitisha kifungu cha siri",
+      "strengthShort": "Fupi mno · tumia angalau herufi 8",
+      "strengthGood": "Urefu mzuri · herufi 12 au zaidi ni salama zaidi",
+      "strengthLong": "Kifungu cha siri kirefu · hifadhi mahali salama",
+      "mismatch": "Vifungu vya siri haviendani.",
+      "share": "Simbwa na shiriki",
+      "unlock": "Fungua nakala rudufu",
+      "apply": "Leta nakala rudufu",
+      "mergeStrategy": "Ruka marudio",
+      "mergeDescription": "Hifadhi wenyeji waliopo kwa lebo, funguo kwa alama ya kidole na wenyeji wanaotumainiwa kwa muundo. Vipande vinavyolingana na vifungo vya vipitisho pia huhifadhiwa.",
+      "conflicts": "Imehifadhiwa kwenye kifaa hiki",
+      "counts": {
+        "hosts": "Wenyeji wa SSH",
+        "keys": "Funguo za faragha",
+        "snippets": "Vipande vya amri"
+      },
+      "wrongPassphrase": "Kifungu hicho cha siri hakikufungua nakala rudufu. Jaribu tena.",
+      "invalidExport": "Hii si nakala rudufu halali ya Kilo SSH inayoauniwa. Chagua faili nyingine.",
+      "fileError": "Faili ya nakala rudufu haikuweza kusomwa.",
+      "storageError": "Nakala rudufu haikuweza kuhifadhiwa. Hakuna kilicholetwa.",
+      "unavailable": "Operesheni ya nakala rudufu iliyosimbwa imeshindikana. Jaribu tena.",
+      "empty": "Hakuna cha kuhifadhi nakala rudufu",
+      "previewTitle": "Yaliyomo kwenye nakala rudufu",
+      "imported": "Nakala rudufu ya SSH imeletwa.",
+      "nothingNew": "Kila kitu kwenye nakala rudufu hii tayari kiko kwenye kifaa hiki."
+    },
+    "keyBar": {
+      "title": "Pau ya funguo",
+      "subtitle": "Buruta ufunguo ili kuuhamisha, au uzime ili kuuficha.",
+      "editHint": "Bonyeza kwa muda mrefu ili kuchagua na kupanga upya funguo",
+      "restoreDefault": "Rejesha chaguo-msingi",
+      "moveUp": "Hamisha {{label}} juu",
+      "moveDown": "Hamisha {{label}} chini",
+      "show": "Onyesha {{label}}",
+      "keepOne": "Angalau ufunguo mmoja unabaki kwenye pau.",
+      "loadFailed": "Pau ya funguo haikuweza kupakiwa."
     },
     "sandbox": {
       "title": "Terminal",

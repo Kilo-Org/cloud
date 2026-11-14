@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH variantlari",
       "emptyTitle": "Hozircha host yo‘q",
       "emptyDescription": "Saqlangan hostlar serveringizda terminal ochadi.",
       "addHost": "Host qo‘shish",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Kalit yaratildi",
       "createdDescription": "Ushbu ochiq kalitni serverning authorized_keys fayliga qo'shing, so'ngra ushbu kalit bilan ulaning.",
       "copyPublicKey": "Kalitni nusxalash"
+    },
+    "backup": {
+      "exportTitle": "Shifrlangan zaxira nusxasini eksport qilish",
+      "importTitle": "Shifrlangan zaxira nusxasini import qilish",
+      "exportDescription": "Hostlar, shaxsiy kalitlar, saqlangan parollar, ishonchli hostlar, parchalar va yo‘naltirishlar birgalikda shifrlanadi. Parol iborasini alohida saqlang.",
+      "importDescription": "Import qilishdan oldin tarkibini ko‘rish uchun Kilo SSH zaxira nusxasini oching.",
+      "confirmPassphrase": "Parol iborasini tasdiqlang",
+      "strengthShort": "Juda qisqa · kamida 8 ta belgidan foydalaning",
+      "strengthGood": "Yaxshi uzunlik · 12 yoki undan ortiq belgi xavfsizroq",
+      "strengthLong": "Uzun parol iborasi · uni xavfsiz joyda saqlang",
+      "mismatch": "Parol iboralari mos kelmaydi.",
+      "share": "Shifrlang va ulashing",
+      "unlock": "Zaxira nusxasi qulfini ochish",
+      "apply": "Zaxira nusxasini import qilish",
+      "mergeStrategy": "Dublikatlarni o‘tkazib yuborish",
+      "mergeDescription": "Mavjud hostlarni yorliq bo‘yicha, kalitlarni barmoq izi bo‘yicha va ishonchli hostlarni naqsh bo‘yicha saqlang. Mos keluvchi parchalar va yo‘naltirish bog‘lanishlari ham saqlanadi.",
+      "conflicts": "Bu qurilmada qoldirilgan",
+      "counts": {
+        "hosts": "SSH hostlari",
+        "keys": "Shaxsiy kalitlar",
+        "snippets": "Buyruq parchalari"
+      },
+      "wrongPassphrase": "Bu parol iborasi zaxira nusxasini ochmadi. Qayta urinib ko‘ring.",
+      "invalidExport": "Bu qo‘llab-quvvatlanadigan haqiqiy Kilo SSH zaxira nusxasi emas. Boshqa faylni tanlang.",
+      "fileError": "Zaxira nusxasi faylini o‘qib bo‘lmadi.",
+      "storageError": "Zaxira nusxasini saqlab bo‘lmadi. Hech narsa import qilinmadi.",
+      "unavailable": "Shifrlangan zaxira nusxasi operatsiyasi muvaffaqiyatsiz tugadi. Qayta urinib ko‘ring.",
+      "empty": "Zaxiralash uchun hech narsa yo‘q",
+      "previewTitle": "Zaxira nusxasi tarkibi",
+      "imported": "SSH zaxira nusxasi import qilindi.",
+      "nothingNew": "Bu zaxira nusxasidagi hamma narsa allaqachon bu qurilmada mavjud."
+    },
+    "keyBar": {
+      "title": "Kalit paneli",
+      "subtitle": "Kalitni ko‘chirish uchun torting yoki yashirish uchun uni o‘chiring.",
+      "editHint": "Kalitlarni tanlash va tartibini o‘zgartirish uchun uzoq bosing",
+      "restoreDefault": "Standart holatni tiklash",
+      "moveUp": "{{label}}ni yuqoriga ko‘chirish",
+      "moveDown": "{{label}}ni pastga ko‘chirish",
+      "show": "{{label}}ni ko‘rsatish",
+      "keepOne": "Kamida bitta kalit panelda qoladi.",
+      "loadFailed": "Kalit paneli yuklab bo‘lmadi."
     },
     "sandbox": {
       "title": "Terminal",

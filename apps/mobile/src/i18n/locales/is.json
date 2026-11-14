@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH valkostir",
       "emptyTitle": "Engir netþjónar ennþá",
       "emptyDescription": "Vistaðir hýslar opna flugstöð á netþjóni þínum.",
       "addHost": "Bæta við netþjóni",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Lykill búinn til",
       "createdDescription": "Bættu þessum opinbera lykli við authorized_keys á netþjóninum og tengdu þig síðan með þessum lykli.",
       "copyPublicKey": "Afrita lykil"
+    },
+    "backup": {
+      "exportTitle": "Flytja út dulkóðað öryggisafrit",
+      "importTitle": "Flytja inn dulkóðað öryggisafrit",
+      "exportDescription": "Netþjónar, einkalyklar, vistuð lykilorð, treystir netþjónar, brot og framsendingar eru dulkóðuð saman. Geymdu lykilsetninguna sérstaklega.",
+      "importDescription": "Opnaðu Kilo SSH-öryggisafrit til að fara yfir innihaldið áður en flutt er inn.",
+      "confirmPassphrase": "Staðfesta lykilsetningu",
+      "strengthShort": "Of stutt · notaðu að minnsta kosti 8 stafi",
+      "strengthGood": "Góð lengd · 12 stafir eða fleiri eru öruggari",
+      "strengthLong": "Löng lykilsetning · geymdu hana á öruggum stað",
+      "mismatch": "Lykilsetningarnar passa ekki saman.",
+      "share": "Dulkóða og deila",
+      "unlock": "Opna öryggisafrit",
+      "apply": "Flytja inn öryggisafrit",
+      "mergeStrategy": "Sleppa tvítekningum",
+      "mergeDescription": "Haltu núverandi netþjónum eftir merki, lyklum eftir fingrafari og treystum netþjónum eftir mynstri. Brot og framsendingartengingar sem passa eru einnig geymdar.",
+      "conflicts": "Geymt á þessu tæki",
+      "counts": {
+        "hosts": "SSH-netþjónar",
+        "keys": "Einkalyklar",
+        "snippets": "Skipanabrot"
+      },
+      "wrongPassphrase": "Þessi lykilsetning opnaði ekki öryggisafritið. Reyndu aftur.",
+      "invalidExport": "Þetta er ekki gilt studd Kilo SSH-öryggisafrit. Veldu aðra skrá.",
+      "fileError": "Ekki tókst að lesa öryggisafritsskrána.",
+      "storageError": "Ekki tókst að vista öryggisafritið. Ekkert var flutt inn.",
+      "unavailable": "Dulkóðaða öryggisafritsaðgerðin mistókst. Reyndu aftur.",
+      "empty": "Ekkert til að öryggisafrita",
+      "previewTitle": "Innihald öryggisafrits",
+      "imported": "SSH-öryggisafrit flutt inn.",
+      "nothingNew": "Allt í þessu öryggisafriti er þegar á þessu tæki."
+    },
+    "keyBar": {
+      "title": "Lyklastika",
+      "subtitle": "Dragðu lykil til að færa hann eða slökktu á honum til að fela hann.",
+      "editHint": "Haltu inni til að velja og endurraða lyklum",
+      "restoreDefault": "Endurheimta sjálfgefið",
+      "moveUp": "Færa {{label}} upp",
+      "moveDown": "Færa {{label}} niður",
+      "show": "Sýna {{label}}",
+      "keepOne": "Að minnsta kosti einn lykill verður á lyklastikunni.",
+      "loadFailed": "Ekki tókst að hlaða lyklastikunni."
     },
     "sandbox": {
       "title": "Skjáhermir",

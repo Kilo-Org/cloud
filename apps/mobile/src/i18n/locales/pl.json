@@ -4561,6 +4561,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opcje SSH",
       "emptyTitle": "Brak hostów",
       "emptyDescription": "Zapisane hosty otwierają terminal na twoim serwerze.",
       "addHost": "Dodaj hosta",
@@ -4717,6 +4718,48 @@
       "createdTitle": "Klucz utworzony",
       "createdDescription": "Dodaj ten klucz publiczny do authorized_keys na serwerze, a następnie połącz się za pomocą tego klucza.",
       "copyPublicKey": "Kopiuj klucz"
+    },
+    "backup": {
+      "exportTitle": "Eksportuj zaszyfrowaną kopię zapasową",
+      "importTitle": "Importuj zaszyfrowaną kopię zapasową",
+      "exportDescription": "Hosty, klucze prywatne, zapisane hasła, zaufane hosty, fragmenty i przekierowania są szyfrowane razem. Hasło przechowuj osobno.",
+      "importDescription": "Otwórz kopię zapasową Kilo SSH, aby przejrzeć jej zawartość przed importem.",
+      "confirmPassphrase": "Potwierdź hasło",
+      "strengthShort": "Zbyt krótkie · użyj co najmniej 8 znaków",
+      "strengthGood": "Dobra długość · 12 lub więcej znaków jest bezpieczniejsze",
+      "strengthLong": "Długie hasło · przechowuj je w bezpiecznym miejscu",
+      "mismatch": "Hasła nie są zgodne.",
+      "share": "Zaszyfruj i udostępnij",
+      "unlock": "Odblokuj kopię zapasową",
+      "apply": "Importuj kopię zapasową",
+      "mergeStrategy": "Pomiń duplikaty",
+      "mergeDescription": "Zachowaj istniejące hosty według etykiety, klucze według odcisku i zaufane hosty według wzorca. Pasujące fragmenty i powiązania przekierowań również są zachowywane.",
+      "conflicts": "Zachowano na tym urządzeniu",
+      "counts": {
+        "hosts": "Hosty SSH",
+        "keys": "Klucze prywatne",
+        "snippets": "Fragmenty poleceń"
+      },
+      "wrongPassphrase": "To hasło nie odblokowało kopii zapasowej. Spróbuj ponownie.",
+      "invalidExport": "To nie jest prawidłowa, obsługiwana kopia zapasowa Kilo SSH. Wybierz inny plik.",
+      "fileError": "Nie można odczytać pliku kopii zapasowej.",
+      "storageError": "Nie można zapisać kopii zapasowej. Nie zaimportowano niczego.",
+      "unavailable": "Operacja szyfrowanej kopii zapasowej nie powiodła się. Spróbuj ponownie.",
+      "empty": "Brak danych do kopii zapasowej",
+      "previewTitle": "Zawartość kopii zapasowej",
+      "imported": "Zaimportowano kopię zapasową SSH.",
+      "nothingNew": "Wszystko z tej kopii zapasowej jest już na tym urządzeniu."
+    },
+    "keyBar": {
+      "title": "Pasek kluczy",
+      "subtitle": "Przeciągnij klucz, aby go przenieść, lub wyłącz go, aby ukryć.",
+      "editHint": "Przytrzymaj, aby wybrać i zmienić kolejność kluczy",
+      "restoreDefault": "Przywróć domyślne",
+      "moveUp": "Przenieś {{label}} w górę",
+      "moveDown": "Przenieś {{label}} w dół",
+      "show": "Pokaż {{label}}",
+      "keepOne": "Co najmniej jeden klucz pozostaje na pasku.",
+      "loadFailed": "Nie można wczytać paska kluczy."
     },
     "sandbox": {
       "title": "Terminal",

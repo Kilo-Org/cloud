@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH valikud",
       "emptyTitle": "Ühtegi hosti veel pole",
       "emptyDescription": "Salvestatud hostid avavad sinu serveris terminali.",
       "addHost": "Lisa host",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Võti loodud",
       "createdDescription": "Lisa see avalik võti serveri authorized_keys-faili ja ühendu seejärel selle võtmega.",
       "copyPublicKey": "Kopeeri võti"
+    },
+    "backup": {
+      "exportTitle": "Ekspordi krüpteeritud varukoopia",
+      "importTitle": "Impordi krüpteeritud varukoopia",
+      "exportDescription": "Hostid, privaatvõtmed, salvestatud paroolid, usaldatud hostid, käsujupid ja suunamised krüpteeritakse koos. Hoia pääsufraas eraldi.",
+      "importDescription": "Ava Kilo SSH varukoopia, et enne importimist selle sisu üle vaadata.",
+      "confirmPassphrase": "Kinnita pääsufraas",
+      "strengthShort": "Liiga lühike · kasuta vähemalt 8 tähemärki",
+      "strengthGood": "Hea pikkus · 12 või rohkem tähemärki on turvalisem",
+      "strengthLong": "Pikk pääsufraas · hoia seda turvalises kohas",
+      "mismatch": "Pääsufraasid ei ühti.",
+      "share": "Krüpteeri ja jaga",
+      "unlock": "Lukusta varukoopia lahti",
+      "apply": "Impordi varukoopia",
+      "mergeStrategy": "Jäta duplikaadid vahele",
+      "mergeDescription": "Säilita olemasolevad hostid sildi järgi, võtmed sõrmejälje järgi ja usaldatud hostid mustri järgi. Sobivad käsujupid ja suunamissidemed säilitatakse samuti.",
+      "conflicts": "Säilitatud selles seadmes",
+      "counts": {
+        "hosts": "SSH hostid",
+        "keys": "Privaatvõtmed",
+        "snippets": "Käsujupid"
+      },
+      "wrongPassphrase": "See pääsufraas ei avanud varukoopiat. Proovi uuesti.",
+      "invalidExport": "See ei ole kehtiv toetatud Kilo SSH varukoopia. Vali teine fail.",
+      "fileError": "Varukoopia faili ei saanud lugeda.",
+      "storageError": "Varukoopiat ei saanud salvestada. Midagi ei imporditud.",
+      "unavailable": "Krüpteeritud varukoopia toiming ebaõnnestus. Proovi uuesti.",
+      "empty": "Pole midagi varundada",
+      "previewTitle": "Varukoopia sisu",
+      "imported": "SSH varukoopia imporditud.",
+      "nothingNew": "Kõik selles varukoopias on juba selles seadmes."
+    },
+    "keyBar": {
+      "title": "Võtmeriba",
+      "subtitle": "Lohista võtit, et seda liigutada, või lülita see välja, et seda peita.",
+      "editHint": "Pika vajutusega vali ja järjesta võtmeid ümber",
+      "restoreDefault": "Taasta vaikeväärtus",
+      "moveUp": "Liiguta {{label}} üles",
+      "moveDown": "Liiguta {{label}} alla",
+      "show": "Näita {{label}}",
+      "keepOne": "Ribale jääb alles vähemalt üks võti.",
+      "loadFailed": "Võtmeriba ei saanud laadida."
     },
     "sandbox": {
       "title": "Terminal",

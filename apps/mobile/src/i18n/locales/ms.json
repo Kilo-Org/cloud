@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Pilihan SSH",
       "emptyTitle": "Belum ada hos",
       "emptyDescription": "Hos yang disimpan membuka terminal pada pelayan anda.",
       "addHost": "Tambah hos",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Kunci dicipta",
       "createdDescription": "Tambah kunci awam ini ke authorized_keys pelayan, kemudian sambung dengan kunci ini.",
       "copyPublicKey": "Salin kunci"
+    },
+    "backup": {
+      "exportTitle": "Eksport sandaran disulitkan",
+      "importTitle": "Import sandaran disulitkan",
+      "exportDescription": "Hos, kunci peribadi, kata laluan disimpan, hos dipercayai, serpihan dan pemajuan disulitkan bersama. Simpan frasa laluan secara berasingan.",
+      "importDescription": "Buka sandaran Kilo SSH untuk menyemak kandungannya sebelum mengimport.",
+      "confirmPassphrase": "Sahkan frasa laluan",
+      "strengthShort": "Terlalu pendek · guna sekurang-kurangnya 8 aksara",
+      "strengthGood": "Panjang yang baik · 12 aksara atau lebih adalah lebih selamat",
+      "strengthLong": "Frasa laluan panjang · simpan di tempat yang selamat",
+      "mismatch": "Frasa laluan tidak sepadan.",
+      "share": "Sulitkan dan kongsi",
+      "unlock": "Buka kunci sandaran",
+      "apply": "Import sandaran",
+      "mergeStrategy": "Langkau pendua",
+      "mergeDescription": "Kekalkan hos sedia ada mengikut label, kunci mengikut cap jari dan hos dipercayai mengikut corak. Serpihan dan pengikatan pemajuan yang sepadan juga dikekalkan.",
+      "conflicts": "Dikekalkan pada peranti ini",
+      "counts": {
+        "hosts": "Hos SSH",
+        "keys": "Kunci peribadi",
+        "snippets": "Serpihan arahan"
+      },
+      "wrongPassphrase": "Frasa laluan itu tidak membuka kunci sandaran. Cuba lagi.",
+      "invalidExport": "Ini bukan sandaran Kilo SSH yang sah dan disokong. Pilih fail lain.",
+      "fileError": "Fail sandaran tidak dapat dibaca.",
+      "storageError": "Sandaran tidak dapat disimpan. Tiada apa-apa diimport.",
+      "unavailable": "Operasi sandaran disulitkan gagal. Cuba lagi.",
+      "empty": "Tiada apa-apa untuk disandarkan",
+      "previewTitle": "Kandungan sandaran",
+      "imported": "Sandaran SSH diimport.",
+      "nothingNew": "Semua dalam sandaran ini sudah ada pada peranti ini."
+    },
+    "keyBar": {
+      "title": "Bar kunci",
+      "subtitle": "Seret kunci untuk mengalihkannya, atau matikannya untuk menyembunyikannya.",
+      "editHint": "Tekan lama untuk memilih dan menyusun semula kunci",
+      "restoreDefault": "Pulihkan lalai",
+      "moveUp": "Alihkan {{label}} ke atas",
+      "moveDown": "Alihkan {{label}} ke bawah",
+      "show": "Tunjukkan {{label}}",
+      "keepOne": "Sekurang-kurangnya satu kunci kekal pada bar.",
+      "loadFailed": "Bar kunci tidak dapat dimuatkan."
     },
     "sandbox": {
       "title": "Terminal",

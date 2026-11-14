@@ -4561,6 +4561,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Možnosti SSH",
       "emptyTitle": "Zatím žádní hostitelé",
       "emptyDescription": "Uložení hostitelé otevřou terminál na vašem serveru.",
       "addHost": "Přidat hostitele",
@@ -4717,6 +4718,48 @@
       "createdTitle": "Klíč vytvořen",
       "createdDescription": "Přidejte tento veřejný klíč do souboru authorized_keys na serveru a poté se připojte pomocí tohoto klíče.",
       "copyPublicKey": "Kopírovat klíč"
+    },
+    "backup": {
+      "exportTitle": "Exportovat šifrovanou zálohu",
+      "importTitle": "Importovat šifrovanou zálohu",
+      "exportDescription": "Hostitelé, soukromé klíče, uložená hesla, důvěryhodní hostitelé, úryvky a přesměrování se šifrují společně. Přístupovou frázi uchovávejte odděleně.",
+      "importDescription": "Otevřete zálohu Kilo SSH a před importem zkontrolujte její obsah.",
+      "confirmPassphrase": "Potvrdit přístupovou frázi",
+      "strengthShort": "Příliš krátká · použijte alespoň 8 znaků",
+      "strengthGood": "Dobrá délka · 12 nebo více znaků je bezpečnější",
+      "strengthLong": "Dlouhá přístupová fráze · uchovávejte ji na bezpečném místě",
+      "mismatch": "Přístupové fráze se neshodují.",
+      "share": "Zašifrovat a sdílet",
+      "unlock": "Odemknout zálohu",
+      "apply": "Importovat zálohu",
+      "mergeStrategy": "Přeskočit duplikáty",
+      "mergeDescription": "Zachovat stávající hostitele podle názvu, klíče podle otisku a důvěryhodné hostitele podle vzoru. Odpovídající úryvky a vazby přesměrování se také zachovají.",
+      "conflicts": "Ponecháno na tomto zařízení",
+      "counts": {
+        "hosts": "Hostitelé SSH",
+        "keys": "Soukromé klíče",
+        "snippets": "Příkazové úryvky"
+      },
+      "wrongPassphrase": "Tato přístupová fráze zálohu neodemkla. Zkuste to znovu.",
+      "invalidExport": "Toto není platná podporovaná záloha Kilo SSH. Vyberte jiný soubor.",
+      "fileError": "Soubor zálohy se nepodařilo přečíst.",
+      "storageError": "Zálohu se nepodařilo uložit. Nic se neimportovalo.",
+      "unavailable": "Operace se šifrovanou zálohou se nezdařila. Zkuste to znovu.",
+      "empty": "Nic k zálohování",
+      "previewTitle": "Obsah zálohy",
+      "imported": "Záloha SSH importována.",
+      "nothingNew": "Všechno v této záloze už je na tomto zařízení."
+    },
+    "keyBar": {
+      "title": "Panel klíčů",
+      "subtitle": "Přetažením klíče jej přesunete, nebo jej vypnutím skryjete.",
+      "editHint": "Dlouhým stisknutím vyberte a změňte pořadí klíčů",
+      "restoreDefault": "Obnovit výchozí",
+      "moveUp": "Přesunout {{label}} nahoru",
+      "moveDown": "Přesunout {{label}} dolů",
+      "show": "Zobrazit {{label}}",
+      "keepOne": "Na panelu zůstane alespoň jeden klíč.",
+      "loadFailed": "Panel klíčů se nepodařilo načíst."
     },
     "sandbox": {
       "title": "Terminál",

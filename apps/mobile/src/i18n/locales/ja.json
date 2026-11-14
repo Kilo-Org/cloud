@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSHの選択肢",
       "emptyTitle": "ホストがまだありません",
       "emptyDescription": "保存したホストは、お使いのサーバーでターミナルを開きます。",
       "addHost": "ホストを追加",
@@ -4587,6 +4588,48 @@
       "createdTitle": "キーを作成しました",
       "createdDescription": "この公開鍵をサーバーのauthorized_keysに追加してから、このキーで接続してください。",
       "copyPublicKey": "キーをコピー"
+    },
+    "backup": {
+      "exportTitle": "暗号化バックアップを書き出す",
+      "importTitle": "暗号化バックアップを読み込む",
+      "exportDescription": "ホスト、秘密鍵、保存したパスワード、信頼済みのホスト、スニペット、転送はまとめて暗号化されます。パスフレーズは別に保管してください。",
+      "importDescription": "Kilo SSHバックアップを開いて、読み込む前に内容を確認します。",
+      "confirmPassphrase": "パスフレーズを確認",
+      "strengthShort": "短すぎます · 8文字以上を使用してください",
+      "strengthGood": "適切な長さです · 12文字以上がより安全です",
+      "strengthLong": "長いパスフレーズ · 安全な場所に保管してください",
+      "mismatch": "パスフレーズが一致しません。",
+      "share": "暗号化して共有",
+      "unlock": "バックアップのロックを解除",
+      "apply": "バックアップを読み込む",
+      "mergeStrategy": "重複をスキップ",
+      "mergeDescription": "既存のホストはラベル、キーはフィンガープリント、信頼済みのホストはパターンで保持します。一致するスニペットと転送のバインドも保持されます。",
+      "conflicts": "このデバイスで保持",
+      "counts": {
+        "hosts": "SSHホスト",
+        "keys": "秘密鍵",
+        "snippets": "コマンドスニペット"
+      },
+      "wrongPassphrase": "そのパスフレーズではバックアップのロックを解除できませんでした。もう一度お試しください。",
+      "invalidExport": "これは有効なサポート対象のKilo SSHバックアップではありません。別のファイルを選択してください。",
+      "fileError": "バックアップファイルを読み取れませんでした。",
+      "storageError": "バックアップを保存できませんでした。何も読み込まれませんでした。",
+      "unavailable": "暗号化バックアップの操作に失敗しました。もう一度お試しください。",
+      "empty": "バックアップするものがありません",
+      "previewTitle": "バックアップの内容",
+      "imported": "SSHバックアップを読み込みました。",
+      "nothingNew": "このバックアップの内容はすべて既にこのデバイスにあります。"
+    },
+    "keyBar": {
+      "title": "キーバー",
+      "subtitle": "キーをドラッグして移動するか、オフに切り替えて非表示にします。",
+      "editHint": "長押ししてキーを選択し、並べ替えます",
+      "restoreDefault": "デフォルトに戻す",
+      "moveUp": "{{label}}を上へ移動",
+      "moveDown": "{{label}}を下へ移動",
+      "show": "{{label}}を表示",
+      "keepOne": "少なくとも1つのキーはバーに残ります。",
+      "loadFailed": "キーバーを読み込めませんでした。"
     },
     "sandbox": {
       "title": "ターミナル",

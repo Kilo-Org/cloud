@@ -4496,6 +4496,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH opcije",
       "emptyTitle": "Još nema hostova",
       "emptyDescription": "Sačuvani hostovi otvaraju terminal na vašem serveru.",
       "addHost": "Dodaj host",
@@ -4652,6 +4653,48 @@
       "createdTitle": "Ključ je generisan",
       "createdDescription": "Dodaj ovaj javni ključ u authorized_keys na serveru, a zatim se poveži pomoću ovog ključa.",
       "copyPublicKey": "Kopiraj ključ"
+    },
+    "backup": {
+      "exportTitle": "Izvezi šifriranu sigurnosnu kopiju",
+      "importTitle": "Uvezi šifriranu sigurnosnu kopiju",
+      "exportDescription": "Hostovi, privatni ključevi, sačuvane lozinke, pouzdani hostovi, isječci i prosljeđivanja šifriraju se zajedno. Pristupnu frazu čuvajte odvojeno.",
+      "importDescription": "Otvorite Kilo SSH sigurnosnu kopiju da pregledate njen sadržaj prije uvoza.",
+      "confirmPassphrase": "Potvrdi pristupnu frazu",
+      "strengthShort": "Prekratka · koristite najmanje 8 znakova",
+      "strengthGood": "Dobra dužina · 12 ili više znakova je sigurnije",
+      "strengthLong": "Duga pristupna fraza · čuvajte je na sigurnom mjestu",
+      "mismatch": "Pristupne fraze se ne poklapaju.",
+      "share": "Šifriraj i podijeli",
+      "unlock": "Otključaj sigurnosnu kopiju",
+      "apply": "Uvezi sigurnosnu kopiju",
+      "mergeStrategy": "Preskoči duplikate",
+      "mergeDescription": "Zadržite postojeće hostove po oznaci, ključeve po otisku i pouzdane hostove po obrascu. Odgovarajući isječci i vezanja prosljeđivanja također se zadržavaju.",
+      "conflicts": "Zadržano na ovom uređaju",
+      "counts": {
+        "hosts": "SSH hostovi",
+        "keys": "Privatni ključevi",
+        "snippets": "Isječci komandi"
+      },
+      "wrongPassphrase": "Ta pristupna fraza nije otključala sigurnosnu kopiju. Pokušajte ponovo.",
+      "invalidExport": "Ovo nije ispravna podržana Kilo SSH sigurnosna kopija. Odaberite drugu datoteku.",
+      "fileError": "Datoteka sigurnosne kopije nije mogla biti pročitana.",
+      "storageError": "Sigurnosna kopija nije mogla biti sačuvana. Ništa nije uvezeno.",
+      "unavailable": "Operacija šifrirane sigurnosne kopije nije uspjela. Pokušajte ponovo.",
+      "empty": "Nema ništa za sigurnosnu kopiju",
+      "previewTitle": "Sadržaj sigurnosne kopije",
+      "imported": "SSH sigurnosna kopija je uvezena.",
+      "nothingNew": "Sve iz ove sigurnosne kopije već je na ovom uređaju."
+    },
+    "keyBar": {
+      "title": "Traka ključeva",
+      "subtitle": "Prevucite ključ da ga pomjerite ili ga isključite da biste ga sakrili.",
+      "editHint": "Dugo pritisnite da odaberete i preuredite ključeve",
+      "restoreDefault": "Vrati zadano",
+      "moveUp": "Pomjeri {{label}} gore",
+      "moveDown": "Pomjeri {{label}} dolje",
+      "show": "Prikaži {{label}}",
+      "keepOne": "Najmanje jedan ključ ostaje na traci.",
+      "loadFailed": "Traka ključeva nije mogla biti učitana."
     },
     "sandbox": {
       "title": "Terminal",

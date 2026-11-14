@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Àwọn àṣàyàn SSH",
       "emptyTitle": "Kò tíì sí sáfà kankan",
       "emptyDescription": "Àwọn olùgbàlejò tí a ti fipamọ́ máa ń ṣí tẹmínà kan lórí sáfà rẹ.",
       "addHost": "Fi sáfà kún",
@@ -4587,6 +4588,48 @@
       "createdTitle": "A ti dá kọ́kọ́rọ́",
       "createdDescription": "Fi kọ́kọ́rọ́ gbogbo ènìyàn yìí kún authorized_keys lórí sáfà náà, lẹ́yìn náà lo kọ́kọ́rọ́ yìí láti sopọ̀ mọ́ sáfà náà.",
       "copyPublicKey": "Ṣe àdàkọ́ kọ́kọ́rọ́"
+    },
+    "backup": {
+      "exportTitle": "Gbé ẹ̀dà ìpamọ́ tí a fi ààbò pamọ́ jáde",
+      "importTitle": "Gbe ẹ̀dà ìpamọ́ tí a fi ààbò pamọ́ wọlé",
+      "exportDescription": "Àwọn sáfà, àwọn kọ́kọ́rọ́ àdáni, àwọn ọ̀rọ̀ ìpamọ́ tí a ti fipamọ́, àwọn sáfà tí a gbẹ́kẹ̀lé, àwọn àṣẹ kúkúrú àti àwọn ìtẹ̀síwájú ni a fi ààbò pamọ́ papọ̀. Pa ọ̀rọ̀ ìpamọ́ kọ́kọ́rọ́ mọ́ lọ́tọ̀ọ̀tọ̀.",
+      "importDescription": "Ṣí ẹ̀dà ìpamọ́ SSH Kilo kan láti ṣàyẹ̀wò àwọn àkóónú rẹ̀ kí o tó gbé e wọlé.",
+      "confirmPassphrase": "Fìdí ọ̀rọ̀ ìpamọ́ kọ́kọ́rọ́ múlẹ̀",
+      "strengthShort": "Ó kúrú jù · lo ó kéré tán 8 àmì",
+      "strengthGood": "Gígùn tó dára · 12 àmì tàbí jù bẹ́ẹ̀ lọ ló túbọ̀ ní ààbò",
+      "strengthLong": "Ọ̀rọ̀ ìpamọ́ kọ́kọ́rọ́ gígùn · pa á mọ́ sí ibìkan tí ó ní ààbò",
+      "mismatch": "Àwọn ọ̀rọ̀ ìpamọ́ kọ́kọ́rọ́ kò bára wọn mu.",
+      "share": "Fi ààbò pamọ́ kí o sì pín",
+      "unlock": "Ṣí ẹ̀dà ìpamọ́",
+      "apply": "Gbe ẹ̀dà ìpamọ́ wọlé",
+      "mergeStrategy": "Fò àwọn àdàkọ́ kọjá",
+      "mergeDescription": "Pa àwọn sáfà tí ó wà tẹ́lẹ̀ mọ́ nípasẹ̀ orúkọ, àwọn kọ́kọ́rọ́ nípasẹ̀ àmì ìka àti àwọn sáfà tí a gbẹ́kẹ̀lé nípasẹ̀ àpẹẹrẹ. Àwọn àṣẹ kúkúrú àti àwọn ìsopọ̀ ìtẹ̀síwájú tí ó bá mu ni a tún pa mọ́.",
+      "conflicts": "Tí a pa mọ́ sórí ẹ̀rọ yìí",
+      "counts": {
+        "hosts": "Àwọn sáfà SSH",
+        "keys": "Àwọn kọ́kọ́rọ́ àdáni",
+        "snippets": "Àwọn àṣẹ kúkúrú"
+      },
+      "wrongPassphrase": "Ọ̀rọ̀ ìpamọ́ kọ́kọ́rọ́ yẹn kò ṣí ẹ̀dà ìpamọ́. Gbìyànjú lẹ́ẹ̀kan sí i.",
+      "invalidExport": "Èyí kì í ṣe ẹ̀dà ìpamọ́ SSH Kilo tí ó tọ́ tí a ń ṣàtìlẹ́yìn. Yan fáìlì mìíràn.",
+      "fileError": "A kò lè kà fáìlì ẹ̀dà ìpamọ́.",
+      "storageError": "A kò lè fipamọ́ ẹ̀dà ìpamọ́. Kò sí nǹkan tí a gbe wọlé.",
+      "unavailable": "Ìṣiṣẹ́ ẹ̀dà ìpamọ́ tí a fi ààbò pamọ́ kùnà. Gbìyànjú lẹ́ẹ̀kan sí i.",
+      "empty": "Kò sí nǹkan láti ṣe ẹ̀dà ìpamọ́",
+      "previewTitle": "Àwọn àkóónú ẹ̀dà ìpamọ́",
+      "imported": "A ti gbe ẹ̀dà ìpamọ́ SSH wọlé.",
+      "nothingNew": "Gbogbo nǹkan nínú ẹ̀dà ìpamọ́ yìí ti wà lórí ẹ̀rọ yìí tẹ́lẹ̀."
+    },
+    "keyBar": {
+      "title": "Báà kọ́kọ́rọ́",
+      "subtitle": "Fa kọ́kọ́rọ́ kan láti gbé e, tàbí pa á láti fi í pamọ́.",
+      "editHint": "Tẹ̀ fún ìgbà pípẹ́ láti yan àwọn kọ́kọ́rọ́ àti láti tún tò wọ́n.",
+      "restoreDefault": "Padà sí àkọ́kọ́",
+      "moveUp": "Gbé {{label}} sókè",
+      "moveDown": "Gbé {{label}} sílẹ̀",
+      "show": "Fi {{label}} hàn",
+      "keepOne": "Ó kéré tán kọ́kọ́rọ́ kan yóò wà lórí báà.",
+      "loadFailed": "A kò lè gbé báà kọ́kọ́rọ́ wọlé."
     },
     "sandbox": {
       "title": "Tẹmínà",

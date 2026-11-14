@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH options",
       "emptyTitle": "No hosts yet",
       "emptyDescription": "Saved hosts open a terminal on your server.",
       "addHost": "Add host",
@@ -4587,6 +4588,48 @@
       "copied": "Public key copied.",
       "unreadable": "That key could not be read.",
       "unsupported": "This key's algorithm is not supported."
+    },
+    "backup": {
+      "exportTitle": "Export encrypted backup",
+      "importTitle": "Import encrypted backup",
+      "exportDescription": "Hosts, private keys, saved passwords, trusted hosts, snippets and forwards are encrypted together. Keep the passphrase separately.",
+      "importDescription": "Open a Kilo SSH backup to review its contents before importing.",
+      "confirmPassphrase": "Confirm passphrase",
+      "strengthShort": "Too short · use at least 8 characters",
+      "strengthGood": "Good length · 12 or more characters is safer",
+      "strengthLong": "Long passphrase · keep it somewhere safe",
+      "mismatch": "The passphrases do not match.",
+      "share": "Encrypt and share",
+      "unlock": "Unlock backup",
+      "apply": "Import backup",
+      "mergeStrategy": "Skip duplicates",
+      "mergeDescription": "Keep existing hosts by label, keys by fingerprint and trusted hosts by pattern. Matching snippets and forward bindings are also kept.",
+      "conflicts": "Kept on this device",
+      "counts": {
+        "hosts": "SSH hosts",
+        "keys": "Private keys",
+        "snippets": "Command snippets"
+      },
+      "wrongPassphrase": "That passphrase did not unlock the backup. Try again.",
+      "invalidExport": "This is not a valid supported Kilo SSH backup. Choose another file.",
+      "fileError": "The backup file could not be read.",
+      "storageError": "The backup could not be saved. Nothing was imported.",
+      "unavailable": "The encrypted backup operation failed. Try again.",
+      "empty": "Nothing to back up",
+      "previewTitle": "Backup contents",
+      "imported": "SSH backup imported.",
+      "nothingNew": "Everything in this backup is already on this device."
+    },
+    "keyBar": {
+      "title": "Key bar",
+      "subtitle": "Drag a key to move it, or switch it off to hide it.",
+      "editHint": "Long press to choose and reorder keys",
+      "restoreDefault": "Restore default",
+      "moveUp": "Move {{label}} up",
+      "moveDown": "Move {{label}} down",
+      "show": "Show {{label}}",
+      "keepOne": "At least one key stays on the bar.",
+      "loadFailed": "The key bar could not be loaded."
     },
     "sandbox": {
       "title": "Terminal",

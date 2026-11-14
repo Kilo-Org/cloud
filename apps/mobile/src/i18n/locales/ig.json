@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Nhọrọ SSH",
       "emptyTitle": "Enwebeghị host ọ bụla",
       "emptyDescription": "Ndị ọbịa echekwara na-emepe terminal na sava gị.",
       "addHost": "Tinye host",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Emepụtala igodo",
       "createdDescription": "Tinye igodo ọhaneze a na authorized_keys nke sẹva ahụ, wee jikọọ na igodo a.",
       "copyPublicKey": "ṅomi igodo"
+    },
+    "backup": {
+      "exportTitle": "Bupụ ndabere ezoro ezo",
+      "importTitle": "Bubata ndabere ezoro ezo",
+      "exportDescription": "A na-ezoro host, igodo nzuzo, paswọọdụ echekwara, host ntụkwasị obi, snippet na nbuga ọnụ. Debe pasfres ahụ iche.",
+      "importDescription": "Mepee ndabere Kilo SSH ka ị nyochaa ọdịnaya ya tupu ibubata.",
+      "confirmPassphrase": "Kwenye pasfres",
+      "strengthShort": "Dị mkpụmkpụ · jiri opekata mpe mkpụrụedemede 8",
+      "strengthGood": "Ogologo dị mma · mkpụrụedemede 12 ma ọ bụ karịa ka dị nchebe",
+      "strengthLong": "Pasfres ogologo · debe ya ebe dị nchebe",
+      "mismatch": "Pasfres ndị ahụ adabaghị.",
+      "share": "Zoo ma kekọrịta",
+      "unlock": "Kpọghee ndabere",
+      "apply": "Bubata ndabere",
+      "mergeStrategy": "Wụfuo ihe megharịrị",
+      "mergeDescription": "Debe host ndị dị adị site na akara, igodo site na mkpịsị aka na host ntụkwasị obi site na ụkpụrụ. A na-edebekwa snippet na njikọ nbuga ndị kwekọrọ.",
+      "conflicts": "Edebere na ngwaọrụ a",
+      "counts": {
+        "hosts": "Host SSH",
+        "keys": "Igodo nzuzo",
+        "snippets": "Snippet iwu"
+      },
+      "wrongPassphrase": "Pasfres ahụ akpọgheghị ndabere. Nwaa ọzọ.",
+      "invalidExport": "Nke a abụghị ndabere Kilo SSH ziri ezi akwadoro. Họrọ faịlụ ọzọ.",
+      "fileError": "Enweghị ike ịgụ faịlụ ndabere.",
+      "storageError": "Enweghị ike ichekwa ndabere. Ọnweghị ihe e bubatara.",
+      "unavailable": "Ọrụ ndabere ezoro ezo daara. Nwaa ọzọ.",
+      "empty": "Ọnweghị ihe a ga-edebe",
+      "previewTitle": "Ọdịnaya ndabere",
+      "imported": "Ebubatala ndabere SSH.",
+      "nothingNew": "Ihe niile dị na ndabere a adịlarị na ngwaọrụ a."
+    },
+    "keyBar": {
+      "title": "Ogwe igodo",
+      "subtitle": "Dọrọ igodo ka i bugharịa ya, ma ọ bụ gbanyụọ ya ka izo ya.",
+      "editHint": "Pịa ogologo oge ka ịhọrọ ma hazigharịa igodo",
+      "restoreDefault": "Weghachi ndabara",
+      "moveUp": "Bugharịa {{label}} elu",
+      "moveDown": "Bugharịa {{label}} ala",
+      "show": "Gosi {{label}}",
+      "keepOne": "Opekata mpe otu igodo na-anọgide na ogwe ahụ.",
+      "loadFailed": "Enweghị ike ibudata ogwe igodo."
     },
     "sandbox": {
       "title": "Terminal",

@@ -4691,6 +4691,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opsiynau SSH",
       "emptyTitle": "Dim gwesteiwyr eto",
       "emptyDescription": "Mae gwesteiwyr a gadwyd yn agor terfynell ar eich gweinydd.",
       "addHost": "Ychwanegu gwesteiwr",
@@ -4847,6 +4848,48 @@
       "createdTitle": "Allwedd wedi'i chreu",
       "createdDescription": "Ychwanegwch yr allwedd gyhoeddus hon at authorized_keys y gweinydd, yna cysylltwch â'r allwedd hon.",
       "copyPublicKey": "Copïo allwedd"
+    },
+    "backup": {
+      "exportTitle": "Allforio copi wrth gefn wedi'i amgryptio",
+      "importTitle": "Mewnforio copi wrth gefn wedi'i amgryptio",
+      "exportDescription": "Mae gwesteiwyr, allweddi preifat, cyfrineiriau wedi'u cadw, gwesteiwyr dibynadwy, tameidiau ac anfoniadau yn cael eu hamgryptio gyda'i gilydd. Cadwch y gyfrinymadrodd ar wahân.",
+      "importDescription": "Agorwch gopi wrth gefn Kilo SSH i adolygu ei gynnwys cyn mewnforio.",
+      "confirmPassphrase": "Cadarnhau cyfrinymadrodd",
+      "strengthShort": "Yn rhy fyr · defnyddiwch o leiaf 8 nod",
+      "strengthGood": "Hyd da · mae 12 nod neu fwy yn fwy diogel",
+      "strengthLong": "Cyfrinymadrodd hir · cadwch ef yn rhywle diogel",
+      "mismatch": "Nid yw'r cyfrinymadroddion yn cyfateb.",
+      "share": "Amgryptio a rhannu",
+      "unlock": "Datgloi copi wrth gefn",
+      "apply": "Mewnforio copi wrth gefn",
+      "mergeStrategy": "Hepgor dyblygiadau",
+      "mergeDescription": "Cadwch westeiwyr presennol yn ôl label, allweddi yn ôl ôl bys a gwesteiwyr dibynadwy yn ôl patrwm. Mae tameidiau a rhwymiadau anfoniadau cyfatebol yn cael eu cadw hefyd.",
+      "conflicts": "Wedi'u cadw ar y ddyfais hon",
+      "counts": {
+        "hosts": "Gwesteiwyr SSH",
+        "keys": "Allweddi preifat",
+        "snippets": "Tameidiau gorchmynion"
+      },
+      "wrongPassphrase": "Ni ddatglôdd y gyfrinymadrodd honno'r copi wrth gefn. Ceisiwch eto.",
+      "invalidExport": "Nid yw hwn yn copi wrth gefn Kilo SSH dilys a gefnogir. Dewiswch ffeil arall.",
+      "fileError": "Nid oedd modd darllen y ffeil copi wrth gefn.",
+      "storageError": "Nid oedd modd cadw'r copi wrth gefn. Ni fewnforiwyd dim.",
+      "unavailable": "Methodd y gweithrediad copi wrth gefn wedi'i amgryptio. Ceisiwch eto.",
+      "empty": "Dim byd i'w gopïo wrth gefn",
+      "previewTitle": "Cynnwys y copi wrth gefn",
+      "imported": "Copi wrth gefn SSH wedi'i fewnforio.",
+      "nothingNew": "Mae popeth yn y copi wrth gefn hwn eisoes ar y ddyfais hon."
+    },
+    "keyBar": {
+      "title": "Bar allweddi",
+      "subtitle": "Llusgwch allwedd i'w symud, neu ei throi i ffwrdd i'w chuddio.",
+      "editHint": "Pwyswch yn hir i ddewis ac aildrefnu allweddi",
+      "restoreDefault": "Adfer y rhagosodiad",
+      "moveUp": "Symud {{label}} i fyny",
+      "moveDown": "Symud {{label}} i lawr",
+      "show": "Dangos {{label}}",
+      "keepOne": "Mae o leiaf un allwedd yn aros ar y bar.",
+      "loadFailed": "Nid oedd modd llwytho'r bar allweddi."
     },
     "sandbox": {
       "title": "Terfynell",

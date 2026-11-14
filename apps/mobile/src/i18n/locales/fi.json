@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH-vaihtoehdot",
       "emptyTitle": "Ei vielä isäntiä",
       "emptyDescription": "Tallennetut isännät avaavat päätteen palvelimellasi.",
       "addHost": "Lisää isäntä",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Avain luotu",
       "createdDescription": "Lisää tämä julkinen avain palvelimen authorized_keys-tiedostoon ja muodosta sitten yhteys tällä avaimella.",
       "copyPublicKey": "Kopioi avain"
+    },
+    "backup": {
+      "exportTitle": "Vie salattu varmuuskopio",
+      "importTitle": "Tuo salattu varmuuskopio",
+      "exportDescription": "Isännät, yksityiset avaimet, tallennetut salasanat, luotetut isännät, komennonpätkät ja ohjaukset salataan yhdessä. Säilytä salalause erikseen.",
+      "importDescription": "Avaa Kilo SSH -varmuuskopio tarkastellaksesi sen sisältöä ennen tuontia.",
+      "confirmPassphrase": "Vahvista salalause",
+      "strengthShort": "Liian lyhyt · käytä vähintään 8 merkkiä",
+      "strengthGood": "Hyvä pituus · 12 tai useampi merkki on turvallisempi",
+      "strengthLong": "Pitkä salalause · säilytä se turvallisessa paikassa",
+      "mismatch": "Salalauseet eivät täsmää.",
+      "share": "Salaa ja jaa",
+      "unlock": "Avaa varmuuskopio",
+      "apply": "Tuo varmuuskopio",
+      "mergeStrategy": "Ohita kaksoiskappaleet",
+      "mergeDescription": "Säilytä olemassa olevat isännät tunnisteen perusteella, avaimet sormenjäljen perusteella ja luotetut isännät kuvion perusteella. Vastaavat komennonpätkät ja ohjausmääritykset säilytetään myös.",
+      "conflicts": "Säilytetään tällä laitteella",
+      "counts": {
+        "hosts": "SSH-isännät",
+        "keys": "Yksityiset avaimet",
+        "snippets": "Komennonpätkät"
+      },
+      "wrongPassphrase": "Salalause ei avannut varmuuskopiota. Yritä uudelleen.",
+      "invalidExport": "Tämä ei ole kelvollinen tuettu Kilo SSH -varmuuskopio. Valitse toinen tiedosto.",
+      "fileError": "Varmuuskopiotiedostoa ei voitu lukea.",
+      "storageError": "Varmuuskopiota ei voitu tallentaa. Mitään ei tuotu.",
+      "unavailable": "Salattu varmuuskopiotoiminto epäonnistui. Yritä uudelleen.",
+      "empty": "Ei varmuuskopioitavaa",
+      "previewTitle": "Varmuuskopion sisältö",
+      "imported": "SSH-varmuuskopio tuotu.",
+      "nothingNew": "Kaikki tässä varmuuskopiossa on jo tällä laitteella."
+    },
+    "keyBar": {
+      "title": "Avainpalkki",
+      "subtitle": "Vedä avainta siirtääksesi sen tai kytke se pois päältä piilottaaksesi sen.",
+      "editHint": "Valitse ja järjestä avaimet uudelleen pitämällä painettuna",
+      "restoreDefault": "Palauta oletus",
+      "moveUp": "Siirrä {{label}} ylös",
+      "moveDown": "Siirrä {{label}} alas",
+      "show": "Näytä {{label}}",
+      "keepOne": "Vähintään yksi avain pysyy palkissa.",
+      "loadFailed": "Avainpalkkia ei voitu ladata."
     },
     "sandbox": {
       "title": "Pääte",

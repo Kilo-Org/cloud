@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH Seçenekleri",
       "emptyTitle": "Henüz host yok",
       "emptyDescription": "Kayıtlı makineler sunucunuzda bir terminal açar.",
       "addHost": "Host ekle",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Anahtar oluşturuldu",
       "createdDescription": "Bu açık anahtarı sunucunun authorized_keys dosyasına ekleyin, ardından bu anahtarla bağlanın.",
       "copyPublicKey": "Anahtarı kopyala"
+    },
+    "backup": {
+      "exportTitle": "Şifreli yedek dışa aktar",
+      "importTitle": "Şifreli yedek içe aktar",
+      "exportDescription": "Hostlar, özel anahtarlar, kaydedilmiş parolalar, güvenilen hostlar, snippet'ler ve yönlendirmeler birlikte şifrelenir. Parolayı ayrı tutun.",
+      "importDescription": "İçe aktarmadan önce içeriğini gözden geçirmek için bir Kilo SSH yedeği açın.",
+      "confirmPassphrase": "Parolayı onayla",
+      "strengthShort": "Çok kısa · en az 8 karakter kullanın",
+      "strengthGood": "İyi uzunluk · 12 veya daha fazla karakter daha güvenli",
+      "strengthLong": "Uzun parola · güvenli bir yerde saklayın",
+      "mismatch": "Parolalar eşleşmiyor.",
+      "share": "Şifrele ve paylaş",
+      "unlock": "Yedeğin kilidini aç",
+      "apply": "Yedeği içe aktar",
+      "mergeStrategy": "Yinelenenleri atla",
+      "mergeDescription": "Mevcut hostları etikete, anahtarları parmak izine ve güvenilen hostları desene göre koruyun. Eşleşen snippet'ler ve yönlendirme bağlamaları da korunur.",
+      "conflicts": "Bu cihazda korundu",
+      "counts": {
+        "hosts": "SSH hostları",
+        "keys": "Özel anahtarlar",
+        "snippets": "Komut snippet'leri"
+      },
+      "wrongPassphrase": "Bu parola yedeğin kilidini açmadı. Tekrar deneyin.",
+      "invalidExport": "Bu, desteklenen geçerli bir Kilo SSH yedeği değil. Başka bir dosya seçin.",
+      "fileError": "Yedek dosyası okunamadı.",
+      "storageError": "Yedek kaydedilemedi. Hiçbir şey içe aktarılmadı.",
+      "unavailable": "Şifreli yedek işlemi başarısız oldu. Tekrar deneyin.",
+      "empty": "Yedeklenecek bir şey yok",
+      "previewTitle": "Yedek içeriği",
+      "imported": "SSH yedeği içe aktarıldı.",
+      "nothingNew": "Bu yedekteki her şey zaten bu cihazda."
+    },
+    "keyBar": {
+      "title": "Anahtar çubuğu",
+      "subtitle": "Taşımak için bir anahtarı sürükleyin veya gizlemek için kapatın.",
+      "editHint": "Anahtarları seçmek ve yeniden sıralamak için uzun basın",
+      "restoreDefault": "Varsayılana geri yükle",
+      "moveUp": "{{label}} yukarı taşı",
+      "moveDown": "{{label}} aşağı taşı",
+      "show": "{{label}} göster",
+      "keepOne": "Çubukta en az bir anahtar kalır.",
+      "loadFailed": "Anahtar çubuğu yüklenemedi."
     },
     "sandbox": {
       "title": "Terminal",

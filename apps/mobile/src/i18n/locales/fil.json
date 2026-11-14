@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Pagpipilian sa SSH",
       "emptyTitle": "Wala pang host",
       "emptyDescription": "Ang mga naka-save na host ay nagbubukas ng terminal sa iyong server.",
       "addHost": "Magdagdag ng host",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Nagawa ang key",
       "createdDescription": "Idagdag ang pampublikong key na ito sa authorized_keys ng server, pagkatapos ay kumonekta gamit ang key na ito.",
       "copyPublicKey": "Kopyahin ang key"
+    },
+    "backup": {
+      "exportTitle": "I-export ang naka-encrypt na backup",
+      "importTitle": "I-import ang naka-encrypt na backup",
+      "exportDescription": "Sabay na naka-encrypt ang mga host, pribadong key, naka-save na password, pinagkakatiwalaang host, snippet at forward. Itabi nang hiwalay ang passphrase.",
+      "importDescription": "Buksan ang isang Kilo SSH backup para tingnan ang mga nilalaman nito bago i-import.",
+      "confirmPassphrase": "Kumpirmahin ang passphrase",
+      "strengthShort": "Masyadong maikli · gumamit ng hindi bababa sa 8 character",
+      "strengthGood": "Magandang haba · mas ligtas ang 12 o higit pang character",
+      "strengthLong": "Mahaba ang passphrase · itabi ito sa ligtas na lugar",
+      "mismatch": "Hindi magkatugma ang mga passphrase.",
+      "share": "I-encrypt at ibahagi",
+      "unlock": "I-unlock ang backup",
+      "apply": "I-import ang backup",
+      "mergeStrategy": "Laktawan ang mga duplicate",
+      "mergeDescription": "Panatilihin ang mga kasalukuyang host ayon sa label, mga key ayon sa fingerprint, at mga pinagkakatiwalaang host ayon sa pattern. Pinananatili rin ang mga katugmang snippet at binding ng forward.",
+      "conflicts": "Pinanatili sa device na ito",
+      "counts": {
+        "hosts": "Mga SSH host",
+        "keys": "Mga pribadong key",
+        "snippets": "Mga snippet ng command"
+      },
+      "wrongPassphrase": "Hindi na-unlock ng passphrase na iyon ang backup. Subukan muli.",
+      "invalidExport": "Hindi ito isang valid at sinusuportahang Kilo SSH backup. Pumili ng ibang file.",
+      "fileError": "Hindi mabasa ang backup file.",
+      "storageError": "Hindi ma-save ang backup. Walang na-import.",
+      "unavailable": "Nabigo ang operasyon ng naka-encrypt na backup. Subukan muli.",
+      "empty": "Walang mai-backup",
+      "previewTitle": "Mga nilalaman ng backup",
+      "imported": "Na-import ang SSH backup.",
+      "nothingNew": "Nasa device na ito na ang lahat ng laman ng backup na ito."
+    },
+    "keyBar": {
+      "title": "Bar ng key",
+      "subtitle": "I-drag ang isang key para ilipat ito, o i-off ito para itago.",
+      "editHint": "Pindutin nang matagal para pumili at muling ayusin ang mga key",
+      "restoreDefault": "Ibalik sa default",
+      "moveUp": "Ilipat pataas ang {{label}}",
+      "moveDown": "Ilipat pababa ang {{label}}",
+      "show": "Ipakita ang {{label}}",
+      "keepOne": "Hindi bababa sa isang key ang mananatili sa bar.",
+      "loadFailed": "Hindi ma-load ang bar ng key."
     },
     "sandbox": {
       "title": "Terminal",

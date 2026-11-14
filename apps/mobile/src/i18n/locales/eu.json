@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH aukerak",
       "emptyTitle": "Oraindik ez dago ostalaririk",
       "emptyDescription": "Gordetako ostalariek terminal bat irekitzen dute zure zerbitzarian.",
       "addHost": "Gehitu ostalaria",
@@ -4587,6 +4588,48 @@
       "createdTitle": "Gakoa sortu da",
       "createdDescription": "Gehitu gako publiko hau zerbitzariaren authorized_keys fitxategian, eta, ondoren, konektatu gako honekin.",
       "copyPublicKey": "Kopiatu gakoa"
+    },
+    "backup": {
+      "exportTitle": "Esportatu babeskopia enkriptatua",
+      "importTitle": "Inportatu babeskopia enkriptatua",
+      "exportDescription": "Ostalariak, gako pribatuak, gordetako pasahitzak, ostalari fidagarriak, zatiak eta birbideratzeak elkarrekin enkriptatzen dira. Gorde pasaesaldia bereizita.",
+      "importDescription": "Ireki Kilo SSH babeskopia bat haren edukia berrikusteko inportatu aurretik.",
+      "confirmPassphrase": "Berretsi pasaesaldia",
+      "strengthShort": "Laburregia · erabili gutxienez 8 karaktere",
+      "strengthGood": "Luzera ona · 12 karaktere edo gehiago seguruagoa da",
+      "strengthLong": "Pasaesaldi luzea · gorde leku seguru batean",
+      "mismatch": "Pasaesaldiak ez datoz bat.",
+      "share": "Enkriptatu eta partekatu",
+      "unlock": "Desblokeatu babeskopia",
+      "apply": "Inportatu babeskopia",
+      "mergeStrategy": "Saltatu bikoiztuak",
+      "mergeDescription": "Mantendu lehendik dauden ostalariak etiketaren arabera, gakoak hatz-markaren arabera eta ostalari fidagarriak ereduaren arabera. Bat datozen zatiak eta birbideratze-loturak ere mantentzen dira.",
+      "conflicts": "Gailu honetan mantenduak",
+      "counts": {
+        "hosts": "SSH ostalariak",
+        "keys": "Gako pribatuak",
+        "snippets": "Komando-zatiak"
+      },
+      "wrongPassphrase": "Pasaesaldi horrek ez zuen babeskopia desblokeatu. Saiatu berriro.",
+      "invalidExport": "Hau ez da baliozko Kilo SSH babeskopia onartua. Aukeratu beste fitxategi bat.",
+      "fileError": "Ezin izan da babeskopia fitxategia irakurri.",
+      "storageError": "Ezin izan da babeskopia gorde. Ez da ezer inportatu.",
+      "unavailable": "Babeskopia enkriptatuaren eragiketa huts egin du. Saiatu berriro.",
+      "empty": "Ez dago babeskopiarik egiteko",
+      "previewTitle": "Babeskopiaren edukia",
+      "imported": "SSH babeskopia inportatu da.",
+      "nothingNew": "Babeskopia honetako guztia jada gailu honetan dago."
+    },
+    "keyBar": {
+      "title": "Gako-barra",
+      "subtitle": "Arrastatu gako bat mugitzeko, edo desaktibatu ezkutatzeko.",
+      "editHint": "Eduki sakatuta gakoak aukeratzeko eta berrantolatzeko",
+      "restoreDefault": "Berrezarri lehenetsia",
+      "moveUp": "Mugitu {{label}} gora",
+      "moveDown": "Mugitu {{label}} behera",
+      "show": "Erakutsi {{label}}",
+      "keepOne": "Gutxienez gako bat barran geratzen da.",
+      "loadFailed": "Ezin izan da gako-barra kargatu."
     },
     "sandbox": {
       "title": "Terminala",

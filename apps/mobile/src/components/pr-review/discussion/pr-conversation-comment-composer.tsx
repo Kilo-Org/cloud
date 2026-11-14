@@ -192,7 +192,7 @@ export function PrConversationCommentComposer({
     } catch (error) {
       // A server bad-request keeps Comment live: the ledger dedupes the retry.
       const classified = await classifyPrInlineFailure(error, {
-        surface: 'composer',
+        surface: 'conversation',
         ...(prRef ? { platform: prRef.platform } : {}),
         announce: 'toast',
       });

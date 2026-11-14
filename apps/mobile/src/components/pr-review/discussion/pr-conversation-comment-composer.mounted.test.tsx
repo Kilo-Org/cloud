@@ -10,12 +10,23 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { PrConversationCommentComposer } from './pr-conversation-comment-composer';
 import { i18n } from '@/i18n';
 import { PR_OPERATION_PERSISTENCE_FAILED_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
-import { clearDraft } from '@/lib/persist/drafts';
+import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
+import { clearDraft, saveDraft } from '@/lib/persist/drafts';
 
-const { addComment, gate, connectivity } = vi.hoisted(() => ({
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
+
+const { addComment, gate, connectivity, confirmRequests, backHandler } = vi.hoisted(() => ({
   addComment: { mutateAsync: vi.fn<(input: unknown) => Promise<unknown>>() },
   gate: { ensureTermsAcceptedOutcome: vi.fn<() => Promise<{ kind: string }>>() },
   connectivity: { value: 'online' },
+  confirmRequests: [] as ConfirmRequest[],
+  backHandler: { current: null as null | (() => boolean) },
 }));
 
 // The Expo modules in this graph read the build-time `__DEV__` global when they
@@ -25,7 +36,16 @@ vi.hoisted(() => {
 });
 
 vi.mock('react-native', () => ({
-  BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  BackHandler: {
+    addEventListener: (_event: string, handler: () => boolean) => {
+      backHandler.current = handler;
+      return {
+        remove: () => {
+          backHandler.current = null;
+        },
+      };
+    },
+  },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   ScrollView: 'ScrollView',
   View: 'View',
@@ -47,7 +67,12 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmRequests.push(request);
+    },
+    dialog: null,
+  }),
 }));
 vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
   PrFormSheetHeader: 'PrFormSheetHeader',
@@ -151,11 +176,14 @@ function failureCopy(renderer: ReactTestRenderer): string | undefined {
 }
 
 beforeEach(() => {
+  confirmRequests.length = 0;
+  backHandler.current = null;
   connectivity.value = 'online';
   addComment.mutateAsync.mockReset();
   gate.ensureTermsAcceptedOutcome.mockReset();
   gate.ensureTermsAcceptedOutcome.mockResolvedValue({ kind: 'accepted' });
   vi.mocked(clearDraft).mockReset();
+  vi.mocked(saveDraft).mockReset();
   baseProps.onDismiss = vi.fn();
 });
 
@@ -166,6 +194,134 @@ afterEach(() => {
 });
 
 describe('PrConversationCommentComposer', () => {
+  it('keys the durable draft per provider ref so a same-named GitHub PR and GitLab MR never share one', async () => {
+    const gitlabRef = { platform: 'gitlab' as const, projectPath: 'group/sub/repo', mrIid: 12 };
+    const refKey = `pr-conversation:key@${providerPrRefKey(gitlabRef)}`;
+
+    const renderer = await mount(
+      createElement(PrConversationCommentComposer, { ...baseProps, prRef: gitlabRef })
+    );
+    typeBody(renderer, 'hello');
+    expect(saveDraft).toHaveBeenCalledWith('u1', refKey, 'hello');
+
+    addComment.mutateAsync.mockResolvedValue({});
+    await pressCommentAndSettle(renderer);
+    expect(clearDraft).toHaveBeenCalledWith('u1', refKey);
+    expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails a submit while confirmed offline at once and posts when the banner clears', async () => {
+    connectivity.value = 'offline';
+    const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
+    typeBody(renderer, 'hello');
+    await pressCommentAndSettle(renderer);
+
+    // Nothing was sent: no request, no spinner, the gate never ran, and the
+    // same control offers the retry.
+    expect(addComment.mutateAsync).not.toHaveBeenCalled();
+    expect(gate.ensureTermsAcceptedOutcome).not.toHaveBeenCalled();
+    expect(failureCopy(renderer)).toBe(i18n.t('prReview.mutationError.couldNotPostComment'));
+    expect(commentDisabled(renderer)).toBe(false);
+    expect(clearDraft).not.toHaveBeenCalled();
+    expect(baseProps.onDismiss).not.toHaveBeenCalled();
+
+    connectivity.value = 'online';
+    addComment.mutateAsync.mockResolvedValue({});
+    await pressCommentAndSettle(renderer);
+    expect(addComment.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['BAD_REQUEST', i18n.t('prReview.discussion.commentBadRequest'), 'bad-request'],
+    ['FORBIDDEN', i18n.t('prReview.discussion.commentForbidden'), 'forbidden'],
+  ])('keeps its own copy for a %s rejection', async (code, copy, kind) => {
+    addComment.mutateAsync.mockRejectedValue(Object.assign(new Error('rejected'), { data: { code } }));
+    const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
+    typeBody(renderer, 'hello');
+    await pressCommentAndSettle(renderer);
+
+    // The conversation surface words its own rejection; `kind` decides whether
+    // the CTA stays live (bad-request) or goes down (forbidden).
+    expect(failureCopy(renderer)).toBe(copy);
+    expect(commentDisabled(renderer)).toBe(kind === 'forbidden');
+  });
+
+  describe('dismissal gate', () => {
+    function footerCancel(renderer: ReactTestRenderer): void {
+      const [cancel] = renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.findAll(child => child.props.children === i18n.t('common.cancel')).length > 0
+      );
+      if (!cancel) {
+        throw new Error('missing Cancel button');
+      }
+      act(() => {
+        (cancel.props.onPress as () => void)();
+      });
+    }
+
+    it.each([
+      ['the footer Cancel', (r: ReactTestRenderer) => footerCancel(r)],
+      [
+        'the header close',
+        (r: ReactTestRenderer) => {
+          act(() => {
+            (r.root.findByType('PrFormSheetHeader').props.onBack as () => void)();
+          });
+        },
+      ],
+      [
+        'the hardware back',
+        (r: ReactTestRenderer) => {
+          act(() => {
+            backHandler.current?.();
+          });
+        },
+      ],
+    ])('dismisses %s with an empty body without a discard confirm', async (_name, trigger) => {
+      const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
+      trigger(renderer);
+
+      expect(confirmRequests).toHaveLength(0);
+      expect(clearDraft).not.toHaveBeenCalled();
+      expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('arms the back listener so the header close and the hardware back share one gate', async () => {
+      const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
+      typeBody(renderer, 'hello');
+
+      act(() => {
+        backHandler.current?.();
+      });
+
+      expect(backHandler.current).toBeTypeOf('function');
+      expect(confirmRequests.at(-1)).toMatchObject({
+        confirmLabel: i18n.t('common.discard'),
+        cancelLabel: i18n.t('common.keepEditing'),
+      });
+    });
+
+    it('stays on the composer with the retryable copy when the discard clear fails', async () => {
+      vi.mocked(clearDraft).mockResolvedValue(false);
+      const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
+      typeBody(renderer, 'hello');
+      footerCancel(renderer);
+      confirmRequests.at(-1)?.onConfirm();
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // The stored draft could not be removed: dismissing would resurface the
+      // text on the next open, so the sheet stays and this copy offers the
+      // retry.
+      expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-conversation:key');
+      expect(baseProps.onDismiss).not.toHaveBeenCalled();
+      expect(failureCopy(renderer)).toBe(i18n.t('agentChat.newSession.discardFailed'));
+    });
+  });
+
   it('issues one request for two taps during the Terms status round-trip', async () => {
     const roundTrip = Promise.withResolvers<{ kind: string }>();
     gate.ensureTermsAcceptedOutcome.mockReturnValueOnce(roundTrip.promise);
@@ -217,7 +373,7 @@ describe('PrConversationCommentComposer', () => {
 
     await pressCommentAndSettle(renderer);
 
-    expect(failureCopy(renderer)).toBe(i18n.t('prReview.mutationError.commentNotPosted'));
+    expect(failureCopy(renderer)).toBe(i18n.t('prReview.discussion.commentBadRequest'));
     expect(commentDisabled(renderer)).toBe(false);
   });
 

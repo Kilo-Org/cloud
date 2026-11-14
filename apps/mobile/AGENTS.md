@@ -300,7 +300,7 @@ A chat flag is one `ChatFlag` on `ChatState` (`@/lib/chat/chat-flag`): read it a
 
 Resolve a queued operation's session inside its turn, because an earlier move can rename it. Keep send startup in that turn through assigning `chat.answering`; a tool retry rechecks the live chat inside its turn and defers while an answer streams. Closing skips only waiting skippable tickets, never a queued reopen. A skipped caller may settle early, but its queue tail still waits for its predecessor.
 
-Sign-out and account switch abort the old account's turn generation before cleanup, which is bounded to one second. Carry the captured `AbortSignal` through flag persistence and migration: encrypted-KV mutations check it after opening the database, immediately before SQL executes. Late old-account continuations must not persist, move or publish. A deferred flag stays `moving` until its move publishes `current` or `behind`.
+Sign-out and account switch cancel only the old account's chat flags: drop waiting flag tickets and abandon a pending flag persist, whose captured `AbortSignal` fences the SQL write and later application/publication. Every non-flag operation, session move and runtime close is still awaited, with no teardown deadline. Once a flag begins moving a session, finish that move and its metadata migration before teardown continues. A deferred flag stays `moving` until its move publishes `current` or `behind`.
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 

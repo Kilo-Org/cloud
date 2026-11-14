@@ -188,25 +188,25 @@ type ChatTurn = {
   /** Resolves when the last queued operation has finished, so a caller can wait for it. */
   tail: Promise<void>;
   /** Operations waiting for their turn; a close skips the ones that may be skipped. */
-  readonly waiting: Set<{ readonly skippable: boolean; skip: () => void }>;
+  readonly waiting: Set<{
+    readonly skippable: boolean;
+    readonly flag: boolean;
+    skip: () => void;
+  }>;
   forgotten: boolean;
 };
 
 const chatTurns = new Map<string, ChatTurn>();
-let account = new AbortController();
+let flagAccount = new AbortController();
 let releasingChats: Promise<void> | undefined = undefined;
 
-function isAccountActive(signal: AbortSignal): boolean {
+function isFlagAccountActive(signal: AbortSignal): boolean {
   return !signal.aborted;
 }
 
-function isLiveChat(sessionId: string, chat: Chat): boolean {
-  return chats.get(sessionId) === chat && !chat.closing;
-}
-
-function checkAccount(signal: AbortSignal): void {
-  if (!isAccountActive(signal)) {
-    throw new Error('The chat account changed');
+function checkFlagAccount(signal: AbortSignal): void {
+  if (!isFlagAccountActive(signal)) {
+    throw new Error('The chat flag account changed');
   }
 }
 
@@ -225,19 +225,13 @@ async function open(): Promise<SQLiteDatabase> {
   return sqlite;
 }
 
-async function runtimeFor(
-  place: ChatPlace,
-  signal: AbortSignal = account.signal
-): Promise<ChatRuntime> {
+async function runtimeFor(place: ChatPlace): Promise<ChatRuntime> {
   await waitForChatBackends();
-  checkAccount(signal);
   const held = runtimes.get(place.chatScope);
   if (held !== undefined) {
     return held;
   }
-  const database = await open();
-  checkAccount(signal);
-  const made = openRuntime(database, place.org);
+  const made = openRuntime(await open(), place.org);
   runtimes.set(place.chatScope, made);
   return made;
 }
@@ -390,10 +384,11 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
     await enterChat(place, followed);
     return;
   }
-  await runTurn(sessionId, { skippable: false }, async signal => {
+  await runTurn(sessionId, { skippable: false }, async () => {
     const current = resolveSessionId(sessionId);
-    await openIn(place, current, signal);
-    await ensureFlags(current, signal);
+    await openIn(place, current);
+    /* Both flags are read inside the open's turn, after any earlier tap. */
+    await ensureFlags(current);
   });
 }
 
@@ -437,37 +432,27 @@ function turnOf(sessionId: string): ChatTurn {
  */
 function runTurn<T>(
   sessionId: string,
-  options: { readonly skippable: boolean },
-  work: (signal: AbortSignal) => Promise<T>
+  options: { readonly skippable: boolean; readonly flag?: boolean },
+  work: () => Promise<T>
 ): Promise<T | undefined> {
-  const signal = account.signal;
   const turn = turnOf(sessionId);
   const previous = turn.tail;
   const gate = Promise.withResolvers<boolean>();
   const ticket = {
     skippable: options.skippable,
+    flag: options.flag ?? false,
     skip: () => {
       gate.resolve(false);
     },
   };
   turn.waiting.add(ticket);
   const done = (async () => {
-    if (!(await gate.promise) || !isAccountActive(signal)) {
+    if (!(await gate.promise)) {
       return undefined;
     }
     turn.waiting.delete(ticket);
-    try {
-      const result = await Effect.runPromise(
-        Effect.promise(() => work(signal)),
-        { signal }
-      );
-      return result;
-    } catch (error) {
-      if (signal.aborted) {
-        return undefined;
-      }
-      throw error;
-    }
+    const result = await work();
+    return result;
   })();
   const tail = (async () => {
     await previous;
@@ -515,22 +500,18 @@ function forgetTurn(sessionId: string): void {
  * screen asked, so a chat another place opened, or the one this place let go,
  * has finished changing before this decides.
  */
-async function openIn(place: ChatPlace, sessionId: string, signal: AbortSignal): Promise<void> {
-  checkAccount(signal);
+async function openIn(place: ChatPlace, sessionId: string): Promise<void> {
   const held = chats.get(sessionId);
   if (held !== undefined) {
     if (held.chatScope === place.chatScope) {
       return;
     }
-    await settleUnavailable(sessionId, signal);
+    await settleUnavailable(sessionId);
     return;
   }
   try {
-    await reopen(place, sessionId, signal);
+    await reopen(place, sessionId);
   } catch (error) {
-    if (signal.aborted) {
-      return;
-    }
     /* Opening the store, the session, or its history can fail. The chat is not
        left saying it is opening with the rejection swallowing it: it settles
        idle with the reason, so entering it again is possible rather than a
@@ -556,18 +537,17 @@ async function openIn(place: ChatPlace, sessionId: string, signal: AbortSignal):
  * chat is let go before that close runs and a failed close is not allowed to
  * leave this place holding it.
  */
-async function settleUnavailable(sessionId: string, signal: AbortSignal): Promise<void> {
+async function settleUnavailable(sessionId: string): Promise<void> {
   const chat = chats.get(sessionId);
   if (chat !== undefined) {
     try {
-      await endChat(sessionId, chat, signal);
+      await endChat(sessionId, chat);
     } catch {
       /* Nothing of the conversation was written down and the session is no
          longer reachable from here. The state below is what the screen draws
          either way. */
     }
   }
-  checkAccount(signal);
   /* A move can take the conversation onto another session while that close
      runs, and that session is live and belongs to whoever moved it. This
      settles an id nothing holds, so it does not blank one that does. */
@@ -605,13 +585,11 @@ type Opened =
  */
 async function openOrMissing<E>(
   runtime: ChatRuntime,
-  opened: Effect.Effect<SessionHandle, E, ChatContext | Scope.Scope>,
-  signal: AbortSignal = account.signal
+  opened: Effect.Effect<SessionHandle, E, ChatContext | Scope.Scope>
 ): Promise<Opened> {
   const scope = await runtime.runPromise(Scope.make());
-  const exit = await runtime.runPromise(Effect.exit(Scope.provide(opened, scope)), { signal });
+  const exit = await runtime.runPromise(Effect.exit(Scope.provide(opened, scope)));
   if (Exit.isSuccess(exit)) {
-    checkAccount(signal);
     return { opened: true, handle: exit.value, scope };
   }
   /* Opening failed after the scope was made; with nothing holding it, only
@@ -652,43 +630,39 @@ async function openRecords(sessionId: string, turns: readonly Turn[]) {
   return folded;
 }
 
-async function reopen(place: ChatPlace, sessionId: string, signal: AbortSignal): Promise<void> {
+async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   /* The row is what says whose chat this is. It is read on the same handle the
      rest of the open reads, before the session, its servers or its history are
      asked for anything: a chat this place did not record is settled as not
      here, and nothing of it is opened. */
   if (scopeOfChat(await open(), sessionId) !== place.chatScope) {
-    await settleUnavailable(sessionId, signal);
+    await settleUnavailable(sessionId);
     return;
   }
-  const runtime = await runtimeFor(place, signal);
+  const runtime = await runtimeFor(place);
   const storedModel = modelOfSession(await open(), sessionId);
   if (storedModel !== null) {
     await migrateAsked(sessionId, storedModel);
   }
-  checkAccount(signal);
   /* An open, so the four-second bound: a server that is slow or down leaves the
      chat opening on the base tools rather than holding it here. The stored
      names are what the session was opened with, and a continued session may
      not change them. Discovering the servers first is what makes them resolve
      again after a restart. */
   await discoverServers(place, await mcpEnabledFor(sessionId));
-  checkAccount(signal);
-  const opened = await openOrMissing(runtime, continueSession(sessionId), signal);
+  const opened = await openOrMissing(runtime, continueSession(sessionId));
   if (!opened.opened) {
     /* The stored names no longer resolve: the server's tool list moved on, or
        the server is down while the session was stored with its tools. The chat
        opens either way, on the names the registry holds now. */
     const current = await onto(place, sessionId, {
       tools: await chatToolNames(organizationIdOf(place.org), sessionId, storedModel ?? ''),
-      signal,
     });
     const moved = chats.get(current);
     const history =
       moved === undefined ? [] : await runtime.runPromise(moved.handle.history).catch(() => []);
     const { asked, kept } = await openRecords(current, history);
     const database = await open();
-    checkAccount(signal);
     change(current, {
       model: modelOfSession(database, current) ?? '',
       effort: effortOfSession(database, current),
@@ -710,13 +684,12 @@ async function reopen(place: ChatPlace, sessionId: string, signal: AbortSignal):
   }
   const { handle, scope } = opened;
   try {
-    const turns = await runtime.runPromise(handle.history, { signal });
+    const turns = await runtime.runPromise(handle.history);
     /* A question asked again can leave either of its two records behind when a
        write was refused; the stored turns say which of them the conversation has
        already answered. */
     const { asked, kept } = await openRecords(sessionId, turns);
     const database = await open();
-    checkAccount(signal);
     chats.set(sessionId, {
       handle,
       scope,
@@ -850,7 +823,7 @@ export async function say(
 ): Promise<void> {
   const { text, images } = question;
   const { model, effort } = target;
-  await runTurn(sessionId, { skippable: false }, async signal => {
+  await runTurn(sessionId, { skippable: false }, async () => {
     let current = resolveSessionId(sessionId);
     try {
       const held = chats.get(current);
@@ -870,11 +843,9 @@ export async function say(
       }
       const before = snapshotOf(current);
       await keepAsked(current);
-      checkAccount(signal);
       if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
-        await rememberFirstQuestion(current, text, signal);
+        await rememberFirstQuestion(current, text);
       }
-      checkAccount(signal);
       change(current, {
         asked: text,
         askedImages: images,
@@ -882,28 +853,22 @@ export async function say(
         askedEffort: effort,
         askedFrom: question.from ?? null,
       });
-      await rememberAsked(
-        current,
-        {
-          text,
-          model,
-          effort,
-          images,
-          ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
-          ...(question.from == null ? {} : { from: question.from }),
-        },
-        signal
-      );
-      current = await ontoForUse(current, { model, effort, signal }, held);
+      await rememberAsked(current, {
+        text,
+        model,
+        effort,
+        images,
+        ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
+        ...(question.from == null ? {} : { from: question.from }),
+      });
+      current = await ontoForUse(current, { model, effort }, held);
       const chat = chats.get(current);
       if (chat === undefined) {
         throw new Error('the chat is not open');
       }
-      const runtime = await runtimeFor(chat, signal);
+      const runtime = await runtimeFor(chat);
       const at = Date.now();
-      const database = await open();
-      checkAccount(signal);
-      touchChat(database, current, at);
+      touchChat(await open(), current, at);
       change(current, {
         status: 'working',
         answering: [],
@@ -918,9 +883,6 @@ export async function say(
       });
       chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
     } catch (error) {
-      if (signal.aborted) {
-        return;
-      }
       current = snapshotOf(current).sessionId;
       const failureKey = backendFailureKey(error, model);
       await keepAskedFailure(current, failureKey);
@@ -1265,13 +1227,10 @@ async function settle(
   failure: { readonly reason: string; readonly key: string } | null
 ): Promise<void> {
   const chat = chats.get(sessionId);
-  if (chat === undefined || chat.closing) {
+  if (chat === undefined) {
     return;
   }
   const turns = await runtime.runPromise(chat.handle.history);
-  if (!isLiveChat(sessionId, chat)) {
-    return;
-  }
   await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
   const failed = failure?.reason ?? null;
   /* The kept question this attempt asked again, if it was one: an answer to it
@@ -1306,9 +1265,6 @@ async function settle(
   } else {
     await forgetAsked(sessionId);
   }
-  if (!isLiveChat(sessionId, chat)) {
-    return;
-  }
   chat.answering = undefined;
   change(sessionId, {
     turns,
@@ -1340,7 +1296,6 @@ async function settle(
  * so only a question whose answer landed is asked here.
  */
 async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<void> {
-  const requestedAccount = account.signal;
   /* The chat was let go while it was still answering: it has left the live
      ones and its scope is closing. There is nothing left to move or to ask, and
      asking would wait on that close from inside the answer it is interrupting. */
@@ -1361,34 +1316,26 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
          the close that waits on the answer's settle. The close opens the gate
          first, which is what keeps a close from deadlocking on itself. */
       const from = current;
-      const moved = await runTurn(from, { skippable: true }, async signal => {
+      const moved = await runTurn(from, { skippable: true }, async () => {
         const landed = resolveSessionId(from);
         const live = chats.get(landed);
         if (live === undefined || live.closing) {
           return landed;
         }
         try {
-          const result = await ontoTools(landed, live, signal);
-          checkAccount(signal);
+          const result = await ontoTools(landed, live);
           settleFlagApplications(result, 'current');
           return result;
         } catch (error) {
-          checkAccount(signal);
           settleFlagApplications(resolveSessionId(landed), 'behind');
           throw error;
         }
       });
-      if (!isAccountActive(requestedAccount)) {
-        return;
-      }
       current = moved ?? snapshotOf(from).sessionId;
       if (!failed) {
         change(current, { failed: null, failureKey: null });
       }
     } catch (error) {
-      if (!isAccountActive(requestedAccount)) {
-        return;
-      }
       /* A backend can change while its answer arrives. Keep the tool change
          and the whole line for an explicit retry or a new, valid target. */
       current = snapshotOf(current).sessionId;
@@ -1424,7 +1371,6 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
 
 /** What a chat can be moved onto: another model, effort or tool set, or several. */
 type Onto = {
-  readonly signal?: AbortSignal;
   readonly model?: string;
   /** Null clears the effort, so the session asks with the model's default. */
   readonly effort?: Effort | null;
@@ -1450,8 +1396,6 @@ type Onto = {
  * holds now rather than reporting the send as failed.
  */
 async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<string> {
-  const signal = move.signal ?? account.signal;
-  checkAccount(signal);
   const chat = chats.get(sessionId);
   const held = snapshotOf(sessionId);
   const model = move.model === undefined || move.model === '' ? held.model : move.model;
@@ -1464,21 +1408,18 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   if (wanted.model === undefined && wanted.effort === undefined && wanted.tools === undefined) {
     return sessionId;
   }
-  const runtime = await runtimeFor(chat ?? place, signal);
+  const runtime = await runtimeFor(chat ?? place);
   const { handle, scope } = await cloneOnto(runtime, sessionId, {
     move: wanted,
     organizationId: organizationIdOf(place.org),
     model,
-    signal,
   });
   const database = await open();
-  checkAccount(signal);
   moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
-  await moveQuestions(sessionId, handle.id, signal);
-  await moveMcpEnabled(sessionId, handle.id, signal);
-  await moveWebSearchEnabled(sessionId, handle.id, signal);
-  const turns = await runtime.runPromise(handle.history, { signal });
-  checkAccount(signal);
+  await moveQuestions(sessionId, handle.id);
+  await moveMcpEnabled(sessionId, handle.id);
+  await moveWebSearchEnabled(sessionId, handle.id);
+  const turns = await runtime.runPromise(handle.history);
   chats.delete(sessionId);
   chats.set(
     handle.id,
@@ -1516,7 +1457,6 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   if (chat !== undefined) {
     await runtime.runPromise(Scope.close(chat.scope, Exit.void));
   }
-  checkAccount(signal);
   forgetSession(database, sessionId);
   return handle.id;
 }
@@ -1527,7 +1467,6 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
  * chose.
  */
 type Clone = {
-  readonly signal: AbortSignal;
   readonly move: Onto;
   readonly organizationId?: string;
   readonly model: string;
@@ -1550,13 +1489,12 @@ async function cloneOnto(
   sessionId: string,
   clone: Clone
 ): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.Closeable }> {
-  const { signal } = clone;
   const { effort, ...move } = clone.move;
   const wanted: CloneOptions = {
     ...move,
     ...(effort === undefined ? {} : { effort: effort ?? 'default' }),
   };
-  const cloned = await openOrMissing(runtime, cloneSession(sessionId, wanted), signal);
+  const cloned = await openOrMissing(runtime, cloneSession(sessionId, wanted));
   if (cloned.opened) {
     return cloned;
   }
@@ -1566,7 +1504,7 @@ async function cloneOnto(
     throw new Error('the chat was moved onto a tool the registry does not hold');
   }
   const tools = await chatToolNames(clone.organizationId, sessionId, clone.model);
-  const again = await openOrMissing(runtime, cloneSession(sessionId, { ...wanted, tools }), signal);
+  const again = await openOrMissing(runtime, cloneSession(sessionId, { ...wanted, tools }));
   if (!again.opened) {
     throw new Error('the chat names a tool the registry does not hold');
   }
@@ -1604,12 +1542,7 @@ async function holdsTools(sessionId: string, names: readonly string[]): Promise<
  * conversation twice and leave two rows for one chat. A chat already on the
  * names keeps its session.
  */
-async function ontoForUse(
-  sessionId: string,
-  target: ChatTarget & { readonly signal: AbortSignal },
-  chat: Chat
-): Promise<string> {
-  const { signal } = target;
+async function ontoForUse(sessionId: string, target: ChatTarget, chat: Chat): Promise<string> {
   const marked = chat.pendingTools !== undefined;
   chat.pendingTools = undefined;
   const names = targetSupportsTools(target.model)
@@ -1621,7 +1554,10 @@ async function ontoForUse(
     stored.length === names.length &&
     stored.every((name, i) => name === names[i]);
   const tools = already || (stored === null && !marked) ? undefined : names;
-  return onto(chat, sessionId, { ...target, ...(tools === undefined ? {} : { tools }), signal });
+  return onto(chat, sessionId, {
+    ...target,
+    ...(tools === undefined ? {} : { tools }),
+  });
 }
 
 /**
@@ -1632,12 +1568,7 @@ async function ontoForUse(
  * enabled flag flipped, or the settings group switch moved. A chat already on
  * those names is left where it is — the switch that moved was not its own.
  */
-async function ontoTools(
-  sessionId: string,
-  place: ChatPlace,
-  signal: AbortSignal
-): Promise<string> {
-  checkAccount(signal);
+async function ontoTools(sessionId: string, place: ChatPlace): Promise<string> {
   const { model } = snapshotOf(sessionId);
   const names = targetSupportsTools(model)
     ? await chatToolNames(organizationIdOf(place.org), sessionId, model)
@@ -1645,7 +1576,7 @@ async function ontoTools(
   if (await holdsTools(sessionId, names)) {
     return sessionId;
   }
-  return onto(place, sessionId, { tools: names, signal });
+  return onto(place, sessionId, { tools: names });
 }
 
 /**
@@ -1712,6 +1643,7 @@ async function applyFlag(
   context: { readonly place: ChatPlace; readonly signal: AbortSignal }
 ): Promise<ChatFlagApplication> {
   const { place, signal } = context;
+  checkFlagAccount(signal);
   const id = snapshotOf(sessionId).sessionId;
   const chat = chats.get(id);
   /* Enabling a chat that never discovered tools must reach the server first. */
@@ -1723,14 +1655,14 @@ async function applyFlag(
   ) {
     await ensureKiloMcp(chat, 'automatic');
   }
-  checkAccount(signal);
+  checkFlagAccount(signal);
   if (chat?.answering !== undefined) {
     /* Never under an answer: the tool set would change between two rounds of
        one question. The settle applies it. */
     chat.pendingTools ??= true;
     return 'moving';
   }
-  await ontoTools(id, place, signal);
+  await ontoTools(id, place);
   return 'current';
 }
 
@@ -1756,17 +1688,26 @@ export async function setChatFlag(options: {
   readonly next: boolean;
 }): Promise<void> {
   const { sessionId, place, flag, next } = options;
-  await runTurn(sessionId, { skippable: true }, async signal => {
+  const signal = flagAccount.signal;
+  await runTurn(sessionId, { skippable: true, flag: true }, async () => {
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
     /* Resolved inside the turn rather than at the call: a chat that moved while
        this waited is the one the choice belongs to. */
     const id = resolveSessionId(sessionId);
     writeFlagOf(flag, id, flagPicked(readFlagOf(flag, id), next));
     try {
-      await (flag === 'webSearch'
-        ? persistWebSearchEnabled(id, next, signal)
-        : persistMcpEnabled(id, next, signal));
+      await Effect.runPromise(
+        Effect.promise(() =>
+          flag === 'webSearch'
+            ? persistWebSearchEnabled(id, next, signal)
+            : persistMcpEnabled(id, next, signal)
+        ),
+        { signal }
+      );
     } catch (error) {
-      if (signal.aborted) {
+      if (!isFlagAccountActive(signal)) {
         return;
       }
       /* The write was refused: the switch goes back to the stored choice and
@@ -1774,7 +1715,9 @@ export async function setChatFlag(options: {
       writeFlagOf(flag, id, flagRefused(readFlagOf(flag, id)));
       throw error;
     }
-    checkAccount(signal);
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
     writeFlagOf(flag, id, flagPersisted(readFlagOf(flag, id), next));
     if (place === null) {
       writeFlagOf(flag, id, flagApplication(readFlagOf(flag, id), 'current'));
@@ -1784,13 +1727,15 @@ export async function setChatFlag(options: {
     try {
       application = await applyFlag(flag, id, { place, signal });
     } catch {
-      if (signal.aborted) {
+      if (!isFlagAccountActive(signal)) {
         return;
       }
       /* Saved, but this session is not on it. */
       application = 'behind';
     }
-    checkAccount(signal);
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
     /* The move renamed the chat, and the flag travelled with its state. */
     const landed = resolveSessionId(id);
     writeFlagOf(flag, landed, flagApplication(readFlagOf(flag, landed), application));
@@ -1804,7 +1749,11 @@ export async function retryChatFlag(options: {
   readonly flag: ChatFlagName;
 }): Promise<void> {
   const { sessionId, place, flag } = options;
-  await runTurn(sessionId, { skippable: true }, async signal => {
+  const signal = flagAccount.signal;
+  await runTurn(sessionId, { skippable: true, flag: true }, async () => {
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
     const id = resolveSessionId(sessionId);
     if (place === null || !chatFlagBehind(readFlagOf(flag, id))) {
       return;
@@ -1814,12 +1763,14 @@ export async function retryChatFlag(options: {
     try {
       application = await applyFlag(flag, id, { place, signal });
     } catch {
-      if (signal.aborted) {
+      if (!isFlagAccountActive(signal)) {
         return;
       }
       application = 'behind';
     }
-    checkAccount(signal);
+    if (!isFlagAccountActive(signal)) {
+      return;
+    }
     const landed = resolveSessionId(id);
     writeFlagOf(flag, landed, flagApplication(readFlagOf(flag, landed), application));
   });
@@ -1858,8 +1809,7 @@ function readFlag(flag: ChatFlag, read: ReadChoice): ChatFlag {
  * rather than putting the stored value over the tap, and a tap enqueued after it
  * runs behind the read.
  */
-async function ensureFlags(sessionId: string, signal: AbortSignal): Promise<void> {
-  checkAccount(signal);
+async function ensureFlags(sessionId: string): Promise<void> {
   const id = resolveSessionId(sessionId);
   const held = snapshotOf(id);
   const wantWeb = awaitingRead(held.webSearch);
@@ -1871,7 +1821,6 @@ async function ensureFlags(sessionId: string, signal: AbortSignal): Promise<void
     wantWeb ? readChoice(() => webSearchChoiceFor(id)) : null,
     wantKilo ? readChoice(() => mcpChoiceFor(id)) : null,
   ]);
-  checkAccount(signal);
   if (web !== null) {
     change(id, { webSearch: readFlag(snapshotOf(id).webSearch, web) });
   }
@@ -1896,20 +1845,16 @@ async function ensureFlags(sessionId: string, signal: AbortSignal): Promise<void
  * person turned the setting off while it was arriving.
  */
 export async function retryKiloMcp(sessionId: string): Promise<void> {
-  const requestedAccount = account.signal;
   const current = snapshotOf(sessionId).sessionId;
   const chat = chats.get(current);
   if (chat === undefined) {
     return;
   }
   const state = await ensureKiloMcp(chat, 'retry');
-  if (requestedAccount.aborted) {
-    return;
-  }
   if (state.status !== 'ready' || state.tools.length === 0) {
     return;
   }
-  await runTurn(current, { skippable: true }, async signal => {
+  await runTurn(current, { skippable: true }, async () => {
     const landed = resolveSessionId(current);
     const live = chats.get(landed);
     if (live === undefined || live.closing) {
@@ -1919,7 +1864,7 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
       live.pendingTools ??= true;
       return;
     }
-    await ontoTools(landed, live, signal);
+    await ontoTools(landed, live);
   });
 }
 
@@ -1949,17 +1894,12 @@ export async function stopChat(sessionId: string): Promise<void> {
  * It is deliberately only the interrupt: a chat being stopped goes on to ask
  * what is waiting, and a chat being closed does not.
  */
-async function halt(
-  sessionId: string,
-  chat: Chat,
-  signal: AbortSignal = account.signal
-): Promise<boolean> {
+async function halt(sessionId: string, chat: Chat): Promise<boolean> {
   if (chat.answering === undefined) {
     return false;
   }
-  const runtime = await runtimeFor(chat, signal);
-  await runtime.runPromise(Fiber.interrupt(chat.answering), { signal });
-  checkAccount(signal);
+  const runtime = await runtimeFor(chat);
+  await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
   change(sessionId, { status: 'idle', answering: [] });
   return true;
@@ -1978,12 +1918,7 @@ async function halt(
  * queued behind it installs its session after this has finished rather than
  * under a close that would then forget it.
  */
-async function endChat(
-  sessionId: string,
-  chat: Chat,
-  signal: AbortSignal = account.signal
-): Promise<void> {
-  checkAccount(signal);
+async function endChat(sessionId: string, chat: Chat): Promise<void> {
   chat.closing = true;
   chats.delete(sessionId);
   /* A move queued behind this close would wait for the turn this close holds,
@@ -1991,14 +1926,12 @@ async function endChat(
      settle finishes, and the interrupt returns. Without this the close waits on
      a turn only it can release. */
   skipWaitingTurns(sessionId);
-  await halt(sessionId, chat, signal);
-  checkAccount(signal);
+  await halt(sessionId, chat);
   /* Whatever was still waiting goes with the chat. Asking it now would open a
      round on a session whose scope is closing under it. */
   chat.waiting.length = 0;
-  const runtime = await runtimeFor(chat, signal);
-  await runtime.runPromise(Scope.close(chat.scope, Exit.void), { signal });
-  checkAccount(signal);
+  const runtime = await runtimeFor(chat);
+  await runtime.runPromise(Scope.close(chat.scope, Exit.void));
   forgetTurn(sessionId);
   forgetState(sessionId);
 }
@@ -2012,7 +1945,7 @@ async function endChat(
  * chat running and the old id pointing at one nobody ended.
  */
 export async function releaseChat(sessionId: string): Promise<void> {
-  await runTurn(sessionId, { skippable: false }, async signal => {
+  await runTurn(sessionId, { skippable: false }, async () => {
     const current = resolveSessionId(sessionId);
     const chat = chats.get(current);
     if (chat === undefined) {
@@ -2022,58 +1955,48 @@ export async function releaseChat(sessionId: string): Promise<void> {
       forgetState(current);
       return;
     }
-    await endChat(current, chat, signal);
+    await endChat(current, chat);
   });
 }
 
 /** Ends every chat, which is what signing out does before the wipe. */
+async function closeAccountChats(): Promise<void> {
+  for (const sessionId of chats.keys()) {
+    // eslint-disable-next-line no-await-in-loop -- one scope closes after another: the store has no lock, and two closes at once would write over each other
+    await releaseChat(sessionId);
+  }
+  /* A chat with a queued flag write but no live session is drained too: the
+     preferences are deleted after this returns, and a write that landed after
+     that would restore a choice the sign-out just removed. */
+  for (const sessionId of chatTurns.keys()) {
+    // eslint-disable-next-line no-await-in-loop -- each chat's queue finishes before the next is waited on: their writes share one database
+    await releaseChat(sessionId);
+  }
+  for (const runtime of runtimes.values()) {
+    // eslint-disable-next-line no-await-in-loop -- close each runtime after all of its sessions
+    await runtime.dispose();
+  }
+  runtimes.clear();
+}
+
 export async function releaseEveryChat(): Promise<void> {
   if (releasingChats !== undefined) {
     await releasingChats;
     return;
   }
-  const sessionIds = new Set(
-    [...chats.keys(), ...chatTurns.keys()].map(id => resolveSessionId(id))
-  );
-  for (const chat of chats.values()) {
-    chat.closing = true;
+  flagAccount.abort();
+  for (const turn of chatTurns.values()) {
+    for (const ticket of turn.waiting) {
+      if (ticket.flag) {
+        ticket.skip();
+      }
+    }
   }
-  account.abort();
-  const cleanup = new AbortController();
-  const deadline = setTimeout(() => {
-    cleanup.abort();
-  }, 1_000);
-  releasingChats = Effect.runPromise(
-    Effect.promise(async () => {
-      await Promise.all([...chatTurns.values()].map(turn => turn.tail));
-      checkAccount(cleanup.signal);
-      for (const [sessionId, chat] of chats) {
-        // eslint-disable-next-line no-await-in-loop -- one scope closes after another: the store has no lock, and two closes at once would write over each other
-        await endChat(sessionId, chat, cleanup.signal);
-      }
-      for (const runtime of runtimes.values()) {
-        // eslint-disable-next-line no-await-in-loop -- close each runtime after all of its sessions
-        await runtime.dispose();
-        checkAccount(cleanup.signal);
-      }
-    }),
-    { signal: cleanup.signal }
-  );
+  releasingChats = closeAccountChats();
   try {
     await releasingChats;
-  } catch (error) {
-    if (!cleanup.signal.aborted) {
-      throw error;
-    }
   } finally {
-    clearTimeout(deadline);
-    for (const sessionId of sessionIds) {
-      forgetState(sessionId);
-    }
-    chats.clear();
-    chatTurns.clear();
-    runtimes.clear();
-    account = new AbortController();
+    flagAccount = new AbortController();
     releasingChats = undefined;
   }
 }

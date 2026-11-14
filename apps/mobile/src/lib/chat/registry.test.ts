@@ -136,6 +136,10 @@ const toolReads = vi.hoisted((): { sessionId: string | null; gate: Promise<void>
   sessionId: null,
   gate: undefined,
 }));
+const questionRead = vi.hoisted((): { gate: Promise<undefined> | undefined; started: boolean } => ({
+  gate: undefined,
+  started: false,
+}));
 
 vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
 const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[], failNext: false }));
@@ -363,11 +367,8 @@ vi.mock('./kilo-mcp', () => ({
     }
     mcp.enabled.set(sessionId, false);
   },
-  moveMcpEnabled: async (from: string, to: string, signal?: AbortSignal) => {
+  moveMcpEnabled: async (from: string, to: string) => {
     await Promise.resolve();
-    if (signal?.aborted) {
-      throw new Error('cancelled');
-    }
     const held = mcp.enabled.get(from);
     mcp.enabled.delete(from);
     if (held === undefined) {
@@ -417,7 +418,12 @@ vi.mock('@/lib/persist/encrypted-kv', () => {
     },
     getItem: async (scope: string, key: string) => {
       await Promise.resolve();
-      return storedQuestions.get(`${scope}:${key}`) ?? null;
+      const stored = storedQuestions.get(`${scope}:${key}`) ?? null;
+      if (scope === 'chat-asked-target' && questionRead.gate !== undefined) {
+        questionRead.started = true;
+        await questionRead.gate;
+      }
+      return stored;
     },
     setItem,
     setItemWithSignal: setItem,
@@ -568,6 +574,8 @@ beforeEach(async () => {
   cloning = undefined;
   toolReads.sessionId = null;
   toolReads.gate = undefined;
+  questionRead.gate = undefined;
+  questionRead.started = false;
   finish = undefined;
   emitEvent = undefined;
   storedHistory = undefined;
@@ -2287,46 +2295,163 @@ describe('a flag applied after an answer', () => {
   );
 });
 
-describe('account teardown with an abandoned flag turn', () => {
-  it.each(['persist', 'apply'])(
-    'cancels a never-settling %s and fences its late continuation',
-    async stage => {
-      const gate = Promise.withResolvers<undefined>();
-      if (stage === 'persist') {
-        choiceWrites.gate = gate.promise;
-      } else {
-        cloning = gate.promise;
-      }
-      const picking = setChatFlag({
-        sessionId: opened,
-        place: stage === 'persist' ? null : place,
-        flag: 'webSearch',
-        next: false,
-      });
-      await settled();
-      let finished = false;
-      const releasing = (async () => {
-        await releaseEveryChat();
-        finished = true;
-      })();
-      try {
-        await vi.waitFor(
-          () => {
-            expect(finished).toBe(true);
-          },
-          { timeout: 1_500 }
-        );
-      } finally {
-        storedQuestions.clear();
-        gate.resolve(undefined);
-        await Promise.all([picking, releasing]);
-      }
-      await settled();
-      expect(storedQuestions.size).toBe(0);
-      expect(snapshotOf(opened).webSearch.kind).toBe('reading');
-      expect(snapshotOf('s2').model).toBe('');
+describe('account teardown preserving non-flag work', () => {
+  it('waits for a kept-question read before sign-out may wipe it', async () => {
+    failAnswerFor = opened;
+    await say(opened, { text: 'failed', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    failAnswerFor = undefined;
+    const gate = Promise.withResolvers<undefined>();
+    questionRead.gate = gate.promise;
+    const sending = say(
+      opened,
+      { text: 'replacement', images: [] },
+      { model: 'kilo/one', effort: null }
+    );
+    await settled();
+    expect(questionRead.started).toBe(true);
+    const teardown = { finished: false };
+    const releasing = (async () => {
+      await releaseEveryChat();
+      teardown.finished = true;
+    })();
+    await settled();
+    const finishedBeforeRead = teardown.finished;
+    if (finishedBeforeRead) {
+      storedQuestions.clear();
     }
-  );
+    gate.resolve(undefined);
+    await Promise.all([sending, releasing]);
+    if (!finishedBeforeRead) {
+      storedQuestions.clear();
+    }
+    await settled();
+
+    expect(finishedBeforeRead).toBe(false);
+    expect(storedQuestions.size).toBe(0);
+    expect(snapshotOf(opened).asked).toBeNull();
+  });
+
+  it('finishes preference migration before account switch returns', async () => {
+    storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'off');
+    mcp.enabled.set(opened, false);
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+    const sending = say(opened, { text: 'moved', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    expect(scopes.of('s2')).toBe(place.chatScope);
+    expect(storedQuestions.get(`${choiceWrites.scope}:${opened}`)).toBeUndefined();
+    let finished = false;
+    const releasing = (async () => {
+      await releaseEveryChat();
+      finished = true;
+    })();
+    await settled();
+    const finishedBeforeCopy = finished;
+    gate.resolve(undefined);
+    await Promise.all([sending, releasing]);
+    opened = 's2';
+    await enterChat(place, opened);
+
+    expect(finishedBeforeCopy).toBe(false);
+    expect(storedQuestions.get(`${choiceWrites.scope}:${opened}`)).toBe('off');
+    expect(snapshotOf(opened).webSearch).toMatchObject({ kind: 'saved', choice: false });
+    expect(snapshotOf(opened).kiloTools).toMatchObject({ kind: 'saved', choice: false });
+  });
+
+  it('does not detach a held close while a start is discovering', async () => {
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    const discovery = Promise.withResolvers<undefined>();
+    mcp.ensure.mockImplementationOnce(async () => {
+      await discovery.promise;
+      return { status: 'ready', tools: [] };
+    });
+    const starting = startChat(place, { model: 'kilo/one', effort: null });
+    await settled();
+    const closeGate = Promise.withResolvers<undefined>();
+    closing = closeGate.promise;
+    let finished = false;
+    vi.useFakeTimers();
+    const releasing = (async () => {
+      await releaseEveryChat();
+      finished = true;
+    })();
+    try {
+      await vi.advanceTimersByTimeAsync(1_100);
+    } finally {
+      vi.useRealTimers();
+    }
+    const finishedBeforeClose = finished;
+    discovery.resolve(undefined);
+    await starting;
+    closeGate.resolve(undefined);
+    await releasing;
+
+    expect(finishedBeforeClose).toBe(false);
+    expect(snapshotOf(opened).status).toBe('opening');
+  });
+});
+
+describe('account teardown during a flag turn', () => {
+  it('cancels a never-settling flag persist and fences its late continuation', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+    const picking = setChatFlag({
+      sessionId: opened,
+      place: null,
+      flag: 'webSearch',
+      next: false,
+    });
+    await settled();
+    let finished = false;
+    const releasing = (async () => {
+      await releaseEveryChat();
+      finished = true;
+    })();
+    try {
+      await vi.waitFor(
+        () => {
+          expect(finished).toBe(true);
+        },
+        { timeout: 1_500 }
+      );
+    } finally {
+      storedQuestions.clear();
+      gate.resolve(undefined);
+      await Promise.all([picking, releasing]);
+    }
+    await settled();
+    expect(storedQuestions.size).toBe(0);
+    expect(snapshotOf(opened).webSearch.kind).toBe('reading');
+    expect(snapshotOf('s2').model).toBe('');
+  });
+
+  it('waits for a flag session move once application has started', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    cloning = gate.promise;
+    const picking = setChatFlag({
+      sessionId: opened,
+      place,
+      flag: 'webSearch',
+      next: false,
+    });
+    await settled();
+    expect(clonesMade).toBe(1);
+    let finished = false;
+    const releasing = (async () => {
+      await releaseEveryChat();
+      finished = true;
+    })();
+    await settled();
+    const finishedBeforeMove = finished;
+    gate.resolve(undefined);
+    await Promise.all([picking, releasing]);
+
+    expect(finishedBeforeMove).toBe(false);
+    expect(storedQuestions.get(`${choiceWrites.scope}:s2`)).toBe('off');
+    expect(snapshotOf('s2').model).toBe('');
+  });
 });
 
 describe('releasing a chat with queued operations', () => {

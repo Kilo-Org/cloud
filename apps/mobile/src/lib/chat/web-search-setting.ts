@@ -45,20 +45,14 @@ export async function setWebSearchEnabled(
 }
 
 /** Carries the person's choice across a move, which opens a new session. */
-export async function moveWebSearchEnabled(
-  from: string,
-  to: string,
-  signal?: AbortSignal
-): Promise<void> {
+export async function moveWebSearchEnabled(from: string, to: string): Promise<void> {
   const stored = await getItem(PREFERENCE_SCOPE, from);
-  await removeItem(PREFERENCE_SCOPE, from, signal);
+  await removeItem(PREFERENCE_SCOPE, from);
   if (stored === null) {
-    await removeItem(PREFERENCE_SCOPE, to, signal);
+    await removeItem(PREFERENCE_SCOPE, to);
     return;
   }
-  await (signal === undefined
-    ? setItem(PREFERENCE_SCOPE, to, stored)
-    : setItemWithSignal(PREFERENCE_SCOPE, to, { value: stored, signal }));
+  await setItem(PREFERENCE_SCOPE, to, stored);
 }
 
 /** Drops the choices of chats that are gone, which is what signing out does. */

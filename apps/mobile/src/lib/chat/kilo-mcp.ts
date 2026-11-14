@@ -361,20 +361,14 @@ export async function setMcpEnabled(
 }
 
 /** Carries the setting across a model switch, which opens a new session. */
-export async function moveMcpEnabled(
-  from: string,
-  to: string,
-  signal?: AbortSignal
-): Promise<void> {
+export async function moveMcpEnabled(from: string, to: string): Promise<void> {
   const enabled = await mcpEnabledFor(from);
-  await removeItem(PREFERENCE_SCOPE, from, signal);
+  await removeItem(PREFERENCE_SCOPE, from);
   if (enabled) {
-    await removeItem(PREFERENCE_SCOPE, to, signal);
+    await removeItem(PREFERENCE_SCOPE, to);
     return;
   }
-  await (signal === undefined
-    ? setItem(PREFERENCE_SCOPE, to, OFF)
-    : setItemWithSignal(PREFERENCE_SCOPE, to, { value: OFF, signal }));
+  await setItem(PREFERENCE_SCOPE, to, OFF);
 }
 
 /** Drops the settings of chats that are gone, which is what signing out does. */

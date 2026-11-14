@@ -10,7 +10,7 @@ describe('Eden AI direct BYOK provider', () => {
     ['edenai/xai/grok-4.6', 'openai'],
     ['edenai/google/gemini-flash-latest', undefined],
   ] as const)('selects the model-family API for %s', (model, expectedProvider) => {
-    expect(getAiSdkProvider(model, 'edenai')).toBe(expectedProvider);
+    expect(getAiSdkProvider(model)).toBe(expectedProvider);
   });
 
   test.each([

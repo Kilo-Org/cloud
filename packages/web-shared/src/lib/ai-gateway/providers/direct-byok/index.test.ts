@@ -7,6 +7,7 @@ import {
   type DirectByokUpstream,
 } from './types';
 import type * as DirectByokTypes from './types';
+import type * as OpenCodeGoModule from './opencode-go';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
@@ -103,16 +104,15 @@ describe('createAiSdkProvider session headers', () => {
 
   test('keeps an OpenCode Go probe session stable across SDK retries and isolates new probes', async () => {
     const { createAiSdkProvider } = await import('.');
-    const { directByokProviders } = await loadDirectByokModule();
-    const provider = { ...directByokProviders[0], id: 'opencode-go' as const };
+    const openCodeGo = jest.requireActual<typeof OpenCodeGoModule>('./opencode-go').default;
     const fetchMock = mockCompletions().mockResolvedValueOnce(
       new Response('Temporary failure', { status: 500 })
     );
-    const firstProbe = await createAiSdkProvider(provider, 'test-key', 'test-model');
+    const firstProbe = await createAiSdkProvider(openCodeGo, 'test-key', 'test-model');
 
     await generateText({ model: firstProbe('test-model'), prompt: 'Say hi', maxRetries: 1 });
     await generateText({
-      model: (await createAiSdkProvider(provider, 'test-key', 'test-model'))('test-model'),
+      model: (await createAiSdkProvider(openCodeGo, 'test-key', 'test-model'))('test-model'),
       prompt: 'Say hi',
       maxRetries: 0,
     });
@@ -169,6 +169,8 @@ describe('createAiSdkProvider resolved upstream', () => {
       openrouter_inference_provider_id: 'chutes',
       supportedChatApis: upstream.supportedChatApis,
       resolveUpstream: async () => upstream,
+      chatCompletionsHeaders: (resolved): Record<string, string> =>
+        resolved.apiKeyHeader ? { [resolved.apiKeyHeader]: resolved.apiKey } : {},
       transformRequest() {},
       models: async () => [],
     };
@@ -320,6 +322,27 @@ describe('getDirectByokModel', () => {
     const models = await getDirectByokModelsForUser('user-id');
 
     expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['anthropic', undefined]);
+  });
+
+  test("uses a provider's own AI SDK choice over the model-name classification", async () => {
+    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getAiSdkProvider } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
+    const provider: DirectByokProvider = directByokProviders[0];
+    provider.getAiSdkProvider = () => ({ aiSdkProvider: undefined });
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
+    jest.mocked(getAiSdkProvider).mockReturnValue('anthropic');
+
+    try {
+      const models = await getDirectByokModelsForUser('user-id');
+
+      expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual([undefined, undefined]);
+      expect(getAiSdkProvider).not.toHaveBeenCalled();
+    } finally {
+      delete provider.getAiSdkProvider;
+      jest.mocked(getAiSdkProvider).mockReset();
+    }
   });
 
   test('derives the AI SDK provider from the chat API a provider assigns each model', async () => {

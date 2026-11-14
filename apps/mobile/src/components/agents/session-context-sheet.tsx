@@ -315,10 +315,11 @@ export function SessionContextSheet({
         {/* The ring sits beside its value, not above it. Stacked, the ring held
             the sheet's first text a ring-height down the scroll content, which
             the design gate reads as empty space under the title: the ring draws
-            nothing the accessibility tree reports. Side by side, the value
-            starts at the row's own top and stays within one section break of
-            the scroll content's top padding, whatever the ring reports. */}
-        <View className="flex-row items-start justify-center gap-3 pt-2">
+            nothing the accessibility tree reports. Side by side, the ring fills
+            the row and the value centres on the ring's own middle, so the pair
+            reads as one figure and neither half floats off its partner's
+            centre. */}
+        <View className="flex-row items-center justify-center gap-3 pt-2">
           <ContextUsageRing
             size={SHEET_RING_SIZE}
             strokeWidth={SHEET_RING_STROKE}

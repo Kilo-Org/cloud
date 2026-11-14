@@ -1770,6 +1770,8 @@
       "events": "Настани",
       "eventConfidence": "Доверба: {{confidence}}",
       "eventReason": "Причина: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} настан",
       "eventsCount_other": "{{displayCount}} настани",
       "generated": "Извештајот е генериран {{generatedAt}}.",

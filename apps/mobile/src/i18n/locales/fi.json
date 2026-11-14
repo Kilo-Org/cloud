@@ -1770,6 +1770,8 @@
       "events": "Tapahtumat",
       "eventConfidence": "Varmuus: {{confidence}}",
       "eventReason": "Syy: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} tapahtuma",
       "eventsCount_other": "{{displayCount}} tapahtumaa",
       "generated": "Raportti luotiin {{generatedAt}}",

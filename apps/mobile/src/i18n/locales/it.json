@@ -635,9 +635,9 @@
     },
     "providerConnect": {
       "description": "Connetti {{label}} di Kilo per revisionare automaticamente le pull request.",
-      "githubApp": "App GitHub",
+      "githubApp": "l'App GitHub",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
-      "gitlabAccount": "Account GitLab",
+      "gitlabAccount": "l'account GitLab",
       "gitlabError": "Impossibile aprire la configurazione di GitLab. Riprova.",
       "bitbucketError": "Impossibile aprire la configurazione di Bitbucket. Riprova."
     },
@@ -955,6 +955,8 @@
       "events": "Eventi",
       "eventConfidence": "Confidenza: {{confidence}}",
       "eventReason": "Motivo: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} evento",
       "eventsCount_many": "{{displayCount}} eventi",
       "eventsCount_other": "{{displayCount}} eventi",

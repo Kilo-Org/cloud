@@ -986,6 +986,8 @@
       "events": "Ereignisse",
       "eventConfidence": "Konfidenz: {{confidence}}",
       "eventReason": "Grund: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} Ereignis",
       "eventsCount_other": "{{displayCount}} Ereignisse",
       "generated": "Der Bericht wurde am {{generatedAt}} erstellt.",

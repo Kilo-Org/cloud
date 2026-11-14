@@ -988,6 +988,8 @@
       "events": "אירועים",
       "eventConfidence": "רמת ביטחון: {{confidence}}",
       "eventReason": "סיבה: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): מ{{previous}} ל{{next}}",
+      "eventStatusChange": "$t(common.status): מ{{previous}} ל{{next}}",
       "eventsCount_one": "{{displayCount}} אירוע",
       "eventsCount_two": "{{displayCount}} אירועים",
       "eventsCount_other": "{{displayCount}} אירועים",

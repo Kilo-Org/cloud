@@ -1770,6 +1770,8 @@
       "events": "Peristiwa",
       "eventConfidence": "Keyakinan: {{confidence}}",
       "eventReason": "Sebab: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} peristiwa",
       "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dijana pada {{generatedAt}}.",
@@ -4093,11 +4095,11 @@
       "delete": "Padam ejen {{name}}"
     },
     "slashCommands": {
-      "title": "Perintah tebas",
+      "title": "Arahan tebas",
       "add": "Tambah arahan slash",
       "empty": "Tiada arahan slash lagi",
       "name": "Nama arahan",
-      "description": "Penerangan perintah",
+      "description": "Penerangan arahan",
       "template": "templat",
       "namePlaceholder": "explain",
       "agentPlaceholder": "reviewer",

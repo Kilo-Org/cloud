@@ -1397,11 +1397,11 @@
       "activity": "Gníomhaíocht"
     },
     "providerConnect": {
-      "githubApp": "Aip GitHub",
+      "githubApp": "an aip GitHub",
       "githubError": "Níorbh fhéidir socrú GitHub a oscailt. Bain triail as arís le do thoil.",
-      "gitlabAccount": "Cuntas GitLab",
+      "gitlabAccount": "an cuntas GitLab",
       "gitlabError": "Níorbh fhéidir socrú GitLab a oscailt. Bain triail as arís le do thoil.",
-      "description": "Ceangail {{label}} Kilo chun iarratais tarraingthe a athbhreithniú go huathoibríoch.",
+      "description": "Ceangail {{label}} le Kilo chun iarratais tarraingthe a athbhreithniú go huathoibríoch.",
       "bitbucketError": "Níorbh fhéidir socrú Bitbucket a oscailt. Bain triail as arís."
     },
     "overview": {
@@ -1878,6 +1878,8 @@
       "events": "Imeachtaí",
       "eventConfidence": "Muinín: {{confidence}}",
       "eventReason": "Cúis: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} imeacht",
       "eventsCount_two": "{{displayCount}} imeacht",
       "eventsCount_few": "{{displayCount}} imeacht",

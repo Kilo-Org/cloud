@@ -1770,6 +1770,8 @@
       "events": "رویدادها",
       "eventConfidence": "اطمینان: {{confidence}}",
       "eventReason": "دلیل: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): از {{previous}} به {{next}}",
+      "eventStatusChange": "$t(common.status): از {{previous}} به {{next}}",
       "eventsCount_one": "{{displayCount}} رویداد",
       "eventsCount_other": "{{displayCount}} رویداد",
       "generated": "این گزارش در {{generatedAt}} تولید شده است.",
@@ -4093,9 +4095,9 @@
       "delete": "عامل {{name}} را حذف کنید"
     },
     "slashCommands": {
-      "title": "دستورات اسلش",
-      "add": "دستور اسلش را اضافه کنید",
-      "empty": "هنوز دستور اسلش وجود ندارد",
+      "title": "فرمانهای اسلش",
+      "add": "فرمان اسلش را اضافه کنید",
+      "empty": "هنوز فرمان اسلش وجود ندارد",
       "name": "نام فرمان",
       "description": "توضیحات فرمان",
       "template": "الگو",
@@ -4112,7 +4114,7 @@
       "nameRequired": "یک نام فرمان وارد کنید",
       "nameInvalid": "نام باید با یک حرف کوچک شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند",
       "templateRequired": "یک قالب فرمان را وارد کنید",
-      "nameConflict": "این نام توسط یک دستور داخلی رزرو شده است",
+      "nameConflict": "این نام توسط یک فرمان داخلی رزرو شده است",
       "duplicateName": "فرمانی با این نام از قبل در این نمایه وجود دارد"
     },
     "repoBindings": {

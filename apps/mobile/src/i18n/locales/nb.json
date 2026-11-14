@@ -1328,9 +1328,9 @@
       "activity": "Aktivitet"
     },
     "providerConnect": {
-      "githubApp": "GitHub-app",
+      "githubApp": "GitHub-appen",
       "githubError": "Kunne ikke åpne GitHub-oppsettet. Prøv igjen.",
-      "gitlabAccount": "GitLab-konto",
+      "gitlabAccount": "GitLab-kontoen",
       "gitlabError": "Kunne ikke åpne GitLab-oppsettet. Prøv igjen.",
       "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk.",
       "bitbucketError": "Kunne ikke åpne Bitbucket-oppsettet. Prøv igjen."
@@ -1770,6 +1770,8 @@
       "events": "Hendelser",
       "eventConfidence": "Konfidens: {{confidence}}",
       "eventReason": "Årsak: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} hendelse",
       "eventsCount_other": "{{displayCount}} hendelser",
       "generated": "Rapporten ble generert {{generatedAt}}.",

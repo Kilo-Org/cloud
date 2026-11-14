@@ -1770,6 +1770,8 @@
       "events": "Sündmused",
       "eventConfidence": "Usaldus: {{confidence}}",
       "eventReason": "Põhjus: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} sündmus",
       "eventsCount_other": "{{displayCount}} sündmust",
       "generated": "Aruanne on loodud {{generatedAt}}.",

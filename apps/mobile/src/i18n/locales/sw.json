@@ -1770,6 +1770,8 @@
       "events": "Matukio",
       "eventConfidence": "Uhakika: {{confidence}}",
       "eventReason": "Sababu: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} tukio",
       "eventsCount_other": "{{displayCount}} matukio",
       "generated": "Ripoti imetengenezwa {{generatedAt}}.",

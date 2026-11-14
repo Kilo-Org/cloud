@@ -986,6 +986,8 @@
       "events": "Sự kiện",
       "eventConfidence": "Độ tin cậy: {{confidence}}",
       "eventReason": "Lý do: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} sự kiện",
       "eventsCount_other": "{{displayCount}} sự kiện",
       "generated": "Báo cáo được tạo vào {{generatedAt}}.",

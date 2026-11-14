@@ -1351,11 +1351,11 @@
       "activity": "Activitat"
     },
     "providerConnect": {
-      "githubApp": "Aplicació de GitHub",
+      "githubApp": "l'Aplicació de GitHub",
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
-      "gitlabAccount": "Compte de GitLab",
+      "gitlabAccount": "el Compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta {{label}} de Kilo per revisar automàticament les sol·licituds d'integració.",
+      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració.",
       "bitbucketError": "No s'ha pogut obrir la configuració de Bitbucket. Torna-ho a provar."
     },
     "overview": {
@@ -1806,6 +1806,8 @@
       "events": "Esdeveniments",
       "eventConfidence": "Confiança: {{confidence}}",
       "eventReason": "Motiu: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} esdeveniment",
       "eventsCount_many": "{{displayCount}} esdeveniments",
       "eventsCount_other": "{{displayCount}} esdeveniments",
@@ -4154,7 +4156,7 @@
       "delete": "Elimina l'agent {{name}}"
     },
     "slashCommands": {
-      "title": "Comandes de barra",
+      "title": "Ordres de barra",
       "add": "Afegeix l'ordre de barra inclinada",
       "empty": "Encara no hi ha ordres de barra inclinada",
       "name": "Nom de l'ordre",

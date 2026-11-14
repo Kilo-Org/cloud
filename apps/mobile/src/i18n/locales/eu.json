@@ -1770,6 +1770,8 @@
       "events": "Gertaerak",
       "eventConfidence": "Konfiantza: {{confidence}}",
       "eventReason": "Arrazoia: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} gertaera",
       "eventsCount_other": "{{displayCount}} gertaera",
       "generated": "Txostena sortu da: {{generatedAt}}.",

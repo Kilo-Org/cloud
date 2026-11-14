@@ -1770,6 +1770,8 @@
       "events": "Zava-nitranga",
       "eventConfidence": "Fahatokisana: {{confidence}}",
       "eventReason": "Antony: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} Zava-nitranga",
       "eventsCount_other": "{{displayCount}} Zava-nitranga",
       "generated": "Noforonina tamin'ny {{generatedAt}}.",

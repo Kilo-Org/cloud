@@ -1770,6 +1770,8 @@
       "events": "ਘਟਨਾਵਾਂ",
       "eventConfidence": "ਭਰੋਸਾ: {{confidence}}",
       "eventReason": "ਕਾਰਨ: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ਘਟਨਾ",
       "eventsCount_other": "{{displayCount}} ਘਟਨਾਵਾਂ",
       "generated": "{{generatedAt}} ਨੂੰ ਤਿਆਰ ਕੀਤੀ ਗਈ।",

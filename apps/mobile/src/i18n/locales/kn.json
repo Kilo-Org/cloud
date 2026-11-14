@@ -1770,6 +1770,8 @@
       "events": "ಘಟನೆಗಳು",
       "eventConfidence": "ವಿಶ್ವಾಸ: {{confidence}}",
       "eventReason": "ಕಾರಣ: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ಘಟನೆ",
       "eventsCount_other": "{{displayCount}} ಘಟನೆಗಳು",
       "generated": "{{generatedAt}} ರಂದು ರಚಿಸಲಾಗಿದೆ.",
@@ -4111,7 +4113,7 @@
       "deleteFailed": "ಆಜ್ಞೆಯನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "nameRequired": "ಆಜ್ಞೆಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
       "nameInvalid": "ಹೆಸರು ಸಣ್ಣ ಅಕ್ಷರದಿಂದ ಪ್ರಾರಂಭವಾಗಬೇಕು ಮತ್ತು ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಅಂಕೆಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಬೇಕು",
-      "templateRequired": "ಕಮಾಂಡ್ ಟೆಂಪ್ಲೇಟ್ ಅನ್ನು ನಮೂದಿಸಿ",
+      "templateRequired": "ಆಜ್ಞೆಯ ಟೆಂಪ್ಲೇಟ್ ಅನ್ನು ನಮೂದಿಸಿ",
       "nameConflict": "ಆ ಹೆಸರನ್ನು ಅಂತರ್ನಿರ್ಮಿತ ಆಜ್ಞೆಯಿಂದ ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ",
       "duplicateName": "ಈ ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ಈ ಹೆಸರಿನ ಆಜ್ಞೆ ಈಗಾಗಲೇ ಅಸ್ತಿತ್ವದಲ್ಲಿದೆ"
     },

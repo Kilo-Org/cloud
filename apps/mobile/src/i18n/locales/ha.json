@@ -1770,6 +1770,8 @@
       "events": "Abubuwan da suka faru",
       "eventConfidence": "Amincewa: {{confidence}}",
       "eventReason": "Dalili: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} abubuwan da suka faru",
       "eventsCount_other": "{{displayCount}} abubuwan da suka faru",
       "generated": "An samar da rahoton {{generatedAt}}.",

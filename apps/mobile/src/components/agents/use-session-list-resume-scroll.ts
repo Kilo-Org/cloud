@@ -8,6 +8,10 @@ import {
   claimIsSend,
   type SessionPositionClaim,
 } from '@/components/agents/use-session-auto-scroll-state';
+import {
+  motionIsMoving,
+  type MotionState,
+} from '@/components/agents/use-session-list-scroll-timeouts';
 import { planResumeScroll } from '@/lib/session-resume';
 
 /**
@@ -72,7 +76,7 @@ type UseSessionListResumeScrollParams<ItemT> = {
    * interrupted, and no scheduled scroll may yank the list mid-fling. The
    * timeouts hook ends it on every path that ends motion.
    */
-  motionRef: RefObject<boolean>;
+  motionRef: RefObject<MotionState>;
   suppressAutoFollow: (ms: number) => void;
   /**
    * Message id a `?at=` deep link wants the transcript to open on. When it is
@@ -161,7 +165,7 @@ export function useSessionListResumeScroll<ItemT>({
               clearResumeRetries();
               return;
             }
-            if (motionRef.current) {
+            if (motionIsMoving(motionRef.current)) {
               return;
             }
             const index = latest.anchorIds.indexOf(latest.resumeAnchor);
@@ -225,7 +229,7 @@ export function useSessionListResumeScroll<ItemT>({
       // An in-flight drag (or a fling a send interrupted) must not be yanked
       // either: the immediate scroll waits for the list to settle. The retry
       // chain below still lands the anchor once it has, so nothing is lost.
-      if (!motionRef.current) {
+      if (!motionIsMoving(motionRef.current)) {
         // Arm the suppression before any scroll this plan issues: FlashList's
         // bottom-start events (cold) or this scroll's own 5-step events (warm)
         // read "at the bottom" and would arm the tail follow, whose

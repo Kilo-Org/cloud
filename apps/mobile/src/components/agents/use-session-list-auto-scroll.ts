@@ -25,11 +25,7 @@ import {
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
-import {
-  DRAG_SETTLE_MS,
-  MOMENTUM_BOUND_MS,
-  useSessionListScrollTimeouts,
-} from '@/components/agents/use-session-list-scroll-timeouts';
+import { useSessionListScrollTimeouts } from '@/components/agents/use-session-list-scroll-timeouts';
 import { useSessionTailRepin } from '@/components/agents/use-session-tail-repin';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 
@@ -309,7 +305,7 @@ export function useSessionListAutoScroll<ItemT>({
     // send's claim, which a later link is allowed to release (a drag's is not).
     claimRef.current = claimAfterDragBegin(claimRef.current);
     isAutoScrollingRef.current = false;
-    timeouts.beginMotion();
+    timeouts.beginDrag();
     timeouts.clearReset();
     timeouts.clearRetry();
   }, [timeouts]);
@@ -320,7 +316,7 @@ export function useSessionListAutoScroll<ItemT>({
       // onMomentumScrollEnd is not guaranteed to fire for every drag (short or
       // slow drags release without momentum). The settle ends both the motion
       // and the claim; a real fling replaces it with its own bound.
-      timeouts.settleMotion(DRAG_SETTLE_MS, () => {
+      timeouts.endDrag(() => {
         claimRef.current = claimAfterDragEnd(claimRef.current);
       });
     },
@@ -330,17 +326,19 @@ export function useSessionListAutoScroll<ItemT>({
   const handleMomentumScrollBegin = useCallback(() => {
     /* The fling is real, and it may never report its end: one bound, not none.
        The bound settles the claim exactly as a momentum end would, or the list
-       would stop following the tail for good once the bound fired. */
-    timeouts.settleMotion(MOMENTUM_BOUND_MS, () => {
+       would stop following the tail for good once the bound fired. A later drag
+       cancels it, so it cannot settle that drag's claim. */
+    timeouts.beginMomentum(() => {
       claimRef.current = claimAfterMomentumEnd(claimRef.current);
     });
   }, [timeouts]);
 
   const handleMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      timeouts.endMotion();
       // A late momentum end follows a drag; a send's claim outranks it.
-      claimRef.current = claimAfterMomentumEnd(claimRef.current);
+      timeouts.endMomentum(() => {
+        claimRef.current = claimAfterMomentumEnd(claimRef.current);
+      });
       updateAutoScrollFromEvent(event);
     },
     [timeouts, updateAutoScrollFromEvent]

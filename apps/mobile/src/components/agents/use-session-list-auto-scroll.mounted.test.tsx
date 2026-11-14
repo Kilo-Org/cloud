@@ -198,6 +198,32 @@ describe('useSessionListAutoScroll send during a fling', () => {
     expect(scrollToEnd).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a new drag claim when the previous fling bound elapses', () => {
+    // Regression: the bound was armed by the fling and never cancelled by the
+    // drag that followed, so it settled the new drag's claim while the finger
+    // was still down.
+    vi.useFakeTimers();
+    const { scrollToEnd, api } = mountAutoScroll(1);
+    closeProgrammaticScrollWindow();
+
+    act(() => {
+      api.handleScrollBeginDrag();
+      api.handleMomentumScrollBegin();
+      api.handleScrollBeginDrag();
+    });
+    act(() => {
+      vi.advanceTimersByTime(MOMENTUM_BOUND_MS + 1);
+    });
+
+    expect(api.claimRef.current).toEqual({ kind: 'drag' });
+    scrollToEnd.mockClear();
+    act(() => {
+      api.handleContentSizeChange(400, 2000);
+      vi.advanceTimersByTime(1);
+    });
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
   it('follows the tail again after the fling bound settles the claim', () => {
     // Regression: the bound ended motion but left the drag claim live, so the
     // content-size follow refused for the rest of the screen.

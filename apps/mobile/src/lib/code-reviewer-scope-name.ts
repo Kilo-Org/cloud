@@ -80,6 +80,11 @@ const names = new Map<string, string>();
 // account (see `rememberScopeName`).
 let recordUserId: string | null = null;
 let hydration: Promise<void> | null = null;
+// Bumped at an account boundary. A restart read captures it before its first
+// await and drops every result once it moved, so a read already past the
+// account lookup cannot commit the previous account's names or its id after
+// `clearScopeNames` ran.
+let generation = 0;
 // The latest queued mirror write. Held so the pure suite can await the chain
 // rather than guess at a delay; every operation swallows its own failure, so
 // this never rejects.
@@ -167,18 +172,31 @@ async function restore(): Promise<void> {
   if (store === null) {
     return;
   }
+  const startedAt = generation;
   try {
     const userId = await store.getItemAsync(ACTIVE_USER_ID_KEY);
+    if (generation !== startedAt) {
+      return;
+    }
     if (userId === null || userId === recordUserId) {
       return;
     }
     // Names remembered for another account must never paint under this one.
     if (recordUserId !== null) {
+      recordUserId = null;
       names.clear();
       notify();
     }
-    recordUserId = userId;
     const raw = await store.getItemAsync(REVIEWER_SCOPE_NAMES_KEY);
+    // The clear that landed during this read owns the store now: its delete
+    // covers the record this read would apply, and the empty map is the truth.
+    if (generation !== startedAt) {
+      return;
+    }
+    // Only a completed record read commits the account. A refused read leaves
+    // it unset, so the next hydrate reaches the record again instead of
+    // short-circuiting, and no remember can serialize a map that never saw it.
+    recordUserId = userId;
     if (raw === null) {
       return;
     }
@@ -283,6 +301,9 @@ export function subscribeScopeNames(listener: () => void): () => void {
  */
 export function clearScopeNames(): void {
   const hadNames = names.size > 0 || recordUserId !== null;
+  // Bumped before the state moves, so a restart read already holding this
+  // account cannot commit its names or its id after this clear.
+  generation += 1;
   names.clear();
   recordUserId = null;
   hydration = null;
@@ -323,6 +344,9 @@ export function _resetScopeNamesForTests(): void {
   names.clear();
   recordUserId = null;
   hydration = null;
+  // Bumped, not zeroed: a restart read still in flight from an earlier test
+  // must not commit into this one.
+  generation += 1;
   lastWrite = null;
   listeners.clear();
   secureStoreForTests = null;

@@ -21,6 +21,13 @@ import {
 
 const store = new Map<string, string>();
 
+// Controls the record read: one case holds it open so the account boundary can
+// land mid-read, another refuses it once the way a locked device does.
+const recordRead = {
+  gate: null as null | { reached: () => void; released: Promise<void>; release: () => void },
+  failures: 0,
+};
+
 // Fake SecureStore surface backed by an in-memory Map, injected through the
 // test-only setter so the durable mirror never loads the real native module.
 const secureStoreMock = {
@@ -30,6 +37,23 @@ const secureStoreMock = {
   }),
   getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
+    if (key === REVIEWER_SCOPE_NAMES_KEY) {
+      // The bytes are captured when the read starts, like a native read that
+      // resolves with what the keychain held before a later delete.
+      const captured = store.get(key) ?? null;
+      const gate = recordRead.gate;
+      if (gate !== null) {
+        recordRead.gate = null;
+        gate.reached();
+        await gate.released;
+        return captured;
+      }
+      if (recordRead.failures > 0) {
+        recordRead.failures -= 1;
+        throw new Error('the keychain refused the record read');
+      }
+      return captured;
+    }
     return store.get(key) ?? null;
   }),
   deleteItemAsync: vi.fn(async (key: string) => {
@@ -37,6 +61,48 @@ const secureStoreMock = {
     await Promise.resolve();
   }),
 };
+
+/**
+ * A promise a case resolves by hand, so a test can wait for something without
+ * guessing at a delay.
+ */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let storedResolve: (() => void) | undefined = undefined;
+  const promise = new Promise<void>(resolve => {
+    storedResolve = resolve;
+  });
+  return {
+    promise,
+    resolve: () => {
+      storedResolve?.();
+    },
+  };
+}
+
+/**
+ * Hold the next record read open, so a case can run the account boundary while
+ * a restart read is in flight without guessing at a delay.
+ */
+function holdRecordRead(): { reached: Promise<void>; release: () => void } {
+  const reached = deferred();
+  const released = deferred();
+  recordRead.gate = {
+    reached: () => {
+      reached.resolve();
+    },
+    released: released.promise,
+    release: () => {
+      released.resolve();
+    },
+  };
+  return {
+    reached: reached.promise,
+    release: () => {
+      recordRead.gate = null;
+      released.resolve();
+    },
+  };
+}
 
 function persistedRecord(entries: readonly { organizationId: string; organizationName: string }[]) {
   return JSON.stringify({
@@ -89,10 +155,14 @@ beforeEach(() => {
   _resetScopeNamesForTests();
   _setSecureStoreForTests(secureStoreMock);
   store.clear();
+  recordRead.gate = null;
+  recordRead.failures = 0;
   vi.clearAllMocks();
 });
 
 afterEach(async () => {
+  recordRead.gate?.release();
+  recordRead.gate = null;
   await _flushScopeNameWritesForTests();
   _resetScopeNamesForTests();
   store.clear();
@@ -171,16 +241,91 @@ describe('remembered scope names', () => {
     await _hydrateScopeNamesForTests();
     expect(readScopeName('org-labs')).toBeUndefined();
 
+    // The first read committed `u1`, so the second half names another active
+    // account: otherwise the same-account short-circuit keeps the `version: 2`
+    // record from ever reaching the check this case is about.
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
     store.set(
       REVIEWER_SCOPE_NAMES_KEY,
       JSON.stringify({
         version: 2,
-        userId: 'u1',
+        userId: 'u2',
         entries: [{ organizationId: 'org-labs', organizationName: 'Drain Labs', seenAt: 1 }],
       })
     );
     await _hydrateScopeNamesForTests();
     expect(readScopeName('org-labs')).toBeUndefined();
+  });
+
+  it('keeps the account uncommitted when the record read is refused', async () => {
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    store.set(
+      REVIEWER_SCOPE_NAMES_KEY,
+      persistedRecord([{ organizationId: 'org-labs', organizationName: 'Drain Labs' }])
+    );
+
+    recordRead.failures = 1;
+    await _hydrateScopeNamesForTests();
+    expect(readScopeName('org-labs')).toBeUndefined();
+
+    // A committed account would short-circuit this read; it must reach the
+    // record the refusal never returned.
+    await _hydrateScopeNamesForTests();
+    expect(readScopeName('org-labs')).toBe('Drain Labs');
+  });
+
+  it('writes the whole record when a remember follows a refused read', async () => {
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    store.set(
+      REVIEWER_SCOPE_NAMES_KEY,
+      persistedRecord([{ organizationId: 'org-labs', organizationName: 'Drain Labs' }])
+    );
+
+    recordRead.failures = 1;
+    await _hydrateScopeNamesForTests();
+    expect(readScopeName('org-labs')).toBeUndefined();
+
+    rememberScopeName('org-new', 'New Labs');
+    await _flushScopeNameWritesForTests();
+
+    // The write waited on a read that succeeded — the refusal committed
+    // nothing — so the record carries the name the refused read missed instead
+    // of a map that never saw it.
+    expect(mirroredRecord().entries.map(entry => entry.organizationId)).toEqual([
+      'org-new',
+      'org-labs',
+    ]);
+    expect(readScopeName('org-labs')).toBe('Drain Labs');
+    expect(readScopeName('org-new')).toBe('New Labs');
+  });
+
+  it('drops a restart read that races the account boundary', async () => {
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    store.set(
+      REVIEWER_SCOPE_NAMES_KEY,
+      persistedRecord([{ organizationId: 'org-labs', organizationName: 'Drain Labs' }])
+    );
+    const read = holdRecordRead();
+
+    const hydration = hydrateScopeNames();
+    await read.reached;
+
+    clearScopeNames();
+    read.release();
+    await hydration;
+
+    expect(readScopeName('org-labs')).toBeUndefined();
+    await _flushScopeNameWritesForTests();
+    expect(store.has(REVIEWER_SCOPE_NAMES_KEY)).toBe(false);
+
+    // The raced read committed no account either: a record that arrives after
+    // the boundary is read on the next hydrate instead of being skipped.
+    store.set(
+      REVIEWER_SCOPE_NAMES_KEY,
+      persistedRecord([{ organizationId: 'org-two', organizationName: 'Drain Labs EU' }])
+    );
+    await _hydrateScopeNamesForTests();
+    expect(readScopeName('org-two')).toBe('Drain Labs EU');
   });
 
   it('re-renders a subscriber once the restart read lands', async () => {

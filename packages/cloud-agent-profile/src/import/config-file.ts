@@ -22,6 +22,7 @@ export type ConfigSections = {
   instructionGlobs: string[];
 };
 
+/** Config file names that mark a real config root, so a bare config file is not treated as a wrapper. */
 export const CONFIG_FILE_NAMES = new Set(['kilo.json', 'kilo.jsonc']);
 
 const AGENT_SECTION_KEYS = ['agent', 'agents'] as const;

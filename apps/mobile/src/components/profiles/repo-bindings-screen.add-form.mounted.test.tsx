@@ -254,40 +254,4 @@ describe('RepoBindingsScreen add form', () => {
 
     unmount();
   });
-
-  it('empty picker: a read-only organization context offers no create action', async () => {
-    permissionState.permission = 'read-only';
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'An organization owner or admin can create an organization profile.'
-    );
-    expect(empty.action).toBeUndefined();
-
-    unmount();
-  });
-
-  it('empty picker: an unresolved role does not yet read as read-only', async () => {
-    permissionState.permission = 'resolving';
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'Create an organization profile to reuse environment variables, setup commands, and skills across sessions.'
-    );
-    // The action still waits for the role: a member must never be offered a
-    // create the server rejects.
-    expect(empty.action).toBeUndefined();
-
-    unmount();
-  });
 });

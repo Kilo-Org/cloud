@@ -305,6 +305,7 @@ describe('getSecurityDeadlinePresentation', () => {
   it.each<[string, string, string, string, number?]>([
     ['1 day overdue', localTimestamp(2026, 6, 7), '1 day overdue', 'overdue', 1],
     ['plural days overdue', localTimestamp(2026, 6, 4), '4 days overdue', 'overdue', 4],
+    ['overdue earlier today', localTimestamp(2026, 6, 8, 9), 'Overdue', 'overdue', 0],
     ['due today', localTimestamp(2026, 6, 8, 20), 'Due today', 'due-today'],
     ['due tomorrow', localTimestamp(2026, 6, 9), 'Due tomorrow', 'due-tomorrow'],
     [

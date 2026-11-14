@@ -4158,8 +4158,7 @@
       "unbindFailed": "रेपॉजिटरी अनबाइंड करता आली नाही",
       "repoValue": "रेपॉजिटरी: {{name}}",
       "profileValue": "प्रोफाइल: {{name}}",
-      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "संस्था मालक किंवा प्रशासक संस्था प्रोफाइल तयार करू शकतो."
+      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा."
     },
     "variablesDeleteFailed": "व्हेरिएबल हटवता आले नाही",
     "deleteVariable": "व्हेरिएबल {{key}} हटवा",

@@ -4341,8 +4341,7 @@
       "unbindFailed": "Níorbh fhéidir repo a dhícheangal",
       "repoValue": "Stór: {{name}}",
       "profileValue": "Próifíl: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Cruthaigh próifíl eagrais chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Is féidir le húinéir nó riarthóir eagrais próifíl eagrais a chruthú."
+      "pickerEmptyDescriptionOrganization": "Cruthaigh próifíl eagrais chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin."
     },
     "variablesDeleteFailed": "Níorbh fhéidir an athróg a scriosadh",
     "deleteVariable": "Scrios athróg {{key}}",

@@ -4219,8 +4219,7 @@
       "unbindFailed": "Impossibile scollegare il repository",
       "repoValue": "Archivio: {{name}}",
       "profileValue": "Profilo: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Crea un profilo dell'organizzazione per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un proprietario o un amministratore dell'organizzazione può creare un profilo dell'organizzazione."
+      "pickerEmptyDescriptionOrganization": "Crea un profilo dell'organizzazione per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni."
     },
     "variablesDeleteFailed": "Impossibile eliminare la variabile",
     "deleteVariable": "Elimina la variabile {{key}}",

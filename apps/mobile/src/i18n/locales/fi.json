@@ -4158,8 +4158,7 @@
       "unbindFailed": "Koodivaraston sidontaa ei voitu purkaa",
       "repoValue": "Koodivarasto: {{name}}",
       "profileValue": "Profiili: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Luo organisaatioprofiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organisaation omistaja tai ylläpitäjä voi luoda organisaatioprofiilin."
+      "pickerEmptyDescriptionOrganization": "Luo organisaatioprofiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana."
     },
     "variablesDeleteFailed": "Muuttujaa ei voitu poistaa",
     "deleteVariable": "Poista muuttuja {{key}}",

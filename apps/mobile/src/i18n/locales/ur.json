@@ -4158,8 +4158,7 @@
       "unbindFailed": "ریپو کو بند نہیں کیا جا سکا",
       "repoValue": "ذخیرہ: {{name}}",
       "profileValue": "پروفائل: {{name}}",
-      "pickerEmptyDescriptionOrganization": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک تنظیمی پروفائل بنائیں۔",
-      "pickerEmptyDescriptionOrganizationReadOnly": "تنظیم کا مالک یا ایڈمن تنظیمی پروفائل بنا سکتا ہے۔"
+      "pickerEmptyDescriptionOrganization": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک تنظیمی پروفائل بنائیں۔"
     },
     "variablesDeleteFailed": "متغیر حذف نہیں کیا جا سکا",
     "deleteVariable": "متغیر {{key}} کو حذف کریں",

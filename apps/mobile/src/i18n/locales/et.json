@@ -4158,8 +4158,7 @@
       "unbindFailed": "Repot ei saanud lahti siduda",
       "repoValue": "Hoidla: {{name}}",
       "profileValue": "Profiil: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Loo organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organisatsiooni omanik või administraator saab organisatsiooniprofiili luua."
+      "pickerEmptyDescriptionOrganization": "Loo organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul."
     },
     "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
     "deleteVariable": "Kustuta muutuja {{key}}",

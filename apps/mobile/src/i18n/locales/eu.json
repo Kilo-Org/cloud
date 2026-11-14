@@ -4158,8 +4158,7 @@
       "unbindFailed": "Ezin izan da biltegia deslotu",
       "repoValue": "Biltegia: {{name}}",
       "profileValue": "Profila: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Erakundearen jabe batek edo administratzaile batek sor dezake erakunde-profil bat."
+      "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko."
     },
     "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
     "deleteVariable": "Ezabatu aldagaia {{key}}",

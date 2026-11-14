@@ -9,7 +9,6 @@ import {
   findAll,
   mountScreen,
   pressButton,
-  pressPressable,
   testBinding,
   type TestBinding,
 } from '@/components/profiles/repo-bindings-screen.test-helpers';

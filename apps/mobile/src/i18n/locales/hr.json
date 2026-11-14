@@ -4219,8 +4219,7 @@
       "unbindFailed": "Nije moguće odvezati repo",
       "repoValue": "Spremište: {{name}}",
       "profileValue": "Profil: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Izradite profil organizacije za ponovno korištenje varijabli okoline, naredbi za postavljanje i vještina u više sesija.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može izraditi profil organizacije."
+      "pickerEmptyDescriptionOrganization": "Izradite profil organizacije za ponovno korištenje varijabli okoline, naredbi za postavljanje i vještina u više sesija."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati varijablu",
     "deleteVariable": "Obriši varijablu {{key}}",

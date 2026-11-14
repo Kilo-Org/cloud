@@ -4402,8 +4402,7 @@
       "unbindFailed": "Ni fu modd dadrwymo repo",
       "repoValue": "Ystorfa: {{name}}",
       "profileValue": "Proffil: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Gall perchennog sefydliad neu weinyddwr greu proffil sefydliad."
+      "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau."
     },
     "variablesDeleteFailed": "Ni fu modd dileu'r newidyn",
     "deleteVariable": "Dileu newidyn {{key}}",

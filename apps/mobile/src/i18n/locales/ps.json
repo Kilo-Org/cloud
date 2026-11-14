@@ -4158,8 +4158,7 @@
       "unbindFailed": "د زېرمتون تړاو لیرې نشو کړای",
       "repoValue": "زېرمتون: {{name}}",
       "profileValue": "پروفایل: {{name}}",
-      "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "د سازمان خاوند یا مدیر کولی شي د سازمان پروفایل رامینځته کړي."
+      "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ."
     },
     "variablesDeleteFailed": "متغیر ړنګول نشو کړای",
     "deleteVariable": "د {{key}} متغیر ړنګ کړئ",

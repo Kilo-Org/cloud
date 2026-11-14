@@ -4280,8 +4280,7 @@
       "unbindFailed": "Nepodarilo sa odpojiť repo",
       "repoValue": "Úložisko: {{name}}",
       "profileValue": "Profil: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Vytvorte profil organizácie na opätovné použitie premenných prostredia, príkazov nastavenia a zručností v rámci relácií.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizácie môže vytvoriť vlastník alebo správca organizácie."
+      "pickerEmptyDescriptionOrganization": "Vytvorte profil organizácie na opätovné použitie premenných prostredia, príkazov nastavenia a zručností v rámci relácií."
     },
     "variablesDeleteFailed": "Premennú sa nepodarilo vymazať",
     "deleteVariable": "Odstrániť premennú {{key}}",

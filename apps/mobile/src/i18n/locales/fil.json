@@ -4158,8 +4158,7 @@
       "unbindFailed": "Hindi ma-unbind ang repo",
       "repoValue": "Repositoryo: {{name}}",
       "profileValue": "Profile: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ang may-ari ng organisasyon o admin ang makakagawa ng profile ng organisasyon."
+      "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session."
     },
     "variablesDeleteFailed": "Hindi ma-delete ang variable",
     "deleteVariable": "Burahin ang variable {{key}}",

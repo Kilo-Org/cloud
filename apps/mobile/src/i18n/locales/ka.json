@@ -4158,8 +4158,7 @@
       "unbindFailed": "რეპოს გაუქმება ვერ მოხერხდა",
       "repoValue": "საცავი: {{name}}",
       "profileValue": "პროფილი: {{name}}",
-      "pickerEmptyDescriptionOrganization": "შექმენით ორგანიზაციის პროფილი გარემოს ცვლადების, დაყენების ბრძანებებისა და უნარების ხელახლა გამოსაყენებლად სესიებზე.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ორგანიზაციის მფლობელს ან ადმინისტრატორს შეუძლია შექმნას ორგანიზაციის პროფილი."
+      "pickerEmptyDescriptionOrganization": "შექმენით ორგანიზაციის პროფილი გარემოს ცვლადების, დაყენების ბრძანებებისა და უნარების ხელახლა გამოსაყენებლად სესიებზე."
     },
     "variablesDeleteFailed": "ცვლადის წაშლა ვერ მოხერხდა",
     "deleteVariable": "წაშალე ცვლადი {{key}}",

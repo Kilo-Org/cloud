@@ -4158,8 +4158,7 @@
       "unbindFailed": "Kaore i taea te wete i te repo",
       "repoValue": "Rokiroki: {{name}}",
       "profileValue": "Kōtaha: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Waihangatia he kōtaha umanga hei whakamahi ano i nga taurangi taiao, nga whakahau tatūnga, me nga pukenga puta noa i nga waahi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ka taea e te rangatira o te umanga, te kaiwhakahaere ranei, te waihanga i tetahi kōtaha umanga."
+      "pickerEmptyDescriptionOrganization": "Waihangatia he kōtaha umanga hei whakamahi ano i nga taurangi taiao, nga whakahau tatūnga, me nga pukenga puta noa i nga waahi."
     },
     "variablesDeleteFailed": "Kāore i taea te muku taurangi",
     "deleteVariable": "Muku taurangi {{key}}",

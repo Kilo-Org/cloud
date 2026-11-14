@@ -4280,8 +4280,7 @@
       "unbindFailed": "Ni bilo mogoče razvezati repoja",
       "repoValue": "Repozitorij: {{name}}",
       "profileValue": "Profil: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijski profil lahko ustvari lastnik organizacije ali skrbnik."
+      "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami."
     },
     "variablesDeleteFailed": "Spremenljivke ni bilo mogoče izbrisati",
     "deleteVariable": "Izbriši spremenljivko {{key}}",

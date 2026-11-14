@@ -4219,8 +4219,7 @@
       "unbindFailed": "Nevarēja atsaistīt repo",
       "repoValue": "Repozitorijs: {{name}}",
       "profileValue": "Profils: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Izveidojiet organizācijas profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizācijas īpašnieks vai administrators var izveidot organizācijas profilu."
+      "pickerEmptyDescriptionOrganization": "Izveidojiet organizācijas profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes."
     },
     "variablesDeleteFailed": "Nevarēja izdzēst mainīgo",
     "deleteVariable": "Dzēst mainīgo {{key}}",

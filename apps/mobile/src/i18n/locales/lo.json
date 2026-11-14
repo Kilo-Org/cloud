@@ -4158,8 +4158,7 @@
       "unbindFailed": "ບໍ່ສາມາດຍົກເລີກການຜູກມັດ repo ໄດ້",
       "repoValue": "ບ່ອນເກັບມ້ຽນ: {{name}}",
       "profileValue": "ໂປຣໄຟລ໌: {{name}}",
-      "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ເຈົ້າຂອງອົງກອນ ຫຼືຜູ້ບໍລິຫານສາມາດສ້າງໂປຣໄຟລ໌ຂອງອົງກອນໄດ້."
+      "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ."
     },
     "variablesDeleteFailed": "ບໍ່ສາມາດລຶບຕົວແປໄດ້",
     "deleteVariable": "ລຶບຕົວແປ {{key}}",

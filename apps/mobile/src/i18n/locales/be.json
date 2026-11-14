@@ -4280,8 +4280,7 @@
       "unbindFailed": "Не ўдалося адвязаць рэпазітар",
       "repoValue": "Сховішча: {{name}}",
       "profileValue": "Профіль: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Стварыце профіль арганізацыі для паўторнага выкарыстання зменных асяроддзя, каманд наладкі і навыкаў у сеансах.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Уладальнік арганізацыі або адмін можа стварыць профіль арганізацыі."
+      "pickerEmptyDescriptionOrganization": "Стварыце профіль арганізацыі для паўторнага выкарыстання зменных асяроддзя, каманд наладкі і навыкаў у сеансах."
     },
     "variablesDeleteFailed": "Не ўдалося выдаліць зменную",
     "deleteVariable": "Выдаліць зменную {{key}}",

@@ -4158,8 +4158,7 @@
       "unbindFailed": "Deponun bağlantısı kaldırılamadı",
       "repoValue": "Depo: {{name}}",
       "profileValue": "Profil: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Kuruluş sahibi veya yöneticisi bir kuruluş profili oluşturabilir."
+      "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun."
     },
     "variablesDeleteFailed": "Değişken silinemedi",
     "deleteVariable": "{{key}} değişkenini sil",

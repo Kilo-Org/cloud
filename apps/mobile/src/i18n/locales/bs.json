@@ -4219,8 +4219,7 @@
       "unbindFailed": "Nije moguće poništiti vezivanje repo",
       "repoValue": "Spremište: {{name}}",
       "profileValue": "Profil: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Kreirajte organizacijski profil za ponovno korištenje varijabli okruženja, naredbi za postavljanje i vještina u svim sesijama.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može kreirati organizacijski profil."
+      "pickerEmptyDescriptionOrganization": "Kreirajte organizacijski profil za ponovno korištenje varijabli okruženja, naredbi za postavljanje i vještina u svim sesijama."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati varijablu",
     "deleteVariable": "Obriši varijablu {{key}}",

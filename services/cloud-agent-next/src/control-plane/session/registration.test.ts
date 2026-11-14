@@ -9,6 +9,7 @@ import {
   controlPlaneRegistrationRouteSpecSchema,
   controlPlaneRouteSpecSchema,
 } from '../../shared/control-plane-protocol.js';
+import { matchesKiloPermissionPattern } from '../../shared/profile-permission-policy.js';
 import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
@@ -327,6 +328,28 @@ describe('egress policy registration', () => {
 });
 
 describe('migrated origin permissions', () => {
+  // A profile agent that permits every bash command and edit, so each case shows
+  // the session command policy and the agent restriction both applying.
+  const unrestrictedAgent = {
+    slug: 'reviewer',
+    name: 'Reviewer',
+    config: { permission: { edit: 'allow', bash: { '*': 'allow' } } },
+  };
+
+  function resolveBashPermission(
+    session: Record<string, string>,
+    agent: Record<string, string>,
+    command: string
+  ): string | undefined {
+    let action: string | undefined;
+    // The CLI installs the session rules first and appends the agent's rules,
+    // and a call resolves by the last matching rule.
+    for (const [pattern, verdict] of [...Object.entries(session), ...Object.entries(agent)]) {
+      if (matchesKiloPermissionPattern(command, pattern)) action = verdict;
+    }
+    return action;
+  }
+
   it.each(['standard', 'lite', undefined] as const)(
     'defers GitHub publisher identity %s to credential resolution',
     appType => {
@@ -418,6 +441,63 @@ describe('migrated origin permissions', () => {
       ).toBe(true);
     }
   );
+
+  it('narrows a profile agent permission map to the code-review command guard', () => {
+    const input = metadata({ profile: { runtimeAgents: [unrestrictedAgent] } });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    expect(permission).not.toHaveProperty('edit');
+    const bash = permission?.bash as Record<string, string> | undefined;
+    expect(bash).toBeDefined();
+    expect(bash?.['*']).not.toBe('allow');
+    expect(Object.values(bash ?? {}).every(action => action === 'deny')).toBe(true);
+    const guardBash = spec.permission?.bash as Record<string, string>;
+    // The guard's own rules decide these commands.
+    expect(resolveBashPermission(guardBash, bash ?? {}, 'npm test')).toBe('deny');
+    expect(resolveBashPermission(guardBash, bash ?? {}, 'git push')).toBe('deny');
+  });
+
+  it('narrows a pattern-map agent allow against the guard flat denial', () => {
+    const input = metadata({
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { edit: { '*': 'allow', 'notes.txt': 'allow' } } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const guardEdit = spec.permission?.edit;
+    expect(guardEdit).toBe('deny');
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    // The session states its policy as one flat action, so the entry carries it.
+    expect(permission?.edit).toEqual({ '*': 'deny' });
+    expect(
+      resolveBashPermission(
+        { '*': guardEdit as string },
+        permission?.edit as Record<string, string>,
+        '*'
+      )
+    ).toBe('deny');
+  });
+
+  it('keeps a profile agent permission map unchanged without a command guard', () => {
+    const input = metadata({ profile: { runtimeAgents: [unrestrictedAgent] } });
+    input.identity.createdOnPlatform = 'cloud-agent-web';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    expect(spec.permission).toBeUndefined();
+    expect(spec.runtimeAgents).toEqual([unrestrictedAgent]);
+    expect(JSON.stringify(spec.runtimeAgents)).toBe(JSON.stringify([unrestrictedAgent]));
+  });
 });
 
 describe('runtime authorization admission', () => {

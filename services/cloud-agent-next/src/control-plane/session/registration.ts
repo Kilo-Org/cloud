@@ -39,6 +39,7 @@ import { sessionWorkspace } from './workspace-roots.js';
 import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session/command-guard.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
+import { narrowProfileAgents } from '../../shared/profile-permission-policy.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -280,14 +281,26 @@ export function buildControlPlaneSessionRegistration(
   );
   if (payload.directory === undefined)
     throw new Error('Session attach payload requires a directory');
+  const guardPermissions = commandGuard
+    ? getCommandGuardPermissions(commandGuard, payload.directory, bitbucketReviewId)
+    : undefined;
   const permission = {
     ...(!isInteractiveSessionOrigin(createdOnPlatform) ? { question: 'deny' } : {}),
-    ...(commandGuard
-      ? getCommandGuardPermissions(commandGuard, payload.directory, bitbucketReviewId)
-      : {}),
+    ...(guardPermissions ?? {}),
   };
+  // A guarded session states the session command policy, and a profile agent
+  // carries its own permission map. Apply both here so the stored route spec and
+  // its persisted metadata hold the effective map: the agent's restrictions,
+  // and the session's policy for everything else.
+  const effectiveProfile =
+    guardPermissions === undefined || runtimeProfile.runtimeAgents === undefined
+      ? runtimeProfile
+      : {
+          ...runtimeProfile,
+          runtimeAgents: narrowProfileAgents(guardPermissions, runtimeProfile.runtimeAgents),
+        };
   const spec = controlPlaneRouteSpecSchema.parse({
-    ...runtimeProfile,
+    ...effectiveProfile,
     ...(metadata.continuation ? { continuation: true } : {}),
     ...(Object.keys(permission).length > 0 ? { permission } : {}),
     ...(roots === undefined ? {} : { roots }),

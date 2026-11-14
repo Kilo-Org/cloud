@@ -24,16 +24,10 @@ const hoisted = vi.hoisted(() => {
     allowsOptional: vi.fn().mockReturnValue(true),
     currentGeneration: vi.fn().mockReturnValue(0),
   };
-  let sealedState = false;
   const storage = {
-    sealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = true;
-    }),
-    unsealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = false;
-    }),
+    sealPostHogStorage: vi.fn(),
+    unsealPostHogStorage: vi.fn(),
     purgePostHogPersistence: vi.fn(),
-    isPostHogStorageSealed: vi.fn().mockImplementation(() => sealedState),
     // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
     posthogCustomStorage: {} as Record<string, unknown>,
   };
@@ -76,7 +70,6 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   sealPostHogStorage: hoisted.storage.sealPostHogStorage,
   unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
   purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
-  isPostHogStorageSealed: hoisted.storage.isPostHogStorageSealed,
   posthogCustomStorage: hoisted.storage.posthogCustomStorage,
 }));
 

@@ -89,7 +89,9 @@ function rateLimitMessage(headers: HeaderRecord, now: number): string {
 
 const NOT_FOUND_MESSAGE =
   "PR not found, you don't have access, or the Kilo GitHub App isn't installed for this repository";
-const PRECONDITION_FAILED_MESSAGE = 'GitHub connection is no longer valid — reconnect';
+export const PRECONDITION_FAILED_MESSAGE = 'GitHub connection is no longer valid — reconnect';
+export const TEMPORARILY_UNAVAILABLE_MESSAGE =
+  'GitHub authorization is temporarily unavailable. Try again.';
 const FALLBACK_FORBIDDEN = 'You do not have permission to perform this action on this PR';
 const FALLBACK_BAD_REQUEST = 'GitHub rejected this request';
 const FALLBACK_CONFLICT = 'GitHub reported a conflict for this PR';

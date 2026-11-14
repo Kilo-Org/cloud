@@ -338,6 +338,14 @@ describe('getGitHubUserAccessToken', () => {
     expect(result).toEqual({ status: 'temporarily_unavailable' });
   });
 
+  it('maps a response that breaks the response contract to temporarily_unavailable', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ connected: true }));
+
+    const result = await getGitHubUserAccessToken('kilo-user-1', { op: 'fetch' });
+
+    expect(result).toEqual({ status: 'temporarily_unavailable' });
+  });
+
   it('returns disconnected when the service is unconfigured', async () => {
     mockConfig.apiUrl = '';
     // The function returns `temporarily_unavailable` when unconfigured; this

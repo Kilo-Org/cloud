@@ -1648,8 +1648,33 @@ describe('Organizations', () => {
         provider: 'workos',
         ssoSourceOrganizationId: organization.id,
       });
-      expect(result.success).toBe(false);
+      expect(result).toEqual({ success: false, error: 'Invitation is no longer valid' });
       expect(await isOrganizationMember(db, organization.id, invitee.id)).toBe(false);
+
+      const storedInvitation = await db.query.organization_invitations.findFirst({
+        where: eq(organization_invitations.id, invitation.id),
+      });
+      expect(storedInvitation).toBeDefined();
+      expect(storedInvitation?.accepted_at).toBeNull();
+      expect(new Date(storedInvitation?.expires_at ?? '').getTime()).toBeLessThanOrEqual(
+        Date.now()
+      );
+
+      const retry = await acceptOrganizationInvite(invitee.id, invitation.token, {
+        provider: 'workos',
+        ssoSourceOrganizationId: organization.id,
+      });
+      expect(retry).toEqual({ success: false, error: 'Invitation has expired' });
+
+      const replacement = await inviteUserToOrganization(
+        organization.id,
+        owner.id,
+        invitee.google_user_email,
+        'member'
+      );
+      expect(replacement.id).not.toBe(invitation.id);
+      expect(replacement.authentication_requirement).toBe('workos');
+      expect(replacement.sso_source_organization_id).toBe(organization.id);
     });
 
     test('rejects a direct SSO invitation after the SSO policy changes', async () => {

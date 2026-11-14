@@ -114,8 +114,8 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { description?: React.ReactNode; action?: React.ReactNode }) =>
-    React.createElement('EmptyState', props, props.description, props.action),
+  EmptyState: (props: { title?: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode }) =>
+    React.createElement('EmptyState', props, props.title, props.description, props.action),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
@@ -256,11 +256,12 @@ describe('organization GitLab reconnect state', () => {
     expect(renderedText(renderer)).toContain(
       'Only organization owners, admins, and billing managers can connect it.'
     );
+    // The title names the provider the state is about; the copy that explains
+    // why there is nothing to press is the description above.
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('Connect GitLab');
     // The reader never had a connection, so no line claims an expired one, and
-    // the refused connect action is not rendered under its label.
+    // no control offers the action the role cannot complete.
     expect(renderedText(renderer)).not.toContain('GitLab connection expired');
-    expect(renderedText(renderer)).not.toContain('Connect GitLab');
-    expect(renderedText(renderer)).not.toContain('Reconnect GitLab');
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
   });
 

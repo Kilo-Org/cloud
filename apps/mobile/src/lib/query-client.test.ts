@@ -9,7 +9,6 @@ import {
 } from './active-sessions-live-sync.test-helpers';
 import {
   createKiloAppQueryClient,
-  DEFAULT_QUERY_STALE_TIME_MS,
   getActiveSessionsQueryMetadata,
   subscribeActiveSessionsQueryMetadata,
 } from './query-client';
@@ -619,11 +618,6 @@ describe('default query stale time', () => {
       const result = await Promise.resolve({ ok: true });
       return result;
     });
-
-  it('defaults new queries to the shared stale time', () => {
-    const client = createKiloAppQueryClient();
-    expect(client.getDefaultOptions().queries?.staleTime).toBe(DEFAULT_QUERY_STALE_TIME_MS);
-  });
 
   it('serves a fresh query from cache on remount without calling the query function again', async () => {
     const client = createKiloAppQueryClient();

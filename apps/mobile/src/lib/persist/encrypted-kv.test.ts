@@ -1,10 +1,14 @@
 /* eslint-disable max-lines -- cohesive unit suite for the encrypted-kv open/recovery contract, key validation, and KV behavior */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake native lifecycle methods and vi.fn factories settle without await because node:sqlite calls are synchronous */
-// eslint-disable-next-line import/no-nodejs-modules -- node:sqlite is the only way to run real SQL semantics in a node test; the expo-sqlite native module cannot load here
-import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
+/* eslint-disable import/no-nodejs-modules -- node:sqlite is the only way to run real SQL semantics in a node test, and a file-backed database is the only way to prove a reopen keeps the file; the expo-sqlite native module cannot load here */
+import { rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
+/* eslint-enable import/no-nodejs-modules */
 import * as Sentry from '@sentry/react-native';
 import * as Crypto from 'expo-crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The native modules cannot run in a node test, so they are mocked. Drizzle's
 // expo driver drives the *synchronous* expo-sqlite API (`openDatabaseSync`,
@@ -79,12 +83,16 @@ function fakeRows(rows: () => Record<string, unknown>[]): FakeStatement {
   };
 }
 
-/** A statement executed by node:sqlite, in expo-sqlite's result shape. */
-function nativeStatement(statement: StatementSync): FakeStatement {
-  const returnsRows = statement.columns().length > 0;
+/**
+ * A statement executed by the handle open when it runs, in expo-sqlite's result
+ * shape: a close or a reset between the prepare and the execute must not reach a
+ * handle the connection no longer has.
+ */
+function nativeStatement(source: string): FakeStatement {
   return {
     executeSync: (params = []) => {
-      if (!returnsRows) {
+      const statement = currentHandle().prepare(source);
+      if (statement.columns().length === 0) {
         const { changes, lastInsertRowid } = statement.run(...params);
         return {
           changes,
@@ -102,12 +110,16 @@ function nativeStatement(statement: StatementSync): FakeStatement {
       };
     },
     executeForRawResultSync: (params = []) => ({
-      getAllSync: () => statement.all(...params).map(row => Object.values(row)),
+      getAllSync: () =>
+        currentHandle()
+          .prepare(source)
+          .all(...params)
+          .map(row => Object.values(row)),
     }),
   };
 }
 
-function createFakeStatement(native: DatabaseSync, source: string): FakeStatement {
+function createFakeStatement(source: string): FakeStatement {
   // Probe failure seam: a wrong key or corrupt file throws at the probe.
   if (source.includes('sqlite_master')) {
     return fakeRows(() => {
@@ -121,11 +133,37 @@ function createFakeStatement(native: DatabaseSync, source: string): FakeStatemen
       return [{ 'count(*)': 0 }];
     });
   }
-  return nativeStatement(native.prepare(source));
+  return nativeStatement(source);
+}
+
+/**
+ * The one database every open shares. It is a file, not `:memory:`: a reopen
+ * after a close must find the schema and the rows the closed connection wrote,
+ * which a fresh in-memory handle can never show.
+ */
+const databasePath = join(tmpdir(), `kilo-persist-${process.pid}.db`);
+
+/** The handle the open connections use; dropped on close or delete so the next
+ * open creates a new one, as the native module does. */
+let openHandle: DatabaseSync | undefined = undefined;
+
+function currentHandle(): DatabaseSync {
+  openHandle ??= new DatabaseSync(databasePath);
+  return openHandle;
+}
+
+function closeHandle(): void {
+  openHandle?.close();
+  openHandle = undefined;
+}
+
+/** Drop the handle and its file: the next open starts from an empty database. */
+function resetDatabaseFile(): void {
+  closeHandle();
+  rmSync(databasePath, { force: true });
 }
 
 function createFakeDatabase(): FakeDatabase {
-  const native = new DatabaseSync(':memory:');
   return {
     // SQLCipher presence seam. node:sqlite has no `cipher_version` pragma, so
     // the fake answers it directly.
@@ -141,7 +179,7 @@ function createFakeDatabase(): FakeDatabase {
         }
         return { journal_mode: journalMode };
       }
-      return native.prepare(source).get() ?? null;
+      return currentHandle().prepare(source).get() ?? null;
     },
     // PRAGMA failure seam: the key call can fail after the handle opened.
     execSync: source => {
@@ -150,18 +188,18 @@ function createFakeDatabase(): FakeDatabase {
         failNextPragma = false;
         throw new Error('PRAGMA key failed');
       }
-      native.exec(source);
+      currentHandle().exec(source);
     },
     prepareSync: source => {
       sqlLog.push(source);
-      return createFakeStatement(native, source);
+      return createFakeStatement(source);
     },
     closeAsync: async () => {
       closeCallCount += 1;
       if (failClose) {
         throw new Error('handle is stuck open');
       }
-      native.close();
+      closeHandle();
     },
   };
 }
@@ -183,8 +221,17 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('expo-sqlite', () => ({
-  openDatabaseSync: vi.fn(() => createFakeDatabase()),
-  deleteDatabaseAsync: vi.fn(async () => undefined),
+  openDatabaseSync: vi.fn(() => {
+    // One live handle to the file, shared by every connection, as the native
+    // module keeps one database per name.
+    currentHandle();
+    return createFakeDatabase();
+  }),
+  // The native delete drops the file under the handle, so the next open starts
+  // from an empty database.
+  deleteDatabaseAsync: vi.fn(async () => {
+    resetDatabaseFile();
+  }),
 }));
 
 vi.mock('@sentry/react-native', () => ({
@@ -229,8 +276,16 @@ beforeEach(() => {
   hasSQLCipher = true;
   cipherProbedAtSqlCount = -1;
   closeCallCount = 0;
+  // Each test starts from its own empty file, and the handle is dropped: the
+  // recovery tests count opens and closes, so a closed handle must force a new one.
+  resetDatabaseFile();
   setProtectedDataAvailable(true);
   resetEncryptedKvOpenForTests();
+});
+
+// The fake database is a real file, so the run removes the last one it made.
+afterAll(() => {
+  resetDatabaseFile();
 });
 
 describe('scope and key validation', () => {
@@ -370,14 +425,20 @@ describe('single-flight open contract', () => {
     expect(createSql).toContain('`v` text NOT NULL');
   });
 
-  it('records the applied migration so a reopened database does not re-run it', async () => {
+  it('reopens the file without re-running the schema migration', async () => {
     await setItem('s', 'a', 'x');
-    // Drizzle owns the bookkeeping: it creates its ledger, reads the last
-    // applied entry, and records the migration it just ran.
-    expect(
-      sqlLog.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS "__drizzle_migrations"'))
-    ).toBe(true);
-    expect(sqlLog.some(sql => sql.includes('INSERT INTO "__drizzle_migrations"'))).toBe(true);
+
+    // A relaunch: a fresh module state opens the same file again.
+    resetEncryptedKvOpenForTests();
+    const opensBefore = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+    sqlLog.length = 0;
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+
+    // The second open ran, and the ledger the first one wrote in the file kept
+    // it from creating the table again.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(opensBefore + 1);
+    expect(sqlLog.some(sql => sql.includes('CREATE TABLE `kv`'))).toBe(false);
   });
 });
 

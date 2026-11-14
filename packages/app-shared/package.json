@@ -30,6 +30,7 @@
     "./agent-briefing": "./src/agent-briefing.ts",
     "./agent-profile": "./src/agent-profile.ts",
     "./approval-key": "./src/approval-key.ts",
+    "./cloud-agent-error": "./src/cloud-agent-error.ts",
     "./byok-credentials": "./src/byok-credentials.ts",
     "./home-widget": "./src/home-widget.ts",
     "./display-text": "./src/display-text.ts",

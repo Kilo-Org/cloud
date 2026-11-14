@@ -1,6 +1,7 @@
 import type { ToolDisplayMode } from './tool-detail-marker';
 import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
+import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
@@ -841,9 +842,9 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
   if (r.success) {
     if (isSelectedModelUnavailable(r.data.message))
       return { message: SELECTED_MODEL_UNAVAILABLE_ERROR, code: 'selected-model-unavailable' };
-    const code = r.data.data?.code ?? r.data.shape?.code;
-    const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
-    if (code === 'PAYMENT_REQUIRED' || http === 402)
+    const fields = readCloudAgentErrorFields(err);
+    const { code, httpStatus } = fields;
+    if (code === 'PAYMENT_REQUIRED' || httpStatus === 402)
       return {
         message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
         code: 'insufficient-credits',
@@ -855,17 +856,19 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         message: 'Service is unavailable right now. Please try again.',
         code: 'service-unavailable',
       };
-    if (code === 'CONFLICT' || http === 409)
+    if (code === 'CONFLICT' || httpStatus === 409)
       return {
         message: 'Previous task is still finishing up. Please wait a moment.',
         code: 'previous-task-in-progress',
       };
-    if (code === 'SERVICE_UNAVAILABLE' || http === 503)
+    if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503)
       return {
         message: 'Service is temporarily unavailable. Please retry in a moment.',
         code: 'service-temporarily-unavailable',
       };
-    if (code !== undefined || http !== undefined) {
+    // The numeric JSON-RPC `shape.code` is a server answer, not a code, so it
+    // reaches this branch through `answeredByServer`.
+    if (code !== undefined || httpStatus !== undefined || fields.answeredByServer) {
       const reason = serverErrorReason(r.data.message);
       return {
         message: GENERIC_ERROR,
@@ -3341,8 +3344,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   function denySessionOpen(open: SessionOpen, error: unknown): boolean {
-    const parsed = errorShapeSchema.safeParse(error);
-    const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
+    const { code } = readCloudAgentErrorFields(error);
     if (code !== 'NOT_FOUND' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') return false;
     if (code === 'NOT_FOUND' && takeSpawnedRetry(open.kiloSessionId)) {
       open.denied = true;
@@ -4143,15 +4145,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // that carries a code or an HTTP status is the server's own verdict on
       // this send, whatever `formatErrorDetail` labels it, so no row will ever
       // confirm it; so is a failure no transport could have delivered.
-      const shape = errorShapeSchema.safeParse(err);
-      const answeredByServer =
-        shape.success &&
-        (shape.data.data?.code !== undefined ||
-          shape.data.data?.httpStatus !== undefined ||
-          shape.data.shape?.code !== undefined ||
-          shape.data.shape?.data?.httpStatus !== undefined);
+      const serverAnswered = readCloudAgentErrorFields(err).answeredByServer;
       const outcomeUnknown =
-        !answeredByServer &&
+        !serverAnswered &&
         (detail.code === 'connection-failed' ||
           detail.code === 'connection-lost' ||
           detail.code === 'generic-error');

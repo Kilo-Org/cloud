@@ -127,7 +127,9 @@ export function useDisconnectIntegration(organizationId: string | undefined) {
 /**
  * The provider's connect URL. OAuth callbacks land on the web, so every
  * provider is connected there; GitHub additionally validates a one-time install
- * state token, which the minted URL carries.
+ * state token, which the minted URL carries. An organization whose mint is
+ * refused still gets the page, without the token, because the page mints its
+ * own state for the signed-in web user.
  */
 async function connectUrl(
   provider: IntegrationProvider,

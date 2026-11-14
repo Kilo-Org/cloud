@@ -5,10 +5,11 @@ import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import {
   _resetSessionTokenIdentityForTests,
   _setSessionTokenIdentityStoreForTests,
-  clearSessionTokenIdentities,
   forgetSessionTokenIdentity,
   readSessionTokenIdentities,
+  readSessionTokenIdentity,
   rememberSessionTokenIdentity,
+  retireSessionTokenIdentities,
 } from './session-token-identity';
 import { SESSION_TOKEN_IDENTITY_KEY } from './widget-store';
 
@@ -121,7 +122,7 @@ describe('session token identities', () => {
       'ExponentPushToken[second]',
     ]);
 
-    clearSessionTokenIdentities();
+    retireSessionTokenIdentities(null, new Set());
     await vi.waitFor(() => {
       expect(stored.get(SESSION_TOKEN_IDENTITY_KEY) ?? '').not.toContain('ExponentPushToken');
     });
@@ -144,5 +145,67 @@ describe('session token identities', () => {
     expect(await readSessionTokenIdentities('session-0', CTX)).toEqual([]);
     expect(await readSessionTokenIdentities('session-1', CTX)).toEqual([]);
     expect(await readSessionTokenIdentities('session-33', CTX)).toEqual(['ExponentPushToken[33]']);
+  });
+
+  it('keeps a persisted token when the same session is registered again after a restart', async () => {
+    rememberSessionTokenIdentity('session-1', CTX, 'ExponentPushToken[persisted]');
+    await settled('ExponentPushToken[persisted]');
+
+    /* A restart, then the restore re-registers the follow with the rotated
+       token. The record must hold both: the row may exist under either. */
+    restart();
+    rememberSessionTokenIdentity('session-1', CTX, 'ExponentPushToken[rotated]');
+
+    expect(await readSessionTokenIdentities('session-1', CTX)).toEqual([
+      'ExponentPushToken[persisted]',
+      'ExponentPushToken[rotated]',
+    ]);
+
+    await vi.waitFor(() => {
+      expect(stored.get(SESSION_TOKEN_IDENTITY_KEY) ?? '').toContain(
+        'ExponentPushToken[persisted]'
+      );
+    });
+    restart();
+    expect(await readSessionTokenIdentities('session-1', CTX)).toEqual([
+      'ExponentPushToken[persisted]',
+      'ExponentPushToken[rotated]',
+    ]);
+  });
+
+  it('does not merge a record that belongs to another account', async () => {
+    rememberSessionTokenIdentity('session-1', CTX, 'ExponentPushToken[persisted]');
+    await settled('ExponentPushToken[persisted]');
+
+    restart();
+    const other = { userId: 'user-2', organizationId: null };
+    rememberSessionTokenIdentity('session-1', other, 'ExponentPushToken[other]');
+
+    expect(await readSessionTokenIdentities('session-1', other)).toEqual([
+      'ExponentPushToken[other]',
+    ]);
+    expect(await readSessionTokenIdentities('session-1', CTX)).toEqual([]);
+  });
+
+  it('retires only the version it read, leaving a newer record in place', async () => {
+    rememberSessionTokenIdentity('session-1', CTX, 'ExponentPushToken[first]');
+    const read = await readSessionTokenIdentity('session-1', CTX);
+    if (read === null) {
+      throw new Error('the recorded identity must be readable');
+    }
+
+    // A re-follow records its own identity for the same session.
+    rememberSessionTokenIdentity('session-1', CTX, 'ExponentPushToken[second]');
+    await settled('ExponentPushToken[second]');
+    forgetSessionTokenIdentity('session-1', read.version);
+
+    expect(await readSessionTokenIdentities('session-1', CTX)).toEqual([
+      'ExponentPushToken[first]',
+      'ExponentPushToken[second]',
+    ]);
+    restart();
+    expect(await readSessionTokenIdentities('session-1', CTX)).toContain(
+      'ExponentPushToken[second]'
+    );
   });
 });

@@ -2643,6 +2643,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'No GitHub integration configured for this session',
+          cause: { reason: 'no_integration' },
         });
       }
 
@@ -2651,6 +2652,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'GitHub installation ID is malformed',
+          cause: { reason: 'malformed_installation' },
         });
       }
       const appType = integration.github_app_type ?? 'standard';
@@ -2673,6 +2675,10 @@ export const cliSessionsV2Router = createTRPCRouter({
               : refreshBudget.reason === 'rate_limited'
                 ? `GitHub rate limit reached; try again after ${refreshBudget.retryAt.toISOString()}`
                 : `PR refresh was already attempted; try again after ${refreshBudget.retryAt.toISOString()}`,
+          cause: {
+            reason: refreshBudget.reason,
+            retryAt: refreshBudget.retryAt.toISOString(),
+          },
         });
       }
       const signal = AbortSignal.timeout(45_000);
@@ -2703,6 +2709,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
             message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+            cause: { reason: 'rate_limited', retryAt: rateLimit.resetAt.toISOString() },
           });
         }
         captureException(error, {
@@ -2715,6 +2722,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch pull request from GitHub',
+          cause: { reason: 'fetch_failed' },
         });
       }
 
@@ -2794,6 +2802,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
             message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+            cause: { reason: 'rate_limited', retryAt: rateLimit.resetAt.toISOString() },
           });
         }
         observations = {

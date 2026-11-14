@@ -6,6 +6,7 @@ import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { DataExportScreen } from './data-export-screen';
+import { ExportRow } from './data-export-row';
 import type * as ReactQuery from '@tanstack/react-query';
 
 type Export = {
@@ -200,6 +201,27 @@ describe('DataExportScreen', () => {
 
     expect(button(root, 'Get code')).toBeDefined();
     expect(texts(root)).toEqual(expect.arrayContaining(['Preparing', 'Ready to download']));
+  });
+
+  it('shows a rejected code request under the list while no challenge is open', async () => {
+    state.exports = readyExport();
+    const root = await mount();
+
+    act(() => {
+      (root.findByType(ExportRow).props.onRequestCode as () => void)();
+    });
+    expect(state.calls).toEqual([{ name: 'requestCode', input: { exportId: 'export-2' } }]);
+
+    act(() => {
+      (state.mutations.requestCode as { onError: (error: unknown) => void }).onError(
+        new Error('Too many codes requested.')
+      );
+    });
+
+    // The message renders where the request was raised, with no code field on
+    // screen: the old copy could only paint inside the open challenge.
+    expect(texts(root)).toContain('Too many codes requested.');
+    expect(root.findAll(node => Object.is(node.type, 'FormField'))).toHaveLength(0);
   });
 
   it('surfaces the server reason for a failed export', async () => {

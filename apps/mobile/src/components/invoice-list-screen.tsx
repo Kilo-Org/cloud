@@ -63,6 +63,18 @@ function InvoiceRowSkeleton() {
 type InvoiceListScreenProps = Readonly<{
   /** The screen's own title: the personal and organization lists differ. */
   title: string;
+  /**
+   * The screen's own name when the title names a scope: the organization scope
+   * titles itself with the membership's name, so this list's name keeps the
+   * header's mono category line and a user-authored name never takes it.
+   */
+  eyebrow?: string;
+  /**
+   * Hold the eyebrow's line before a scope name resolves, so the header keeps
+   * one height while the membership read settles. A caller whose title is
+   * already this screen's name paints no eyebrow and leaves this off.
+   */
+  reserveEyebrow?: boolean;
   /** The scope's paged invoice read, flattened by its own hook. */
   query: InvoiceListQuery;
   entries: readonly Invoice[];
@@ -78,6 +90,8 @@ type InvoiceListScreenProps = Readonly<{
  */
 export function InvoiceListScreen({
   title,
+  eyebrow,
+  reserveEyebrow,
   query,
   entries,
   hasMore,
@@ -214,7 +228,7 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} />
+      <ScreenHeader title={title} eyebrow={eyebrow} reserveEyebrow={reserveEyebrow} />
       {body}
     </View>
   );

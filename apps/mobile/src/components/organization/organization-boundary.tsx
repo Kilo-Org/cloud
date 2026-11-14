@@ -21,6 +21,13 @@ const PROFILE_HREF = '/(app)/(tabs)/(3_profile)' as Href;
 type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
   title?: string;
+  /**
+   * Hold the header's eyebrow line while the caller's real content has one to
+   * fill. The boundary paints no eyebrow itself, so this only reserves the
+   * band: the title keeps its height and the content below it does not move
+   * when the resolved screen swaps the label in.
+   */
+  reserveEyebrow?: boolean;
   /** Explicit org id (e.g. deep-link `?org=`) replacing the persisted selection for this render. */
   organizationIdOverride?: string;
   /** Overrides the default boundary icon (PR-review passes its own glyph). */
@@ -52,6 +59,7 @@ type OrganizationBoundaryProps = Readonly<{
  */
 export function OrganizationBoundary({
   title,
+  reserveEyebrow,
   organizationIdOverride,
   icon = Building2,
 }: OrganizationBoundaryProps = {}) {
@@ -154,7 +162,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} />
+      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} />
       {content}
     </View>
   );

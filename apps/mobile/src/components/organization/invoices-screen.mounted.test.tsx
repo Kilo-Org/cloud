@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { OrganizationInvoicesScreen } from './invoices-screen';
 
 const pageQuery = vi.hoisted(() => ({
@@ -41,6 +41,23 @@ const queryErrors = vi.hoisted(() => ({
 
 const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
 
+// The organization the boundary resolves to, and whether its membership read is
+// still running. The header contract is driven through both.
+const boundaryState = vi.hoisted(() => ({
+  isResolving: false,
+  organizationName: 'Acme Corp',
+}));
+
+// Props each header boundary was rendered with: the boundary's own header and
+// the shared list header, which the resolved screen paints.
+const boundaryProps = vi.hoisted(() => ({
+  rendered: [] as { title?: string; reserveEyebrow?: boolean }[],
+}));
+
+const screenHeaders = vi.hoisted(() => ({
+  rendered: [] as { title?: string; eyebrow?: string; reserveEyebrow?: boolean }[],
+}));
+
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => connectivity.value,
   useCommittedConnectivityStatus: () => connectivity.value,
@@ -60,8 +77,12 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
     organizationId: 'org-1',
     role: 'owner',
-    org: { organizationId: 'org-1', role: 'owner' },
-    isResolving: false,
+    org: {
+      organizationId: 'org-1',
+      role: 'owner',
+      organizationName: boundaryState.organizationName,
+    },
+    isResolving: boundaryState.isResolving,
   }),
   useOrgInvoicesPage: () => ({
     query: pageQuery,
@@ -116,10 +137,18 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
-  OrganizationBoundary: () => null,
+  OrganizationBoundary: (props: { title?: string; reserveEyebrow?: boolean }) => {
+    boundaryProps.rendered.push(props);
+    return null;
+  },
 }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
+    screenHeaders.rendered.push(props);
+    return null;
+  },
+}));
 
 vi.mock('@/components/ui/button', () => ({
   Button: (props: {
@@ -219,6 +248,10 @@ beforeEach(() => {
   pageHook.hasMore = false;
   queryErrors.errors = [];
   buttons.rendered = [];
+  boundaryState.isResolving = false;
+  boundaryState.organizationName = 'Acme Corp';
+  boundaryProps.rendered = [];
+  screenHeaders.rendered = [];
 });
 
 describe('OrganizationInvoicesScreen status badges', () => {
@@ -438,5 +471,33 @@ describe('OrganizationInvoicesScreen pagination', () => {
     expect(texts).toContain('Older invoices are available.');
     expect(texts).not.toContain("Couldn't load more");
     expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+});
+
+describe('OrganizationInvoicesScreen header', () => {
+  it('titles the loaded header with the organization name and keeps the screen name as its eyebrow', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+
+    await renderScreen();
+
+    expect(screenHeaders.rendered).toHaveLength(1);
+    expect(screenHeaders.rendered[0]?.title).toBe('Acme Corp');
+    expect(screenHeaders.rendered[0]?.eyebrow).toBe(i18n.t('organization.invoices.title'));
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+  });
+
+  it('reserves the eyebrow line on the boundary so the header keeps its height before the name arrives', async () => {
+    boundaryState.isResolving = true;
+
+    await renderScreen();
+
+    // The list header is not painted yet: the boundary owns the header while the
+    // membership read resolves, and it reserves the eyebrow line for the label
+    // the resolved screen fills in.
+    expect(screenHeaders.rendered).toHaveLength(0);
+    expect(boundaryProps.rendered).toHaveLength(1);
+    expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
+    expect(boundaryProps.rendered[0]?.reserveEyebrow).toBe(true);
   });
 });

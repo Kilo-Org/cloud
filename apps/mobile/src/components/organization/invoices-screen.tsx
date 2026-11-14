@@ -12,12 +12,20 @@ export function OrganizationInvoicesScreen() {
   useRouteForegroundRefresh([[['organizations']]]);
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.invoices.title')} />;
+    // The boundary paints this screen's name as the title and reserves the
+    // eyebrow line, so the resolved header below swaps the name into the
+    // title without changing the header's height.
+    return <OrganizationBoundary title={t('organization.invoices.title')} reserveEyebrow />;
   }
 
   return (
     <InvoiceListScreen
-      title={t('organization.invoices.title')}
+      title={org.organizationName}
+      // The organization titles the screen, so the eyebrow keeps the list's own
+      // name out of the header's uppercase style. The boundary above already
+      // reserved this one-line eyebrow, so the name arriving cannot move the
+      // list.
+      eyebrow={t('organization.invoices.title')}
       query={query}
       entries={entries}
       hasMore={hasMore}

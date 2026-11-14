@@ -6,8 +6,8 @@ import {
   LINE_ACTION_BOX_CLASS,
   LINE_ACTION_HIT_SLOP,
   MIN_TAP_TARGET_DP,
-  TOUCH_TARGET_DP,
   tapTargetReachDp,
+  TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
 
 import { MarkdownCodeFence } from './markdown-code-fence';
@@ -144,9 +144,7 @@ describe('MarkdownCodeFence', () => {
     );
     // The icon's slot is wider than one line, so the 36dp box still carries the
     // horizontal reach: 36 + 5 + 5 = 46dp.
-    expect(tapTargetReachDp(36, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
+    expect(tapTargetReachDp(36, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
   it('passes a multi-line fence through unchanged', async () => {

@@ -7,6 +7,8 @@ import path from 'node:path';
 import { kilo2RuntimeEnvironment } from './runtime-harness.js';
 import { buildWorktreeKiloEnvironment } from '../control/worktree-runtime.js';
 import { prepareKiloFilesystem } from './kilo-runtime.js';
+import { buildGitHubReviewBashRules } from '../github-review-publish-config.js';
+import { matchesKiloPermissionPattern } from '../../../src/shared/profile-permission-policy.js';
 import {
   createRuntimeProfileMaterializer,
   materializeRuntimeProfile,
@@ -742,14 +744,12 @@ describe('runtime profile session policy scope', () => {
     }
   });
 
-  it('carries the publisher refusals for a review session', async () => {
+  it('composes the publisher rules a review session writes into the same map', async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-scope-'));
     try {
+      const publicationAllow = 'gh api repos/*/issues/*/comments --input*';
       await materializeRuntimeProfile(home, {
-        permission: {
-          edit: 'deny',
-          bash: { 'gh pr diff': 'allow', 'gh pr diff *': 'allow' },
-        },
+        permission: { edit: 'deny', bash: { [publicationAllow]: 'allow' } },
         githubReviewTarget: {
           repo: 'acme/widgets',
           pullRequestNumber: 42,
@@ -760,22 +760,36 @@ describe('runtime profile session policy scope', () => {
           {
             slug: 'reviewer',
             name: 'Reviewer',
-            config: {
-              permission: {
-                bash: { 'gh pr diff': 'allow', 'gh api repos/*/issues/*/comments*': 'allow' },
-              },
-            },
+            config: { permission: { bash: { [publicationAllow]: 'allow' } } },
           },
         ],
       });
-      const bash = (await readAgentEntries(home)).reviewer?.permission as Record<
+      const written = (await readAgentEntries(home)).reviewer?.permission as Record<
         string,
         Record<string, string>
       >;
-      expect(bash.bash?.['gh pr diff']).toBe('allow');
-      // The agent allowance for a comment endpoint is not written, so the
-      // publisher refusals decide those calls.
-      expect(bash.bash?.['gh api repos/*/issues/*/comments*']).toBeUndefined();
+      const bash = written.bash ?? {};
+      expect(bash[publicationAllow]).toBe('allow');
+      const publisherRule = Object.keys(buildGitHubReviewBashRules()).find(pattern =>
+        matchesKiloPermissionPattern(publicationAllow, pattern)
+      );
+      expect(publisherRule).toBeDefined();
+      // The publisher rule is written after the allowance, so it decides the
+      // command the allowance covers.
+      const keys = Object.keys(bash);
+      expect(keys.indexOf(publisherRule ?? '')).toBeGreaterThan(keys.indexOf(publicationAllow));
+      let verdict: string | undefined;
+      for (const [pattern, action] of Object.entries(bash)) {
+        if (
+          matchesKiloPermissionPattern(
+            'gh api repos/acme/widgets/issues/7/comments --input payload.json',
+            pattern
+          )
+        ) {
+          verdict = action;
+        }
+      }
+      expect(verdict).toBe('deny');
     } finally {
       await fs.rm(home, { recursive: true, force: true });
     }

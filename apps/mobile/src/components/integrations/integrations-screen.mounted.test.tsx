@@ -353,11 +353,12 @@ describe('IntegrationsScreen', () => {
     // list, instead of under each row. GitLab belongs to that set: every
     // organization GitLab connect asks for a billing role, first connect too.
     // The row keeps a press that opens the provider's page, so the hub is a
-    // list of destinations rather than a list of labels.
+    // list of destinations rather than a list of labels, and its name repeats
+    // the state a sighted reader takes from the subtitle.
     for (const title of ['GitHub', 'Slack', 'GitLab', 'Bitbucket']) {
       const row = rowTitled(root, title);
       expect(actionOf(row)).toBeNull();
-      expect(row.props.accessibilityLabel).toBe(`Open in browser. ${title}`);
+      expect(row.props.accessibilityLabel).toBe(`Open in browser. ${title}. ${row.props.subtitle}`);
     }
     expect(texts(root).filter(text => text === SHARED_NOTE)).toHaveLength(1);
 

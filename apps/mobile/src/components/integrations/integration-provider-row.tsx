@@ -140,7 +140,13 @@ export function IntegrationProviderRow({
   // Connect already does, so the hub reads as a list of destinations rather than
   // a list of labels. A pending connections read keeps the row inert until the
   // control it settles on is known.
+  //
+  // The row's own name replaces its visible text, so it repeats the subtitle:
+  // a reader who cannot see the row still hears the connection state.
   const opensProviderPage = action === null && !row.actionPending;
+  const blockedRowName = [t('common.openInBrowser'), label, subtitle].join(
+    t('common.sentenceJoiner')
+  );
 
   return (
     <ConfigureRow
@@ -150,7 +156,7 @@ export function IntegrationProviderRow({
       subtitleNumberOfLines={1}
       trailing={action}
       onPress={opensProviderPage ? onOpenOnWeb : undefined}
-      accessibilityLabel={opensProviderPage ? namedAction(t('common.openInBrowser')) : undefined}
+      accessibilityLabel={opensProviderPage ? blockedRowName : undefined}
       last={last}
     />
   );

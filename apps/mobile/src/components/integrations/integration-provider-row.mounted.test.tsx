@@ -143,18 +143,26 @@ describe('IntegrationProviderRow body press', () => {
     expect(calls.manageOnWeb).not.toHaveBeenCalled();
   });
 
-  it('adds no second accessibility stop beside the named Connect button', () => {
+  it('makes the row the one named Connect control', () => {
     const root = renderRow({ row: integrationRow(), scope: 'personal' });
 
-    // The trailing button stays the row's one named control, so the wrapper
-    // must not become a focus stop of its own: iOS drops it with `accessible`,
-    // and Android keeps it out of the tree without hiding its children.
     const [body] = bodyPresses(root);
     if (!body) {
       throw new Error('the uninstalled row rendered no body press');
     }
-    expect(body.props.accessible).toBe(false);
-    expect(body.props.importantForAccessibility).toBe('no');
+    // One stop, named and typed: the row spans the series and the trailing
+    // button is only its face, kept out of the tree.
+    expect(body.props.accessibilityRole).toBe('button');
+    expect(body.props.accessibilityLabel).toBe('Connect. GitHub');
+    expect(body.props.accessibilityState).toEqual({ disabled: false, busy: false });
+  });
+
+  it('keeps the trailing button out of the tree where the row acts', () => {
+    const root = renderRow({ row: integrationRow(), scope: 'personal' });
+
+    const [button] = root.findAll(node => String(node.type) === 'Button');
+    expect(button?.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(button?.props.accessible).toBe(false);
   });
 
   it('blocks a second mint while the launch is in flight', () => {

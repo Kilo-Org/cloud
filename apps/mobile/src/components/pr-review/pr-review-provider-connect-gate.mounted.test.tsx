@@ -114,8 +114,11 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { title?: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode }) =>
-    React.createElement('EmptyState', props, props.title, props.description, props.action),
+  EmptyState: (props: {
+    title?: React.ReactNode;
+    description?: React.ReactNode;
+    action?: React.ReactNode;
+  }) => React.createElement('EmptyState', props, props.title, props.description, props.action),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));

@@ -3996,7 +3996,7 @@
     "skillSourceMarketplace": "ბაზარი",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "ჩასვით SKILL.md და ივსება მისი სახელი; დაამატეთ უნარი თქვენი ტელეფონიდან გადათრევის გარეშე.",
-    "skillEditTitle": "რედაქტირების უნარი",
+    "skillEditTitle": "დაარედაქტირე უნარი",
     "skillEdit": "დაარედაქტირე უნარი {{name}}",
     "skillDelete": "წაშალე უნარი {{name}}",
     "skillDeleteTitle": "უნარის წაშლა {{name}}?",

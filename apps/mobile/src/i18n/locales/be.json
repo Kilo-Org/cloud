@@ -4116,7 +4116,7 @@
     "skillSourceMarketplace": "Маркетплэйс",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Устаўце SKILL.md і запоўніце яго імя; дадаць навык са свайго тэлефона без перацягвання.",
-    "skillEditTitle": "Майстэрства рэдагавання",
+    "skillEditTitle": "Рэдагаваць навык",
     "skillEdit": "Рэдагаваць навык {{name}}",
     "skillDelete": "Выдаліць навык {{name}}",
     "skillDeleteTitle": "Выдаліць навык {{name}}?",

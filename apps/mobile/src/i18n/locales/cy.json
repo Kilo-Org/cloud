@@ -4236,7 +4236,7 @@
     "skillSourceMarketplace": "Marchnad",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Gludwch SKILL.md ac mae ei enw yn llenwi; ychwanegu sgil o'ch ffôn heb lusgo a gollwng.",
-    "skillEditTitle": "Sgil golygu",
+    "skillEditTitle": "Golygu sgil",
     "skillEdit": "Golygu sgil {{name}}",
     "skillDelete": "Dileu sgil {{name}}",
     "skillDeleteTitle": "Dileu sgil {{name}}?",

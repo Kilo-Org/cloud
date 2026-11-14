@@ -3996,7 +3996,7 @@
     "skillSourceMarketplace": "சந்தை",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "ஒரு SKILL.md ஐ ஒட்டவும், அதன் பெயர் நிரப்பப்படும்; இழுத்து விடாமல் உங்கள் ஃபோனிலிருந்து திறமையைச் சேர்க்கவும்.",
-    "skillEditTitle": "திருத்தும் திறமை",
+    "skillEditTitle": "திறமையைத் திருத்தவும்",
     "skillEdit": "{{name}} திறமையைத் திருத்தவும்",
     "skillDelete": "{{name}} திறமையை நீக்கவும்",
     "skillDeleteTitle": "திறமை {{name}}-ஐ நீக்கவா?",

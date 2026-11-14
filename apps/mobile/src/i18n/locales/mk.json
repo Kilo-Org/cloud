@@ -3996,7 +3996,7 @@
     "skillSourceMarketplace": "Пазар",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Залепете SKILL.md и неговото име се пополнува; додадете вештина од вашиот телефон без влечење и пуштање.",
-    "skillEditTitle": "Вештина за уредување",
+    "skillEditTitle": "Уреди вештина",
     "skillEdit": "Уреди вештина {{name}}",
     "skillDelete": "Избриши вештина {{name}}",
     "skillDeleteTitle": "Избриши вештина {{name}}?",

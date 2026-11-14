@@ -167,3 +167,57 @@ describe('useSessionListAutoScroll viewport resize', () => {
     expect(scrollToEnd).not.toHaveBeenCalled();
   });
 });
+
+describe('useSessionListAutoScroll send during a fling', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('follows a content change after a send during a fling', () => {
+    // Regression: the send set its take-over without clearing the live drag
+    // claim, so the content-size follow refused to run and the reply streamed
+    // in off-screen.
+    vi.useFakeTimers();
+    const { scrollToEnd, api } = mountAutoScroll(1);
+    closeProgrammaticScrollWindow();
+
+    act(() => {
+      api.handleScrollBeginDrag();
+      api.handleMomentumScrollBegin();
+      api.followTailFromSend();
+    });
+    // The send scrolls directly; only the content follow is under test.
+    scrollToEnd.mockClear();
+
+    act(() => {
+      api.handleContentSizeChange(400, 2000);
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(scrollToEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps following after the fling ends with the send still claimed', () => {
+    // The late momentum end is the drag's trailing motion: it must leave the
+    // send's follow alone instead of turning it off from a stale offset.
+    vi.useFakeTimers();
+    const { scrollToEnd, api } = mountAutoScroll(1);
+    closeProgrammaticScrollWindow();
+
+    act(() => {
+      api.handleScrollBeginDrag();
+      api.handleMomentumScrollBegin();
+      api.followTailFromSend();
+      // Far from the content end: this event would turn the follow off.
+      api.handleMomentumScrollEnd(scrollEvent(4000, 600, 0));
+    });
+    scrollToEnd.mockClear();
+
+    act(() => {
+      api.handleContentSizeChange(400, 2200);
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(scrollToEnd).toHaveBeenCalledTimes(1);
+  });
+});

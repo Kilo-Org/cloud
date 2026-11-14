@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  claimAfterDragBegin,
+  claimAfterMomentumEnd,
+  claimAfterReset,
+  claimAfterResumeAnchor,
+  claimAfterSend,
+  claimBlocksResume,
+  claimIsDragging,
+  claimKeepsTail,
   getInitialSessionListAutoScrollVisibility,
   isSessionListAtBottom,
   SESSION_LIST_BOTTOM_THRESHOLD_PX,
+  type SessionPositionClaim,
   shouldFollowSessionContentSize,
   shouldFollowSessionViewportResize,
   shouldRetrySessionAutoScroll,
@@ -341,5 +350,21 @@ describe('shouldFollowSessionViewportResize', () => {
         didViewportHeightChange: true,
       })
     ).toBe(false);
+  });
+});
+
+const c = (kind: 'free' | 'drag' | 'user' | 'send'): SessionPositionClaim => ({ kind });
+
+describe('SessionPositionClaim', () => {
+  it('moves only on the transition that owns the position, and reads as the guards do', () => {
+    // A fling's late momentum end cannot touch a send; a new anchor releases it.
+    expect([
+      claimAfterMomentumEnd(c('send')),
+      claimAfterDragBegin(c('send')),
+      claimAfterSend(c('drag')),
+      claimAfterResumeAnchor(c('send')),
+      claimAfterReset(c('drag')),
+    ]).toEqual([c('send'), c('drag'), c('send'), c('free'), c('free')]);
+    expect([claimBlocksResume(c('send')), claimKeepsTail(c('send')), claimIsDragging(c('drag'))]).toEqual([true, true, true]);
   });
 });

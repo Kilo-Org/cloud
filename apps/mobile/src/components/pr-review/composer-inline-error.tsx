@@ -21,15 +21,16 @@ export function ComposerInlineError({ feedback }: Readonly<ComposerInlineErrorPr
     return null;
   }
   switch (feedback.failure.kind) {
-    case 'reconnect':
+    case 'reconnect': {
       return <PrReviewReconnectNotice />;
+    }
     case 'body-empty':
     case 'not-recorded':
     case 'retryable':
     case 'bad-request':
     case 'forbidden':
     case 'not-found':
-    case 'ambiguous':
+    case 'ambiguous': {
       return (
         <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
           {feedback.failure.announce === 'here' ? (
@@ -39,7 +40,9 @@ export function ComposerInlineError({ feedback }: Readonly<ComposerInlineErrorPr
           )}
         </View>
       );
-    default:
+    }
+    default: {
       return assertSurfaceFailureHandled(feedback.failure);
+    }
   }
 }

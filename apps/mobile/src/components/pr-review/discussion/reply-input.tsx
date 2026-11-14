@@ -216,7 +216,8 @@ export function ReplyInput({
   const submit = async () => {
     const attempt = begin();
     if (attempt === null) {
-      return; // one reply in flight: the double-tap window is closed
+      // One reply in flight: the double-tap window is closed.
+      return;
     }
     const body = bodyRef.current.trim();
     if (!body) {

@@ -141,7 +141,8 @@ export function PrConversationCommentComposer({
   async function handleSubmit() {
     const attempt = begin();
     if (attempt === null) {
-      return; // one post in flight, admitted before any await
+      // One post in flight, admitted before any await.
+      return;
     }
     const body = bodyRef.current;
     if (body.trim().length === 0) {

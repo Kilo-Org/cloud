@@ -53,7 +53,8 @@ export type PrInlineOptions = {
 
 export type PrInlineOutcome =
   | { readonly kind: 'failure'; readonly failure: PrInlineFailure }
-  | { readonly kind: 'abandoned' }; // pre-submit gate cancelled: nothing was sent
+  /** Pre-submit gate cancelled: nothing was sent. */
+  | { readonly kind: 'abandoned' };
 
 /** The ledger persistence marker, raised before classification by the ledger-keyed surfaces. */
 export function prInlineNotRecordedFailure(announce: PrInlineAnnounce): PrInlineFailure {

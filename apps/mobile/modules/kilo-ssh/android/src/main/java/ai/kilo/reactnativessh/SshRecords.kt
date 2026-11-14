@@ -5,6 +5,7 @@ import expo.modules.kotlin.records.Record
 
 /** What JavaScript passes to `connect`. */
 class ConnectConfigRecord : Record {
+  @Field var attemptId: String = ""
   @Field var host: String = ""
   @Field var port: Int = 22
   @Field var username: String = ""
@@ -68,6 +69,7 @@ class ForwardStartRecord(
 
 internal class HostKeyRequestRecord(
   val sessionId: String,
+  val attemptId: String,
   val requestId: String,
   val host: String,
   val port: Int,
@@ -77,6 +79,7 @@ internal class HostKeyRequestRecord(
 ) {
   fun toEvent(): Map<String, Any?> = mapOf(
     "sessionId" to sessionId,
+    "attemptId" to attemptId,
     "requestId" to requestId,
     "host" to host,
     "port" to port,
@@ -92,6 +95,7 @@ internal class PromptRecord(val text: String, val echo: Boolean) {
 
 internal class KeyboardInteractiveRequestRecord(
   val sessionId: String,
+  val attemptId: String,
   val requestId: String,
   val name: String,
   val instructions: String,
@@ -99,6 +103,7 @@ internal class KeyboardInteractiveRequestRecord(
 ) {
   fun toEvent(): Map<String, Any?> = mapOf(
     "sessionId" to sessionId,
+    "attemptId" to attemptId,
     "requestId" to requestId,
     "name" to name,
     "instructions" to instructions,

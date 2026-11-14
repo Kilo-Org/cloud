@@ -81,6 +81,9 @@ export function PrCommentEditSheet({
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PrInlineFailure>();
 
   const isSubmitting = feedback.status === 'pending';
+  // Cancel must stay live while only the pre-submit Terms gate is in flight.
+  const [awaitingGate, setAwaitingGate] = useState(false);
+  const dismissalLocked = isSubmitting && !awaitingGate;
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
   // pinned header. Compact kb layout fits at offset 0 — snap back so body +
@@ -134,7 +137,9 @@ export function PrCommentEditSheet({
       });
       return;
     }
+    setAwaitingGate(true);
     const outcome = await ensureTermsAcceptedOutcome();
+    setAwaitingGate(false);
     if (outcome.kind === 'dismissed') {
       attempt.abandon();
       return;
@@ -168,7 +173,7 @@ export function PrCommentEditSheet({
   }
 
   function handleCancel() {
-    if (isSubmitting) {
+    if (dismissalLocked) {
       return;
     }
     // Read the ref, not the derived `dirty` state: the gate must see the text
@@ -254,7 +259,7 @@ export function PrCommentEditSheet({
           <Button
             variant="ghost"
             onPress={handleCancel}
-            disabled={isSubmitting}
+            disabled={dismissalLocked}
             className="mt-2"
             accessibilityLabel={t('common.cancel')}
           >

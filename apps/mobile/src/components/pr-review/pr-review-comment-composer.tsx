@@ -28,7 +28,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { clearDraft, prCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
@@ -147,6 +147,11 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const platform = useProviderPrScopeOrNull()?.ref.platform;
 
   const isSubmitting = feedback.status === 'pending';
+  // The Terms gate runs before the write is dispatched, so it must not lock
+  // dismissal: a stalled status read would otherwise leave a dead Cancel behind
+  // a spinner. Cancel stays live while the gate is the only work in flight.
+  const [awaitingGate, setAwaitingGate] = useState(false);
+  const dismissalLocked = isSubmitting && !awaitingGate;
   const lineRangeLabel = composerRangeLabel(line, startLine);
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
@@ -230,7 +235,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     // Confirmed offline: fail at once with the retryable copy instead of
     // starting a write React Query pauses, which would look like a stuck
     // submit. The body stays intact and the same tap retries.
-    if (getCommittedConnectivityStatus() === 'offline') {
+    if (connectionRefusesWrites()) {
       attempt.fail({
         kind: 'retryable',
         message: t('prReview.mutationError.couldNotPostComment'),
@@ -238,7 +243,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       });
       return;
     }
+    setAwaitingGate(true);
     const outcome = await ensureTermsAcceptedOutcome();
+    setAwaitingGate(false);
     if (outcome.kind === 'dismissed') {
       attempt.abandon();
       return;
@@ -312,7 +319,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   }
 
   function handleCancel() {
-    if (isSubmitting) {
+    if (dismissalLocked) {
       return;
     }
     const dirty = isEdit
@@ -444,6 +451,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
         <ComposerFooter
           isEdit={isEdit}
           isSubmitting={isSubmitting}
+          dismissalLocked={dismissalLocked}
           primaryDisabled={primaryDisabled}
           onSave={handleSave}
           onCommentNow={() => {

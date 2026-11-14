@@ -238,6 +238,27 @@ describe('PrCommentEditSheet', () => {
     expect(saveDisabled(renderer)).toBe(false);
   });
 
+  it('leaves Cancel live while the pre-submit Terms read is stalled', async () => {
+    const roundTrip = Promise.withResolvers<{ kind: string }>();
+    gate.ensureTermsAcceptedOutcome.mockReturnValueOnce(roundTrip.promise);
+    const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
+    typeBody(renderer, 'edited body');
+
+    act(() => {
+      (saveButton(renderer).props.onPress as () => void)();
+    });
+    expect(saveDisabled(renderer)).toBe(true);
+
+    // The sheet owns no Cancel lock for the gate: the user can still leave.
+    pressCancel(renderer);
+    expect(confirmRequests.at(-1)?.confirmLabel).toBe(i18n.t('common.discard'));
+
+    roundTrip.resolve({ kind: 'dismissed' });
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+
   it('saves an edited body and dismisses', async () => {
     updateComment.mutateAsync.mockResolvedValueOnce({});
     const renderer = await mount(createElement(PrCommentEditSheet, baseProps));

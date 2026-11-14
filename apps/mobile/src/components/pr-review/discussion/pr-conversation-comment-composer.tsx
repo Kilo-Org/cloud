@@ -11,7 +11,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BackHandler,
@@ -110,6 +110,9 @@ export function PrConversationCommentComposer({
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PrInlineFailure>();
 
   const isSubmitting = feedback.status === 'pending';
+  // Cancel must stay live while only the pre-submit Terms gate is in flight.
+  const [awaitingGate, setAwaitingGate] = useState(false);
+  const dismissalLocked = isSubmitting && !awaitingGate;
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
   // pinned header. Compact kb layout fits at offset 0 — snap back so body +
@@ -167,7 +170,9 @@ export function PrConversationCommentComposer({
       });
       return;
     }
+    setAwaitingGate(true);
     const outcome = await ensureTermsAcceptedOutcome();
+    setAwaitingGate(false);
     if (outcome.kind === 'dismissed') {
       attempt.abandon();
       return;
@@ -206,7 +211,7 @@ export function PrConversationCommentComposer({
   }
 
   function handleCancel() {
-    if (isSubmitting) {
+    if (dismissalLocked) {
       return;
     }
     if (bodyRef.current.trim().length > 0) {
@@ -334,7 +339,7 @@ export function PrConversationCommentComposer({
           <Button
             variant="ghost"
             onPress={handleCancel}
-            disabled={isSubmitting}
+            disabled={dismissalLocked}
             className="mt-2"
             accessibilityLabel={t('common.cancel')}
           >

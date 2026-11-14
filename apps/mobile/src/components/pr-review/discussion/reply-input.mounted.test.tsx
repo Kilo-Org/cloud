@@ -210,6 +210,34 @@ describe('ReplyInput submit', () => {
     });
     expect(clearDraft).toHaveBeenCalledWith('u1', `pr-reply:key@${providerPrRefKey(GITLAB_REF)}`);
   });
+
+  it('keeps the replacement draft when a deferred reply resolves after unmount', async () => {
+    const deferred = Promise.withResolvers<unknown>();
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockReturnValue(deferred.promise);
+    const renderer = await mount(
+      createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
+    );
+    typeBody(renderer, 'hello');
+    act(() => {
+      pressReply(renderer);
+    });
+
+    // The user leaves the thread and reopens it; the late success belongs to a
+    // component that no longer owns the draft slot.
+    unmountAll();
+    const reopened = await mount(
+      createElement(ReplyInput, { ...baseProps, reply: makeReply(vi.fn()) })
+    );
+    typeBody(reopened, 'replacement reply');
+
+    await act(async () => {
+      deferred.resolve({});
+      await Promise.resolve();
+    });
+
+    expect(clearDraft).not.toHaveBeenCalled();
+  });
 });
 
 describe('ReplyInput draft seeding', () => {

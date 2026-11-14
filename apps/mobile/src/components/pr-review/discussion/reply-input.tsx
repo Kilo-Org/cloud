@@ -262,7 +262,11 @@ export function ReplyInput({
           ? { threadId: provider.threadId, commentNodeId: provider.commentNodeId, body }
           : { owner, repo, number, commentId, body }
       );
-      attempt.succeed();
+      // A departed surface's token is dead: a newer mount owns the key, and the
+      // draft it is typing must survive this late success.
+      if (!attempt.succeed()) {
+        return;
+      }
       bodyRef.current = '';
       if (userId) {
         void clearDraft(userId, replyDraftKey);

@@ -19,12 +19,13 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, relative as relativePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
+  catalogTags,
   countPlaceholderBases,
   flattenCatalog,
   missingPluralCategories,
@@ -319,12 +320,44 @@ const PER_LINE_BUCKET_PHRASES = new Set([
 
 /** The supported tags, read from the one source of truth. */
 function supportedLanguages(root) {
-  const source = readFileSync(join(root, 'apps/mobile/src/i18n/languages.ts'), 'utf8');
-  const block = /export const SUPPORTED_LANGUAGES = \[([^\]]*)\]/.exec(source);
-  if (!block) {
-    throw new Error('SUPPORTED_LANGUAGES not found in languages.ts');
+  const file = join(root, 'apps/mobile/src/i18n/languages.ts');
+  if (!existsSync(file)) {
+    fail(`mobile: no supported-language list at ${relativePath(root, file)}`);
+    return [];
   }
-  return [...block[1].matchAll(/'([^']+)'/g)].map(match => match[1]);
+  const entry = parseSourceEntry(root, root, file, readFileSync(file, 'utf8'));
+  for (const problem of entry.problems) {
+    fail(problem);
+  }
+  const tags = [];
+  let declared = false;
+  walk(entry.program, node => {
+    if (
+      node.type !== 'VariableDeclarator' ||
+      node.id.type !== 'Identifier' ||
+      node.id.name !== 'SUPPORTED_LANGUAGES'
+    ) {
+      return;
+    }
+    declared = true;
+    const init = node.init === null ? null : unwrap(node.init);
+    if (init?.type !== 'ArrayExpression') {
+      fail(`${entry.path}: SUPPORTED_LANGUAGES is not an array literal`);
+      return;
+    }
+    for (const element of init.elements) {
+      const value = element === null ? null : unwrap(element);
+      if (value?.type !== 'Literal' || typeof value.value !== 'string') {
+        fail(`${entry.path}: SUPPORTED_LANGUAGES has an element this check cannot read`);
+        continue;
+      }
+      tags.push(value.value);
+    }
+  });
+  if (!declared) {
+    fail(`${entry.path}: SUPPORTED_LANGUAGES is not declared`);
+  }
+  return tags;
 }
 
 /**
@@ -1120,11 +1153,7 @@ function checkPushLocaleRegistry(root) {
     fail(`notifications: no push locale registry at ${relativeModule}`);
     return;
   }
-  const present = new Set(
-    readdirSync(catalogDir)
-      .filter(name => name.endsWith('.json'))
-      .map(name => name.replace(/\.json$/, ''))
-  );
+  const present = new Set(catalogTags(catalogDir));
   const text = readFileSync(localeModule, 'utf8');
   const entry = parseSourceEntry(root, root, localeModule, text);
   for (const problem of entry.problems) {
@@ -1221,6 +1250,16 @@ function checkPushLocaleRegistry(root) {
 }
 
 /**
+ * Whether a translated-only key is an admitted member of an English plural
+ * family: it ends in a category, and English declares that family or counts
+ * through a `{{count}}` base for it. The extra-key rule skips such a key and the
+ * placeholder rule validates it, so one predicate decides both.
+ */
+function isAdmittedPluralKey(parts, englishFamilies, englishCountedBases) {
+  return parts !== null && (englishFamilies.has(parts.base) || englishCountedBases.has(parts.base));
+}
+
+/**
  * Every problem the catalogs under `root` have, and how many languages were
  * checked. The repository root is the default, so the CLI below and a test that
  * points at a fixture tree run the same audit. The findings are returned, not
@@ -1242,12 +1281,10 @@ export function checkCatalogs(root = ROOT) {
   checkPushLocaleRegistry(root);
 
   for (const catalog of catalogsOf(root)) {
-    const present = readdirSync(catalog.dir)
-      .filter(name => name.endsWith('.json'))
-      .map(name => name.replace(/\.json$/, ''));
+    const present = new Set(catalogTags(catalog.dir));
 
     for (const tag of tags) {
-      if (!present.includes(tag)) {
+      if (!present.has(tag)) {
         fail(`${catalog.name}: no catalog for supported language "${tag}"`);
       }
     }
@@ -1394,7 +1431,7 @@ export function checkCatalogs(root = ROOT) {
           continue;
         }
         const parts = pluralParts(key);
-        if (parts && (englishFamilies.has(parts.base) || englishCountedBases.has(parts.base))) {
+        if (isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
           continue;
         }
         fail(`${label}: extra key "${key}" is not in en.json`);
@@ -1411,7 +1448,7 @@ export function checkCatalogs(root = ROOT) {
           continue;
         }
         const parts = pluralParts(key);
-        if (!(parts && (englishFamilies.has(parts.base) || englishCountedBases.has(parts.base)))) {
+        if (!isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
           continue;
         }
         const englishRef =

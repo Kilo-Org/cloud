@@ -849,7 +849,7 @@ async function createAndroidNotificationChannels(): Promise<boolean> {
 }
 
 /**
- * Create the Android notification channels once. No-op on iOS (`true`).
+ * Create the Android notification channels once. No-op on iOS. Resolves `true` there.
  * Idempotent and single-flight: every call returns the same module-level
  * promise, and a per-channel failure never rejects it (reported to Sentry
  * instead).

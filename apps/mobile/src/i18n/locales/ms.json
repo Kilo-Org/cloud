@@ -4046,11 +4046,11 @@
       "delete": "Padam ejen {{name}}"
     },
     "slashCommands": {
-      "title": "Perintah tebas",
+      "title": "Arahan tebas",
       "add": "Tambah arahan slash",
       "empty": "Tiada arahan slash lagi",
       "name": "Nama arahan",
-      "description": "Penerangan perintah",
+      "description": "Penerangan arahan",
       "template": "templat",
       "namePlaceholder": "explain",
       "agentPlaceholder": "reviewer",

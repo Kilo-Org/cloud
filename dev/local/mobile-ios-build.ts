@@ -164,7 +164,18 @@ export function buildFingerprintOptions(): {
     // The generated ios/ tree is output, not an input: its bytes differ per
     // worktree (pbxproj UUIDs, absolute paths in Podfile.lock). Pin it out of
     // the hash so no fingerprint version can key builds on it.
-    ignorePaths: ['ios/**', 'modules/*/android/**', 'modules/*/src/**', 'modules/**/*.test.ts'],
+    ignorePaths: [
+      'ios/**',
+      'modules/*/android/**',
+      'modules/*/src/**',
+      'modules/**/*.test.ts',
+      // The SSH module's Rust artifacts: scripts/build-ios.sh writes the
+      // xcframework, the bindings and a multi-gigabyte cargo target tree, and
+      // the versions of those bytes depend on the host that built them.
+      'modules/kilo-ssh/rust/target/**',
+      'modules/kilo-ssh/ios/Generated/**',
+      'modules/kilo-ssh/ios/Frameworks/**',
+    ],
     extraSources: [
       {
         type: 'contents',
@@ -1458,6 +1469,10 @@ async function productionBuilder(args: {
 // `--clean` regenerates ios/ from scratch, as CI does on a fresh checkout.
 // CI=1 keeps the Expo CLI non-interactive (no dirty-git-tree prompt).
 function productionPrebuild(mobileRoot: string): void {
+  execFileSync('bash', ['modules/kilo-ssh/scripts/build-native.sh'], {
+    cwd: mobileRoot,
+    stdio: 'inherit',
+  });
   execFileSync('pnpm', ['exec', 'expo', 'prebuild', '--platform', 'ios', '--clean'], {
     cwd: mobileRoot,
     stdio: 'inherit',

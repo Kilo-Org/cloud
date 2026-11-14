@@ -1,0 +1,6 @@
+[bindings.kotlin]
+package_name = "ai.kilo.reactnativessh.uniffi"
+cdylib_name = "ssh_core"
+
+[bindings.swift]
+module_name = "SshCore"

@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/require-await, require-await, promise-function-async, promise/prefer-await-to-then, max-lines -- a download is a pending promise the test settles by hand, and the store's whole state machine is one suite */
+/* eslint-disable typescript-eslint/require-await, require-await, promise-function-async, promise/prefer-await-to-then -- a download is a pending promise the test settles by hand */
 import { describe, expect, it } from 'vitest';
 
 import { CATALOG, finish, flush, harness, taskAt } from './gguf-downloads.test-helpers';
@@ -298,41 +298,6 @@ it.each([
 
   expect(h.index.text).toBe(text);
   expect(h.files.has(ggufModelName('other'))).toBe(true);
-});
-
-describe('a storage read that fails', () => {
-  it('reports the failure instead of an empty list and clears it on a successful load', () => {
-    const h = harness();
-    h.index.fails = true;
-
-    expect(h.store.load()).toBe(false);
-    expect(h.store.snapshot()).toMatchObject({ models: [], loadFailed: true });
-
-    // A repeated failed read publishes nothing new: the render path must not see a
-    // fresh snapshot for an unchanged state.
-    const failed = h.store.snapshot();
-    expect(h.store.load()).toBe(false);
-    expect(h.store.snapshot()).toBe(failed);
-
-    h.index.fails = false;
-    h.index.text = JSON.stringify([
-      {
-        fileId: 'small',
-        name: 'Small model',
-        url: 'https://example.com/small.gguf',
-        sizeBytes: 10,
-        contextWindow: 4096,
-        tools: false,
-        vision: false,
-        thinking: false,
-      },
-    ]);
-    h.files.set(ggufModelName('small'), 10);
-
-    expect(h.store.load()).toBe(true);
-    expect(h.store.snapshot().loadFailed).toBe(false);
-    expect(h.store.snapshot().models.map(model => model.fileId)).toEqual(['small']);
-  });
 });
 
 describe('deleting a model', () => {

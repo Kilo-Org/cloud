@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- the transfer state machine and its store share one closure over `active` */
 import {
   type GgufDownloadProblem,
   type GgufDownloadSource,
@@ -28,6 +27,7 @@ import {
   transfersOf,
   transferStart,
 } from './gguf-transfers';
+import { createProgressReporter } from './gguf-transfer-progress';
 import { verifyModel } from './gguf-verify';
 
 /**
@@ -159,31 +159,11 @@ export function ggufDownloads({
     await verify(download, download.done + size);
   };
 
-  const onProgress =
-    (download: () => Active | undefined) =>
-    (progress: { readonly bytesWritten: number; readonly totalBytes: number }) => {
-      const current = download();
-      if (current === undefined || active !== current || current.phase !== 'downloading') {
-        return;
-      }
-      // Bytes arriving after a resume mean the server accepted it.
-      current.resuming = false;
-      const { expected } = currentTransfer(current);
-      const firstLength = current.total <= 0 && progress.totalBytes > 0;
-      current.written = progress.bytesWritten;
-      current.total = progress.totalBytes > 0 ? progress.totalBytes : (expected ?? 0);
-      const room = storage.freeBytes();
-      if (
-        firstLength &&
-        expected === undefined &&
-        room < current.total - current.written + STORAGE_HEADROOM_BYTES
-      ) {
-        current.stop = 'space';
-        current.task.cancel();
-        return;
-      }
-      publish();
-    };
+  const onProgress = createProgressReporter({
+    storage,
+    activeDownload: () => active,
+    publish,
+  });
 
   /** A resume the server refused: drop the partial file and download it again from zero. */
   const restart = (download: Active) => {

@@ -2542,6 +2542,7 @@ describe('foreground attention-push suppression', () => {
     // Imported through the same resetModules cycle as './notifications', so the
     // posted marker this test reads is the one the handler reads.
     const needsInput = await import('./needs-input-notification');
+    const presentation = await import('./needs-input-presentation');
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
@@ -2551,7 +2552,7 @@ describe('foreground attention-push suppression', () => {
         };
       }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
     };
-    return { loaded, needsInput, registration };
+    return { loaded, needsInput, presentation, registration };
   }
 
   const attentionPush = {
@@ -2572,7 +2573,7 @@ describe('foreground attention-push suppression', () => {
   } as const;
 
   it('suppresses the server attention push while the app notification for that session is posted', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
@@ -2581,7 +2582,7 @@ describe('foreground attention-push suppression', () => {
     });
     // The marker is only a fast path; the OS says the notification is on screen.
     mocks.getPresentedNotificationsAsync.mockResolvedValue([
-      { request: { identifier: needsInput.notificationIdentifierForSession('ses_1') } },
+      { request: { identifier: presentation.notificationIdentifierForSession('ses_1') } },
     ]);
 
     const behavior = await registration.handleNotification({
@@ -2592,7 +2593,7 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows a foreground attention push whose app-owned notification the user dismissed', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
@@ -2614,7 +2615,7 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows the app-owned needs-input notification even while its session is posted', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
@@ -2626,7 +2627,7 @@ describe('foreground attention-push suppression', () => {
     // suppressing it would drop the only notification the app presents.
     const behavior = await registration.handleNotification({
       request: {
-        identifier: needsInput.notificationIdentifierForSession('ses_1'),
+        identifier: presentation.notificationIdentifierForSession('ses_1'),
         content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
       },
     });
@@ -2660,14 +2661,14 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows the server attention push again after the raise is answered headless', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],
       updates: [],
     });
 
-    needsInput.clearPostedNeedsInputNotification('ses_1');
+    presentation.clearPostedNeedsInputNotification('ses_1');
 
     const behavior = await registration.handleNotification({
       request: {
@@ -2678,7 +2679,7 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows an ordinary agent progress push even while the raise is posted', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],

@@ -7,12 +7,14 @@ import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sin
 import {
   applyNeedsInputNotifications,
   type NeedsInputNotificationRow,
-  notificationIdentifierForSession,
   planNeedsInputNotifications,
-  readNeedsInputPresentation,
   reconcileNotifiedAfterApply,
   shouldPublishForSession,
 } from './needs-input-notification';
+import {
+  notificationIdentifierForSession,
+  readNeedsInputPresentation,
+} from './needs-input-presentation';
 
 const mocks = vi.hoisted(() => ({
   scheduleNotificationAsync: vi.fn(),

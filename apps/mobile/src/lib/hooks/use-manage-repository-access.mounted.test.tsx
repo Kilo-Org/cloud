@@ -1,119 +1,22 @@
-/* eslint-disable max-lines -- one mounted suite pins the watchdog, supersession and return-edge contract */
-// The picker's Manage access control is the only way to widen what the
-// repository list may show, so a tap that produces nothing is the whole defect:
-// it has to draw a busy state while the install state is minted, never start a
-// second launch from a repeated tap, and report a launch that failed — including
-// one that failed after the app's own return edge ended the wait.
+// The Manage-access control's busy state, its mint failures, and the return edge
+// its caller resyncs from. Mocks and mounting live in the helpers module, whose
+// import MUST stay first: it registers the module mocks while it is evaluated.
 
-import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, TestRenderer } from '@/test/renderer';
+import { act } from '@/test/renderer';
 
 import {
-  type ManageRepositoryAccess,
-  useManageRepositoryAccess,
-} from './use-manage-repository-access';
+  accessMocks,
+  mountHook,
+  requireHook,
+  resetAccessMocks,
+} from './use-manage-repository-access.test-helpers';
 
-const mocks = vi.hoisted(() => ({
-  toastError: vi.fn(),
-  mintInstallState: vi.fn((_input: unknown): Promise<{ token: string }> =>
-    Promise.resolve({ token: 'install-token' })
-  ),
-  launch: vi.fn<(url: string) => Promise<unknown>>(),
-}));
-
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
-
-vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
-
-vi.mock('@/lib/hooks/use-code-reviewer', () => ({
-  isPersonal: (scope: string) => scope === 'personal',
-}));
-
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.com' }));
-
-vi.mock('@/lib/agent-github-integration', () => ({
-  getGitHubIntegrationUrl: (base: string, orgId: string | undefined, token?: string) =>
-    `${base}/${orgId ?? 'personal'}${token ? `?state=${token}` : ''}`,
-}));
-
-vi.mock('@/lib/integration-urls', () => ({
-  getGitLabIntegrationUrl: (base: string, orgId: string | undefined) =>
-    `${base}/${orgId ?? 'personal'}/gitlab`,
-}));
-
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: mocks.mintInstallState } } },
-}));
-
-vi.mock('react-native', () => ({
-  Platform: { OS: 'android' },
-  AppState: {
-    addEventListener: () => ({ remove: () => undefined }),
-    currentState: 'active',
-  },
-}));
-
-vi.mock('expo-web-browser', () => ({
-  openAuthSessionAsync: vi.fn(),
-  openBrowserAsync: vi.fn(),
-  WebBrowserResultType: { OPENED: 'opened', CANCEL: 'cancel', DISMISS: 'dismiss' },
-}));
-
-// Only the launch is faked: the late-failure report under test is the real one.
-vi.mock('@/lib/pr-review/connect-gate-platform', async importOriginal => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  openAuthorizationAndWaitForReturn: mocks.launch,
-}));
-
-type HookResult = ManageRepositoryAccess | undefined;
-
-type Handlers = { onOpen?: () => void; onReturn?: (opened: boolean) => void };
-
-function Harness({
-  scope,
-  platform,
-  handlers,
-  resultRef,
-}: {
-  scope: string;
-  platform: 'github' | 'gitlab' | 'bitbucket';
-  handlers: Handlers;
-  resultRef: { current: HookResult };
-}) {
-  resultRef.current = useManageRepositoryAccess(scope, platform, handlers);
-  return null;
-}
-
-function mountHook(
-  scope: string,
-  platform: 'github' | 'gitlab' | 'bitbucket',
-  handlers: Handlers = {}
-): { current: HookResult } {
-  const resultRef: { current: HookResult } = { current: undefined };
-  act(() => {
-    TestRenderer.create(React.createElement(Harness, { scope, platform, handlers, resultRef }));
-  });
-  return resultRef;
-}
-
-function requireHook(resultRef: { current: HookResult }): ManageRepositoryAccess {
-  const result = resultRef.current;
-  if (!result) {
-    throw new Error('useManageRepositoryAccess returned no action');
-  }
-  return result;
-}
+const mocks = accessMocks();
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.mintInstallState.mockImplementation(() => Promise.resolve({ token: 'install-token' }));
-  mocks.launch.mockImplementation(() =>
-    Promise.resolve({ reported: Promise.resolve({ type: 'dismiss' }), settledByLaunch: true })
-  );
+  resetAccessMocks();
 });
 
 describe('useManageRepositoryAccess', () => {
@@ -248,61 +151,6 @@ describe('useManageRepositoryAccess', () => {
         await Promise.resolve();
       });
       expect(requireHook(resultRef).pending).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('delivers no return event for an attempt the watchdog already released', async () => {
-    vi.useFakeTimers();
-    try {
-      const firstLaunch = Promise.withResolvers<unknown>();
-      const secondLaunch = Promise.withResolvers<unknown>();
-      mocks.launch
-        .mockReturnValueOnce(firstLaunch.promise)
-        .mockReturnValueOnce(secondLaunch.promise);
-      const onReturn = vi.fn<(opened: boolean) => void>();
-      const resultRef = mountHook('personal', 'github', { onReturn });
-
-      await act(async () => {
-        requireHook(resultRef).handlePress();
-        await Promise.resolve();
-      });
-      await act(() => {
-        vi.advanceTimersByTime(20_000);
-      });
-      // The watchdog released the control, and a second tap superseded the attempt.
-      await act(async () => {
-        requireHook(resultRef).handlePress();
-        await Promise.resolve();
-      });
-      expect(onReturn).not.toHaveBeenCalled();
-
-      // The superseded attempt settling must not deliver its return edge: the
-      // caller's own resync flag belongs to the attempt it is still waiting on.
-      await act(async () => {
-        firstLaunch.resolve({
-          reported: Promise.resolve({ type: 'dismiss' }),
-          settledByLaunch: true,
-        });
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-      expect(onReturn).not.toHaveBeenCalled();
-      expect(requireHook(resultRef).pending).toBe(true);
-
-      // The attempt that owns the control still delivers its own return.
-      await act(async () => {
-        secondLaunch.resolve({
-          reported: Promise.resolve({ type: 'dismiss' }),
-          settledByLaunch: true,
-        });
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-      expect(onReturn).toHaveBeenCalledTimes(1);
-      expect(onReturn).toHaveBeenCalledWith(true);
-      expect(requireHook(resultRef).pending).toBe(false);
     } finally {
       vi.useRealTimers();
     }

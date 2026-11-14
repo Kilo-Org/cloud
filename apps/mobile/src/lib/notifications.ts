@@ -76,7 +76,7 @@ import { notificationDestinationForData } from './notification-path';
 import {
   isAppOwnedNeedsInputNotification,
   readNeedsInputPresentation,
-} from './needs-input-notification';
+} from './needs-input-presentation';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
 

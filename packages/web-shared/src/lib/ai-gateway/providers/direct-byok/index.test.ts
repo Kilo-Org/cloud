@@ -330,11 +330,13 @@ describe('getDirectByokModel', () => {
     const { getAiSdkProvider } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
     const provider: DirectByokProvider = directByokProviders[0];
-    provider.getAiSdkProvider = () => ({ aiSdkProvider: undefined });
     jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
     jest.mocked(getAiSdkProvider).mockReturnValue('anthropic');
 
     try {
+      // The module under test reads its own default export, so the stub has to live on that
+      // shared definition; the finally block removes it again.
+      provider.getAiSdkProvider = () => ({ aiSdkProvider: undefined });
       const models = await getDirectByokModelsForUser('user-id');
 
       expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual([undefined, undefined]);

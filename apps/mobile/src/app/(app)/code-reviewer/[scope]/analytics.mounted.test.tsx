@@ -143,7 +143,7 @@ vi.mock('@/components/ui/icons', () => ({
   LineChart: 'LineChart',
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
 
 const Screen = CodeReviewerAnalyticsRoute as ComponentType<Record<string, never>>;
 

@@ -101,6 +101,26 @@ describe('useFetchToCompletion failure phase', () => {
     expect(current(holder).failure).not.toBeNull();
   });
 
+  it('retires a failure published after a refetch already advanced the version', async () => {
+    const pageError = new Error('later page failed');
+    const fetchNextPage = vi.fn(async () => {
+      await Promise.resolve();
+      return { data: PAGE, hasNextPage: true, error: pageError, dataUpdatedAt: 100 };
+    });
+    // The live version moved before the loop ran, and the failed page reports
+    // the version it was requested at.
+    const { holder } = await mountProbe({ fetchNextPage, dataUpdatedAt: 300 });
+    await act(async () => {
+      await current(holder).run();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(current(holder).failure).toBeNull();
+    expect(current(holder).feedback.status).toBe('idle');
+  });
+
   it('retires the failure once a page lands beyond the version it failed at', async () => {
     const pageError = new Error('later page failed');
     const fetchNextPage = vi.fn(async () => {

@@ -239,8 +239,15 @@ export function useFetchToCompletion(
   // A page that landed after the failure makes it false: retire the line
   // instead of leaving a "stopped" report over a complete list.
   useEffect(() => {
+    // The failure identity is a dependency, not just the version: a refetch can
+    // move `dataUpdatedAt` while the run is still looping, so the effect that
+    // saw the newer version ran before anything was published. Without this the
+    // failure outlives its own recovery until the user retries.
+    if (failure === null) {
+      return;
+    }
     clearWhere(f => query.dataUpdatedAt > f.at);
-  }, [clearWhere, query.dataUpdatedAt]);
+  }, [clearWhere, failure, query.dataUpdatedAt]);
 
   return { run, loadedFiles, totalFiles, feedback, failure };
 }

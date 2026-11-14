@@ -1,5 +1,6 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
@@ -80,11 +81,32 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' })
 const BUTTON = 'Button' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
+let queryClient: QueryClient | undefined = undefined;
 
 async function mount() {
   const view = await renderWithProviders(createElement(LoginMethodsScreen));
   renderer = view.renderer;
+  queryClient = view.queryClient;
   return view.renderer.root;
+}
+
+/**
+ * Re-render the mounted screen under the providers it was mounted with, so the
+ * tree keeps its state. Rendering the screen bare would mount a second tree and
+ * drop exactly the state under test.
+ */
+function rerender() {
+  if (!renderer || !queryClient) {
+    throw new Error('screen is not mounted');
+  }
+  const tree = createElement(
+    QueryClientProvider,
+    { client: queryClient },
+    createElement(LoginMethodsScreen)
+  );
+  act(() => {
+    renderer?.update(tree);
+  });
 }
 
 function unlinkButtons(root: ReactTestRenderer['root']) {
@@ -116,6 +138,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  queryClient = undefined;
 });
 
 describe('LoginMethodsScreen', () => {
@@ -165,6 +188,21 @@ describe('LoginMethodsScreen', () => {
       "You can't unlink your only sign-in method. Link another method first.",
     ]);
     expect(state.mutate).not.toHaveBeenCalled();
+
+    // The reader links a second method and the foreground refresh hands this same
+    // mounted tree a two-method list.
+    state.providers = [
+      { provider: 'github', email: 'ada@example.test' },
+      { provider: 'google', email: 'ada@example.test' },
+    ];
+    rerender();
+
+    if (!renderer) {
+      throw new Error('missing mounted tree');
+    }
+    expect(unlinkButtons(renderer.root)).toHaveLength(2);
+    const retired = renderer.root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
+    expect(retired.map(node => node.props.message)).toEqual([null]);
   });
 
   it('reports the last-method rule beside the list in the screen language', async () => {

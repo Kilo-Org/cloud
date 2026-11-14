@@ -94,7 +94,6 @@ export function retrySession(id: string): void {
     return;
   }
   entry.attempt = 0;
-  entry.reconnecting = false;
   entry.passwords.clear();
   entry.authHostId = null;
   entry.passphrase = null;

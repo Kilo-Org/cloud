@@ -5,6 +5,7 @@ import { SECURITY_COMMAND_TYPES } from '@kilocode/app-shared/security-agent';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
 import {
+  ANALYTICS_DENY_LIST_CARVE_OUTS,
   ANALYTICS_EVENT_SCHEMAS,
   APP_STARTUP_EVENT,
   CLAW_WEATHER_LOCATION_SELECTED_EVENT,
@@ -46,6 +47,7 @@ import {
   SSH_SANDBOX_TERMINAL_EVENT,
   SSH_SFTP_TRANSFER_EVENT,
   TERMINAL_PHASE_EVENTS,
+  analyticsCarveOutKeys,
   type AcceptedPhaseEventName,
   type TerminalOutcomeEventName,
 } from './event-map';
@@ -548,21 +550,43 @@ describe('privacy deny-list', () => {
       'event_uuid',
       'Event_UUID',
       'eventUuid',
-      'authMethod',
-      'auth_method',
     ]) {
       expect(isProhibitedPropertyKey(key), key).toBe(false);
     }
   });
 
-  it('walks every schema property key and finds none prohibited', () => {
+  it('rejects the SSH credential-kind key unless the event declares it', () => {
+    for (const key of ['auth_method', 'authMethod', 'Auth_Method']) {
+      expect(isProhibitedPropertyKey(key), key).toBe(true);
+      expect(isProhibitedPropertyKey(key, analyticsCarveOutKeys(SSH_CONNECT_SUCCEEDED_EVENT))).toBe(
+        false
+      );
+    }
+  });
+
+  it('derives the carve-outs from the schemas that declare them', () => {
+    expect([...ANALYTICS_DENY_LIST_CARVE_OUTS.keys()]).toEqual([
+      SSH_CONNECT_SUCCEEDED_EVENT,
+      SSH_CONNECT_FAILED_EVENT,
+    ]);
+    for (const name of [SSH_CONNECT_SUCCEEDED_EVENT, SSH_CONNECT_FAILED_EVENT]) {
+      expect([...analyticsCarveOutKeys(name)]).toEqual(['auth_method']);
+    }
+    for (const name of [SESSION_VIEWED_EVENT, SSH_RECONNECT_EVENT, APP_STARTUP_EVENT]) {
+      expect(analyticsCarveOutKeys(name).size).toBe(0);
+    }
+  });
+
+  it('walks every schema property key and finds none prohibited beyond its carve-outs', () => {
     for (const [name, schema] of Object.entries(ANALYTICS_EVENT_SCHEMAS)) {
       const def = defOf(schema);
       if (def.type !== 'object' || !def.shape) {
         continue;
       }
       for (const key of Object.keys(def.shape)) {
-        expect(isProhibitedPropertyKey(key), `${name}.${key}`).toBe(false);
+        expect(isProhibitedPropertyKey(key, analyticsCarveOutKeys(name)), `${name}.${key}`).toBe(
+          false
+        );
       }
     }
   });
@@ -605,6 +629,8 @@ describe('privacy deny-list', () => {
       repo_count: 3,
       duration_ms: 42,
       event_uuid: 'abc',
+      auth_method: 'password',
+      authMethod: 'password',
     };
     const copy = { ...input };
 
@@ -616,5 +642,17 @@ describe('privacy deny-list', () => {
       event_uuid: 'abc',
     });
     expect(input).toEqual(copy);
+  });
+
+  it('keeps auth_method only for an event whose schema declares it', () => {
+    const payload = { authMethod: 'password' as const, category: 'none' as const };
+
+    expect(
+      redactProhibitedProperties(payload, analyticsCarveOutKeys(SSH_CONNECT_SUCCEEDED_EVENT))
+    ).toEqual(payload);
+    expect(redactProhibitedProperties(payload)).toEqual({ category: 'none' });
+    expect(
+      redactProhibitedProperties(payload, analyticsCarveOutKeys(SESSION_VIEWED_EVENT))
+    ).toEqual({ category: 'none' });
   });
 });

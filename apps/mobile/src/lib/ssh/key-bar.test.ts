@@ -6,6 +6,7 @@ import {
   isDefaultKeyBarLayout,
   keyBarKeys,
   type KeyBarLayout,
+  type KeyBarLayoutSave,
   loadKeyBarLayout,
   moveKeyBarKey,
   moveKeyBarKeyTo,
@@ -14,6 +15,8 @@ import {
   saveKeyBarLayout,
   serializeKeyBarLayout,
   setKeyBarKeyHidden,
+  settleKeyBarLayoutSave,
+  startKeyBarLayoutSave,
   visibleKeyBarKeys,
 } from './key-bar';
 import { TERMINAL_KEYS } from './terminal-keys';
@@ -257,5 +260,45 @@ describe('storing the layout', () => {
 
     expect(kv.removeItem).toHaveBeenCalledWith('ssh-key-bar', 'layout');
     await expect(loadKeyBarLayout()).resolves.toEqual(DEFAULT_KEY_BAR_LAYOUT);
+  });
+});
+
+describe('optimistic layout saves', () => {
+  const firstMove = moveKeyBarKeyTo(DEFAULT_KEY_BAR_LAYOUT, 0, 1);
+  const secondMove = moveKeyBarKeyTo(firstMove, 1, 2);
+  const start: KeyBarLayoutSave = {
+    shown: DEFAULT_KEY_BAR_LAYOUT,
+    persisted: DEFAULT_KEY_BAR_LAYOUT,
+  };
+
+  it('rolls two quick failing edits back to the last persisted layout', () => {
+    let state = startKeyBarLayoutSave(start, firstMove);
+    state = startKeyBarLayoutSave(state, secondMove);
+
+    state = settleKeyBarLayoutSave(state, firstMove, true);
+    expect(state.shown).toEqual(secondMove);
+
+    state = settleKeyBarLayoutSave(state, secondMove, true);
+    expect(state).toEqual({ shown: DEFAULT_KEY_BAR_LAYOUT, persisted: DEFAULT_KEY_BAR_LAYOUT });
+  });
+
+  it('keeps the newer edit when only the earlier write fails', () => {
+    let state = startKeyBarLayoutSave(start, firstMove);
+    state = startKeyBarLayoutSave(state, secondMove);
+
+    state = settleKeyBarLayoutSave(state, firstMove, true);
+    state = settleKeyBarLayoutSave(state, secondMove, false);
+
+    expect(state).toEqual({ shown: secondMove, persisted: secondMove });
+  });
+
+  it('rolls a single failing edit back to the loaded layout, not the default one', () => {
+    const loaded: KeyBarLayout = moveKeyBarKeyTo(DEFAULT_KEY_BAR_LAYOUT, 2, 0);
+    let state: KeyBarLayoutSave = { shown: loaded, persisted: loaded };
+
+    state = startKeyBarLayoutSave(state, firstMove);
+    state = settleKeyBarLayoutSave(state, firstMove, true);
+
+    expect(state).toEqual({ shown: loaded, persisted: loaded });
   });
 });

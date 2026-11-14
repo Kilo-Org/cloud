@@ -250,8 +250,12 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     setAwaitingGate(true);
     gateAttemptRef.current = attempt;
     const outcome = await ensureTermsAcceptedOutcome();
-    setAwaitingGate(false);
-    gateAttemptRef.current = null;
+    // A newer attempt may own the slot by now (the user cancelled this one and
+    // started another while this gate was pending): only the owner clears it.
+    if (gateAttemptRef.current === attempt) {
+      gateAttemptRef.current = null;
+      setAwaitingGate(false);
+    }
     if (!attempt.owns()) {
       // Dismissed (or unmounted) while the gate ran: this token no longer owns
       // the phase, so it must not dispatch the write.

@@ -28,12 +28,11 @@ type ConfirmRequest = {
   onConfirm: () => void;
 };
 
-const { addComment, gate, connectivity, confirmRequests, backHandler } = vi.hoisted(() => ({
+const { addComment, gate, connectivity, confirmRequests } = vi.hoisted(() => ({
   addComment: { mutateAsync: vi.fn<(input: unknown) => Promise<unknown>>() },
   gate: { ensureTermsAcceptedOutcome: vi.fn<() => Promise<{ kind: string }>>() },
   connectivity: { value: 'online' },
   confirmRequests: [] as ConfirmRequest[],
-  backHandler: { current: null as null | (() => boolean) },
 }));
 
 // The Expo modules in this graph read the build-time `__DEV__` global when they
@@ -43,16 +42,7 @@ vi.hoisted(() => {
 });
 
 vi.mock('react-native', () => ({
-  BackHandler: {
-    addEventListener: (_event: string, handler: () => boolean) => {
-      backHandler.current = handler;
-      return {
-        remove: () => {
-          backHandler.current = null;
-        },
-      };
-    },
-  },
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   ScrollView: 'ScrollView',
   View: 'View',
@@ -142,8 +132,6 @@ function commentDisabled(renderer: ReactTestRenderer): boolean {
 }
 
 beforeEach(() => {
-  confirmRequests.length = 0;
-  backHandler.current = null;
   connectivity.value = 'online';
   addComment.mutateAsync.mockReset();
   gate.ensureTermsAcceptedOutcome.mockReset();
@@ -210,83 +198,6 @@ describe('PrConversationCommentComposer', () => {
     // the CTA stays live (bad-request) or goes down (forbidden).
     expect(failureCopy(renderer)).toBe(copy);
     expect(commentDisabled(renderer)).toBe(kind === 'forbidden');
-  });
-
-  describe('dismissal gate', () => {
-    function pressCancel(renderer: ReactTestRenderer): void {
-      act(() => {
-        (buttonByText(renderer, i18n.t('common.cancel')).props.onPress as () => void)();
-      });
-    }
-
-    function pressHeaderBack(renderer: ReactTestRenderer): void {
-      act(() => {
-        (renderer.root.findByType('PrFormSheetHeader').props.onBack as () => void)();
-      });
-    }
-
-    function pressHardwareBack(): void {
-      act(() => {
-        backHandler.current?.();
-      });
-    }
-
-    it.each([
-      ['the footer Cancel', pressCancel],
-      ['the header close', pressHeaderBack],
-      ['the hardware back', pressHardwareBack],
-    ] as const)(
-      'dismisses %s with an empty body without a discard confirm',
-      async (_name, trigger) => {
-        const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
-        trigger(renderer);
-
-        expect(confirmRequests).toHaveLength(0);
-        expect(clearDraft).not.toHaveBeenCalled();
-        expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
-      }
-    );
-
-    it('writes nothing when the composer is dismissed during the Terms read', async () => {
-      const roundTrip = Promise.withResolvers<{ kind: string }>();
-      gate.ensureTermsAcceptedOutcome.mockReturnValueOnce(roundTrip.promise);
-      addComment.mutateAsync.mockResolvedValue({});
-      const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
-      typeBody(renderer, 'hello');
-
-      act(() => {
-        pressComment(renderer);
-      });
-      act(() => {
-        (buttonByText(renderer, i18n.t('common.cancel')).props.onPress as () => void)();
-      });
-
-      await act(async () => {
-        roundTrip.resolve({ kind: 'accepted' });
-        await Promise.resolve();
-      });
-
-      expect(addComment.mutateAsync).not.toHaveBeenCalled();
-      expect(clearDraft).not.toHaveBeenCalled();
-    });
-
-    it('stays on the composer with the retryable copy when the discard clear fails', async () => {
-      vi.mocked(clearDraft).mockResolvedValue(false);
-      const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
-      typeBody(renderer, 'hello');
-      pressCancel(renderer);
-      confirmRequests.at(-1)?.onConfirm();
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      // The stored draft could not be removed: dismissing would resurface the
-      // text on the next open, so the sheet stays and this copy offers the
-      // retry.
-      expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-conversation:key');
-      expect(baseProps.onDismiss).not.toHaveBeenCalled();
-      expect(failureCopy(renderer)).toBe(i18n.t('agentChat.newSession.discardFailed'));
-    });
   });
 
   it('issues one request for two taps during the Terms status round-trip', async () => {

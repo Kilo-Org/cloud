@@ -2,12 +2,22 @@
 // shared inline box, a retryable one keeps Save live for the same tap, and a
 // terminal 404 (the comment is gone) keeps Save down with the sheet's copy.
 
-import { createElement, type ReactElement } from 'react';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+import { act } from '@/test/renderer';
 
 import { PrCommentEditSheet } from './pr-comment-edit-sheet';
+import {
+  failureCopy,
+  mount,
+  pressCancel,
+  pressSave,
+  saveButton,
+  saveDisabled,
+  typeBody,
+  unmountAll,
+} from './pr-comment-edit-sheet.test-helpers';
 import { i18n } from '@/i18n';
 
 type ConfirmRequest = {
@@ -99,77 +109,6 @@ const baseProps = {
   onDismiss: vi.fn(),
 };
 
-const mounted: ReactTestRenderer[] = [];
-
-async function mount(element: ReactElement): Promise<ReactTestRenderer> {
-  const holder: { current: ReactTestRenderer | undefined } = { current: undefined };
-  await act(async () => {
-    holder.current = TestRenderer.create(element);
-    await Promise.resolve();
-  });
-  const renderer = holder.current;
-  if (!renderer) {
-    throw new Error('renderer did not mount');
-  }
-  mounted.push(renderer);
-  return renderer;
-}
-
-function typeBody(renderer: ReactTestRenderer, text: string): void {
-  act(() => {
-    (renderer.root.findByType('CommentBodyField').props.onChangeText as (value: string) => void)(
-      text
-    );
-  });
-}
-
-function saveButton(renderer: ReactTestRenderer) {
-  const [first] = renderer.root.findAll(
-    node =>
-      Object.is(node.type, 'Button') &&
-      node.findAll(child => child.props.children === i18n.t('common.save')).length > 0
-  );
-  if (!first) {
-    throw new Error('missing Save button');
-  }
-  return first;
-}
-
-function cancelButton(renderer: ReactTestRenderer) {
-  const [first] = renderer.root.findAll(
-    node =>
-      Object.is(node.type, 'Button') &&
-      node.findAll(child => child.props.children === i18n.t('common.cancel')).length > 0
-  );
-  if (!first) {
-    throw new Error('missing Cancel button');
-  }
-  return first;
-}
-
-function pressCancel(renderer: ReactTestRenderer): void {
-  act(() => {
-    (cancelButton(renderer).props.onPress as () => void)();
-  });
-}
-
-async function pressSave(renderer: ReactTestRenderer): Promise<void> {
-  await act(async () => {
-    (saveButton(renderer).props.onPress as () => void)();
-    await Promise.resolve();
-  });
-}
-
-function saveDisabled(renderer: ReactTestRenderer): boolean {
-  return saveButton(renderer).props.disabled as boolean;
-}
-
-function failureCopy(renderer: ReactTestRenderer): string | undefined {
-  const status = renderer.root.findAllByType('AccessibleStatus')[0];
-  const text = renderer.root.findAllByType('Text')[0];
-  return (status?.props.message ?? text?.props.children) as string | undefined;
-}
-
 beforeEach(() => {
   confirmRequests.length = 0;
   backHandler.current = null;
@@ -181,9 +120,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const renderer of mounted.splice(0)) {
-    renderer.unmount();
-  }
+  unmountAll();
 });
 
 describe('PrCommentEditSheet', () => {
@@ -254,6 +191,38 @@ describe('PrCommentEditSheet', () => {
       await Promise.resolve();
     });
 
+    expect(updateComment.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('leaves the newer attempt’s gate slot alone when an abandoned gate resolves', async () => {
+    const abandoned = Promise.withResolvers<{ kind: string }>();
+    const newer = Promise.withResolvers<{ kind: string }>();
+    gate.ensureTermsAcceptedOutcome
+      .mockReturnValueOnce(abandoned.promise)
+      .mockReturnValueOnce(newer.promise);
+    const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
+    typeBody(renderer, 'edited body');
+
+    act(() => {
+      (saveButton(renderer).props.onPress as () => void)();
+    });
+    pressCancel(renderer);
+    act(() => {
+      (saveButton(renderer).props.onPress as () => void)();
+    });
+
+    await act(async () => {
+      abandoned.resolve({ kind: 'accepted' });
+      await Promise.resolve();
+    });
+    expect(confirmRequests).toHaveLength(1);
+    pressCancel(renderer);
+    expect(confirmRequests).toHaveLength(2);
+
+    await act(async () => {
+      newer.resolve({ kind: 'accepted' });
+      await Promise.resolve();
+    });
     expect(updateComment.mutateAsync).not.toHaveBeenCalled();
   });
 

@@ -5,13 +5,21 @@
 //
 // Real React state, real ComposerInlineError, native children stubbed.
 
-import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+import { act } from '@/test/renderer';
 
-import { PrReviewCommentComposer } from './pr-review-comment-composer';
+import {
+  hasCopy,
+  hasReconnectNotice,
+  isDisabled,
+  mountComposer,
+  press,
+  pressAndSettle,
+  typeBody,
+  unmountAll,
+} from './pr-review-comment-composer.test-helpers';
 import { PR_OPERATION_PERSISTENCE_FAILED_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { clearDraft } from '@/lib/persist/drafts';
 
@@ -21,19 +29,30 @@ vi.hoisted(() => {
   Object.assign(globalThis, { __DEV__: false });
 });
 
-const { announcement, connectivity, createComment, draftLoad, gate, pendingReview, termsStatus } =
-  vi.hoisted(() => ({
-    announcement: { announce: vi.fn() },
-    connectivity: { value: 'online' },
-    createComment: {
-      mutateAsync: vi.fn<() => Promise<unknown>>(),
-      publish: { current: null as ((state: { error: Error | null }) => void) | null },
-    },
-    draftLoad: { value: { settled: true, value: null as string | null } },
-    gate: { status: vi.fn<() => Promise<{ accepted: boolean; currentVersion: string }>>() },
-    pendingReview: { addComment: vi.fn() },
-    termsStatus: { accept: vi.fn<() => Promise<unknown>>() },
-  }));
+type ConfirmRequest = { readonly confirmLabel: string; readonly onConfirm: () => void };
+
+const {
+  announcement,
+  confirmRequests,
+  connectivity,
+  createComment,
+  draftLoad,
+  gate,
+  pendingReview,
+  termsStatus,
+} = vi.hoisted(() => ({
+  announcement: { announce: vi.fn() },
+  confirmRequests: [] as ConfirmRequest[],
+  connectivity: { value: 'online' },
+  createComment: {
+    mutateAsync: vi.fn<() => Promise<unknown>>(),
+    publish: { current: null as ((state: { error: Error | null }) => void) | null },
+  },
+  draftLoad: { value: { settled: true, value: null as string | null } },
+  gate: { status: vi.fn<() => Promise<{ accepted: boolean; currentVersion: string }>>() },
+  pendingReview: { addComment: vi.fn() },
+  termsStatus: { accept: vi.fn<() => Promise<unknown>>() },
+}));
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
@@ -57,7 +76,12 @@ vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmRequests.push(request);
+    },
+    dialog: null,
+  }),
 }));
 vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
   PrFormSheetFooter: 'PrFormSheetFooter',
@@ -148,68 +172,11 @@ const baseProps = {
   title: 'Comment',
 } as const;
 
-const mounted: ReactTestRenderer[] = [];
-
-async function mountComposer(): Promise<ReactTestRenderer> {
-  const holder: { current: ReactTestRenderer | undefined } = { current: undefined };
-  await act(async () => {
-    holder.current = TestRenderer.create(createElement(PrReviewCommentComposer, baseProps));
-    await Promise.resolve();
-  });
-  const renderer = holder.current;
-  if (!renderer) {
-    throw new Error('renderer did not mount');
-  }
-  mounted.push(renderer);
-  return renderer;
-}
-
-function button(renderer: ReactTestRenderer, label: string) {
-  return renderer.root
-    .findAllByType('Button')
-    .find(node => node.props.accessibilityLabel === label);
-}
-
-function press(renderer: ReactTestRenderer, label: string): void {
-  const target = button(renderer, label);
-  if (!target) {
-    throw new Error(`no ${label} button`);
-  }
-  act(() => {
-    (target.props.onPress as () => void)();
-  });
-}
-
-async function pressAndSettle(renderer: ReactTestRenderer, label: string): Promise<void> {
-  await act(async () => {
-    press(renderer, label);
-    await Promise.resolve();
-  });
-}
-
-function typeBody(renderer: ReactTestRenderer, text: string): void {
-  const field = renderer.root.findByType('TextInput');
-  act(() => {
-    (field.props.onChangeText as (value: string) => void)(text);
-  });
-}
-
-function hasCopy(renderer: ReactTestRenderer, copy: string): boolean {
-  return renderer.root.findAllByType('Text').some(node => node.props.children === copy);
-}
-
-function hasReconnectNotice(renderer: ReactTestRenderer): boolean {
-  return renderer.root.findAllByType('PrReviewReconnectNotice').length > 0;
-}
-
-function isDisabled(renderer: ReactTestRenderer, label: string): boolean {
-  return button(renderer, label)?.props.disabled === true;
-}
-
 const BODY_EMPTY = 'Comment body cannot be empty.';
 const NOT_RECORDED = 'We could not record this action. Please try again later.';
 
 beforeEach(() => {
+  confirmRequests.length = 0;
   createComment.publish.current = null;
   draftLoad.value = { settled: true, value: null };
   connectivity.value = 'online';
@@ -224,15 +191,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const renderer of mounted.splice(0)) {
-    renderer.unmount();
-  }
+  unmountAll();
 });
 
 describe('PrReviewCommentComposer submit phase', () => {
   it('announces an empty body, then posts once a body is typed', async () => {
     createComment.mutateAsync.mockResolvedValue({});
-    const renderer = await mountComposer();
+    const renderer = await mountComposer(baseProps);
 
     press(renderer, 'Comment now');
     expect(hasCopy(renderer, BODY_EMPTY)).toBe(true);
@@ -259,7 +224,7 @@ describe('PrReviewCommentComposer submit phase', () => {
       createComment.publish.current?.({ error: rejection });
       return Promise.reject(rejection);
     });
-    const renderer = await mountComposer();
+    const renderer = await mountComposer(baseProps);
     typeBody(renderer, 'hello');
     await pressAndSettle(renderer, 'Comment now');
     expect(hasReconnectNotice(renderer)).toBe(true);
@@ -284,7 +249,7 @@ describe('PrReviewCommentComposer submit phase', () => {
       createComment.publish.current?.({ error: rejection });
       return Promise.reject(rejection);
     });
-    const renderer = await mountComposer();
+    const renderer = await mountComposer(baseProps);
     typeBody(renderer, 'hello');
     await pressAndSettle(renderer, 'Comment now');
 
@@ -302,7 +267,7 @@ describe('PrReviewCommentComposer submit phase', () => {
     const roundTrip = Promise.withResolvers<{ accepted: boolean; currentVersion: string }>();
     gate.status.mockReturnValueOnce(roundTrip.promise);
     createComment.mutateAsync.mockResolvedValue({});
-    const renderer = await mountComposer();
+    const renderer = await mountComposer(baseProps);
     typeBody(renderer, 'hello');
 
     act(() => {
@@ -324,7 +289,7 @@ describe('PrReviewCommentComposer submit phase', () => {
   it('writes nothing when the composer is dismissed during the Terms read', async () => {
     const roundTrip = Promise.withResolvers<{ accepted: boolean; currentVersion: string }>();
     gate.status.mockReturnValueOnce(roundTrip.promise);
-    const renderer = await mountComposer();
+    const renderer = await mountComposer(baseProps);
     typeBody(renderer, 'hello');
 
     act(() => {
@@ -342,13 +307,46 @@ describe('PrReviewCommentComposer submit phase', () => {
     expect(clearDraft).not.toHaveBeenCalled();
   });
 
+  it('leaves the newer attempt’s gate slot alone when an abandoned gate resolves', async () => {
+    const abandoned = Promise.withResolvers<{ accepted: boolean; currentVersion: string }>();
+    const newer = Promise.withResolvers<{ accepted: boolean; currentVersion: string }>();
+    gate.status.mockReturnValueOnce(abandoned.promise).mockReturnValueOnce(newer.promise);
+    const renderer = await mountComposer(baseProps);
+    typeBody(renderer, 'hello');
+
+    act(() => {
+      press(renderer, 'Comment now');
+    });
+    press(renderer, 'Cancel');
+    act(() => {
+      press(renderer, 'Comment now');
+    });
+
+    // The abandoned attempt's gate resolves: it writes nothing, and the
+    // successor's slot survives so Cancel still reaches the newer attempt.
+    await act(async () => {
+      abandoned.resolve({ accepted: true, currentVersion: 'v1' });
+      await Promise.resolve();
+    });
+    expect(confirmRequests).toHaveLength(1);
+    press(renderer, 'Cancel');
+    expect(confirmRequests).toHaveLength(2);
+
+    await act(async () => {
+      newer.resolve({ accepted: true, currentVersion: 'v1' });
+      await Promise.resolve();
+    });
+    expect(createComment.mutateAsync).not.toHaveBeenCalled();
+    expect(clearDraft).not.toHaveBeenCalled();
+  });
+
   it.each(['offline', 'confirming-offline'] as const)(
     'fails locally while the connection refuses writes (%s)',
     async phase => {
       // A write dispatched in the confirming window waits out its deadline on a
       // transport that just went away, so both phases fail locally.
       connectivity.value = phase;
-      const renderer = await mountComposer();
+      const renderer = await mountComposer(baseProps);
       typeBody(renderer, 'hello');
       await pressAndSettle(renderer, 'Comment now');
 

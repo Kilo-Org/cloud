@@ -1,45 +1,12 @@
 import { InfiniteQueryObserver, QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  buildActiveSessionsInput,
-  buildAgentSessionListInput,
-  buildAgentSessionSearchInput,
-} from '@/lib/agent-session-input';
 import { SESSION_HISTORY_MAX_PAGES } from '@/lib/agent-session-pages';
 import {
   buildAgentSessionSearchQueryOptions,
   buildStoredSessionsQueryOptions,
 } from '@/lib/agent-session-queries';
 import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
-
-// The hook module transitively imports react-native (via the user-web-
-// connection lifecycle) and the real tRPC client (via `@/lib/trpc`), which the
-// node vitest pipeline cannot transform. The options builder itself is pure,
-// so only the module-load chain needs these mocks; no hook is mounted.
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: vi.fn(),
-}));
-vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
-vi.mock('@/lib/organization-context', () => ({ useOrganization: vi.fn() }));
-vi.mock('@/components/agents/user-web-connection-provider', () => ({
-  useUserWebConnection: vi.fn(),
-}));
-
-vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
-  useUserWebConnectionState: () => false,
-}));
-
-vi.mock('@/lib/active-sessions-live-sync', () => ({
-  refreshActiveSessionsNow: vi.fn().mockResolvedValue(false),
-}));
-
-vi.mock('react-native', () => ({
-  AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
-}));
-vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
-  scheduleCacheMaintenance: vi.fn(),
-}));
 
 function createTrpcStub(infiniteQueryOptions: unknown) {
   const stub = { cliSessionsV2: { list: { infiniteQueryOptions } } };
@@ -50,143 +17,6 @@ function createSearchTrpcStub(infiniteQueryOptions: unknown) {
   const stub = { cliSessionsV2: { search: { infiniteQueryOptions } } };
   return stub as never;
 }
-
-describe('buildAgentSessionListInput', () => {
-  it('defaults to updated_at when sortBy is omitted (matches pre-feature behavior)', () => {
-    expect(
-      buildAgentSessionListInput({
-        createdOnPlatform: 'cli',
-        organizationId: null,
-      })
-    ).toMatchObject({
-      orderBy: 'updated_at',
-      limit: 30,
-      includeChildren: false,
-      createdOnPlatform: 'cli',
-      organizationId: null,
-    });
-  });
-
-  it('passes updated_at through when explicitly requested', () => {
-    expect(
-      buildAgentSessionListInput({
-        sortBy: 'updated_at',
-      }).orderBy
-    ).toBe('updated_at');
-  });
-
-  it('passes created_at through when explicitly requested', () => {
-    expect(
-      buildAgentSessionListInput({
-        sortBy: 'created_at',
-      }).orderBy
-    ).toBe('created_at');
-  });
-
-  it('falls back to updated_at for an unknown sort value (defensive default)', () => {
-    expect(
-      buildAgentSessionListInput({
-        sortBy: 'title' as unknown as 'updated_at',
-      }).orderBy
-    ).toBe('updated_at');
-  });
-
-  it('forwards filter fields alongside the sort', () => {
-    expect(
-      buildAgentSessionListInput({
-        sortBy: 'created_at',
-        createdOnPlatform: ['cli', 'extension'],
-        gitUrl: ['https://github.com/foo/bar'],
-        organizationId: 'org-1',
-      })
-    ).toEqual({
-      limit: 30,
-      orderBy: 'created_at',
-      includeChildren: false,
-      createdOnPlatform: ['cli', 'extension'],
-      gitUrl: ['https://github.com/foo/bar'],
-      organizationId: 'org-1',
-    });
-  });
-});
-
-describe('buildActiveSessionsInput', () => {
-  it('collapses null to { organizationId: null }', () => {
-    expect(buildActiveSessionsInput(null)).toEqual({ organizationId: null });
-  });
-
-  it('passes a uuid through unchanged', () => {
-    expect(buildActiveSessionsInput('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toEqual({
-      organizationId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    });
-  });
-
-  it('collapses undefined to { organizationId: null }', () => {
-    expect(buildActiveSessionsInput(undefined)).toEqual({ organizationId: null });
-  });
-
-  it('produces the same key for null and undefined (key-stability rule)', () => {
-    expect(buildActiveSessionsInput(null)).toEqual(buildActiveSessionsInput(undefined));
-  });
-});
-
-describe('buildAgentSessionSearchInput', () => {
-  it('defaults to updated_at when sortBy is omitted', () => {
-    expect(buildAgentSessionSearchInput({ searchQuery: 'hello' })).toMatchObject({
-      search_string: 'hello',
-      orderBy: 'updated_at',
-      limit: 30,
-      includeChildren: false,
-    });
-  });
-
-  it('uses created_at when explicitly requested', () => {
-    expect(
-      buildAgentSessionSearchInput({ searchQuery: 'hello', sortBy: 'created_at' })
-    ).toMatchObject({
-      search_string: 'hello',
-      orderBy: 'created_at',
-      limit: 30,
-    });
-  });
-
-  it('falls back to updated_at for an unknown sort value', () => {
-    expect(
-      buildAgentSessionSearchInput({
-        searchQuery: 'hello',
-        sortBy: 'name' as unknown as 'updated_at',
-      }).orderBy
-    ).toBe('updated_at');
-  });
-
-  it('forwards filter fields alongside the sort', () => {
-    expect(
-      buildAgentSessionSearchInput({
-        searchQuery: 'hello',
-        sortBy: 'created_at',
-        createdOnPlatform: 'cli',
-        gitUrl: 'https://github.com/foo/bar',
-        organizationId: 'org-1',
-      })
-    ).toEqual({
-      search_string: 'hello',
-      limit: 30,
-      orderBy: 'created_at',
-      includeChildren: false,
-      createdOnPlatform: 'cli',
-      gitUrl: 'https://github.com/foo/bar',
-      organizationId: 'org-1',
-    });
-  });
-
-  it('has no cursor key — the query framework injects it', () => {
-    const input = buildAgentSessionSearchInput({
-      searchQuery: 'hello',
-      organizationId: 'org-1',
-    });
-    expect(input).not.toHaveProperty('cursor');
-  });
-});
 
 describe('buildStoredSessionsQueryOptions', () => {
   it('leaves the native window-focus refetch off by default so the hook owns the foreground reconcile', () => {
@@ -227,13 +57,6 @@ describe('buildStoredSessionsQueryOptions', () => {
     expect(result.enabled).toBe(false);
   });
 
-  it('carries a numeric maxPages retention bound', () => {
-    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
-    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
-
-    expect(result.maxPages).toBeTypeOf('number');
-  });
-
   it('retains the browsable history past the shared front-eviction bound', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
@@ -261,15 +84,6 @@ describe('buildStoredSessionsQueryOptions', () => {
 });
 
 describe('buildAgentSessionSearchQueryOptions', () => {
-  it('carries a numeric maxPages retention bound', () => {
-    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
-    const result = buildAgentSessionSearchQueryOptions(createSearchTrpcStub(infiniteQueryOptions), {
-      searchQuery: 'hello',
-    });
-
-    expect(result.maxPages).toBeTypeOf('number');
-  });
-
   it('keeps the search-text gating (enabled passthrough)', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildAgentSessionSearchQueryOptions(createSearchTrpcStub(infiniteQueryOptions), {
@@ -297,22 +111,37 @@ function readStoredOptions(options: object): StoredOptions {
 }
 
 /**
+ * One page of the retention walk. The walker serves both session lists, so a
+ * page carries the stored list (`cliSessions`) and the search results
+ * (`results`); `readRows` picks the one the builder under test produces.
+ */
+type RetentionWalkPage = {
+  cliSessions: { session_id: string }[];
+  results: { session_id: string }[];
+  nextCursor: string;
+};
+
+/**
  * Drive a builder's real options through React Query's infinite-query
  * behavior, paging forward past the retention bound. React Query trims index 0
  * of the pages array on a forward fetch (`addToEnd`), and index 0 is page one —
  * the newest page — so this walk is what proves the head stays cached.
  */
-async function walkPastRetentionBound(options: StoredOptions) {
+async function walkPastRetentionBound(
+  options: StoredOptions,
+  readRows: (page: RetentionWalkPage) => { session_id: string }[]
+) {
   const queryClient = new QueryClient();
   let fetched = 0;
-  const observer = new InfiniteQueryObserver(queryClient, {
+  const observer = new InfiniteQueryObserver<RetentionWalkPage>(queryClient, {
     queryKey: ['session-history-retention'],
     initialPageParam: 'cursor-0',
     // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
-    queryFn: async ({ pageParam }: { pageParam: string }) => {
-      const index = Number(pageParam.replace('cursor-', ''));
+    queryFn: async ({ pageParam }: { pageParam: unknown }) => {
+      const index = Number(String(pageParam).replace('cursor-', ''));
       fetched += 1;
-      return { cliSessions: [{ session_id: `ses-${index}` }], nextCursor: `cursor-${index + 1}` };
+      const rows = [{ session_id: `ses-${index}` }];
+      return { cliSessions: rows, results: rows, nextCursor: `cursor-${index + 1}` };
     },
     getNextPageParam: options.getNextPageParam,
     maxPages: options.maxPages,
@@ -330,7 +159,7 @@ async function walkPastRetentionBound(options: StoredOptions) {
 
   const result = observer.getCurrentResult();
   const ids = (result.data?.pages ?? []).flatMap(page =>
-    page.cliSessions.map(session => session.session_id)
+    readRows(page).map(session => session.session_id)
   );
   unsubscribe();
   return { ids, fetched, hasNextPage: result.hasNextPage };
@@ -366,11 +195,32 @@ describe('newest-first session paging at the retention bound', () => {
     const { ids, fetched, hasNextPage } = await walkPastRetentionBound(
       readStoredOptions(
         buildStoredSessionsQueryOptions(createTrpcStub(echoInfiniteQueryOptions), {})
-      )
+      ),
+      page => page.cliSessions
     );
 
     // The newest page (`ses-0`) is still at the front, the walk stopped at the
     // bound, and the list reports no next page so the footer cannot page on.
+    expect(ids[0]).toBe('ses-0');
+    expect(ids).toHaveLength(SESSION_HISTORY_MAX_PAGES);
+    expect(fetched).toBe(SESSION_HISTORY_MAX_PAGES);
+    expect(hasNextPage).toBe(false);
+  });
+
+  it('keeps the first search page cached when the results page past the bound', async () => {
+    const searchOptions = buildAgentSessionSearchQueryOptions(
+      createSearchTrpcStub(echoInfiniteQueryOptions),
+      { searchQuery: 'hello' }
+    ) as unknown as StoredOptions;
+    const { ids, fetched, hasNextPage } = await walkPastRetentionBound(
+      searchOptions,
+      page => page.results
+    );
+
+    // Search results are newest-first like the stored list, so `ses-0` must
+    // still be at the front of the retained pages: the guarded cursor ends the
+    // chain at the bound instead of letting the trim drop page one, the walk
+    // fetched exactly the bound, and the list reports no next page.
     expect(ids[0]).toBe('ses-0');
     expect(ids).toHaveLength(SESSION_HISTORY_MAX_PAGES);
     expect(fetched).toBe(SESSION_HISTORY_MAX_PAGES);

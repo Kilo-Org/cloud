@@ -56,7 +56,7 @@ export function AgentSessionsSection({
       // An object href replaces the route params. A bare string would keep a
       // status param a previous tap left behind, so See all clears them.
       const href: Href = status
-        ? { pathname: '/(app)/(tabs)/(2_agents)/', params: { status } }
+        ? { pathname: '/(app)/(tabs)/(2_agents)', params: { status } }
         : AGENTS_SESSIONS_INDEX_HREF;
       router.navigate(href);
       router.dismissTo(href);

@@ -211,6 +211,106 @@ it('closes the turn and keeps the feed open when a native read fails', async () 
   }
 });
 
+it.each([200, 503])(
+  'clears retry status when the next native step starts with reads returning %s',
+  async status => {
+    const directory = '/workspace';
+    const sessionID = 'ses_local';
+    const events: KiloFeedEvent[] = [];
+    let streamingStatus: KiloFeedEvent['properties'] | undefined;
+    const finished = Promise.withResolvers<void>();
+    const retry = {
+      sessionID,
+      assistantMessageID: 'msg_answer',
+      attempt: 1,
+      at: 20,
+      error: { type: 'provider.internal', message: 'Provider request failed with HTTP 520' },
+    };
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        const pathname = new URL(request.url).pathname;
+        if (pathname === '/api/event')
+          return new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                for (const [type, data] of [
+                  ['server.connected', {}],
+                  ['session.execution.started', { sessionID }],
+                  ['session.retry.scheduled', retry],
+                  ['session.step.started', { sessionID, assistantMessageID: 'msg_answer' }],
+                  [
+                    'session.text.delta',
+                    { sessionID, assistantMessageID: 'msg_answer', ordinal: 0, delta: 'Recovered' },
+                  ],
+                  ['session.retry.scheduled', { ...retry, attempt: 2, at: 30 }],
+                  ['session.step.started', { sessionID, assistantMessageID: 'msg_answer' }],
+                  ['session.execution.succeeded', { sessionID }],
+                ] as const)
+                  controller.enqueue(
+                    new TextEncoder().encode(
+                      `data: ${JSON.stringify({ id: `evt_${type}`, type, data, created: 10, location: { directory } })}\n\n`
+                    )
+                  );
+              },
+            }),
+            { headers: { 'content-type': 'text/event-stream' } }
+          );
+        if (status !== 200) return new Response(null, { status });
+        if (pathname.endsWith('/message'))
+          return Response.json({ data: [], cursor: { next: null } });
+        return Response.json({
+          data: { id: sessionID, location: { directory }, time: { created: 0, updated: 20 } },
+        });
+      },
+    });
+    const signal = AbortSignal.timeout(5000);
+    const feed = createKilo2EventFeed({
+      source: { server: { url: native.url.origin }, directory, nativeRuntimeId: 'runtime_local' },
+      signal,
+      onEvent(event) {
+        events.push(event);
+        if (event.type === 'session.idle') finished.resolve();
+      },
+      onHarnessActivity(event) {
+        if (event.activity.type === 'delta')
+          streamingStatus = events
+            .filter(event => event.type === 'session.status')
+            .at(-1)?.properties;
+      },
+      onFailure: () => finished.reject(new Error('Native feed failed')),
+      log() {},
+    });
+    try {
+      await feed.open();
+      await finished.promise;
+      expect(
+        events.filter(event => event.type === 'session.status').map(event => event.properties)
+      ).toEqual([
+        { sessionID, status: { type: 'busy' } },
+        {
+          sessionID,
+          status: { type: 'retry', attempt: 1, next: 20, message: retry.error.message },
+        },
+        { sessionID, status: { type: 'busy' } },
+        {
+          sessionID,
+          status: { type: 'retry', attempt: 2, next: 30, message: retry.error.message },
+        },
+        { sessionID, status: { type: 'busy' } },
+        { sessionID, status: { type: 'idle' } },
+      ]);
+      expect(streamingStatus).toEqual({ sessionID, status: { type: 'busy' } });
+      expect(events.filter(event => event.type === 'session.turn.open')).toHaveLength(1);
+      expect(events.filter(event => event.type === 'session.turn.close')).toHaveLength(1);
+    } finally {
+      feed.close();
+      await native.stop(true);
+    }
+  }
+);
+
 it('forwards an unchanged assistant projection once', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';

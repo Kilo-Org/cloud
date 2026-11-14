@@ -87,6 +87,27 @@ export function isTranslateCallee(callee) {
   );
 }
 
+/**
+ * The statically readable name of one object-literal property: an `Identifier`
+ * key, or a string `Literal` key, and nothing else. A member that is not a
+ * `Property` — a spread — declares no key, and neither does a computed key: it
+ * holds an expression, so its name is whatever that expression evaluates to when
+ * the object is built, which no rule can read here.
+ */
+export function propertyName(property) {
+  if (property.type !== 'Property' || property.computed) {
+    return null;
+  }
+  const { key } = property;
+  if (key.type === 'Identifier') {
+    return key.name;
+  }
+  if (key.type === 'Literal' && typeof key.value === 'string') {
+    return key.value;
+  }
+  return null;
+}
+
 /** The wrapper nodes that only hold an expression, so a rule reads through them. */
 const TS_WRAPPERS = new Set([
   'TSAsExpression',

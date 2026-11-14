@@ -1,4 +1,7 @@
-import { describe, expect, it } from '@jest/globals';
+jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
+
+import { beforeEach, describe, expect, it } from '@jest/globals';
+import { captureMessage } from '@sentry/nextjs';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   createEmptyEnkryptOutputDetectors,
@@ -17,6 +20,7 @@ import {
 const organizationId = '00000000-0000-4000-8000-000000000002';
 const groupId = '00000000-0000-4000-8000-000000000003';
 const otherGroupId = '00000000-0000-4000-8000-000000000004';
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 function resolve(settings: OrganizationSettings | undefined) {
   return resolveEnkryptInputGuardrail(
@@ -406,4 +410,106 @@ describe('resolveEnkryptOutputGuardrail', () => {
       blockingDetectors: action === 'block' ? ['nsfw'] : [],
     });
   });
+});
+
+describe('invalid guardrail settings reporting', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('reports an invalid input section once with its issue paths and never the invalid value', () => {
+    const reportingOrganizationId = '00000000-0000-4000-8000-000000000005';
+    const settings = {
+      kilo_encrypt: true,
+      enkrypt: { input_guardrail: { enabled: 'yes' } },
+    } as unknown as OrganizationSettings;
+
+    expect(resolveEnkryptInputGuardrail(reportingOrganizationId, settings)).toBeNull();
+    expect(resolveEnkryptInputGuardrail(reportingOrganizationId, settings)).toBeNull();
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] invalid organization settings; guardrail disabled',
+      {
+        level: 'error',
+        tags: { source: 'enkrypt_guardrail_settings', guardrail: 'input' },
+        extra: { organization_id: reportingOrganizationId, issues: ['enabled'] },
+      }
+    );
+    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('yes');
+  });
+
+  it('reports an invalid output section with the output guardrail tag', () => {
+    const reportingOrganizationId = '00000000-0000-4000-8000-000000000006';
+
+    expect(
+      resolveEnkryptOutputGuardrail(reportingOrganizationId, {
+        kilo_encrypt: true,
+        enkrypt: { output_guardrail: { enabled: 'yes' } },
+      } as unknown as OrganizationSettings)
+    ).toBeNull();
+
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] invalid organization settings; guardrail disabled',
+      {
+        level: 'error',
+        tags: { source: 'enkrypt_guardrail_settings', guardrail: 'output' },
+        extra: { organization_id: reportingOrganizationId, issues: ['enabled'] },
+      }
+    );
+  });
+
+  it('reports for a second organization while the window suppresses a repeat', () => {
+    const firstOrganizationId = '00000000-0000-4000-8000-000000000007';
+    const secondOrganizationId = '00000000-0000-4000-8000-000000000008';
+    const settings = {
+      kilo_encrypt: true,
+      enkrypt: { input_guardrail: { enabled: 'yes' } },
+    } as unknown as OrganizationSettings;
+
+    expect(resolveEnkryptInputGuardrail(firstOrganizationId, settings)).toBeNull();
+    expect(resolveEnkryptInputGuardrail(firstOrganizationId, settings)).toBeNull();
+    expect(resolveEnkryptInputGuardrail(secondOrganizationId, settings)).toBeNull();
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(2);
+    expect(mockCaptureMessage).toHaveBeenNthCalledWith(
+      1,
+      '[enkrypt-guardrail] invalid organization settings; guardrail disabled',
+      {
+        level: 'error',
+        tags: { source: 'enkrypt_guardrail_settings', guardrail: 'input' },
+        extra: { organization_id: firstOrganizationId, issues: ['enabled'] },
+      }
+    );
+    expect(mockCaptureMessage).toHaveBeenNthCalledWith(
+      2,
+      '[enkrypt-guardrail] invalid organization settings; guardrail disabled',
+      {
+        level: 'error',
+        tags: { source: 'enkrypt_guardrail_settings', guardrail: 'input' },
+        extra: { organization_id: secondOrganizationId, issues: ['enabled'] },
+      }
+    );
+  });
+
+  it.each([
+    ['no settings', undefined],
+    ['no guardrail section', { kilo_encrypt: true, enkrypt: {} }],
+    [
+      'a disabled section',
+      { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: false } } },
+    ],
+    [
+      'no kilo_encrypt grant',
+      { enkrypt: { input_guardrail: { enabled: 'yes' } } } as unknown as OrganizationSettings,
+    ],
+  ] satisfies [string, OrganizationSettings | undefined][])(
+    'reports nothing for %s',
+    (_name, settings) => {
+      expect(
+        resolveEnkryptInputGuardrail('00000000-0000-4000-8000-000000000009', settings)
+      ).toBeNull();
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    }
+  );
 });

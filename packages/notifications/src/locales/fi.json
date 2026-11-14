@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktiivisilla agenteilla on päivitys"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tehtävä valmis"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Epäonnistui: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Keskeytetty: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

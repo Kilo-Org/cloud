@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Zadatak dovršen"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Nije uspjelo: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Prekinuto: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "L-aġenti attivi għandhom aġġornament"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Il-kompitu tlesta"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Fallejt: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Interrott: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

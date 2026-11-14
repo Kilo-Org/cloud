@@ -52,6 +52,7 @@ function fixture() {
   let summaries = [file('uncommitted'), file('against-base-branch')];
   let texts = ['working', 'committed'];
   let invalidRecords = false;
+  let omittedRecords = false;
   let recovery: WorktreeRecovery | undefined;
   const manager = createWorktreeChanges({
     storage: {
@@ -70,9 +71,20 @@ function fixture() {
       ok: true,
       result: {
         summary: { revision, comparison, files: summaries, truncated: false },
-        files: summaries.map((summary, index) =>
-          record(invalidRecords ? file(undefined, summary.path) : summary, revision, texts[index])
-        ),
+        files: summaries.map((summary, index) => {
+          const saved = record(
+            invalidRecords ? file(undefined, summary.path) : summary,
+            revision,
+            texts[index]
+          );
+          return omittedRecords
+            ? {
+                ...saved,
+                diff: { status: 'omitted' as const, reason: 'binary' as const },
+                content: { status: 'unavailable' as const, reason: 'binary' as const },
+              }
+            : saved;
+        }),
         ...(recovery === undefined ? {} : { recovery }),
       },
     }),
@@ -88,6 +100,9 @@ function fixture() {
       summaries = files;
       texts = content;
       invalidRecords = invalid;
+    },
+    omitPayloads: (next: boolean) => {
+      omittedRecords = next;
     },
   };
 }
@@ -264,5 +279,70 @@ describe('scoped worktree snapshot persistence', () => {
       manager.getFile({ path: scoped.path, scope: scoped.scope, expectedRevision: 1 })
     ).toMatchObject({ file: { content: { text: 'scoped' } } });
     expect(values.has(WORKTREE_CHANGES_KEY)).toBe(true);
+  });
+});
+
+describe('saved workspace change states', () => {
+  it('projects diff and content availability without returning payloads', async () => {
+    const { manager } = fixture();
+    await manager.refresh();
+
+    const { snapshot, states } = manager.savedStates();
+
+    expect(snapshot?.revision).toBe(1);
+    expect(states).toEqual([
+      {
+        path: 'same.txt',
+        scope: 'uncommitted',
+        revision: 1,
+        diff: { status: 'available' },
+        content: { status: 'available', source: 'current' },
+      },
+      {
+        path: 'same.txt',
+        scope: 'against-base-branch',
+        revision: 1,
+        diff: { status: 'available' },
+        content: { status: 'available', source: 'current' },
+      },
+    ]);
+  });
+
+  it('keeps an omitted payload explicit instead of reporting an empty diff', async () => {
+    const { manager, omitPayloads } = fixture();
+    omitPayloads(true);
+    await manager.refresh();
+
+    const { states } = manager.savedStates();
+
+    expect(states).toHaveLength(2);
+    for (const state of states) {
+      expect(state.diff).toEqual({ status: 'omitted', reason: 'binary' });
+      expect(state.content).toEqual({ status: 'unavailable', reason: 'binary' });
+    }
+  });
+
+  it('reports a missing record instead of a successful empty record', async () => {
+    const { manager, values } = fixture();
+    await manager.refresh();
+    values.delete(`${WORKTREE_FILE_PREFIX}${worktreeFileIdentity(file('uncommitted'))}`);
+
+    const { states } = manager.savedStates();
+
+    expect(states).toHaveLength(2);
+    expect(states[0]).toMatchObject({
+      scope: 'uncommitted',
+      diff: { status: 'omitted', reason: 'inconsistent' },
+      content: { status: 'unavailable', reason: 'inconsistent' },
+    });
+    expect(states[1]).toMatchObject({
+      scope: 'against-base-branch',
+      diff: { status: 'available' },
+    });
+  });
+
+  it('returns no snapshot when nothing has been captured', () => {
+    const { manager } = fixture();
+    expect(manager.savedStates()).toEqual({ snapshot: null, states: [] });
   });
 });

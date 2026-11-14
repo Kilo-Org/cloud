@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Hojii xumurameera"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Hin milkoofne: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Ni ceeceefame: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

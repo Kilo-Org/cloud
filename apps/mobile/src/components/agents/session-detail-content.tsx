@@ -3030,6 +3030,8 @@ export function SessionDetailContent({
               visible={sheetMountState.visible}
               info={sheetMountState.info}
               sessionId={sessionId}
+              cloudAgentSessionId={fetchedData?.cloudAgentSessionId ?? null}
+              organizationId={organizationId}
               anchorMessageId={anchor ?? resumeAnchor}
               sessionTitle={rename.title}
               activeSessionType={activeSessionType}
@@ -3037,8 +3039,6 @@ export function SessionDetailContent({
               modelDisplay={contextModelAndProvider.model}
               providerDisplay={contextModelAndProvider.provider}
               totalCostMicrodollars={totalMicrodollars}
-              cloudAgentSessionId={cloudAgentSessionId}
-              organizationId={organizationId}
               breakdownCostUsd={breakdownCostUsd}
               messages={messages}
               modelOptions={modelOptions}

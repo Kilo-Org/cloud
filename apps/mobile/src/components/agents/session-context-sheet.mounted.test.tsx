@@ -8,6 +8,7 @@ import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type SessionComputeCharges } from '@/lib/session-compute-total';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -17,6 +18,7 @@ import { formatSessionTotalCost } from './session-list-helpers';
 
 const holder = vi.hoisted(() => ({
   instances: [] as unknown[],
+  sshEnabled: false,
   isPending: false,
   copied: [] as string[],
   copyResult: true as boolean | Promise<boolean>,
@@ -28,13 +30,22 @@ const holder = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: { instances: holder.instances }, isPending: holder.isPending }),
+  useQuery: (options: { sandbox?: boolean }) => ({
+    data: options.sandbox ? undefined : { instances: holder.instances },
+    isPending: holder.isPending,
+  }),
   useQueryClient: () => ({ invalidateQueries: () => Promise.resolve() }),
   useMutation: () => ({ mutate: () => undefined, isPending: false }),
 }));
+vi.mock('@/lib/ssh/use-ssh-client-enabled', () => ({
+  useSshClientEnabled: () => holder.sshEnabled,
+}));
 vi.mock('@/lib/trpc', () => {
-  const options = { queryOptions: () => ({}), queryKey: () => [] };
-  const namespace = { getSandboxStatus: options, getWorkspaceSnapshotRecovery: options };
+  const sandboxOptions = { queryOptions: () => ({ sandbox: true }), queryKey: () => [] };
+  const namespace = {
+    getSandboxStatus: sandboxOptions,
+    getWorkspaceSnapshotRecovery: sandboxOptions,
+  };
   return {
     trpcClient: { cloudAgentNext: {}, organizations: { cloudAgentNext: {} } },
     useTRPC: () => ({
@@ -151,13 +162,13 @@ function renderSheet(
         visible: true,
         info: INFO,
         sessionId: 'ses-123',
+        cloudAgentSessionId: null,
+        organizationId: undefined,
         anchorMessageId: null,
         sessionTitle: 'Greeting',
         activeSessionType: null,
         ownerConnectionId: null,
-        cloudAgentSessionId: null,
         cloudStatusType: null,
-        organizationId: undefined,
         modelDisplay: 'Model X',
         providerDisplay: 'Kilo',
         totalCostMicrodollars: null,
@@ -334,13 +345,13 @@ function sheetElement(
     visible: true,
     info: INFO,
     sessionId: 'ses-123',
+    cloudAgentSessionId: null,
+    organizationId: undefined,
     anchorMessageId: null,
     sessionTitle: 'Greeting',
     activeSessionType: null,
     ownerConnectionId: null,
-    cloudAgentSessionId: null,
     cloudStatusType: null,
-    organizationId: undefined,
     modelDisplay: 'Claude',
     providerDisplay: 'Kilo',
     totalCostMicrodollars: null,
@@ -394,6 +405,7 @@ function pressByTestID(renderer: TestRenderer.ReactTestRenderer, testID: string)
 }
 
 beforeEach(() => {
+  holder.sshEnabled = false;
   holder.instances = [];
   holder.isPending = false;
   holder.copied = [];
@@ -404,6 +416,15 @@ beforeEach(() => {
 });
 
 describe('SessionContextSheet session id and running on', () => {
+  it.each([false, true])('only shows the Terminal row when SSH is enabled (%s)', async enabled => {
+    holder.sshEnabled = enabled;
+    const renderer = await mountSheet({ cloudAgentSessionId: 'workspace-fixture' });
+    expect(findByTestID(renderer.root, 'session-context-sheet-terminal')).toHaveLength(
+      enabled ? 1 : 0
+    );
+    await unmount(renderer);
+  });
+
   it('shows the session title above the id row so the sheet names its session', async () => {
     const renderer = await mountSheet({ sessionTitle: 'Greeting' });
     const values = textValues(renderer);
@@ -654,6 +675,23 @@ describe('SessionContextSheet copy link row', () => {
     expect(values).not.toContain(i18n.t('agents.sessionRow.idCopied'));
     await unmount(renderer);
   });
+});
+
+describe('SessionContextSheet copy row touch targets', () => {
+  it.each(['session-context-sheet-copy-id', 'session-context-sheet-copy-link'])(
+    'renders the %s row on the shared full target',
+    async testID => {
+      // Two stacked lines of small type measured 32 dp together, so each copy
+      // row has to carry the shared target on its own pressable node.
+      const renderer = await mountSheet();
+      const target = findByType(renderer.root, 'Pressable').find(
+        node => node.props.testID === testID
+      );
+      expect(target?.props.accessibilityRole).toBe('button');
+      expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+      await unmount(renderer);
+    }
+  );
 });
 
 describe('SessionContextSheet connection row', () => {

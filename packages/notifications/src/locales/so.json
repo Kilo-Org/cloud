@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Hawsha waa la dhammaystiray"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Guuldarraystay: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Waa la hakiyay: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

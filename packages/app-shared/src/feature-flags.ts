@@ -37,9 +37,17 @@ export const ORGANIZATION_AUTO_MODEL_FLAG = 'organization-auto-model-routing';
  */
 export const CHATGPT_ACCESS_FLAG = 'sign-in-with-chatgpt';
 
+/**
+ * The mobile SSH client section, opened from Home. Staged behind a flag so the
+ * surface stays hidden in builds that predate it; the flag doubles as a kill
+ * switch for the native module.
+ */
+export const SSH_CLIENT_FLAG = 'ssh-client';
+
 /** Every flag key this repository evaluates in more than one app. */
 export type FeatureFlagKey =
   | typeof CODE_REVIEW_MD_CONVERSION_FLAG
   | typeof CODE_REVIEW_COUNCIL_FLAG
   | typeof ORGANIZATION_AUTO_MODEL_FLAG
-  | typeof CHATGPT_ACCESS_FLAG;
+  | typeof CHATGPT_ACCESS_FLAG
+  | typeof SSH_CLIENT_FLAG;

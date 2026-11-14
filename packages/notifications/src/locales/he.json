@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "לסוכנים הפעילים יש עדכון"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "המשימה הושלמה"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "נכשל: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "הופסק: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

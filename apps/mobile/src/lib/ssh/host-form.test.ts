@@ -1,0 +1,73 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import { hostFormValuesOf, jumpHostCandidates, toHostInput, validateHostInput } from './host-form';
+import { type SshHost } from './hosts';
+
+// The stores reach `expo-crypto` for ids; under Node its runtime setup reads
+// `__DEV__`, which this project does not define.
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'id-fixture' }));
+
+const hostOf = (id: string, jumpHostId: string | null): SshHost => ({
+  id,
+  label: id,
+  hostname: `${id}.example.com`,
+  port: 22,
+  username: 'igor',
+  authMethod: 'password',
+  password: null,
+  keyId: null,
+  jumpHostId,
+  tmuxAttach: false,
+  tmuxSessionName: null,
+  sortOrder: 0,
+  createdAt: 0,
+  updatedAt: 0,
+  lastConnectedAt: null,
+});
+
+describe('jumpHostCandidates', () => {
+  it('never offers the host itself', () => {
+    const hosts = [hostOf('a', null), hostOf('b', null)];
+
+    expect(jumpHostCandidates(hosts, 'a').map(host => host.id)).toEqual(['b']);
+  });
+
+  it('hides a host whose chain reaches the host being edited', () => {
+    const hosts = [hostOf('outer', null), hostOf('inner', 'outer'), hostOf('leaf', 'inner')];
+
+    expect(jumpHostCandidates(hosts, 'outer').map(host => host.id)).toEqual([]);
+    expect(jumpHostCandidates(hosts, 'inner').map(host => host.id)).toEqual(['outer']);
+  });
+
+  it('offers every other host while a new host is being created', () => {
+    const hosts = [hostOf('a', null), hostOf('b', 'a')];
+
+    expect(jumpHostCandidates(hosts, null).map(host => host.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('hostFormValuesOf', () => {
+  it('carries a saved password back into the record when nothing is retyped', () => {
+    const stored = { ...hostOf('a', null), password: 'kept' };
+
+    expect(toHostInput(hostFormValuesOf(stored)).password).toBe('kept');
+  });
+
+  it('starts a new host with no password', () => {
+    const values = hostFormValuesOf(null);
+
+    expect(values.password).toBe('');
+    expect(values.savePassword).toBe(false);
+  });
+});
+
+describe('key authentication validation', () => {
+  it('requires a selected key and names its inline field', () => {
+    const input = toHostInput(hostFormValuesOf(hostOf('a', null)));
+    expect(validateHostInput({ ...input, authMethod: 'key' })).toEqual([
+      { field: 'keyId', kind: 'required' },
+    ]);
+    expect(validateHostInput({ ...input, authMethod: 'key', keyId: 'key-1' })).toEqual([]);
+    expect(validateHostInput(input)).toEqual([]);
+  });
+});

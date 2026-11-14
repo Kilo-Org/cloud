@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Ama-agent asebenzayo anokubuyekezwa"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Umsebenzi uqediwe"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ihlulekile: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Iphazamisekile: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

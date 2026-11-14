@@ -1,5 +1,6 @@
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { readJsonBody } from './request-body.helper';
 
 export const TEST_BYOK_DATA_KEY = Buffer.alloc(32, 7).toString('base64');
 const TEST_KMS_URL = 'http://byok-kms.test';
@@ -19,6 +20,17 @@ export function testByokEnvelope(
 }
 
 export type FakeByokKmsRequest = { path: string; body: Record<string, unknown> };
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** The body the BYOK KMS client sends is a JSON object; anything else is a broken fixture. */
+function requestBodyObject(body: BodyInit | null | undefined): Record<string, unknown> {
+  const parsed = readJsonBody(body ?? '{}');
+  if (!isJsonObject(parsed)) throw new Error('Expected the BYOK KMS request body to be an object');
+  return parsed;
+}
 
 function requestUrl(input: RequestInfo | URL): URL {
   return new URL(input instanceof Request ? input.url : String(input));
@@ -47,10 +59,10 @@ export function useFakeByokKms(): { requests: FakeByokKmsRequest[] } {
     requests.length = 0;
     process.env.BYOK_KMS_SERVICE_URL = TEST_KMS_URL;
     process.env.BYOK_KMS_SERVICE_TOKEN = 'test-token';
-    global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       if (!isFakeByokKmsRequest(input)) return originalFetch(input, init);
       const url = requestUrl(input);
-      requests.push({ path: url.pathname, body: JSON.parse(String(init?.body ?? '{}')) });
+      requests.push({ path: url.pathname, body: requestBodyObject(init?.body) });
       if (url.pathname === '/data-key') {
         return Response.json({
           data_key: TEST_BYOK_DATA_KEY,
@@ -61,7 +73,7 @@ export function useFakeByokKms(): { requests: FakeByokKmsRequest[] } {
       }
       if (url.pathname === '/decrypt') return Response.json({ data_key: TEST_BYOK_DATA_KEY });
       return new Response('{}', { status: 404 });
-    }) as typeof fetch;
+    };
   });
 
   afterEach(() => {

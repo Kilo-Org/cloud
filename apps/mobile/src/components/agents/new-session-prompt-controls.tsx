@@ -68,7 +68,6 @@ export function NewSessionPromptControls({
       {children}
       <VoiceInputButton
         disabled={control.voiceDisabled}
-        size="lg"
         status={voiceInput.status}
         onPress={handleVoiceToggle}
       />

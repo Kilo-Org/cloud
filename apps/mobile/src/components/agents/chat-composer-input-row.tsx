@@ -272,13 +272,12 @@ export function ChatComposerInputRow({
 
         {/* The toggle stays in the row whether or not the OS recognizer answers
             available: a tap re-probes it and either starts a session or says why
-            it cannot, so the control never disappears without a word. `lg`
-            renders its own 48dp target box, so the row adds no slop and the
-            box cannot reach into a neighbour. */}
+            it cannot, so the control never disappears without a word. It renders
+            the shared 48dp target box on its own node, so the row adds no slop
+            and the box cannot reach into a neighbour. */}
         <View className={COMPOSER_CONTROL_GAP_CLASS}>
           <VoiceInputButton
             disabled={voiceDisabled}
-            size="lg"
             status={voiceInputStatus}
             onPress={onToggleVoice}
           />

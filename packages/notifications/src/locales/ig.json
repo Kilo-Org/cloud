@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Ndị nnọchi anya na-arụ ọrụ nwere mmelite"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ọrụ gwụchara"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Dara: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Kwụsịrị: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

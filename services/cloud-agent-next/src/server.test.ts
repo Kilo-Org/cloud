@@ -2815,6 +2815,44 @@ describe('server code-review billing status', () => {
   });
 });
 
+describe('server containers billing status', () => {
+  const path =
+    'http://worker.test/internal/containers/billing/user/oauth%2Fprovider%2Fuser/standard-4';
+  const headers = { 'x-internal-api-key': 'test-internal-secret' };
+
+  it('requires internal authentication', async () => {
+    expect((await fetchWorker(new Request(path), createEnv())).status).toBe(401);
+  });
+
+  it.each(['paid', 'shadow'] as const)(
+    'reports the meter decision for the instance service: %s',
+    async mode => {
+      const env = createEnv();
+      const getBillingMode = vi.fn().mockResolvedValue(mode);
+      env.CONTAINER_USAGE_METER = { getBillingMode };
+      const response = await fetchWorker(new Request(path, { headers }), env);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      await expect(response.json()).resolves.toEqual({ billingMode: mode });
+      expect(getBillingMode).toHaveBeenCalledWith({
+        service: 'cloud-agent-next-sandbox-containers-standard4',
+        subject: { type: 'user', id: 'oauth/provider/user' },
+      });
+    }
+  );
+
+  it.each([
+    ['owner type', path.replace('/user/', '/bot/')],
+    ['instance size', path.replace('/standard-4', '/standard-9')],
+  ])('rejects an invalid %s', async (_field, url) => {
+    const env = createEnv();
+    const getBillingMode = vi.fn();
+    env.CONTAINER_USAGE_METER = { getBillingMode };
+    expect((await fetchWorker(new Request(url, { headers }), env)).status).toBe(400);
+    expect(getBillingMode).not.toHaveBeenCalled();
+  });
+});
+
 describe('server /internal/byoc/vercel-enrollment/:organizationId', () => {
   const organizationId = '11111111-1111-4111-8111-111111111111';
 

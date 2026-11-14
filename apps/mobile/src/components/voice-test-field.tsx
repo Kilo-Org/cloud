@@ -92,7 +92,6 @@ export function VoiceTestField(): React.ReactElement {
         <VoiceInputButton
           disabled={!voice.available}
           onPress={() => void voice.toggle()}
-          size="md"
           status={voice.status}
         />
         <VoiceInputStatus status={voice.status} />

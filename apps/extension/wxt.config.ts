@@ -42,27 +42,45 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   zip: {
+    excludeSources: ['*', '**/*'],
+    /*
+     * WXT keeps a file that matches includeSources OR misses excludeSources, so
+     * excludeSources covers everything to make this list the allowlist it reads
+     * like. Without it the sources zip is the whole monorepo and AMO rejects it.
+     * The list is exactly what a filtered install plus build:firefox reads; see
+     * SOURCE_BUILD.md. Add a package here when the build starts reading it.
+     */
     includeSources: [
+      // Tailwind v4 skips gitignored paths when it scans for class names.
+      '.gitignore',
+      '.nvmrc',
+      'SOURCE_BUILD.md',
       'package.json',
+      'patches/**',
       'pnpm-lock.yaml',
       'pnpm-workspace.yaml',
-      'patches/**',
+      'scripts/check-pnpm.mjs',
+      // A filtered pnpm install still reads every workspace manifest.
+      'apps/*/package.json',
+      'packages/*/package.json',
+      'services/**/package.json',
+      'apps/extension/.gitignore',
+      'apps/extension/.oxlintrc.json',
       'apps/extension/AGENTS.md',
       'apps/extension/SOURCE_CODE_REVIEW.md',
-      'apps/extension/package.json',
       'apps/extension/playwright.config.ts',
       'apps/extension/tsconfig.json',
       'apps/extension/vitest.config.ts',
+      'apps/extension/vitest.setup.ts',
       'apps/extension/wxt.config.ts',
       'apps/extension/entrypoints/**',
       'apps/extension/public/**',
       'apps/extension/scripts/**',
       'apps/extension/src/**',
-      'apps/extension/tests/e2e/**',
-      'packages/cloud-agent-sdk/package.json',
-      'packages/cloud-agent-sdk/src/**',
-      'packages/app-shared/package.json',
+      'apps/extension/tests/**',
       'packages/app-shared/src/**',
+      'packages/cloud-agent-sdk/src/**',
+      'packages/session-ingest-contracts/src/**',
     ],
     sourcesRoot: '../..',
   },

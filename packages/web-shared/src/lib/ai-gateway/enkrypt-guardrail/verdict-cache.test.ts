@@ -23,6 +23,7 @@ import {
   scanUnits,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
+import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import {
   ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
   rememberRequestVerdict,
@@ -145,6 +146,17 @@ function enkryptResponse(summary: Record<string, unknown>, resultMessage: string
   });
 }
 
+/** The text an Enkrypt call scans; the double answers each call by it. */
+function scannedText(init: RequestInit | undefined): string {
+  const body = readJsonBody(init?.body);
+  if (typeof body !== 'object' || body === null || !('text' in body)) {
+    throw new Error('Expected the Enkrypt request body to carry the scanned text');
+  }
+  const { text } = body;
+  if (typeof text !== 'string') throw new Error('Expected the scanned text to be a string');
+  return text;
+}
+
 function deps(
   store: EnkryptVerdictCacheStore | null,
   respond: (text: string) => Response = () => enkryptResponse({ injection_attack: 0 })
@@ -152,7 +164,7 @@ function deps(
   return {
     apiKey: 'test-enkrypt-key',
     fetch: jest.fn(async (_url: string, init: RequestInit) =>
-      respond((JSON.parse(String(init.body)) as { text: string }).text)
+      respond(scannedText(init))
     ) as unknown as typeof fetch,
     timeoutMs: 1_000,
     signal: new AbortController().signal,
@@ -162,7 +174,7 @@ function deps(
 
 function scannedTexts(dependencies: EnkryptDetectDependencies): string[] {
   const calls = jest.mocked(dependencies.fetch).mock.calls as unknown as [string, RequestInit][];
-  return calls.map(([, init]) => (JSON.parse(String(init.body)) as { text: string }).text);
+  return calls.map(([, init]) => scannedText(init));
 }
 
 /** The key of one unit: a rendered segment, or a slice of one. */

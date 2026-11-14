@@ -7,6 +7,7 @@ import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { SessionTodoLinkRow } from './session-todo-link';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   renderWithProviders,
   type RenderWithProvidersResult,
@@ -90,6 +91,7 @@ type RowProps = {
   onAccessibilityAction?: (event: { nativeEvent: { actionName: string } }) => void;
   onPress?: () => void;
   onLongPress?: () => void;
+  className?: string;
 };
 
 function row(mounted: Mounted): RowProps {
@@ -172,5 +174,12 @@ describe('SessionTodoLinkRow', () => {
       props.onPress?.();
     });
     expect(pickerVisible(mounted)).toBe(true);
+  });
+
+  it('renders its own pressable on the shared full target', async () => {
+    // The unlinked row measured below the 44 dp touch rule, so the target lives
+    // on the row itself rather than on its label.
+    const mounted = await mountRow();
+    expect((row(mounted).className as string).split(' ')).toContain(ROW_TARGET_CLASS);
   });
 });

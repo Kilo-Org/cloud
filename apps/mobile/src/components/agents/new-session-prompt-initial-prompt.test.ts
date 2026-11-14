@@ -535,7 +535,6 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     // answers available; a tap says why it cannot start.
     expect(findElementByType(element, VoiceInputButton)).toMatchObject({
       disabled: isCreating,
-      size: 'lg',
     });
     expect(findElementByType(element, VoiceInputStatus)).toEqual({ status: 'idle' });
   });

@@ -155,7 +155,7 @@ describe('NewSessionScreen account gate', () => {
 });
 
 const AGENTS_SESSIONS_INDEX_HREF = {
-  pathname: '/(app)/(tabs)/(2_agents)/',
+  pathname: '/(app)/(tabs)/(2_agents)',
   params: {},
 } as const;
 

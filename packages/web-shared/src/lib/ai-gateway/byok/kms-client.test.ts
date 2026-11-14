@@ -28,6 +28,11 @@ import {
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_DATA_KEY_CACHE_TTL_SECONDS } from '@kilocode/web-shared/lib/ai-gateway/byok/data-key-cache';
+import {
+  readBodyText,
+  readJsonBody,
+  requestUrlOf,
+} from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const mockRedis = jest.requireMock<{
   redisClient: {
@@ -69,9 +74,9 @@ function installFakeKms() {
   const calls: Call[] = [];
   const dataKeys = new Map<string, { dataKey: string; context: ByokKmsContext }>();
   const fakeFetch = jest.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    const target = new URL(String(url));
+    const target = new URL(requestUrlOf(url));
     calls.push({ url: target, init: init ?? {} });
-    const body = JSON.parse(String(init?.body));
+    const body = readJsonBody(init?.body) as ByokKmsContext & { wrapped_dek?: string };
     if (target.pathname === '/data-key') {
       const dataKey = randomBytes(32).toString('base64');
       const wrapped = `wrapped-${dataKeys.size}`;
@@ -157,11 +162,11 @@ describe('byok kms client', () => {
       authorization: 'Bearer token-1',
       'content-type': 'application/json',
     });
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+    expect(readJsonBody(calls[0].init.body)).toEqual({
       ...context,
       actor_user_id: 'user-1',
     });
-    expect(String(calls[0].init.body)).not.toContain('sk-secret');
+    expect(readBodyText(calls[0].init.body)).not.toContain('sk-secret');
     expect(envelope).toMatchObject({
       wrapped_dek: 'wrapped-0',
       kms_key_id: 'alias/test',
@@ -177,7 +182,7 @@ describe('byok kms client', () => {
 
     const dataKey = await createByokDataKey({ context, actorUserId });
     expect(calls).toHaveLength(1);
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+    expect(readJsonBody(calls[0].init.body)).toEqual({
       ...context,
       actor_user_id: 'user-1',
     });
@@ -221,7 +226,7 @@ describe('byok kms client', () => {
       authorization: 'Bearer token-1',
       'content-type': 'application/json',
     });
-    expect(JSON.parse(String(calls[1].init.body))).toEqual({
+    expect(readJsonBody(calls[1].init.body)).toEqual({
       ...orgContext,
       wrapped_dek: envelope.wrapped_dek,
       kms_key_id: envelope.kms_key_id,
@@ -235,7 +240,7 @@ describe('byok kms client', () => {
     await decryptByokEnvelope(envelope, context);
 
     for (const call of calls) {
-      const sent = `${call.url.href}${String(call.init.body ?? '')}`;
+      const sent = `${call.url.href}${readBodyText(call.init.body ?? '')}`;
       expect(sent).not.toContain('sk-secret');
       expect(sent).not.toContain(envelope.encrypted_data.data);
     }

@@ -5,9 +5,11 @@ import { View } from 'react-native';
 
 import { SectionHeader } from '@/components/home/section-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { GitMerge, GitPullRequest, ShieldCheck } from '@/components/ui/icons';
+import { GitMerge, GitPullRequest, ShieldCheck, Terminal } from '@/components/ui/icons';
 import { getCodeReviewerProfilePath, getPrReviewEntryPath } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { useSshClientEnabled } from '@/lib/ssh/use-ssh-client-enabled';
+import { SSH_HOSTS_ROUTE } from '@/lib/ssh/routes';
 
 type ProductChoicesProps = {
   organizationId: string | null;
@@ -18,6 +20,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
   const router = useRouter();
   const { t } = useTranslation();
   const scope = organizationId ?? PERSONAL_SECURITY_SCOPE;
+  const sshEnabled = useSshClientEnabled();
 
   return (
     <View>
@@ -47,6 +50,18 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
             />
           </>
         )}
+        {sshEnabled ? (
+          <ConfigureRow
+            icon={Terminal}
+            title={t('ssh.title')}
+            subtitle={t('ssh.subtitle')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push(SSH_HOSTS_ROUTE);
+            }}
+          />
+        ) : null}
         <ConfigureRow
           icon={GitMerge}
           title={t('common.prReview')}

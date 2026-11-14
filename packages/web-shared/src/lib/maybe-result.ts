@@ -29,7 +29,7 @@ export function verifyOrError<TErr = void>(
   ok: boolean,
   error?: TErr
 ): OptionalError<TErr | undefined> {
-  return ok ? { success: true } : ({ error, success: false } as OptionalError<TErr | undefined>);
+  return ok ? { success: true } : { error, success: false };
 }
 
 export function trpcFailure(

@@ -139,6 +139,9 @@ describe('listActiveSessions cloud candidates', () => {
 
     expect(limitMock).toHaveBeenCalledWith(CLOUD_AGENT_CANDIDATE_LIMIT);
     expect(result.sessions).toHaveLength(60);
+    expect(result.sessions.map(session => session.cloudAgentSessionId)).toEqual(
+      sixty.map(row => row.cloud_agent_session_id)
+    );
   });
 
   it('forwards the session verified-at so an unverified link renders no associatedPr', async () => {

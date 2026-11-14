@@ -41,6 +41,7 @@ import {
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq, inArray } from 'drizzle-orm';
 
@@ -459,7 +460,7 @@ describe('envelope-encrypted BYOK rows', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('http://kms.test/decrypt');
     expect(init.method).toBe('POST');
-    expect(JSON.parse(String(init.body))).toEqual({
+    expect(readJsonBody(init.body)).toEqual({
       key_id: keyId,
       owner_type: 'user',
       owner_id: user.id,
@@ -519,11 +520,16 @@ describe('envelope-encrypted BYOK rows', () => {
       '2026-01-01T00:00:00.000Z'
     );
     const fakeKms = global.fetch;
-    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
-      JSON.parse(String(init?.body)).provider_id === 'anthropic'
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = readJsonBody(init?.body);
+      const providerId =
+        typeof body === 'object' && body !== null && 'provider_id' in body
+          ? body.provider_id
+          : undefined;
+      return providerId === 'anthropic'
         ? new Response('{}', { status: 502 })
-        : fakeKms(input, init)
-    ) as unknown as typeof fetch;
+        : fakeKms(input, init);
+    }) as unknown as typeof fetch;
 
     await expect(getBYOKforUser(db, user.id, ['anthropic', 'openai'])).resolves.toEqual([
       { decryptedAPIKey: openaiSecret, providerId: 'openai' },

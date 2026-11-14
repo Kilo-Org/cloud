@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "সক্রিয় এজেন্টগুলির একটি আপডেট আছে"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "কাজ সম্পন্ন হয়েছে"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ব্যর্থ হয়েছে: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "বাধাগ্রস্ত: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

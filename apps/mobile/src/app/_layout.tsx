@@ -20,6 +20,7 @@ import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 // font bytes. The per-weight subpaths pull only the two used `.ttf` files.
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
+import { RobotoMono_500Medium } from '@expo-google-fonts/roboto-mono/500Medium';
 import * as Sentry from '@sentry/react-native';
 import { reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
@@ -189,7 +190,7 @@ installErrorReporting();
 function preloadStartupFonts(): void {
   void (async () => {
     try {
-      await loadAsync({ JetBrainsMono_500Medium, JetBrainsMono_600SemiBold });
+      await loadAsync({ JetBrainsMono_500Medium, JetBrainsMono_600SemiBold, RobotoMono_500Medium });
     } catch {
       // useFonts stays the owner of fontsError.
     }
@@ -240,6 +241,7 @@ function RootLayoutNav({
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
     JetBrainsMono_600SemiBold,
+    RobotoMono_500Medium,
   });
   const segments = useSegments();
   const pathname = usePathname();

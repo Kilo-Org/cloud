@@ -54,6 +54,7 @@ describe('Authoritative Claude payer state', () => {
         user_profile_id: row.user_profile_id,
         connected_at: '2026-01-01T00:00:00.123Z',
         kilo_user_id: user.id,
+        organization_id: null,
         created_by: user.id,
       },
     });
@@ -68,6 +69,7 @@ describe('Authoritative Claude payer state', () => {
         user_profile_id: row.user_profile_id,
         connected_at: null,
         kilo_user_id: user.id,
+        organization_id: null,
         created_by: user.id,
       },
     });

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Ajans aktif yo gen yon aktyalizasyon"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Travay fini"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Echwe: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Entèwonp: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

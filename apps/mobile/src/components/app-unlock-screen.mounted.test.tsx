@@ -28,6 +28,10 @@ import OrganizationLayout from '@/app/(app)/(tabs)/(3_profile)/organization/_lay
 import SecurityAgentScopeLayout from '@/app/(app)/security-agent/[scope]/_layout';
 import PrReviewNumberLayout from '@/app/(app)/pr-review/[owner]/[repo]/[number]/_layout';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
+vi.mock('@/lib/ssh/use-ssh-client-enabled', () => ({ useSshClientEnabled: () => false }));
+vi.mock('@/components/ssh/session/ssh-session-runtime', () => ({
+  SshSessionRuntime: 'SshSessionRuntime',
+}));
 
 beforeEach(resetUnlockMocks);
 afterEach(unmountUnlock);

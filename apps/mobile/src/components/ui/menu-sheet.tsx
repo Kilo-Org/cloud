@@ -87,7 +87,10 @@ function MenuSheetBody({
 
   const rows = options.map((option, index) => (
     <Pressable
-      key={option.label}
+      // Two rows can carry the same label (two saved SSH hosts both called
+      // "bastion"), and `onSelect` addresses the list by index, so the index is
+      // the only key that stays unique within a menu.
+      key={index}
       {...(isSingleSelect
         ? radioItemA11y({ label: option.label, checked: option.selected === true })
         : { accessibilityRole: 'button' as const, accessibilityLabel: option.label })}

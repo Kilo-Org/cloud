@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ئەجێنتە چالاکەکان نوێکارییەکیان هەیە"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ئەرکەکە تەواو بوو"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "سەرکەوتوو نەبوو: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "گۆڕدرا: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

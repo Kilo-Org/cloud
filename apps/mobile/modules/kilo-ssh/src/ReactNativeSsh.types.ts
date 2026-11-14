@@ -44,6 +44,13 @@ export type SshAuth =
   | { type: 'keyboardInteractive' };
 
 export type ConnectOptions = {
+  /**
+   * The JavaScript session this connection belongs to. The native registry
+   * keeps it, so a runtime that starts after a reload adopts the row its screen
+   * names instead of minting a second id for one connection. Omit it for a
+   * connection with no row of its own, such as a jump hop.
+   */
+  appSessionId?: string;
   /** Echoed in server requests, including requests raised before connect resolves. */
   attemptId?: string;
   host: string;
@@ -118,13 +125,48 @@ export type DisconnectNotice = {
 };
 
 /**
- * The texts the background session notification renders. `body` receives the
- * number of open sessions so each plural form stays in the app's translations.
+ * A live session as the native registry holds it. A JavaScript runtime that
+ * starts while the sockets are already open reads these to rebuild its view.
  */
+export type SessionInfo = {
+  viaSessionId: string | null;
+  sessionId: string;
+  /** The JavaScript session that opened it, or '' for a connection with no row. */
+  appSessionId: string;
+  host: string;
+  port: number;
+  username: string;
+  /** Shell ids whose byte sources are still registered with the terminal. */
+  shellIds: string[];
+  sftpIds: string[];
+  forwardIds: string[];
+};
+
+/** A forward that is still listening on a live session. */
+export type ForwardInfo = {
+  forwardId: string;
+  sessionId: string;
+  direction: 'local' | 'remote';
+  bindHost: string;
+  bindPort: number;
+  /** The port the listener actually bound. */
+  port: number;
+};
+
+/**
+ * Where a localized notification body puts the session count. The sentence is
+ * translated once with this token in place of the number and the native side
+ * substitutes its own registry count, so the text never depends on a number a
+ * destroyed JavaScript runtime once reported.
+ */
+export const BACKGROUND_SESSION_COUNT_TOKEN = '{count}';
+
+/** The texts the background session notification renders. */
 export type BackgroundSessionTexts = {
   channelName: string;
   title: string;
-  body: (count: number) => string;
+  /** The translated body with {@link BACKGROUND_SESSION_COUNT_TOKEN} where the count goes. */
+  bodyTemplate: string;
   disconnectAllLabel: string;
 };
 
@@ -194,6 +236,12 @@ export type NativeAuth =
   | { type: 'keyboardInteractive' };
 
 export type NativeConnectConfig = {
+  /**
+   * The JavaScript session this connection belongs to. The registry keeps it, so
+   * a runtime that starts after a reload adopts the row the open screen names
+   * instead of minting a second id for one connection.
+   */
+  appSessionId: string;
   attemptId: string;
   host: string;
   port: number;

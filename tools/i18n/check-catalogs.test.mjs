@@ -69,6 +69,9 @@ function run({
   translated = TRANSLATED,
   source = SOURCE,
   language = 'ru',
+  pushEnglish = {},
+  pushTranslated = {},
+  pushSource = '',
   extraFiles = {},
 } = {}) {
   const root = fixture({
@@ -76,8 +79,9 @@ function run({
     'apps/mobile/src/example.ts': source,
     'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
     [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(translated),
-    'packages/notifications/src/locales/en.json': '{}',
-    [`packages/notifications/src/locales/${language}.json`]: '{}',
+    'packages/notifications/src/locales/en.json': JSON.stringify(pushEnglish),
+    [`packages/notifications/src/locales/${language}.json`]: JSON.stringify(pushTranslated),
+    'packages/notifications/src/push-copy.ts': pushSource,
     // The push locale module the catalog checker reads: one import and one
     // registry entry per fixture catalog, as the real module writes them.
     'packages/notifications/src/i18n.ts': [
@@ -891,6 +895,18 @@ test('accepts a flat counted key kept untranslated to a family in another locale
   assert.deepEqual(found, []);
 });
 
+test('leaves an incomplete English family unowed by a locale', () => {
+  // English declares only the `_one` category of the family, so it is not a
+  // family every locale owes. Neither value interpolates {{count}}: a locale
+  // that keeps only the flat base key owes no categories for it.
+  const found = run({
+    english: { counts: { items: 'items', items_one: 'one item' } },
+    translated: { counts: { items: 'lokal' } },
+    source: "t('counts.items', { count: 2 });",
+  });
+  assert.deepEqual(found, []);
+});
+
 test('rejects an incomplete locale-declared family for a counted key', () => {
   const found = run({
     english: COUNTED,
@@ -1343,6 +1359,208 @@ test('rejects a push locale registry with no initializer', () => {
   assert.match(
     found.join('\n'),
     /notifications\/src\/i18n\.ts: the push locale registry has no initializer/
+  );
+});
+
+// The push catalog binds its keys two ways: a literal handed to
+// `translatePush`, and a payload `i18nKey` base that the worker and the app
+// expand to `.title`/`.body`. `translatePush` returns its fallback for a key the
+// catalog does not define, so the lock screen would carry English copy and no
+// check would say so. Both directions of the usage check read that shape here.
+const PUSH_ENGLISH = {
+  generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
+};
+const PUSH_TRANSLATED = {
+  generic: { title: 'Kilo', body: { chatMessage: 'Tienes un mensaje nuevo' } },
+};
+const PUSH_SOURCE = [
+  "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+  "translatePush(locale, 'generic.body.chatMessage', undefined, 'You have a new message');",
+].join('\n');
+
+test('accepts a push key the source passes to translatePush', () => {
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: PUSH_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push key no catalog defines, which would ship its English fallback', () => {
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: `${PUSH_SOURCE}\ntranslatePush(locale, 'generic.body.chatMesage', undefined, 'x');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: source uses "generic\.body\.chatMesage", which en\.json does not define/
+  );
+});
+
+test('rejects an English push key no source uses', () => {
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: PUSH_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: en\.json defines "generic\.body\.scheduledAction", which no source file uses/
+  );
+});
+
+test('accepts a push key no source names in full, because the payload carries its base', () => {
+  // A producer sends `i18nKey: 'sessionReady'`; the worker appends `.title` and
+  // `.body`. Both halves of the family are used, so neither is dead copy.
+  const found = run({
+    pushEnglish: {
+      sessionReady: {
+        title: '{{sessionTitle}}',
+        body: 'Your Kilo session is ready to control from your phone',
+      },
+    },
+    pushTranslated: {
+      sessionReady: {
+        title: '{{sessionTitle}}',
+        body: 'Tu sesión de Kilo está lista para controlarla desde tu teléfono',
+      },
+    },
+    pushSource: "const push = { i18nKey: 'sessionReady' };",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a push source that builds its key from the payload', () => {
+  // `translatePush(locale, `${i18nKey}.title`)` is the mechanism the catalog
+  // exists for, not a key the audit can read. It must not be reported.
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: [
+      PUSH_SOURCE,
+      'const title = translatePush(locale, `${base}.title`, params, stored);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push value left in English in one locale', () => {
+  // The mobile rule only fires when a value is English in every locale, which a
+  // single untranslated locale never is.
+  const found = run({
+    pushEnglish: {
+      internal: {
+        lowBalance: {
+          title: 'Low balance alert',
+          body: '{{organizationName}} balance fell below ${{minimumBalanceUsd}}',
+        },
+      },
+    },
+    pushTranslated: {
+      internal: {
+        lowBalance: {
+          title: 'Low balance alert',
+          body: 'El saldo de {{organizationName}} cayó por debajo de ${{minimumBalanceUsd}}',
+        },
+      },
+    },
+    pushSource: "const push = { i18nKey: 'internal.lowBalance' };",
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/ru: "internal\.lowBalance\.title" is English; translate it/
+  );
+});
+
+test('accepts a one-token push value that reads the same in every language', () => {
+  // A product name and a bare placeholder carry no grammar to translate.
+  const found = run({
+    pushEnglish: { generic: { title: 'Kilo' }, sessionReady: { title: '{{sessionTitle}}' } },
+    pushTranslated: { generic: { title: 'Kilo' }, sessionReady: { title: '{{sessionTitle}}' } },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "const push = { i18nKey: 'sessionReady' };",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+// A language whose preposition for this message is the English word keeps the
+// copy: reviewed per (value, tag) in NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS.
+const SHARED_PREPOSITION_ENGLISH = {
+  internal: {
+    securityFindingNew: {
+      title: 'New security finding ({{severity}})',
+      body: '{{findingTitle}} in {{repoFullName}}',
+    },
+  },
+};
+const SHARED_PREPOSITION_SOURCE = "const push = { i18nKey: 'internal.securityFindingNew' };";
+const SINGLE_ENGLISH = { agents: { title: 'Agents' } };
+const SINGLE_SOURCE = "t('agents.title');";
+
+test('accepts a push value a reviewed exception lists for its language', () => {
+  const found = run({
+    english: SINGLE_ENGLISH,
+    translated: { agents: { title: 'Agenten' } },
+    source: SINGLE_SOURCE,
+    language: 'de',
+    pushEnglish: SHARED_PREPOSITION_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingNew: {
+          title: 'Neue Sicherheitsfeststellung ({{severity}})',
+          body: '{{findingTitle}} in {{repoFullName}}',
+        },
+      },
+    },
+    pushSource: SHARED_PREPOSITION_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('still rejects that push value in a language the exceptions do not list', () => {
+  const found = run({
+    english: SINGLE_ENGLISH,
+    translated: { agents: { title: 'Агенты' } },
+    source: SINGLE_SOURCE,
+    language: 'ru',
+    pushEnglish: SHARED_PREPOSITION_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingNew: {
+          title: 'Новая находка ({{severity}})',
+          body: '{{findingTitle}} in {{repoFullName}}',
+        },
+      },
+    },
+    pushSource: SHARED_PREPOSITION_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/ru: "internal\.securityFindingNew\.body" is English; translate it/
   );
 });
 

@@ -425,6 +425,7 @@ import type {
   RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { WorktreeRecovery } from '../../shared/worktree-changes-wire.js';
+import type { WorktreeChangeStates } from '../session/worktree-changes.js';
 import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
 import type { WorktreeChangesContext } from '../../sandbox-session/worktree-changes.js';
 import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
@@ -1957,6 +1958,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     this.subscribeToWorktreeChanges(input.context);
     return this.worktreeChanges.getFile(input, query);
+  }
+
+  async getWorktreeChangeStates(input: SharedWorktreeChangesInput): Promise<WorktreeChangeStates> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.savedStates(input);
   }
 
   async refreshWorktreeChanges(

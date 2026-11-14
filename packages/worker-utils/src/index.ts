@@ -255,6 +255,7 @@ export type {
 export {
   activeOrganizationAccessSql,
   activeOrganizationJoinCondition,
+  hasInheritedOrganizationAccess,
   hasOrganizationAccess,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Görev tamamlandı"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Başarısız: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Kesildi: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tasc críochnaithe"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Theip: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Curtha isteach: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -50,15 +36,15 @@
     },
     "securityFindingNew": {
       "title": "Tátal slándála nua ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "body": "{{findingTitle}} i {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
       "title": "Rabhadh SLA",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "body": "{{findingTitle}} i {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
       "title": "Sárú SLA",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "body": "{{findingTitle}} i {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",

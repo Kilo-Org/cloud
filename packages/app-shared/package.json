@@ -8,6 +8,7 @@
     "./utils": "./src/utils.ts",
     "./support": "./src/support.ts",
     "./security-agent": "./src/security-agent/index.ts",
+    "./auth": "./src/auth/index.ts",
     "./code-review": "./src/code-review/index.ts",
     "./code-reviews": "./src/code-reviews/index.ts",
     "./organizations": "./src/organizations/index.ts",

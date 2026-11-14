@@ -126,8 +126,11 @@ internal class SinkDelivery(
 
     synchronized(lock) {
       sink = next
-      pending = buffered ?: emptyList()
-      buffered = null
+      pending = if (next == null) emptyList() else buffered ?: emptyList()
+      if (next != null) {
+        buffered = ArrayList()
+        bufferedBytes = 0
+      }
 
       if (next != null && !delivered) {
         val event = closeEvent

@@ -252,3 +252,27 @@ export async function hasOrganizationAccess(
   const rows = await organizationAccessQuery(db, params);
   return rows[0] !== undefined;
 }
+
+/**
+ * True when the user may act for the organization through any membership the
+ * read paths honour: a direct membership in the live organization, or a
+ * permitted role in its live parent organization. Session reads gate on
+ * {@link activeOrganizationAccessSql}, so a user who can read a session in an
+ * organization can also create one there.
+ */
+export async function hasInheritedOrganizationAccess(
+  db: OrganizationMembershipDb,
+  params: { kiloUserId: string; organizationId: string }
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.id, params.organizationId),
+        activeOrganizationAccessSql(organizations.id, params.kiloUserId)
+      )
+    )
+    .limit(1);
+  return rows[0] !== undefined;
+}

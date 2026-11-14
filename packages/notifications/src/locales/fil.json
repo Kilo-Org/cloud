@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "May update ang mga aktibong agent"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Natapos ang task"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Nabigo: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Na-interrupt: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -41,7 +27,7 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
+      "title": "Alerto sa mababang balance",
       "body": "Bumaba sa ibaba ng ${{minimumBalanceUsd}} ang balance ng {{organizationName}}"
     },
     "spendAlert": {

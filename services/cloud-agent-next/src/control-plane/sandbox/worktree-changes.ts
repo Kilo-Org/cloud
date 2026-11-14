@@ -157,6 +157,7 @@ export function createSharedWorktreeChanges(deps: {
   return {
     get: (input: SharedWorktreeChangesInput) => manager(input).get(),
     getFile: (input: SharedWorktreeChangesInput, query: unknown) => manager(input).getFile(query),
+    savedStates: (input: SharedWorktreeChangesInput) => manager(input).savedStates(),
     recovery: (input: SharedWorktreeChangesInput) => manager(input).recovery(),
     async refresh(input: SharedWorktreeChangesInput) {
       const key = input.context.worktreeId;

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳಿಗೆ ನವೀಕರಣವಿದೆ"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ಕಾರ್ಯ ಪೂರ್ಣಗೊಂಡಿದೆ"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ವಿಫಲವಾಗಿದೆ: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ಅಡಚಣೆಯಾಗಿದೆ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

@@ -398,7 +398,7 @@ export function SandboxStatusIndicator({
         >
           <div id={detailsId}>
             <SandboxStatusDetails view={view} />
-            <SandboxComputeRate snapshot={query.data?.snapshot} />
+            <SandboxComputeRate snapshot={query.data?.snapshot} organizationId={organizationId} />
           </div>
           <details className="group mt-3 border-t text-xs">
             <summary

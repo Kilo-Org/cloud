@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Белсенді агенттерде жаңарту бар"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Тапсырма аяқталды"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Сәтсіз: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Үзілді: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

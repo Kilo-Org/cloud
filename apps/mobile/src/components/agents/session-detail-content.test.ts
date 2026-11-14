@@ -118,6 +118,7 @@ const connectionHealth = vi.hoisted(() => ({
   retryConnection: vi.fn(),
 }));
 const hideThinking = vi.hoisted(() => ({ current: false, loaded: true }));
+vi.mock('@/lib/ssh/use-ssh-client-enabled', () => ({ useSshClientEnabled: () => false }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/agents/session-provider', () => ({
@@ -1360,7 +1361,7 @@ describe('SessionDetailContent display scope', () => {
     act(rename.props.onPress as () => void);
     expect(openRenameModal).toHaveBeenCalledOnce();
     pressHeaderBack(renderer);
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
   });
@@ -3797,7 +3798,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
     );
   });
 
@@ -3833,12 +3834,12 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
           renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
       );
       const routesBeforeCardBack = [...navigationRoutes];
-      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)/', 'agent-chat/x'];
+      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)', 'agent-chat/x'];
       navigationRoutes.splice(0, navigationRoutes.length, ...plantedRoutes);
       act(() => {
         (backToSessions.props.onPress as () => void)();
       });
-      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)/']);
+      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)']);
       navigationRoutes.splice(0, navigationRoutes.length, ...routesBeforeCardBack);
     }
 
@@ -3852,7 +3853,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
     expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
     );
   });
 });

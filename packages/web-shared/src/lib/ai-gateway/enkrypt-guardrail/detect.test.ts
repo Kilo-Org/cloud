@@ -13,6 +13,7 @@ import type { EnkryptUnavailableReason } from './report';
 import { createEnkryptCallLimiter, type EnkryptCallLimiter } from './call-limiter';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
+import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const mockedWarnExceptInTest = jest.fn();
 
@@ -113,7 +114,7 @@ describe('scanRequest', () => {
       'content-type': 'application/json',
       apikey: 'test-enkrypt-key',
     });
-    expect(JSON.parse(String(init.body))).toEqual({
+    expect(readJsonBody(init.body)).toEqual({
       text: 'tool output',
       detectors: config.detectors,
       user_metadata: { organization_id: '00000000-0000-4000-8000-000000000002' },
@@ -581,7 +582,7 @@ describe('scanRequest', () => {
     expect(result.verdict).toEqual({ action: 'allow' });
     expect(dependencies.fetch).toHaveBeenCalledTimes(1);
     const [[, init]] = fetchCalls(dependencies);
-    expect(JSON.parse(String(init.body)).text).toBe(text);
+    expect(readJsonBody(init.body)).toMatchObject({ text });
   });
 
   describe('a request above the scan limit', () => {
@@ -1336,7 +1337,9 @@ describe('scanRequest', () => {
       responses[1].resolve(detectResponse({ summary: {} }));
       expect((await second).verdict).toEqual({ action: 'allow' });
       expect(maxInFlight).toBe(1);
-      expect(JSON.parse(String(fetchCalls(dependencies)[1][1].body)).text).toBe('other output');
+      expect(readJsonBody(fetchCalls(dependencies)[1][1].body)).toMatchObject({
+        text: 'other output',
+      });
     });
   });
 

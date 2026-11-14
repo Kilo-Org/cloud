@@ -10,6 +10,7 @@ import {
   findUserIdByAuthProvider,
 } from '@/lib/user';
 import { insertTestUserAndGoogleAuth } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { assertNotNullish } from '@/lib/utils';
 
 describe('Multi-Auth System', () => {
@@ -150,6 +151,11 @@ describe('Multi-Auth System', () => {
       expect(res.success ? null : res.error.message).toBe(
         'Cannot unlink the last authentication method'
       );
+
+      if (res.success) throw new Error('the last method must be refused');
+      expect(res.error.cause).toBeInstanceOf(UpstreamApiError);
+      if (!(res.error.cause instanceof UpstreamApiError)) throw new Error('missing refusal code');
+      expect(res.error.cause.upstreamCode).toBe('last_sign_in_method');
     });
 
     test('should handle unlinking non-existent provider', async () => {
@@ -158,6 +164,11 @@ describe('Multi-Auth System', () => {
       expect(!res.success ? res.error.message : null).toBe(
         'User does not have a linked fake-login account'
       );
+
+      if (res.success) throw new Error('an unlinked provider must be refused');
+      expect(res.error.cause).toBeInstanceOf(UpstreamApiError);
+      if (!(res.error.cause instanceof UpstreamApiError)) throw new Error('missing refusal code');
+      expect(res.error.cause.upstreamCode).toBe('sign_in_method_not_linked');
     });
   });
 

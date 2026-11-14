@@ -14,6 +14,7 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber, formatPercent } from '@/lib/format';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { resolveRunningOnLabel } from '@/lib/instance-target-label';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -54,6 +55,8 @@ import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
 import { SessionSandboxSection } from './session-sandbox-section';
 import { copySessionId, copySessionLink } from './session-row-actions';
+import { sshSandboxPath } from '@/lib/ssh/routes';
+import { useSshClientEnabled } from '@/lib/ssh/use-ssh-client-enabled';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
 import { SessionTodoLinkRow } from '@/components/todos/session-todo-link';
 import { SessionShareSection } from './session-share-section';
@@ -62,6 +65,9 @@ type SessionContextSheetProps = {
   visible: boolean;
   info: SessionContextInfo | undefined;
   sessionId: string;
+  /** The runtime id that addresses this session's sandbox, or null when it has none. */
+  cloudAgentSessionId: string | null;
+  organizationId: string | undefined;
   /** Message the copied link resumes at; null copies the session link without a position. */
   anchorMessageId: string | null;
   sessionTitle: string;
@@ -78,11 +84,8 @@ type SessionContextSheetProps = {
   onAutoApproveChange: (enabled: boolean) => void;
   connectionDisplay: SessionConnectionDisplay;
   onRetryConnection: () => void;
-  /** The control-plane session id; null when this session has no sandbox. */
-  cloudAgentSessionId: string | null;
   /** See `SessionSandboxSection`: only a failed start offers a fresh start. */
   cloudStatusType: string | null;
-  organizationId: string | undefined;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -181,6 +184,8 @@ export function SessionContextSheet({
   visible,
   info,
   sessionId,
+  cloudAgentSessionId,
+  organizationId,
   anchorMessageId,
   sessionTitle,
   activeSessionType,
@@ -196,13 +201,12 @@ export function SessionContextSheet({
   onAutoApproveChange,
   connectionDisplay,
   onRetryConnection,
-  cloudAgentSessionId,
   cloudStatusType,
-  organizationId,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const manager = useOptionalSessionManager();
+  const sshEnabled = useSshClientEnabled();
   const runningOn = useRunningOnLabel(activeSessionType, ownerConnectionId, visible);
   const idCopy = useCopyRowFeedback(
     async () => {
@@ -397,6 +401,15 @@ export function SessionContextSheet({
           ) : null}
 
           <SessionChangesRow sessionId={sessionId} onClose={onClose} />
+
+          {!sshEnabled || cloudAgentSessionId === null ? null : (
+            <SandboxTerminalRow
+              cloudAgentSessionId={cloudAgentSessionId}
+              organizationId={organizationId}
+              title={sessionTitle}
+              onClose={onClose}
+            />
+          )}
 
           <CopyRow
             testID="session-context-sheet-copy-id"
@@ -620,7 +633,7 @@ function CopyRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="gap-1 active:opacity-70"
+      className={cn(ROW_TARGET_CLASS, 'justify-center gap-1 active:opacity-70')}
       testID={testID}
     >
       {/* The row keeps its call-to-action name in every state; the copy
@@ -675,6 +688,50 @@ function SessionChangesRow({
       testID="session-context-sheet-view-changes"
     >
       <Text className="text-base font-medium text-foreground">{label}</Text>
+      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+    </Pressable>
+  );
+}
+
+/**
+ * Opens a terminal inside the session's sandbox. Like the changes row, the
+ * sheet dismisses before the push so the route does not render behind it, and
+ * the router is imported at press time for the mounted sheet test's sake.
+ */
+function SandboxTerminalRow({
+  cloudAgentSessionId,
+  organizationId,
+  title,
+  onClose,
+}: Readonly<{
+  cloudAgentSessionId: string;
+  organizationId: string | undefined;
+  title: string;
+  onClose: () => void;
+}>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  return (
+    <Pressable
+      onPress={() => {
+        onClose();
+        void (async () => {
+          const { router } = await import('expo-router');
+          router.push(
+            sshSandboxPath({
+              cloudAgentSessionId,
+              title,
+              ...(organizationId === undefined ? {} : { organizationId }),
+            })
+          );
+        })();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={t('ssh.sandbox.title')}
+      className="min-h-[44px] flex-row items-center justify-between gap-3 active:opacity-70"
+      testID="session-context-sheet-terminal"
+    >
+      <Text className="text-base font-medium text-foreground">{t('ssh.sandbox.title')}</Text>
       <DirectionalChevronRight size={16} color={colors.mutedForeground} />
     </Pressable>
   );

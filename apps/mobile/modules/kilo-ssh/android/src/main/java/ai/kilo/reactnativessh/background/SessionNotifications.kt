@@ -25,7 +25,7 @@ internal object SessionNotifications {
     val builder = NotificationCompat.Builder(context, CHANNEL_ID)
       .setSmallIcon(R.drawable.ic_ssh_session)
       .setContentTitle(BackgroundSessions.texts.title)
-      .setContentText(BackgroundSessions.body)
+      .setContentText(BackgroundSessions.body())
       .setOngoing(true)
       .setSilent(true)
       .setShowWhen(false)

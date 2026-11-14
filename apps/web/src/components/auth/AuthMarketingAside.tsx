@@ -21,7 +21,7 @@ const bullets: Bullet[] = [
   },
   {
     lead: '500+ AI models.',
-    detail: 'Claude Opus 4.8, GPT-5.5, Gemini 3.5, and hundreds more.',
+    detail: 'Claude Opus 5.5, GPT-6 Astra, Gemini 4 Argon, and hundreds more.',
   },
   {
     lead: 'Fully open source.',

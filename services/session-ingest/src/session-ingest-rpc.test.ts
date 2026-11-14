@@ -374,6 +374,7 @@ function makeRpc(db: ReturnType<typeof makeDbFakes>['db']) {
 function makeRootWriteDb(params: {
   created?: Record<string, unknown>;
   existing?: Record<string, unknown>;
+  member?: boolean;
 }) {
   const values = vi.fn(() => insert);
   const insert = {
@@ -401,7 +402,11 @@ function makeRootWriteDb(params: {
           : []
     ),
     then: (resolve: (rows: unknown[]) => unknown) =>
-      resolve(selectedTable === organization_memberships ? [{ id: 'membership' }] : []),
+      resolve(
+        selectedTable === organization_memberships && params.member !== false
+          ? [{ id: 'membership' }]
+          : []
+      ),
   };
   const worktreeInsert = {
     values: (values: Record<string, unknown>) => {
@@ -428,9 +433,10 @@ function makeRootWriteDb(params: {
     transaction: vi.fn(async (callback: (nested: unknown) => unknown) => callback(tx)),
   };
   return {
-    db: { transaction: vi.fn(async callback => callback(tx)) },
+    db: { select: vi.fn(() => select), transaction: vi.fn(async callback => callback(tx)) },
     values,
     updateSet,
+    select,
   };
 }
 
@@ -512,6 +518,40 @@ describe('createSessionForCloudAgent', () => {
     await rpc.createSessionForCloudAgent(params);
 
     expect(fake.values).toHaveBeenCalledWith(expect.objectContaining({ profile_id: null }));
+  });
+
+  it('records the organization when the acting user is a member', async () => {
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId } });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
+    expect(fake.values).toHaveBeenCalledWith(
+      expect.objectContaining({ organization_id: params.organizationId })
+    );
+  });
+
+  it('rejects an organization the acting user does not belong to before any write', async () => {
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId }, member: false });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'rejected',
+      code: 'organization_access_denied',
+    });
+    expect(fake.values).not.toHaveBeenCalled();
+  });
+
+  it('skips the membership query for a personal create', async () => {
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId } });
+    const rpc = makeRpc(fake.db as never);
+    const { organizationId: _organizationId, ...personalParams } = params;
+
+    await rpc.createSessionForCloudAgent(personalParams);
+
+    expect(fake.select.from).not.toHaveBeenCalledWith(organization_memberships);
   });
 
   it('persists the worktree ID when creating a grouped root', async () => {
@@ -1562,26 +1602,33 @@ describe('createSessionForCloudAgent clone path', () => {
     existing?: Record<string, unknown>;
     insertError?: Error;
   }) {
-    // `leftJoin` distinguishes the source ownership lookup from the destination
-    // pre-check read: only the source lookup joins organization_memberships.
-    // `from` resets the flag so each query chain starts clean.
-    let leftJoined = false;
+    // Join shape identifies the query: the membership lookup inner-joins
+    // organizations, the source ownership lookup left-joins, and the
+    // destination pre-check joins neither. `from` resets the shape so each
+    // query chain starts clean.
+    let joined: 'membership' | 'source' | 'destination' = 'destination';
     const selectResult = vi.fn(async () =>
-      leftJoined ? options.sourceRows : (options.destinationRows ?? [])
+      joined === 'source' ? options.sourceRows : (options.destinationRows ?? [])
     );
     const select = {
       from: vi.fn(() => {
-        leftJoined = false;
+        joined = 'destination';
+        return select;
+      }),
+      innerJoin: vi.fn(() => {
+        joined = 'membership';
         return select;
       }),
       leftJoin: vi.fn(() => {
-        leftJoined = true;
+        joined = 'source';
         return select;
       }),
       where: vi.fn(() => select),
       orderBy: vi.fn(() => select),
       limit: vi.fn(() => select),
-      then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
+      then: vi.fn((resolve: (value: unknown) => unknown) =>
+        resolve(joined === 'membership' ? [{ id: 'membership' }] : selectResult())
+      ),
     };
     const values = vi.fn(() => insert);
     const insert = {

@@ -42,6 +42,14 @@ let failureExpiresAt = 0;
 let inFlight: Promise<Set<string> | null> | null = null;
 
 /**
+ * `Array.isArray` narrows to `any[]`, which would make every element read unsafe; this guard keeps
+ * the elements `unknown` so each one is narrowed where it is read.
+ */
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+/**
  * The served ids in a `/models` body, or null when the body carries no usable
  * list. A 200 whose shape is unrecognizable — an error envelope, a proxy stub, a
  * body without `data` — is a failed lookup, not an empty catalog: caching it as
@@ -52,11 +60,19 @@ let inFlight: Promise<Set<string> | null> | null = null;
 function readServedModelIds(body: unknown): Set<string> | null {
   if (typeof body !== 'object' || body === null || !('data' in body)) return null;
   const { data } = body;
-  if (!Array.isArray(data) || data.length === 0) return null;
+  if (!isUnknownArray(data) || data.length === 0) return null;
 
-  const ids = data
-    .map(model => (typeof model?.id === 'string' ? model.id : null))
-    .filter((id): id is string => id !== null);
+  const ids: string[] = [];
+  for (const entry of data) {
+    if (
+      typeof entry === 'object' &&
+      entry !== null &&
+      'id' in entry &&
+      typeof entry.id === 'string'
+    ) {
+      ids.push(entry.id);
+    }
+  }
   return ids.length === 0 ? null : new Set(ids);
 }
 

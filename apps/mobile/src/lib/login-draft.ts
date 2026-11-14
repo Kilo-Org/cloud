@@ -1,7 +1,12 @@
 import * as SecureStore from '@/lib/auth/secure-store';
 import { z } from 'zod';
 
-import { LOGIN_EMAIL_DRAFT_KEY, LOGIN_SSO_RECOVERY_DRAFT_KEY } from '@/lib/storage-keys';
+import { chainSave } from '@/lib/hooks/save-chain';
+import {
+  LOGIN_DRAFT_RECORD_KEY,
+  LOGIN_EMAIL_DRAFT_KEY,
+  LOGIN_SSO_RECOVERY_DRAFT_KEY,
+} from '@/lib/storage-keys';
 
 export type SsoRecoveryDraft = { email: string; ssoOrganizationId: string | undefined };
 
@@ -10,71 +15,180 @@ const ssoRecoveryDraftSchema = z.object({
   ssoOrganizationId: z.string().optional(),
 });
 
-let emailDraft = '';
-let ssoRecoveryDraft: SsoRecoveryDraft | null = null;
+/**
+ * The one durable record: the copy a reload reads, or the tombstone that keeps
+ * it from coming back. Retirement is a write, so it survives a restart and no
+ * delete can fail it away.
+ */
+const storedLoginDraftSchema = z.discriminatedUnion('state', [
+  z.object({
+    version: z.literal(2),
+    state: z.literal('held'),
+    email: z.string(),
+    ssoRecovery: ssoRecoveryDraftSchema.optional(),
+  }),
+  z.object({ version: z.literal(2), state: z.literal('retired') }),
+]);
 
-/** Track the typed login email so it can be persisted before an RTL reload. */
-export function setLoginEmailDraft(email: string): void {
-  emailDraft = email;
+/** The one durable record: the copy a reload reads, or the tombstone that keeps it from coming back. */
+type StoredLoginDraft = z.infer<typeof storedLoginDraftSchema>;
+
+/** One sign-in attempt: what the form holds, or the retirement the sign-in left behind. */
+type LoginDraftPhase =
+  | {
+      readonly kind: 'attempt';
+      readonly email: string;
+      readonly ssoRecovery: SsoRecoveryDraft | null;
+    }
+  | { readonly kind: 'retired' };
+
+let phase: LoginDraftPhase = { kind: 'attempt', email: '', ssoRecovery: null };
+
+/** The pre-upgrade drafts are deleted once per process and never read as values. */
+let legacyCleaned = false;
+
+/** Write the record on the one chain, so a persist can never land after a retirement. */
+function writeRecord(record: StoredLoginDraft): Promise<void> {
+  return chainSave(LOGIN_DRAFT_RECORD_KEY, async () => {
+    await SecureStore.setItemAsync(LOGIN_DRAFT_RECORD_KEY, JSON.stringify(record));
+  });
 }
 
-/** Track the SSO-recovery banner so it can be persisted before an RTL reload. */
-export function setSsoRecoveryDraft(recovery: SsoRecoveryDraft | null): void {
-  ssoRecoveryDraft = recovery;
+/** Start an attempt from what the person typed: explicit typing always reopens one. */
+export function beginLoginEmail(email: string): void {
+  phase = {
+    kind: 'attempt',
+    email,
+    ssoRecovery: phase.kind === 'attempt' ? phase.ssoRecovery : null,
+  };
 }
 
-/** Write the drafts to disk so they survive an RTL language reload. */
+/** Seed the address a restore handed the form. A passive write, so it never reopens a retired attempt. */
+export function holdLoginEmail(email: string): void {
+  if (phase.kind === 'retired') {
+    return;
+  }
+  phase = { kind: 'attempt', email, ssoRecovery: phase.ssoRecovery };
+}
+
+/**
+ * Hold the SSO-recovery banner. A banner the person arrived with is an invite
+ * they followed, so it reopens a retired attempt; clearing one is passive and
+ * never does.
+ */
+export function holdSsoRecovery(recovery: SsoRecoveryDraft | null): void {
+  if (recovery !== null) {
+    phase = {
+      kind: 'attempt',
+      email: phase.kind === 'attempt' ? phase.email : recovery.email,
+      ssoRecovery: recovery,
+    };
+    return;
+  }
+  if (phase.kind === 'retired') {
+    return;
+  }
+  if (phase.ssoRecovery === null) {
+    return;
+  }
+  phase = { kind: 'attempt', email: phase.email, ssoRecovery: null };
+}
+
+/** Write the drafts to disk so they survive an RTL language reload. A retired attempt writes nothing. */
 export async function persistLoginDrafts(): Promise<void> {
-  if (emailDraft.length > 0) {
-    await SecureStore.setItemAsync(LOGIN_EMAIL_DRAFT_KEY, emailDraft);
+  if (phase.kind === 'retired') {
+    return;
   }
-  if (ssoRecoveryDraft) {
-    await SecureStore.setItemAsync(LOGIN_SSO_RECOVERY_DRAFT_KEY, JSON.stringify(ssoRecoveryDraft));
+  await writeRecord({
+    version: 2,
+    state: 'held',
+    email: phase.email,
+    ...(phase.ssoRecovery === null ? {} : { ssoRecovery: phase.ssoRecovery }),
+  });
+}
+
+/** The record's held values, or null when it holds none this build can read. */
+async function readRecord(): Promise<{
+  email: string;
+  ssoRecovery: SsoRecoveryDraft | null;
+} | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(LOGIN_DRAFT_RECORD_KEY);
+    if (raw === null) {
+      return null;
+    }
+    const parsed = storedLoginDraftSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success || parsed.data.state !== 'held') {
+      return null;
+    }
+    const ssoRecovery = parsed.data.ssoRecovery;
+    return {
+      email: parsed.data.email,
+      ssoRecovery:
+        ssoRecovery === undefined
+          ? null
+          : { email: ssoRecovery.email, ssoOrganizationId: ssoRecovery.ssoOrganizationId },
+    };
+  } catch {
+    return null;
   }
 }
 
-/** Read the persisted drafts on login mount. A draft the form is holding in
- * memory wins over the stored copy: a remount inside the same app process, such
- * as the one a language change causes, must not drop what the person already
- * typed. The caller deletes the stored copies only after it applies the
- * restored values, because a cancelled mount must not lose them. */
+/**
+ * Delete what the previous build stored under two keys. It is never restored:
+ * the build cannot know whether it belongs to a live attempt, and a cold start
+ * has an empty field anyway.
+ */
+async function deleteLegacyDrafts(): Promise<void> {
+  if (legacyCleaned) {
+    return;
+  }
+  legacyCleaned = true;
+  await Promise.all([
+    SecureStore.deleteItemAsync(LOGIN_EMAIL_DRAFT_KEY).catch(() => undefined),
+    SecureStore.deleteItemAsync(LOGIN_SSO_RECOVERY_DRAFT_KEY).catch(() => undefined),
+  ]);
+}
+
+/**
+ * Read the drafts on login mount. A draft the form is holding in memory wins
+ * over the stored copy: a remount inside the same app process, such as the one
+ * a language change causes, must not drop what the person already typed. A
+ * retired attempt restores nothing, whatever the record says.
+ */
 export async function restoreLoginDrafts(): Promise<{
   email: string;
   ssoRecovery: SsoRecoveryDraft | null;
 }> {
-  const [email, ssoRaw] = await Promise.all([
-    SecureStore.getItemAsync(LOGIN_EMAIL_DRAFT_KEY),
-    SecureStore.getItemAsync(LOGIN_SSO_RECOVERY_DRAFT_KEY),
-  ]);
-
-  let ssoRecovery: SsoRecoveryDraft | null = null;
-  if (ssoRaw) {
-    try {
-      const parsed = ssoRecoveryDraftSchema.safeParse(JSON.parse(ssoRaw));
-      if (parsed.success) {
-        ssoRecovery = {
-          email: parsed.data.email,
-          ssoOrganizationId: parsed.data.ssoOrganizationId,
-        };
-      }
-    } catch {
-      // Corrupt draft: ignore it.
-    }
+  await deleteLegacyDrafts();
+  if (phase.kind === 'retired') {
+    return { email: '', ssoRecovery: null };
   }
-  const restoredEmail = emailDraft.length > 0 ? emailDraft : (email ?? '');
-  return { email: restoredEmail, ssoRecovery: ssoRecoveryDraft ?? ssoRecovery };
+  const held = await readRecord();
+  return {
+    email: phase.email.length > 0 ? phase.email : (held?.email ?? ''),
+    ssoRecovery: phase.ssoRecovery ?? held?.ssoRecovery ?? null,
+  };
 }
 
-/** Delete the persisted drafts after the caller applies the restored values. */
-export async function clearPersistedLoginDrafts(): Promise<void> {
-  await Promise.all([
-    SecureStore.deleteItemAsync(LOGIN_EMAIL_DRAFT_KEY),
-    SecureStore.deleteItemAsync(LOGIN_SSO_RECOVERY_DRAFT_KEY),
-  ]);
+/**
+ * Retire the attempt after a successful sign-in: memory first, then the
+ * tombstone. Its failure is reported by the store and memory stays retired, so
+ * this process still has no attempt to restore.
+ */
+export async function endLoginAttempt(): Promise<void> {
+  phase = { kind: 'retired' };
+  try {
+    await writeRecord({ version: 2, state: 'retired' });
+  } catch {
+    // The next sign-in writes the tombstone again.
+  }
 }
 
-/** Drop the drafts after a successful sign-in. */
-export function clearLoginDrafts(): void {
-  emailDraft = '';
-  ssoRecoveryDraft = null;
+// ── Test-only helpers ───────────────────────────────────────────────────────
+
+/** Test-only: a fresh process, with nothing typed and no retirement. */
+export function _resetLoginDraftForTests(): void {
+  phase = { kind: 'attempt', email: '', ssoRecovery: null };
+  legacyCleaned = false;
 }

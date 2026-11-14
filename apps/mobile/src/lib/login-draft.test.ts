@@ -1,56 +1,139 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { LOGIN_EMAIL_DRAFT_KEY, LOGIN_SSO_RECOVERY_DRAFT_KEY } from '@/lib/storage-keys';
+
+import type * as LoginDraftModule from './login-draft';
+
 import {
-  clearLoginDrafts,
+  _resetLoginDraftForTests,
+  beginLoginEmail,
+  endLoginAttempt,
+  holdLoginEmail,
+  holdSsoRecovery,
+  persistLoginDrafts,
   restoreLoginDrafts,
-  setLoginEmailDraft,
-  setSsoRecoveryDraft,
 } from './login-draft';
 
+/**
+ * The sign-in drafts, and the retirement a completed sign-in leaves behind.
+ *
+ * What is worth proving is that the previous attempt cannot come back: the
+ * person's address is a temporary convenience, so it must survive a language
+ * reload and must never survive a successful sign-in, whatever a keychain write
+ * does on the way.
+ */
+
 const stored = vi.hoisted(() => ({
-  email: null as string | null,
-  sso: null as string | null,
+  values: new Map<string, string>(),
+  failingWrites: 0,
 }));
 
 vi.mock('@/lib/auth/secure-store', () => ({
-  getItemAsync: vi.fn((key: string) =>
-    Promise.resolve(key.includes('sso') ? stored.sso : stored.email)
-  ),
-  setItemAsync: vi.fn(() => Promise.resolve()),
-  deleteItemAsync: vi.fn(() => Promise.resolve()),
+  getItemAsync: async (key: string) => {
+    await Promise.resolve();
+    return stored.values.get(key) ?? null;
+  },
+  setItemAsync: async (key: string, value: string) => {
+    await Promise.resolve();
+    if (stored.failingWrites > 0) {
+      stored.failingWrites -= 1;
+      throw new Error('keychain unavailable');
+    }
+    stored.values.set(key, value);
+  },
+  deleteItemAsync: async (key: string) => {
+    await Promise.resolve();
+    stored.values.delete(key);
+  },
 }));
 
-describe('login drafts across a remount', () => {
-  beforeEach(() => {
-    stored.email = null;
-    stored.sso = null;
-    clearLoginDrafts();
+/** A fresh app process: the module's memory is gone, the keychain is not. */
+async function reload(): Promise<typeof LoginDraftModule> {
+  vi.resetModules();
+  return await import('./login-draft');
+}
+
+beforeEach(() => {
+  stored.values.clear();
+  stored.failingWrites = 0;
+  _resetLoginDraftForTests();
+});
+
+describe('a sign-in attempt', () => {
+  it('retires the disk copy across a module reload, even after a failed write', async () => {
+    beginLoginEmail('a@b.c');
+    /* The first write fails — a locked or unhappy keychain — so the copy never
+       lands. The retirement is a write of its own, so it does not depend on it. */
+    stored.failingWrites = 1;
+    await expect(persistLoginDrafts()).rejects.toThrow('keychain unavailable');
+
+    await endLoginAttempt();
+
+    const reloaded = await reload();
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
   });
 
-  it('keeps the drafts the form is holding in memory', async () => {
-    setLoginEmailDraft('typed@example.com');
-    setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
-    stored.email = 'older@example.com';
+  it('does not reopen a retired attempt from a passive mount', async () => {
+    beginLoginEmail('a@b.c');
+    await persistLoginDrafts();
+    await endLoginAttempt();
 
-    await expect(restoreLoginDrafts()).resolves.toEqual({
-      email: 'typed@example.com',
-      ssoRecovery: { email: 'typed@example.com', ssoOrganizationId: 'org-1' },
-    });
-  });
-
-  it('falls back to the stored drafts when the form holds none', async () => {
-    stored.email = 'stored@example.com';
-    stored.sso = JSON.stringify({ email: 'stored@example.com', ssoOrganizationId: 'org-2' });
-
-    await expect(restoreLoginDrafts()).resolves.toEqual({
-      email: 'stored@example.com',
-      ssoRecovery: { email: 'stored@example.com', ssoOrganizationId: 'org-2' },
-    });
-  });
-
-  it('ignores a corrupt stored draft instead of failing the mount', async () => {
-    stored.sso = '{not json';
+    // The login screen seeds what it restored, and its banner effect clears a
+    // banner on every mount: neither is a person typing an address.
+    holdLoginEmail('restored@b.c');
+    holdSsoRecovery(null);
 
     await expect(restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+
+    const reloaded = await reload();
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+  });
+
+  it('keeps the typed address across a language reload', async () => {
+    beginLoginEmail('typed@b.c');
+    holdSsoRecovery({ email: 'typed@b.c', ssoOrganizationId: 'org-1' });
+    await persistLoginDrafts();
+
+    const reloaded = await reload();
+
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({
+      email: 'typed@b.c',
+      ssoRecovery: { email: 'typed@b.c', ssoOrganizationId: 'org-1' },
+    });
+  });
+
+  it('holds the address the form already typed over the stored one', async () => {
+    beginLoginEmail('typed@b.c');
+    await persistLoginDrafts();
+    const reloaded = await reload();
+    reloaded.beginLoginEmail('newer@b.c');
+
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({
+      email: 'newer@b.c',
+      ssoRecovery: null,
+    });
+  });
+
+  it('deletes a legacy key and never restores it', async () => {
+    stored.values.set(LOGIN_EMAIL_DRAFT_KEY, 'legacy@b.c');
+    stored.values.set(
+      LOGIN_SSO_RECOVERY_DRAFT_KEY,
+      JSON.stringify({ email: 'legacy@b.c', ssoOrganizationId: 'org-1' })
+    );
+
+    await expect(restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+    expect(stored.values.has(LOGIN_EMAIL_DRAFT_KEY)).toBe(false);
+    expect(stored.values.has(LOGIN_SSO_RECOVERY_DRAFT_KEY)).toBe(false);
+  });
+
+  it('holds a followed invite as the address of a new attempt', async () => {
+    await endLoginAttempt();
+
+    holdSsoRecovery({ email: 'invited@b.c', ssoOrganizationId: 'org-1' });
+
+    await expect(restoreLoginDrafts()).resolves.toEqual({
+      email: 'invited@b.c',
+      ssoRecovery: { email: 'invited@b.c', ssoOrganizationId: 'org-1' },
+    });
   });
 });

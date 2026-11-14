@@ -837,8 +837,8 @@ describe('sign-out teardown ordering', () => {
     // The mount loads auth-context from a fresh module registry, so the drafts
     // module the provider closes over is the one imported after it.
     const drafts = await import('@/lib/login-draft');
-    drafts.setLoginEmailDraft('typed@example.com');
-    drafts.setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
+    drafts.beginLoginEmail('typed@example.com');
+    drafts.holdSsoRecovery({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
 
     await act(async () => {
       await ctx.signIn('signed-in-token');
@@ -855,8 +855,8 @@ describe('sign-out teardown ordering', () => {
   it('keeps the sign-in form drafts when the credential write fails', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const drafts = await import('@/lib/login-draft');
-    drafts.setLoginEmailDraft('typed@example.com');
-    drafts.setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
+    drafts.beginLoginEmail('typed@example.com');
+    drafts.holdSsoRecovery({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
     hoisted.secureStore.setItemAsync.mockRejectedValueOnce(new Error('keychain unavailable'));
 
     await act(async () => {

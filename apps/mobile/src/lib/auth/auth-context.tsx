@@ -74,7 +74,7 @@ import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
-import { clearLoginDrafts } from '@/lib/login-draft';
+import { endLoginAttempt } from '@/lib/login-draft';
 import { takeAccountIndependentLaunchUrl } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
@@ -477,8 +477,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         clearSessionScopedState();
         // The sign-in form's drafts belong to the attempt that just succeeded,
         // whatever provider finished it; a later signed-out screen must not
-        // prefill the previous attempt's address or SSO banner.
-        clearLoginDrafts();
+        // prefill the previous attempt's address or SSO banner. The retirement
+        // is durable, so a failed cleanup cannot leave the copy behind.
+        await endLoginAttempt();
       });
     },
     []

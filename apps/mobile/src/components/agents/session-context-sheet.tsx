@@ -14,6 +14,7 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber, formatPercent } from '@/lib/format';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { resolveRunningOnLabel } from '@/lib/instance-target-label';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -620,7 +621,7 @@ function CopyRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="gap-1 active:opacity-70"
+      className={cn(ROW_TARGET_CLASS, 'justify-center gap-1 active:opacity-70')}
       testID={testID}
     >
       {/* The row keeps its call-to-action name in every state; the copy
@@ -671,7 +672,10 @@ function SessionChangesRow({
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className="min-h-[44px] flex-row items-center justify-between gap-3 active:opacity-70"
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 active:opacity-70'
+      )}
       testID="session-context-sheet-view-changes"
     >
       <Text className="text-base font-medium text-foreground">{label}</Text>

@@ -1921,6 +1921,9 @@ importers:
 
   packages/scim-contracts:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../app-shared
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2306,6 +2309,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

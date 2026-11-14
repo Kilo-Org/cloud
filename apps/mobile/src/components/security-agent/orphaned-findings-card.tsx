@@ -12,6 +12,7 @@ import {
   useOrphanedRepositories,
 } from '@/lib/hooks/use-security-orphaned-findings';
 import { i18n } from '@/i18n';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 /**
@@ -29,6 +30,7 @@ export function OrphanedFindingsCard({
   canManage,
 }: Readonly<{ scope: string; canManage: boolean }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const orphans = useOrphanedRepositories(scope);
   const removeFindings = useDeleteFindingsByRepository(scope);
   const { confirm, dialog } = useConfirmDialog();
@@ -42,7 +44,7 @@ export function OrphanedFindingsCard({
     <>
       <View className="mt-4 gap-2 rounded-lg bg-warn-tile-bg p-4">
         <View className="flex-row items-center gap-2">
-          <ShieldAlert size={16} className="text-foreground" />
+          <ShieldAlert size={16} color={colors.foreground} />
           <Text className="flex-1 text-sm font-medium">
             {t('securityAgent.orphanedFindings.title')}
           </Text>

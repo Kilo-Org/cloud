@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "فعال اجنټان تازه معلومات لري"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "دنده بشپړه شوه"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ناکام شو: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ودرېد: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

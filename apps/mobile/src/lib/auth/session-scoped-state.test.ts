@@ -97,6 +97,7 @@ const mocks = vi.hoisted(() => ({
   clearFilePartCache: vi.fn(),
   clearMarkdownImageConfirmMemory: vi.fn(),
   clearSessionAutoApprove: vi.fn(),
+  clearUserSessionTitles: vi.fn(),
   clearToolCardImageCache: vi.fn(),
   clearRemoteMcpServers: vi.fn(),
   clearSettingsToolsEnabled: vi.fn(),
@@ -129,6 +130,11 @@ vi.mock('@/components/agents/markdown-image-confirm', () => ({
 }));
 vi.mock('@/components/agents/session-auto-approve', () => ({
   clearSessionAutoApprove: mocks.clearSessionAutoApprove,
+}));
+// The per-session rename titles are account-scoped memory; the boundary's call is
+// observed through this spy, and the store's own suite pins what it clears.
+vi.mock('@/components/agents/session-detail-rename-state', () => ({
+  clearUserSessionTitles: mocks.clearUserSessionTitles,
 }));
 // Partial on purpose: the mirror's manifest reads `extensionForMime` from this
 // module, and `clearArtifactMirror` never calls it.
@@ -195,6 +201,7 @@ const SESSION_MEMBERS = [
   mocks.clearFilePartCache,
   mocks.clearClipboardImages,
   mocks.clearSessionAutoApprove,
+  mocks.clearUserSessionTitles,
   mocks.forgetRemoteMcp,
   mocks.clearRemoteMcpServers,
   mocks.clearChatBackends,

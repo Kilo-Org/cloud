@@ -14,19 +14,26 @@ import type {
   ReviewMemoryPlatform,
   ReviewMemoryProposalStatus,
 } from '@kilocode/db/schema-types';
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { reviewMemoryRetentionCutoff } from './retention';
 
 export type ReviewMemoryOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
 export type ReviewMemoryDatabase = typeof db;
 
-const ACTIVE_PROPOSAL_STATUSES = [
+/**
+ * Statuses that still occupy the proposal's scope. A proposal in one of these
+ * statuses holds its scope and can still be superseded.
+ */
+export const ACTIVE_PROPOSAL_STATUSES = [
   'open',
   'edited',
   'opening_change_request',
   'change_request_failed',
 ] as const;
-const EDITABLE_PROPOSAL_STATUSES = ['open', 'edited', 'change_request_failed'] as const;
+/**
+ * Statuses that can still be edited or approved into a change request.
+ */
+export const EDITABLE_PROPOSAL_STATUSES = ['open', 'edited', 'change_request_failed'] as const;
 const TERMINAL_PRUNABLE_PROPOSAL_STATUSES = [
   'rejected',
   'change_request_opened',
@@ -505,7 +512,7 @@ export async function markProposalSuperseded(input: {
 }): Promise<CodeReviewMemoryProposal | null> {
   return await markProposalStatus({
     proposalId: input.proposalId,
-    fromStatuses: ['open', 'edited', 'opening_change_request', 'change_request_failed'],
+    fromStatuses: [...ACTIVE_PROPOSAL_STATUSES],
     set: { status: 'superseded' },
     database: input.database,
   });

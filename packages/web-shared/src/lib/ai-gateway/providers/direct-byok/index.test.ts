@@ -8,6 +8,7 @@ import {
 } from './types';
 import type * as DirectByokTypes from './types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
@@ -190,7 +191,7 @@ describe('createAiSdkProvider resolved upstream', () => {
     const aiSdkProvider = await createAiSdkProvider(providerWith(upstream), 'stored', 'test-model');
     await generateText({ model: aiSdkProvider('test-model'), prompt: 'Say hi', maxRetries: 0 });
     const [url, init] = fetchMock.mock.calls[0];
-    return { url: String(url), headers: new Headers(init?.headers) };
+    return { url: requestUrlOf(url), headers: new Headers(init?.headers) };
   }
 
   test('uses the Chat Completions URL override and the x-api-key header', async () => {

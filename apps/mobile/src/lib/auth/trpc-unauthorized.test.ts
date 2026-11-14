@@ -45,12 +45,14 @@ describe('handleTrpcQueryError single-flight', () => {
   });
 
   it('does nothing when no handler is set', async () => {
-    // Clear any handler from a previous test.
-    setTrpcUnauthorizedHandler(() => undefined)();
-    // Must not throw.
+    const handler = vi.fn().mockResolvedValue(undefined);
+    // Register and immediately unset so no handler is attached for the call.
+    setTrpcUnauthorizedHandler(handler)();
+
     await expect(
       handleTrpcQueryError({ data: { authRequired: true, httpStatus: 401 } })
     ).resolves.toBeUndefined();
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it('does nothing for a non-auth-required error', async () => {

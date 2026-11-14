@@ -326,6 +326,15 @@ export async function getDirectByokModelsForUser(userId: string) {
 }
 
 /**
+ * The URL string of a fetch input: a string as it arrives, a `URL` by its `href`, and a `Request`
+ * by its `url`. Interpolating the input would turn a `Request` into `[object Request]`.
+ */
+function fetchInputUrlString(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
+/**
  * An AI SDK provider for calling `modelId` with a stored credential, such as for
  * key tests. It applies the resolved upstream's Chat Completions URL and auth;
  * the model is resolved by id alone, so it must be one the provider serves over
@@ -355,7 +364,7 @@ export async function createAiSdkProvider(
       ...(directByokProvider.id === 'opencode-go' && { 'x-opencode-session': randomUUID() }),
     },
     fetch: async (url, init) => {
-      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : String(url);
+      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : fetchInputUrlString(url);
       const headers = new Headers(init?.headers);
       headers.set('user-agent', COMPATIBLE_USER_AGENT);
       if (!awsBedrock || typeof init?.body !== 'string') {

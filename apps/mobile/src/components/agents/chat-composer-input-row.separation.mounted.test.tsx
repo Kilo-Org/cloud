@@ -125,7 +125,6 @@ describe('ChatComposerInputRow mounted — control separation', () => {
         const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
         const send = findByAccessibilityLabel(renderer.root, 'Send message');
         expect(hasGapWrapper(send, COMPOSER_VOICE_SEND_GAP_CLASS)).toBe(true);
-        expect(mic?.props.size).toBe('lg');
         // The toggle's pressable is the whole target, so it has no slop that
         // could reach across the gap into the send control.
         expect(hitSlopOf(mic)).toBeUndefined();

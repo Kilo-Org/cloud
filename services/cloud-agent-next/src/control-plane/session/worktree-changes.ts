@@ -2,6 +2,7 @@ import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
   RefreshWorktreeChangesOutput,
+  WorktreeChangesSnapshot,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { EventQueries } from '../../session/queries/index.js';
 import { ingestKiloSessionId } from '../../sandbox-session/control-plane-ingest.js';
@@ -21,10 +22,20 @@ import type { SandboxControlV2 } from '../sandbox/sandbox-do.js';
 import type { SharedWorktreeChangesInput } from '../sandbox/worktree-changes.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import type { WorktreeRecovery } from '../../shared/worktree-changes-wire.js';
+import type { HostedWorkspaceChangeState } from '../../shared/hosted-workspace-changes.js';
+
+export type WorktreeChangeStates = {
+  snapshot: WorktreeChangesSnapshot | null;
+  states: HostedWorkspaceChangeState[];
+};
 
 export type SharedWorktreeChangesPeer = Pick<
   SandboxControlV2,
-  'getWorktreeChanges' | 'getWorktreeFile' | 'refreshWorktreeChanges' | 'getWorktreeRecovery'
+  | 'getWorktreeChanges'
+  | 'getWorktreeFile'
+  | 'getWorktreeChangeStates'
+  | 'refreshWorktreeChanges'
+  | 'getWorktreeRecovery'
 >;
 
 export type ControlPlaneWorktreeChangesDeps = {
@@ -167,6 +178,12 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
       if (current?.worktreeId)
         return shared(current, (peer, input) => peer.getWorktreeFile(input, query));
       return manager.getFile(query);
+    },
+    changeStates(): Promise<WorktreeChangeStates> {
+      const current = context();
+      if (current?.worktreeId)
+        return shared(current, (peer, input) => peer.getWorktreeChangeStates(input));
+      return Promise.resolve(manager.savedStates());
     },
     async refresh(): Promise<RefreshWorktreeChangesOutput> {
       const result = await manager.refresh();

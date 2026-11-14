@@ -24,6 +24,9 @@ import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
   fetchGitHubRepositories,
+  GitHubRateLimitError,
+  isGitHubRateLimitError,
+  toGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -140,15 +143,17 @@ export async function checkUserPendingInstallation(userId: string) {
  * This includes:
  * - 404 Not Found: Installation was deleted
  * - 401 Unauthorized: App credentials revoked
- * - 403 Forbidden: App was suspended or access revoked
+ * - 403 Forbidden: App was suspended or access revoked, unless GitHub answered
+ *   with a rate limit instead. 403 carries both meanings, and a limited request
+ *   proves nothing about the installation, so it is not "gone".
  */
 export function isInstallationGoneError(error: unknown): boolean {
-  // Octokit errors have a status property
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status: number }).status;
-    return status === 404 || status === 401 || status === 403;
-  }
-  return false;
+  // Octokit errors carry the HTTP status.
+  if (!error || typeof error !== 'object' || !('status' in error)) return false;
+  const status = error.status;
+  if (typeof status !== 'number') return false;
+  if (status === 403) return !isGitHubRateLimitError(error);
+  return status === 404 || status === 401;
 }
 
 /**
@@ -189,6 +194,12 @@ export async function uninstallApp(
         try {
           await deleteGitHubInstallation(installationId, appType);
         } catch (error) {
+          // A rate-limited delete proves nothing about the installation, so
+          // surface the typed limit and let the transaction roll back instead
+          // of removing the local association for an installation that is
+          // still installed upstream.
+          const rateLimitError = toGitHubRateLimitError(error);
+          if (rateLimitError) throw rateLimitError;
           if (!isInstallationGoneError(error)) throw error;
         }
       },
@@ -198,6 +209,14 @@ export async function uninstallApp(
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'Disconnect this Kilo connection instead of uninstalling the shared GitHub App',
+      });
+    }
+    if (error instanceof GitHubRateLimitError) {
+      const minutes = Math.max(1, Math.round((error.resetAt.getTime() - Date.now()) / 60_000));
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: `GitHub rate limit reached. Try again in about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+        cause: error,
       });
     }
     errorExceptInTest('Failed to delete GitHub installation', { error });

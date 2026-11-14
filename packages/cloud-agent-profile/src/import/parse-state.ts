@@ -82,6 +82,7 @@ function contractIssueCode(category: ImportCategory, field: string | null): Impo
       if (field === 'name') return 'skill-name-invalid';
       if (field === 'rawMarkdown') return 'skill-markdown-invalid';
       if (field === 'files') return 'skill-files-invalid';
+      if (field === 'description') return 'skill-description-invalid';
       return 'skill-name-invalid';
     case 'instructions':
       return 'instruction-invalid';

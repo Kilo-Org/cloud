@@ -6,6 +6,7 @@ import {
   type CloudAgentWorktreeId,
 } from './cloud-agent-session-scope';
 import { storedSessionIdSchema } from './kilo-session-id';
+import { needsPartTextRepair } from './part-text';
 
 export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
@@ -227,7 +228,8 @@ export const createSessionForCloudAgentSchema = z.object({
     .string()
     .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
     .optional(),
-  organizationId: z.string().optional(),
+  /** Must be an organization the acting user is a live member of. */
+  organizationId: z.uuid().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
@@ -255,6 +257,7 @@ export type CreateSessionForCloudAgentParams = z.input<typeof createSessionForCl
  */
 export type SessionCloneRejectionCode =
   | 'source_access_denied'
+  | 'organization_access_denied'
   | 'organization_mismatch'
   | 'malformed_source_data'
   | 'missing_source_body'
@@ -1102,24 +1105,19 @@ type NormalizedPersistedStoredMessage = {
 };
 
 /**
- * The generated `Part` types declare `text: string` on text and reasoning
- * parts, but persisted storage can hold a part without the field (Sentry
- * KILO-APP-99). A single such part fails the strict `kiloSdkPartSchema`, so
- * the WHOLE history page degrades to `invalid_data` and the agent chat
- * transcript never renders. Mirror the SDK's `normalizeMissingPartText`
- * (packages/cloud-agent-sdk/src/part-utils.ts — this package cannot import
- * the SDK, it depends back on us): fill absent or non-string text with `''`
- * so the part renders nothing downstream instead of poisoning the page.
- * Returns `null` when the part needs no fix (not a text/reasoning part, or it
- * already carries string text); otherwise a copy with `text: ''`.
+ * Fill absent or non-string text on a persisted text or reasoning part so the
+ * part renders nothing downstream instead of poisoning the page: a single such
+ * part fails the strict `kiloSdkPartSchema`, so the WHOLE history page degrades
+ * to `invalid_data` and the agent chat transcript never renders.
+ *
+ * Returns `null` when the part needs no fix; otherwise a copy with `text: ''`.
+ * The rule itself is declared once in `needsPartTextRepair` (`./part-text`),
+ * shared with the SDK's wire normalizer.
  */
 function normalizePersistedMissingPartText(
   part: Record<string, unknown>
 ): Record<string, unknown> | null {
-  const type = part['type'];
-  if (type !== 'text' && type !== 'reasoning') return null;
-  if (typeof part['text'] === 'string') return null;
-  return { ...part, text: '' };
+  return needsPartTextRepair(part) ? { ...part, text: '' } : null;
 }
 
 function normalizePersistedKiloSdkParts(value: unknown): {
@@ -1392,6 +1390,41 @@ export type AuthorizedSessionMessages = {
   history: KiloSdkMessageHistory | null;
 };
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
+
+/**
+ * tRPC wire input for `cliSessionsV2.getSessionMessagesPage`, the paginated
+ * access-checked history call the mobile client and the web app both make
+ * against the web router (which forwards the page read to this contract's
+ * worker RPC). Sharing the schema keeps tRPC-level validation identical to
+ * the worker's own bounded reader.
+ *
+ * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and defaults
+ * to `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE` when omitted, so the request is
+ * always bounded before it reaches the session store. `cursor` is the opaque
+ * continuation cursor validated by `validateKiloSdkMessagesCursor`; a caller
+ * receives one from a previous page and passes it back to walk older history.
+ */
+export const getSessionMessagesPageInputSchema = z
+  .object({
+    session_id: z.string().min(1),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
+    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+  })
+  .superRefine((params, ctx) => {
+    if (params.cursor === undefined) return;
+    if (!validateKiloSdkMessagesCursor(params.cursor)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cursor'],
+        message: 'cursor is not a valid message cursor',
+      });
+    }
+  });
 
 export type SessionIngestRpcMethods = {
   publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;

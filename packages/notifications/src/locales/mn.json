@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Идэвхтэй агентуудад шинэчлэлт бий"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Даалгавар дууссан"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Амжилтгүй: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Тасарсан: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

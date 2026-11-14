@@ -19,8 +19,10 @@ import { assignableMemberRoles } from './organization-role-options';
 
 type MemberRowProps = {
   member: ActiveOrgMember;
-  /** Caller may act on this row: management role, not their own, owner rows owner-only. */
+  /** Caller may change this member's role or remove them: management role, not their own, owner rows owner-only. */
   canManage: boolean;
+  /** Caller may set this member's daily usage limit. */
+  canManageLimit: boolean;
   /** Caller's own organization role; it decides which roles the menu offers. */
   callerRole: OrgRole | undefined;
   enableUsageLimits: boolean;
@@ -45,6 +47,7 @@ export function roleLabel(role: OrgRole): string {
 export function MemberRow({
   member,
   canManage,
+  canManageLimit,
   callerRole,
   enableUsageLimits,
   isSalesDemo,
@@ -91,10 +94,15 @@ export function MemberRow({
     selected: role === member.role,
   }));
 
+  // Each action carries its own gate: a limit-only caller (an admin facing an
+  // owner row) still gets a menu, while role change and removal stay
+  // owner-only there.
   const actionOptions: MenuSheetOption[] = [
-    { label: t('organization.members.changeRole') },
-    ...(enableUsageLimits ? [{ label: t('organization.members.setDailyUsageLimit') }] : []),
-    { label: t('organization.members.removeMember'), destructive: true },
+    ...(canManage ? [{ label: t('organization.members.changeRole') }] : []),
+    ...(canManageLimit && enableUsageLimits
+      ? [{ label: t('organization.members.setDailyUsageLimit') }]
+      : []),
+    ...(canManage ? [{ label: t('organization.members.removeMember'), destructive: true }] : []),
   ];
 
   function onSelectRole(role: OrgRole) {
@@ -200,7 +208,9 @@ export function MemberRow({
     </View>
   );
 
-  if (!canManage) {
+  // No action at all, so the row is not pressable: a limit-only row still
+  // opens the menu.
+  if (actionOptions.length === 0) {
     return (
       <View className="px-3">
         {inner}

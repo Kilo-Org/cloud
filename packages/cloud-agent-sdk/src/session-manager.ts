@@ -1,4 +1,5 @@
 import type { ToolDisplayMode } from './tool-detail-marker';
+import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import {
   errorShapeSchema,
@@ -31,6 +32,7 @@ import {
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
+  REMOTE_SESSION_ORGANIZATION_MISMATCH,
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
@@ -563,6 +565,7 @@ type SessionManagerAtoms = {
   activePermission: W<StandalonePermission | null>;
   /** Every pending question, oldest first. `activeQuestion` is the head. */
   pendingQuestions: W<readonly StandaloneQuestion[]>;
+  backgroundActivity: W<BackgroundActivityState>;
   /** Every pending permission, oldest first. `activePermission` is the head. */
   pendingPermissions: W<readonly StandalonePermission[]>;
   /**
@@ -733,6 +736,7 @@ type SessionManager = {
   setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
   retryRemoteModels(): void;
   retryRemoteCommands(): void;
+  retryBackgroundActivity(): void;
   createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId>;
   exitRemoteSession(): Promise<void>;
   interrupt(): Promise<void>;
@@ -1206,6 +1210,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const permissionAtom = atom<PermissionState | null>(null);
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const pendingQuestionsAtom = atom<readonly StandaloneQuestion[]>([]);
+  const backgroundActivityAtom = atom<BackgroundActivityState>({ status: 'inactive' });
   const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
   const unreadablePermissionsAtom = atom<readonly UnreadablePermissionState[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
@@ -1745,6 +1750,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
     store.set(pendingQuestionsAtom, []);
+    store.set(backgroundActivityAtom, { status: 'inactive' });
     store.set(pendingPermissionsAtom, []);
     store.set(unreadablePermissionsAtom, []);
     store.set(suggestionAtom, null);
@@ -3577,6 +3583,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       },
       onEvent: event => {
+        if (event.type === 'background.activity') {
+          store.set(backgroundActivityAtom, event.state);
+          return;
+        }
         if (
           event.type === 'cloud.message.queued' ||
           event.type === 'cloud.message.sent' ||
@@ -4456,18 +4466,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.retryRemoteCommands();
   }
 
+  /**
+   * Create a session beside the active one. The organization and the other
+   * inheritance fields come from the active session's own row; a caller may
+   * repeat that organization but not change it.
+   */
   async function createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId> {
     if (!currentSession || activeSessionType !== 'remote') {
       throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
     }
-    // Inheritance from the active session (Decision 6). Explicit caller fields
-    // win when provided (e.g. tests); otherwise store-derived values apply. Only
-    // the active session's own row supplies an organization, and a caller that
-    // names its own organization needs no row.
     const fetched = store.get(fetchedSessionDataAtom);
-    const scopeSupplied = input?.orgId !== undefined;
-    if (!scopeSupplied && fetched?.kiloSessionId !== activeSessionId) {
+    if (fetched?.kiloSessionId !== activeSessionId) {
       throw new Error(REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED);
+    }
+    if (input?.orgId !== undefined && input.orgId !== fetched?.organizationId) {
+      throw new Error(REMOTE_SESSION_ORGANIZATION_MISMATCH);
     }
     const selection = store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
     const inherited = computeCreateRemoteSessionInheritance({
@@ -4580,6 +4593,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     setCloudAgentModelOverride,
     retryRemoteModels,
     retryRemoteCommands,
+    retryBackgroundActivity: () => currentSession?.retryBackgroundActivity?.(),
     createRemoteSession,
     exitRemoteSession,
     interrupt,
@@ -4633,6 +4647,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       permission: permissionAtom,
       activePermission: activePermissionAtom,
       pendingQuestions: pendingQuestionsAtom,
+      backgroundActivity: backgroundActivityAtom,
       pendingPermissions: pendingPermissionsAtom,
       unreadablePermissions: unreadablePermissionsAtom,
       suggestion: suggestionAtom,

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
 import { Text } from '@/components/ui/text';
+import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -53,15 +54,14 @@ function FolderSelector({
       accessibilityRole="button"
       accessibilityLabel={t('agentChat.folderPicker.accessibility', { label })}
       accessibilityState={{ disabled }}
-      className={cn(
-        'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',
-        disabled && 'opacity-50'
-      )}
+      className={cn(FIELD_TRIGGER_FRAME_CLASS, disabled && 'opacity-50')}
     >
-      <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-        {label}
-      </Text>
-      <ChevronDown size={14} color={colors.mutedForeground} />
+      <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+        <Text className="min-w-0 flex-1 text-base text-foreground" numberOfLines={1}>
+          {label}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
     </Pressable>
   );
 }

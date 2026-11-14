@@ -91,6 +91,8 @@ import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js
 import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
+import { containersBillingIdentity } from './container-usage-context.js';
+import { CLOUDFLARE_CONTAINERS_INSTANCES } from '@kilocode/worker-utils/sandbox-allocation';
 import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
 import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
@@ -324,6 +326,23 @@ app.get('/internal/code-review/billing/:type/:id', async (c: Context<HonoContext
     subject: subject.data,
   });
   return c.json({ enabled: mode === 'paid' }, 200, { 'Cache-Control': 'no-store' });
+});
+
+app.get('/internal/containers/billing/:type/:id/:instance', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+  const subject = billingSubjectSchema.safeParse({
+    type: c.req.param('type'),
+    id: c.req.param('id'),
+  });
+  if (!subject.success) return c.text('Invalid billing owner', 400);
+  const instance = z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).safeParse(c.req.param('instance'));
+  if (!instance.success) return c.text('Invalid instance size', 400);
+  const billingMode = await c.env.CONTAINER_USAGE_METER.getBillingMode({
+    service: containersBillingIdentity(instance.data).service,
+    subject: subject.data,
+  });
+  return c.json({ billingMode }, 200, { 'Cache-Control': 'no-store' });
 });
 
 app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoContext>) => {

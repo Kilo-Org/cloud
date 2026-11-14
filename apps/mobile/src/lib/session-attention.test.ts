@@ -726,40 +726,33 @@ describe('revision snapshot and listener notification', () => {
   it('bumps revision on mutating reconciles and stays stable on no-ops', () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribe(listener);
-
-    const initial = getRevisionSnapshot();
-    let mutations = 0;
+    const start = getRevisionSnapshot();
 
     // ack → mutation
     ackSessionAttention('s1', 'question', 'R1');
-    if (getRevisionSnapshot() !== initial) {
-      mutations += 1;
-    }
+    expect(getRevisionSnapshot()).toBe(start + 1);
+    expect(listener).toHaveBeenCalledTimes(1);
 
     // the same raise observed → no-op
     reconcileSessionAttention('s1', 'question', 'R1');
-    if (getRevisionSnapshot() !== initial + mutations) {
-      mutations += 1;
-    }
+    expect(getRevisionSnapshot()).toBe(start + 1);
+    expect(listener).toHaveBeenCalledTimes(1);
 
-    const afterMutations = getRevisionSnapshot();
-
-    // no-op reconciles: no entry → no change; resolved entry + same raise → no change
+    // no entry → no-op; same raise again → no-op
     reconcileSessionAttention('s2', 'busy', null);
     reconcileSessionAttention('s1', 'question', 'R1');
-
-    expect(getRevisionSnapshot()).toBe(afterMutations);
-    expect(listener).toHaveBeenCalledTimes(mutations);
+    expect(getRevisionSnapshot()).toBe(start + 1);
+    expect(listener).toHaveBeenCalledTimes(1);
 
     // re-raise → mutation
     reconcileSessionAttention('s1', 'question', 'R2');
-    expect(getRevisionSnapshot()).toBe(afterMutations + 1);
-    expect(listener).toHaveBeenCalledTimes(mutations + 1);
+    expect(getRevisionSnapshot()).toBe(start + 2);
+    expect(listener).toHaveBeenCalledTimes(2);
 
     // delete → mutation
     reconcileSessionAttention('s1', 'busy', null);
-    expect(getRevisionSnapshot()).toBe(afterMutations + 2);
-    expect(listener).toHaveBeenCalledTimes(mutations + 2);
+    expect(getRevisionSnapshot()).toBe(start + 3);
+    expect(listener).toHaveBeenCalledTimes(3);
 
     unsubscribe();
   });

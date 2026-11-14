@@ -76,12 +76,14 @@ export function pressPressable(root: ReactTestInstance, label: string): void {
   });
 }
 
+/** Press the empty state's action, the button the manage slot renders for a manager. */
 export function pressEmptyAction(renderer: ReactTestRenderer): void {
-  const action = findOne(renderer.root, 'EmptyState').props.action as {
-    props: { onPress: () => void };
-  };
+  const button = findAll(findOne(renderer.root, 'EmptyState'), 'Button')[0];
+  if (!button) {
+    throw new Error('the empty state has no action button');
+  }
   act(() => {
-    action.props.onPress();
+    (button.props as { onPress: () => void }).onPress();
   });
 }
 

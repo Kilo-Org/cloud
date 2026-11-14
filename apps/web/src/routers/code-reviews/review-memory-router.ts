@@ -29,7 +29,7 @@ import {
 } from '@/lib/code-reviews/review-memory/change-request';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { REVIEW_MEMORY_PROPOSAL_STATUSES } from '@kilocode/db/schema-types';
@@ -37,6 +37,11 @@ import { REVIEW_MEMORY_PROPOSAL_STATUSES } from '@kilocode/db/schema-types';
 const OwnerInputSchema = z.object({ organizationId: z.uuid().optional() });
 const PlatformOwnerInputSchema = OwnerInputSchema.extend({ platform: z.enum(['github']) });
 const ProposalStatusSchema = z.enum(REVIEW_MEMORY_PROPOSAL_STATUSES);
+const ProposalListInputSchema = PlatformOwnerInputSchema.extend({
+  repoFullName: z.string().min(1).optional(),
+  statuses: z.array(ProposalStatusSchema).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+});
 
 async function ownerFromInput(
   ctx: TRPCContext,
@@ -73,36 +78,21 @@ export const reviewMemoryRouter = createTRPCRouter({
       return { enabled, repositories, openProposalCount };
     }),
 
-  listProposals: baseProcedure
-    .input(
-      PlatformOwnerInputSchema.extend({
-        repoFullName: z.string().min(1).optional(),
-        statuses: z.array(ProposalStatusSchema).optional(),
-        limit: z.number().int().min(1).max(100).optional(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input);
-      return await listProposals({
-        owner,
-        platform: input.platform,
-        repoFullName: input.repoFullName,
-        statuses: input.statuses,
-        limit: input.limit,
-      });
-    }),
+  listProposals: baseProcedure.input(ProposalListInputSchema).query(async ({ ctx, input }) => {
+    const owner = await ownerFromInput(ctx, input);
+    return await listProposals({
+      owner,
+      platform: input.platform,
+      repoFullName: input.repoFullName,
+      statuses: input.statuses,
+      limit: input.limit,
+    });
+  }),
 
   // Compatibility: `listProposals` above keeps the deployed array shape for
   // the web panel and stale client bundles. The paginated shape is additive.
   listProposalsPage: baseProcedure
-    .input(
-      PlatformOwnerInputSchema.extend({
-        repoFullName: z.string().min(1).optional(),
-        statuses: z.array(ProposalStatusSchema).optional(),
-        limit: z.number().int().min(1).max(100).optional(),
-        cursor: z.string().optional(),
-      })
-    )
+    .input(ProposalListInputSchema.extend({ cursor: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const owner = await ownerFromInput(ctx, input);
       return await listProposalsPage({

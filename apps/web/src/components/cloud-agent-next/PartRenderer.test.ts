@@ -176,7 +176,7 @@ describe('native tool files through the existing FilePartRenderer', () => {
         time: { created: 1, updated: 2 },
       },
       snapshot: { position: 2, revision: 2 },
-      pending: { permissions: [], questions: [] },
+      pending: { permissions: [], questions: [], unreadablePermissions: [] },
       events: [],
       commands: {},
       assetURLs: {

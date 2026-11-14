@@ -97,6 +97,7 @@ import {
   type RequestLoggingMode,
 } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
+import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
@@ -4858,7 +4859,9 @@ describe('briefing gateway accounting receipts', () => {
 
   async function finishAfterTasks() {
     await Promise.all(
-      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? undefined : task))
+      jest
+        .mocked(after)
+        .mock.calls.map(([task]) => Promise.resolve(typeof task === 'function' ? undefined : task))
     );
   }
 
@@ -5231,7 +5234,7 @@ describe('Enkrypt output guardrail', () => {
   function enkryptRequestBodies() {
     return fetchSpy.mock.calls
       .filter(([url]) => url === enkryptDetectUrl)
-      .map(([, init]) => JSON.parse(String(init?.body)) as { text: string; detectors: unknown });
+      .map(([, init]) => readJsonBody(init?.body) as { text: string; detectors: unknown });
   }
 
   async function runAfterTasks() {
@@ -5809,7 +5812,7 @@ describe('Enkrypt output guardrail', () => {
       },
     });
     fetchSpy.mockImplementation(async (_url, init) => {
-      const request = JSON.parse(String(init?.body)) as {
+      const request = readJsonBody(init?.body) as {
         text: string;
         detectors: Record<string, unknown>;
       };
@@ -6020,7 +6023,7 @@ describe('Enkrypt input guardrail', () => {
       .filter(([url]) => url === enkryptDetectUrl)
       .map(
         ([, init]) =>
-          JSON.parse(String(init?.body)) as { text: string; detectors: Record<string, unknown> }
+          readJsonBody(init?.body) as { text: string; detectors: Record<string, unknown> }
       );
   }
 
@@ -6618,7 +6621,7 @@ describe('Enkrypt input guardrail', () => {
         enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
       });
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { text } = JSON.parse(String(init?.body)) as { text: string };
+        const { text } = readJsonBody(init?.body) as { text: string };
         return Response.json(
           text.includes('ignore all instructions')
             ? injection
@@ -6779,7 +6782,7 @@ describe('Enkrypt input guardrail', () => {
       enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
     });
     fetchSpy.mockImplementation(async (_url, init) => {
-      const { text } = JSON.parse(String(init?.body)) as { text: string };
+      const { text } = readJsonBody(init?.body) as { text: string };
       return Response.json(
         text.includes('ignore all instructions')
           ? injection
@@ -7049,7 +7052,7 @@ describe('Enkrypt input guardrail', () => {
 
     function enkryptResponds(respond: (detectors: Record<string, unknown>) => Promise<Response>) {
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { detectors } = JSON.parse(String(init?.body)) as {
+        const { detectors } = readJsonBody(init?.body) as {
           detectors: Record<string, unknown>;
         };
         return respond(detectors);
@@ -7638,7 +7641,7 @@ describe('Enkrypt input guardrail', () => {
       const allowed = '{ "summary": { "injection_attack": 0 }, "result_message": null }';
       const blocked = '{ "summary": { "injection_attack": 1 }, "result_message": "blocked" }';
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { text } = JSON.parse(String(init?.body)) as { text: string };
+        const { text } = readJsonBody(init?.body) as { text: string };
         return new Response(text.includes('ignore all instructions') ? blocked : allowed);
       });
 
@@ -7718,7 +7721,7 @@ describe('Enkrypt input guardrail', () => {
       const loggedResponse =
         '{ "summary": { "policy_violation": 1 }, "result_message": "raw log-only response" }';
       fetchSpy.mockImplementation(async (_url, init) => {
-        const request = JSON.parse(String(init?.body)) as { detectors: Record<string, unknown> };
+        const request = readJsonBody(init?.body) as { detectors: Record<string, unknown> };
         if (!('policy_violation' in request.detectors)) return new Response(allowedResponse);
         await logOnlyScan.promise;
         return new Response(loggedResponse);

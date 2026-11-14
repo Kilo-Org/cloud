@@ -1,4 +1,5 @@
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { signInMethodRefusalForCode } from '@kilocode/app-shared/auth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +23,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** The web page that starts a link: the round trip needs the browser's session. */
 const CONNECTED_ACCOUNTS_URL = `${WEB_BASE_URL}/connected-accounts`;
@@ -72,10 +74,12 @@ function ProviderRow({
 /**
  * The sign-in methods of the account, and the way to add another.
  *
- * Unlinking asks first and the server owns the rule that at least one method
- * stays: its refusal is rendered in place, beside the list, rather than as a
- * toast, because it is the answer to the tap the reader just made and the list
- * they can act on is still above it. That inline status is the screen's single
+ * Unlinking asks first and the server owns the rules that at least one method
+ * stays and that the row it names still exists: a refusal is rendered in place,
+ * beside the list, rather than as a toast, because it is the answer to the tap
+ * the reader just made and the list they can act on is still above it. A known
+ * refusal code becomes catalog copy, and only an unknown failure shows the
+ * server's sentence as written. That inline status is the screen's single
  * announcement owner, so no toast repeats it.
  *
  * Adding a method is the web's round trip (the OAuth callback needs the browser
@@ -100,9 +104,22 @@ export function LoginMethodsScreen() {
           t('profile.signInMethods.unlinked', { provider: providerLabel(input.provider) })
         );
       },
-      // The server's message is the account of why it refused (the last method),
-      // so it is shown as written.
-      onError: error => {
+      // A known refusal code becomes catalog copy. Only a failure the screen
+      // does not recognise shows the server's sentence as written.
+      onError: (error, input) => {
+        const refusal = signInMethodRefusalForCode(readTrpcErrorField(error, 'upstreamCode'));
+        if (refusal === 'lastMethod') {
+          setUnlinkError(t('profile.signInMethods.lastMethod'));
+          return;
+        }
+        if (refusal === 'notLinked') {
+          setUnlinkError(
+            t('profile.signInMethods.notLinked', { provider: providerLabel(input.provider) })
+          );
+          // The list still draws the row the server reports as gone.
+          void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
+          return;
+        }
         setUnlinkError(error.message);
       },
     })

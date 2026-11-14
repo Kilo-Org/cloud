@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Οι ενεργοί πράκτορες έχουν μια ενημέρωση"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Η εργασία ολοκληρώθηκε"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Απέτυχε: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Διακόπηκε: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

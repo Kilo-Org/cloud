@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Kazi imekamilika"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Imeshindwa: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Imekatizwa: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

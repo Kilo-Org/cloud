@@ -153,8 +153,8 @@ export function settle<T>(
   promise: Promise<T>
 ): Promise<{ ok: true; value: T } | { ok: false; error: unknown }> {
   return promise.then(
-    value => ({ ok: true as const, value }),
-    error => ({ ok: false as const, error })
+    (value: T) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error })
   );
 }
 

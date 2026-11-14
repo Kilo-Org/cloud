@@ -489,7 +489,9 @@ function CreditsPageContent() {
                     return (
                       <tr key={entry.id} className="even:bg-muted">
                         <TableCell>{formatIsoDateString_UsaDateOnlyFormat(entry.date)}</TableCell>
-                        <TableCell>{entry.description}</TableCell>
+                        <TableCell>
+                          {entry.kind === 'auto_top_up' ? 'Automatic top-up' : 'Credit purchase'}
+                        </TableCell>
                         <TableCell numeric>{formatMicrodollars(entry.amount_mUsd)}</TableCell>
                         <TableCell>
                           {entry.expiryDate

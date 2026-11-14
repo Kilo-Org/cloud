@@ -6,7 +6,7 @@
 // sentences, matched whole; anything unrecognized falls back to the localized
 // generic line, and a raw server sentence never reaches a screen.
 
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';

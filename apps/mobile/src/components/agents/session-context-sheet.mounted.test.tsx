@@ -8,6 +8,7 @@ import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type SessionComputeCharges } from '@/lib/session-compute-total';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -652,6 +653,38 @@ describe('SessionContextSheet copy link row', () => {
     const values = textValues(renderer);
     expect(values).toContain(i18n.t('agentChat.chatLink.linkCopied'));
     expect(values).not.toContain(i18n.t('agents.sessionRow.idCopied'));
+    await unmount(renderer);
+  });
+});
+
+describe('SessionContextSheet copy row touch targets', () => {
+  it.each(['session-context-sheet-copy-id', 'session-context-sheet-copy-link'])(
+    'renders the %s row on the shared full target',
+    async testID => {
+      // Two stacked lines of small type measured 32 dp together, so each copy
+      // row has to carry the shared target on its own pressable node.
+      const renderer = await mountSheet();
+      const target = findByType(renderer.root, 'Pressable').find(
+        node => node.props.testID === testID
+      );
+      expect(target?.props.accessibilityRole).toBe('button');
+      expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+      await unmount(renderer);
+    }
+  );
+});
+
+describe('SessionContextSheet view changes row touch target', () => {
+  it('renders the view changes row on the shared full target', async () => {
+    // It kept a 44 dp frame between two 48 dp copy rows, so one action list
+    // used two row heights — visible the moment a row gets a pressed fill.
+    const renderer = await mountSheet();
+    const target = findByType(renderer.root, 'Pressable').find(
+      node => node.props.testID === 'session-context-sheet-view-changes'
+    );
+    expect(target?.props.accessibilityRole).toBe('button');
+    expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+    expect(target?.props.className).not.toContain('min-h-[44px]');
     await unmount(renderer);
   });
 });

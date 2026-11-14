@@ -11,7 +11,7 @@ import type * as ReactQuery from '@tanstack/react-query';
 type ConfirmOptions = { title: string; onConfirm: () => void };
 type MutationOptions = {
   onSuccess?: (result: unknown, input: { provider: string }) => void;
-  onError?: (error: Error) => void;
+  onError?: (error: Error, input: { provider: string }) => void;
 };
 
 const state = vi.hoisted(() => ({
@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
   openExternalUrl: vi.fn(),
+  invalidateQueries: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -41,7 +42,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
       state.mutations.push(options);
       return { mutate: state.mutate, isPending: false };
     },
-    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+    useQueryClient: () => ({ invalidateQueries: state.invalidateQueries }),
   };
 });
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
@@ -57,7 +58,10 @@ vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     user: {
-      getAuthProviders: { queryOptions: () => ({}), queryKey: () => [] },
+      getAuthProviders: {
+        queryOptions: () => ({}),
+        queryKey: () => ['user', 'getAuthProviders'],
+      },
       unlinkAuthProvider: { mutationOptions: (options: MutationOptions) => options },
     },
   }),
@@ -106,6 +110,7 @@ beforeEach(() => {
   state.mutate.mockClear();
   state.confirm.mockClear();
   state.openExternalUrl.mockClear();
+  state.invalidateQueries.mockClear();
 });
 
 afterEach(() => {
@@ -142,18 +147,59 @@ describe('LoginMethodsScreen', () => {
     expect(state.mutate).toHaveBeenCalledWith({ provider: 'github' });
   });
 
-  it('reports the server rule for the last method beside the list', async () => {
+  it('reports the last-method rule beside the list in the screen language', async () => {
     state.providers = [{ provider: 'github', email: 'ada@example.test' }];
     const root = await mount();
 
     act(() => {
-      state.mutations[0]?.onError?.(new Error('You must keep at least one sign-in method'));
+      state.mutations[0]?.onError?.(
+        Object.assign(new Error('Cannot unlink the last authentication method'), {
+          data: { upstreamCode: 'last_sign_in_method' },
+        }),
+        { provider: 'google' }
+      );
     });
 
     const status = root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
     expect(status.map(node => node.props.message)).toEqual([
-      'You must keep at least one sign-in method',
+      "You can't unlink your only sign-in method. Link another method first.",
     ]);
+    expect(state.invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it('names the provider a stale row still shows and reloads the list', async () => {
+    const root = await mount();
+
+    act(() => {
+      state.mutations[0]?.onError?.(
+        Object.assign(new Error('User does not have a linked github account'), {
+          data: { upstreamCode: 'sign_in_method_not_linked' },
+        }),
+        { provider: 'github' }
+      );
+    });
+
+    const status = root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
+    expect(status.map(node => node.props.message)).toEqual([
+      'GitHub is no longer linked to your account.',
+    ]);
+    expect(state.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['user', 'getAuthProviders'],
+    });
+  });
+
+  it('keeps the server sentence for a failure it does not recognise', async () => {
+    const root = await mount();
+
+    act(() => {
+      state.mutations[0]?.onError?.(new Error('Something broke on the server'), {
+        provider: 'github',
+      });
+    });
+
+    const status = root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
+    expect(status.map(node => node.props.message)).toEqual(['Something broke on the server']);
+    expect(state.invalidateQueries).not.toHaveBeenCalled();
   });
 
   it('opens the connected accounts page to link another provider', async () => {

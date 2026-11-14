@@ -375,7 +375,7 @@ export async function handleLlmProxyRequest(
 
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
   const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
-  providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
+  providerMetadataCapture?.captureEnkryptReport(() => enkryptGuardrail.report());
   const providerPolicy = await resolveProviderAndPolicy({
     request: requestBodyParsed,
     model: effectiveModelIdLowerCased,
@@ -459,7 +459,7 @@ export async function handleLlmProxyRequest(
     session_id: usageContext.session_id,
     vercel_request_id: headers.vercelRequestId,
     request: requestBodyParsed,
-    enkrypt: enkryptGuardrail.requestLogs,
+    enkrypt: (captureResponse?: boolean) => enkryptGuardrail.requestLogs(captureResponse),
   };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(

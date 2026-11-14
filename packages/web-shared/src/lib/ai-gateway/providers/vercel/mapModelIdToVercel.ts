@@ -20,10 +20,9 @@ const vercelModelPrefixMapping: Record<string, string | undefined> = {
 };
 
 const openRouterModelPrefixMapping: Record<string, string | undefined> = Object.fromEntries(
-  Object.entries(vercelModelPrefixMapping).map(([openRouterPrefix, vercelPrefix]) => [
-    vercelPrefix,
-    openRouterPrefix,
-  ])
+  Object.entries(vercelModelPrefixMapping)
+    .filter((entry): entry is [string, string] => entry[1] !== undefined)
+    .map(([openRouterPrefix, vercelPrefix]): [string, string] => [vercelPrefix, openRouterPrefix])
 );
 
 /** Throws on an invalid stored config, so the cached getter keeps its last valid value. */

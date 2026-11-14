@@ -88,7 +88,6 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   sealPostHogStorage: vi.fn(),
   unsealPostHogStorage: vi.fn(),
   purgePostHogPersistence: vi.fn(),
-  isPostHogStorageSealed: vi.fn().mockReturnValue(false),
   posthogCustomStorage: {},
 }));
 

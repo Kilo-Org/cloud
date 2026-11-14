@@ -8,6 +8,7 @@ import type { CondenseResult } from '../condense-on-complete.js';
 import type { SessionObservation } from './session-supervisor.js';
 import type { RestoreRoots } from '../restore-roots.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import type { BackgroundActivityInventory } from '../../../src/shared/background-activity.js';
 
 export type HarnessSession = { sessionId: string; directory: string; signal?: AbortSignal };
 export type HarnessPrompt = HarnessSession & {
@@ -62,6 +63,11 @@ export type HarnessReads = Pick<
   | 'getQuestions'
   | 'getPermissions'
 > & {
+  getBackgroundActivity?: (
+    sessionId: string,
+    directory: string,
+    signal: AbortSignal
+  ) => Promise<BackgroundActivityInventory>;
   /** Kilo v1 message rows. Other harnesses keep native messages in Cloud history. */
   getRecentSessionMessages?: WrapperKiloClient['getRecentSessionMessages'];
 };
@@ -107,6 +113,8 @@ export type Harness = {
     signal?: AbortSignal;
   }): Promise<boolean>;
   interrupt(input: HarnessSession): Promise<boolean>;
+  /** Full-tree HTTP/marker completion proof, supported only by the Kilo v2 harness. */
+  drainSession?: (input: HarnessSession & { token?: string }) => Promise<boolean>;
   observe(input: HarnessObservationInput): Promise<SessionObservation[]>;
   release(input: HarnessSession & { deadlineMs: number; signal: AbortSignal }): Promise<{
     ok: boolean;

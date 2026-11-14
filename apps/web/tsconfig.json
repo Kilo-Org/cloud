@@ -42,7 +42,12 @@
   "include": [
     "next-env.d.ts",
     "src/**/*",
-    "../../packages/web-shared/src/**/*",
+    // These files are global and module-augmentation declarations that no
+    // module imports, so the web program lists this directory. Every
+    // importable web-shared module reaches the program through the
+    // `@kilocode/web-shared/*` path mapping, and the package's own
+    // `pnpm --filter @kilocode/web-shared typecheck` covers the whole package.
+    "../../packages/web-shared/src/types/*.d.ts",
     "tests/**/*",
     ".next/types/**/*.ts",
     "jest.config.ts",

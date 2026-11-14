@@ -1,7 +1,8 @@
+import type { EnkryptDetectorId } from '@kilocode/db/schema-types';
 import type { inferRouterOutputs } from '@trpc/server';
+import { DETECTOR_DETAILS } from '@/components/organizations/guardrails/EnkryptDetectorList';
 import type { EnkryptUsageOutcome } from '@/lib/request-logs/filters';
 import type { RootRouter } from '@/routers/root-router';
-import { detectorLabel } from './EnkryptReportSection';
 import type { StepTone } from './routing-labels';
 
 type RequestLogsOutputs = inferRouterOutputs<RootRouter>['organizations']['requestLogs'];
@@ -20,6 +21,10 @@ export const GUARDRAIL_LABELS: Record<EnkryptGuardrail, string> = {
   input: 'Input',
   output: 'Output',
 };
+
+export function detectorLabel(detector: EnkryptDetectorId): string {
+  return DETECTOR_DETAILS[detector].label;
+}
 
 export function firedDetectorsLabel(call: EnkryptUsageRow): string | null {
   return call.fired_detectors.length > 0

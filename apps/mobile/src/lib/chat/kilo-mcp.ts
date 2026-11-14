@@ -11,6 +11,7 @@ import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { KILO_MCP_URL } from '@/lib/config';
 import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { KILO_MCP_SERVER_ID } from './mcp-server-namespace';
 import { type ChatPlace } from './scope';
 
 /**
@@ -34,9 +35,6 @@ export type KiloMcpState =
   | { readonly status: 'connecting' }
   | { readonly status: 'ready'; readonly tools: readonly Tool[] }
   | { readonly status: 'failed'; readonly kind: RemoteMcpFailure; readonly retryable: boolean };
-
-/** The id the server's tools are named under: `mcp_kilo_<tool>`. */
-const SERVER_ID = 'kilo';
 
 /**
  * How long a *discovery* may take, chosen by the caller. A chat opening bounds
@@ -65,7 +63,7 @@ const OFF = 'off';
  */
 function kiloServer(url: string): RemoteMcpServer {
   return {
-    id: SERVER_ID,
+    id: KILO_MCP_SERVER_ID,
     name: 'Kilo tools',
     url: `${url}/mcp`,
     auth: { type: 'bearer' },
@@ -87,7 +85,8 @@ const kiloToken = (): Effect.Effect<string, RemoteMcpError> =>
       }
       return token;
     },
-    catch: cause => new RemoteMcpError({ serverId: SERVER_ID, kind: 'unauthorized', cause }),
+    catch: cause =>
+      new RemoteMcpError({ serverId: KILO_MCP_SERVER_ID, kind: 'unauthorized', cause }),
   });
 
 const ready = (tools: readonly Tool[]): KiloMcpState => ({ status: 'ready', tools });
@@ -201,7 +200,7 @@ async function connect(place: ChatPlace, timeoutMs: number, id: number): Promise
       Effect.match({ onFailure: failed, onSuccess: ready }),
       Effect.catchCause(cause =>
         Effect.succeed(
-          failed(new RemoteMcpError({ serverId: SERVER_ID, kind: 'unreachable', cause }))
+          failed(new RemoteMcpError({ serverId: KILO_MCP_SERVER_ID, kind: 'unreachable', cause }))
         )
       )
     )

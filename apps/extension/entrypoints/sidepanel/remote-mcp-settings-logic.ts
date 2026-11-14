@@ -11,6 +11,14 @@ import { upsertRemoteMcpServer } from '../../src/shared/remote-mcp-storage';
 export const getConnectButtonLabel = (status: RemoteMcpStatus): 'Connect' | 'Refresh' =>
   status === 'untested' || status === 'needs_auth' ? 'Connect' : 'Refresh';
 
+/*
+ * A 401 from a server with no OAuth configured cannot be fixed by connecting
+ * again: the user has to supply a token or header first, so the row sends them
+ * to Edit instead of repeating the failing request.
+ */
+export const needsCredentials = (server: RemoteMcpServer): boolean =>
+  server.status === 'needs_auth' && server.auth.type !== 'oauth';
+
 const buildAuth = (
   fields: {
     authType: 'none' | 'bearer' | 'header' | 'oauth';

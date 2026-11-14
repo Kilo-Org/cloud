@@ -1,7 +1,7 @@
 import { createHash, createHmac } from 'node:crypto';
 import type { CustomLlmAwsBedrockCredentials } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from './build-direct-provider';
-import { upstreamRequest } from './upstream-request';
+import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -41,6 +41,7 @@ async function sendToBedrock(base_url: string) {
       { type: 'aws_bedrock', credentials }
     ),
     reasoningEffort: null,
+    durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
 
   expect(result.type).toBe('success');

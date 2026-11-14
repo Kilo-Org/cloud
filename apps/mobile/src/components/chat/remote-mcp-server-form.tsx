@@ -11,6 +11,7 @@ import {
   type RemoteMcpServerDraft,
   type StoredRemoteMcpServer,
 } from '@/lib/chat/remote-mcp-store';
+import { normalizeRemoteMcpUrl, sameRemoteMcpEndpoint } from '@/lib/chat/remote-mcp-url';
 
 import { mcpServerFormError, type McpServerFormErrors } from './mcp-settings-state';
 
@@ -75,6 +76,19 @@ function draftOf(
   return server === undefined ? draft : { ...draft, id: server.id };
 }
 
+/**
+ * The endpoint a URL text names, normalized the way the store normalizes it, or
+ * null when the text names none. The form compares these to decide whether a
+ * bearer value belongs to the endpoint the URL now names.
+ */
+function endpointOf(url: string): string | null {
+  try {
+    return normalizeRemoteMcpUrl(url);
+  } catch {
+    return null;
+  }
+}
+
 export function RemoteMcpServerForm({
   server,
   onSave,
@@ -89,6 +103,36 @@ export function RemoteMcpServerForm({
   const name = useRef(initialName);
   const url = useRef(initialUrl);
   const token = useRef(initialToken);
+  /**
+   * The token field's mount key. The field starts from the value saved for the
+   * endpoint the URL names: a value saved for one endpoint is not a value for
+   * another, so the field is mounted again whenever the URL names a different
+   * endpoint — empty for the new one, and the saved value again when the URL
+   * returns to the saved endpoint. The field is uncontrolled, so the key is
+   * what makes the new default take effect.
+   */
+  const [tokenFieldKey, setTokenFieldKey] = useState(0);
+  const tokenDefault = useRef(initialToken);
+  /**
+   * Whether the person typed in the token field during this edit. A typed value
+   * is theirs from then on, even while the URL names no endpoint, and the save
+   * reports it as entered.
+   */
+  const tokenTyped = useRef(false);
+  /**
+   * The endpoint the URL named, normalized, when the person last typed in the
+   * token field; null while the URL named none. A value typed while the URL
+   * names nothing belongs to the endpoint the person then names, so the field
+   * keeps it; a URL that names another endpoint clears the field rather than
+   * carrying the value to a server it was not entered for.
+   */
+  const tokenEndpoint = useRef<string | null>(null);
+  /**
+   * Whether the token field was cleared because the URL left the saved
+   * endpoint. The field then shows why it is empty, rather than leaving a greyed
+   * Save with no reason; typing a value answers it.
+   */
+  const [tokenRetargeted, setTokenRetargeted] = useState(false);
   const [method, setMethod] = useState<AuthMethod>(initialMethod);
   const fieldsWith = useCallback(
     (changed: Partial<DraftFields>): DraftFields => ({
@@ -122,6 +166,61 @@ export function RemoteMcpServerForm({
     [fieldsWith, server, onDirtyChange, initialName, initialUrl, initialMethod, initialToken]
   );
 
+  /**
+   * Points the token field at the endpoint the URL text now names. A value the
+   * person typed belongs to the endpoint the URL named when it was typed: the
+   * field keeps it while the URL still names that endpoint, and clears it for
+   * any other, so the value is never carried to a server it was not entered
+   * for and the required-token rule holds Save until a value is entered for the
+   * new one. A value typed while the URL named no endpoint belongs to the
+   * endpoint the person then names, so it is kept. While the field still holds
+   * the value the server was saved with, a URL that names the saved endpoint
+   * restores it — respelling the saved URL is not an edit — and a URL that
+   * names another endpoint starts from an empty field.
+   */
+  const retargetToken = useCallback(
+    (nextUrl: string) => {
+      if (server === undefined) {
+        return;
+      }
+      if (tokenTyped.current) {
+        const named = endpointOf(nextUrl);
+        if (tokenEndpoint.current === null) {
+          tokenEndpoint.current = named;
+          return;
+        }
+        if (named === tokenEndpoint.current) {
+          return;
+        }
+        token.current = '';
+        tokenDefault.current = '';
+        tokenTyped.current = false;
+        tokenEndpoint.current = null;
+        setTokenRetargeted(initialToken !== '');
+        setTokenFieldKey(key => key + 1);
+        return;
+      }
+      if (sameRemoteMcpEndpoint(initialUrl, nextUrl)) {
+        if (token.current === initialToken) {
+          return;
+        }
+        token.current = initialToken;
+        tokenDefault.current = initialToken;
+        setTokenRetargeted(false);
+        setTokenFieldKey(key => key + 1);
+        return;
+      }
+      if (token.current === '') {
+        return;
+      }
+      token.current = '';
+      tokenDefault.current = '';
+      setTokenRetargeted(initialToken !== '');
+      setTokenFieldKey(key => key + 1);
+    },
+    [server, initialUrl, initialToken]
+  );
+
   const validateName = useCallback(
     (value: string): string | null => {
       const found = mcpServerFormError(draftOf(server, fieldsWith({ name: value })));
@@ -151,7 +250,9 @@ export function RemoteMcpServerForm({
     const found = mcpServerFormError(draft);
     setErrors(found);
     if (found === null) {
-      onSave(draft);
+      // A value is the person's own only when they typed it, and that is what
+      // the store is told.
+      onSave({ ...draft, tokenEntered: tokenTyped.current });
     }
   }, [fieldsWith, onSave, server]);
 
@@ -178,6 +279,7 @@ export function RemoteMcpServerForm({
         returnKeyType="next"
         onChangeText={value => {
           url.current = value;
+          retargetToken(value);
           refresh();
         }}
         validate={validateUrl}
@@ -202,13 +304,20 @@ export function RemoteMcpServerForm({
       </View>
       {method === 'bearer' ? (
         <FormField
+          key={tokenFieldKey}
           label={t('modelChat.mcpOAuth.fieldToken')}
-          defaultValue={initialToken}
+          defaultValue={tokenDefault.current}
+          error={tokenRetargeted && errors?.token !== undefined ? t(errors.token) : undefined}
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
           onChangeText={value => {
             token.current = value;
+            tokenTyped.current = true;
+            tokenEndpoint.current = endpointOf(url.current);
+            if (value.trim() !== '') {
+              setTokenRetargeted(false);
+            }
             refresh();
           }}
           validate={validateToken}

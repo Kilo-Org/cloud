@@ -20,10 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type {
-  OrganizationPlan,
-  OrganizationRole,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { hasInviteSeatCapacity } from '@kilocode/app-shared/organizations';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -92,22 +90,6 @@ type InviteMemberDialogProps = {
   organizationId: string;
   onMemberInvited: () => void;
 };
-
-type InviteSeatCapacity = {
-  plan: OrganizationPlan | undefined;
-  requireSeats: boolean | undefined;
-  usedSeats: number;
-  totalSeats: number;
-};
-
-export function hasInviteSeatCapacity({
-  plan,
-  requireSeats,
-  usedSeats,
-  totalSeats,
-}: InviteSeatCapacity): boolean {
-  return requireSeats === false || plan === 'enterprise' || totalSeats - usedSeats > 0;
-}
 
 /**
  * Capture properties for `organization_member_invited`: `role` only. The old

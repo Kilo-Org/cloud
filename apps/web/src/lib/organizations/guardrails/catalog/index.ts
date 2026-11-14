@@ -52,13 +52,13 @@ export async function resolveMcpCatalogItem(params: {
   return items.find(item => item.sourceId === params.sourceId) ?? null;
 }
 
-export type McpCatalogMatch = { item: McpCatalogItem; versionHint: string | null };
+export type McpCatalogMatch = { item: McpCatalogItem; versionSpecHint: string | null };
 
 function findEligibleVariant(items: McpCatalogItem[], identityKey: string): McpCatalogMatch | null {
   for (const item of items) {
     for (const variant of item.variants) {
       if (variant.eligible && variant.identityKey === identityKey) {
-        return { item, versionHint: variant.versionHint };
+        return { item, versionSpecHint: variant.versionSpecHint };
       }
     }
   }

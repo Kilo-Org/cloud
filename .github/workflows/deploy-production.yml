@@ -161,28 +161,22 @@ jobs:
       base_sha: ${{ needs.check-changes.outputs.base_sha }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
 
+  # The Worker deploy consumes the detected matrix and the SHAs, so it opens as
+  # soon as the gate and the matrix are done, beside the Vercel stage-and-promote
+  # chain; deploy-staging.yml runs it the same way. The previous web release runs
+  # against the new Workers until promotion finishes, so a Worker change keeps
+  # every route that release calls until promotion replaces it (ADR 0003,
+  # deploy-order contract). record-deployment below still requires every Vercel
+  # leg and this deploy.
   deploy-workers:
-    needs:
-      [
-        db-gate,
-        check-changes,
-        detect-workers,
-        stage-app,
-        stage-ai-gateway,
-        promote-app,
-        promote-ai-gateway,
-      ]
+    needs: [db-gate, check-changes, detect-workers]
     if: >-
       ${{
         github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.detect-workers.result == 'success' &&
-        needs.db-gate.result == 'success' &&
-        contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.promote-ai-gateway.result)
+        needs.db-gate.result == 'success'
       }}
     uses: ./.github/workflows/deploy-workers.yml
     with:

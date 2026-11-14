@@ -10,6 +10,7 @@ const badgeVariants = cva(
         'secondary-outline': 'bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
         destructive:
           'border-status-destructive-border bg-status-destructive-surface text-status-destructive [a&]:hover:bg-destructive/20 focus-visible:ring-destructive/40',
+        warning: 'border-status-warning-border bg-status-warning-surface text-status-warning',
         outline: 'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         beta: 'border-status-neutral-border bg-status-neutral-surface text-status-neutral',
         new: 'border-status-success-border bg-status-success-surface text-status-success',

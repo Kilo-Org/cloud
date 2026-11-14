@@ -31,6 +31,16 @@ import {
   listHostedWorkspaces,
 } from './router/handlers/hosted-workspace-list.js';
 import { getHostedWorkspaceStatus } from './router/handlers/hosted-workspace-status.js';
+import { refreshHostedWorkspacePullRequest } from './router/handlers/hosted-workspace-pull-request-refresh.js';
+import {
+  getHostedWorkspaceChangeFile,
+  getHostedWorkspaceChanges,
+  refreshHostedWorkspaceChanges,
+} from './router/handlers/hosted-workspace-changes.js';
+import {
+  getHostedWorkspacePullRequest,
+  getHostedWorkspacePullRequestFile,
+} from './router/handlers/hosted-workspace-pull-request.js';
 import {
   buildEnvironment,
   cancelEnvironmentBuild,
@@ -38,10 +48,14 @@ import {
   getEnvironmentBuildStatus,
   notifyEnvironmentDeleted,
 } from './router/handlers/environment-build.js';
-import { getSessionMessagesPage } from './router/handlers/session-history.js';
+import {
+  getSessionMessagesPage,
+  getSessionToolPartDetail,
+} from './router/handlers/session-history.js';
 
 export const appRouter = router({
   getSessionMessagesPage,
+  getSessionToolPartDetail,
   deleteWorktree,
   getSandboxSelectionOptions,
   getPreviewOptions,
@@ -51,6 +65,12 @@ export const appRouter = router({
   listHostedWorkspaces,
   getHostedWorkspace,
   getHostedWorkspaceStatus,
+  refreshHostedWorkspacePullRequest,
+  getHostedWorkspaceChanges,
+  refreshHostedWorkspaceChanges,
+  getHostedWorkspaceChangeFile,
+  getHostedWorkspacePullRequest,
+  getHostedWorkspacePullRequestFile,
   buildEnvironment,
   getEnvironmentBuildStatus,
   getEnvironmentBuildLogs,

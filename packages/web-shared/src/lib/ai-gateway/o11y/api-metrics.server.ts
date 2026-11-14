@@ -16,7 +16,6 @@ export type ApiMetricsTokens = {
 };
 
 export type ApiMetricsParams = {
-  clientSecret: string;
   kiloUserId: string;
   organizationId?: string;
   isAnonymous: boolean;
@@ -175,13 +174,14 @@ const apiMetricsUrl = (() => {
 
 async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {
   if (!apiMetricsUrl) return;
-  if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
+  const clientSecret = O11Y_KILO_GATEWAY_CLIENT_SECRET;
+  if (!clientSecret) return;
 
   await fetch(apiMetricsUrl, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'X-O11Y-ADMIN-TOKEN': O11Y_KILO_GATEWAY_CLIENT_SECRET || '',
+      'X-O11Y-ADMIN-TOKEN': clientSecret,
     },
     body: JSON.stringify(params),
   }).catch(() => {
@@ -197,13 +197,13 @@ export function emitApiMetrics(params: ApiMetricsParams) {
   });
 }
 
-export function emitGatewayApiMetrics(params: Omit<ApiMetricsParams, 'clientSecret'>) {
+export function emitGatewayApiMetrics(params: ApiMetricsParams) {
   if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
-  emitApiMetrics({ ...params, clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET });
+  emitApiMetrics(params);
 }
 
 export function emitApiMetricsForResponse(
-  params: Omit<ApiMetricsParams, 'clientSecret' | 'completeRequestMs'>,
+  params: Omit<ApiMetricsParams, 'completeRequestMs'>,
   statsPromise: Promise<Pick<MicrodollarUsageStats, 'inference_provider'> | null>,
   requestStartedAt: number
 ) {
@@ -220,7 +220,6 @@ export function emitApiMetricsForResponse(
         await sendApiMetrics({
           ...params,
           inferenceProvider: stats?.inference_provider ?? undefined,
-          clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
           completeRequestMs,
         } satisfies ApiMetricsParams);
       })

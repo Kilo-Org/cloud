@@ -1,5 +1,6 @@
 import type { Part, TextPart } from '@kilocode/app-shared/opencode';
 import { partSettledAt } from '../part-utils';
+import { isPreviewOfStoredTool } from '../tool-detail-marker';
 import type { MessageInfo } from '../types';
 
 function compareIds(left: string, right: string): number {
@@ -7,162 +8,129 @@ function compareIds(left: string, right: string): number {
   return left > right ? 1 : 0;
 }
 
+type OrderRow = {
+  id: string;
+  /** Rank key: the row's server time, or its array position when times cannot be read. */
+  key: number;
+  /** A client row without a server time; its turn sorts after every placed turn. */
+  unplaced: boolean;
+  /** Array position of the row that opens this row's turn. */
+  turn: number;
+};
+
 /**
- * Rows ordered by their own creation time, id as the tiebreak, so the store's
- * id order never stands in for the transcript's order.
+ * The transcript's row order, one turn after another.
+ *
+ * A turn is a user row and the assistant rows that answer it (`parentID`,
+ * followed through assistant parents). Turns are ordered by the time of the
+ * row that opens them, and the other rows of a turn follow it in their own time
+ * order. So a turn stays together: a prompt queued while an earlier turn still
+ * runs sorts after every step of that turn, and a reply never sorts above the
+ * prompt it answers. An assistant row whose prompt is not in the store (an
+ * older page, another session) opens a turn of its own.
  *
  * The store keeps `messageIds` sorted by id because that order is the only one
- * it can maintain incrementally. A CLI mints ids that rise with the clock, so
- * that order used to agree with `time.created`; a session written by another
- * client, an import, or an older id scheme holds ids in any order, and the
- * worker's history read orders every page by `time.created`
- * (`compareKiloSdkMessageInfo`). Reading the id order as the transcript order
- * showed such a session out of sequence, with a newer turn above older rows.
+ * it can maintain incrementally. A session written by another client, an
+ * import, or an older id scheme holds ids in any order, and the worker's
+ * history read orders every page by `time.created`
+ * (`compareKiloSdkMessageInfo`), so the id order never stands in for the
+ * transcript's order.
  *
- * An optimistic or queued row is stamped with the device clock, and every
- * stored row carries the writer's clock, so the two cannot be ranked against
- * each other while a phone's clock disagrees with the writer's. Both are marked
- * `synthetic` until the server echoes the row, and an unconfirmed row closes the
- * transcript for the turn it belongs to, so they rank after every timed row.
+ * A row is placed by server time: `time.created` of a stored row, and
+ * `queuedAt` (the server queue time) of a client-materialised `synthetic` row.
+ * A synthetic row without `queuedAt` carries only the device clock, which
+ * cannot be ranked against server times. It is the newest submission, so its
+ * turn sorts after every placed turn.
  *
  * Returns `ids` itself while the array already follows that order, so an
- * unchanged transcript keeps its reference. A row whose time is unreadable
- * keeps the array as it is: the wire boundary rejects such a row, and a guess
- * here would reorder a transcript on data the store cannot place.
- */
-function orderMessageIdsByCreated(
-  ids: readonly string[],
-  messages: ReadonlyMap<string, MessageInfo>
-): readonly string[] {
-  const rows: Array<{ id: string; created: number; unconfirmed: boolean }> = [];
-  for (const id of ids) {
-    const info = messages.get(id);
-    const unconfirmed = info?.role === 'user' && info.synthetic === true;
-    const created: unknown = info?.time?.created;
-    if (!unconfirmed && (typeof created !== 'number' || !Number.isFinite(created))) return ids;
-    rows.push({
-      id,
-      created: typeof created === 'number' && Number.isFinite(created) ? created : 0,
-      unconfirmed,
-    });
-  }
-  let ordered = true;
-  for (let index = 1; index < rows.length; index += 1) {
-    const previous = rows[index - 1];
-    const current = rows[index];
-    if (previous === undefined || current === undefined) return ids;
-    if (compareCreatedRows(previous, current) > 0) {
-      ordered = false;
-      break;
-    }
-  }
-  if (ordered) return ids;
-  rows.sort(compareCreatedRows);
-  return rows.map(row => row.id);
-}
-
-function compareCreatedRows(
-  left: { id: string; created: number; unconfirmed: boolean },
-  right: { id: string; created: number; unconfirmed: boolean }
-): number {
-  if (left.unconfirmed !== right.unconfirmed) return left.unconfirmed ? 1 : -1;
-  if (left.created !== right.created) return left.created < right.created ? -1 : 1;
-  return compareIds(left.id, right.id);
-}
-
-/**
- * The transcript's row order: creation time first, then the causality repair
- * that keeps an assistant reply behind the prompt it answers.
+ * unchanged transcript keeps its reference. While a placed row has no readable
+ * time, turns keep the array's order: the wire boundary rejects such a row,
+ * and a guess would reorder a transcript on data the store cannot place.
  */
 function orderMessageIds(
   ids: readonly string[],
   messages: ReadonlyMap<string, MessageInfo>
 ): readonly string[] {
-  const ordered = orderMessageIdsByCreated(ids, messages);
-  const causal = orderCausalMessageIds(ordered, messages);
-  if (causal === ids) return ids;
-  if (causal.length === ids.length && causal.every((id, index) => id === ids[index])) return ids;
-  return causal;
+  const positions = new Map<string, number>();
+  for (let index = 0; index < ids.length; index += 1) positions.set(ids[index] ?? '', index);
+
+  const times: Array<{ time: number; unplaced: boolean } | undefined> = [];
+  let timesReadable = true;
+  for (const id of ids) {
+    const placement = readPlacement(messages.get(id));
+    if (placement === undefined) timesReadable = false;
+    times.push(placement);
+  }
+
+  const rows: OrderRow[] = ids.map((id, index) => {
+    const placement = times[index];
+    return {
+      id,
+      key: timesReadable && placement ? placement.time : index,
+      unplaced: timesReadable && placement?.unplaced === true,
+      turn: turnStart(index, ids, positions, messages),
+    };
+  });
+
+  const compare = (left: OrderRow, right: OrderRow): number => {
+    const leftTurn = rows[left.turn];
+    const rightTurn = rows[right.turn];
+    if (leftTurn === undefined || rightTurn === undefined) return 0;
+    if (leftTurn !== rightTurn) return compareOrderRows(leftTurn, rightTurn);
+    if (left === right) return 0;
+    if (left === leftTurn) return -1;
+    if (right === rightTurn) return 1;
+    return compareOrderRows(left, right);
+  };
+  if (rows.every((row, index) => index === 0 || compare(rows[index - 1] ?? row, row) <= 0)) {
+    return ids;
+  }
+  const ordered = [...rows].sort(compare);
+  return ordered.every((row, index) => row.id === ids[index]) ? ids : ordered.map(row => row.id);
 }
 
-function orderCausalMessageIds(
+function readPlacement(
+  info: MessageInfo | undefined
+): { time: number; unplaced: boolean } | undefined {
+  const created: unknown = info?.time?.created;
+  const readableCreated = typeof created === 'number' && Number.isFinite(created) ? created : 0;
+  if (info?.role === 'user' && info.synthetic === true) {
+    const queuedAt: unknown = info.queuedAt;
+    return typeof queuedAt === 'number' && Number.isFinite(queuedAt)
+      ? { time: queuedAt, unplaced: false }
+      : { time: readableCreated, unplaced: true };
+  }
+  if (typeof created !== 'number' || !Number.isFinite(created)) return undefined;
+  return { time: created, unplaced: false };
+}
+
+/**
+ * The array position of the row that opens the turn of the row at `index`. A
+ * missing parent, a self reference, a parent in another session, or a parent
+ * cycle ends the chain at the row itself, so no row is ever hidden.
+ */
+function turnStart(
+  index: number,
   ids: readonly string[],
+  positions: ReadonlyMap<string, number>,
   messages: ReadonlyMap<string, MessageInfo>
-): readonly string[] {
-  const positions = new Map(ids.map((id, index) => [id, index]));
-  const parents = new Map<number, number>();
-  let needsOrdering = false;
-  for (let index = 0; index < ids.length; index += 1) {
-    const info = messages.get(ids[index] ?? '');
-    if (info?.role !== 'assistant') continue;
-    const parentIndex = positions.get(info.parentID);
-    const parent = messages.get(info.parentID);
-    if (
-      parentIndex === undefined ||
-      parentIndex === index ||
-      parent?.sessionID !== info.sessionID
-    ) {
-      continue;
-    }
-    parents.set(index, parentIndex);
-    if (parentIndex > index) needsOrdering = true;
+): number {
+  let current = index;
+  for (let steps = 0; steps <= ids.length; steps += 1) {
+    const info = messages.get(ids[current] ?? '');
+    if (info?.role !== 'assistant') return current;
+    const parent = positions.get(info.parentID);
+    if (parent === undefined || parent === current) return current;
+    if (messages.get(ids[parent] ?? '')?.sessionID !== info.sessionID) return current;
+    current = parent;
   }
-  if (!needsOrdering) return ids;
+  return index;
+}
 
-  const children = new Map<number, number[]>();
-  const ready: number[] = [];
-  function enqueue(index: number): void {
-    let position = ready.length;
-    ready.push(index);
-    while (position > 0) {
-      const parentPosition = (position - 1) >>> 1;
-      const parentIndex = ready[parentPosition];
-      if (parentIndex === undefined || parentIndex <= index) break;
-      ready[position] = parentIndex;
-      position = parentPosition;
-    }
-    ready[position] = index;
-  }
-  for (let index = 0; index < ids.length; index += 1) {
-    const parent = parents.get(index);
-    if (parent === undefined) {
-      enqueue(index);
-    } else {
-      const siblings = children.get(parent);
-      if (siblings) siblings.push(index);
-      else children.set(parent, [index]);
-    }
-  }
-
-  const result: string[] = [];
-  const emitted = new Set<number>();
-  while (ready.length > 0) {
-    const index = ready[0];
-    const last = ready.pop();
-    if (index === undefined || last === undefined) break;
-    if (ready.length > 0) {
-      let position = 0;
-      while (position * 2 + 1 < ready.length) {
-        let childPosition = position * 2 + 1;
-        if ((ready[childPosition + 1] ?? Infinity) < (ready[childPosition] ?? Infinity)) {
-          childPosition += 1;
-        }
-        const child = ready[childPosition];
-        if (child === undefined || child >= last) break;
-        ready[position] = child;
-        position = childPosition;
-      }
-      ready[position] = last;
-    }
-    result.push(ids[index] ?? '');
-    emitted.add(index);
-    for (const child of children.get(index) ?? []) enqueue(child);
-  }
-  // Invalid parent cycles cannot satisfy every edge, but must never hide a row.
-  for (let index = 0; index < ids.length; index += 1) {
-    if (!emitted.has(index)) result.push(ids[index] ?? '');
-  }
-  return result;
+function compareOrderRows(left: OrderRow, right: OrderRow): number {
+  if (left.unplaced !== right.unplaced) return left.unplaced ? 1 : -1;
+  if (left.key !== right.key) return left.key < right.key ? -1 : 1;
+  return compareIds(left.id, right.id);
 }
 
 function insertSorted(arr: string[], id: string): string[] {
@@ -376,6 +344,9 @@ function upsertPartDroppingStaleSyntheticParts(
     ) {
       return arr;
     }
+    // A later history page or replay may carry a bounded preview of a tool call
+    // this storage already holds in full; keep the complete copy.
+    if (existing !== undefined && isPreviewOfStoredTool(existing, part)) return arr;
     const nextArr = [...filtered];
     nextArr[idx] = nextPart;
     // Remember the ordering evidence the accepted update actually won on: its

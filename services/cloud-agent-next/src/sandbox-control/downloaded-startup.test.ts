@@ -98,13 +98,16 @@ describe('startup selection and preflight', () => {
       )
     ).toThrow(RetiredSandboxProviderError);
   });
-  it('selects downloaded startup for Vercel and requires its release descriptor', () => {
-    expect(
-      selectStartup(
-        { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
-        'vercel'
-      )
-    ).toMatchObject({ mode: 'downloaded', descriptor: text });
+  it('always selects the downloaded runtime-free image for Vercel', () => {
+    for (const env of [
+      {},
+      { RUNTIME_STARTUP_MODE: 'preinstalled' },
+      { RUNTIME_STARTUP_MODE: 'invalid', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+      { RUNTIME_STARTUP_MODE: 'downloaded', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+    ] as const)
+      expect(selectStartup({ ...env, RUNTIME_RELEASE_DESCRIPTOR: text }, 'vercel')).toEqual(
+        scopedDownloaded
+      );
     expect(() => selectStartup({ RUNTIME_STARTUP_MODE: 'downloaded' }, 'vercel')).toThrow(
       'configuration'
     );
@@ -255,13 +258,16 @@ describe('startup selection and preflight', () => {
       RetiredSandboxProviderError
     );
   });
-  it('downloads on Vercel regardless of organization', () => {
+  it('ignores the native cohort and configured scope for Vercel', () => {
     expect(selectStartup(scopedEnv, 'vercel', { preparingRoutes: [orgRoute] })).toEqual(
       scopedDownloaded
     );
     expect(selectStartup(scopedEnv, 'vercel', {})).toEqual(scopedDownloaded);
     expect(
       selectStartup(scopedEnv, 'vercel', { preparingRoutes: [{ ...orgRoute, orgId: otherOrgId }] })
+    ).toEqual(scopedDownloaded);
+    expect(
+      selectStartup({ ...scopedEnv, RUNTIME_INTERACTIVE_ORG_IDS: '*' }, 'vercel', isolatedCohort)
     ).toEqual(scopedDownloaded);
   });
   it('rejects obsolete interactive startup scope without fallback', () => {

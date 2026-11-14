@@ -1,5 +1,5 @@
 /* eslint-disable max-lines, max-classes-per-file -- the page-global fakes below need several instanceof-identity classes in this one test file */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   FIREFOX_PLATFORM_LIMIT,
   FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
@@ -1018,6 +1018,40 @@ describe('browser tool session scripting backend', () => {
 
     expect(session.backend).toBe('scripting');
     expect(debuggerBackedSession.backend).toBe('debugger');
+  });
+
+  it('sends the page the canonical WebMCP signature it rebuilds', async () => {
+    const executeScript = vi
+      .fn<BrowserScriptingApi['executeScript']>()
+      .mockResolvedValueOnce([
+        {
+          documentId: 'doc-1',
+          result: [
+            {
+              description: 'Do it',
+              // eslint-disable-next-line sort-keys -- the page declares this order; the signature must not depend on it.
+              inputSchema: { type: 'object', properties: { amount: { type: 'number' } } },
+              name: 'do_thing',
+              origin: 'https://example.com',
+              title: 'Do',
+            },
+          ],
+        },
+      ])
+      .mockResolvedValueOnce([{ documentId: 'doc-1', result: { ok: true, value: 'ran' } }]);
+    const tabsApi = createTabsApi();
+    const session = createBrowserToolSession({
+      scriptingApi: { executeScript },
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    });
+
+    await expect(
+      session.callTool('kilo_browser_webmcp_call', { name: 'do_thing' })
+    ).resolves.toStrictEqual({ ok: true, value: 'ran' });
+    expect(executeScript.mock.calls[1]?.[0].args[2]).toBe(
+      '["do_thing","Do","Do it","https://example.com",{"properties":{"amount":{"type":"number"}},"type":"object"}]'
+    );
   });
 
   it('runs a supported tool through the scripting API and surfaces its value', async () => {

@@ -66,7 +66,7 @@ export function sessionNeedsInput(status: string | null | undefined): boolean {
  * the app's reader for both spellings: Hermes' `Date` cannot parse the
  * PostgreSQL form on its own.
  */
-function sameRaise(a: string | null, b: string | null): boolean {
+export function sameRaise(a: string | null, b: string | null): boolean {
   if (a === b) {
     return true;
   }

@@ -104,7 +104,7 @@ describe('remote backend requests', () => {
     });
     await expect(
       discoverBackendModels(profile, new AbortController().signal, transport)
-    ).rejects.toThrow('discoveryFailed');
+    ).rejects.toThrow(/^discoveryFailed$/u);
     expect(profile.models[0]?.id).toBe('manual-model');
   });
 
@@ -112,7 +112,7 @@ describe('remote backend requests', () => {
     vi.useFakeTimers();
     const transport = stalledDiscovery;
     const work = discoverBackendModels(profile, new AbortController().signal, transport);
-    const outcome = expect(work).rejects.toThrow('discoveryFailed');
+    const outcome = expect(work).rejects.toThrow(/^discoveryFailed$/u);
     await vi.advanceTimersByTimeAsync(15_000);
     await outcome;
   });
@@ -166,7 +166,7 @@ describe('remote backend requests', () => {
         signal: new AbortController().signal,
         transport,
       })
-    ).rejects.toThrow('connectionFailed');
+    ).rejects.toThrow(/^connectionFailed$/u);
     expect(transport).toHaveBeenCalledOnce();
   });
 });

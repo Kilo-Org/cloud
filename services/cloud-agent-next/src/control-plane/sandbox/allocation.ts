@@ -97,6 +97,11 @@ export type AllocationEvent =
   | { type: 'provider-ref'; at: number; allocationId: string; providerRef: string }
   | { type: 'startup-failed'; at: number; allocationId: string; code: StartupFailureCode }
   | { type: 'created'; at: number; allocationId: string; providerRef: string }
+  /**
+   * A snapshot launch retry starts with its own attempt bound. The create
+   * deadline moves to that bound, so the alarm does not expire the retry.
+   */
+  | { type: 'snapshot-retry'; at: number; allocationId: string; createDeadlineAt: number }
   | {
       type: 'create-failed';
       at: number;
@@ -328,6 +333,13 @@ export function reduceAllocation(
         },
         effects: NO_EFFECTS,
       };
+    }
+
+    case 'snapshot-retry': {
+      if (state.kind !== 'creating' || state.allocationId !== event.allocationId) {
+        return { state, effects: NO_EFFECTS };
+      }
+      return { state: { ...state, createDeadlineAt: event.createDeadlineAt }, effects: NO_EFFECTS };
     }
 
     case 'create-failed': {

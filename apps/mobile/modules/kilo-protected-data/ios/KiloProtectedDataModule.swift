@@ -4,10 +4,14 @@ import UIKit
 /**
  * Whether protected data (the keychain) is available.
  *
- * Every SecureStore item is `WHEN_UNLOCKED*`, so while the device is locked the
+ * The credential items are `WHEN_UNLOCKED*`, so while the device is locked the
  * keychain refuses each call with `errSecInteractionNotAllowed`. JS reads this
- * state before a keychain call and waits for `onProtectedDataChange` to resume
- * work after unlock.
+ * state before a credential call and waits for `onProtectedDataChange` to
+ * resume work after unlock. The Home-widget, glanceable mirror and session-card
+ * scope items are `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` instead, so a background
+ * push reaches them with the screen locked and their calls are attempted rather
+ * than gated; this state still tells a refusal before the first unlock since
+ * boot apart from a real failure.
  *
  * `UIApplication.isProtectedDataAvailable` is main-thread only, and the JS
  * read is synchronous on the JS thread. So the main thread records the state:

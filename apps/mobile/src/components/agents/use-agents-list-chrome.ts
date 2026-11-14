@@ -21,12 +21,16 @@ export function useAgentsListChrome({
   fontScale,
   left,
   right,
+  noMatchSecondaryAction = false,
 }: {
   showFab: boolean;
   tabBarHeight: number;
   fontScale: number;
   left: number;
   right: number;
+  /** The no-match body carries a Clear control per active cause, so a search and
+   *  a filter together can wrap the action row onto a second line. */
+  noMatchSecondaryAction?: boolean;
 }) {
   const [bodyHeight, setBodyHeight] = useState<number | null>(null);
   const onBodyLayout = useCallback((event: LayoutChangeEvent) => {
@@ -53,6 +57,7 @@ export function useAgentsListChrome({
       bottomInset: centeredBottomInset,
       reservedHeight: refreshReserve,
       fontScale,
+      secondaryAction: noMatchSecondaryAction,
     }) === 'compact';
   // The accepted-empty body stacks its See-all history link under the
   // new-session button, so its full form is a row taller than the single-action

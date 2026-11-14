@@ -5,7 +5,12 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   deleteGitHubInstallation: (...args: unknown[]) => mockDeleteGitHubInstallation(...args),
   fetchGitHubRepositories: jest.fn(),
 }));
-import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
+import {
+  github_app_installations,
+  kilocode_users,
+  organizations,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -20,6 +25,7 @@ import {
   checkUserPendingInstallation,
   getInstallation,
   isInstallationGoneError,
+  listNativelyUninstallableIds,
   listRepositories,
   uninstallApp,
   updateModel,
@@ -403,6 +409,29 @@ describe('isInstallationGoneError', () => {
   it('should return false for number errors', () => {
     expect(isInstallationGoneError(404)).toBe(false);
   });
+
+  it('should return false for a 403 secondary rate limit with a Retry-After header', () => {
+    const error = {
+      status: 403,
+      message: 'You have exceeded a secondary rate limit.',
+      response: { headers: { 'retry-after': '30' } },
+    };
+    expect(isInstallationGoneError(error)).toBe(false);
+  });
+
+  it('should return false for a 403 secondary rate limit known only from the message', () => {
+    const error = {
+      status: 403,
+      message:
+        'You have exceeded a secondary rate limit. Please wait a few minutes before you try again.',
+    };
+    expect(isInstallationGoneError(error)).toBe(false);
+  });
+
+  it('should return false for 429 Too Many Requests', () => {
+    const error = { status: 429, message: 'Too Many Requests' };
+    expect(isInstallationGoneError(error)).toBe(false);
+  });
 });
 
 describe('listRepositories', () => {
@@ -534,6 +563,52 @@ describe('listRepositories', () => {
 });
 
 describe('uninstallApp', () => {
+  // The canonical installation table only accepts GitHub's numeric ids.
+  function installationNumber(): string {
+    return String(Math.floor(Math.random() * 1e15) + 1);
+  }
+
+  async function insertWorkflowIntegration(installationId: string) {
+    const user = await insertTestUser();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    return { user, row };
+  }
+
+  async function readRow(id: string) {
+    const [row] = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, id));
+    return row;
+  }
+
+  async function cleanup(userId: string, installationIds: readonly string[]) {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, userId));
+    for (const installationId of installationIds) {
+      await db
+        .delete(github_app_installations)
+        .where(eq(github_app_installations.installation_id, installationId));
+    }
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+  }
+
+  beforeEach(() => {
+    mockDeleteGitHubInstallation.mockReset();
+  });
+
   it('returns a fixed message when the provider rejects the deletion', async () => {
     const [organization] = await db
       .insert(organizations)
@@ -572,6 +647,179 @@ describe('uninstallApp', () => {
         'standard'
       );
     } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('answers a rate-limited delete with a retryable error and keeps the connection', async () => {
+    const installationId = installationNumber();
+    const { user, row } = await insertWorkflowIntegration(installationId);
+    mockDeleteGitHubInstallation.mockRejectedValueOnce({
+      status: 403,
+      message: 'You have exceeded a secondary rate limit.',
+      response: { headers: { 'retry-after': '30' } },
+    });
+
+    try {
+      const uninstall = uninstallApp(
+        { type: 'user', id: user.id },
+        row.id,
+        'user-for-uninstall-test',
+        'user@example.com',
+        'Test User'
+      );
+
+      await expect(uninstall).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+      await expect(uninstall).rejects.toThrow(
+        /GitHub rate limit reached\. Try again in about 1 minute\./
+      );
+      expect(mockDeleteGitHubInstallation).toHaveBeenCalledWith(installationId, 'standard');
+      // The transaction rolled back, so the association is still connected.
+      expect(await readRow(row.id)).toEqual({ id: row.id });
+    } finally {
+      await cleanup(user.id, [installationId]);
+    }
+  });
+
+  it('removes the connection when the provider answers that it is already gone', async () => {
+    const installationId = installationNumber();
+    const { user, row } = await insertWorkflowIntegration(installationId);
+    mockDeleteGitHubInstallation.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+
+    try {
+      await expect(
+        uninstallApp(
+          { type: 'user', id: user.id },
+          row.id,
+          'user-for-uninstall-test',
+          'user@example.com',
+          'Test User'
+        )
+      ).resolves.toEqual({ success: true });
+      expect(await readRow(row.id)).toBeUndefined();
+      const [canonical] = await db
+        .select({
+          installationId: github_app_installations.installation_id,
+          lifecycleState: github_app_installations.lifecycle_state,
+        })
+        .from(github_app_installations)
+        .where(eq(github_app_installations.installation_id, installationId));
+      expect(canonical).toEqual({ installationId, lifecycleState: 'deleted' });
+    } finally {
+      await cleanup(user.id, [installationId]);
+    }
+  });
+});
+
+describe('listNativelyUninstallableIds', () => {
+  type IntegrationRow = typeof platform_integrations.$inferInsert;
+
+  // The canonical installation table only accepts GitHub's numeric ids.
+  function installationNumber(): string {
+    return String(Math.floor(Math.random() * 1e15) + 1);
+  }
+
+  async function insertInstallation(appType: 'standard' | 'lite') {
+    const [installation] = await db
+      .insert(github_app_installations)
+      .values({ github_app_type: appType, installation_id: installationNumber() })
+      .returning();
+    return installation;
+  }
+
+  async function insertRow(overrides: Partial<IntegrationRow>) {
+    const user = await insertTestUser();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+        ...overrides,
+      })
+      .returning();
+    return { user, row };
+  }
+
+  async function cleanup(userIds: readonly string[]) {
+    for (const userId of userIds) {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, userId));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  }
+
+  it('counts only a workflow connection whose installation has no local sibling', async () => {
+    const installation = await insertInstallation('standard');
+    const workflow = await insertRow({ github_connection_role: 'workflow' });
+    const agentOnly = await insertRow({
+      github_connection_role: 'agent_only',
+      github_installation_id: installation.id,
+    });
+
+    try {
+      const ids = await listNativelyUninstallableIds([workflow.row, agentOnly.row]);
+      expect([...ids]).toEqual([workflow.row.id]);
+    } finally {
+      await cleanup([workflow.user.id, agentOnly.user.id]);
+      await db
+        .delete(github_app_installations)
+        .where(eq(github_app_installations.id, installation.id));
+    }
+  });
+
+  it('counts a null app type with standard on both sides of the comparison', async () => {
+    const shared = crypto.randomUUID();
+    const blocked = await insertRow({
+      github_connection_role: 'workflow',
+      platform_installation_id: shared,
+      github_app_type: null,
+    });
+    const legacySibling = await insertRow({
+      platform_installation_id: shared,
+      github_app_type: 'standard',
+    });
+    const alone = await insertRow({
+      github_connection_role: 'workflow',
+      platform_installation_id: crypto.randomUUID(),
+      github_app_type: null,
+    });
+
+    try {
+      const ids = await listNativelyUninstallableIds([blocked.row, alone.row]);
+      expect([...ids]).toEqual([alone.row.id]);
+    } finally {
+      await cleanup([blocked.user.id, legacySibling.user.id, alone.user.id]);
+    }
+  });
+
+  it('counts one installation shared with another owner as busy', async () => {
+    const installationId = crypto.randomUUID();
+    const workflow = await insertRow({
+      github_connection_role: 'workflow',
+      platform_installation_id: installationId,
+    });
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub shared ${crypto.randomUUID()}` })
+      .returning();
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: installationId,
+      integration_status: 'active',
+      repository_access: 'all',
+    });
+
+    try {
+      await expect(listNativelyUninstallableIds([workflow.row])).resolves.toEqual(new Set());
+    } finally {
+      await cleanup([workflow.user.id]);
       await db.delete(organizations).where(eq(organizations.id, organization.id));
     }
   });

@@ -1,21 +1,20 @@
 import { type Href, useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { type ReactNode } from 'react';
-import { Linking, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { rowTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getKiloPassCardContentState } from '@/lib/kilo-pass/state';
 import { isNarrowLayout } from '@/lib/narrow-layout';
+import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc';
-import {
-  getKiloPassSubscriptionCardAccessibility,
-  getKiloPassSubscriptionCardContentState,
-} from '@/lib/kilo-pass/subscription-card-state';
 
 export function KiloPassSubscriptionCard({
   hideLoadingSkeleton = false,
@@ -40,41 +39,23 @@ export function KiloPassSubscriptionCard({
   // 160 dp, e1 round, 2026-09-21). Stacking hands the text the card's full
   // width, the same presentation ConfigureRow takes on these screens.
   const narrow = isNarrowLayout(width);
-  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-  const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
-  const presentationQuery = useQuery(
-    trpc.kiloPass.getPurchasePresentation.queryOptions({
-      platform,
-      storefront,
-      product: 'kilo_pass',
-    })
-  );
-  const contentState = getKiloPassSubscriptionCardContentState({
-    presentation: presentationQuery.data,
-    presentationIsError: presentationQuery.isError,
-    presentationIsPending: presentationQuery.isPending,
+  const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
+  const contentState = getKiloPassCardContentState({
+    subscription: stateQuery.data?.subscription,
+    isError: stateQuery.isError,
+    isPending: stateQuery.isPending,
   });
 
   const handlePress = () => {
     if (contentState.kind !== 'card') {
       return;
     }
-
-    const cardState = contentState.state;
-
     selectionHaptic();
-    if (cardState.action === 'open-web') {
-      const webUrl = presentationQuery.data?.webUrl;
-      if (webUrl) {
-        void Linking.openURL(webUrl);
-      }
-      return;
-    }
     router.push('/(app)/kilo-pass' as Href);
   };
   const handleRetryPress = () => {
     selectionHaptic();
-    void presentationQuery.refetch();
+    void stateQuery.refetch();
   };
 
   // The card body's one row: icon tile + text block + an optional trailing
@@ -111,9 +92,9 @@ export function KiloPassSubscriptionCard({
         // (2026-11-05). The earlier 66 assumed a 16 pt rem and left every
         // section below the card moving 8 dp when the card arrived.
         //
-        // The stacked reserve keeps its old value: the standard matrix has no
-        // window narrow enough to reach it, so there is no measurement behind
-        // a change to it.
+        // The stacked reserve holds the tallest state: p-3 (21) + borders (2)
+        // + the h-10 icon row (35) + the gap (7) + the title (21) and the two
+        // lines the no-pass and ended sentences wrap to at a narrow width (28).
         <View className={narrow ? 'h-[114px]' : 'h-[58px]'} />
       ) : null}
 
@@ -150,8 +131,18 @@ export function KiloPassSubscriptionCard({
         >
           {cardBody(
             <>
-              <Text className="font-semibold">{contentState.title}</Text>
-              <Text className="text-xs text-muted-foreground">{contentState.description}</Text>
+              <Text className="font-semibold" numberOfLines={1}>
+                {contentState.title}
+              </Text>
+              {/* The stacked card keeps a two-line slot at every state so the
+                  reserved loading height is the height the card resolves to;
+                  the side-by-side layout clamps the line instead. */}
+              <Text
+                className={cn('text-xs text-muted-foreground', narrow && 'min-h-[28px]')}
+                numberOfLines={narrow ? 2 : 1}
+              >
+                {contentState.description}
+              </Text>
             </>,
             <Text className="shrink-0 text-xs font-medium text-primary">
               {contentState.actionLabel}
@@ -162,28 +153,31 @@ export function KiloPassSubscriptionCard({
 
       {contentState.kind === 'card' ? (
         <Pressable
-          accessibilityHint={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint
-          }
-          accessibilityLabel={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
-          }
+          accessibilityLabel={contentState.accessibilityLabel}
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handlePress}
         >
           {cardBody(
             <>
-              <Text className="font-semibold">{contentState.state.title}</Text>
-              <Text className="text-xs text-muted-foreground">
-                {contentState.state.description}
+              <Text className="font-semibold" numberOfLines={1}>
+                {contentState.title}
+              </Text>
+              {/* The stacked card keeps a two-line slot at every state so the
+                  reserved loading height is the height the card resolves to;
+                  the side-by-side layout clamps the line instead. */}
+              <Text
+                className={cn('text-xs text-muted-foreground', narrow && 'min-h-[28px]')}
+                numberOfLines={narrow ? 2 : 1}
+              >
+                {contentState.description}
               </Text>
             </>,
-            contentState.state.actionLabel ? (
-              <Text className="shrink-0 text-xs font-medium text-primary">
-                {contentState.state.actionLabel}
-              </Text>
-            ) : undefined
+            <DirectionalChevronRight
+              size={14}
+              color={colors.mutedForeground}
+              className="shrink-0"
+            />
           )}
         </Pressable>
       ) : null}

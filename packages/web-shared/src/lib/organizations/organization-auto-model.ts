@@ -37,12 +37,9 @@ export {
   hasOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
   MAX_ORGANIZATION_AUTO_ROUTES,
-  ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
-import {
-  isOrganizationAutoTargetModel,
-  ORGANIZATION_AUTO_MODEL_FLAG,
-} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { isOrganizationAutoTargetModel } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { ORGANIZATION_AUTO_MODEL_FLAG } from '@kilocode/app-shared/feature-flags';
 import {
   isCustomRouterModelId,
   ORG_CUSTOM_ROUTER_MODEL_PREFIX,

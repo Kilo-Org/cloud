@@ -1,7 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { cloud_billing_sku, container_usage_interval } from '@kilocode/db/schema';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
-import { hasOrganizationAccess } from '@kilocode/worker-utils';
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getPgDb } from '../../db/pg.js';
@@ -16,6 +15,7 @@ import type { WorkspaceRuntimeStatus } from '../../shared/workspace-runtime-stat
 import type { TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure } from '../auth.js';
+import { getAuthorizedHostedWorkspace } from './hosted-workspace-access.js';
 
 const ROOT_STATUS_ATTEMPTS = 3;
 
@@ -115,36 +115,9 @@ export const getHostedWorkspaceStatus = protectedProcedure
   .input(getHostedWorkspaceStatusInput)
   .output(getHostedWorkspaceStatusOutput)
   .query(async ({ input, ctx }) => {
-    const requestedOrganizationId = input.kilocodeOrganizationId ?? null;
-    if (
-      requestedOrganizationId !== null &&
-      !(await hasOrganizationAccess(getPgDb(ctx.env), {
-        kiloUserId: ctx.userId,
-        organizationId: requestedOrganizationId,
-      }))
-    ) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'Workspace access denied' });
-    }
-    const workspace = await ctx.env.SESSION_INGEST.getCloudAgentWorkspace({
-      kiloUserId: ctx.userId,
-      workspaceId: input.workspaceId,
+    const workspace = await getAuthorizedHostedWorkspace(ctx, input, {
       sessionLimit: ROOT_STATUS_ATTEMPTS,
     });
-    if (!workspace) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Workspace not found' });
-    }
-    if (requestedOrganizationId !== null && workspace.organizationId !== requestedOrganizationId) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'Workspace scope mismatch' });
-    }
-    if (
-      workspace.organizationId !== null &&
-      !(await hasOrganizationAccess(getPgDb(ctx.env), {
-        kiloUserId: ctx.userId,
-        organizationId: workspace.organizationId,
-      }))
-    ) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'Workspace access denied' });
-    }
     const status = await ctx.env.SESSION_INGEST.getCloudAgentWorkspaceStatus({
       kiloUserId: ctx.userId,
       workspaceId: input.workspaceId,

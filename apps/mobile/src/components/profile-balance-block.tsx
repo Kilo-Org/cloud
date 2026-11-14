@@ -102,7 +102,10 @@ export function BalanceBlock({
   );
 
   return (
-    <View className={shellClass}>
+    // The shell draws the card and takes no touch itself, so the account
+    // picker's hit slop above it (the Credits header row) still reaches into
+    // the card's top padding; its own controls keep their touches.
+    <View className={shellClass} pointerEvents="box-none">
       <Animated.View className={contentClass} layout={LinearTransition.duration(200)}>
         {/* `flex-row` keeps the column's `flex-1` on the horizontal axis. */}
         <View className={valueColumnClass}>

@@ -358,7 +358,11 @@ export async function addUserByokAvailability(
         enabledProviderIds: enabledProviders,
         allowedProviders: getAllowedProviders(model.id),
       });
-      return { ...model, hasUserByokAvailable };
+      return {
+        ...model,
+        hasUserByokAvailable,
+        ...(hasUserByokAvailable ? { isFree: false } : {}),
+      };
     })
   );
   // One record per pass: the availability pass touches every catalog model, so a
@@ -417,7 +421,9 @@ export function addDirectByokCatalogAvailability(
 ): OpenRouterModel[] {
   if (directByokCatalogModelIds.size === 0) return models;
   return models.map(model =>
-    directByokCatalogModelIds.has(model.id) ? { ...model, hasUserByokAvailable: true } : model
+    directByokCatalogModelIds.has(model.id)
+      ? { ...model, hasUserByokAvailable: true, isFree: false }
+      : model
   );
 }
 

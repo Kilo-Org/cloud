@@ -33,7 +33,7 @@ export { isStreamError, isValidCloudAgentEvent } from './schemas';
 export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 
 export { formatError as formatSessionError } from './session-manager';
-export { createSessionManager } from './session-manager';
+export { createSessionManager, RETAINED_MESSAGE_WINDOW } from './session-manager';
 export { sessionConfigFromFetchedSession } from './session-config';
 export { customerBillingFailureSchema, parseCustomerBillingFailure } from './schemas';
 export type { CustomerBillingFailure } from './schemas';
@@ -52,6 +52,8 @@ export type {
   StandaloneSuggestion,
   ChildSessionHydrationState,
   StoredMessage,
+  DeliveredFailedPrompt,
+  PendingSendConfirmation,
   FetchedSessionData,
   AssociatedPrData,
   PrepareInput,
@@ -71,6 +73,7 @@ export type {
   PermissionResponse,
 } from './session';
 
+export { cloudMessageInfoSchema, cloudMessagePartSchema } from './cloud-conversation-schemas';
 export { normalize, normalizeCliEvent, isChatEvent, projectSessionGoal } from './normalizer';
 export type { NormalizedEvent, ChatEvent, ChatEventVersion, ServiceEvent } from './normalizer';
 
@@ -174,7 +177,10 @@ export { splitByContiguousPrefix } from './array-utils';
 export { calculateContextUsagePercentage } from './context-usage';
 export type { ContextUsage } from './context-usage';
 
-export { isNoOpCompletedPreparationAttempt } from './preparation-attempts';
+export {
+  isNoOpCompletedPreparationAttempt,
+  isPreparationCancellation,
+} from './preparation-attempts';
 
 export type {
   KiloSdkMessageHistory,

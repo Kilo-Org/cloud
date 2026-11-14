@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { clearDraft, prConversationCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
@@ -239,7 +239,7 @@ export function PrConversationCommentComposer({
     // draft stays intact, nothing is pending, and the same tap retries once
     // the banner clears. This is a local rejection with no toast owner, so it
     // announces through AccessibleStatus.
-    if (getCommittedConnectivityStatus() === 'offline') {
+    if (connectionRefusesWrites()) {
       setInlineError(t('prReview.mutationError.couldNotPostComment'));
       setInlineErrorKind('retryable');
       setInlineErrorIsLocal(true);

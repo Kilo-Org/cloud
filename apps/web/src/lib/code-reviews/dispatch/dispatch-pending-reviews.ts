@@ -68,7 +68,12 @@ import {
   type PendingCodeReviewCreatedAtWindow,
 } from './dispatch-constants';
 import { getManualCodeReviewConfig, shouldPublishCodeReviewToProvider } from '../manual-config';
-import { CODE_REVIEW_BILLING_FAILURE_MESSAGE, finalizeCodeReviewBillingFailure } from '../billing';
+import {
+  CODE_REVIEW_BILLING_FAILURE_MESSAGE,
+  CODE_REVIEW_RECONNECT_FAILURE_MESSAGE,
+  finalizeCodeReviewBillingFailure,
+  finalizeCodeReviewReconnectFailure,
+} from '../billing';
 import { settleCodeReviewLedgerRow } from '../code-review-ledger';
 import { resolveCodeReviewDispatchBilling } from './dispatch-billing';
 
@@ -115,6 +120,18 @@ class CodeReviewInsufficientCreditsDispatchError extends Error {
   constructor() {
     super(CODE_REVIEW_BILLING_FAILURE_MESSAGE);
     this.name = 'CodeReviewInsufficientCreditsDispatchError';
+  }
+}
+
+/**
+ * The organization's shared-services Claude billing link needs a reconnect, and
+ * routing refuses every request for the review model until an owner performs
+ * it. Thrown before the worker call so no session is prepared.
+ */
+class CodeReviewReconnectRequiredDispatchError extends Error {
+  constructor() {
+    super(CODE_REVIEW_RECONNECT_FAILURE_MESSAGE);
+    this.name = 'CodeReviewReconnectRequiredDispatchError';
   }
 }
 
@@ -373,10 +390,20 @@ export async function tryDispatchPendingReviews(
         const errorMessage = getErrorMessage(error);
 
         if (error instanceof CodeReviewInsufficientCreditsDispatchError) {
-          await failReviewForInsufficientCredits(
-            reservation.review,
-            reservation.dispatchReservationId
-          );
+          await failReviewForBillingRefusal(reservation.review, reservation.dispatchReservationId, {
+            reason: 'insufficient-credits',
+            message: CODE_REVIEW_BILLING_FAILURE_MESSAGE,
+            finalize: finalizeCodeReviewBillingFailure,
+          });
+          continue;
+        }
+
+        if (error instanceof CodeReviewReconnectRequiredDispatchError) {
+          await failReviewForBillingRefusal(reservation.review, reservation.dispatchReservationId, {
+            reason: 'reconnect-required',
+            message: CODE_REVIEW_RECONNECT_FAILURE_MESSAGE,
+            finalize: finalizeCodeReviewReconnectFailure,
+          });
           continue;
         }
 
@@ -525,30 +552,43 @@ export async function tryDispatchPendingReviews(
 }
 
 /**
- * Terminalize a review refused for insufficient credits before any worker
- * call: persist the billing outcome, settle the ledger, and close the provider
- * gate with the same notice the status callback posts for a worker-side
- * billing failure.
+ * A review refusal decided before any worker call: the reason stored on the
+ * review and the attempt, and the provider-side record of it.
  */
-async function failReviewForInsufficientCredits(
+type DispatchBillingRefusal = {
+  /** Names the refusal in logs and Sentry operation tags. */
+  reason: 'insufficient-credits' | 'reconnect-required';
+  /** Stored on the review and its attempt, and shown in the app. */
+  message: string;
+  /** Closes the provider gate with the copy that matches the reason. */
+  finalize: (review: CloudAgentCodeReview) => Promise<void>;
+};
+
+/**
+ * Terminalize a review refused on billing grounds before any worker call:
+ * persist the refusal, settle the ledger, and close the provider gate the same
+ * way the status callback does for a worker-side billing failure.
+ */
+async function failReviewForBillingRefusal(
   review: CloudAgentCodeReview,
-  dispatchReservationId: string
+  dispatchReservationId: string,
+  refusal: DispatchBillingRefusal
 ): Promise<void> {
   let failed = false;
   try {
     failed = await failReservedQueuedReview(
       review.id,
       dispatchReservationId,
-      CODE_REVIEW_BILLING_FAILURE_MESSAGE,
+      refusal.message,
       'billing'
     );
   } catch (error) {
-    errorExceptInTest('[dispatchReview] Failed to mark review failed for insufficient credits', {
+    errorExceptInTest(`[dispatchReview] Failed to mark review failed for ${refusal.reason}`, {
       reviewId: review.id,
       error,
     });
     captureException(error, {
-      tags: { operation: 'dispatch-review-insufficient-credits' },
+      tags: { operation: `dispatch-review-${refusal.reason}` },
       extra: { reviewId: review.id },
     });
     try {
@@ -559,7 +599,7 @@ async function failReviewForInsufficientCredits(
         releaseError,
       });
       captureException(releaseError, {
-        tags: { operation: 'release-insufficient-credits-review-reservation' },
+        tags: { operation: `release-${refusal.reason}-review-reservation` },
         extra: { reviewId: review.id },
       });
     }
@@ -579,17 +619,17 @@ async function failReviewForInsufficientCredits(
       codeReviewId: review.id,
       attemptId: attempt.id,
       status: 'failed',
-      errorMessage: CODE_REVIEW_BILLING_FAILURE_MESSAGE,
+      errorMessage: refusal.message,
       terminalReason: 'billing',
       completedAt: new Date(),
     });
   } catch (error) {
-    errorExceptInTest('[dispatchReview] Failed to record insufficient-credits attempt', {
+    errorExceptInTest(`[dispatchReview] Failed to record ${refusal.reason} attempt`, {
       reviewId: review.id,
       error,
     });
     captureException(error, {
-      tags: { operation: 'dispatch-review-insufficient-credits-attempt' },
+      tags: { operation: `dispatch-review-${refusal.reason}-attempt` },
       extra: { reviewId: review.id },
     });
   }
@@ -607,13 +647,13 @@ async function failReviewForInsufficientCredits(
       error,
     });
     captureException(error, {
-      tags: { operation: 'dispatch-review-insufficient-credits-ledger' },
+      tags: { operation: `dispatch-review-${refusal.reason}-ledger` },
       extra: { reviewId: review.id },
     });
   }
 
   if (!shouldPublishCodeReviewToProvider(review)) return;
-  await finalizeCodeReviewBillingFailure(review);
+  await refusal.finalize(review);
 }
 
 async function dispatchReservedReview(reservation: ReservedReview, owner: Owner): Promise<boolean> {
@@ -707,6 +747,14 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     owner,
     models: [reviewModel, ...councilModels],
   });
+  if (!billing.skipBalanceCheck && billing.reconnectRequired) {
+    logExceptInTest('[dispatchReview] Review waits on a Claude billing reconnect', {
+      reviewId: review.id,
+      owner,
+      models: [reviewModel, ...councilModels],
+    });
+    throw new CodeReviewReconnectRequiredDispatchError();
+  }
   if (!billing.skipBalanceCheck && !billing.canAfford) {
     logExceptInTest('[dispatchReview] Review requires more credits than the payer has', {
       reviewId: review.id,

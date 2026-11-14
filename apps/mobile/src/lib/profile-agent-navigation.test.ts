@@ -177,6 +177,10 @@ describe('Profile route names', () => {
     expect(getProfileSectionRouteName('slash-commands', 'app')).toBe(
       'profile-management/[profileId]/slash-commands'
     );
+    expect(getProfileSectionRouteName('instructions')).toBe('profiles/[profileId]/instructions');
+    expect(getProfileSectionRouteName('instructions', 'app')).toBe(
+      'profile-management/[profileId]/instructions'
+    );
   });
 
   it('lists every profile screen of a Stack, the list first', () => {
@@ -189,11 +193,12 @@ describe('Profile route names', () => {
       'profile-management/[profileId]/commands',
       'profile-management/[profileId]/mcp',
       'profile-management/[profileId]/skills',
+      'profile-management/[profileId]/instructions',
       'profile-management/[profileId]/slash-commands',
       'profile-management/[profileId]/variables',
     ]);
     expect(getProfileRouteNames()[0]).toBe('profiles/index');
-    expect(getProfileRouteNames()).toHaveLength(10);
+    expect(getProfileRouteNames()).toHaveLength(11);
   });
 });
 

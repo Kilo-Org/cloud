@@ -25,7 +25,7 @@ import {
 
 import assetLinks from '../../../public/.well-known/assetlinks.json';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 
 /**
@@ -80,13 +80,25 @@ function getReleaseAndroidOrigins(): string[] {
   return origins;
 }
 
-function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
+/**
+ * Resolve the configured relying party. `rpId` is the host of `NEXTAUTH_URL`
+ * without the port, and `origin` is that URL's origin. Both relying-party
+ * helpers read it through here, so a credential registered by an ordinary
+ * ceremony always verifies for a privileged step-up: WebAuthn binds the
+ * credential and challenge to this `rpId`.
+ */
+function nextAuthRelyingParty(): { rpId: string; origin: string } {
   const url = new URL(NEXTAUTH_URL);
-  const expectedOrigins = [url.origin, ...getReleaseAndroidOrigins()];
+  return { rpId: url.hostname, origin: url.origin };
+}
+
+function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
+  const { rpId, origin } = nextAuthRelyingParty();
+  const expectedOrigins = [origin, ...getReleaseAndroidOrigins()];
   if (process.env.NODE_ENV !== 'production') {
     expectedOrigins.push(fingerprintToAndroidOrigin(ANDROID_DEBUG_CERT_FINGERPRINT));
   }
-  return { rpId: url.hostname, expectedOrigins };
+  return { rpId, expectedOrigins };
 }
 
 /**
@@ -95,8 +107,8 @@ function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
  * there would let a mobile client borrow a browser session's proof.
  */
 export function getWebRelyingParty(): { rpId: string; expectedOrigin: string } {
-  const url = new URL(NEXTAUTH_URL);
-  return { rpId: url.hostname, expectedOrigin: url.origin };
+  const { rpId, origin } = nextAuthRelyingParty();
+  return { rpId, expectedOrigin: origin };
 }
 
 const rpName = 'Kilo Code';
@@ -207,6 +219,79 @@ function readPresentedChallenge(response: {
 }
 
 /**
+ * Refuse a ceremony whose client data names another challenge. A response can
+ * omit the client data challenge or carry one that cannot be parsed, so only a
+ * readable mismatch is refused here; verification still runs against the
+ * stored challenge.
+ */
+function assertPresentedChallenge(
+  response: { response?: { clientDataJSON?: unknown } },
+  storedChallenge: string
+): void {
+  const presentedChallenge = readPresentedChallenge(response);
+  if (presentedChallenge !== null && presentedChallenge !== storedChallenge) {
+    throw new PasskeyVerificationError('WRONG_CHALLENGE');
+  }
+}
+
+/**
+ * Normalize a failed WebAuthn call: our own refusal keeps its code, and every
+ * library throw becomes `VERIFICATION_FAILED`, so library detail never reaches
+ * the client.
+ */
+function normalizeVerificationFailure(error: unknown): never {
+  if (error instanceof PasskeyVerificationError) {
+    throw error;
+  }
+  throw new PasskeyVerificationError('VERIFICATION_FAILED');
+}
+
+/**
+ * Run one WebAuthn verifier and return its verified result. A verifier that
+ * reports `verified: false` is refused with the same code as a throw, and every
+ * throw is normalized, so library detail never reaches the client.
+ */
+async function verifyOrRefuse<T extends { verified: boolean }>(
+  call: () => Promise<T>
+): Promise<T & { verified: true }> {
+  function isVerified(result: T): result is T & { verified: true } {
+    return result.verified;
+  }
+
+  try {
+    const result = await call();
+    if (!isVerified(result)) {
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
+    return result;
+  } catch (error) {
+    normalizeVerificationFailure(error);
+  }
+}
+
+/**
+ * Store a freshly minted challenge and return the opaque id the client echoes
+ * back. The row carries the ceremony it authorizes and, for registration, the
+ * owner it was minted for; authentication is usernameless, so its owner is
+ * null.
+ */
+async function storeChallenge(
+  challenge: string,
+  ceremony: PasskeyCeremony,
+  kiloUserId: string | null
+): Promise<string> {
+  const challengeId = randomUUID();
+  await db.insert(passkey_challenges).values({
+    id: challengeId,
+    challenge,
+    kind: ceremony,
+    kilo_user_id: kiloUserId,
+    expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
+  });
+  return challengeId;
+}
+
+/**
  * Create the WebAuthn registration options for a signed-in user and store the
  * challenge server-side.
  *
@@ -245,14 +330,7 @@ export async function createRegistrationOptions(
     },
   });
 
-  const challengeId = randomUUID();
-  await db.insert(passkey_challenges).values({
-    id: challengeId,
-    challenge: options.challenge,
-    kind: 'registration',
-    kilo_user_id: kiloUserId,
-    expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
-  });
+  const challengeId = await storeChallenge(options.challenge, 'registration', kiloUserId);
 
   return { challengeId, options };
 }
@@ -290,14 +368,10 @@ export async function verifyRegistration(
     throw new PasskeyVerificationError('VERIFICATION_FAILED');
   }
 
-  const presentedChallenge = readPresentedChallenge(response);
-  if (presentedChallenge !== null && presentedChallenge !== challenge.challenge) {
-    throw new PasskeyVerificationError('WRONG_CHALLENGE');
-  }
+  assertPresentedChallenge(response, challenge.challenge);
 
-  let registrationInfo: Awaited<ReturnType<typeof verifyRegistrationResponse>>['registrationInfo'];
-  try {
-    const verification = await verifyRegistrationResponse({
+  const { registrationInfo } = await verifyOrRefuse(() =>
+    verifyRegistrationResponse({
       response,
       expectedChallenge: challenge.challenge,
       expectedOrigin: expectedOrigins,
@@ -305,17 +379,8 @@ export async function verifyRegistration(
       // The options ask for `userVerification: 'preferred'`, so an
       // authenticator that skipped verification is still a legitimate user.
       requireUserVerification: false,
-    });
-    if (!verification.verified) {
-      throw new PasskeyVerificationError('VERIFICATION_FAILED');
-    }
-    registrationInfo = verification.registrationInfo;
-  } catch (error) {
-    if (error instanceof PasskeyVerificationError) {
-      throw error;
-    }
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
-  }
+    })
+  );
 
   const { credential, credentialDeviceType, credentialBackedUp, aaguid } = registrationInfo;
 
@@ -375,14 +440,7 @@ export async function createAuthenticationOptions(): Promise<AuthenticationOptio
     userVerification: 'preferred',
   });
 
-  const challengeId = randomUUID();
-  await db.insert(passkey_challenges).values({
-    id: challengeId,
-    challenge: options.challenge,
-    kind: 'authentication',
-    kilo_user_id: null,
-    expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
-  });
+  const challengeId = await storeChallenge(options.challenge, 'authentication', null);
 
   return { challengeId, options };
 }
@@ -395,7 +453,7 @@ export async function createAuthenticationOptions(): Promise<AuthenticationOptio
 export async function advancePasskeyCounter(
   credential: Pick<PasskeyCredential, 'id' | 'sign_count'>,
   newCounter: number,
-  fromDb: typeof db | DrizzleTransaction = db
+  fromDb: DrizzleConnection = db
 ): Promise<boolean> {
   const advanced = await fromDb
     .update(passkey_credentials)
@@ -437,10 +495,7 @@ export async function verifyAuthentication(
 
   const challenge = await consumeChallenge(challengeId, 'authentication');
 
-  const presentedChallenge = readPresentedChallenge(response);
-  if (presentedChallenge !== null && presentedChallenge !== challenge.challenge) {
-    throw new PasskeyVerificationError('WRONG_CHALLENGE');
-  }
+  assertPresentedChallenge(response, challenge.challenge);
 
   const [credential] = await db
     .select()
@@ -451,9 +506,8 @@ export async function verifyAuthentication(
     throw new PasskeyVerificationError('UNKNOWN_CREDENTIAL');
   }
 
-  let newCounter: number;
-  try {
-    const verification = await verifyAuthenticationResponse({
+  const { authenticationInfo } = await verifyOrRefuse(() =>
+    verifyAuthenticationResponse({
       response,
       expectedChallenge: challenge.challenge,
       expectedOrigin: expectedOrigins,
@@ -466,19 +520,10 @@ export async function verifyAuthentication(
       },
       // Match the `userVerification: 'preferred'` request options.
       requireUserVerification: false,
-    });
-    if (!verification.verified) {
-      throw new PasskeyVerificationError('VERIFICATION_FAILED');
-    }
-    newCounter = verification.authenticationInfo.newCounter;
-  } catch (error) {
-    if (error instanceof PasskeyVerificationError) {
-      throw error;
-    }
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
-  }
+    })
+  );
 
-  if (credential.sign_count !== 0 && newCounter <= credential.sign_count) {
+  if (credential.sign_count !== 0 && authenticationInfo.newCounter <= credential.sign_count) {
     // The counter only moves forward; a lower or equal value is a replayed
     // assertion from a cloned authenticator.
     throw new PasskeyVerificationError('VERIFICATION_FAILED');
@@ -496,12 +541,21 @@ export async function verifyAuthentication(
   // row, or wait for this commit and then delete the ticket minted here.
   // Neither can leave a ticket that outlives the removed credential.
   const ticket = await db.transaction(async tx => {
-    if (!(await advancePasskeyCounter(credential, newCounter, tx))) {
+    if (!(await advancePasskeyCounter(credential, authenticationInfo.newCounter, tx))) {
       throw new PasskeyVerificationError('VERIFICATION_FAILED');
     }
     return createSignInTicket(credential.kilo_user_id, tx);
   });
   return { ticket };
+}
+
+/**
+ * Derive the stored digest of a sign-in ticket. The ticket itself is never
+ * stored: issuance writes this digest and redemption looks the row up by it,
+ * so both read the one derivation and cannot disagree.
+ */
+function hashSignInTicket(ticket: string): string {
+  return createHash('sha256').update(ticket).digest('hex');
 }
 
 /**
@@ -512,10 +566,10 @@ export async function verifyAuthentication(
  */
 export async function createSignInTicket(
   kiloUserId: string,
-  fromDb: typeof db | DrizzleTransaction = db
+  fromDb: DrizzleConnection = db
 ): Promise<string> {
   const ticket = randomBytes(32).toString('hex');
-  const ticket_hash = createHash('sha256').update(ticket).digest('hex');
+  const ticket_hash = hashSignInTicket(ticket);
 
   await fromDb.insert(passkey_sign_in_tickets).values({
     ticket_hash,
@@ -531,7 +585,7 @@ export async function createSignInTicket(
  * is usable exactly once, and never after its two-minute expiry.
  */
 export async function consumeSignInTicket(ticket: string): Promise<PasskeySignInTicket | null> {
-  const ticket_hash = createHash('sha256').update(ticket).digest('hex');
+  const ticket_hash = hashSignInTicket(ticket);
 
   const [row] = await db
     .update(passkey_sign_in_tickets)
@@ -549,35 +603,35 @@ export async function consumeSignInTicket(ticket: string): Promise<PasskeySignIn
 }
 
 /**
- * Delete passkey challenges that can no longer authorize anything. Both
- * ceremonies mint rows, and the usernameless ones carry no user id, so account
- * deletion cannot reach them; this is what keeps the table bounded. Only rows
- * past their five-minute expiry are removed, so a ceremony in flight is never
- * cut short.
+ * Delete passkey rows that can no longer authorize anything, under one cutoff.
+ *
+ * Challenges: both ceremonies mint rows, and the usernameless ones carry no
+ * user id, so account deletion cannot reach them; this is what keeps the table
+ * bounded. Only rows past their five-minute expiry are removed, so a ceremony
+ * in flight is never cut short.
+ *
+ * Sign-in tickets: a ticket is single-use and expires two minutes after it is
+ * minted, and redemption only marks it consumed, so without this every passkey
+ * sign-in would retain a user-linked row forever. Only rows past their expiry
+ * are removed, so a redemption in flight is never cut short.
  */
-export async function cleanupExpiredPasskeyChallenges(): Promise<number> {
-  const deleted = await db
+export async function cleanupExpiredPasskeyRows(): Promise<{
+  challenges: number;
+  tickets: number;
+}> {
+  const cutoff = new Date().toISOString();
+
+  const challenges = await db
     .delete(passkey_challenges)
-    .where(lt(passkey_challenges.expires_at, new Date().toISOString()))
+    .where(lt(passkey_challenges.expires_at, cutoff))
     .returning({ id: passkey_challenges.id });
 
-  return deleted.length;
-}
-
-/**
- * Delete passkey sign-in tickets that can no longer authorize anything. A
- * ticket is single-use and expires two minutes after it is minted, and
- * redemption only marks it consumed, so without this every passkey sign-in
- * would retain a user-linked row forever. Only rows past their expiry are
- * removed, so a redemption in flight is never cut short.
- */
-export async function cleanupExpiredPasskeySignInTickets(): Promise<number> {
-  const deleted = await db
+  const tickets = await db
     .delete(passkey_sign_in_tickets)
-    .where(lt(passkey_sign_in_tickets.expires_at, new Date().toISOString()))
+    .where(lt(passkey_sign_in_tickets.expires_at, cutoff))
     .returning({ id: passkey_sign_in_tickets.id });
 
-  return deleted.length;
+  return { challenges: challenges.length, tickets: tickets.length };
 }
 
 /** Passkeys registered by a user, newest first. */

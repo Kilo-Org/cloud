@@ -323,13 +323,14 @@ describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
 });
 
 describe('idle composer control and ring track contrast (non-text)', () => {
-  // Two dark-mode surfaces the light theme already carries: the composer's send
-  // circle while there is nothing to send, and the track under the context-usage
-  // ring's arc. Both painted the light theme's neutral and hairline tint, which
-  // sit within 1.2:1 of the near-black page and left the disc and the ring
-  // invisible. The floors below are perception floors, not a WCAG bar: the fill
-  // and the track must read as objects on the page, and the ring track must stay
-  // under the neutral arc so a part-filled arc still reads as a fraction.
+  // Two surfaces that needed their own step: the composer's send circle while
+  // there is nothing to send (dark only — the light theme keeps its neutral),
+  // and the track under the context-usage ring's arc (both themes: the light
+  // hairline tint sat within 1.2:1 of its pill and left the ring invisible just
+  // as the dark one did). The floors below are perception floors, not a WCAG
+  // bar: the fill and the track must read as objects on their surfaces, and the
+  // ring track must stay under the neutral arc so a part-filled arc still reads
+  // as a fraction.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
   const themes = [
     ['light', lightColors],
@@ -351,15 +352,24 @@ describe('idle composer control and ring track contrast (non-text)', () => {
     }
   });
 
-  it('dark theme: the ring track reads on its pill and stays under the neutral arc', () => {
-    // The header pill's own surface is `secondary`, so the track is measured
-    // over that, not over the page.
-    const track = compositeToken(darkColors.ringTrack, darkColors.secondary);
-    const trackRatio = contrastRatio(track, darkColors.secondary);
-    expect(trackRatio).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    expect(trackRatio).toBeLessThan(
-      contrastRatio(darkColors.mutedForeground, darkColors.secondary)
-    );
+  // The ring paints in the header pill (`secondary`) and in the context and
+  // message-details sheets (`background`), so the track is measured over both
+  // rather than over the page alone. It must clear the perception floor on each
+  // and stay under the neutral arc so a part-filled arc still reads as a
+  // fraction. Light once shipped the hairline tint here (1.11:1 on the pill),
+  // which left the ring as a lone arc with no circle under it.
+  it('every theme: the ring track reads on its surfaces and stays under the neutral arc', () => {
+    for (const [themeName, colors] of themes) {
+      const arcRatio = contrastRatio(colors.mutedForeground, colors.secondary);
+      for (const surfaceName of ['secondary', 'background'] as const) {
+        const surface = colors[surfaceName];
+        const trackRatio = contrastRatio(compositeToken(colors.ringTrack, surface), surface);
+        expect(trackRatio, `ring track vs ${surfaceName} (${themeName})`).toBeGreaterThanOrEqual(
+          MIN_VISIBLE_SURFACE_RATIO
+        );
+        expect(trackRatio, `ring track vs arc (${themeName})`).toBeLessThan(arcRatio);
+      }
+    }
   });
 });
 

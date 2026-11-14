@@ -1,9 +1,6 @@
-import * as ExpoSecureStore from 'expo-secure-store';
-
 import {
   deleteStoredValue,
   readStoredValue,
-  secureStoreOptionsArgs,
   type SecureStoreReadOptions,
   writeStoredValue,
 } from '@/lib/auth/secure-store-value';
@@ -20,10 +17,12 @@ import {
  * with the app's data: the keychain is unavailable because the device is
  * locked (iOS `errSecInteractionNotAllowed` on a `WHEN_UNLOCKED*` item), the
  * keystore is not ready after a reboot, or the OS rewrote the item. Every call
- * through this module reports that failure at warning level with the stable
+ * through this module reports a failure at warning level with the stable
  * operation fingerprint before the rejection reaches the caller, so one
  * failure produces one Sentry issue named after the operation instead of a raw
- * `FunctionCallException` message that changes per platform and OS version.
+ * `FunctionCallException` message that changes per platform and OS version. The
+ * locked-device refusal is the one exception: it is expected, so it leaves a
+ * breadcrumb and files no event (see `lib/telemetry/secure-store-events`).
  *
  * The key and the stored value are never attached to the report: a stored
  * value can be a credential.
@@ -43,9 +42,7 @@ import {
  * repeating it: one module decides the protected-data guard, the option
  * forwarding, the report fingerprint and the rethrow. The read below is the
  * one intended difference, since the layer's plain read stays silent for the
- * retrying credential read and reports here. The synchronous pair has no
- * counterpart there — the layer is asynchronous — so this module keeps that
- * one path, with the same guard and report.
+ * retrying credential read and reports here.
  */
 
 /** Report one failed operation and rethrow so the caller owns the outcome. */
@@ -82,22 +79,4 @@ export async function deleteItemAsync(
   options?: SecureStoreReadOptions
 ): Promise<void> {
   await deleteStoredValue(key, options);
-}
-
-export function getItem(key: string, options?: SecureStoreReadOptions): string | null {
-  assertProtectedDataAvailable();
-  try {
-    return ExpoSecureStore.getItem(key, ...secureStoreOptionsArgs(options));
-  } catch (error) {
-    return reportAndRethrow('read', error);
-  }
-}
-
-export function setItem(key: string, value: string, options?: SecureStoreReadOptions): void {
-  assertProtectedDataAvailable();
-  try {
-    ExpoSecureStore.setItem(key, value, ...secureStoreOptionsArgs(options));
-  } catch (error) {
-    reportAndRethrow('write', error);
-  }
 }

@@ -36,10 +36,12 @@ const h = vi.hoisted(() => ({
   back: vi.fn(),
 }));
 
-const permissionState = vi.hoisted(() => ({ canManage: true }));
+const permissionState = vi.hoisted(() => ({
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+}));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => permissionState.canManage,
+  useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -64,7 +66,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', async () => {
+  // vi.mock factories are hoisted above the module's imports, so the React
+  // helpers must be loaded inside the factory.
+  const { createElement } = await import('react');
+  return {
+    // The real state renders its `action` below the title, so the manage slot's
+    // sentence or the manager's CTA reaches the tree the way the screen hands it over.
+    EmptyState: (props: { action?: unknown }) =>
+      createElement('EmptyState', props, props.action as never),
+  };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement, useRef } = await import('react');
@@ -102,13 +114,17 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
 }));
 
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
+
 /** Press the add CTA the empty state renders through its `action` prop. */
 function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['renderer']): void {
-  const action = findOne(renderer.root, 'EmptyState').props.action as {
-    props: { onPress: () => void };
-  };
+  const action = findAll(findOne(renderer.root, 'EmptyState'), 'Button')[0];
+  if (!action) {
+    throw new Error('the empty state rendered no add CTA');
+  }
   act(() => {
-    action.props.onPress();
+    (action.props as { onPress: () => void }).onPress();
   });
 }
 
@@ -116,6 +132,7 @@ describe('ProfileCommandsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -156,6 +173,22 @@ describe('ProfileCommandsScreen', () => {
     expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No setup commands yet');
     pressEmptyAction(renderer);
     expect(findFields(renderer.root)[0]?.props.placeholder).toBe('e.g. pnpm install');
+
+    unmount();
+  });
+
+  it('resolving: offers neither the add CTA nor the role sentence before the role is known', async () => {
+    permissionState.permission = 'resolving';
+    h.query.data = testCommands();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No setup commands yet');
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      ROLE_SENTENCE
+    );
 
     unmount();
   });

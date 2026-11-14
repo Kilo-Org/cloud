@@ -5,7 +5,8 @@ import {
   organization_memberships,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, isNotNull, sql } from 'drizzle-orm';
+import { availableAccountCondition } from './account-availability';
 import {
   DEFAULT_GITLAB_INSTANCE_URL,
   parseGitLabCloneUrl,
@@ -98,7 +99,7 @@ export function buildAuthorizedGitLabIntegrationQuery(
     )
     .innerJoin(
       kilocode_users,
-      and(eq(kilocode_users.id, params.userId), isNull(kilocode_users.blocked_reason))
+      and(eq(kilocode_users.id, params.userId), availableAccountCondition())
     )
     .where(
       and(

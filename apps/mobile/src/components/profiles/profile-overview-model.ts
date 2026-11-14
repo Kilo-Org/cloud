@@ -35,6 +35,7 @@ export type OverviewSectionKey =
   | 'slashCommands'
   | 'mcp'
   | 'skills'
+  | 'instructions'
   | 'agents';
 
 /** One navigable section row: its route key, catalog title, and item count. */
@@ -66,6 +67,7 @@ export type ProfileOverviewCounts = {
   kiloCommandCount: number;
   mcpServerCount: number;
   skillCount: number;
+  instructionCount: number;
   agentCount: number;
 };
 
@@ -84,6 +86,11 @@ export function overviewSectionRows(counts: ProfileOverviewCounts): OverviewSect
     },
     { key: 'mcp', titleKey: 'profiles.mcp.title', count: counts.mcpServerCount },
     { key: 'skills', titleKey: 'profiles.skillsTitle', count: counts.skillCount },
+    {
+      key: 'instructions',
+      titleKey: 'profiles.instructionsTitle',
+      count: counts.instructionCount,
+    },
     { key: 'agents', titleKey: 'profiles.agents.title', count: counts.agentCount },
   ];
 }

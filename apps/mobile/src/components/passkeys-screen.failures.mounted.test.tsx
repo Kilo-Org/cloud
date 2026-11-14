@@ -2,6 +2,7 @@ import {
   buttonByLabel,
   confirmRemoval,
   confirmSpy,
+  emptyDescription,
   hasButtonLabel,
   list,
   MACBOOK,
@@ -120,6 +121,55 @@ describe('PasskeysScreen inline failures', () => {
     // The label re-derivation itself is covered in button.mounted.test.tsx;
     // here the failed ceremony settles back to an enabled, offered control.
     expect(buttonByLabel(view, 'Add a passkey').props.loading).toBe(false);
+    view.unmount();
+  });
+
+  it('withdraws the Add control when adding a passkey is unavailable in the app', async () => {
+    store.rows = [MACBOOK];
+    list.register.mockResolvedValue({ status: 'error', failure: 'unavailable' });
+    const view = await mount();
+    await waitFor(() => texts(view).includes('MacBook'));
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => texts(view).includes('Passkeys can only be added in a web browser.'));
+
+    // Repeating the same request cannot succeed, so the control is gone and the
+    // notice is the state: the rows the account already has stay listed.
+    expect(hasButtonLabel(view, 'Add a passkey')).toBe(false);
+    expect(texts(view)).toContain('MacBook');
+    view.unmount();
+  });
+
+  it('replaces the empty state hint with the same notice', async () => {
+    store.rows = [];
+    list.register.mockResolvedValue({ status: 'error', failure: 'unavailable' });
+    const view = await mount();
+    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => !hasButtonLabel(view, 'Add a passkey'));
+
+    // Non-retryable: no retry control, and no Add control that could only be
+    // refused the same way again. The notice takes the hint's place.
+    expect(hasButtonLabel(view, 'Retry')).toBe(false);
+    expect(emptyDescription(view)).toBe('Passkeys can only be added in a web browser.');
+    view.unmount();
+  });
+
+  it('names the reason the control went away when a press lands during the first load', async () => {
+    // The footer keeps its coordinates whatever the body renders, so the Add
+    // control is pressable while the first load is still skeletons. Its refusal
+    // then has no empty state to sit in, and the footer must still say why the
+    // control is gone.
+    list.queryFn.mockImplementation(() => new Promise<void>(() => undefined));
+    list.register.mockResolvedValue({ status: 'error', failure: 'unavailable' });
+    const view = await mount();
+    await waitFor(() => nodes(view, 'Skeleton').length > 0);
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => !hasButtonLabel(view, 'Add a passkey'));
+
+    expect(texts(view)).toContain('Passkeys can only be added in a web browser.');
     view.unmount();
   });
 });

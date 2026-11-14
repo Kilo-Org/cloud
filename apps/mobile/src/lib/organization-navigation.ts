@@ -15,3 +15,10 @@ export const ORGANIZATION_HUB_PATH = '/(app)/(tabs)/(3_profile)/organization' as
  * route names rely on (`profile-agent-navigation.ts`).
  */
 export const ORGANIZATION_HUB_ROUTE_NAME = 'index';
+
+/**
+ * The in-app create flow. Both of its entries — the Organization section on
+ * Profile and the boundary's no-organization state — read this one path, so a
+ * screen that cannot pick an organization can still make one.
+ */
+export const CREATE_ORGANIZATION_HREF = '/(app)/(tabs)/(3_profile)/organization/create' as Href;

@@ -1,6 +1,7 @@
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
 import { nativeEgressAllowlistSchema } from '../sandbox-containers/egress-policy.js';
 import { ProviderCreationError } from './provider.js';
+import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
 
 const GIT_DOMAINS = [
   'github.com',
@@ -30,6 +31,7 @@ export function buildNativeEgressAllowlist(input: {
   try {
     const urls = [
       input.env.WORKER_URL,
+      CLOUD_AGENT_SESSION_SYNC_ORIGIN,
       ...Object.values(targets.targets),
       ...(input.repositoryUrl === undefined ? [] : [input.repositoryUrl]),
     ].map(value => new URL(value));

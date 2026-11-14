@@ -103,6 +103,23 @@ describe('POST /api/auth/pending-link/verify', () => {
     expect(await response.json()).toMatchObject({ token: 'magic-1' });
   });
 
+  it('refuses an account whose block timestamp is set', async () => {
+    mockGetPending.mockResolvedValue(pendingRow('challenge-1'));
+    mockFindUser.mockResolvedValue({
+      id: 'user-1',
+      google_user_email: 'user@example.com',
+      blocked_at: '2026-01-15T12:00:00.000Z',
+      blocked_reason: null,
+    } as never);
+
+    const response = await POST(verifyRequest());
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'BLOCKED' });
+    expect(mockReserve).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
   it('refuses a foreign Origin before reading the link', async () => {
     const response = await POST(verifyRequest({ Origin: 'https://evil.example' }));
 

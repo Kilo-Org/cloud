@@ -13,50 +13,19 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
 
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
-import { enkrypt_usage, organizations } from '@kilocode/db/schema';
-import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
-import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { isUSRegion } from '@kilocode/web-shared/lib/drizzle';
+import {
+  enkryptLedgerRows,
+  enkryptUsageRecordForNewOrganization,
+  organizationMicrodollarsUsed,
+} from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT, recordEnkryptUsage } from './usage';
-import { EnkryptUsageWriteSchema } from './usage-write';
+import { EnkryptUsageWriteSchema } from '@kilocode/usage-contracts';
+import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const mockedIsUSRegion = jest.mocked(isUSRegion);
 const nativeFetch = globalThis.fetch;
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
-
-async function usageRecordForNewOrganization() {
-  const user = await insertTestUser();
-  const organization = await createTestOrganization(
-    `enkrypt-guardrail-${randomUUID()}`,
-    user.id,
-    10_000_000
-  );
-  return {
-    organizationId: organization.id,
-    kiloUserId: user.id,
-    sessionId: 'ses_guardrail',
-    microdollarUsageId: randomUUID(),
-    apiKind: 'messages' as const,
-    decision: 'blocked' as const,
-    creditsCost: 7,
-    scannedCharacters: 2_400,
-    totalCharacters: 10_000,
-    addedLatencyMs: 212,
-  };
-}
-
-async function ledgerRows(organizationId: string) {
-  return db.select().from(enkrypt_usage).where(eq(enkrypt_usage.organization_id, organizationId));
-}
-
-async function microdollarsUsed(organizationId: string) {
-  const [row] = await db
-    .select({ microdollarsUsed: organizations.microdollars_used })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId));
-  return row?.microdollarsUsed;
-}
 
 beforeEach(() => {
   mockFetch.mockReset();
@@ -71,13 +40,13 @@ afterEach(() => {
 
 describe('recordEnkryptUsage region routing', () => {
   it('writes directly outside a US region', async () => {
-    const usageRecord = await usageRecordForNewOrganization();
+    const usageRecord = await enkryptUsageRecordForNewOrganization();
 
     await recordEnkryptUsage(usageRecord);
 
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(await ledgerRows(usageRecord.organizationId)).toHaveLength(1);
-    expect(await microdollarsUsed(usageRecord.organizationId)).toBe(
+    expect(await enkryptLedgerRows(usageRecord.organizationId)).toHaveLength(1);
+    expect(await organizationMicrodollarsUsed(usageRecord.organizationId)).toBe(
       7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
     );
   });
@@ -85,39 +54,30 @@ describe('recordEnkryptUsage region routing', () => {
   it('hands the write to the primary region from a US region', async () => {
     mockedIsUSRegion.mockReturnValue(true);
     mockFetch.mockResolvedValue(Response.json({ status: 'recorded' }));
-    const usageRecord = await usageRecordForNewOrganization();
+    const usageRecord = await enkryptUsageRecordForNewOrganization({
+      microdollarUsageId: randomUUID(),
+    });
 
     await recordEnkryptUsage(usageRecord);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(String(url)).toBe('https://app.example.com/api/internal/enkrypt-usage/record');
+    expect(requestUrlOf(url)).toBe('https://app.example.com/api/internal/enkrypt-usage/record');
     expect(init?.method).toBe('POST');
     expect(init?.headers).toEqual({
       'content-type': 'application/json',
       'x-internal-api-key': 'test-internal-secret',
     });
-    expect(JSON.parse(String(init?.body))).not.toHaveProperty('guardrail');
-    const body = EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body)));
+    expect(readJsonBody(init?.body)).not.toHaveProperty('guardrail');
+    const body = EnkryptUsageWriteSchema.parse(readJsonBody(init?.body));
     expect(body).toEqual({
       ...usageRecord,
       guardrail: 'input',
       id: expect.any(String),
       occurredAt: expect.any(String),
     });
-    expect(await ledgerRows(usageRecord.organizationId)).toEqual([]);
-    expect(await microdollarsUsed(usageRecord.organizationId)).toBe(0);
-  });
-
-  it('treats a duplicate response as handled without writing locally', async () => {
-    mockedIsUSRegion.mockReturnValue(true);
-    mockFetch.mockResolvedValue(Response.json({ status: 'duplicate' }));
-    const usageRecord = await usageRecordForNewOrganization();
-
-    await recordEnkryptUsage(usageRecord);
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(await ledgerRows(usageRecord.organizationId)).toEqual([]);
+    expect(await enkryptLedgerRows(usageRecord.organizationId)).toEqual([]);
+    expect(await organizationMicrodollarsUsed(usageRecord.organizationId)).toBe(0);
   });
 
   it.each(['recorded', 'duplicate'])(
@@ -127,18 +87,18 @@ describe('recordEnkryptUsage region routing', () => {
       mockFetch.mockImplementation(async (_url, init) =>
         Response.json({
           status,
-          usageId: EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body))).id,
+          usageId: EnkryptUsageWriteSchema.parse(readJsonBody(init?.body)).id,
         })
       );
       const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-      const usageRecord = await usageRecordForNewOrganization();
+      const usageRecord = await enkryptUsageRecordForNewOrganization();
 
       await recordEnkryptUsage(usageRecord);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(consoleError).not.toHaveBeenCalled();
-      expect(await ledgerRows(usageRecord.organizationId)).toEqual([]);
-      expect(await microdollarsUsed(usageRecord.organizationId)).toBe(0);
+      expect(await enkryptLedgerRows(usageRecord.organizationId)).toEqual([]);
+      expect(await organizationMicrodollarsUsed(usageRecord.organizationId)).toBe(0);
     }
   );
 
@@ -183,7 +143,9 @@ describe('recordEnkryptUsage region routing', () => {
     mockedIsUSRegion.mockReturnValue(true);
     arrange();
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const usageRecord = await usageRecordForNewOrganization();
+    const usageRecord = await enkryptUsageRecordForNewOrganization({
+      microdollarUsageId: randomUUID(),
+    });
 
     await expect(recordEnkryptUsage(usageRecord)).resolves.toBeUndefined();
 
@@ -193,15 +155,13 @@ describe('recordEnkryptUsage region routing', () => {
     );
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('test-internal-secret');
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const handedOff = EnkryptUsageWriteSchema.parse(
-      JSON.parse(String(mockFetch.mock.calls[0][1]?.body))
-    );
-    const rows = await ledgerRows(usageRecord.organizationId);
+    const handedOff = EnkryptUsageWriteSchema.parse(readJsonBody(mockFetch.mock.calls[0][1]?.body));
+    const rows = await enkryptLedgerRows(usageRecord.organizationId);
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(handedOff.id);
     expect(rows[0].microdollar_usage_id).toBe(usageRecord.microdollarUsageId);
     expect(new Date(rows[0].created_at).toISOString()).toBe(handedOff.occurredAt);
-    expect(await microdollarsUsed(usageRecord.organizationId)).toBe(
+    expect(await organizationMicrodollarsUsed(usageRecord.organizationId)).toBe(
       7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
     );
   });
@@ -253,12 +213,12 @@ describe('recordEnkryptUsage region routing', () => {
       mockFetch.mockResolvedValue(response());
       const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-      const usageRecord = await usageRecordForNewOrganization();
+      const usageRecord = await enkryptUsageRecordForNewOrganization();
 
       await expect(recordEnkryptUsage(usageRecord)).resolves.toBeUndefined();
 
       const handedOff = EnkryptUsageWriteSchema.parse(
-        JSON.parse(String(mockFetch.mock.calls[0][1]?.body))
+        readJsonBody(mockFetch.mock.calls[0][1]?.body)
       );
       expect(consoleWarn).toHaveBeenCalledTimes(1);
       expect(consoleWarn).toHaveBeenCalledWith(warning, {
@@ -270,10 +230,10 @@ describe('recordEnkryptUsage region routing', () => {
         '[enkrypt-guardrail] failed to record usage in the primary region; writing locally',
         { usage_id: handedOff.id, reason }
       );
-      const rows = await ledgerRows(usageRecord.organizationId);
+      const rows = await enkryptLedgerRows(usageRecord.organizationId);
       expect(rows).toHaveLength(1);
       expect(rows[0].id).toBe(handedOff.id);
-      expect(await microdollarsUsed(usageRecord.organizationId)).toBe(
+      expect(await organizationMicrodollarsUsed(usageRecord.organizationId)).toBe(
         7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
       );
     }

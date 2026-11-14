@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the list, its auto-scroll wiring and the ride-up frame share this file; splitting it further would scatter one behavior across three modules. */
 import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
@@ -12,6 +13,10 @@ import { useSessionListAnchorReport } from '@/components/agents/use-session-list
 import { useSessionListOpenSettle } from '@/components/agents/use-session-list-open-settle';
 import { useSessionListResumeScroll } from '@/components/agents/use-session-list-resume-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
+import {
+  resolveTranscriptFrame,
+  resolveTranscriptRideUp,
+} from '@/components/agents/session-message-list-anchor';
 import { SessionTranscriptOpenGate } from '@/components/agents/session-transcript-open-gate';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import {
@@ -99,6 +104,16 @@ type SessionMessageListProps<T> = {
    * caller byte-identical.
    */
   onOpenSettledChange?: (sessionId: string, settled: boolean) => void;
+  /**
+   * How far the chrome under the transcript has grown past its resting height,
+   * in dp. The transcript's content rides up by this amount, so the newest row
+   * stays on that chrome's top edge in the same commit that grows it. Holding
+   * the growth out of the list's own height clips the top of the content by the
+   * same amount until the growth ends; that strip is bounded by the composer's
+   * cap and no scroll can recover it without the late jump this removes. Absent
+   * or 0 keeps every other caller byte-identical.
+   */
+  chromeGrowthDp?: number;
 };
 
 export function SessionMessageList<T>({
@@ -119,6 +134,7 @@ export function SessionMessageList<T>({
   onOpenSettledChange,
   resumeAt,
   followTailNonce,
+  chromeGrowthDp,
 }: Readonly<SessionMessageListProps<T>>) {
   // Rows are already present when the list mounts (the resume never mounts a
   // blank list), so the resume decision is derivable at render.
@@ -325,6 +341,19 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = newestItemKey;
   }, [items, newestItemKey]);
 
+  // The transcript rides up by the chrome's growth, so the newest row keeps the
+  // chrome's top edge in the same commit that grows the chrome. The frame holds
+  // that growth out of the list's own height, which costs the top of the content
+  // the same amount until the chrome shrinks again; releasing the shift instead
+  // would move every row at once. The shift cannot be gated on the list's own
+  // scrollability: reserving the growth keeps the list's height, so the verdict
+  // would flip the reservation it is measuring against.
+  const chromeRideUp = resolveTranscriptRideUp(chromeGrowthDp ?? 0);
+  // Memoized by the growth so the frame's style objects keep their identity: a
+  // fresh style object on every render re-applies the native transform, and the
+  // list re-lays-out each time it lands.
+  const transcriptFrame = useMemo(() => resolveTranscriptFrame(chromeRideUp), [chromeRideUp]);
+
   // When the optional `contentBottomInset` is omitted and the landscape side
   // insets are 0 (portrait) we return the original module-level
   // `listContentContainerStyle` reference so the default-prop path is
@@ -381,83 +410,85 @@ export function SessionMessageList<T>({
 
   return (
     <SessionTranscriptOpenGate settled={openSettled} sessionId={sessionId}>
-      <View className="flex-1">
-        <FlashList<T>
-          ref={listRef}
-          style={listStyle}
-          contentContainerStyle={resolvedContentContainerStyle}
-          data={items}
-          keyExtractor={keyExtractor}
-          getItemType={getItemType}
-          renderItem={renderItem}
-          // Transcript rows are tall and parse markdown on mount. The 250 dp
-          // default draws under half a screen ahead, so a fast fling shows blank
-          // space until the rows mount. A 2000 dp lookahead hides that.
-          drawDistance={DRAW_DISTANCE}
-          // Android Fabric can race clipped-view reattachment with rapid transcript updates.
-          // Kept explicit: flash-list ≥ 2.3.2 defaults this to false (PR #2202); the pin
-          // is asserted in src/lib/flash-list-contract.test.ts.
-          removeClippedSubviews={false}
-          onScroll={handleScroll}
-          onScrollBeginDrag={handleScrollBeginDrag}
-          onScrollEndDrag={handleScrollEndDrag}
-          onMomentumScrollBegin={handleMomentumScrollBegin}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
-          onContentSizeChange={handleContentSizeChangeForOpen}
-          onLayout={handleListLayoutForOpen}
-          scrollEventThrottle={16}
-          onStartReached={hasOlderMessages ? handleStartReached : undefined}
-          onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
-          // Viewability is only wired when a host asked for the position, so
-          // every other caller's list stays byte-identical.
-          {...anchorReport}
-          maintainVisibleContentPosition={{
-            // Start rendering from the bottom so the newest message is visible
-            // on first render. `autoscrollToTopThreshold` is left at its default
-            // so the viewport only repositions when the user is far enough away
-            // from the top — preserving the existing auto-follow behavior on
-            // streaming insertions at the bottom.
-            startRenderingFromBottom: true,
-          }}
-          ListHeaderComponent={listHeaderComponent}
-          ListFooterComponent={ListFooterComponent}
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-        />
-        {/* Floating "scroll to bottom" affordance. Rendered only when the
+      <View className="flex-1" style={transcriptFrame.holder}>
+        <View style={transcriptFrame.content}>
+          <FlashList<T>
+            ref={listRef}
+            style={listStyle}
+            contentContainerStyle={resolvedContentContainerStyle}
+            data={items}
+            keyExtractor={keyExtractor}
+            getItemType={getItemType}
+            renderItem={renderItem}
+            // Transcript rows are tall and parse markdown on mount. The 250 dp
+            // default draws under half a screen ahead, so a fast fling shows blank
+            // space until the rows mount. A 2000 dp lookahead hides that.
+            drawDistance={DRAW_DISTANCE}
+            // Android Fabric can race clipped-view reattachment with rapid transcript updates.
+            // Kept explicit: flash-list ≥ 2.3.2 defaults this to false (PR #2202); the pin
+            // is asserted in src/lib/flash-list-contract.test.ts.
+            removeClippedSubviews={false}
+            onScroll={handleScroll}
+            onScrollBeginDrag={handleScrollBeginDrag}
+            onScrollEndDrag={handleScrollEndDrag}
+            onMomentumScrollBegin={handleMomentumScrollBegin}
+            onMomentumScrollEnd={handleMomentumScrollEnd}
+            onContentSizeChange={handleContentSizeChangeForOpen}
+            onLayout={handleListLayoutForOpen}
+            scrollEventThrottle={16}
+            onStartReached={hasOlderMessages ? handleStartReached : undefined}
+            onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
+            // Viewability is only wired when a host asked for the position, so
+            // every other caller's list stays byte-identical.
+            {...anchorReport}
+            maintainVisibleContentPosition={{
+              // Start rendering from the bottom so the newest message is visible
+              // on first render. `autoscrollToTopThreshold` is left at its default
+              // so the viewport only repositions when the user is far enough away
+              // from the top — preserving the existing auto-follow behavior on
+              // streaming insertions at the bottom.
+              startRenderingFromBottom: true,
+            }}
+            ListHeaderComponent={listHeaderComponent}
+            ListFooterComponent={ListFooterComponent}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+          />
+          {/* Floating "scroll to bottom" affordance. Rendered only when the
           user has scrolled past the 100px bottom threshold; the fade
           animations match the chat-composer convention. `pointerEvents`
           is set on the wrapper so empty space around the button keeps
           scrolling the list, while the Pressable itself catches taps. */}
-        {!isAtBottom ? (
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-            pointerEvents="box-none"
-            className="absolute bottom-4 right-4"
-            // The fixed 16pt (right-4) offset gains the landscape right inset so
-            // the control clears the sensor area; portrait insets are 0, keeping
-            // the geometry unchanged (16 == right-4).
-            style={{ right: 16 + right }}
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('agentChat.session.scrollToBottom')}
-              onPress={scrollToLatestAnimated}
-              // The pressable is the touch target a control-size audit
-              // measures, and `hitSlop` never moves that rect: the 48pt floor
-              // has to be this node's own box.
-              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          {!isAtBottom ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              pointerEvents="box-none"
+              className="absolute bottom-4 right-4"
+              // The fixed 16pt (right-4) offset gains the landscape right inset so
+              // the control clears the sensor area; portrait insets are 0, keeping
+              // the geometry unchanged (16 == right-4).
+              style={{ right: 16 + right }}
             >
-              {/* The visible circle stays compact (explicit px, because
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('agentChat.session.scrollToBottom')}
+                onPress={scrollToLatestAnimated}
+                // The pressable is the touch target a control-size audit
+                // measures, and `hitSlop` never moves that rect: the 48pt floor
+                // has to be this node's own box.
+                className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              >
+                {/* The visible circle stays compact (explicit px, because
                   NativeWind's 14pt rem renders `h-10` at 35pt): DESIGN.md keeps
                   the target, not the visual, at 44pt. */}
-              <View className="h-[35px] w-[35px] items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
-                <ChevronDown size={20} color={colors.foreground} />
-              </View>
-            </Pressable>
-          </Animated.View>
-        ) : null}
+                <View className="h-[35px] w-[35px] items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
+                  <ChevronDown size={20} color={colors.foreground} />
+                </View>
+              </Pressable>
+            </Animated.View>
+          ) : null}
+        </View>
       </View>
     </SessionTranscriptOpenGate>
   );

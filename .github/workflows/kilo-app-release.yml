@@ -10,8 +10,6 @@ on:
       - 'apps/mobile/**'
       - 'packages/trpc/**'
       - 'packages/app-shared/**'
-      - 'packages/kilo-chat/**'
-      - 'packages/kilo-chat-hooks/**'
       - 'packages/event-service/**'
       - 'packages/notifications/**'
       - 'packages/cloud-agent-sdk/**'
@@ -97,7 +95,35 @@ jobs:
           # the version-bump branch re-triggers this workflow, and the tag marks the
           # pre-changelog commit, so without the exclusion every release starts the
           # next one. The same exclusion retires the bump-PR merge from the range.
-          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/kilo-chat/ packages/kilo-chat-hooks/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ ':(exclude)apps/mobile/CHANGELOG.md')
+          #
+          # The other exclusions are app-local files that cannot reach the shipped
+          # bundle: lint and test configuration, test files, markdown, and the
+          # repo-side scripts under apps/mobile/scripts and apps/mobile/e2e. Metro
+          # adds only `sql` to sourceExts and `txt` to assetExts, so none of these
+          # is resolvable into the bundle, and no app module imports one of them.
+          # A merge that touches only them changes no byte of the app, and must not
+          # spend one of the ten App Store Connect uploads. A script's generated
+          # output is committed under apps/mobile/src, which stays in the range, so
+          # a change of the generated app bytes still releases.
+          # The push `paths` filter above stays unfiltered: such a merge still
+          # starts this run and records the decision here, while the upload-cap
+          # gate and the suite lookup stay behind should_build. Add a path here
+          # only when the bundle cannot reach it.
+          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- \
+            apps/mobile/ \
+            packages/trpc/ \
+            packages/app-shared/ \
+            packages/event-service/ \
+            packages/notifications/ \
+            packages/cloud-agent-sdk/ \
+            ':(exclude)apps/mobile/CHANGELOG.md' \
+            ':(exclude,glob)apps/mobile/**/*.md' \
+            ':(exclude,glob)apps/mobile/**/*.test.ts' \
+            ':(exclude,glob)apps/mobile/**/*.test.tsx' \
+            ':(exclude,glob)apps/mobile/scripts/**' \
+            ':(exclude,glob)apps/mobile/e2e/**' \
+            ':(exclude)apps/mobile/.oxlintrc*.json' \
+            ':(exclude)apps/mobile/vitest*.ts')
 
           # The bump-version job edits the version line after every submission. Its
           # merged PR must not release the same code again, or every release starts
@@ -372,8 +398,15 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # The preflight only reads the EAS CLI and the evaluated Expo config, and
+      # both come from the app's own closure: `eas-cli` is the app's development
+      # dependency, and `app.config.ts` with scripts/assert-expo-config.mjs
+      # resolves app-local modules. Only that closure and the root project are
+      # installed, so the smaller runner stops linking the workspaces the
+      # preflight never reads. Widen the filter when a step here imports a
+      # workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       - name: Check EXPO_TOKEN
         run: |
@@ -394,7 +427,7 @@ jobs:
             exit 1
           fi
           MISSING=""
-          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER; do
+          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER; do
             if ! printf '%s\n' "$ENV_OUTPUT" | grep -qE "^Name[[:space:]]+${NAME}[[:space:]]*$"; then
               MISSING="$MISSING $NAME"
             fi
@@ -784,8 +817,19 @@ jobs:
             --land "origin:$BRANCH" \
             --pending "$PENDING")
           printf '%s\n' "$OUT"
+          # The land prints the head it verified and the files that commit
+          # changes; the PR body reports them instead of asserting a shape
+          # nobody checked.
+          HEAD=$(printf '%s\n' "$OUT" | sed -n 's/^changelog-head=//p')
+          FILES=$(printf '%s\n' "$OUT" | sed -n 's/^changelog-files=//p')
           if printf '%s\n' "$OUT" | grep -q '^changelog: landed '; then
             echo "landed=true" >> "$GITHUB_OUTPUT"
+            echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+            echo "files=$FILES" >> "$GITHUB_OUTPUT"
+            if [ -z "$HEAD" ] || [ -z "$FILES" ]; then
+              echo "::error::The section landed without reporting the verified head and files"
+              exit 1
+            fi
           else
             echo "landed=false" >> "$GITHUB_OUTPUT"
             echo "::notice::The version-bump branch was already merged — this build's changelog section waits on $PENDING for the next build's section. The submission itself succeeded."
@@ -799,9 +843,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: ${{ needs.bump-version.outputs.branch }}
           OLD: ${{ needs.check-changes.outputs.version }}
+          HEAD_SHA: ${{ steps.land.outputs.head }}
+          FILES: ${{ steps.land.outputs.files }}
         run: |
           NEW="${BRANCH#kilo-app-version-bump-}"
           RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          # The files and the head come from the land-time check, so the body
+          # reports what was verified instead of asserting a shape nobody checked.
           cat > "$RUNNER_TEMP/kilo-app-bump-pr.md" <<EOF
           ## What
 
@@ -820,10 +868,12 @@ jobs:
           1. Required checks show as pending: PRs opened with the default GITHUB_TOKEN
              do not trigger workflow runs. Close and reopen this PR (or push an empty
              commit) to start CI.
-          2. Review and merge. Only the version line and the changelog section
-             changed; no product code.
+          2. Review and merge. Against main this branch changes only $FILES.
+             Verified head $HEAD_SHA. No product code.
           EOF
-          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          # Only a PR opened from this repository is the version-bump PR.
+          PR=$(gh pr list --head "$BRANCH" --state open --json number,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not)][0].number // empty')
           if [ -n "$PR" ]; then
             gh pr edit "$PR" --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md"
             echo "Refreshed the version-bump PR #$PR for $BRANCH"

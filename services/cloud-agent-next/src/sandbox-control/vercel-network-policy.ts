@@ -4,6 +4,7 @@ import type {
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { EXA_PROXY_PATHS } from '../kilo/runtime-credential-proxy-routes.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
+import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
 
 export type VercelCredentialPolicyInput = {
   rootSessionIds: string[];
@@ -112,6 +113,15 @@ function runtimeProxyInjectionRules(
   const allRoots = [...new Set(policy.rootSessionIds)];
   for (const handle of handles) {
     const authorization = `Bearer ${handle}`;
+    rules.push(
+      createCredentialRule({
+        target: new URL(CLOUD_AGENT_SESSION_SYNC_ORIGIN),
+        path: { startsWith: '/v1/' },
+        methods: ['GET', 'PUT', 'POST'],
+        expectedAuthorization: authorization,
+        injectedAuthorization: authorization,
+      })
+    );
     const roots = adoptedHandles.has(handle)
       ? allRoots
       : [

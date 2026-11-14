@@ -288,7 +288,28 @@ export async function signInWithPasskey(
 
 export type PasskeyRegistrationResult =
   | { status: 'ok' }
-  | { status: 'error'; failure: 'cancelled' | 'unsupported' | 'failed' };
+  | { status: 'error'; failure: 'cancelled' | 'unsupported' | 'unavailable' | 'failed' };
+
+/**
+ * The registration route answers a browser session only: it refuses a request
+ * that carries a bearer token (`Unauthorized`), and it refuses a session that
+ * is not recent enough (`REAUTH_REQUIRED`). Neither answer changes by repeating
+ * the request, so both map to `unavailable` instead of the retryable `failed`.
+ */
+function registrationRefusal(
+  failure: { errorCode: string | undefined; httpStatus?: number },
+  step: 'options' | 'verify'
+): 'unavailable' | 'failed' {
+  if (failure.errorCode === 'Unauthorized' || failure.errorCode === 'REAUTH_REQUIRED') {
+    return 'unavailable';
+  }
+  // The options step answers 401 only for a session it will not accept, so the
+  // status alone is enough there even when the body is not one this client
+  // parses. Verify also answers 401 for credential refusals — an expired
+  // challenge, a signature that did not verify — which a fresh ceremony can
+  // fix, so the session refusals are named by code there instead.
+  return step === 'options' && failure.httpStatus === 401 ? 'unavailable' : 'failed';
+}
 
 /** Creation has no credential to be missing yet, so `no-passkey` is just a refusal. */
 function registrationFailure(error: unknown): 'cancelled' | 'unsupported' | 'failed' {
@@ -312,7 +333,7 @@ export async function registerPasskey(
   const authHeaders = buildAuthHeaders(await getAuthTokenForRequest());
   const optionsResult = await postAuth(REGISTER_ROUTE, { action: 'options' }, authHeaders);
   if (!optionsResult.ok) {
-    return { status: 'error', failure: 'failed' };
+    return { status: 'error', failure: registrationRefusal(optionsResult, 'options') };
   }
   const ceremony = ceremonyOptionsSchema.safeParse(optionsResult.data);
   if (!ceremony.success) {
@@ -339,7 +360,7 @@ export async function registerPasskey(
     authHeaders
   );
   if (!verifyResult.ok) {
-    return { status: 'error', failure: 'failed' };
+    return { status: 'error', failure: registrationRefusal(verifyResult, 'verify') };
   }
   return { status: 'ok' };
 }

@@ -15,6 +15,12 @@ type KvRowProps = {
   value: string;
   valueTone?: 'default' | KvTone;
   /**
+   * A state that trails the value on its own ink — the status of the thing the
+   * value names. The value keeps the row's ordinary ink, so the state carries
+   * the emphasis instead of colouring the name it belongs to.
+   */
+  valueStatus?: KvStatus;
+  /**
    * Renders a small colored status dot before the label to categorize the row,
    * leaving the value uncolored (mirrors the web dashboard's summary rows). Use
    * this instead of `valueTone` when the count itself shouldn't be tinted — a
@@ -71,12 +77,21 @@ const DOT_TONE = {
   muted: 'bg-muted-foreground',
 } satisfies Record<KvTone, string>;
 
+/**
+ * Value props for a status that trails a value on its own ink — the state of
+ * the thing the value names. The label carries its own leading separator in the
+ * catalog, so each language keeps its own spacing and the value keeps the row's
+ * ordinary colour.
+ */
+type KvStatus = Readonly<{ label: string; tone: KvTone }>;
+
 /** Label-left / value-right row with hair-soft bottom divider. */
 export function KvRow({
   icon: Icon,
   label,
   value,
   valueTone = 'default',
+  valueStatus,
   dotTone,
   valueFace = 'mono',
   last,
@@ -111,6 +126,13 @@ export function KvRow({
       )}
     >
       {value}
+      {valueStatus === undefined ? null : (
+        // The status keeps its own ink inside the value paragraph, so the name
+        // before it stays in the row's ordinary colour. It restates the value's
+        // own size, because the shared Text carries the body size by default and
+        // a nested node would otherwise paint larger than the value it follows.
+        <Text className={cn('text-[13px]', VALUE_TONE[valueStatus.tone])}>{valueStatus.label}</Text>
+      )}
     </Text>
   );
   return (

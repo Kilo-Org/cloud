@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import {
   detectPlatform,
+  inconclusiveReason,
   installAbortRestore,
   isHelpRequest,
   main,
@@ -131,6 +132,21 @@ test('a scan that never settles exits 2 instead of reporting a pass', async () =
   assert.equal(code, 2);
   assert.match(lines.join('\n'), /capture is inconclusive/);
   assert.match(lines.join('\n'), /2 warnings across 1 cells/);
+});
+
+test('a run that skipped a target is inconclusive and names every gap', () => {
+  assert.equal(inconclusiveReason({ cells: [], findings: [], skipped: [] }), undefined);
+  assert.equal(
+    inconclusiveReason({
+      cells: [],
+      findings: [],
+      skipped: [
+        { cell: 'base', target: 'home', reason: 'InfraError: no page' },
+        { cell: 'rtl', target: 'chat', reason: 'InfraError: no page' },
+      ],
+    }),
+    '2 target(s) could not be read: base/home, rtl/chat'
+  );
 });
 
 test('readSettledDump measures a layout that repeats across reads', async () => {

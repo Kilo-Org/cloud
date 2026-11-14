@@ -4,6 +4,7 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import { z } from 'zod';
+import type { BackgroundActivityState } from './background-activity';
 import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
@@ -95,6 +96,8 @@ export type ChatEvent = (
 
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
 export type ServiceEvent =
+  | { type: 'background.activity'; state: BackgroundActivityState }
+  | { type: 'background.invalidated' }
   | { type: 'session.status'; sessionId: string; status: SessionStatus }
   | { type: 'session.created'; info: SessionInfo }
   | { type: 'session.updated'; info: SessionInfo }
@@ -222,6 +225,7 @@ export type ServiceEvent =
       messageId: string;
       executionId?: string | undefined;
       content?: string | undefined;
+      createdAt?: number | undefined;
     }
   | {
       type: 'cloud.message.canceled';
@@ -232,6 +236,7 @@ export type ServiceEvent =
       type: 'cloud.message.sent';
       messageId: string;
       executionId?: string | undefined;
+      turnType?: 'command' | undefined;
     }
   | {
       type: 'cloud.message.completed';
@@ -660,6 +665,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         type: 'cloud.message.sent',
         messageId: r.data.messageId,
         executionId: r.data.executionId,
+        ...(r.data.turnType === 'command' ? { turnType: r.data.turnType } : {}),
       };
     }
 
@@ -739,6 +745,10 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   const event = normalizeInnerEvent(eventType, data);
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };
+  }
+  if (event?.type === 'cloud.message.queued') {
+    const createdAt = Date.parse(raw.timestamp);
+    return Number.isFinite(createdAt) ? { ...event, createdAt } : event;
   }
   // Only a completion that carries a storable commit hash gets the envelope
   // timestamp the commit record is anchored to. The schema already dropped a

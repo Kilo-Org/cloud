@@ -1,11 +1,12 @@
-import { type Href, useNavigation } from 'expo-router';
+import { type Href } from 'expo-router';
 import { FolderGit2 } from '@/components/ui/icons';
-import { type ReactNode, useCallback, useEffect, useRef } from 'react';
-import { AppState, View } from 'react-native';
+import { type ReactNode } from 'react';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
 import { repositoryEmptyCopy } from '@/components/code-reviewer/repository-empty-copy';
+import { RepositoryModelOverrides } from '@/components/code-reviewer/repository-model-overrides';
 import { RepositoryRowsList } from '@/components/code-reviewer/repository-rows-list';
 import { RepositorySyncFooter } from '@/components/code-reviewer/repository-sync-footer';
 import { EmptyState } from '@/components/empty-state';
@@ -23,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { TAB_SCREEN_TRAILING_GAP, useTabScreenFrame } from '@/components/tab-screen';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { repositoryModelOverrideHandlers } from '@/lib/code-reviewer-repo-models';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import {
@@ -33,13 +35,10 @@ import {
   useReviewConfig,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
-import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
-import {
-  type SyncedRepoPlatform,
-  useReviewerRepositoriesResync,
-} from '@/lib/hooks/use-code-reviewer-repo-sync';
+import { useRepositoryAccessSync } from '@/lib/hooks/use-repository-access-sync';
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
@@ -61,6 +60,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   const configFailure = reviewConfigFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
+  const { models, isLoading: modelsLoading } = useReviewerModels(scope);
   const { t } = useTranslation();
   const { frameStyle, measureFrame } = useTabScreenFrame();
   const capabilities = PLATFORM_CAPABILITIES[platform];
@@ -122,27 +122,8 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   // it does for the other platforms' empty surfaces.
   const githubAppMissing =
     platform === 'github' && githubRepos.data?.integrationInstalled === false;
-  const resyncPlatform: SyncedRepoPlatform = platform === 'gitlab' ? 'gitlab' : 'github';
-  const { resync, resyncing } = useReviewerRepositoriesResync(scope, resyncPlatform);
-  // Set on the way to the provider's settings page, where installation access
-  // may have widened. Two signals report the return and only the first syncs:
-  // the awaited browser dismissal (the only one iOS reports, since its page
-  // opens in-app) and the next foreground (Android).
-  const pendingAccessChange = useRef(false);
-  const navigation = useNavigation();
-  const flushPendingSync = useCallback(() => {
-    if (!pendingAccessChange.current) {
-      return;
-    }
-    pendingAccessChange.current = false;
-    void resync();
-  }, [resync]);
-  const manageAccess = useManageRepositoryAccess(scope, platform, {
-    onOpen: () => {
-      pendingAccessChange.current = true;
-    },
-    onReturn: flushPendingSync,
-  });
+  const { manageAccess, resync, resyncing } = useRepositoryAccessSync(scope, platform);
+  // Bitbucket has no provider sync to force, so its pull re-reads the snapshot.
   const refreshing = platform === 'bitbucket' ? reposFetching : resyncing;
   const refreshRepositories = () => {
     if (platform === 'bitbucket') {
@@ -161,18 +142,6 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       })
     : null;
   const emptyStateCopy = repositoryEmptyCopy(platform, t);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState !== 'active' || !navigation.isFocused()) {
-        return;
-      }
-      flushPendingSync();
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, [flushPendingSync, navigation]);
 
   const setMode = (nextMode: 'all' | 'selected') => {
     save.mutate({ repositorySelectionMode: nextMode });
@@ -303,6 +272,18 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     </View>
   );
 
+  // Per-repository model + effort (the web form's Advanced section): GitLab has
+  // no 'all' mode, so it always offers this; GitHub offers it in 'selected' mode
+  // only, which is the screen's own gate for the repository rows.
+  const repositoryModelOverrides = data?.repositoryModelOverrides ?? [];
+  const overridableRepositories = rowsBody
+    ? repoRows
+        .filter(repo => selectedIds.includes(repo.id))
+        .map(repo => ({ id: repo.id, fullName: repo.fullName }))
+    : [];
+  const { set: handleSetRepositoryOverride, remove: handleRemoveRepositoryOverride } =
+    repositoryModelOverrideHandlers(repositoryModelOverrides, save.mutate);
+
   const listFooter = (
     <>
       {showFooter && (
@@ -315,6 +296,18 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
           refreshing={refreshing}
           onRefresh={refreshRepositories}
           manageAccess={manageAccess}
+        />
+      )}
+      {overridableRepositories.length > 0 && (
+        <RepositoryModelOverrides
+          repositories={overridableRepositories}
+          overrides={repositoryModelOverrides}
+          defaultModelSlug={data?.modelSlug ?? ''}
+          models={models}
+          modelsLoading={modelsLoading}
+          disabled={save.isPending}
+          onSet={handleSetRepositoryOverride}
+          onRemove={handleRemoveRepositoryOverride}
         />
       )}
       <View style={{ height: TAB_SCREEN_TRAILING_GAP }} pointerEvents="none" />

@@ -20,6 +20,13 @@ export type ProbeNode = Readonly<{
   rect: Rect;
   layoutRect: Rect;
   owners?: readonly string[];
+  /**
+   * The route file of the screen that renders the node, relative to the app
+   * directory (`./(app)/(tabs)/history.tsx`). A route component names itself after
+   * its file, so the screen that owns a node stays readable where the owner chain
+   * is cut. The design gate reads the focused screen from it.
+   */
+  screen?: string;
   text?: string;
   testID?: string;
   label?: string;
@@ -36,6 +43,14 @@ export const DESIGN_GATE_ANCHOR_ID = 'design-gate-anchor';
 const ELEMENT_NODE = 1;
 const COMPOSITE_TAGS = new Set([0, 1, 11, 14, 15]);
 const OWNER_LIMIT = 6;
+/**
+ * A route component names itself `<Name>(<contextKey>)` in development, and the
+ * context key is the route's file below the app directory. Screens nest, so the
+ * nearest such name is the screen a node sits in, and the whole path of that
+ * screen is what a route name alone cannot give: the navigator's own name for a
+ * route is relative to the navigator.
+ */
+const SCREEN_OWNER = /\((\..+\.[jt]sx?)\)$/;
 const PRESS_HANDLERS = ['onClick', 'onPress'] as const;
 const STYLE_KEYS = [
   'alignItems',
@@ -97,19 +112,34 @@ function compositeName(fiber: unknown): string | undefined {
   );
 }
 
-function owners(fiber: unknown): readonly string[] | undefined {
+type Ancestry = Readonly<{ owners?: readonly string[]; screen?: string }>;
+
+/**
+ * The owner names of a node and the screen that renders it, from one walk up the
+ * fiber chain. The walk stops once the naming budget is spent and the screen is
+ * known, so a node inside a screen reads a few ancestors and a node outside every
+ * screen, such as the root chrome, is the only one that walks the whole chain.
+ */
+function ancestry(fiber: unknown): Ancestry {
   const names: string[] = [];
+  let screen: string | undefined = undefined;
   let current = field(fiber, 'return');
-  while (current !== undefined && current !== null && names.length < OWNER_LIMIT) {
+  while (current !== undefined && current !== null) {
     const tag = field(current, 'tag');
     const name =
       typeof tag === 'number' && COMPOSITE_TAGS.has(tag) ? compositeName(current) : undefined;
-    if (name !== undefined && names.at(-1) !== name) {
-      names.push(name);
+    if (name !== undefined) {
+      screen ??= SCREEN_OWNER.exec(name)?.[1];
+      if (names.length < OWNER_LIMIT && names.at(-1) !== name) {
+        names.push(name);
+      }
+      if (names.length >= OWNER_LIMIT && screen !== undefined) {
+        break;
+      }
     }
     current = field(current, 'return');
   }
-  return names.length > 0 ? names : undefined;
+  return { owners: names.length > 0 ? names : undefined, screen };
 }
 
 function insets(value: unknown): Insets | undefined {
@@ -157,6 +187,7 @@ function describe(element: Element, parent: number, viewport: Offset): ProbeNode
   const props = field(fiber, 'memoizedProps');
   const tag = element.tagName.replace(/^RN:/, '');
   const lines = finite(field(props, 'numberOfLines'));
+  const chain = ancestry(fiber);
   return {
     parent,
     tag,
@@ -167,7 +198,8 @@ function describe(element: Element, parent: number, viewport: Offset): ProbeNode
       round(layout.width),
       round(layout.height),
     ],
-    owners: owners(fiber),
+    owners: chain.owners,
+    screen: chain.screen,
     text: renderedText(tag, element, props),
     testID: text(field(props, 'testID')) ?? text(field(props, 'nativeID')),
     label: text(field(props, 'accessibilityLabel')) ?? text(field(props, 'aria-label')),

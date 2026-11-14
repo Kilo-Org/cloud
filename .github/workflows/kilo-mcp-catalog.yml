@@ -159,11 +159,16 @@ jobs:
       # and never fails the job. An entry that fails the check in the install
       # step is not replaced under an unchanged key, so it costs that install in
       # every job until the release changes.
+      #
+      # This job only reads the entry: a save from a pull_request run is scoped
+      # to that pull request, so it would upload the tree once per
+      # catalog-relevant PR and only that PR's later runs could restore it. The
+      # merge job writes the entry on main, and every PR restores that one.
       - name: Restore Kilo CLI
         id: kilo_cli_cache
         if: steps.catalog_changes.outputs.catalog == 'true'
         continue-on-error: true
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ${{ runner.temp }}/kilo-cli
           # The tree holds the @kilocode/cli-<os>-<arch> platform packages, so an
@@ -522,9 +527,10 @@ jobs:
           echo "::error::Could not resolve the Kilo CLI version from the registry"
           exit 1
 
-      # Same shape as the PR job's restore: the main-branch entry is what the
-      # catalog PRs restore, so this job also populates it. A miss or a cache
-      # failure costs the registry install and never fails the job.
+      # The only writer of the Kilo CLI tree: this job runs on main, so its
+      # entry is visible to every catalog PR, which restores it with
+      # actions/cache/restore and never saves its own. A miss or a cache failure
+      # costs the registry install and never fails the job.
       - name: Restore Kilo CLI
         id: kilo_cli_cache
         if: steps.merge_changes.outputs.catalog == 'true'

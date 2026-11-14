@@ -56,7 +56,11 @@ import {
   MAX_DURABLE_RESULT_BYTES,
   UserConnectionDO,
 } from './UserConnectionDO';
-import type { Instance } from '../types/user-connection-protocol';
+import {
+  MAX_HEARTBEAT_SESSIONS,
+  MAX_HEARTBEAT_TITLE_LENGTH,
+  type Instance,
+} from '../types/user-connection-protocol';
 
 type MockWS = {
   send: ReturnType<typeof vi.fn>;
@@ -241,6 +245,23 @@ function setup(env: Partial<Env> = {}) {
   const ctx = mockCtx.build();
   const doInstance = new UserConnectionDO(ctx as never, env as Env);
   return { doInstance, ctx, mockCtx };
+}
+
+/** Route the `create_session` organization check to a member or a non-member. */
+function setupOrganizationMembership(isMember: boolean) {
+  vi.mocked(getWorkerDb).mockReturnValue(
+    drizzle(async (sql: string) => {
+      if (sql.includes('organization_memberships')) {
+        return { rows: isMember ? [['membership-1']] : [] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    }) as never
+  );
+}
+
+/** Env whose Hyperdrive binding supplies a connection string for that check. */
+function databaseEnv(): Partial<Env> {
+  return { HYPERDRIVE: { connectionString: 'postgres://unused' } } as unknown as Partial<Env>;
 }
 
 function pendingGlanceableKey(userId: string, organizationId: string | null): string {
@@ -1855,6 +1876,44 @@ describe('UserConnectionDO', () => {
         subscribedSessions: string[];
       };
       expect(att.subscribedSessions).toEqual(['s1']);
+    });
+
+    it('answers a subscribe for a session the socket already holds from that subscription', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      sessionAccessMocks.resolveAccessibleKiloSession.mockClear();
+      webWs.send.mockClear();
+      cliWs.send.mockClear();
+
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      expect(sessionAccessMocks.resolveAccessibleKiloSession).not.toHaveBeenCalled();
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(cliWs.send).not.toHaveBeenCalled();
+      expect(webWs.deserializeAttachment()).toMatchObject({ subscribedSessions: ['s1'] });
+    });
+
+    it('rechecks access for a subscribe that follows an unsubscribe', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendSubscribe(doInstance, webWs, 's1');
+      sendUnsubscribe(doInstance, webWs, 's1');
+      await flushAsync();
+
+      sessionAccessMocks.resolveAccessibleKiloSession.mockClear();
+      webWs.send.mockClear();
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      expect(sessionAccessMocks.resolveAccessibleKiloSession).toHaveBeenCalledTimes(1);
+      expect(allSent(webWs).filter(m => m.event === 'sessions.list')).toHaveLength(1);
     });
 
     it('unsubscribe sends to CLI when last subscriber leaves', async () => {
@@ -3982,6 +4041,226 @@ describe('UserConnectionDO', () => {
     });
   });
 
+  describe('create_session organization scope', () => {
+    const ORG_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const OTHER_ORG_ID = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+
+    it('forwards a create_session for an organization the user belongs to', async () => {
+      setupOrganizationMembership(true);
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, []);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        connectionId: 'cli-1',
+        data: { orgId: ORG_ID, title: 'Org session' },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        data: { orgId: ORG_ID, title: 'Org session' },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+    });
+
+    it('refuses a create_session for an organization the user does not belong to', async () => {
+      setupOrganizationMembership(false);
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, []);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        connectionId: 'cli-1',
+        data: { orgId: ORG_ID, title: 'Org session' },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'ORGANIZATION_ACCESS_DENIED',
+          message: 'You do not have access to this organization',
+        },
+      });
+      expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(0);
+    });
+
+    it('refuses a create_session whose organization id is not a uuid', async () => {
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, []);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        connectionId: 'cli-1',
+        data: { orgId: 'not-a-uuid', title: 'Org session' },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'ORGANIZATION_ACCESS_DENIED',
+          message: 'You do not have access to this organization',
+        },
+      });
+      expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(0);
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+
+    it('forwards a create_session without an organization id', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, []);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        connectionId: 'cli-1',
+        data: { title: 'Personal session' },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        data: { title: 'Personal session' },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+
+    it('forwards a session-scoped create whose organization matches the session', async () => {
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        sessionId: 's1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+
+    it('refuses a session-scoped create for a different organization', async () => {
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: OTHER_ORG_ID },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'ORGANIZATION_ACCESS_DENIED',
+          message: 'You do not have access to this organization',
+        },
+      });
+      expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(0);
+    });
+
+    it('forwards a session-scoped create for a session reached through a parent organization', async () => {
+      setupOrganizationMembership(false);
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        sessionId: 's1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+  });
+
   describe('exit_cli routing and relay policy', () => {
     it.each([
       { label: 'missing sessionId', input: { data: { protocolVersion: 1 } } },
@@ -6034,6 +6313,86 @@ describe('UserConnectionDO', () => {
         issues: [{ path: ['id'], code: 'invalid_type' }],
       });
       expect(JSON.stringify(warn.mock.calls)).not.toContain(secret);
+    });
+
+    it('acknowledges and relays a heartbeat at the session count limit', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const sessions = Array.from({ length: MAX_HEARTBEAT_SESSIONS }, (_, index) =>
+        makeSession(`ses-at-limit-${index}`)
+      );
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', sessions })
+      );
+      await flushAsync();
+
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+      const heartbeatEvent = allSent(webWs).find(message => message.event === 'sessions.heartbeat');
+      const data: unknown = heartbeatEvent?.data;
+      if (!isRecord(data) || !Array.isArray(data.sessions)) {
+        throw new Error('sessions.heartbeat must carry a session list');
+      }
+      expect(data.sessions).toHaveLength(MAX_HEARTBEAT_SESSIONS);
+    });
+
+    it('refuses a heartbeat over the session limit before any per-session work', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const sessions = Array.from({ length: MAX_HEARTBEAT_SESSIONS + 1 }, (_, index) =>
+        makeSession(`ses-over-limit-${index}`)
+      );
+      const frame = JSON.stringify({ type: 'heartbeat', sessions });
+
+      await doInstance.webSocketMessage(cliWs as never, frame);
+      await flushAsync();
+
+      expect(warn).toHaveBeenCalledWith('CLI message parse failed', {
+        role: 'cli',
+        connectionId: 'cli-1',
+        byteCount: new TextEncoder().encode(frame).byteLength,
+        sessionCount: MAX_HEARTBEAT_SESSIONS + 1,
+        issues: [{ path: ['sessions'], code: 'too_big' }],
+      });
+      // No acknowledgement, no broadcast, no ready-push entry, no ownership.
+      expect(allSent(cliWs)).toEqual([]);
+      expect(allSent(webWs)).toEqual([]);
+      expect(ctx.storage.store.size).toBe(0);
+      expect(ctx.storage.put).not.toHaveBeenCalled();
+      expect(doInstance.getActiveSessions()).toEqual([]);
+      expect(cliWs.deserializeAttachment()).toMatchObject({ sessions: [] });
+    });
+
+    it('shortens an over-limit title and relays the shortened value', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const sessions = [
+        makeSession('ses_title_too_long', 'busy', 't'.repeat(MAX_HEARTBEAT_TITLE_LENGTH + 1)),
+      ];
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', sessions })
+      );
+      await flushAsync();
+
+      expect(warn).not.toHaveBeenCalledWith('CLI message parse failed', expect.anything());
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+      const active = doInstance.getActiveSessions();
+      expect(active).toHaveLength(1);
+      expect(active[0]?.title).toHaveLength(MAX_HEARTBEAT_TITLE_LENGTH);
+      const heartbeatEvent = allSent(webWs).find(message => message.event === 'sessions.heartbeat');
+      expect(JSON.stringify(heartbeatEvent)).toContain('t'.repeat(MAX_HEARTBEAT_TITLE_LENGTH));
+      expect(JSON.stringify(heartbeatEvent)).not.toContain(
+        't'.repeat(MAX_HEARTBEAT_TITLE_LENGTH + 1)
+      );
+      expect(ctx.storage.store.size).toBeGreaterThan(0);
     });
 
     it('webSocketError triggers webSocketClose', async () => {

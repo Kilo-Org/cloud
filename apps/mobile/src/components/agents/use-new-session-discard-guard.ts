@@ -191,6 +191,15 @@ export function useNewSessionDiscardGuard({
       leave();
       return;
     }
+    if (!navigation.isFocused()) {
+      // The removal was asked for by a screen above this one — the session
+      // route's "Back to sessions" truncates the stack under it — so this
+      // confirm would open where nobody can see it, and refusing the removal
+      // would leave the person on that screen with a Back that does nothing.
+      // The draft is durable, so the replay leaves it for the next open.
+      leave();
+      return;
+    }
     if (!dirty || !isLeaveAction(data.action.type)) {
       leave();
       return;

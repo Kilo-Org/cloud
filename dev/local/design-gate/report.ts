@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { writeJson, type CellRun, type Exec, type RunOutcome } from './capture';
+import { writeJson, type CellRun, type Exec, type RunOutcome, type SkippedTarget } from './capture';
 import type { Finding, Rect } from './findings';
 import { hasPresentedOwner, parseDump } from './tree';
 
@@ -214,7 +214,8 @@ export function renderReport(
   meta: RunMeta,
   cells: readonly CellRun[],
   groups: readonly FindingGroup[],
-  out: string
+  out: string,
+  skippedTargets: readonly SkippedTarget[] = []
 ): string {
   const findings = groups.map(group => group.finding);
   const lines = [
@@ -253,6 +254,20 @@ export function renderReport(
     lines.push('', '## Skipped rules', '');
     for (const entry of skipped) {
       lines.push(`- ${entry.cell} · ${entry.target} · ${entry.rule}: ${entry.reason}.`);
+    }
+  }
+  // A target the probe could not read was never graded: the run is
+  // inconclusive, so the report names it instead of leaving the gap to the
+  // screen counts.
+  if (skippedTargets.length > 0) {
+    lines.push(
+      '',
+      '## Unmeasured targets',
+      '',
+      'The run is inconclusive; these targets were not read.'
+    );
+    for (const entry of skippedTargets) {
+      lines.push('', `- ${entry.cell} · ${entry.target}: ${entry.reason}`);
     }
   }
   lines.push('', '## Findings', '');
@@ -320,7 +335,12 @@ export function writeArtifacts(args: {
   }
   writeJson(path.join(out, 'findings.json'), {
     version: 1,
-    run: { ...meta, sheets, skippedRules: skippedRules(outcome.cells, out) },
+    run: {
+      ...meta,
+      sheets,
+      skippedRules: skippedRules(outcome.cells, out),
+      skipped: outcome.skipped,
+    },
     cells: outcome.cells.map(cell => ({
       id: cell.id,
       config: cell.config,
@@ -330,6 +350,6 @@ export function writeArtifacts(args: {
     findings: groups.map(group => group.finding),
   });
   const reportPath = path.join(out, 'report.md');
-  fs.writeFileSync(reportPath, renderReport(meta, outcome.cells, groups, out));
+  fs.writeFileSync(reportPath, renderReport(meta, outcome.cells, groups, out, outcome.skipped));
   return reportPath;
 }

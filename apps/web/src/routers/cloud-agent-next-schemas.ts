@@ -2,21 +2,28 @@ import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script'
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
-import { ParentCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  ParentCallbackTargetSchema,
+  requestedEnvironmentSchema,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   cloudSessionMetadataSchema,
   cloudSessionMessagesPageInputSchema,
   cloudSessionMessagesPageWireSchema,
 } from '@kilocode/cloud-agent-sdk/schemas';
-import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
-import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
+import {
+  cloudToolPartDetailInputSchema,
+  cloudToolPartDetailWireSchema,
+} from '@kilocode/cloud-agent-sdk/tool-part-detail';
+import { SandboxStatusSessionIdSchema } from '@cloud-agent-shared/sandbox-status';
+import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
 import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   clientKiloSessionIdSchema,
-  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
+  MESSAGE_ID_PATTERN,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
@@ -31,31 +38,25 @@ import {
   CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX,
   CLOUD_AGENT_ATTACHMENT_RELAXED_FILENAME_REGEX,
 } from '@/lib/cloud-agent/constants';
-import {
-  PREVIEW_PORT_MAX,
-  PREVIEW_PORT_MIN,
-} from '../../../../services/cloud-agent-next/src/shared/preview-port';
-import {
-  previewTargetSchema,
-  type PreviewTarget,
-} from '../../../../services/cloud-agent-next/src/shared/preview-target';
+import { PREVIEW_PORT_MAX, PREVIEW_PORT_MIN } from '@cloud-agent-shared/preview-port';
+import { previewTargetSchema, type PreviewTarget } from '@cloud-agent-shared/preview-target';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
-} from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+} from '@cloud-agent-shared/sandbox-status';
 export {
   ListPreviewServicesOutputSchema as baseListPreviewServicesNextOutputSchema,
   type ListPreviewServicesOutput,
   type PreviewService,
-} from '../../../../services/cloud-agent-next/src/shared/preview-services';
+} from '@cloud-agent-shared/preview-services';
 export { GetEgressAuditResponseSchema as baseGetEgressAuditNextOutputSchema } from '@kilocode/worker-utils/egress-audit';
 export type {
   SandboxLifecycleStatus,
   SandboxProviderLabel,
   SandboxStatusDetailCode,
   SandboxStatusSnapshot,
-} from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+} from '@cloud-agent-shared/sandbox-status';
 
 /**
  * Shared schemas for cloud-agent-next routers
@@ -191,7 +192,7 @@ export const cloudAgentReleasePendingUploadsSchema = z.object({
  */
 export const messageIdNextSchema = z
   .string()
-  .regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/, 'Invalid message ID format');
+  .regex(MESSAGE_ID_PATTERN, 'Invalid message ID format');
 
 export const agentModeNextSchema = z.enum([
   'code',
@@ -375,28 +376,6 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
   }),
   sendMessageNextPayloadSchema.options[1],
 ]);
-
-/**
- * The environment the user selected, and the branch of each additional
- * repository of a multi-repository environment. The worker checks both against
- * the owner and the launch repository, and validates each branch.
- */
-const requestedEnvironmentSchema = z
-  .object({
-    id: z.uuid(),
-    repositories: z
-      .array(
-        z
-          .object({
-            repoFullName: z.string().min(1).max(500),
-            branch: z.string().min(1).max(255).optional(),
-          })
-          .strict()
-      )
-      .max(100)
-      .optional(),
-  })
-  .strict();
 
 /**
  * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:
@@ -642,19 +621,29 @@ export const baseStackedWorkspaceSourceNextOutputSchema = z
   .strict();
 
 /**
+ * Control-plane `workspace_<uuid>` session id. The accepted shape is the
+ * worker/wrapper `SESSION_ID_RE`, so the accepted set changes in one place. A
+ * boundary that has its own wording passes `message`; the default keeps the
+ * validation message out of the user's way instead of echoing the pattern.
+ */
+function controlPlaneSessionIdSchema(message = 'Invalid session ID format') {
+  return z.string().regex(SESSION_ID_RE, message);
+}
+
+/**
  * Sync and Restack are session-only: the caller names the session and the
  * server derives the branch, base, and upstream. No client-supplied SHA or
  * branch target is accepted.
  */
 export const baseSyncWorktreeBranchNextSchema = z
   .object({
-    cloudAgentSessionId: cloudAgentSessionIdSchema,
+    cloudAgentSessionId: controlPlaneSessionIdSchema(),
   })
   .strict();
 
 export const baseRestackWorktreeBranchNextSchema = z
   .object({
-    cloudAgentSessionId: cloudAgentSessionIdSchema,
+    cloudAgentSessionId: controlPlaneSessionIdSchema(),
   })
   .strict();
 
@@ -673,7 +662,7 @@ export const baseCreateWorktreeChatNextSchema = z
 export const baseCreateWorktreeChatNextOutputSchema = z
   .object({
     kiloSessionId: kiloSessionIdSchema,
-    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    cloudAgentSessionId: controlPlaneSessionIdSchema(),
     worktreeId: cloudAgentWorktreeIdSchema,
     replayed: z.boolean().optional(),
   })
@@ -686,12 +675,9 @@ export const baseInitiateFromPreparedSessionNextSchema = z
   })
   .strict();
 
-const controlPlaneSessionIdNextSchema = z
-  .string()
-  .regex(
-    /^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
-    'Worktree review requires a control-plane session'
-  );
+const controlPlaneSessionIdNextSchema = controlPlaneSessionIdSchema(
+  'Worktree review requires a control-plane session'
+);
 
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 export const baseSendMessageNextSchema = z
@@ -748,7 +734,7 @@ const sessionMessageCompletionSourceNextSchema = z.enum([
 ]);
 
 // Mirrors the Worker's public result contract without duplicating its strict
-// validation. Non-strict here keeps web-first deploy rolling reads forward
+// validation. Non-strict here keeps a rolling deploy's reads forward
 // compatible; the Worker remains the authority for the full shape.
 export const baseGetMessageResultNextOutputSchema = z.object({
   cloudAgentSessionId: controlPlaneSessionIdNextSchema,
@@ -808,11 +794,13 @@ export const baseGetSessionNextSchema = z.object({
 });
 
 export const baseGetEgressAuditNextSchema = GetEgressAuditInputSchema.extend({
-  cloudAgentSessionId: z.string().regex(SESSION_ID_RE, 'Invalid session ID format'),
+  cloudAgentSessionId: controlPlaneSessionIdSchema(),
   limit: z.number().int().min(1).max(100).default(50),
 }).strict();
 export const baseGetSessionMessagesPageNextSchema = cloudSessionMessagesPageInputSchema;
 export const baseGetSessionMessagesPageNextOutputSchema = cloudSessionMessagesPageWireSchema;
+export const baseGetSessionToolPartDetailNextSchema = cloudToolPartDetailInputSchema;
+export const baseGetSessionToolPartDetailNextOutputSchema = cloudToolPartDetailWireSchema;
 
 export const baseGetSandboxStatusNextSchema = z
   .object({
@@ -831,12 +819,7 @@ export const baseGetPendingInteractionsNextOutputSchema = z.object({
 
 export const baseWorktreeChangesNextSchema = z
   .object({
-    cloudAgentSessionId: z
-      .string()
-      .regex(
-        /^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
-        'Changes require a control-plane session'
-      ),
+    cloudAgentSessionId: controlPlaneSessionIdSchema('Changes require a control-plane session'),
   })
   .strict();
 

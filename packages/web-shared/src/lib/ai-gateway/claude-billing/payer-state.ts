@@ -6,6 +6,7 @@ import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { getGrantedClaudeBillingConnection, type ClaudeBillingOwner } from './store';
+import { claudeBillingOwnerMatches } from './owner';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
 export const ClaudeBillingOwnerSchema = z.discriminatedUnion('kind', [
@@ -60,9 +61,19 @@ export const ClaudeBillingPayerStateSchema = z.object({
   status: z.enum(ClaudeBillingConnectionStatus),
   user_profile_id: z.string().min(1),
   connected_at: z.iso.datetime().nullable(),
-  /** The person the row belongs to; absent from the previous web app release. */
+  /**
+   * The person the row belongs to, null for an organization-owned row. The
+   * cross-region read requires the requesting person for a personal or member
+   * owner, and null for a shared-services owner.
+   */
   kilo_user_id: z.string().nullable().optional(),
-  /** The person who linked it last; absent from the previous web app release. */
+  /**
+   * The organization of an organization-owned row, null for a personal row. The
+   * cross-region read requires the requested organization for a member or
+   * shared-services owner, and null or absent for a personal owner.
+   */
+  organization_id: z.uuid().nullable().optional(),
+  /** The person who linked it last; every release since #10300 answers with it. */
   created_by: z.string().min(1).optional(),
 });
 export type ClaudeBillingPayerState = z.infer<typeof ClaudeBillingPayerStateSchema>;
@@ -77,6 +88,7 @@ export function claudeBillingPayerState(
         user_profile_id: row.user_profile_id,
         connected_at: row.connected_at ? new Date(row.connected_at).toISOString() : null,
         kilo_user_id: row.kilo_user_id,
+        organization_id: row.organization_id,
         created_by: row.created_by,
       }
     : null;
@@ -103,8 +115,6 @@ export async function getAuthoritativeClaudeBillingState(
   );
   if (!response.ok) throw new Error(`Claude payer-state read failed with HTTP ${response.status}`);
   const { connection } = responseSchema.parse(await response.json());
-  // A member connection is that person's row. The previous web app release
-  // answers a member query with the organization's row, which is never it.
-  if (owner.kind === 'member' && connection?.kilo_user_id !== owner.kiloUserId) return null;
+  if (!connection || !claudeBillingOwnerMatches(connection, owner)) return null;
   return connection;
 }

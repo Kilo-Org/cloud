@@ -194,7 +194,8 @@ export type BouncerUsageContext = {
   /** Wall-clock time the request started. */
   occurredAt: Date;
   /**
-   * The payer key bouncer uses: `org:<id>` for an org request, else `user:<id>`.
+   * The payer key bouncer uses: `org:<id>` for an org request, `user:<id>` otherwise. An org
+   * request carries the root organization of its family, the same key its decide uses.
    * Null for an anonymous request, which bouncer keys on the IP instead and must
    * never turn into a payer-sharing row.
    */

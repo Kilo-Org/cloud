@@ -10,17 +10,15 @@ import {
   type ClaudeBillingConnectionRow,
 } from '@kilocode/db/schema';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
-import { db, type DrizzleTransaction, type readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  db,
+  type DrizzleDatabase,
+  type DrizzleTransaction,
+} from '@kilocode/web-shared/lib/drizzle';
+import { claudeBillingOwnerMatches, type ClaudeBillingOwner } from './owner';
 
-/**
- * Who a Claude billing connection belongs to: the person's personal account,
- * the person's own requests in one organization, or the organization's shared
- * services. A request uses only the connection of the owner it runs for.
- */
-export type ClaudeBillingOwner =
-  | { kind: 'personal'; kiloUserId: string }
-  | { kind: 'member'; kiloUserId: string; organizationId: string }
-  | { kind: 'shared_services'; organizationId: string };
+export type { ClaudeBillingOwner } from './owner';
+
 export type ClaudeBillingOwnerInput = {
   organizationId?: string;
   scope?: 'shared_services';
@@ -42,8 +40,8 @@ export type UnreferencedClaudeBillingPayer = {
   id: string;
   userProfileId: string;
 };
-type Database = typeof db | typeof readDb | DrizzleTransaction;
-type WriteDatabase = typeof db | DrizzleTransaction;
+type Database = DrizzleDatabase | DrizzleTransaction;
+type WriteDatabase = DrizzleDatabase | DrizzleTransaction;
 
 export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
   switch (owner.kind) {
@@ -294,7 +292,7 @@ export async function insertClaudeBillingProfile(
     .where(eq(claude_billing_connections.user_profile_id, userProfileId))
     .limit(1);
   if (!row) throw new Error('Claude billing connection row is missing after insert');
-  if (!isInitialOwner(row, owner)) {
+  if (!claudeBillingOwnerMatches(row, owner)) {
     const [existingGrant] = await onDb
       .select({ id: claude_billing_connection_grants.id })
       .from(claude_billing_connection_grants)
@@ -431,17 +429,6 @@ async function deletePersonalAnthropicByokKey(
     );
 }
 
-function isInitialOwner(row: ClaudeBillingConnectionRow, owner: ClaudeBillingOwner): boolean {
-  switch (owner.kind) {
-    case 'personal':
-      return row.kilo_user_id === owner.kiloUserId && row.organization_id === null;
-    case 'member':
-      return row.kilo_user_id === owner.kiloUserId && row.organization_id === owner.organizationId;
-    case 'shared_services':
-      return row.kilo_user_id === null && row.organization_id === owner.organizationId;
-  }
-}
-
 async function reassignPayerOwnerColumns(
   tx: DrizzleTransaction,
   payerConnectionId: string,
@@ -514,7 +501,7 @@ export async function removeClaudeBillingGrant(
       .from(claude_billing_connections)
       .where(eq(claude_billing_connections.id, connection.id))
       .limit(1);
-    if (payerRow && isInitialOwner(payerRow, owner)) {
+    if (payerRow && claudeBillingOwnerMatches(payerRow, owner)) {
       await reassignPayerOwnerColumns(tx, connection.id, remaining);
       return null;
     }
@@ -792,6 +779,14 @@ export async function describeClaudeBillingSharing(
   return { shareableLinks, sharedWith };
 }
 
+/**
+ * Clears the grants a deleted person held. The organization's shared-services
+ * connection and its grant stay when the connector is erased: the connection
+ * belongs to the organization, and the row keeps `created_by` as the record of
+ * who linked it until an organization owner reconnects it. Routing and the
+ * billing card report that connection as requiring a reconnect while its
+ * connector is gone.
+ */
 export async function removeUserClaudeBillingGrants(
   userId: string,
   onDb: WriteDatabase
@@ -852,6 +847,38 @@ export async function removeUserClaudeBillingGrants(
 }
 
 /**
+ * Columns that refusal bookkeeping may change on a connected row.
+ */
+type ConnectedClaudeBillingConnectionChange = Partial<
+  Pick<ClaudeBillingConnectionRow, 'status' | 'last_refusal_code' | 'last_refusal_at'>
+>;
+
+/**
+ * Updates only the connected row that refused the request: the same profile with
+ * the same `connected_at`, so a removal or a newer reconnect is never undone.
+ * `updated_at` keeps its value because an approval already in flight is keyed on it.
+ */
+async function updateConnectedClaudeBillingConnection(
+  userProfileId: string,
+  connectedAt: string,
+  change: ConnectedClaudeBillingConnectionChange
+): Promise<void> {
+  await db
+    .update(claude_billing_connections)
+    .set({
+      ...change,
+      updated_at: claude_billing_connections.updated_at,
+    })
+    .where(
+      and(
+        eq(claude_billing_connections.user_profile_id, userProfileId),
+        eq(claude_billing_connections.connected_at, connectedAt),
+        eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
+      )
+    );
+}
+
+/**
  * Anthropic refused a request for this profile with `user_profile_not_billable`.
  * Later requests fail without an upstream call until an admin acts. Only a
  * connected row changes, so a removal or a newer reconnect is never undone.
@@ -861,22 +888,11 @@ export async function markClaudeBillingUnavailable(
   refusalCode: string,
   connectedAt: string
 ): Promise<void> {
-  await db
-    .update(claude_billing_connections)
-    .set({
-      status: ClaudeBillingConnectionStatus.BillingUnavailable,
-      last_refusal_code: refusalCode,
-      // Request bookkeeping must not invalidate an approval already in flight.
-      updated_at: claude_billing_connections.updated_at,
-      last_refusal_at: new Date().toISOString(),
-    })
-    .where(
-      and(
-        eq(claude_billing_connections.user_profile_id, userProfileId),
-        eq(claude_billing_connections.connected_at, connectedAt),
-        eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
-      )
-    );
+  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
+    status: ClaudeBillingConnectionStatus.BillingUnavailable,
+    last_refusal_code: refusalCode,
+    last_refusal_at: new Date().toISOString(),
+  });
 }
 
 /** Records a refusal that leaves the connection usable, such as a spend limit. */
@@ -885,20 +901,10 @@ export async function recordClaudeBillingRefusal(
   refusalCode: string,
   connectedAt: string
 ): Promise<void> {
-  await db
-    .update(claude_billing_connections)
-    .set({
-      last_refusal_code: refusalCode,
-      last_refusal_at: new Date().toISOString(),
-      updated_at: claude_billing_connections.updated_at,
-    })
-    .where(
-      and(
-        eq(claude_billing_connections.user_profile_id, userProfileId),
-        eq(claude_billing_connections.connected_at, connectedAt),
-        eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
-      )
-    );
+  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
+    last_refusal_code: refusalCode,
+    last_refusal_at: new Date().toISOString(),
+  });
 }
 
 /** A request the customer paid for succeeded, so an earlier refusal no longer applies. */
@@ -906,18 +912,8 @@ export async function clearClaudeBillingRefusal(
   userProfileId: string,
   connectedAt: string
 ): Promise<void> {
-  await db
-    .update(claude_billing_connections)
-    .set({
-      last_refusal_code: null,
-      last_refusal_at: null,
-      updated_at: claude_billing_connections.updated_at,
-    })
-    .where(
-      and(
-        eq(claude_billing_connections.user_profile_id, userProfileId),
-        eq(claude_billing_connections.connected_at, connectedAt),
-        eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
-      )
-    );
+  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
+    last_refusal_code: null,
+    last_refusal_at: null,
+  });
 }

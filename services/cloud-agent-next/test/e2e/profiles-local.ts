@@ -1,10 +1,13 @@
 /** Local saved-profile acceptance against the real Worker, database, wrapper, and Kilo v2. */
 import assert from 'node:assert/strict';
-import { randomUUID, createPublicKey } from 'node:crypto';
+import { randomUUID, createPublicKey, createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createServer } from 'node:http';
+import { createMessageId } from '../../src/shared/message-id.js';
+import { shellQuote } from '../../src/kilo/utils.js';
+import { PINNED_CLIS } from '../../scripts/runtime-cli-artifact.js';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { createDrizzleClient } from '@kilocode/db/client';
@@ -17,7 +20,9 @@ import {
   agent_environment_profile_instructions,
   agent_environment_profile_skills,
   agent_environment_profile_mcp_servers,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
+import { cloudSessionMessagesPageSchema } from '../../../../packages/cloud-agent-sdk/src/schemas.js';
 import {
   createProfile,
   getProfile,
@@ -26,11 +31,12 @@ import {
   mergeProfileConfiguration,
   createMcpServer,
 } from '@kilocode/cloud-agent-profile';
-import { loadRepoEnvFiles, loadDevVars, ensureTestUser } from './auth.js';
+import { loadRepoEnvFiles, loadDevVars, ensureTestUser, loadExistingUserByEmail } from './auth.js';
 import {
   DEFAULT_CONFIG,
-  createHostedWorkspace,
   createHostedWorkspaceSession,
+  createWorktreeChat,
+  trpcCall,
   deleteWorktree,
   openConnectedStream,
   sendCommand,
@@ -38,6 +44,7 @@ import {
   isMessageCompleted,
   type DriverConfig,
   type StreamConnection,
+  type WorktreeSessionResult,
 } from './client.js';
 import {
   executeDockerCommand,
@@ -65,7 +72,10 @@ const client = createDrizzleClient({
   poolConfig: { max: 1 },
 });
 const tag = `profiles-${randomUUID().slice(0, 8)}`;
-const user = await ensureTestUser(database.toString(), `${tag}@example.com`, { funded: true });
+const user = process.env.E2E_USER_EMAIL
+  ? await loadExistingUserByEmail(database.toString(), process.env.E2E_USER_EMAIL)
+  : await ensureTestUser(database.toString(), `${tag}@example.com`, { funded: true });
+const organizationId = z.uuid().optional().parse(process.env.E2E_ORG_ID);
 const config: DriverConfig = {
   ...DEFAULT_CONFIG,
   user,
@@ -73,12 +83,29 @@ const config: DriverConfig = {
   internalApiSecret: vars.INTERNAL_API_SECRET,
   workerUrl: `http://localhost:${port('cloud-agent-next')}`,
   fakeLlmUrl: `http://localhost:${port('fake-llm')}`,
+  ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),
 };
 const owner = { type: 'user' as const, id: user.id };
 const profile = await createProfile(client.db, owner, user.id, 'Synthetic v2 profile acceptance');
 const signal = AbortSignal.timeout(180_000);
 let stream: StreamConnection | undefined;
 let workspaceId: string | undefined;
+
+const repositoryFiles = {
+  '.kilo/kilo.json': JSON.stringify({ instructions: ['.kilo/repository-instructions.md'] }),
+  '.kilo/repository-instructions.md': 'SYNTHETIC_RELEASE_REPOSITORY_INSTRUCTION',
+  '.kilo/agents/repository-reviewer.md':
+    '---\nmode: primary\ndescription: Synthetic repository reviewer\n---\nSYNTHETIC_RELEASE_REPOSITORY_AGENT',
+  '.kilo/commands/repository-command.md':
+    '---\nagent: repository-reviewer\ndescription: Synthetic repository command\n---\n__fake__:echo:$ARGUMENTS',
+  '.kilo/skills/repository-review/SKILL.md':
+    '---\nname: repository-review\ndescription: Synthetic repository skill\n---\nSYNTHETIC_RELEASE_REPOSITORY_SKILL',
+  '.kilo2/commands/prerelease-command.md': '__fake__:echo:SHOULD_NOT_LOAD',
+};
+const repositorySetup = `const fs = require('node:fs'); const path = require('node:path');
+for (const [name, content] of Object.entries(${JSON.stringify(repositoryFiles)})) {
+  fs.mkdirSync(path.dirname(name), {recursive: true}); fs.writeFileSync(name, content);
+}`;
 
 // This local stdio MCP has no dependencies and never prints its environment.
 const mcp = String.raw`
@@ -177,6 +204,7 @@ try {
     { profile_id: profile.id, sequence: 0, command: 'printf first > profile-setup.txt' },
     { profile_id: profile.id, sequence: 1, command: 'exit 17' },
     { profile_id: profile.id, sequence: 2, command: 'printf second >> profile-setup.txt' },
+    { profile_id: profile.id, sequence: 3, command: `node -e ${shellQuote(repositorySetup)}` },
   ]);
   await client.db.insert(agent_environment_profile_agents).values([
     {
@@ -330,12 +358,28 @@ try {
   );
   console.log('PASS saved profile collections, default selection, and masked secret response');
 
-  const created = await createHostedWorkspace(
+  const initialMessageId = createMessageId();
+  const prepared = await trpcCall<WorktreeSessionResult>(
     config,
-    { profileId: profile.id, prompt: `__fake__:echo:${tag}-cold` },
-    signal
+    'prepareSession',
+    {
+      prompt: `__fake__:echo:${tag}-cold`,
+      gitUrl: config.gitUrl,
+      profileId: profile.id,
+      mode: 'code',
+      model: config.model,
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
+      operationKey: randomUUID(),
+      autoInitiate: true,
+      initialMessageId,
+      kilocodeOrganizationId: organizationId,
+    },
+    { internalApiSecret: config.internalApiSecret, signal }
   );
-  workspaceId = created.workspaceId;
+  const created = { ...prepared, messageId: initialMessageId };
+  workspaceId = prepared.worktreeId;
+  assert(workspaceId, 'Browser start did not create a workspace');
   stream = await openConnectedStream(config, created.cloudAgentSessionId, true, undefined, signal);
   assert(
     isMessageCompleted(await stream.waitForTerminal(120_000, created.messageId), created.messageId),
@@ -350,6 +394,9 @@ try {
 
   const native = await findControlPlaneKiloRuntime(created.kiloSessionId);
   assert(native, 'No owned native profile runtime');
+  const wrapperHash = createHash('sha256')
+    .update(await readFile(path.join(service, 'wrapper/dist/control-plane-wrapper.js')))
+    .digest('hex');
   const inspect = String.raw`
     const fs = require('node:fs');
     const input = JSON.parse(process.argv[1]);
@@ -362,6 +409,9 @@ try {
     const servers=(await read('/api/mcp')).data;
     console.log(JSON.stringify({
       harness:fs.readFileSync('/proc/1/environ','utf8').includes('KILO_RUNTIME_HARNESS=kilo2'),
+      releaseConfig:env.KILO_USE_RELEASE_CONFIG==='1',
+      version:require('node:child_process').execFileSync('/proc/'+input.processId+'/exe',['--version'],{env,encoding:'utf8'}).trim(),
+      wrapperBuild:require('node:crypto').createHash('sha256').update(fs.readFileSync('/usr/local/bin/kilocode-control-plane-wrapper.js')).digest('hex')===input.wrapperHash,
       profileFile:Boolean(env.KILO2_CONFIG),
       wrapperProfileBridge:fs.readFileSync('/usr/local/bin/kilocode-control-plane-wrapper.js','utf8').includes('KILO2_CONFIG'),
       variables:env.PROFILE_PLAIN==='synthetic-plain-value' && env.PROFILE_SECRET==='synthetic-secret-value',
@@ -373,43 +423,52 @@ try {
       mcp:servers.map(item=>({name:item.name,status:item.status.status})),
     }));
   `;
-  const proof = z
-    .object({
-      harness: z.boolean(),
-      profileFile: z.boolean(),
-      wrapperProfileBridge: z.boolean(),
-      variables: z.boolean(),
-      setup: z.boolean(),
-      rules: z.boolean(),
-      companion: z.boolean(),
-      mcpEnvironment: z.boolean(),
-      skills: z.array(z.string()),
-      agents: z.array(z.string()),
-      mcp: z.array(z.object({ name: z.string(), status: z.string() })),
-    })
-    .parse(
+  const proofSchema = z.object({
+    harness: z.boolean(),
+    releaseConfig: z.boolean(),
+    version: z.literal(PINNED_CLIS.kilo2.reportedVersion),
+    wrapperBuild: z.boolean(),
+    profileFile: z.boolean(),
+    wrapperProfileBridge: z.boolean(),
+    variables: z.boolean(),
+    setup: z.boolean(),
+    rules: z.boolean(),
+    companion: z.boolean(),
+    mcpEnvironment: z.boolean(),
+    skills: z.array(z.string()),
+    agents: z.array(z.string()),
+    mcp: z.array(z.object({ name: z.string(), status: z.string() })),
+  });
+  async function inspectProfile(runtime: NonNullable<typeof native>) {
+    return proofSchema.parse(
       JSON.parse(
         (
           await executeDockerCommand([
             'exec',
-            native.container.id,
+            runtime.container.id,
             'bun',
             '-e',
             inspect,
-            JSON.stringify(native),
+            JSON.stringify({ ...runtime, wrapperHash }),
           ])
         ).stdout
       )
     );
+  }
+  const proof = await inspectProfile(native);
   console.log(JSON.stringify(proof));
   assert(catalog, 'Cloud did not publish the loaded profile command');
   assert(
     !JSON.stringify(catalog.data).includes('profile-disabled'),
     'Disabled command was published'
   );
+  assert(JSON.stringify(catalog.data).includes('repository-command'), 'Repository command missing');
+  assert(!JSON.stringify(catalog.data).includes('prerelease-command'), '.kilo2 command was loaded');
   console.log('PASS cold start and Cloud slash-command discovery');
   for (const key of [
     'harness',
+    'releaseConfig',
+    'wrapperBuild',
     'profileFile',
     'wrapperProfileBridge',
     'variables',
@@ -422,11 +481,13 @@ try {
   for (const name of [
     'profile-review',
     'profile-marketplace',
+    'repository-review',
     ...(process.env.RUN_SKILLS_SH_INSTALL_TEST === '1' ? ['find-skills'] : []),
   ])
     assert(proof.skills.includes(name), `Missing skill: ${name}`);
   assert(!proof.skills.includes('profile-disabled'));
   assert(proof.agents.includes('profile-reviewer') && proof.agents.includes('profile-helper'));
+  assert(proof.agents.includes('repository-reviewer'));
   assert(!proof.agents.includes('profile-disabled'));
   assert(proof.mcp.some(item => item.name === 'profile-local' && item.status === 'connected'));
   assert(proof.mcp.some(item => item.name === 'profile-remote' && item.status === 'connected'));
@@ -436,24 +497,87 @@ try {
     'PASS v2 runtime, variables, decrypted secrets, non-fatal ordered setup, instructions, agents, skills, companion files, and local/remote MCP'
   );
 
-  async function command(name: string) {
+  async function command(
+    name: string,
+    sessionId = created.cloudAgentSessionId,
+    connection = stream
+  ) {
+    const commandArguments = `${tag}-${name}-${randomUUID().slice(0, 8)}`;
     const result = await sendCommand(config, {
-      cloudAgentSessionId: created.cloudAgentSessionId,
+      cloudAgentSessionId: sessionId,
       command: name,
-      arguments: `${tag}-${name}`,
+      arguments: commandArguments,
       signal,
     });
     assert(
       isMessageCompleted(
-        (await stream?.waitForTerminal(45_000, result.messageId)) ?? null,
+        (await connection?.waitForTerminal(45_000, result.messageId)) ?? null,
         result.messageId
       ),
       `Profile command failed: ${name}`
     );
     console.log(`PASS /${name}`);
+    if (name === 'profile-command' || name === 'repository-command') {
+      const history = cloudSessionMessagesPageSchema.parse(
+        await trpcCall(
+          config,
+          'getSessionMessagesPage',
+          { sessionId, limit: 100 },
+          { method: 'GET', signal }
+        )
+      );
+      assert(
+        history?.messages.some(
+          message =>
+            message.info.role === 'assistant' &&
+            message.parts.some(part => part.type === 'text' && part.text === commandArguments)
+        ),
+        'Profile command output was not retained'
+      );
+    }
   }
+  async function skill(
+    sessionId: string,
+    connection: StreamConnection,
+    name = 'profile-review',
+    content = 'Read scripts/check.sh.'
+  ) {
+    const sent = await sendMessage(config, {
+      cloudAgentSessionId: sessionId,
+      prompt: `__fake__:skill:${tag}-${randomUUID().slice(0, 8)}:${name}`,
+      signal,
+    });
+    assert(
+      isMessageCompleted(await connection.waitForTerminal(45_000, sent.messageId), sent.messageId)
+    );
+    const history = cloudSessionMessagesPageSchema.parse(
+      await trpcCall(
+        config,
+        'getSessionMessagesPage',
+        { sessionId, limit: 100 },
+        { method: 'GET', signal }
+      )
+    );
+    const loaded = history?.messages.some(message =>
+      message.parts.some(
+        part =>
+          part.type === 'tool' && part.tool === 'skill' && JSON.stringify(part).includes(content)
+      )
+    );
+    assert(loaded, `Skill did not load through the native tool: ${name}`);
+    console.log(`PASS native skill loading: ${name}`);
+  }
+  await skill(created.cloudAgentSessionId, stream);
   await command('profile-command');
   await command('profile-task');
+  await command('repository-command');
+  await skill(
+    created.cloudAgentSessionId,
+    stream,
+    'repository-review',
+    'SYNTHETIC_RELEASE_REPOSITORY_SKILL'
+  );
+  console.log('PASS repository .kilo commands, agents, and skills; .kilo2 command ignored');
   const sibling = await createHostedWorkspaceSession(
     config,
     { workspaceId, prompt: `__fake__:echo:${tag}-sibling` },
@@ -473,6 +597,14 @@ try {
         sibling.messageId
       )
     );
+    const siblingNative = await findControlPlaneKiloRuntime(sibling.kiloSessionId);
+    assert(siblingNative, 'Sibling did not attach to the native runtime');
+    assert.equal(siblingNative.container.id, native.container.id);
+    assert.equal(siblingNative.processId, native.processId);
+    assert.deepEqual(await inspectProfile(siblingNative), proof);
+    await command('profile-command', sibling.cloudAgentSessionId, siblingStream);
+    await command('profile-task', sibling.cloudAgentSessionId, siblingStream);
+    await skill(sibling.cloudAgentSessionId, siblingStream);
     assert(
       await siblingStream.waitFor(
         event =>
@@ -485,6 +617,47 @@ try {
     siblingStream.close();
   }
   console.log('PASS sibling profile reuse');
+
+  const emptySibling = await createWorktreeChat(
+    config,
+    {
+      sourceCloudAgentSessionId: created.cloudAgentSessionId,
+      sourceKiloSessionId: created.kiloSessionId,
+    },
+    signal
+  );
+  const emptyStream = await openConnectedStream(
+    config,
+    emptySibling.cloudAgentSessionId,
+    true,
+    undefined,
+    signal
+  );
+  try {
+    const [savedSibling] = await client.db
+      .select({ profileId: cli_sessions_v2.profile_id })
+      .from(cli_sessions_v2)
+      .where(eq(cli_sessions_v2.session_id, emptySibling.kiloSessionId));
+    assert.equal(
+      savedSibling?.profileId,
+      profile.id,
+      'Browser sibling lost its profile association'
+    );
+    assert(
+      await emptyStream.waitFor(
+        event =>
+          event.streamEventType === 'commands.available' &&
+          JSON.stringify(event.data).includes('profile-command'),
+        10_000
+      ),
+      'New browser sibling did not receive profile commands before its first message'
+    );
+    await command('profile-command', emptySibling.cloudAgentSessionId, emptyStream);
+    await skill(emptySibling.cloudAgentSessionId, emptyStream);
+  } finally {
+    emptyStream.close();
+  }
+  console.log('PASS empty browser sibling command discovery and first-turn command');
 
   await signalKiloServerProcess(
     { containerId: native.container.id, processId: native.processId },
@@ -502,12 +675,17 @@ try {
     )
   );
   await command('profile-command');
+  await command('repository-command');
   console.log('PASS profile retained after native process restart');
 } finally {
   stream?.close();
   try {
     if (workspaceId)
-      await deleteWorktree(config, { worktreeId: workspaceId }, AbortSignal.timeout(30_000));
+      await deleteWorktree(
+        config,
+        { worktreeId: workspaceId, kilocodeOrganizationId: organizationId },
+        AbortSignal.timeout(30_000)
+      );
   } finally {
     remote.closeAllConnections();
     remote.close();

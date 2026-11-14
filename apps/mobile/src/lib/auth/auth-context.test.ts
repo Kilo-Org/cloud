@@ -66,16 +66,16 @@ vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
 }));
+
+vi.mock('@/lib/hooks/environment-choice', () => ({
+  clearEnvironmentChoices: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
   clearTrackingPromptDismissed: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   clearReasoningPreference: vi.fn(),
-}));
-
-vi.mock('@/lib/last-active-instance', () => ({
-  clearLastActiveInstance: vi.fn(),
 }));
 
 vi.mock('@/lib/credits/use-store-credit-purchase', () => ({

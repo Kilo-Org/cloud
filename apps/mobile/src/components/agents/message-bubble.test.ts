@@ -1,11 +1,13 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
 import { type MessageDeliveryStatement } from './message-failure-state';
+import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 import {
   assistantMessage,
   findElementByType,
@@ -112,6 +114,9 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
+vi.mock('@/components/add-credits-row', () => ({
+  AddCreditsRow: 'AddCreditsRow',
+}));
 vi.mock('./chat-markdown-text', () => ({
   ChatMarkdownText: () => null,
 }));
@@ -146,6 +151,53 @@ vi.mock('./use-message-copy', () => ({
 const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
 
 describe('MessageBubble compaction', () => {
+  beforeEach(async () => {
+    const { isTextPart } = await import('./part-types');
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+  });
+
+  afterEach(async () => {
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockReturnValue(false);
+  });
+
+  it.each([false, true])(
+    'keeps the projected Kilo v2 summary out of ordinary markdown (native content: %s)',
+    async withNativeContent => {
+      const [message] = readKilo2Messages(
+        { id: 'ses_1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+        [
+          {
+            id: 'msg_compaction',
+            type: 'compaction',
+            status: 'completed',
+            summary: 'Saved context summary',
+            time: { created: 2 },
+            content: withNativeContent ? [{ type: 'text', text: 'Native compaction detail' }] : [],
+          },
+        ]
+      );
+      if (message === undefined) {
+        throw new Error('expected a projected compaction message');
+      }
+      expect(message.parts).toHaveLength(withNativeContent ? 3 : 2);
+      const tree = await renderBubble(message);
+      expect(
+        findElementByType(tree, 'PartRenderer', props => props.part === message.parts[1])
+      ).toBeNull();
+      if (withNativeContent) {
+        expect(
+          findElementByType(tree, 'PartRenderer', props => props.part === message.parts[2])?.props
+            .messageInfo
+        ).toBe(message.info);
+      } else {
+        expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
+        expect(findElementByType(tree, 'PartRenderer')).toBeNull();
+      }
+    }
+  );
+
   it.each([true, false])(
     'passes live state %s to the compaction-only separator',
     async isStreaming => {
@@ -284,18 +336,94 @@ describe('MessageBubble failed delivery state', () => {
   });
 });
 
+describe('MessageBubble stored prompt with no reply', () => {
+  const NOTE = i18n.t('agentChat.messageBubble.noReplyRecorded');
+
+  // The suite leaves `isTextPart` mocked to false, which hides the bubble the
+  // note sits under. Read the real part type here so the prompt renders and the
+  // note's position relative to it is what the assertions read.
+  beforeEach(async () => {
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    const partTypes = await import('./part-types');
+    vi.mocked(partTypes.isTextPart).mockImplementation(actual.isTextPart);
+  });
+
+  afterEach(async () => {
+    const partTypes = await import('./part-types');
+    vi.mocked(partTypes.isTextPart).mockReturnValue(false);
+  });
+
+  /** The props of an unrendered element, or null for text and empty slots. */
+  function elementProps(node: unknown): Record<string, unknown> | null {
+    if (node === null || typeof node !== 'object' || !('props' in node)) {
+      return null;
+    }
+    const props = node.props;
+    return typeof props === 'object' && props !== null ? (props as Record<string, unknown>) : null;
+  }
+
+  /** The row's children in order: the bubble's pressable, then the note. */
+  function rowChildren(tree: unknown): readonly unknown[] {
+    const children = elementProps(tree)?.children;
+    return Array.isArray(children) ? children : [children];
+  }
+
+  it('states that no reply was recorded under the rendered prompt', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-unanswered'), {
+      noReplyRecorded: true,
+      retryAvailable: false,
+    });
+    const children = rowChildren(tree);
+    const promptIndex = children.findIndex(child => elementProps(child)?.onLongPress !== undefined);
+    const noteIndex = children.findIndex(child => findText(child, text => text === NOTE));
+
+    // The prompt bubble is drawn, and the note follows it rather than sitting
+    // inside the pressable or above the prompt.
+    expect(promptIndex).toBeGreaterThanOrEqual(0);
+    expect(noteIndex).toBeGreaterThan(promptIndex);
+    // The record cannot say the send failed, so the note adds no action of its
+    // own; the read-only footer owns the one recovery.
+    expect(
+      findElementByType(
+        tree,
+        'Button',
+        props => props.accessibilityLabel === i18n.t('common.retry')
+      )
+    ).toBeNull();
+  });
+
+  it('draws no note for a row that is not the unanswered prompt', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-answered'), {
+      retryAvailable: false,
+    });
+    expect(findText(tree, text => text === NOTE)).toBe(false);
+  });
+
+  it('never marks an assistant row, even when a caller sets the prop', async () => {
+    const tree = await renderBubbleWithHandlers(assistantMessageWithText('m-asst'), {
+      noReplyRecorded: true,
+    });
+    // The assistant row renders its own part, so this case is not the empty-tree
+    // path: the note is absent because only a user row can carry it.
+    expect(findElementByType(tree, 'PartRenderer')).not.toBeNull();
+    expect(findText(tree, text => text === NOTE)).toBe(false);
+  });
+});
+
 async function renderBubbleWithHandlers(
   message: StoredMessage,
   props: {
     deliveryState?: MessageDeliveryStatement;
     onRetryMessage?: (m: StoredMessage) => void;
-    onAddCredits?: () => void;
+    addCredits?: AddCreditsDestination;
     retryAvailable?: boolean;
+    failureStatedByPreparation?: boolean;
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
     onLongPressDetails?: (m: StoredMessage) => void;
     condenseToolCalls?: boolean;
     partsOverride?: readonly StoredMessage['parts'][number][];
+    noReplyRecorded?: boolean;
   }
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');
@@ -487,12 +615,58 @@ describe('MessageBubble failure footer', () => {
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
   });
 
+  it('keeps the actions and drops the generic statement a preparation group already states', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-failed'), {
+      deliveryState: { status: 'failed', error: 'boom', reason: 'execution' },
+      failureStatedByPreparation: true,
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    // The group names the stage and the reason, so neither generic line is
+    // drawn a second time above it.
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+    expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
+    // The turn keeps the recovery it had, in the column of the failed response.
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).not.toBeNull();
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
+    expect(footerOf(tree)).not.toBeNull();
+  });
+
+  it('draws no footer when the group states the failure and no action can render', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-empty'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      failureStatedByPreparation: true,
+      retryAvailable: false,
+    });
+
+    // Nothing but a padded block would be left above the group, so the footer
+    // is skipped rather than drawn empty.
+    expect(footerOf(tree)).toBeNull();
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+  });
+
+  it('keeps a classified statement on a turn whose preparation also failed', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-credits'), {
+      deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      failureStatedByPreparation: true,
+      addCredits: { kind: 'inApp', onPress: vi.fn<() => void>() },
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    // The balance refusal is a cause the preparation group does not carry, so
+    // its statement stays.
+    expect(findText(tree, t => t === 'Not enough credits to send this message.')).toBe(true);
+  });
+
   it('states a refused send under the person’s bubble with Add credits and no Retry', async () => {
     const onAddCredits = vi.fn<() => void>();
     const tree = await renderBubbleWithHandlers(userMessage('m-credits'), {
       deliveryState: { status: 'failed', error: '', reason: 'credits' },
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
-      onAddCredits,
+      addCredits: { kind: 'inApp', onPress: onAddCredits },
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
 
@@ -503,13 +677,9 @@ describe('MessageBubble failure footer', () => {
     expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
     // The send never left, so the statement sits in the bubble's own column.
     expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
-    const addCredits = findElementByType(
-      tree,
-      'Button',
-      p => p.accessibilityLabel === 'Add credits'
-    );
+    const addCredits = findElementByType(tree, 'AddCreditsRow');
     if (!addCredits) {
-      throw new Error('the footer drew no Add credits button');
+      throw new Error('the footer drew no Add credits action');
     }
     (addCredits.props.onPress as () => void)();
     expect(onAddCredits).toHaveBeenCalledTimes(1);
@@ -633,23 +803,22 @@ describe('MessageBubble failure footer', () => {
         statusCode: 402,
         responseBody: GATEWAY_CREDITS_BODY,
       }),
-      { onRetryMessage: vi.fn<(message: StoredMessage) => void>(), onAddCredits }
+      {
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+        addCredits: { kind: 'inApp', onPress: onAddCredits },
+      }
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
     expect(findText(tree, t => t === 'Not enough credits for this request.')).toBe(true);
 
-    const addCredits = findElementByType(
-      tree,
-      'Button',
-      p => p.accessibilityLabel === 'Add credits'
-    );
+    const addCredits = findElementByType(tree, 'AddCreditsRow');
     if (!addCredits) {
-      throw new Error('the footer drew no Add credits button');
+      throw new Error('the footer drew no Add credits action');
     }
     // The row's one recovery action fills with the accent surface the person's
     // own bubble uses, so it reads as that row's primary action.
-    expect(addCredits.props.className).toContain('bg-accent-soft');
+    expect(addCredits.props.emphasis).toBe('primary');
     const press = addCredits.props.onPress as () => void;
     press();
     expect(onAddCredits).toHaveBeenCalledTimes(1);
@@ -670,15 +839,16 @@ describe('MessageBubble failure footer', () => {
         statusCode: 402,
         responseBody: '{"error":{"message":"Upstream request failed"}}',
       }),
-      { onRetryMessage: vi.fn<(message: StoredMessage) => void>(), onAddCredits }
+      {
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+        addCredits: { kind: 'inApp', onPress: onAddCredits },
+      }
     );
 
     expect(
       findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
     ).toBe(true);
-    expect(
-      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Add credits')
-    ).toBeNull();
+    expect(findElementByType(tree, 'AddCreditsRow')).toBeNull();
   });
 
   it('keeps Add credits on a transcript that cannot resend', async () => {
@@ -689,13 +859,11 @@ describe('MessageBubble failure footer', () => {
         statusCode: 402,
         responseBody: GATEWAY_CREDITS_BODY,
       }),
-      { retryAvailable: false, onAddCredits }
+      { retryAvailable: false, addCredits: { kind: 'inApp', onPress: onAddCredits } }
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
-    expect(
-      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Add credits')
-    ).not.toBeNull();
+    expect(findElementByType(tree, 'AddCreditsRow')).not.toBeNull();
   });
 
   it('renders no pressable host for an assistant row with nothing to show', async () => {

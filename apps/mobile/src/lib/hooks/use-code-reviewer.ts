@@ -10,6 +10,7 @@ import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   type ConfigPatch,
+  isPersonal,
   PERSONAL_SCOPE,
   type ReviewConfigData,
   type ReviewerPlatform,
@@ -24,11 +25,7 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
 
-export { PERSONAL_SCOPE, toPersonalPlatform };
-
-export function isPersonal(scope: string) {
-  return scope === PERSONAL_SCOPE;
-}
+export { isPersonal, PERSONAL_SCOPE, toPersonalPlatform };
 
 // chainSave keys in-flight saves by "scope:platform", so config saves for
 // the same reviewer config are never in flight concurrently — each waits
@@ -54,7 +51,7 @@ export function toNumericRepositoryIds(ids: (number | string)[]): number[] {
 // types even when structurally identical, so we can't pick between them
 // with a ternary and spread the result — TypeScript treats the branches as
 // unrelated. Instead we always call both hooks (one disabled) and return
-// whichever is active, mirroring the pattern in use-kiloclaw-queries.ts.
+// whichever is active.
 
 export function useGitHubStatus(scope: string) {
   const trpc = useTRPC();
@@ -241,11 +238,12 @@ export function gitLabWebhookWarningQueryKey(scope: string, platform: ReviewerPl
  * sync repository webhooks (`saveReviewConfig` still resolves `success:
  * true` in that case — the sync errors are nested in `webhookSync.errors`
  * and easy to miss). Stored in the query cache rather than component state
- * so it survives navigation. `useSaveReviewConfig`'s mutationFn recomputes
- * this flag from the fresh `webhookSync.errors` on every successful save
- * (including a "Retry" that just resubmits the current config), so it
- * clears itself once the sync actually succeeds — there is no separate
- * dismiss action.
+ * so it survives navigation. Only a save that carries the repository
+ * selection can re-run the project-hook sync, so `useSaveReviewConfig`'s
+ * mutationFn rewrites this flag from the fresh `webhookSync.errors` for such
+ * a save (including a "Retry" that resends the current selection), and only
+ * when the response reports a sync at all. It clears once a sync actually
+ * succeeds — there is no separate dismiss action.
  */
 export function useGitLabWebhookWarning(scope: string, platform: ReviewerPlatform) {
   const queryKey = gitLabWebhookWarningQueryKey(scope, platform);
@@ -301,6 +299,11 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         const {
           selectedRepositoryIds: rawSelectedRepositoryIds,
           repositoryModelOverrides: rawRepositoryModelOverrides,
+          // Council is org-only (the personal PATCH schema does not accept it),
+          // so these two keys are pulled out here and forwarded on the org
+          // branch only.
+          council: rawCouncil,
+          councilEnabledRepositoryIds: rawCouncilEnabledRepositoryIds,
           ...restPatch
         } = patch;
         // The personal schema only accepts numeric repository IDs
@@ -354,6 +357,10 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
               ...(rawRepositoryModelOverrides !== undefined
                 ? { repositoryModelOverrides: rawRepositoryModelOverrides }
                 : {}),
+              ...(rawCouncil !== undefined ? { council: rawCouncil } : {}),
+              ...(rawCouncilEnabledRepositoryIds !== undefined
+                ? { councilEnabledRepositoryIds: rawCouncilEnabledRepositoryIds }
+                : {}),
               ...gitlabAutoConfigure,
             });
         // Same reasoning as useToggleReviewer: `success` is typed as `boolean`,
@@ -363,11 +370,18 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         if (!result.success) {
           throw new Error(i18n.t('codeReviewer.configSaveFailed'));
         }
-        if (platform === 'gitlab') {
-          queryClient.setQueryData<boolean>(
-            webhookWarningQueryKey,
-            (result.webhookSync?.errors.length ?? 0) > 0
-          );
+        // Webhook health is evidence, not the absence of it: only a patch that
+        // carries the selection can re-run the project-hook sync, and the
+        // server reports `webhookSync: null` when it skips the sync (no
+        // connected integration, or no stored hook secret). A save that edits
+        // anything else, or one whose sync never ran, must not dismiss a
+        // warning whose hooks were not re-checked.
+        const webhookSync =
+          platform === 'gitlab' && rawSelectedRepositoryIds !== undefined
+            ? result.webhookSync
+            : null;
+        if (webhookSync !== null) {
+          queryClient.setQueryData<boolean>(webhookWarningQueryKey, webhookSync.errors.length > 0);
         }
         return result;
       }),
@@ -407,39 +421,9 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
 export { classifyProviderState } from '@/lib/code-reviewer-status';
 export { useReviewerEditGuard, useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 
-// Bitbucket is org-only, so unlike the GitHub/GitLab status hooks above
-// there is no personal-vs-org split here.
-export function useBitbucketReadiness(scope: string) {
-  const trpc = useTRPC();
-  return useQuery({
-    ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
-      organizationId: scope,
-    }),
-    enabled: !isPersonal(scope),
-  });
-}
-
-export function useConnectBitbucket(scope: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const queryKey = trpc.organizations.reviewAgent.getBitbucketReadiness.queryKey({
-    organizationId: scope,
-  });
-
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: { accessToken: string }) =>
-      trpcClient.organizations.bitbucket.connect.mutate({
-        organizationId: scope,
-        accessToken: vars.accessToken,
-      }),
-    onError: error => {
-      announcingToast.error(error.message);
-    },
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
-  });
-}
+// Bitbucket hooks live in use-bitbucket.ts (keeps this file under the
+// max-lines limit); re-exported here so call sites are unchanged.
+export { useBitbucketReadiness, useConnectBitbucket } from '@/lib/hooks/use-bitbucket';
 
 // Review-memory hooks live in use-review-memory.ts (keeps this file under
 // the max-lines limit); re-exported here so call sites are unchanged.

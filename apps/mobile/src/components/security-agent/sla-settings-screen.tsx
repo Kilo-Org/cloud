@@ -74,8 +74,7 @@ const SLA_ROWS = [
 
 // Uncontrolled numeric TextInput — never pass `value` back on iOS (see
 // apps/mobile/AGENTS.md). The ref holds the raw typed text; `days` holds
-// the parsed number (or NaN while invalid) purely to drive dirty/validity,
-// mirroring the derived-state pattern in kiloclaw/settings-card.tsx.
+// the parsed number (or NaN while invalid) purely to drive dirty/validity.
 function SlaDayRow({
   label,
   description,

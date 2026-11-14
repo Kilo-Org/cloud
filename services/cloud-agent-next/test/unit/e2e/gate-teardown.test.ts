@@ -130,8 +130,11 @@ describe('gate session teardown', () => {
     expect(mocks.deleteSession).not.toHaveBeenCalled();
   });
 
-  it('releases sessions under the local profile and reclaims their sandboxes afterwards', async () => {
-    const reclaimSessions = vi.fn(async () => {});
+  it('reclaims local sandboxes before deletion removes the native ownership proof', async () => {
+    const reclaimSessions = vi.fn(async () => {
+      expect(mocks.interruptSession).not.toHaveBeenCalled();
+      expect(mocks.deleteSession).not.toHaveBeenCalled();
+    });
     const definition: RunnableSharedScenario = {
       name: 'local-teardown',
       requires: ['sandbox'],
@@ -157,9 +160,8 @@ describe('gate session teardown', () => {
       { sessionId: 'workspace_second', kiloSessionId: 'ses_second' },
       { sessionId: 'workspace_first', kiloSessionId: 'ses_first' },
     ]);
-    // A container is only stopped once nothing can recreate demand for it.
-    const lastDelete = Math.max(...mocks.deleteSession.mock.invocationCallOrder);
-    expect(reclaimSessions.mock.invocationCallOrder[0]).toBeGreaterThan(lastDelete);
+    const firstDelete = Math.min(...mocks.deleteSession.mock.invocationCallOrder);
+    expect(reclaimSessions.mock.invocationCallOrder[0]).toBeLessThan(firstDelete);
   });
 
   it('reclaims even when the scenario throws', async () => {
@@ -192,7 +194,10 @@ describe('gate session teardown', () => {
     const definition: RunnableSharedScenario = {
       name: 'local-reclaim-fails',
       requires: ['sandbox'],
-      run: async (args: LifecycleArgs) => passingResult('local-reclaim-fails', args.conversation),
+      run: async (args: LifecycleArgs) => {
+        args.config.onSessionCreated?.('workspace_only', 'ses_only');
+        return passingResult('local-reclaim-fails', args.conversation);
+      },
     };
 
     const result = await runSharedScenario(definition, {
@@ -208,6 +213,7 @@ describe('gate session teardown', () => {
 
     expect(result.ok).toBe(true);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('docker unavailable'));
+    expect(mocks.deleteSession.mock.calls.map(call => call[1])).toEqual(['workspace_only']);
   });
 
   it('reclaims nothing for an unsupported scenario', async () => {

@@ -15,13 +15,14 @@ import { z } from 'zod';
 import { exchangeRequestSchema, principalSchema, type Principal } from './protocol';
 import { rateLimit } from './rate-limit';
 import { jsonResponse, requestMetrics, timed } from './metrics';
+import { exchangeCloudAgentUpload, type CloudAgentUploadEnv } from './cloud-agent-upload';
 
 export type { Principal };
 
 /** A Secrets Store binding in deployment, or a plain string from local vars. */
 export type SecretBinding = string | { get(): Promise<string | null> };
 
-export type AuthEnv = {
+export type AuthEnv = CloudAgentUploadEnv & {
   NEXTAUTH_SECRET: SecretBinding;
   SESSION_SYNC_SECRET: SecretBinding;
   HYPERDRIVE: Hyperdrive;
@@ -294,6 +295,8 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (!token) return failure(401, 'unauthenticated', 'A Kilo bearer credential is required');
   const body = await readExchangeBody(request);
   if (body instanceof Response) return body;
+  const hosted = await exchangeCloudAgentUpload(token, body.organizationID, env);
+  if (hosted) return hosted;
 
   try {
     const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);

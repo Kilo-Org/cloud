@@ -16,6 +16,7 @@ import {
   getDeviceAuthAppModeFromRequestUrl,
 } from '@/app/device-auth/device-auth-url';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import { callerAddressOrNull } from '@/lib/auth/caller-address';
 import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
 
 /**
@@ -52,7 +53,7 @@ async function readRequestingClient(
 export const POST = withRestTiming('/api/device-auth/codes', async (request: Request) => {
   const headersList = await headers();
   const userAgent = headersList.get('user-agent') || undefined;
-  const ipAddress = headersList.get('x-forwarded-for') || undefined;
+  const ipAddress = callerAddressOrNull(headersList) ?? undefined;
 
   const requestingClient = await readRequestingClient(request);
   if (!requestingClient.ok) {

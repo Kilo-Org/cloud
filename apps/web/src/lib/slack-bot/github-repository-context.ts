@@ -2,7 +2,7 @@ import { type Owner, type PlatformRepository } from '@/lib/integrations/core/typ
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
-import { PlatformRepositoryCacheSchema } from '@/lib/integrations/core/schemas';
+import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
 import { captureException } from '@sentry/nextjs';
 
 export type GitHubRepositoryContext = {
@@ -30,18 +30,13 @@ export async function getGitHubRepositoryContext(
       return [];
     }
 
-    const parsedRepositories = PlatformRepositoryCacheSchema.safeParse(
-      integration.repositories ?? null
-    );
-    if (!parsedRepositories.success) {
+    const repositories = parsePlatformRepositoryCache(integration.repositories, () => {
       captureException(new Error('Invalid cached GitHub repository inventory'), {
         tags: { component: 'slack-bot', op: 'parse-github-repository-cache' },
         extra: { integrationId: integration.id },
       });
-      return [];
-    }
-
-    return (parsedRepositories.data ?? []).map(repository => ({
+    });
+    return repositories.map(repository => ({
       ...repository,
       githubIntegrationId: integration.id,
       githubAppType: integration.github_app_type ?? 'standard',

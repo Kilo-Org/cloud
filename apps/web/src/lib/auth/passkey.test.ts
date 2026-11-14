@@ -20,7 +20,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import {
-  cleanupExpiredPasskeySignInTickets,
+  cleanupExpiredPasskeyRows,
   consumeSignInTicket,
   createAuthenticationOptions,
   createRegistrationOptions,
@@ -690,7 +690,7 @@ describe('passkey', () => {
 
       // The cleanup deletes every expired ticket in the table; other tickets
       // this worker left behind must not make the count exact.
-      expect(await cleanupExpiredPasskeySignInTickets()).toBeGreaterThanOrEqual(1);
+      expect((await cleanupExpiredPasskeyRows()).tickets).toBeGreaterThanOrEqual(1);
 
       const expiredRows = await db
         .select()

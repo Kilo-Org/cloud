@@ -6,7 +6,9 @@ import {
   sessionIdSchema,
   kilo2ConversationSourceSchema,
   kilo2MessageSchema,
+  customerBillingFailureSchema,
 } from '@kilocode/session-ingest-contracts';
+import { preparationStepSchema } from './preparation-step';
 import { readKilo2Messages } from './kilo2-source-messages';
 import type {
   CloudAgentSessionId,
@@ -234,6 +236,53 @@ export const cloudSessionMessagesPageInputSchema = z.object({
   kiloSessionId: sessionIdSchema.optional(),
   cursor: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(100).optional(),
+  /** `preview` bounds completed tool bodies; read them with the tool-detail procedure. */
+  toolDisplay: z.enum(['full', 'preview']).optional(),
+});
+
+/**
+ * The page's copy of one preparation attempt, steps included, so the page
+ * transform can carry them through. Each step is validated with the exact
+ * schema the live `preparing` event uses, so the two boundaries cannot drift:
+ * the rows the page carries are already inside the live bounds (the
+ * control-plane route caps each detail line, ingest guards the capture time to
+ * an integer, and the page strips output tails).
+ */
+export const preparationAttemptPageSchema = z.object({
+  id: z.string(),
+  triggerMessageId: z.string(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.number(),
+  completedAt: z.number().optional(),
+  safeError: z.string().optional(),
+  revision: z.number(),
+  steps: z.array(preparationStepSchema),
+});
+
+/**
+ * The page's copy of one queued or failed turn. The shape is closed: the page
+ * type it becomes has no index signature, so a loose object would not be
+ * assignable to it under exact optional property types.
+ */
+export const queuedMessageSnapshotSchema = z.object({
+  messageId: z.string(),
+  content: z.string(),
+  timestamp: z.number(),
+  delivery: z.enum(['queued', 'sent']).optional(),
+  turnType: z.literal('command').optional(),
+  completedAt: z.number().optional(),
+  terminalFailure: z
+    .object({
+      messageId: z.string(),
+      status: z.string().optional(),
+      delivery: z.enum(['queued', 'sent']).optional(),
+      accepted: z.boolean().optional(),
+      error: z.string().optional(),
+      reason: z.string().optional(),
+      billingFailure: customerBillingFailureSchema.optional().catch(undefined),
+      timestamp: z.number(),
+    })
+    .optional(),
 });
 
 const cloudV1MessagesPageWireSchema = z.object({
@@ -245,6 +294,9 @@ const cloudV1MessagesPageWireSchema = z.object({
   omittedItemCount: z.number().int().nonnegative(),
   updateCursor: mutationCursorSchema,
   totalCostMicrodollars: cloudSessionMetadataSchema.shape.totalCostMicrodollars,
+  /** The rows the stream replays on connect; only the first page carries them. */
+  preparationAttempts: z.array(preparationAttemptPageSchema).optional(),
+  queuedMessages: z.array(queuedMessageSnapshotSchema).optional(),
 });
 
 export const cloudSessionMessagesPageWireSchema = z
@@ -282,7 +334,7 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
         if (!display) {
           // A compaction still in progress is shown once it completes; any
           // other message the projection cannot show is an omitted item.
-          if (parsed.data.type !== 'compaction') omittedItemCount++;
+          if (parsed.data.type !== 'compaction' && parsed.data.type !== 'shell') omittedItemCount++;
           continue;
         }
         if (display.info.role === 'assistant' && item.parentID !== undefined)

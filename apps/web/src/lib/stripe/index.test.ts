@@ -5890,7 +5890,11 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
       metadata: {},
       parent: {
         subscription_details: {
-          metadata: { type: 'seats', kiloUserId: testUser.id, organizationId: 'org_bouncer_inv' },
+          metadata: {
+            type: 'seats',
+            kiloUserId: testUser.id,
+            organizationId: '0b0b0b0b-0000-4000-8000-000000000001',
+          },
         },
       },
     } as unknown as Stripe.Invoice;
@@ -5913,7 +5917,7 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
         type: 'charge.succeeded',
         eventId: 'evt_bouncer_inv',
         userId: testUser.id,
-        orgId: 'org_bouncer_inv',
+        orgId: '0b0b0b0b-0000-4000-8000-000000000001',
         amountCents: 4900,
         cardFingerprint: 'fp_inv',
       })
@@ -5943,7 +5947,7 @@ describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
       kiloUserId: 'user-seats',
       stripeCustomerId: 'cus_seats',
       quantity: 3,
-      organizationId: 'org-seats',
+      organizationId: '0b0b0b0b-0000-4000-8000-000000000002',
       cancelUrl: 'https://app.test/cancel',
       plan: 'teams',
       billingCycle,
@@ -5965,7 +5969,7 @@ describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
         type: 'charge.attempted',
         flow: 'seats',
         userId: 'user-seats',
-        orgId: 'org-seats',
+        orgId: '0b0b0b0b-0000-4000-8000-000000000002',
         amountCents,
         accountCreatedAt: '2026-01-01T00:00:00.000Z',
         accountUsedMicrodollars: 1_250_000,

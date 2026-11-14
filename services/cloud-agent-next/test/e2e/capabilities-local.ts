@@ -22,6 +22,7 @@ import {
   findControlPlaneKiloRuntime,
   inspectControlPlaneSummaryCount,
   inspectControlPlaneUserMessageParts,
+  killOwnedControlPlanePrimary,
   recycleControlConnection,
   signalKiloServerProcess,
   waitForNewSandboxPresent,
@@ -31,7 +32,6 @@ import {
   currentOwnedSandbox,
   reclaimOwnedSandboxes,
   snapshotSandboxIds,
-  stopOwnedSandboxFamily,
   waitForOwnedSandbox,
 } from './lifecycle.js';
 import { captureLogCursor, readWorkerLogSnapshot, type LogRecord } from './idle-stop-evidence.js';
@@ -296,11 +296,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
     killOwnedContainer: async target => {
       const container = await requireOwnedContainer(target);
       await requireMatchingWrapper(container.id, target);
-      const killed = await stopOwnedSandboxFamily(
-        container,
-        target.cloudAgentSessionId,
-        target.kiloSessionId
-      );
+      const killed = await killOwnedControlPlanePrimary(container, target.kiloSessionId);
       frozenHandles.delete(target.cloudAgentSessionId);
       if (killed.length === 0) {
         return {
@@ -1002,6 +998,7 @@ export function createLocalScenarioEnvironment(options?: {
     ...(databaseUrl ? { database: { url: databaseUrl } } : {}),
     callbacks: createLocalCallbacks(),
     gates: { parkedStreamsSupported: true },
+    ...(process.env.E2E_KILO2_DRAIN === '1' ? { kilo2Drain: { ready: true as const } } : {}),
     sandboxFaults: createLocalSandboxFaults(),
     controlPlaneRuntime: createLocalControlPlaneRuntime(),
     // The report row lives in Postgres; without a connection string the

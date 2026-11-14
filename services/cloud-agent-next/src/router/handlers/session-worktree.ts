@@ -264,6 +264,7 @@ async function findOwnershipRow(
       parentSessionId: cli_sessions_v2.parent_session_id,
       cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
       gitUrl: cli_sessions_v2.git_url,
+      profileId: cli_sessions_v2.profile_id,
     })
     .from(cli_sessions_v2)
     .where(
@@ -1049,6 +1050,18 @@ async function registerWorktreeSession(
   let response: unknown;
 
   try {
+    const initialCommands = await withDORetry(
+      () => getSandboxSessionStub(ctx.env, ctx.userId, source.ownership.cloudAgentSessionId),
+      stub => stub.getAvailableCommands(),
+      'getAvailableCommands'
+    ).catch(() => {
+      logControlDiagnostic(
+        'worktree_chat_command_catalog',
+        { ...diagnostic, result: 'unavailable', reason: 'source_catalog_read_failed' },
+        'warn'
+      );
+      return undefined;
+    });
     response = await withDORetry(
       () => getSandboxSessionStub(ctx.env, ctx.userId, progress.cloudAgentSessionId),
       async stub => {
@@ -1077,16 +1090,17 @@ async function registerWorktreeSession(
             progress,
             source.ownership.organizationId ?? undefined
           ));
-        return stub.registerSessionFromMetadata(
-          buildRegistrationInput(
+        return stub.registerSessionFromMetadata({
+          ...buildRegistrationInput(
             source,
             ctx,
             progress,
             runtimeAuthorization,
             options?.agent,
             options?.continuation
-          )
-        );
+          ),
+          initialCommands,
+        });
       },
       'registerSession'
     );

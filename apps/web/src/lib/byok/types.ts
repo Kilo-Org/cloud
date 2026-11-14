@@ -1,22 +1,24 @@
 import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import * as z from 'zod';
 
-// API response type (never includes decrypted key)
-export type BYOKApiKeyResponse = {
-  id: string;
-  provider_id: string;
-  provider_name: string;
-  management_source: 'user' | 'coding_plan';
-  is_enabled: boolean;
-  serve_catalog_models: boolean;
+// API response schema (never includes decrypted key)
+export const BYOKApiKeyResponseSchema = z.object({
+  id: z.string().uuid(),
+  provider_id: z.string(),
+  provider_name: z.string(),
+  management_source: z.enum(['user', 'coding_plan']),
+  is_enabled: z.boolean(),
+  serve_catalog_models: z.boolean(),
   /** The provider maps at least one model to a Kilo catalog id. */
-  supports_catalog_mode: boolean;
+  supports_catalog_mode: z.boolean(),
   /** Organization keys need an owner or admin to change catalog mode. */
-  can_change_catalog_mode: boolean;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-};
+  can_change_catalog_mode: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  created_by: z.string(),
+});
+
+export type BYOKApiKeyResponse = z.infer<typeof BYOKApiKeyResponseSchema>;
 
 // Optional organization ID schema - when not provided, uses the authenticated user's ID
 const OptionalOrganizationIdSchema = z.object({
@@ -64,20 +66,6 @@ export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 
 export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   id: z.string().uuid(),
-});
-
-export const BYOKApiKeyResponseSchema = z.object({
-  id: z.string().uuid(),
-  provider_id: z.string(),
-  provider_name: z.string(),
-  management_source: z.enum(['user', 'coding_plan']),
-  is_enabled: z.boolean(),
-  serve_catalog_models: z.boolean(),
-  supports_catalog_mode: z.boolean(),
-  can_change_catalog_mode: z.boolean(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  created_by: z.string(),
 });
 
 export const PreviewBYOKRoutingInputSchema = OptionalOrganizationIdSchema.extend({

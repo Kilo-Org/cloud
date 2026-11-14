@@ -71,14 +71,28 @@ describe('readNativeLiveOperation', () => {
     expect(outcome).toEqual({ kind: 'not_ready', message: 'Live runtime is not ready' });
   });
 
-  it('maps a session status read for a sibling session without leaking its directory', async () => {
+  it('projects only the requested session from a status read', async () => {
+    const siblingSessionId = 'ses_ffffffffffffffffffffffffff';
     const outcome = await readNativeLiveOperation(
       readParams({ name: 'session.status' }, async () => ({
         ok: true,
-        result: { [kiloSessionId]: { type: 'busy', directory: '/workspace/private' } },
+        result: {
+          [siblingSessionId]: { type: 'idle', directory: '/workspace/sibling' },
+          [kiloSessionId]: { type: 'busy', directory: '/workspace/private' },
+        },
       }))
     );
     expect(outcome).toEqual({ kind: 'ok', body: { [kiloSessionId]: { type: 'busy' } } });
+  });
+
+  it('answers an empty status read when the runtime reports no entry for the session', async () => {
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'session.status' }, async () => ({
+        ok: true,
+        result: { ses_ffffffffffffffffffffffffff: { type: 'busy' } },
+      }))
+    );
+    expect(outcome).toEqual({ kind: 'ok', body: {} });
   });
 
   it('rejects a native session detail that names a different session', async () => {
@@ -166,13 +180,15 @@ describe('readNativeLiveOperation', () => {
       {
         info: {
           id: 'msg_paths',
+          sessionID: kiloSessionId,
           role: 'assistant',
           path: { cwd: privateDirectory, root: privateDirectory },
         },
         parts: [
-          { type: 'text', text },
+          { type: 'text', sessionID: kiloSessionId, text },
           {
             type: 'tool',
+            sessionID: kiloSessionId,
             state: {
               input: { filePath: `${privateDirectory}/file.txt` },
               metadata: {
@@ -195,9 +211,10 @@ describe('readNativeLiveOperation', () => {
         {
           info: { ...messages[0].info, path: { cwd: publicDirectory, root: publicDirectory } },
           parts: [
-            { type: 'text', text },
+            { type: 'text', sessionID: kiloSessionId, text },
             {
               type: 'tool',
+              sessionID: kiloSessionId,
               state: {
                 input: { filePath: `${publicDirectory}/file.txt` },
                 metadata: {
@@ -238,7 +255,7 @@ describe('readNativeLiveOperation', () => {
 
   it('bounds a message window to the requested limit', async () => {
     const messages = Array.from({ length: 5 }, (_, index) => ({
-      info: { id: `msg_${index}` },
+      info: { id: `msg_${index}`, sessionID: kiloSessionId },
       parts: [],
     }));
     const outcome = await readNativeLiveOperation(
@@ -253,6 +270,108 @@ describe('readNativeLiveOperation', () => {
       'msg_3',
       'msg_4',
     ]);
+  });
+
+  it('returns only the requested session from a transcript window', async () => {
+    const sibling = {
+      info: { id: 'msg_sibling', sessionID: 'ses_ffffffffffffffffffffffffff', role: 'assistant' },
+      parts: [{ type: 'text', sessionID: 'ses_ffffffffffffffffffffffffff', text: 'sibling text' }],
+    };
+    const own = {
+      info: {
+        id: 'msg_own',
+        sessionID: kiloSessionId,
+        role: 'assistant',
+        path: { cwd: '/workspace/private', root: '/workspace/private' },
+      },
+      parts: [{ type: 'text', sessionID: kiloSessionId, text: 'own text' }],
+    };
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'session.messages' }, async () => ({
+        ok: true,
+        result: [sibling, own],
+      }))
+    );
+    const publicDirectory = publicCloudAgentDirectory(kiloSessionId);
+    expect(outcome).toEqual({
+      kind: 'ok',
+      body: [
+        {
+          info: { ...own.info, path: { cwd: publicDirectory, root: publicDirectory } },
+          parts: own.parts,
+        },
+      ],
+    });
+  });
+
+  it('returns an empty transcript when the runtime reports no row for the session', async () => {
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'session.messages' }, async () => ({
+        ok: true,
+        result: [
+          { info: { id: 'msg_sibling', sessionID: 'ses_ffffffffffffffffffffffffff' }, parts: [] },
+        ],
+      }))
+    );
+    expect(outcome).toEqual({ kind: 'ok', body: [] });
+  });
+
+  it('refuses a transcript row that carries no session identity', async () => {
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'session.messages' }, async () => ({
+        ok: true,
+        result: [{ info: { id: 'msg_anonymous' }, parts: [] }],
+      }))
+    );
+    expect(outcome).toMatchObject({ kind: 'failed', code: 'KILO_UPSTREAM_RESPONSE_INVALID' });
+  });
+
+  it('refuses a transcript part that carries no session identity', async () => {
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'session.messages' }, async () => ({
+        ok: true,
+        result: [
+          {
+            info: { id: 'msg_own', sessionID: kiloSessionId },
+            parts: [{ type: 'text', text: 'anonymous part' }],
+          },
+        ],
+      }))
+    );
+    expect(outcome).toMatchObject({ kind: 'failed', code: 'KILO_UPSTREAM_RESPONSE_INVALID' });
+  });
+
+  it('drops a row outside the session before it validates its parts', async () => {
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'session.messages' }, async () => ({
+        ok: true,
+        result: [
+          {
+            info: { id: 'msg_sibling', sessionID: 'ses_ffffffffffffffffffffffffff' },
+            parts: [{ type: 'text', text: 'anonymous part' }],
+          },
+        ],
+      }))
+    );
+    expect(outcome).toEqual({ kind: 'ok', body: [] });
+  });
+
+  it('drops a transcript row whose parts belong to another session', async () => {
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'session.messages' }, async () => ({
+        ok: true,
+        result: [
+          {
+            info: { id: 'msg_mixed', sessionID: kiloSessionId },
+            parts: [
+              { type: 'text', sessionID: kiloSessionId, text: 'own text' },
+              { type: 'text', sessionID: 'ses_ffffffffffffffffffffffffff', text: 'other text' },
+            ],
+          },
+        ],
+      }))
+    );
+    expect(outcome).toEqual({ kind: 'ok', body: [] });
   });
 
   it('reports a too-large native response as too_large', async () => {

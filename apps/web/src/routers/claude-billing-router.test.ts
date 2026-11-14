@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm';
 import {
   claude_billing_connection_grants,
   claude_billing_connections,
+  kilocode_users,
   organization_memberships,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -278,5 +279,129 @@ describe('claudeBillingRouter.share and multi-account flows', () => {
         target: {},
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
+describe('claudeBillingRouter shared-services connector state', () => {
+  async function seedSharedConnection(connectorId: string) {
+    const org = await createTestOrganization('Shared Connector Org', connectorId, 0);
+    const [row] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: null,
+        organization_id: org.id,
+        user_profile_id: `uprof_${crypto.randomUUID()}`,
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: connectorId,
+      })
+      .returning();
+    if (!row) throw new Error('Missing shared connection fixture');
+    await db.insert(claude_billing_connection_grants).values({
+      payer_connection_id: row.id,
+      kilo_user_id: null,
+      organization_id: org.id,
+      created_by: connectorId,
+    });
+    return { org, row };
+  }
+
+  /** A second manager of the organization, still live, who reads the row. */
+  async function addManager(organizationId: string) {
+    const manager = await insertTestUser();
+    await db.insert(organization_memberships).values({
+      organization_id: organizationId,
+      kilo_user_id: manager.id,
+      role: 'owner',
+    });
+    return manager;
+  }
+
+  /** The account lifecycle keeps the user row and anonymizes it in place. */
+  async function eraseAccount(userId: string) {
+    await db
+      .update(kilocode_users)
+      .set({
+        google_user_email: `deleted+${userId}@deleted.invalid`,
+        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+      })
+      .where(eq(kilocode_users.id, userId));
+  }
+
+  it('reports reconnect_required for a connected shared row whose connector is gone', async () => {
+    const connector = await insertTestUser();
+    const { org } = await seedSharedConnection(connector.id);
+    const manager = await addManager(org.id);
+    await eraseAccount(connector.id);
+
+    const status = await (
+      await callerFor(manager.id)
+    ).status({
+      organizationId: org.id,
+      scope: 'shared_services',
+    });
+
+    expect(status).toMatchObject({ state: 'reconnect_required', canManage: true });
+    expect(status.connectedAt).not.toBeNull();
+  });
+
+  it('keeps connected for a live connector and for a personal row', async () => {
+    const connector = await insertTestUser();
+    const { org } = await seedSharedConnection(connector.id);
+    const shared = await (
+      await callerFor(connector.id)
+    ).status({
+      organizationId: org.id,
+      scope: 'shared_services',
+    });
+
+    const person = await insertTestUser();
+    await seedConnectedPersonal(person.id);
+    const personal = await (await callerFor(person.id)).status({});
+
+    expect(shared).toMatchObject({ state: 'connected' });
+    expect(personal).toMatchObject({ state: 'connected' });
+  });
+
+  it('reports a member without manage rights the same row state', async () => {
+    const connector = await insertTestUser();
+    const { org } = await seedSharedConnection(connector.id);
+    const member = await insertTestUser();
+    await db.insert(organization_memberships).values({
+      organization_id: org.id,
+      kilo_user_id: member.id,
+      role: 'member',
+    });
+    await eraseAccount(connector.id);
+
+    const status = await (
+      await callerFor(member.id)
+    ).status({
+      organizationId: org.id,
+      scope: 'shared_services',
+    });
+
+    expect(status).toMatchObject({ state: 'reconnect_required', canManage: false });
+  });
+
+  it('keeps billing_unavailable ahead of the connector state', async () => {
+    const connector = await insertTestUser();
+    const { org, row } = await seedSharedConnection(connector.id);
+    const manager = await addManager(org.id);
+    await db
+      .update(claude_billing_connections)
+      .set({ status: 'billing_unavailable' })
+      .where(eq(claude_billing_connections.id, row.id));
+    await eraseAccount(connector.id);
+
+    const status = await (
+      await callerFor(manager.id)
+    ).status({
+      organizationId: org.id,
+      scope: 'shared_services',
+    });
+
+    expect(status).toMatchObject({ state: 'billing_unavailable' });
   });
 });

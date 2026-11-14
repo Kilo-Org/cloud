@@ -34,9 +34,49 @@ cloud-agent-next refactor.
    subsequent starts reuse verified CLI tarballs in `.wrangler/state`. ARM hosts need amd64 emulation.
    Restart the Worker after wrapper changes. There is no preinstalled local-image exception.
 
+   Keep `container-usage-meter` enabled: sandbox admission requires it even when
+   inference is fake. After migrations, seed the local-only compute catalog with
+   `pnpm dev:seed cloud-agent:billing-skus` (synthetic test prices; existing SKUs
+   are preserved). Set `E2E_FUNDED=1` on driver commands to create test users with
+   sufficient compute credit. The sandbox setup script provisions both defaults.
+
    Selecting `kilo/fake-deterministic` is enough to hit fake-llm through
    Next.js. A real-model session (`kilo-auto/efficient`, etc.) uses the same
    Worker URL and does not need a restart.
+
+## Kilo v2 drain checks
+
+Drain completion applies only to Kilo v2 (`0.0.0-v2-85` or newer), not the default v1 runtime.
+Select a local test organization before starting the stack. The driver user must have membership
+in that organization. Startup downloads the verified pin from `PINNED_CLIS.kilo2`.
+Opt into its drain scenarios with `E2E_KILO2_DRAIN=1`:
+
+```sh
+export E2E_ORG_ID=<organization-uuid>
+export E2E_USER_EMAIL=<funded-member-email>
+node services/cloud-agent-next/scripts/prepare-kilo2-local.mjs "$E2E_ORG_ID"
+E2E_KILO2_DRAIN=1 pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts drain-background-child _
+```
+
+Set `WORKER_URL` and `FAKE_LLM_URL` to the ports reported by `pnpm dev:status --json`.
+Without this opt-in, v2-only drain scenarios report unsupported rather than changing v1 expectations.
+
+For focused manual acceptance, run these one at a time (reuse the port overrides
+above and set `E2E_FUNDED=1`):
+
+```sh
+pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts cold-hot echo:drain-smoke --timeout-ms=90000
+E2E_KILO2_DRAIN=1 pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts drain-linked-child task:parent1:child1 --timeout-ms=90000
+E2E_KILO2_DRAIN=1 pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts drain-background-child background-task:parent2:child2 --timeout-ms=90000
+pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts queue-while-busy _ --timeout-ms=90000
+pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts interrupt-mid-stream _ --timeout-ms=90000
+```
+
+Use fresh child tags on repeated drain runs. Both child scenarios assert no
+completion callback during an eight-second hold, then completion after release;
+the background case also requires a parent reply before the child is released.
+Local teardown proves exclusive sandbox ownership and stops both the primary and proxy before
+deleting native roots, so sequential runs do not accumulate containers.
 
 ## Credential containment
 
@@ -182,17 +222,26 @@ the concrete cause; there is no skip or production fallback.
 With this worktree's Kilo v2 stack running, execute:
 
 ```bash
-RUN_SKILLS_SH_INSTALL_TEST=1 pnpm exec tsx services/cloud-agent-next/test/e2e/profiles-local.ts
+E2E_ORG_ID=<local-v2-org-uuid> E2E_USER_EMAIL=<funded-local-member-email> \
+  RUN_SKILLS_SH_INSTALL_TEST=1 pnpm exec tsx services/cloud-agent-next/test/e2e/profiles-local.ts
 ```
 
 The driver discovers local ports and refuses a database outside this stack.
 It needs migrated PostgreSQL, sandbox billing SKUs, the usage meter, and
 `AGENT_ENV_VARS_PRIVATE_KEY` in `services/cloud-agent-next/.dev.vars` before Worker
 startup. The driver uses that same key, not an exported driver-only value.
+The organization must be in the Worker's `RUNTIME_KILO2_ORG_IDS` list. The
+local user must already belong to it. The driver uses browser-origin creation
+to select Kilo v2 and checks the running harness before reporting success.
 It creates a synthetic saved profile and tests variables, encrypted secrets, ordered setup,
 instructions, custom agents, custom and marketplace skills, skill companion
 files, local and remote MCP credentials, disabled entries, slash-command catalog
 delivery, command arguments, subtask commands, sibling reuse, and native restart.
+It verifies `KILO_USE_RELEASE_CONFIG=1` on the pinned v2 server, executes repository
+`.kilo` commands and skills, discovers repository agents, and ignores `.kilo2` commands.
+It checks native skill loading and the shared profile configuration in sibling
+sessions. An empty browser sibling must inherit the command catalog and profile
+association before its first message, then execute a command as its first turn.
 The optional flag also installs `vercel-labs/skills@find-skills` through the real
 skills.sh installer. Only model inference uses the deterministic fake.
 The driver deletes its workspace and profile after the run.
@@ -437,22 +486,23 @@ The shared gate (`runSharedScenario`) owns teardown for every profile, so
 including a failed one, the gate:
 
 1. records every session the scenario's creates report, with its Kilo session id;
-2. interrupts, then deletes them, newest first (idempotent: the scenarios also
-   clean up in their own `finally`);
-3. on the `local` profile, stops each sandbox those sessions provably owned,
+2. on the `local` profile, stops each sandbox those sessions provably own,
    primary and `-proxy` together. One sandbox serves one workspace, so every
    workspace, for any user, has its own sandbox derived from its unique session
-   id, and the proxy is named after it. Once the sessions are deleted nothing can address that sandbox
-   again. (A proxy is only reused when the same sandbox gets a replacement
-   primary during a test; deleting it then is a separate proxy-chaos case.)
+   id, and the proxy is named after it. Reclaim runs before session deletion,
+   while the native roots still prove ownership. A proxy is only reused when
+   the same sandbox gets a replacement primary during a test; deleting it then
+   is a separate proxy-chaos case;
+3. interrupts, then deletes sessions, newest first. This cleanup still runs if
+   reclaim fails. Cleanup is idempotent; scenarios can also use their own `finally`.
 
-Step 3 exists because a deleted session only releases its route; the sandbox
+Step 2 exists because a deleted session only releases its route; the sandbox
 otherwise lives until the 10-minute idle stop, and a few dozen scenarios exhaust
 the Docker VM. Ownership is proven through the live Kilo root and the
 exclusivity check, so a sandbox that still hosts another worktree, or a session
 that recorded no Kilo session id, is left running and reported
 (`sandbox reclaim: ...`), never killed. The `local-http` and `deployed` profiles
-have no Docker access and stop at step 2. A child killed by its watchdog skips
+have no Docker access and skip step 2. A child killed by its watchdog skips
 its own teardown; after a local run the matrix prints
 `Sandboxes still running from this run: <n>` and, when primaries are gone but
 their proxies remain, `Orphan sandbox proxies running: <n>`. It never removes
@@ -938,7 +988,7 @@ Node server (`fake-llm-server.ts`) and the deployed Worker + Durable Object
 | `realistic:<text>` | Role delta, 3 deterministic reasoning deltas, then content deltas with whitespace separators as their own deltas, then stop + [DONE] with usage; text is capped at 4000 characters and 512 pieces to emulate a real provider stream. |
 | `idle` | One empty-delta chunk, then stop + `[DONE]`. |
 | `hang` | Opens the SSE stream but emits nothing and never closes. Drives abort/timeout paths. |
-| `first-token:<tag>[:<completion>]` | Emits one assistant content chunk (`held-first-token`) then parks the SSE stream open, so a client frozen mid-turn never receives a finish. A later request with the same tag completes normally with `<completion>` (default `done-<tag>`); the fixture can also exercise a later request with that tag. `kilo-hang-recovery` observes the first native delta, expects `agent_restarted` after the freeze, and recovers with a fresh message. |
+| `first-token:<tag>[:<completion>]` | Emits one assistant content chunk (`held-first-token`) then parks the SSE stream open, so a client frozen mid-turn never receives a finish. A later request with the same tag completes normally with `<completion>` (default `done-<tag>`); the fixture can also exercise a later request with that tag. `kilo-hang-recovery` observes the first native delta, expects `agent_unresponsive` after the freeze, and recovers with a fresh message. |
 | `error-terminal:<msg>` | HTTP 400 with OpenAI-shaped error body carrying `<msg>`. Exercises nonretryable provider-error propagation through the gateway. |
 | `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. The non-BYOK gateway converts this to retryable HTTP 503. |
 | `gate:<tag>` | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
@@ -947,6 +997,10 @@ Node server (`fake-llm-server.ts`) and the deployed Worker + Durable Object
 | `file:seed:<tag>:<path>:<bytes>:<nonce>` | Issues a real `write` of a deterministic `<bytes>`-byte seed fixture prefixed by `<nonce>` to `<path>`. The write tool argument carries the large payload; the read-back echo is where it is measured, so `large-stream` never substitutes assistant text. |
 | `file:read:<tag>:<path>` | Issues a real `read` for `<path>` and answers `file-read:<path>` plus the normalized body; rejects a result that does not match the requested path, is an error, or is empty. |
 | `question:<tag>:<text>` | Issues a real question tool call for `<text>`. The turn parks until `answerQuestion` resolves the question id; `toolResults.question` stays `0` while unanswered. |
+| `task:<parent>:<child>` | Issues a real `task` tool call whose prompt is `gate:<child>:waiting`. After the tool result, answers `done-<parent>`. A title-model request with no tools answers immediately. |
+| `background-task:<parent>:<child>` | Same as `task`, with `background: true`. HTTP 422 when the advertised `task` schema has no `background` property. |
+| `cron:<tag>:<Ns>` | Issues `cron_create` with `delay` `<Ns>` and prompt `echo:fired-<tag>`. HTTP 422 when `cron_create` is not advertised. |
+| `wakeup:<tag>:<Ns>` | Issues `schedule_wakeup` with the same delay and prompt. HTTP 422 when `schedule_wakeup` is not advertised. |
 
 Unknown `__fake__:<name>` directives produce HTTP 402 with
 `unknown fake scenario: <name>` — easy to spot in fake-LLM logs.
@@ -1002,7 +1056,7 @@ reusable catalog of planned and existing scenarios, see
 | `concurrent-chats` | Boots two independent sessions, holds one paced turn in each with proven overlapping `running`, and requires both to reach a completed terminal (or recover) on their own chat. |
 | `interrupt-then-continue` | Interrupts an actively running paced turn, asserts `cloud.message.failed reason=interrupted`, then completes a follow-up on the same session. |
 | `question-idle-resume` | Leaves a real `question:<tag>:<text>` unanswered; requires `toolResults.question=0`, the allocation to disappear inside the 15-minute idle window, the parked message to be terminal before the continuation, and a follow-up completing on a distinct non-null allocation (~30-minute budget). |
-| `external-kill` | After a completed turn, kills the identity-matched owned container via `sandboxFaults`; requires the same session to complete a follow-up on a distinct allocation reference. |
+| `external-kill` | After a completed turn, kills the identity-matched owned container via `sandboxFaults`; requires the same session to complete a follow-up on a distinct allocation reference. The kill keeps the `-proxy`: workerd reuses it for the replacement. After a proxy kill, each later start of that container failed while the same Durable Object instance ran. |
 | `kill-mid-flight` | Kills the identity-matched owned container while a parked `gate:<tag>` turn runs; requires a durable failure and a follow-up on a distinct allocation. Needs `gates` + `sandboxFaults`. |
 | `wrapper-freeze-settled-reap` | Freezes only the identity-matched control-wrapper process after a completed turn; requires identity-correlated evidence — the `health_unhealthy_unresponsive` `allocation_transition` into `stopping.destroying`, a terminal `native_stop`, the heartbeat-expiry recovery start, no re-ready wrapper — plus a distinct replacement. |
 | `wrapper-freeze-inflight-reap` | Freezes the identity-matched control-wrapper process while a paced turn is held; requires the held message to terminalise `runtime_unhealthy`, an identity-matched `accepted_reconciliation` and still-active route, the settled-reap stop evidence, and a distinct replacement. |
@@ -1027,7 +1081,11 @@ reusable catalog of planned and existing scenarios, see
 | `contained-credentials` | New-plane only. See the new-plane table above: clone + model + checkout read under containment, plus a raw-credential negative check. |
 | `kilo-kill-recovery` | New-plane only. See the new-plane table above: `SIGKILL` Kilo after tool progress, require `agent_restarted`, recover in the same container. |
 | `wrapper-kill-recovery` | New-plane only. See the new-plane table above: `SIGKILL` the new-plane wrapper, require `agent_restarted` and the old Kilo pid gone, recover in the same container. |
-| `kilo-hang-recovery` | New-plane only. See the new-plane table above: `SIGSTOP` Kilo while the fake holds the first token, require a new Kilo pid, the progressed turn failing `agent_restarted`, the original user message once, and a fresh follow-up completing. |
+| `kilo-hang-recovery` | New-plane only. See the new-plane table above: `SIGSTOP` Kilo while the fake holds the first token, require a new Kilo pid, the progressed turn failing `agent_unresponsive`, the original user message once, and a fresh follow-up completing. |
+| `drain-linked-child` | Control-plane `unified` start: a foreground `task` whose child parks on a gate. The completion callback must not arrive during an 8s hold, then must arrive after release. This checks the task lifecycle; the foreground tool already blocks the parent reply. The callback sink is registered through `updateSession` because `start` does not accept `callbackTarget`. Runs in the default matrix selected by `matrix.ts`. |
+| `drain-background-child` | Control-plane background `task`. Requires the parent completion text while the child gate remains held, then checks that no completion callback arrives during an 8s hold. This tests drain after the parent replies. Runs in the default matrix. |
+| `drain-scheduled-cron` | Control-plane `cron_create` with a 20s delay. The scheduling callback must complete well before the resume text, and the resume must still appear. Disabled in the default matrix because the control-plane permission map denies `cron_create`; `--only` still runs it. |
+| `drain-scheduled-wakeup` | Same contract for `schedule_wakeup`. Disabled in the default matrix because the control-plane permission map denies `schedule_wakeup`; `--only` still runs it. |
 
 The three callback scenarios are shared definitions. Their `callbacks` capability
 is provided by the profile: a host HTTP sink under local Docker, and the e2e
@@ -1052,7 +1110,7 @@ continues. HTTP profiles report `unsupported` when they cannot inspect that runt
 | `contained-credentials` | Requires mandatory `credentialContainment`. Proves the new plane, requires clone + model + a real checkout read to complete, and proves the negative: no raw SCM credential marker in the container environment and no credential in the git remote. The harness cannot observe the credential lookup itself; a failed negative check is the signal that containment did not apply. |
 | `kilo-kill-recovery` | Holds a turn with `write-then-gate` (a real write tool call, so the turn made progress), then `SIGKILL`s the captured `kilo serve` process. Requires the held message to fail with `agent_restarted` (not be resubmitted) and a follow-up to complete in the same container. |
 | `wrapper-kill-recovery` | Same tool-progress hold, then `SIGKILL`s the captured new-plane control wrapper. Requires `agent_restarted`, proves the old Kilo pid is gone, and requires a follow-up to complete in the same container. |
-| `kilo-hang-recovery` | `SIGSTOP`s Kilo while the fake LLM holds the first token (`first-token:<tag>`). Waits for a correlated native assistant delta before freezing. Requires a new Kilo pid, the progressed turn failing `agent_restarted`, and a fresh follow-up completing in the same allocation. The original user message must appear exactly once in Kilo history (text parts == 1). Pre-progress retry remains a separate wrapper regression contract. |
+| `kilo-hang-recovery` | `SIGSTOP`s Kilo while the fake LLM holds the first token (`first-token:<tag>`). Waits for a correlated native assistant delta before freezing. Requires a new Kilo pid, the progressed turn failing `agent_unresponsive`, and a fresh follow-up completing in the same allocation. The original user message must appear exactly once in Kilo history (text parts == 1). Pre-progress retry remains a separate wrapper regression contract. |
 
 Capabilities: all eight need `controlPlaneV2` + `controlPlaneRuntime`; the three
 process faults add `sandboxFaults`; callback/report adds `callbacks` + `reports`

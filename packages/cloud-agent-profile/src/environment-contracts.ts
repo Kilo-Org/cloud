@@ -231,6 +231,11 @@ type EnvironmentBuildInputBase = {
   commands: string[];
   plainVars: Record<string, string>;
   encryptedSecrets: Record<string, EncryptedEnvelope>;
+  /**
+   * The environment's saved allocation key, unvalidated. Build admission
+   * resolves it with the repository and context settings to pin one target.
+   */
+  sandboxAllocation: string | null;
 };
 
 /**

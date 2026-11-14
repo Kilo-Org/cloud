@@ -261,6 +261,13 @@ function scheduleReconnect(entry: LiveSession, reason: SshCloseReason): void {
 }
 
 function releaseShell(entry: LiveSession): void {
+  const nativeIds = [...entry.jumpSessionIds];
+  if (entry.nativeSessionId !== null) {
+    nativeIds.push(entry.nativeSessionId);
+  }
+  entry.nativeSessionId = null;
+  entry.jumpSessionIds = [];
+  void disconnectAll(nativeIds);
   const session = sessionById(entry.id);
   const shellId = session?.shellId ?? null;
   if (shellId !== null) {

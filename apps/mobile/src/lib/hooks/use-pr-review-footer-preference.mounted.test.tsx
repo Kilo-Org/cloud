@@ -159,28 +159,42 @@ describe('pr-review-footer store', () => {
     expect(mod.getPrReviewFooter()).toBe(false);
   });
 
-  it('persists a set value and clears back to the default on sign-out', async () => {
-    getItemAsync.mockResolvedValue('false');
+  it('persists each set value and clears back to the default from off on sign-out', async () => {
+    getItemAsync.mockResolvedValue(null);
     const mod = await loadModule();
     const renderer = await renderProbe(mod.usePrReviewFooterPreference);
     await vi.waitFor(() => {
-      expect(probeText(renderer)).toBe('false:true');
+      expect(probeText(renderer)).toBe('true:true');
     });
 
     await act(() => {
       mod.setPrReviewFooter(false);
     });
     await vi.waitFor(() => {
-      expect(setItemAsync).toHaveBeenCalledWith(PR_REVIEW_FOOTER_KEY, 'false');
+      expect(setItemAsync).toHaveBeenCalledTimes(1);
     });
+    expect(setItemAsync).toHaveBeenLastCalledWith(PR_REVIEW_FOOTER_KEY, 'false');
     expect(mod.getPrReviewFooter()).toBe(false);
 
     await act(() => {
       mod.setPrReviewFooter(true);
     });
     await vi.waitFor(() => {
-      expect(setItemAsync).toHaveBeenCalledWith(PR_REVIEW_FOOTER_KEY, 'true');
+      expect(setItemAsync).toHaveBeenCalledTimes(2);
     });
+    expect(setItemAsync).toHaveBeenLastCalledWith(PR_REVIEW_FOOTER_KEY, 'true');
+    expect(mod.getPrReviewFooter()).toBe(true);
+
+    // Turn it off again so the clear below starts from the opposite of the
+    // default: only a clear that resets the value can turn it back on.
+    await act(() => {
+      mod.setPrReviewFooter(false);
+    });
+    await vi.waitFor(() => {
+      expect(setItemAsync).toHaveBeenCalledTimes(3);
+    });
+    expect(setItemAsync).toHaveBeenLastCalledWith(PR_REVIEW_FOOTER_KEY, 'false');
+    expect(mod.getPrReviewFooter()).toBe(false);
 
     await act(() => {
       mod.clearPrReviewFooterPreference();
@@ -188,6 +202,8 @@ describe('pr-review-footer store', () => {
     await vi.waitFor(() => {
       expect(deleteItemAsync).toHaveBeenCalledWith(PR_REVIEW_FOOTER_KEY);
     });
+    // A clear that deletes the key but forgets to reset the value stays off.
     expect(mod.getPrReviewFooter()).toBe(true);
+    expect(probeText(renderer)).toBe('true:true');
   });
 });

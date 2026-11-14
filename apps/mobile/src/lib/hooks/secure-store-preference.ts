@@ -151,6 +151,8 @@ export function createSecureStorePreference<T>(options: {
           await setAccountMetadata(key, serialize(target));
         } catch {
           inFlight = undefined;
+          value = target;
+          emit();
           // Drop every pending choice, including one that arrived while this
           // write was in flight: the disk just refused, so retrying the newest
           // one here would only repeat the toast and could reorder choices.

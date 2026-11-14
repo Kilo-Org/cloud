@@ -160,8 +160,10 @@ describe('condense-tool-calls store', () => {
     });
   });
 
-  it('clearCondenseToolCallsPreference resets the value to on and deletes the key', async () => {
-    getItemAsync.mockResolvedValue('true');
+  it('clearCondenseToolCallsPreference resets the value to the default and deletes the key', async () => {
+    // Seed off, the opposite of the shipped default: the loaded value proves
+    // the read ran, and only a clear that assigns the default can turn it on.
+    getItemAsync.mockResolvedValue('false');
     const {
       clearCondenseToolCallsPreference,
       getCondenseToolCalls,
@@ -170,30 +172,47 @@ describe('condense-tool-calls store', () => {
     const renderer = await renderProbe(useCondenseToolCallsPreference);
 
     await vi.waitFor(() => {
-      expect(probeText(renderer)).toBe('true:true');
+      expect(probeText(renderer)).toBe('false:true');
     });
+    expect(getCondenseToolCalls()).toBe(false);
 
-    clearCondenseToolCallsPreference();
+    await act(() => {
+      clearCondenseToolCallsPreference();
+    });
 
     await vi.waitFor(() => {
       expect(deleteItemAsync).toHaveBeenCalledWith(KEY);
     });
-    // The stored choice is gone, so the shipped default shows again.
+    // The stored choice is gone, so the shipped default shows again: a clear
+    // that deletes the key but forgets to reset the value stays off.
+    expect(probeText(renderer)).toBe('true:true');
     expect(getCondenseToolCalls()).toBe(true);
   });
 
-  it('toasts common.couldNotSaveSetting and keeps the on default when the write fails', async () => {
-    getItemAsync.mockResolvedValue(null);
+  it('toasts common.couldNotSaveSetting and keeps the loaded off value when the write fails', async () => {
+    // Seed off so the loaded value differs from both the shipped default and
+    // the rejected choice: only a choice dropped on failure keeps it off.
+    getItemAsync.mockResolvedValue('false');
     setItemAsync.mockRejectedValue(new Error('disk full'));
-    const { getCondenseToolCalls, setCondenseToolCalls } =
+    const { getCondenseToolCalls, setCondenseToolCalls, useCondenseToolCallsPreference } =
       await import('./use-condense-tool-calls-preference');
+    const renderer = await renderProbe(useCondenseToolCallsPreference);
 
-    setCondenseToolCalls(true);
+    await vi.waitFor(() => {
+      expect(probeText(renderer)).toBe('false:true');
+    });
+    expect(getCondenseToolCalls()).toBe(false);
+
+    await act(() => {
+      setCondenseToolCalls(true);
+    });
 
     await vi.waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('Could not save setting');
     });
-    // The failed choice was dropped, so the value is the shipped default.
-    expect(getCondenseToolCalls()).toBe(true);
+    // The failed choice was dropped, so the loaded off value stands: a choice
+    // applied despite the failed write would read on.
+    expect(probeText(renderer)).toBe('false:true');
+    expect(getCondenseToolCalls()).toBe(false);
   });
 });

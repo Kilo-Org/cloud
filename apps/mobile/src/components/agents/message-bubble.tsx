@@ -178,6 +178,8 @@ function MessageBubbleImpl({
 
   // Keep actions on the separate host so interactive descendants remain reachable.
   // Accessible Copy retains the existing ActionSheet path; details matches long-press.
+  // The host precedes the content because Android composes an unnamed focus stop's
+  // name from its speaking non-focusable descendants in child order.
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === 'copy' && canCopy) {
       void copyMessage(message);
@@ -365,6 +367,18 @@ function MessageBubbleImpl({
             accessible={a11y.accessible}
             className="px-4 py-1"
           >
+            {a11y.accessibilityActions.length > 0 ? (
+              <View
+                accessible
+                accessibilityRole={a11y.accessibilityRole}
+                accessibilityLabel={a11y.accessibilityLabel}
+                accessibilityHint={a11y.accessibilityHint}
+                accessibilityActions={a11y.accessibilityActions}
+                onAccessibilityAction={handleAccessibilityAction}
+                className="absolute inset-0 opacity-0"
+                pointerEvents="none"
+              />
+            ) : null}
             <View className="items-end gap-1">
               {drawsBubble ? (
                 <Bubble side="user">
@@ -421,18 +435,6 @@ function MessageBubbleImpl({
                 </View>
               ) : null}
             </View>
-            {a11y.accessibilityActions.length > 0 ? (
-              <View
-                accessible
-                accessibilityRole={a11y.accessibilityRole}
-                accessibilityLabel={a11y.accessibilityLabel}
-                accessibilityHint={a11y.accessibilityHint}
-                accessibilityActions={a11y.accessibilityActions}
-                onAccessibilityAction={handleAccessibilityAction}
-                className="absolute inset-0 opacity-0"
-                pointerEvents="none"
-              />
-            ) : null}
           </Pressable>
         ) : null}
         {failureFooter}
@@ -465,6 +467,18 @@ function MessageBubbleImpl({
     <View>
       {visibleParts.length > 0 ? (
         <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
+          {a11y.accessibilityActions.length > 0 ? (
+            <View
+              accessible
+              accessibilityRole={a11y.accessibilityRole}
+              accessibilityLabel={a11y.accessibilityLabel}
+              accessibilityHint={a11y.accessibilityHint}
+              accessibilityActions={a11y.accessibilityActions}
+              onAccessibilityAction={handleAccessibilityAction}
+              className="absolute inset-0 opacity-0"
+              pointerEvents="none"
+            />
+          ) : null}
           <InMessageBubbleContext.Provider value>
             <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
               <View className="gap-2">
@@ -482,18 +496,6 @@ function MessageBubbleImpl({
               </View>
             </MessageLongPressProvider>
           </InMessageBubbleContext.Provider>
-          {a11y.accessibilityActions.length > 0 ? (
-            <View
-              accessible
-              accessibilityRole={a11y.accessibilityRole}
-              accessibilityLabel={a11y.accessibilityLabel}
-              accessibilityHint={a11y.accessibilityHint}
-              accessibilityActions={a11y.accessibilityActions}
-              onAccessibilityAction={handleAccessibilityAction}
-              className="absolute inset-0 opacity-0"
-              pointerEvents="none"
-            />
-          ) : null}
         </Pressable>
       ) : null}
       {failureFooter}

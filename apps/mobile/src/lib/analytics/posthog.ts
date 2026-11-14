@@ -1,5 +1,6 @@
 import {
   type ANALYTICS_SURFACES,
+  analyticsCarveOutKeys,
   type AnalyticsEventMap,
   redactProhibitedProperties,
 } from '@kilocode/app-shared/analytics';
@@ -324,10 +325,13 @@ export function captureEvent(
   if (!allowsOptional() || currentGeneration() !== clientGeneration) {
     return;
   }
-  // Redaction is a no-op for the cataloged strict-object payloads (their keys
-  // are deny-list-safe by schema); it guards the record-shaped `app_startup`
-  // payload and every uncataloged dynamic payload at runtime.
-  const safe = properties === undefined ? undefined : redactProhibitedProperties(properties);
+  // Redaction guards the record-shaped `app_startup` payload and every
+  // uncataloged dynamic payload at runtime; a cataloged event keeps only the
+  // deny-list terms its own schema declares.
+  const safe =
+    properties === undefined
+      ? undefined
+      : redactProhibitedProperties(properties, analyticsCarveOutKeys(name));
   if (__DEV__ && properties !== undefined && safe !== undefined) {
     // A silently dropped key is invisible in production, so name the drops in
     // development. `__DEV__` is React Native only; the shared package stays

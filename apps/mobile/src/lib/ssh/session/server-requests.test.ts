@@ -4,12 +4,20 @@ import {
   type HostKeyRequest,
   type KeyboardInteractiveRequest,
 } from '../../../../modules/kilo-ssh/src';
+import { fail } from './attempt';
 import { type LiveSession } from './live';
-import { handleHostKey, handlePrompts } from './server-requests';
+import { handleDisconnect, handleHostKey, handlePrompts } from './server-requests';
 
 type ConnectingSession = Pick<
   LiveSession,
-  'connecting' | 'connectAttemptId' | 'prompts' | 'hostKey'
+  | 'connecting'
+  | 'connectAttemptId'
+  | 'prompts'
+  | 'hostKey'
+  | 'id'
+  | 'nativeSessionId'
+  | 'jumpSessionIds'
+  | 'reconnecting'
 >;
 
 const state = vi.hoisted(() => ({
@@ -19,6 +27,7 @@ const state = vi.hoisted(() => ({
   setPhase: vi.fn(),
   sshDatabase: vi.fn(),
   stillOpen: vi.fn(),
+  sessionById: vi.fn(),
 }));
 
 vi.mock('../native', () => ({
@@ -32,7 +41,10 @@ vi.mock('../store', () => ({ sshDatabase: state.sshDatabase }));
 vi.mock('../known-hosts', () => ({ findKnownHost: () => null, trustHostKey: vi.fn() }));
 vi.mock('./attempt', () => ({ fail: vi.fn() }));
 vi.mock('./connection', () => ({ forgetSession: vi.fn() }));
-vi.mock('./session-store', () => ({ patchSession: vi.fn() }));
+vi.mock('./session-store', () => ({
+  patchSession: vi.fn(),
+  sessionById: state.sessionById,
+}));
 vi.mock('./live', () => ({
   live: state.live,
   setPhase: state.setPhase,
@@ -41,10 +53,14 @@ vi.mock('./live', () => ({
 
 function connect(attemptId: string): ConnectingSession {
   const entry: ConnectingSession = {
+    id: attemptId,
     connecting: true,
     connectAttemptId: attemptId,
     prompts: null,
     hostKey: null,
+    nativeSessionId: `native-${attemptId}`,
+    jumpSessionIds: [],
+    reconnecting: false,
   };
   state.live.set(attemptId, entry);
   return entry;
@@ -185,5 +201,35 @@ describe('keyboard-interactive rounds', () => {
     await vi.waitFor(() => {
       expect(state.answerPrompts).toHaveBeenCalledWith('prompts-attempt-1', null);
     });
+  });
+});
+
+describe('disconnect notices', () => {
+  it('counts a drop during the initial connection as the connection failing', () => {
+    const entry = connect('attempt-1');
+    state.sessionById.mockReturnValue({ phase: { kind: 'connecting', attempt: 1 } });
+
+    handleDisconnect({ sessionId: 'native-attempt-1', reason: 'ChannelClosed' });
+
+    expect(vi.mocked(fail)).toHaveBeenCalledWith(entry, 'disconnected', { origin: 'connect' });
+  });
+
+  it('counts a drop after the shell opened as a reconnect', () => {
+    const entry = connect('attempt-1');
+    state.sessionById.mockReturnValue({ phase: { kind: 'connected' } });
+
+    handleDisconnect({ sessionId: 'native-attempt-1', reason: 'ChannelClosed' });
+
+    expect(vi.mocked(fail)).toHaveBeenCalledWith(entry, 'disconnected', { origin: 'session' });
+  });
+
+  it('counts a drop during a retry as a reconnect even before the shell opens', () => {
+    const entry = connect('attempt-1');
+    entry.reconnecting = true;
+    state.sessionById.mockReturnValue({ phase: { kind: 'connecting', attempt: 2 } });
+
+    handleDisconnect({ sessionId: 'native-attempt-1', reason: 'ChannelClosed' });
+
+    expect(vi.mocked(fail)).toHaveBeenCalledWith(entry, 'disconnected', { origin: 'session' });
   });
 });

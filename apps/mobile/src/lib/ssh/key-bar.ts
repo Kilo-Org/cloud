@@ -143,3 +143,34 @@ export async function saveKeyBarLayout(layout: KeyBarLayout): Promise<void> {
 export async function resetKeyBarLayout(): Promise<void> {
   await removeItem(LAYOUT_SCOPE, LAYOUT_ITEM);
 }
+
+/** The layout the bar shows and the layout the store last confirmed. */
+export type KeyBarLayoutSave = Readonly<{
+  shown: KeyBarLayout;
+  persisted: KeyBarLayout;
+}>;
+
+/** Shows an edit while its write is still queued behind the previous one. */
+export function startKeyBarLayoutSave(
+  state: KeyBarLayoutSave,
+  next: KeyBarLayout
+): KeyBarLayoutSave {
+  return { shown: next, persisted: state.persisted };
+}
+
+/**
+ * Applies the end of one write. A failed write that is still the newest edit
+ * puts the bar back on the last layout the store confirmed, so it never keeps
+ * an order that was never saved; a failure an edit has already overtaken
+ * leaves the newer edit alone, and the newer write settles its own outcome.
+ */
+export function settleKeyBarLayoutSave(
+  state: KeyBarLayoutSave,
+  written: KeyBarLayout,
+  failed: boolean
+): KeyBarLayoutSave {
+  if (!failed) {
+    return { shown: state.shown, persisted: written };
+  }
+  return state.shown === written ? { shown: state.persisted, persisted: state.persisted } : state;
+}

@@ -16,6 +16,7 @@ import { z } from 'zod';
 import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
 
 import { ORGANIZATION_ROLES } from '../organizations/roles';
+import { isProhibitedPropertyKey, normalizePropertyKey } from './privacy';
 
 // ----- shared enums -------------------------------------------------------
 
@@ -416,6 +417,31 @@ export const ANALYTICS_EVENT_SCHEMAS = {
     })
     .strict(),
 } as const satisfies Record<string, z.ZodType>;
+
+const NO_CARVE_OUTS: ReadonlySet<string> = new Set();
+
+/**
+ * The deny-list terms an event's own schema declares as a closed enum —
+ * `auth_method` on the SSH connect events. Keyed by event name so runtime
+ * redaction allows them only there: the same key on another event, or on an
+ * uncataloged dynamic payload, is still scrubbed.
+ */
+export const ANALYTICS_DENY_LIST_CARVE_OUTS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
+  Object.entries(ANALYTICS_EVENT_SCHEMAS).flatMap(([name, schema]) => {
+    if (!(schema instanceof z.ZodObject)) {
+      return [];
+    }
+    const carvedOut = Object.keys(schema.shape).filter(key => isProhibitedPropertyKey(key));
+    return carvedOut.length === 0
+      ? []
+      : [[name, new Set(carvedOut.map(normalizePropertyKey))] as const];
+  })
+);
+
+/** The deny-list terms `name`'s schema declares, empty for every other event. */
+export function analyticsCarveOutKeys(name: string): ReadonlySet<string> {
+  return ANALYTICS_DENY_LIST_CARVE_OUTS.get(name) ?? NO_CARVE_OUTS;
+}
 
 /** Inferred event-name → payload type map. */
 export type AnalyticsEventMap = {

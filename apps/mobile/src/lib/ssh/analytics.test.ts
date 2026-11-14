@@ -141,6 +141,16 @@ it('reports export and import outcomes through the same closed category map', ()
   });
 });
 
+it('buckets the Protocol fallback code in the protocol category', () => {
+  captureEvent.mockReset();
+  trackSshSftpTransfer('download', 'failed', 'Protocol');
+  expect(captureEvent).toHaveBeenCalledWith(SSH_SFTP_TRANSFER_EVENT, {
+    direction: 'download',
+    outcome: 'failed',
+    category: 'protocol',
+  });
+});
+
 it('reports a sandbox terminal outcome', () => {
   trackSshSandboxTerminal('stopped');
   expect(captureEvent).toHaveBeenCalledWith(SSH_SANDBOX_TERMINAL_EVENT, {

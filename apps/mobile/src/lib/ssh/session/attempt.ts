@@ -210,7 +210,7 @@ export function fail(entry: LiveSession, reason: SshCloseReason, options: FailOp
   }
   setPhase(entry, { kind: 'closed', reason, retryable: isRetryableReason(reason) });
   if (origin === 'session') {
-    entry.reconnecting = false;
+    finishReconnect(entry, 'failed');
     return;
   }
   if (entry.reconnecting) {

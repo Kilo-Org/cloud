@@ -1,9 +1,13 @@
+import { SSH_RECONNECT_EVENT } from '@kilocode/app-shared/analytics';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+
+import { captureEvent } from '@/lib/analytics/posthog';
 
 import { type SshHost } from '../hosts';
 import type * as Biometric from './biometric';
 import { attempt, fail } from './attempt';
 import { createLiveSession } from './attempt.test-helpers';
+import { MAX_RECONNECT_ATTEMPTS } from './backoff';
 import { live } from './live';
 import { closeSession, resumeSshSessions, retrySession } from './manager';
 import { patchSession, sessionById, writeSession } from './session-store';
@@ -298,3 +302,16 @@ it.each(['close', 'failure'])(
     }
   }
 );
+
+it('reports a failed reconnect when the last retry ends with a session disconnect', () => {
+  entry.attempt = MAX_RECONNECT_ATTEMPTS;
+  entry.reconnecting = true;
+
+  fail(entry, 'disconnected', { origin: 'session' });
+
+  expect(vi.mocked(captureEvent)).toHaveBeenCalledWith(SSH_RECONNECT_EVENT, {
+    outcome: 'failed',
+  });
+  expect(entry.reconnecting).toBe(false);
+  expect(sessionById('app')?.phase.kind).toBe('closed');
+});

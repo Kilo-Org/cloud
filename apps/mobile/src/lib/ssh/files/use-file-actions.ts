@@ -168,7 +168,7 @@ export function useFileActions({
       const nativeCode = nativeErrorCode(error);
       const code = nativeCode ?? 'Protocol';
       if (!downloaded) {
-        trackSshSftpTransfer('download', 'failed', nativeCode);
+        trackSshSftpTransfer('download', 'failed', code);
       }
       cache?.release();
       if (request === previewRequest.current) {

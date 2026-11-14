@@ -7,12 +7,15 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import {
   DEFAULT_KEY_BAR_LAYOUT,
   type KeyBarLayout,
+  type KeyBarLayoutSave,
   loadKeyBarLayout,
   moveKeyBarKey,
   moveKeyBarKeyTo,
   resetKeyBarLayout,
   saveKeyBarLayout,
   setKeyBarKeyHidden,
+  settleKeyBarLayoutSave,
+  startKeyBarLayoutSave,
 } from './key-bar';
 import { type TerminalKeyId } from './terminal-keys';
 
@@ -36,22 +39,22 @@ export type KeyBarLayoutState = Readonly<{
  * The bar paints the default order until the stored one arrives, so a terminal
  * opened on a locked database still has its keys. Every edit shows at once and
  * is written behind the previous write, so two quick moves land in the order
- * they were made; a write that fails puts the layout back and says why. A read
- * that fails keeps the default layout on screen and reports `error`, which the
- * editor answers with a Retry and the default order.
+ * they were made; a write that fails puts the bar back on the last layout the
+ * store confirmed and says why. A read that fails keeps the default layout on
+ * screen and reports `error`, which the editor answers with a Retry and the
+ * default order.
  */
 export function useKeyBarLayout(): KeyBarLayoutState {
   const { t } = useTranslation();
   const [layout, setLayout] = useState<KeyBarLayout>(DEFAULT_KEY_BAR_LAYOUT);
   const [status, setStatus] = useState<KeyBarLayoutStatus>('loading');
   const [attempt, setAttempt] = useState(0);
-  const layoutRef = useRef(layout);
+  const saveRef = useRef<KeyBarLayoutSave>({
+    shown: DEFAULT_KEY_BAR_LAYOUT,
+    persisted: DEFAULT_KEY_BAR_LAYOUT,
+  });
   const editedRef = useRef(false);
   const loadTokenRef = useRef(0);
-
-  useEffect(() => {
-    layoutRef.current = layout;
-  }, [layout]);
 
   useEffect(() => {
     loadTokenRef.current += 1;
@@ -62,7 +65,7 @@ export function useKeyBarLayout(): KeyBarLayoutState {
         if (loadTokenRef.current !== token || editedRef.current) {
           return;
         }
-        layoutRef.current = stored;
+        saveRef.current = { shown: stored, persisted: stored };
         setLayout(stored);
         setStatus('ready');
       } catch {
@@ -78,21 +81,22 @@ export function useKeyBarLayout(): KeyBarLayoutState {
 
   const apply = useCallback(
     (next: KeyBarLayout, write: () => Promise<void>) => {
-      const previous = layoutRef.current;
-      if (next === previous) {
+      if (next === saveRef.current.shown) {
         return;
       }
       editedRef.current = true;
-      layoutRef.current = next;
+      saveRef.current = startKeyBarLayoutSave(saveRef.current, next);
       setLayout(next);
       setStatus('ready');
       void (async () => {
         try {
           await chainSave(SAVE_KEY, write);
+          saveRef.current = settleKeyBarLayoutSave(saveRef.current, next, false);
         } catch (error) {
-          if (layoutRef.current === next) {
-            layoutRef.current = previous;
-            setLayout(previous);
+          const settled = settleKeyBarLayoutSave(saveRef.current, next, true);
+          saveRef.current = settled;
+          if (settled.shown !== next) {
+            setLayout(settled.shown);
           }
           toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
         }
@@ -103,7 +107,7 @@ export function useKeyBarLayout(): KeyBarLayoutState {
 
   const setHidden = useCallback(
     (id: TerminalKeyId, hidden: boolean) => {
-      const next = setKeyBarKeyHidden(layoutRef.current, id, hidden);
+      const next = setKeyBarKeyHidden(saveRef.current.shown, id, hidden);
       apply(next, () => saveKeyBarLayout(next));
     },
     [apply]
@@ -111,7 +115,7 @@ export function useKeyBarLayout(): KeyBarLayoutState {
 
   const move = useCallback(
     (id: TerminalKeyId, offset: -1 | 1) => {
-      const next = moveKeyBarKey(layoutRef.current, id, offset);
+      const next = moveKeyBarKey(saveRef.current.shown, id, offset);
       apply(next, () => saveKeyBarLayout(next));
     },
     [apply]
@@ -119,7 +123,7 @@ export function useKeyBarLayout(): KeyBarLayoutState {
 
   const moveTo = useCallback(
     (from: number, to: number) => {
-      const next = moveKeyBarKeyTo(layoutRef.current, from, to);
+      const next = moveKeyBarKeyTo(saveRef.current.shown, from, to);
       apply(next, () => saveKeyBarLayout(next));
     },
     [apply]

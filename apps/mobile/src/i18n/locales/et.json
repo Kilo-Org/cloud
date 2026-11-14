@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
     "pullRequestUnavailableDescription": "Seda PR-i ei saa avada. See võib olla kustutatud, hoidla võib olla privaatne või Kilo GitHubi rakendus pole hoidlasse installitud.",
+    "pullRequestDiscussionUnavailableMessage": "Võimalik, et ühenduse loomine ebaõnnestus või on tõmbetaotlus eemaldatud.",
     "accessDeniedDescription": "Sul pole õigust seda tõmbetaotlust vaadata.",
     "noFilesChanged": "Faile ei muudetud",
     "noFilesChangedDescription": "See tõmbetaotlus ei sisalda failimuudatusi.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Jaga liitmistaotlust",
       "viewOnProvider": "Vaata teenuses {{provider}}",
       "mergeRequestUnavailable": "Liitmistaotlus pole saadaval",
-      "unavailableDescription": "See võib olla kustutatud või sul puudub ligipääs.",
+      "unavailableDescription": "Võimalik, et ühenduse loomine ebaõnnestus või on üksus kustutatud või ligipääsmatu.",
       "accessDeniedMergeRequest": "Sul pole õigust seda liitmistaotlust vaadata.",
       "couldNotLoadMergeRequest": "Liitmistaotlust ei õnnestunud laadida.",
       "discussionAccessDenied": "Sul puudub õigus selle liitmistaotluse arutelu vaadata.",
-      "discussionUnavailableMessage": "See liitmistaotlus võib olla eemaldatud.",
+      "discussionUnavailableMessage": "Võimalik, et ühenduse loomine ebaõnnestus või on liitmistaotlus eemaldatud.",
       "noDiscussionDescription": "Selle liitmistaotluse juures pole veel ülevaatuslõime ega arutelukommentaare.",
       "noFilesChangedDescription": "See liitmistaotlus ei sisalda failimuudatusi."
     }

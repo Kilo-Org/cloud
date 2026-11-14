@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ ijikọ koodu adịghị",
     "pullRequestUnavailableDescription": "Enweghị ike imepe PR a. O nwere ike ịbụ na ehichapụla ya, ebe nchekwa ahụ bụ nke nzuzo, ma ọ bụ na etinyeghị ngwa Kilo GitHub na ya.",
+    "pullRequestDiscussionUnavailableMessage": "O nwere ike ịbụ na njikọ ahụ dara, ma ọ bụ na ewepụla arịrịọ ijikọ koodu ahụ.",
     "accessDeniedDescription": "Ị nweghị ikike ilele arịrịọ ijikọ koodu a.",
     "noFilesChanged": "Enweghị faịlụ agbanwere",
     "noFilesChangedDescription": "Enweghị mgbanwe faịlụ na arịrịọ ijikọ koodu a.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Kekọrịta arịrịọ njikọta",
       "viewOnProvider": "Lelee na {{provider}}",
       "mergeRequestUnavailable": "Arịrịọ njikọta adịghị",
-      "unavailableDescription": "Ọ nwere ike ịbụ na ehichapụrụ ya, ma ọ bụ na ị nweghị ikike ịbanye ya.",
+      "unavailableDescription": "O nwere ike ịbụ na njikọ ahụ dara, ma ọ bụ na ehichapụrụ ihe ahụ, ma ọ bụ na a pụghị ịnweta ya.",
       "accessDeniedMergeRequest": "Ị nweghị ikike ilele arịrịọ njikọta a.",
       "couldNotLoadMergeRequest": "Enweghị ike ibudata arịrịọ njikọta",
       "discussionAccessDenied": "Ị nweghị ikike ilele mkparịta ụka arịrịọ njikọta a.",
-      "discussionUnavailableMessage": "O nwere ike ịbụ na ewepụla arịrịọ njikọta a.",
+      "discussionUnavailableMessage": "O nwere ike ịbụ na njikọ ahụ dara, ma ọ bụ na ewepụla arịrịọ njikọta ahụ.",
       "noDiscussionDescription": "Enweghị usoro mkparịta ụka nyocha ma ọ bụ okwu mkparịta ụka na arịrịọ njikọta a.",
       "noFilesChangedDescription": "Enweghị mgbanwe faịlụ na arịrịọ njikọta a."
     }

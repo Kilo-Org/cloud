@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Kërkesa për bashkim nuk është e disponueshme",
     "pullRequestUnavailableDescription": "Kjo PR nuk mund të hapet. Mund të jetë fshirë, depoja mund të jetë private ose aplikacioni Kilo për GitHub mund të mos jetë instaluar në të.",
+    "pullRequestDiscussionUnavailableMessage": "Lidhja mund të ketë dështuar, ose kërkesa e bashkimit mund të jetë hequr.",
     "accessDeniedDescription": "Nuk ke leje për ta parë këtë kërkesë për bashkim.",
     "noFilesChanged": "Asnjë skedar i ndryshuar",
     "noFilesChangedDescription": "Kjo kërkesë për bashkim nuk përmban ndryshime në skedarë.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Ndaj kërkesën e integrimit",
       "viewOnProvider": "Shih te {{provider}}",
       "mergeRequestUnavailable": "Kërkesa e integrimit nuk është e disponueshme",
-      "unavailableDescription": "Mbase është fshirë, ose mbase nuk ke akses.",
+      "unavailableDescription": "Lidhja mund të ketë dështuar, ose elementi mund të jetë fshirë ose i paarritshëm.",
       "accessDeniedMergeRequest": "Nuk ke leje për ta parë këtë kërkesë integrimi.",
       "couldNotLoadMergeRequest": "Nuk u ngarkua kërkesa e integrimit.",
       "discussionAccessDenied": "Nuk ke leje për ta parë diskutimin e kësaj kërkeze integrimi.",
-      "discussionUnavailableMessage": "Kjo kërkesë integrimi mund të jetë hequr.",
+      "discussionUnavailableMessage": "Lidhja mund të ketë dështuar, ose kërkesa e integrimit mund të jetë hequr.",
       "noDiscussionDescription": "Nuk ka diskutime rishikimi ose komente bisede në këtë kërkesë integrimi.",
       "noFilesChangedDescription": "Kjo kërkesë integrimi nuk përmban ndryshime në skedarë."
     }

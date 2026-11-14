@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",
     "pullRequestUnavailableDescription": "Tsy azo sokafana ity PR ity. Mety efa voafafa izy, na tsy azon'ny besinimaro idirana ny tahirin-kaody, na tsy napetraka ao ny rindranasa Kilo ho an'ny GitHub.",
+    "pullRequestDiscussionUnavailableMessage": "Mety tsy nahomby ny fifandraisana, na mety efa nesorina ity PR ity.",
     "accessDeniedDescription": "Tsy manana alalana hijery ity fangatahana fampiraisana ity ianao.",
     "noFilesChanged": "Tsy misy rakitra niova",
     "noFilesChangedDescription": "Tsy misy rakitra novaina ao amin'ity fangatahana fampiraisana ity.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Zarao ny fangatahana fampiraisana",
       "viewOnProvider": "Jereo amin'ny {{provider}}",
       "mergeRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",
-      "unavailableDescription": "Mety efa voafafa izany, na mety tsy manana alalana hiditra ianao.",
+      "unavailableDescription": "Mety tsy nahomby ny fifandraisana, na mety efa voafafa na tsy azo idirana ilay zavatra.",
       "accessDeniedMergeRequest": "Tsy manana alalana hijery ity fangatahana fampiraisana ity ianao.",
       "couldNotLoadMergeRequest": "Tsy tafiditra ny fangatahana fampiraisana.",
       "discussionAccessDenied": "Tsy manana alalana hijery ny resaka momba ity fangatahana fampiraisana ity ianao.",
-      "discussionUnavailableMessage": "Mety efa nesorina ity fangatahana fampiraisana ity.",
+      "discussionUnavailableMessage": "Mety tsy nahomby ny fifandraisana, na mety efa nesorina ity fangatahana fampiraisana ity.",
       "noDiscussionDescription": "Tsy mbola misy loha-dresaka fandinihana na hevitra ao amin'ny resaka momba ity fangatahana fampiraisana ity.",
       "noFilesChangedDescription": "Tsy misy rakitra novaina ao amin'ity fangatahana fampiraisana ity."
     }

@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",
     "pullRequestUnavailableDescription": "Ovaj PR se ne može otvoriti. Možda je obrisan, repozitorij je privatan ili aplikacija Kilo za GitHub nije instalirana za taj repozitorij.",
+    "pullRequestDiscussionUnavailableMessage": "Veza možda nije uspostavljena ili je zahtjev za spajanje možda uklonjen.",
     "accessDeniedDescription": "Nemaš dozvolu za pregled ovog zahtjeva za spajanje.",
     "noFilesChanged": "Nijedna datoteka nije promijenjena",
     "noFilesChangedDescription": "Ovaj zahtjev za spajanje ne sadrži promjene u datotekama.",
@@ -1023,11 +1024,11 @@
       "shareMergeRequest": "Podijeli merge request",
       "viewOnProvider": "Pogledaj na {{provider}}",
       "mergeRequestUnavailable": "Merge request nije dostupan",
-      "unavailableDescription": "Možda je obrisan ili možda nemaš pristup njemu.",
+      "unavailableDescription": "Veza možda nije uspostavljena ili je stavka možda obrisana ili nedostupna.",
       "accessDeniedMergeRequest": "Nemaš dozvolu za pregled ovog merge requesta.",
       "couldNotLoadMergeRequest": "Učitavanje merge requesta nije uspjelo.",
       "discussionAccessDenied": "Nemaš dozvolu za pregled rasprave o ovom merge requestu.",
-      "discussionUnavailableMessage": "Ovaj merge request je možda uklonjen.",
+      "discussionUnavailableMessage": "Veza možda nije uspostavljena ili je merge request možda uklonjen.",
       "noDiscussionDescription": "Ovaj merge request još nema niti za pregled koda ni komentara u raspravi.",
       "noFilesChangedDescription": "Ovaj merge request ne sadrži promjene u datotekama."
     }

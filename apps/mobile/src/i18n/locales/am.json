@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
     "pullRequestUnavailableDescription": "ይህን PR መክፈት አይቻልም። ተሰርዞ ሊሆን ይችላል፣ ማከማቻው የግል ሊሆን ይችላል፣ ወይም የKilo GitHub መተግበሪያ በማከማቻው ላይ አልተጫነም።",
+    "pullRequestDiscussionUnavailableMessage": "ግንኙነቱ አልተሳካ ሊሆን ይችላል፣ ወይም የማዋሃድ ጥያቄው ተወግዶ ሊሆን ይችላል።",
     "accessDeniedDescription": "ይህን የማዋሃድ ጥያቄ ለማየት ፈቃድ የለህም።",
     "noFilesChanged": "የተለወጡ ፋይሎች የሉም",
     "noFilesChangedDescription": "ይህ የማዋሃድ ጥያቄ ምንም የፋይል ለውጥ አልያዘም።",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "የማዋሃድ ጥያቄውን አጋራ",
       "viewOnProvider": "በ{{provider}} ይመልከቱ",
       "mergeRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
-      "unavailableDescription": "ተሰርዞ ሊሆን ይችላል፣ ወይም የመዳረስ ፈቃድ ላይኖርዎት ይችላል።",
+      "unavailableDescription": "ግንኙነቱ አልተሳካ ሊሆን ይችላል፣ ወይም ንጥሉ ተሰርዞ ሊሆን ይችላል፣ ወይም ተደራሽ ላይሆን ይችላል።",
       "accessDeniedMergeRequest": "ይህን የማዋሃድ ጥያቄ ለማየት ፈቃድ የለህም።",
       "couldNotLoadMergeRequest": "የማዋሃድ ጥያቄውን መጫን አልተቻለም።",
       "discussionAccessDenied": "የዚህን የማዋሃድ ጥያቄ ውይይት ለማየት ፈቃድ የለህም።",
-      "discussionUnavailableMessage": "ይህ የማዋሃድ ጥያቄ ተወግዶ ሊሆን ይችላል።",
+      "discussionUnavailableMessage": "ግንኙነቱ አልተሳካ ሊሆን ይችላል፣ ወይም የማዋሃድ ጥያቄው ተወግዶ ሊሆን ይችላል።",
       "noDiscussionDescription": "በዚህ የማዋሃድ ጥያቄ ላይ የግምገማ ውይይቶች ወይም አጠቃላይ አስተያየቶች የሉም።",
       "noFilesChangedDescription": "ይህ የማዋሃድ ጥያቄ ምንም የፋይል ለውጥ አልያዘም።"
     }

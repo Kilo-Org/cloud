@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Demann fizyon an pa disponib",
     "pullRequestUnavailableDescription": "Pa ka louvri PR sa a. Petèt yo te efase li, depo a prive, oswa aplikasyon Kilo pou GitHub la pa enstale sou depo a.",
+    "pullRequestDiscussionUnavailableMessage": "Petèt koneksyon an pa t mache, oswa yo te retire demann fizyon an.",
     "accessDeniedDescription": "Ou pa gen pèmisyon pou wè demann fizyon sa a.",
     "noFilesChanged": "Pa gen fichye ki chanje",
     "noFilesChangedDescription": "Pa gen chanjman nan fichye yo nan demann fizyon sa a.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Pataje merge request la",
       "viewOnProvider": "Gade sou {{provider}}",
       "mergeRequestUnavailable": "Merge request la pa disponib",
-      "unavailableDescription": "Petèt yo te efase l, oswa ou pa gen aksè a li.",
+      "unavailableDescription": "Petèt koneksyon an pa t mache, oswa yo te efase atik la, oswa li pa aksesib.",
       "accessDeniedMergeRequest": "Ou pa gen pèmisyon pou wè merge request sa a.",
       "couldNotLoadMergeRequest": "Pa t ka chaje merge request la.",
       "discussionAccessDenied": "Ou pa gen pèmisyon pou wè diskisyon merge request sa a.",
-      "discussionUnavailableMessage": "Petèt yo te retire merge request sa a.",
+      "discussionUnavailableMessage": "Petèt koneksyon an pa t mache, oswa yo te retire Merge request la.",
       "noDiscussionDescription": "Pa gen fil diskisyon pou revizyon ni kòmantè nan konvèsasyon merge request sa a.",
       "noFilesChangedDescription": "Pa gen chanjman nan fichye yo nan merge request sa a."
     }

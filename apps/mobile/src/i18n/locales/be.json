@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Запыт на зліццё недаступны",
     "pullRequestUnavailableDescription": "Немагчыма адкрыць гэты PR. Магчыма, яго выдалілі, рэпазіторый прыватны або ў ім не ўсталявана праграма Kilo для GitHub.",
+    "pullRequestDiscussionUnavailableMessage": "Магчыма, не ўдалося ўсталяваць злучэнне, а запыт на зліццё быў выдалены.",
     "accessDeniedDescription": "У цябе няма дазволу праглядаць гэты запыт на зліццё.",
     "noFilesChanged": "Няма змен у файлах",
     "noFilesChangedDescription": "У гэтым запыце на зліццё няма змен у файлах.",
@@ -1046,11 +1047,11 @@
       "shareMergeRequest": "Падзяліцца merge-запытам",
       "viewOnProvider": "Адкрыць у {{provider}}",
       "mergeRequestUnavailable": "Merge-запыт недаступны",
-      "unavailableDescription": "Магчыма, ён быў выдалены або ў вас няма да яго доступу.",
+      "unavailableDescription": "Магчыма, не ўдалося ўсталяваць злучэнне, а элемент быў выдалены або недаступны.",
       "accessDeniedMergeRequest": "У вас няма правоў на прагляд гэтага merge-запыту.",
       "couldNotLoadMergeRequest": "Не ўдалося загрузіць merge-запыт",
       "discussionAccessDenied": "У вас няма правоў на прагляд абмеркавання гэтага merge-запыту.",
-      "discussionUnavailableMessage": "Гэты merge-запыт магчыма, быў выдалены.",
+      "discussionUnavailableMessage": "Магчыма, не ўдалося ўсталяваць злучэнне, а Merge-запыт быў выдалены.",
       "noDiscussionDescription": "У гэтым merge-запыце няма галін агляду ці каментароў размовы.",
       "noFilesChangedDescription": "У гэтым merge-запыце няма змен файлаў."
     }

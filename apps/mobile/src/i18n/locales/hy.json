@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",
     "pullRequestUnavailableDescription": "Այս PR-ը հնարավոր չէ բացել։ Հնարավոր է՝ այն ջնջվել է, պահոցը մասնավոր է, կամ Kilo GitHub հավելվածը տեղադրված չէ այդ պահոցում։",
+    "pullRequestDiscussionUnavailableMessage": "Հնարավոր է՝ կապը խափանվել է, կամ pull request-ը հեռացվել է։",
     "accessDeniedDescription": "Այս pull request-ը դիտելու թույլտվություն չունես։",
     "noFilesChanged": "Փոփոխված ֆայլեր չկան",
     "noFilesChangedDescription": "Այս pull request-ում ֆայլերի փոփոխություններ չկան։",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Կիսվել միաձուլման հարցմամբ",
       "viewOnProvider": "Դիտել {{provider}}-ում",
       "mergeRequestUnavailable": "Միաձուլման հարցումը հասանելի չէ",
-      "unavailableDescription": "Հնարավոր է՝ այն ջնջվել է, կամ դու հասանելիություն չունես դրան։",
+      "unavailableDescription": "Հնարավոր է՝ կապը խափանվել է, կամ տարրը ջնջվել է կամ անհասանելի է դարձել։",
       "accessDeniedMergeRequest": "Այս միաձուլման հարցումը դիտելու թույլտվություն չունես։",
       "couldNotLoadMergeRequest": "Չհաջողվեց բեռնել միաձուլման հարցումը։",
       "discussionAccessDenied": "Այս միաձուլման հարցման քննարկումը դիտելու թույլտվություն չունես։",
-      "discussionUnavailableMessage": "Հնարավոր է՝ այս միաձուլման հարցումը հեռացվել է։",
+      "discussionUnavailableMessage": "Հնարավոր է՝ կապը խափանվել է, կամ միաձուլման հարցումը հեռացվել է։",
       "noDiscussionDescription": "Այս միաձուլման հարցման մեջ դեռ չկան վերանայման քննարկումներ կամ ընդհանուր մեկնաբանություններ։",
       "noFilesChangedDescription": "Այս միաձուլման հարցման մեջ ֆայլերի փոփոխություններ չկան։"
     }

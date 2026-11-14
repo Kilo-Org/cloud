@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",
     "pullRequestUnavailableDescription": "Den här PR:en kan inte öppnas. Den kan ha tagits bort, kodarkivet kan vara privat eller så är GitHub-appen för Kilo inte installerad i kodarkivet.",
+    "pullRequestDiscussionUnavailableMessage": "Anslutningen kan ha misslyckats, eller så kan PR:en ha tagits bort.",
     "accessDeniedDescription": "Du har inte behörighet att se den här PR:en.",
     "noFilesChanged": "Inga filer ändrade",
     "noFilesChangedDescription": "Den här PR:en innehåller inga filändringar.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Dela merge request",
       "viewOnProvider": "Visa på {{provider}}",
       "mergeRequestUnavailable": "Merge requesten är inte tillgänglig",
-      "unavailableDescription": "Den kan ha tagits bort, eller så kan du sakna åtkomst.",
+      "unavailableDescription": "Anslutningen kan ha misslyckats, eller så kan objektet ha tagits bort eller vara otillgängligt.",
       "accessDeniedMergeRequest": "Du har inte behörighet att se den här merge requesten.",
       "couldNotLoadMergeRequest": "Kunde inte läsa in merge requesten",
       "discussionAccessDenied": "Du har inte behörighet att se diskussionen för den här merge requesten.",
-      "discussionUnavailableMessage": "Den här merge requesten kan ha tagits bort.",
+      "discussionUnavailableMessage": "Anslutningen kan ha misslyckats, eller så kan merge requesten ha tagits bort.",
       "noDiscussionDescription": "Den här merge requesten har inga granskningstrådar eller kommentarer i diskussionen.",
       "noFilesChangedDescription": "Den här merge requesten innehåller inga filändringar."
     }

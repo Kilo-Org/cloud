@@ -3124,6 +3124,7 @@
     },
     "pullRequestUnavailable": "Pull request non disponibile",
     "pullRequestUnavailableDescription": "Impossibile aprire questa PR. Potrebbe essere stata eliminata, il repository potrebbe essere privato oppure l'app Kilo per GitHub potrebbe non essere installata nel repository.",
+    "pullRequestDiscussionUnavailableMessage": "La connessione potrebbe essere fallita, oppure la PR potrebbe essere stata rimossa.",
     "reconnectNotice": {
       "title": "La connessione a GitHub è scaduta.",
       "message": "Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
@@ -3229,11 +3230,11 @@
       "shareMergeRequest": "Condividi il merge request",
       "viewOnProvider": "Visualizza su {{provider}}",
       "mergeRequestUnavailable": "Merge request non disponibile",
-      "unavailableDescription": "Potrebbe essere stato eliminato, oppure potresti non avere accesso.",
+      "unavailableDescription": "La connessione potrebbe essere fallita, oppure l'elemento potrebbe essere stato eliminato o non essere accessibile.",
       "accessDeniedMergeRequest": "Non hai il permesso di visualizzare questo merge request.",
       "couldNotLoadMergeRequest": "Impossibile caricare il merge request.",
       "discussionAccessDenied": "Non hai il permesso di visualizzare la discussione di questo merge request.",
-      "discussionUnavailableMessage": "Questo merge request potrebbe essere stato rimosso.",
+      "discussionUnavailableMessage": "La connessione potrebbe essere fallita, oppure il merge request potrebbe essere stato rimosso.",
       "noDiscussionDescription": "Questo merge request non ha ancora discussioni di revisione né commenti generali.",
       "noFilesChangedDescription": "Questo merge request non contiene modifiche ai file."
     }

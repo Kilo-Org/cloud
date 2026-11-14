@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
     "pullRequestUnavailableDescription": "हा PR उघडता येत नाही. तो हटवला गेला असेल, रेपॉझिटरी खाजगी असेल किंवा त्या रेपॉझिटरीवर Kilo GitHub अॅप इन्स्टॉल केलेले नसेल.",
+    "pullRequestDiscussionUnavailableMessage": "कनेक्शन अयशस्वी झाले असेल, किंवा पुल रिक्वेस्ट काढून टाकली असेल.",
     "accessDeniedDescription": "तुम्हाला ही पुल रिक्वेस्ट पाहण्याची परवानगी नाही.",
     "noFilesChanged": "कोणतीही फाइल बदलली नाही",
     "noFilesChangedDescription": "या पुल रिक्वेस्टमध्ये कोणत्याही फाइलमध्ये बदल केलेले नाहीत.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "मर्ज रिक्वेस्ट शेअर करा",
       "viewOnProvider": "{{provider}} वर पहा",
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट अनुपलब्ध",
-      "unavailableDescription": "ती हटवली गेली असेल, किंवा तुम्हाला त्यावर प्रवेश नसेल.",
+      "unavailableDescription": "कनेक्शन अयशस्वी झाले असेल, किंवा ती नोंद हटवली गेली असेल किंवा तुम्हाला तिच्यापर्यंत प्रवेश नसेल.",
       "accessDeniedMergeRequest": "तुम्हाला ही मर्ज रिक्वेस्ट पाहण्याची परवानगी नाही.",
       "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड करता आली नाही",
       "discussionAccessDenied": "तुम्हाला या मर्ज रिक्वेस्ट वरील चर्चा पाहण्याची परवानगी नाही.",
-      "discussionUnavailableMessage": "ही मर्ज रिक्वेस्ट काढून टाकली असेल.",
+      "discussionUnavailableMessage": "कनेक्शन अयशस्वी झाले असेल, किंवा मर्ज रिक्वेस्ट काढून टाकली असेल.",
       "noDiscussionDescription": "या मर्ज रिक्वेस्टवर पुनरावलोकनाच्या चर्चा किंवा इतर टिप्पण्या नाहीत.",
       "noFilesChangedDescription": "या मर्ज रिक्वेस्टमध्ये कोणत्याही फाइलमध्ये बदल केलेले नाहीत."
     }

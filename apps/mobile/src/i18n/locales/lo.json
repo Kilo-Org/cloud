@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍລວມໂຄດ",
     "pullRequestUnavailableDescription": "ບໍ່ສາມາດເປີດ PR ນີ້ໄດ້. PR ອາດຖືກລຶບແລ້ວ, ຄັງໂຄດອາດເປັນສ່ວນຕົວ ຫຼື ຍັງບໍ່ໄດ້ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub ໃນຄັງໂຄດນັ້ນ.",
+    "pullRequestDiscussionUnavailableMessage": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື ຄຳຂໍລວມໂຄ້ດນີ້ອາດຈະຖືກລຶບໄປແລ້ວ.",
     "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເບິ່ງຄຳຂໍລວມໂຄດນີ້.",
     "noFilesChanged": "ບໍ່ມີໄຟລ໌ທີ່ປ່ຽນແປງ",
     "noFilesChangedDescription": "ຄຳຂໍລວມໂຄດນີ້ບໍ່ມີການປ່ຽນແປງໄຟລ໌.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "ແບ່ງປັນ merge request",
       "viewOnProvider": "ເບິ່ງເທິງ {{provider}}",
       "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດ merge request",
-      "unavailableDescription": "ມັນອາດຖືກລຶບ ຫຼື ທ່ານອາດບໍ່ມີສິດເຂົ້າເຖິງ",
+      "unavailableDescription": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື ລາຍການອາດຈະຖືກລຶບ ຫຼື ເຂົ້າເຖິງບໍ່ໄດ້.",
       "accessDeniedMergeRequest": "ທ່ານບໍ່ມີສິດເບິ່ງ merge request ນີ້.",
       "couldNotLoadMergeRequest": "ບໍ່ສາມາດໂຫຼດ merge request ໄດ້.",
       "discussionAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງການສົນທະນາຂອງ merge request ນີ້.",
-      "discussionUnavailableMessage": "merge request ນີ້ອາດຖືກລຶບໄປແລ້ວ.",
+      "discussionUnavailableMessage": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື Merge request ນີ້ອາດຈະຖືກລຶບໄປແລ້ວ.",
       "noDiscussionDescription": "merge request ນີ້ຍັງບໍ່ມີເທຣດການກວດທານ ຫຼື ຄຳເຫັນການສົນທະນາ.",
       "noFilesChangedDescription": "merge request ນີ້ບໍ່ມີການປ່ຽນແປງເຟົ້ມ."
     }

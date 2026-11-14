@@ -3173,6 +3173,7 @@
     },
     "pullRequestUnavailable": "PR niedostępny",
     "pullRequestUnavailableDescription": "Nie można otworzyć tego PR. Być może został usunięty, repozytorium jest prywatne lub nie zainstalowano w nim aplikacji Kilo dla GitHub.",
+    "pullRequestDiscussionUnavailableMessage": "Połączenie mogło się nie udać albo PR mógł zostać usunięty.",
     "reconnectNotice": {
       "title": "Połączenie z serwisem GitHub wygasło.",
       "message": "Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
@@ -3282,11 +3283,11 @@
       "shareMergeRequest": "Udostępnij merge request",
       "viewOnProvider": "Zobacz w {{provider}}",
       "mergeRequestUnavailable": "Merge request niedostępny",
-      "unavailableDescription": "Mógł zostać usunięty albo możesz nie mieć do niego dostępu.",
+      "unavailableDescription": "Połączenie mogło się nie udać, a element mógł zostać usunięty lub być niedostępny.",
       "accessDeniedMergeRequest": "Nie masz uprawnień do wyświetlenia tego merge request.",
       "couldNotLoadMergeRequest": "Nie udało się wczytać merge request.",
       "discussionAccessDenied": "Nie masz uprawnień do wyświetlenia dyskusji w tym merge request.",
-      "discussionUnavailableMessage": "Ten merge request mógł zostać usunięty.",
+      "discussionUnavailableMessage": "Połączenie mogło się nie udać albo merge request mógł zostać usunięty.",
       "noDiscussionDescription": "W tym merge request nie ma jeszcze wątków przeglądu ani komentarzy w dyskusji.",
       "noFilesChangedDescription": "Ten merge request nie zawiera zmian w plikach."
     }

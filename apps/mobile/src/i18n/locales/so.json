@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Codsiga isku-darka lama heli karo",
     "pullRequestUnavailableDescription": "PR-kan lama furi karo. Waxaa laga yaabaa in la tirtiray, in kaydku gaar yahay ama in barnaamijka Kilo ee GitHub aanu ku rakibnayn kaydka.",
+    "pullRequestDiscussionUnavailableMessage": "Waxaa laga yaabaa in xiriirku guuldareystay, ama in codsigan isku-darka la saaray.",
     "accessDeniedDescription": "Ma haysatid oggolaansho aad ku aragto codsigan isku-darka.",
     "noFilesChanged": "Ma jiraan faylal la beddelay",
     "noFilesChangedDescription": "Codsigan isku-darka kuma jiraan isbeddello faylal.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "La wadaag merge request-ka",
       "viewOnProvider": "Kasoo eeg {{provider}}",
       "mergeRequestUnavailable": "Merge request-ka lama heli karo",
-      "unavailableDescription": "Waa laga yaabaa in la tirtiray, ama in aanad helin ogolaansho.",
+      "unavailableDescription": "Waxaa laga yaabaa in xiriirku guuldareystay, ama in shayga la tirtiray ama in aan la gaari karin.",
       "accessDeniedMergeRequest": "Ma haysatid oggolaansho aad ku aragto merge request-kan.",
       "couldNotLoadMergeRequest": "Merge request-ka lama soo rari karin.",
       "discussionAccessDenied": "Ma haysatid oggolaansho aad ku aragto doodda merge request-kan.",
-      "discussionUnavailableMessage": "Waxaa laga yaabaa in merge request-kan la saaray.",
+      "discussionUnavailableMessage": "Waxaa laga yaabaa in xiriirku guuldareystay, ama in merge request-kan la saaray.",
       "noDiscussionDescription": "Merge request-kan kuma jiraan dooddo dib-u-eegis ama faallooyin wada hadal.",
       "noFilesChangedDescription": "Merge request-kan kuma jiraan isbeddello faylal."
     }

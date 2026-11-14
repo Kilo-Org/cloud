@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
     "pullRequestUnavailableDescription": "A kò lè ṣí PR yìí. Ó lè jẹ́ pé a ti pa á rẹ́, ibi ìpamọ́ náà jẹ́ ti ìkọ̀kọ̀, tàbí a kò tíì fi ìṣàfilọ́lẹ̀ Kilo fún GitHub sórí rẹ̀.",
+    "pullRequestDiscussionUnavailableMessage": "Ó lè jẹ́ pé ìsopọ̀ náà ti já, tàbí pé a ti yọ Ìbéèrè àkópọ̀ náà kúrò.",
     "accessDeniedDescription": "O kò ní àṣẹ láti wo ìbéèrè ìṣọ̀kan yìí.",
     "noFilesChanged": "Kò sí fáìlì tí a yí padà",
     "noFilesChangedDescription": "Kò sí ìyípadà sí fáìlì kankan nínú ìbéèrè ìṣọ̀kan yìí.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Pín ìbéèrè ìṣọ̀kan",
       "viewOnProvider": "Wò ó lórí {{provider}}",
       "mergeRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
-      "unavailableDescription": "Ó lè jẹ́ pé a ti pa á rẹ́, tàbí kí o má ní àṣẹ rẹ̀.",
+      "unavailableDescription": "Ó lè jẹ́ pé ìsopọ̀ náà ti já, tàbí pé a ti pa nǹkan náà rẹ́, tàbí pé a kò lè rí i.",
       "accessDeniedMergeRequest": "O kò ní àṣẹ láti wo ìbéèrè ìṣọ̀kan yìí.",
       "couldNotLoadMergeRequest": "A kò lè ṣàkójọ ìbéèrè ìṣọ̀kan.",
       "discussionAccessDenied": "O kò ní àṣẹ láti wo ìjíròrò ìbéèrè ìṣọ̀kan yìí.",
-      "discussionUnavailableMessage": "Ó lè jẹ́ pé a ti yọ ìbéèrè ìṣọ̀kan yìí kúrò.",
+      "discussionUnavailableMessage": "Ó lè jẹ́ pé ìsopọ̀ náà ti já, tàbí pé a ti yọ Ìbéèrè ìṣọ̀kan náà kúrò.",
       "noDiscussionDescription": "Kò sí ọ̀wọ́ àtúnyẹ̀wò tàbí àsọyé ìjíròrò lórí ìbéèrè ìṣọ̀kan yìí.",
       "noFilesChangedDescription": "Kò sí ìyípadà sí fáìlì kankan nínú ìbéèrè ìṣọ̀kan yìí."
     }

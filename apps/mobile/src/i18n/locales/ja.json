@@ -3075,6 +3075,7 @@
     },
     "pullRequestUnavailable": "プルリクエストを開けません",
     "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
+    "pullRequestDiscussionUnavailableMessage": "接続に失敗したか、プルリクエストが削除された可能性があります。",
     "reconnectNotice": {
       "title": "GitHubとの連携が期限切れになりました。",
       "message": "接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
@@ -3176,11 +3177,11 @@
       "shareMergeRequest": "マージリクエストを共有",
       "viewOnProvider": "{{provider}}で表示",
       "mergeRequestUnavailable": "マージリクエストを開けません",
-      "unavailableDescription": "削除されたか、アクセス権がない可能性があります。",
+      "unavailableDescription": "接続に失敗したか、項目が削除またはアクセス不能になっている可能性があります。",
       "accessDeniedMergeRequest": "このマージリクエストを表示する権限がありません。",
       "couldNotLoadMergeRequest": "マージリクエストを読み込めませんでした。",
       "discussionAccessDenied": "このマージリクエストのディスカッションを表示する権限がありません。",
-      "discussionUnavailableMessage": "このマージリクエストは削除された可能性があります。",
+      "discussionUnavailableMessage": "接続に失敗したか、マージリクエストが削除された可能性があります。",
       "noDiscussionDescription": "このマージリクエストには、レビュースレッドもコメントもまだありません。",
       "noFilesChangedDescription": "このマージリクエストにはファイルの変更がありません。"
     }

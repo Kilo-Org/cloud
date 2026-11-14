@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
     "pullRequestUnavailableDescription": "Hierdie PR kan nie oopgemaak word nie. Dit is dalk geskrap, die bewaarplek is privaat, of die Kilo GitHub-toep is nie daarop geïnstalleer nie.",
+    "pullRequestDiscussionUnavailableMessage": "Die verbinding het dalk misluk, of die trekversoek is dalk verwyder.",
     "accessDeniedDescription": "Jy het nie toestemming om hierdie trekversoek te bekyk nie.",
     "noFilesChanged": "Geen lêers verander nie",
     "noFilesChangedDescription": "Hierdie trekversoek het geen lêerveranderings nie.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Deel merge request",
       "viewOnProvider": "Bekyk op {{provider}}",
       "mergeRequestUnavailable": "Merge request onbeskikbaar",
-      "unavailableDescription": "Dit is dalk uitgevee, of jy het moontlik nie toegang daartoe nie.",
+      "unavailableDescription": "Die verbinding het dalk misluk, of die item is dalk uitgevee of ontoeganklik.",
       "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie merge request te bekyk nie.",
       "couldNotLoadMergeRequest": "Kon nie die merge request laai nie.",
       "discussionAccessDenied": "Jy het nie toestemming om hierdie merge request se bespreking te bekyk nie.",
-      "discussionUnavailableMessage": "Hierdie merge request is dalk verwyder.",
+      "discussionUnavailableMessage": "Die verbinding het dalk misluk, of die merge request is dalk verwyder.",
       "noDiscussionDescription": "Daar is nog geen hersieningsdrade of gesprekskommentare op hierdie merge request nie.",
       "noFilesChangedDescription": "Hierdie merge request het geen lêerveranderings nie."
     }

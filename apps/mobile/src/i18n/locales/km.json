@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលកូដបាន",
     "pullRequestUnavailableDescription": "មិនអាចបើក PR នេះបានទេ។ វាអាចត្រូវបានលុប ឃ្លាំងកូដជាឯកជន ឬមិនទាន់បានដំឡើងកម្មវិធី Kilo សម្រាប់ GitHub លើឃ្លាំងកូដនោះ។",
+    "pullRequestDiscussionUnavailableMessage": "ការតភ្ជាប់អាចបរាជ័យ ឬសំណើបញ្ចូលកូដនេះអាចត្រូវបានដកចេញ។",
     "accessDeniedDescription": "អ្នកគ្មានសិទ្ធិមើលសំណើបញ្ចូលកូដនេះទេ។",
     "noFilesChanged": "គ្មានឯកសារដែលបានកែប្រែ",
     "noFilesChangedDescription": "សំណើបញ្ចូលកូដនេះមិនមានការកែប្រែឯកសារទេ។",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "ចែករំលែកសំណើបញ្ចូល",
       "viewOnProvider": "មើលលើ {{provider}}",
       "mergeRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលបាន",
-      "unavailableDescription": "វាអាចត្រូវបានលុបចោល ឬអ្នកអាចគ្មានសិទ្ធិចូលប្រើទេ។",
+      "unavailableDescription": "ការតភ្ជាប់អាចបរាជ័យ ឬធាតុនេះអាចត្រូវបានលុប ឬមិនអាចចូលប្រើបាន។",
       "accessDeniedMergeRequest": "អ្នកគ្មានសិទ្ធិមើលសំណើបញ្ចូលនេះទេ។",
       "couldNotLoadMergeRequest": "មិនអាចផ្ទុកសំណើបញ្ចូលបានទេ។",
       "discussionAccessDenied": "អ្នកគ្មានសិទ្ធិមើលការពិភាក្សារបស់សំណើបញ្ចូលនេះទេ។",
-      "discussionUnavailableMessage": "សំណើបញ្ចូលនេះអាចត្រូវបានដកចេញ។",
+      "discussionUnavailableMessage": "ការតភ្ជាប់អាចបរាជ័យ ឬសំណើបញ្ចូលនេះអាចត្រូវបានដកចេញ។",
       "noDiscussionDescription": "មិនទាន់មានការពិភាក្សាពិនិត្យកូដ ឬមតិយោបល់លើសំណើបញ្ចូលនេះទេ។",
       "noFilesChangedDescription": "សំណើបញ្ចូលនេះមិនមានការកែប្រែឯកសារទេ។"
     }

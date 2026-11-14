@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
     "pullRequestUnavailableDescription": "Энэ PR-ыг нээх боломжгүй. Устгасан, кодын сан нь хувийн эсвэл уг санд Kilo GitHub аппыг суулгаагүй байж болзошгүй.",
+    "pullRequestDiscussionUnavailableMessage": "Холболт тасалдсан, эсвэл нэгтгэх хүсэлт устгагдсан байж магадгүй.",
     "accessDeniedDescription": "Танд энэ нэгтгэх хүсэлтийг үзэх эрх байхгүй.",
     "noFilesChanged": "Файл өөрчлөгдөөгүй",
     "noFilesChangedDescription": "Энэ нэгтгэх хүсэлтэд файлын өөрчлөлт байхгүй.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Нэгтгэх хүсэлтийг хуваалцах",
       "viewOnProvider": "{{provider}} дээр харах",
       "mergeRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
-      "unavailableDescription": "Устсан байж болзошгүй, эсвэл танд хандах эрх байхгүй.",
+      "unavailableDescription": "Холболт тасалдсан, эсвэл энэ зүйл устгагдсан эсвэл хандах боломжгүй болсон байж магадгүй.",
       "accessDeniedMergeRequest": "Танд энэ нэгтгэх хүсэлтийг үзэх эрх байхгүй.",
       "couldNotLoadMergeRequest": "Нэгтгэх хүсэлтийг ачаалж чадсангүй.",
       "discussionAccessDenied": "Танд энэ нэгтгэх хүсэлтийн хэлэлцүүлгийг үзэх эрх байхгүй.",
-      "discussionUnavailableMessage": "Энэ нэгтгэх хүсэлтийг устгасан байж болзошгүй.",
+      "discussionUnavailableMessage": "Холболт тасалдсан, эсвэл нэгтгэх хүсэлт устгагдсан байж магадгүй.",
       "noDiscussionDescription": "Энэ нэгтгэх хүсэлтэд хяналтын сэдэв эсвэл хэлэлцүүлгийн сэтгэгдэл байхгүй.",
       "noFilesChangedDescription": "Энэ нэгтгэх хүсэлтэд файлын өөрчлөлт байхгүй."
     }

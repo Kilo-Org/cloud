@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
     "pullRequestUnavailableDescription": "ამ PR-ის გახსნა შეუძლებელია. შესაძლოა, ის წაიშალა, საცავი კერძოა ან მასზე Kilo-ს GitHub აპი არ არის დაყენებული.",
+    "pullRequestDiscussionUnavailableMessage": "შესაძლოა, კავშირი ვერ დამყარდა, ან PR წაიშალა.",
     "accessDeniedDescription": "ამ შერწყმის მოთხოვნის ნახვის უფლება არ გაქვს.",
     "noFilesChanged": "ფაილები არ შეცვლილა",
     "noFilesChangedDescription": "ამ შერწყმის მოთხოვნაში ფაილები არ შეცვლილა.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "შერწყმის მოთხოვნის გაზიარება",
       "viewOnProvider": "ნახვა {{provider}}-ში",
       "mergeRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
-      "unavailableDescription": "შესაძლოა წაიშალა, ან შესაძლოა მასზე წვდომა არ გაქვთ.",
+      "unavailableDescription": "შესაძლოა, კავშირი ვერ დამყარდა, ან ელემენტი წაიშალა, ან მასზე წვდომა შეზღუდულია.",
       "accessDeniedMergeRequest": "ამ შერწყმის მოთხოვნის ნახვის უფლება არ გაქვს.",
       "couldNotLoadMergeRequest": "შერწყმის მოთხოვნის ჩატვირთვა ვერ მოხერხდა.",
       "discussionAccessDenied": "ამ შერწყმის მოთხოვნის დისკუსიის ნახვის უფლება არ გაქვს.",
-      "discussionUnavailableMessage": "შესაძლოა, ეს შერწყმის მოთხოვნა წაიშალა.",
+      "discussionUnavailableMessage": "შესაძლოა, კავშირი ვერ დამყარდა, ან შერწყმის მოთხოვნა წაიშალა.",
       "noDiscussionDescription": "ამ შერწყმის მოთხოვნაში ჯერ არც განხილვის თემებია და არც ზოგადი კომენტარები.",
       "noFilesChangedDescription": "ამ შერწყმის მოთხოვნაში ფაილები არ შეცვლილა."
     }

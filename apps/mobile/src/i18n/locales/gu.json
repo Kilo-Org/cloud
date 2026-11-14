@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
     "pullRequestUnavailableDescription": "આ PR ખોલી શકાતી નથી. કદાચ તે કાઢી નાખવામાં આવી છે, રિપોઝિટરી ખાનગી છે અથવા તેના પર Kilo GitHub એપ ઇન્સ્ટોલ કરેલી નથી.",
+    "pullRequestDiscussionUnavailableMessage": "કનેક્શન નિષ્ફળ ગયું હોઈ શકે છે, અથવા પુલ રિક્વેસ્ટ કાઢી નાખવામાં આવી હોઈ શકે છે.",
     "accessDeniedDescription": "તમને આ પુલ રિક્વેસ્ટ જોવાની પરવાનગી નથી.",
     "noFilesChanged": "કોઈ ફાઇલ બદલાઈ નથી",
     "noFilesChangedDescription": "આ પુલ રિક્વેસ્ટમાં કોઈ ફાઇલમાં ફેરફાર નથી.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "મર્જ રિક્વેસ્ટ શેર કરો",
       "viewOnProvider": "{{provider}} પર જુઓ",
       "mergeRequestUnavailable": "મર્જ રિક્વેસ્ટ ઉપલબ્ધ નથી",
-      "unavailableDescription": "કદાચ તે કાઢી નાખવામાં આવી હોય, અથવા તમારી પાસે તેની એક્સેસ ન હોય.",
+      "unavailableDescription": "કનેક્શન નિષ્ફળ ગયું હોઈ શકે છે, અથવા આઇટમ કાઢી નાખવામાં આવી હોઈ શકે છે અથવા તેની એક્સેસ ન હોઈ શકે.",
       "accessDeniedMergeRequest": "તમને આ મર્જ રિક્વેસ્ટ જોવાની પરવાનગી નથી.",
       "couldNotLoadMergeRequest": "મર્જ રિક્વેસ્ટ લોડ કરી શકાઈ નહીં.",
       "discussionAccessDenied": "તમને આ મર્જ રિક્વેસ્ટની ચર્ચા જોવાની પરવાનગી નથી.",
-      "discussionUnavailableMessage": "આ મર્જ રિક્વેસ્ટ કાઢી નાખવામાં આવી હોઈ શકે છે.",
+      "discussionUnavailableMessage": "કનેક્શન નિષ્ફળ ગયું હોઈ શકે છે, અથવા મર્જ રિક્વેસ્ટ કાઢી નાખવામાં આવી હોઈ શકે છે.",
       "noDiscussionDescription": "આ મર્જ રિક્વેસ્ટ પર હજી સમીક્ષાનો કોઈ થ્રેડ કે ચર્ચાની કોઈ ટિપ્પણી નથી.",
       "noFilesChangedDescription": "આ મર્જ રિક્વેસ્ટમાં કોઈ ફાઇલમાં ફેરફાર નથી."
     }

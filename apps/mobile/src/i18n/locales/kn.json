@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
     "pullRequestUnavailableDescription": "ಈ PR ಅನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ. ಅದನ್ನು ಅಳಿಸಿರಬಹುದು, ರೆಪೊಸಿಟರಿ ಖಾಸಗಿಯಾಗಿರಬಹುದು ಅಥವಾ ಅದರಲ್ಲಿ Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸದೆ ಇರಬಹುದು.",
+    "pullRequestDiscussionUnavailableMessage": "ಸಂಪರ್ಕ ವಿಫಲವಾಗಿರಬಹುದು, ಅಥವಾ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು.",
     "accessDeniedDescription": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
     "noFilesChanged": "ಯಾವುದೇ ಫೈಲ್ ಬದಲಾಗಿಲ್ಲ",
     "noFilesChangedDescription": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಹಂಚಿ",
       "viewOnProvider": "{{provider}}ನಲ್ಲಿ ವೀಕ್ಷಿಸಿ",
       "mergeRequestUnavailable": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
-      "unavailableDescription": "ಅದು ಅಳಿಸಲ್ಪಟ್ಟಿರಬಹುದು, ಅಥವಾ ನಿಮಗೆ ಅದಕ್ಕೆ ಪ್ರವೇಶವಿರದಿರಬಹುದು.",
+      "unavailableDescription": "ಸಂಪರ್ಕ ವಿಫಲವಾಗಿರಬಹುದು, ಅಥವಾ ಅದನ್ನು ಅಳಿಸಲಾಗಿರಬಹುದು ಅಥವಾ ಅದಕ್ಕೆ ಪ್ರವೇಶವಿರದಿರಬಹುದು.",
       "accessDeniedMergeRequest": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "couldNotLoadMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "discussionAccessDenied": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನ ಚರ್ಚೆಯನ್ನು ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
-      "discussionUnavailableMessage": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು.",
+      "discussionUnavailableMessage": "ಸಂಪರ್ಕ ವಿಫಲವಾಗಿರಬಹುದು, ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು.",
       "noDiscussionDescription": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಪರಿಶೀಲನೆಗೆ ಸಂಬಂಧಿಸಿದ ಚರ್ಚಾ ಸರಣಿಗಳಾಗಲಿ, ಸಾಮಾನ್ಯ ಕಾಮೆಂಟ್‌ಗಳಾಗಲಿ ಇಲ್ಲ.",
       "noFilesChangedDescription": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ."
     }

@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",
     "pullRequestUnavailableDescription": "Dan il-PR ma jistax jinfetaħ. Jista' jkun tħassar, ir-repożitorju huwa privat, jew l-app ta' Kilo għal GitHub mhix installata fuqu.",
+    "pullRequestDiscussionUnavailableMessage": "Jista' jkun li l-konnessjoni falliet, jew li l-PR tneħħa.",
     "accessDeniedDescription": "M'għandekx permess biex tara din it-talba għall-għaqda.",
     "noFilesChanged": "L-ebda fajl ma nbidel",
     "noFilesChangedDescription": "Din it-talba għall-għaqda ma fiha l-ebda bidla fil-fajls.",
@@ -1069,11 +1070,11 @@
       "shareMergeRequest": "Aqsam il-merge request",
       "viewOnProvider": "Ara fuq {{provider}}",
       "mergeRequestUnavailable": "Il-merge request mhux disponibbli",
-      "unavailableDescription": "Jista' jkun li ġiet imħassra, jew li m'għandekx aċċess għaliha.",
+      "unavailableDescription": "Jista' jkun li l-konnessjoni falliet, jew li l-element tħassar jew m'għadux aċċessibbli.",
       "accessDeniedMergeRequest": "M'għandekx permess biex tara dan il-merge request.",
       "couldNotLoadMergeRequest": "Ma setgħax jitgħabba l-merge request.",
       "discussionAccessDenied": "M'għandekx permess biex tara d-diskussjoni ta' dan il-merge request.",
-      "discussionUnavailableMessage": "Dan il-merge request setgħa tneħħa.",
+      "discussionUnavailableMessage": "Jista' jkun li l-konnessjoni falliet, jew li l-merge request tneħħa.",
       "noDiscussionDescription": "Dan il-merge request għadu m'għandhu l-ebda sensiela ta' kummenti ta' reviżjoni jew kummenti fid-diskussjoni.",
       "noFilesChangedDescription": "Dan il-merge request m'għandux bidliet fil-fajls."
     }

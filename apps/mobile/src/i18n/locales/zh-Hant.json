@@ -3075,6 +3075,7 @@
     },
     "pullRequestUnavailable": "無法開啟提取請求",
     "pullRequestUnavailableDescription": "無法開啟此 PR。可能是 PR 已刪除、存放庫設為私人，或存放庫尚未安裝 Kilo GitHub App。",
+    "pullRequestDiscussionUnavailableMessage": "連線可能已失敗，或者提取要求可能已被移除。",
     "reconnectNotice": {
       "title": "GitHub 連線已過期。",
       "message": "請重新檢查連線；如有需要，系統會提示你重新連線。",
@@ -3176,11 +3177,11 @@
       "shareMergeRequest": "分享合併請求",
       "viewOnProvider": "在 {{provider}} 上檢視",
       "mergeRequestUnavailable": "無法開啟合併請求",
-      "unavailableDescription": "它可能已被移除，或者你可能沒有存取權限。",
+      "unavailableDescription": "連線可能已失敗，或者此項目可能已被刪除或無法存取。",
       "accessDeniedMergeRequest": "你沒有權限檢視此合併請求。",
       "couldNotLoadMergeRequest": "無法載入合併請求。",
       "discussionAccessDenied": "你沒有權限檢視此合併請求的討論。",
-      "discussionUnavailableMessage": "此合併請求可能已移除。",
+      "discussionUnavailableMessage": "連線可能已失敗，或者合併請求可能已被移除。",
       "noDiscussionDescription": "此合併請求尚無審查討論串或留言。",
       "noFilesChangedDescription": "此合併請求沒有檔案變更。"
     }

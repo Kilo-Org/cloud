@@ -3075,6 +3075,7 @@
     },
     "pullRequestUnavailable": "Çekme isteği kullanılamıyor",
     "pullRequestUnavailableDescription": "Bu PR açılamıyor. Silinmiş olabilir, depo özel olabilir veya depoda Kilo GitHub uygulaması kurulu olmayabilir.",
+    "pullRequestDiscussionUnavailableMessage": "Bağlantı başarısız olmuş olabilir veya çekme isteği kaldırılmış olabilir.",
     "reconnectNotice": {
       "title": "GitHub bağlantısının süresi doldu.",
       "message": "Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
@@ -3176,11 +3177,11 @@
       "shareMergeRequest": "Birleştirme isteğini paylaş",
       "viewOnProvider": "{{provider}} üzerinde görüntüle",
       "mergeRequestUnavailable": "Birleştirme isteği kullanılamıyor",
-      "unavailableDescription": "Silinmiş olabilir veya erişim izinlerin olmayabilir.",
+      "unavailableDescription": "Bağlantı başarısız olmuş olabilir veya öğe silinmiş ya da erişilemez durumda olabilir.",
       "accessDeniedMergeRequest": "Bu birleştirme isteğini görüntüleme iznin yok.",
       "couldNotLoadMergeRequest": "Birleştirme isteği yüklenemedi.",
       "discussionAccessDenied": "Bu birleştirme isteğinin tartışmasını görüntüleme iznin yok.",
-      "discussionUnavailableMessage": "Bu birleştirme isteği kaldırılmış olabilir.",
+      "discussionUnavailableMessage": "Bağlantı başarısız olmuş olabilir veya birleştirme isteği kaldırılmış olabilir.",
       "noDiscussionDescription": "Bu birleştirme isteğinde henüz inceleme yorumu veya genel yorum yok.",
       "noFilesChangedDescription": "Bu birleştirme isteğinde dosya değişikliği yok."
     }

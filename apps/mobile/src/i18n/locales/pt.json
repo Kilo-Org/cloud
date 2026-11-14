@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "PR indisponível",
     "pullRequestUnavailableDescription": "Não é possível abrir este PR. Pode ter sido eliminado, o repositório pode ser privado ou a aplicação do Kilo para o GitHub pode não estar instalada nesse repositório.",
+    "pullRequestDiscussionUnavailableMessage": "A ligação pode ter falhado, ou o PR pode ter sido removido.",
     "accessDeniedDescription": "Não tens permissão para ver este PR.",
     "noFilesChanged": "Nenhum ficheiro alterado",
     "noFilesChangedDescription": "Este PR não tem alterações nos ficheiros.",
@@ -1023,11 +1024,11 @@
       "shareMergeRequest": "Partilhar merge request",
       "viewOnProvider": "Ver em {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponível",
-      "unavailableDescription": "Pode ter sido eliminado ou podes não ter acesso.",
+      "unavailableDescription": "A ligação pode ter falhado, ou o item pode ter sido eliminado ou estar inacessível.",
       "accessDeniedMergeRequest": "Não tens permissão para ver este merge request.",
       "couldNotLoadMergeRequest": "Não foi possível carregar o merge request.",
       "discussionAccessDenied": "Não tens permissão para ver a discussão deste merge request.",
-      "discussionUnavailableMessage": "Este merge request pode ter sido removido.",
+      "discussionUnavailableMessage": "A ligação pode ter falhado, ou o merge request pode ter sido removido.",
       "noDiscussionDescription": "Este merge request ainda não tem conversas de revisão nem comentários na discussão.",
       "noFilesChangedDescription": "Este merge request não tem alterações nos ficheiros."
     }

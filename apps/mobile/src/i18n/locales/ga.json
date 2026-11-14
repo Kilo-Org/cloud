@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe gan fáil",
     "pullRequestUnavailableDescription": "Ní féidir an PR seo a oscailt. Seans gur scriosadh é, go bhfuil an stór príobháideach, nó nach bhfuil aip GitHub Kilo suiteáilte air.",
+    "pullRequestDiscussionUnavailableMessage": "Seans gur theip ar an gceangal, nó gur baineadh an t-iarratas tarraingthe.",
     "accessDeniedDescription": "Níl cead agat an t-iarratas tarraingthe seo a fheiceáil.",
     "noFilesChanged": "Gan aon chomhad athraithe",
     "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas tarraingthe seo.",
@@ -1069,11 +1070,11 @@
       "shareMergeRequest": "Comhroinn iarratas cumaisc",
       "viewOnProvider": "Amharc ar {{provider}}",
       "mergeRequestUnavailable": "Iarratas cumaisc gan fáil",
-      "unavailableDescription": "B’fhéidir gur scriosadh é nó nach bhfuil rochtain agat air.",
+      "unavailableDescription": "B’fhéidir gur theip ar an gceangal, nó gur scriosadh an mhír nó nach féidir rochtain a fháil uirthi.",
       "accessDeniedMergeRequest": "Níl cead agat an t-iarratas cumaisc seo a fheiceáil.",
       "couldNotLoadMergeRequest": "Níorbh fhéidir an t-iarratas cumaisc a lódáil.",
       "discussionAccessDenied": "Níl cead agat plé an iarratais chumaisc seo a fheiceáil.",
-      "discussionUnavailableMessage": "Seans gur baineadh an t-iarratas cumaisc seo.",
+      "discussionUnavailableMessage": "Seans gur theip ar an gceangal, nó gur baineadh an t-iarratas cumaisc.",
       "noDiscussionDescription": "Níl aon snáithe athbhreithnithe ná trácht comhrá ar an iarratas cumaisc seo.",
       "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas cumaisc seo."
     }

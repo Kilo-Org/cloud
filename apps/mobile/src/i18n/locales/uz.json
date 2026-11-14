@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",
     "pullRequestUnavailableDescription": "Bu PRni ochib bo'lmaydi. U o'chirilgan, ombor yopiq yoki unga Kilo GitHub ilovasi o'rnatilmagan bo'lishi mumkin.",
+    "pullRequestDiscussionUnavailableMessage": "Aloqa uzilgan yoki PR o‘chirilgan bo‘lishi mumkin.",
     "accessDeniedDescription": "Bu PRni ko'rishga ruxsatingiz yo'q.",
     "noFilesChanged": "Fayllar o'zgarmagan",
     "noFilesChangedDescription": "Bu PRda hech bir fayl o'zgarmagan.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Merge so‘rovini ulashish",
       "viewOnProvider": "{{provider}}da ko'rish",
       "mergeRequestUnavailable": "Merge so‘rovi mavjud emas",
-      "unavailableDescription": "Ehtimol u o‘chirilgan yoki unga kirish huquqingiz yo‘q.",
+      "unavailableDescription": "Aloqa uzilgan, element o‘chirilgan yoki unga kirish imkoni bo‘lmagan bo‘lishi mumkin.",
       "accessDeniedMergeRequest": "Bu merge so‘rovini ko‘rishga ruxsatingiz yo‘q.",
       "couldNotLoadMergeRequest": "Merge so‘rovini yuklab bo‘lmadi.",
       "discussionAccessDenied": "Bu merge so‘rovi muhokamasini ko‘rishga ruxsatingiz yo‘q.",
-      "discussionUnavailableMessage": "Bu merge so‘rovi o‘chirilgan bo‘lishi mumkin.",
+      "discussionUnavailableMessage": "Aloqa uzilgan yoki merge so‘rovi o‘chirilgan bo‘lishi mumkin.",
       "noDiscussionDescription": "Bu merge so‘rovida ko‘rib chiqishga oid izohlar zanjiri ham, umumiy izohlar ham yo‘q.",
       "noFilesChangedDescription": "Bu merge so‘rovida hech bir fayl o‘zgarmagan."
     }

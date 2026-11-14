@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
     "pullRequestUnavailableDescription": "Този PR не може да се отвори. Възможно е да е изтрит, хранилището да е частно или приложението Kilo за GitHub да не е инсталирано за него.",
+    "pullRequestDiscussionUnavailableMessage": "Възможно е връзката да е прекъснала, а заявката за сливане да е премахната.",
     "accessDeniedDescription": "Нямаш права да преглеждаш тази заявка за обединяване.",
     "noFilesChanged": "Няма променени файлове",
     "noFilesChangedDescription": "В тази заявка за обединяване няма промени по файловете.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Сподели merge заявка",
       "viewOnProvider": "Преглед в {{provider}}",
       "mergeRequestUnavailable": "Merge заявката е недостъпна",
-      "unavailableDescription": "Може би е изтрита или нямате достъп до нея.",
+      "unavailableDescription": "Възможно е връзката да е прекъснала, а елементът да е изтрит или недостъпен.",
       "accessDeniedMergeRequest": "Нямате разрешение да прегледате тази merge заявка.",
       "couldNotLoadMergeRequest": "Merge заявката не можа да се зареди",
       "discussionAccessDenied": "Нямате разрешение да прегледате дискусиата по тази merge заявка.",
-      "discussionUnavailableMessage": "Тази merge заявка може би е премахната.",
+      "discussionUnavailableMessage": "Възможно е връзката да е прекъснала, а merge заявката да е премахната.",
       "noDiscussionDescription": "Няма нишки за преглед или коментари по тази merge заявка.",
       "noFilesChangedDescription": "Тази merge заявка няма промени по файлове."
     }

@@ -3075,6 +3075,7 @@
     },
     "pullRequestUnavailable": "Pull-Request nicht verfügbar",
     "pullRequestUnavailableDescription": "Dieser PR kann nicht geöffnet werden. Möglicherweise wurde er gelöscht, das Repository ist privat oder die GitHub-App von Kilo ist dort nicht installiert.",
+    "pullRequestDiscussionUnavailableMessage": "Die Verbindung könnte fehlgeschlagen sein, oder der Pull-Request könnte entfernt worden sein.",
     "reconnectNotice": {
       "title": "Die GitHub-Verbindung ist abgelaufen.",
       "message": "Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
@@ -3176,11 +3177,11 @@
       "shareMergeRequest": "Merge-Request teilen",
       "viewOnProvider": "Auf {{provider}} ansehen",
       "mergeRequestUnavailable": "Merge-Request nicht verfügbar",
-      "unavailableDescription": "Möglicherweise wurde er gelöscht, oder du hast keinen Zugriff.",
+      "unavailableDescription": "Die Verbindung könnte fehlgeschlagen sein, oder der Eintrag könnte gelöscht oder nicht zugänglich sein.",
       "accessDeniedMergeRequest": "Du hast keine Berechtigung, diesen Merge-Request anzusehen.",
       "couldNotLoadMergeRequest": "Der Merge-Request konnte nicht geladen werden.",
       "discussionAccessDenied": "Du hast keine Berechtigung, die Diskussion zu diesem Merge-Request anzusehen.",
-      "discussionUnavailableMessage": "Dieser Merge-Request wurde möglicherweise entfernt.",
+      "discussionUnavailableMessage": "Die Verbindung könnte fehlgeschlagen sein, oder der Merge-Request könnte entfernt worden sein.",
       "noDiscussionDescription": "Zu diesem Merge-Request gibt es noch keine Review-Threads oder Kommentare.",
       "noFilesChangedDescription": "Dieser Merge-Request enthält keine Dateiänderungen."
     }

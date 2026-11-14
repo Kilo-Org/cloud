@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Birləşdirmə sorğusu əlçatan deyil",
     "pullRequestUnavailableDescription": "Bu PR-i açmaq mümkün deyil. Sorğu silinmiş ola bilər, repozitoriya məxfi ola bilər və ya Kilo GitHub tətbiqi orada quraşdırılmayıb.",
+    "pullRequestDiscussionUnavailableMessage": "Bağlantı uğursuz olmuş ola bilər və ya birləşdirmə sorğusu silinmiş ola bilər.",
     "accessDeniedDescription": "Bu birləşdirmə sorğusuna baxmaq icazən yoxdur.",
     "noFilesChanged": "Dəyişdirilmiş fayl yoxdur",
     "noFilesChangedDescription": "Bu birləşdirmə sorğusunda fayl dəyişikliyi yoxdur.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Merge sorğusunu paylaş",
       "viewOnProvider": "{{provider}} üzərində bax",
       "mergeRequestUnavailable": "Merge sorğusu əlçatan deyil",
-      "unavailableDescription": "Silinmiş ola bilər və ya ona giriş icazən olmaya bilər.",
+      "unavailableDescription": "Bağlantı uğursuz olmuş ola bilər, element isə silinmiş və ya əlçatmaz ola bilər.",
       "accessDeniedMergeRequest": "Bu merge sorğusuna baxmaq icazən yoxdur.",
       "couldNotLoadMergeRequest": "Merge sorğusunu yükləmək mümkün olmadı.",
       "discussionAccessDenied": "Bu merge sorğusunun müzakirəsinə baxmaq icazən yoxdur.",
-      "discussionUnavailableMessage": "Bu merge sorğusu silinmiş ola bilər.",
+      "discussionUnavailableMessage": "Bağlantı uğursuz olmuş ola bilər və ya merge sorğusu silinmiş ola bilər.",
       "noDiscussionDescription": "Bu merge sorğusunda kod baxışı müzakirələri və ya ümumi şərhlər yoxdur.",
       "noFilesChangedDescription": "Bu merge sorğusunda fayl dəyişikliyi yoxdur."
     }

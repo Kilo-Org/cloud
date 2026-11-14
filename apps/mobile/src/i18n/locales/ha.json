@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
     "pullRequestUnavailableDescription": "Ba za a iya buɗe wannan PR ba. Wataƙila an share shi, ma'ajiyar lambar ta sirri ce, ko ba a shigar da manhajar Kilo ta GitHub a cikinta ba.",
+    "pullRequestDiscussionUnavailableMessage": "Wataƙila haɗin ya gaza, ko kuma an cire wannan buƙatar haɗa canje-canje.",
     "accessDeniedDescription": "Ba ka da izinin duba wannan buƙatar haɗawa.",
     "noFilesChanged": "Ba a canza fayiloli ba",
     "noFilesChangedDescription": "Babu canje-canje ga fayiloli a wannan buƙatar haɗawa.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Raba buƙatar haɗawa",
       "viewOnProvider": "Duba a {{provider}}",
       "mergeRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
-      "unavailableDescription": "Wataƙila an share shi, ko kuma ba ka da damar shiga.",
+      "unavailableDescription": "Wataƙila haɗin ya gaza, ko kuma an share shi, ko kuma ba a iya samun sa ba.",
       "accessDeniedMergeRequest": "Ba ka da izinin duba wannan buƙatar haɗawa.",
       "couldNotLoadMergeRequest": "Ba a iya loda buƙatar haɗawa ba.",
       "discussionAccessDenied": "Ba ka da izinin duba tattaunawar wannan buƙatar haɗawa.",
-      "discussionUnavailableMessage": "Wataƙila an cire wannan buƙatar haɗawa.",
+      "discussionUnavailableMessage": "Wataƙila haɗin ya gaza, ko kuma an cire wannan buƙatar haɗawa.",
       "noDiscussionDescription": "Babu silsilar bita ko tsokacin tattaunawa a wannan buƙatar haɗawa.",
       "noFilesChangedDescription": "Babu canje-canje ga fayiloli a wannan buƙatar haɗawa."
     }

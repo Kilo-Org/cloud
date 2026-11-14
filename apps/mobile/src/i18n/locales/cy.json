@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Cais tynnu ddim ar gael",
     "pullRequestUnavailableDescription": "Ni ellir agor y PR hwn. Efallai ei fod wedi'i ddileu, bod yr ystorfa'n breifat, neu nad yw ap GitHub Kilo wedi'i osod arni.",
+    "pullRequestDiscussionUnavailableMessage": "Efallai fod y cysylltiad wedi methu, neu efallai fod y cais tynnu wedi'i ddileu.",
     "accessDeniedDescription": "Nid oes gennych ganiatâd i weld y cais tynnu hwn.",
     "noFilesChanged": "Dim ffeiliau wedi'u newid",
     "noFilesChangedDescription": "Nid oes unrhyw ffeiliau wedi'u newid yn y cais tynnu hwn.",
@@ -1092,11 +1093,11 @@
       "shareMergeRequest": "Rhannu cais uno",
       "viewOnProvider": "Gweld ar {{provider}}",
       "mergeRequestUnavailable": "Cais uno ddim ar gael",
-      "unavailableDescription": "Efallai ei fod wedi'i ddileu, neu efallai nad oes gennych fynediad ato.",
+      "unavailableDescription": "Efallai fod y cysylltiad wedi methu, neu efallai fod yr eitem wedi'i dileu neu'n anhygyrch.",
       "accessDeniedMergeRequest": "Nid oes gennych ganiatâd i weld y cais uno hwn.",
       "couldNotLoadMergeRequest": "Ni lwyddwyd i lwytho'r cais uno.",
       "discussionAccessDenied": "Nid oes gennych ganiatâd i weld trafodaeth y cais uno hwn.",
-      "discussionUnavailableMessage": "Efallai fod y cais uno hwn wedi'i ddileu.",
+      "discussionUnavailableMessage": "Efallai fod y cysylltiad wedi methu, neu efallai fod y cais uno wedi'i ddileu.",
       "noDiscussionDescription": "Nid oes edafedd adolygu na sylwadau trafod ar y cais uno hwn.",
       "noFilesChangedDescription": "Nid oes unrhyw ffeiliau wedi'u newid yn y cais uno hwn."
     }

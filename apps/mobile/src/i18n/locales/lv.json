@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",
     "pullRequestUnavailableDescription": "Šo PR nevar atvērt. Iespējams, tas ir dzēsts, repozitorijs ir privāts vai tajā nav instalēta Kilo GitHub lietotne.",
+    "pullRequestDiscussionUnavailableMessage": "Savienojums varētu būt neizdevies, vai arī šis izmaiņu pieprasījums varētu būt noņemts.",
     "accessDeniedDescription": "Tev nav atļaujas skatīt šo izmaiņu pieprasījumu.",
     "noFilesChanged": "Nav mainītu failu",
     "noFilesChangedDescription": "Šajā izmaiņu pieprasījumā nav failu izmaiņu.",
@@ -1023,11 +1024,11 @@
       "shareMergeRequest": "Kopīgot merge request",
       "viewOnProvider": "Skatīt {{provider}}",
       "mergeRequestUnavailable": "Merge request nav pieejams",
-      "unavailableDescription": "Iespējams, tas ir dzēsts, vai arī tev nav tam pieejas.",
+      "unavailableDescription": "Savienojums varētu būt neizdevies, vai arī vienums varētu būt dzēsts vai nepieejams.",
       "accessDeniedMergeRequest": "Tev nav atļaujas skatīt šo merge request.",
       "couldNotLoadMergeRequest": "Neizdevās ielādēt merge request.",
       "discussionAccessDenied": "Tev nav atļaujas skatīt šī merge request diskusiju.",
-      "discussionUnavailableMessage": "Iespējams, šis merge request ir noņemts.",
+      "discussionUnavailableMessage": "Savienojums varētu būt neizdevies, vai arī šis merge request varētu būt noņemts.",
       "noDiscussionDescription": "Šajā merge request nav pārskatīšanas pavedienu vai diskusijas komentāru.",
       "noFilesChangedDescription": "Šajā merge request nav failu izmaiņu."
     }

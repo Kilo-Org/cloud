@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
     "pullRequestUnavailableDescription": "Le PR ayikwazi ukuvulwa. Kungenzeka isusiwe, inqolobane yekhodi iyimfihlo, noma i-Kilo GitHub App ayifakiwe kuyo.",
+    "pullRequestDiscussionUnavailableMessage": "Kungenzeka ukuthi ukuxhumana kuhlulekile, noma i-PR isusiwe.",
     "accessDeniedDescription": "Awunayo imvume yokubuka lesi sicelo sokuhlanganisa.",
     "noFilesChanged": "Awekho amafayela ashintshiwe",
     "noFilesChangedDescription": "Lesi sicelo sokuhlanganisa asinazo izinguquko zamafayela.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Yabelana ngesicelo sokuhlanganisa",
       "viewOnProvider": "Buka ku-{{provider}}",
       "mergeRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
-      "unavailableDescription": "Kungenzeka sisusiwe, noma awunayo imvume yokufinyelela kuso.",
+      "unavailableDescription": "Kungenzeka ukuthi ukuxhumana kuhlulekile, noma into isusiwe noma ayifinyeleleki.",
       "accessDeniedMergeRequest": "Awunayo imvume yokubuka lesi sicelo sokuhlanganisa.",
       "couldNotLoadMergeRequest": "Asikwazanga ukulayisha isicelo sokuhlanganisa.",
       "discussionAccessDenied": "Awunayo imvume yokubuka ingxoxo yalesi sicelo sokuhlanganisa.",
-      "discussionUnavailableMessage": "Kungenzeka lesi sicelo sokuhlanganisa sisusiwe.",
+      "discussionUnavailableMessage": "Kungenzeka ukuthi ukuxhumana kuhlulekile, noma isicelo sokuhlanganisa sisusiwe.",
       "noDiscussionDescription": "Azikho izingxoxo zokubuyekeza noma amazwana engxoxo kulesi sicelo sokuhlanganisa.",
       "noFilesChangedDescription": "Lesi sicelo sokuhlanganisa asinazo izinguquko zamafayela."
     }

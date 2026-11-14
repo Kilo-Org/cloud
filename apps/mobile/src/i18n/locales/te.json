@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
     "pullRequestUnavailableDescription": "ఈ PRని తెరవలేము. దీన్ని తొలగించి ఉండవచ్చు, రిపోజిటరీ ప్రైవేట్‌గా ఉండవచ్చు లేదా అందులో Kilo GitHub యాప్‌ను ఇన్‌స్టాల్ చేసి ఉండకపోవచ్చు.",
+    "pullRequestDiscussionUnavailableMessage": "కనెక్షన్ విఫలమై ఉండవచ్చు, లేదా ఈ పుల్ రిక్వెస్ట్ తీసివేయబడి ఉండవచ్చు.",
     "accessDeniedDescription": "ఈ పుల్ రిక్వెస్ట్‌ను చూడటానికి మీకు అనుమతి లేదు.",
     "noFilesChanged": "మారిన ఫైళ్లు లేవు",
     "noFilesChangedDescription": "ఈ పుల్ రిక్వెస్ట్‌లో ఏ ఫైల్‌లోనూ మార్పులు లేవు.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "మెర్జ్ రిక్వెస్ట్‌ను పంచుకోండి",
       "viewOnProvider": "{{provider}}పై చూడండి",
       "mergeRequestUnavailable": "మెర్జ్ రిక్వెస్ట్ అందుబాటులో లేదు",
-      "unavailableDescription": "అది తొలగించబడి ఉండవచ్చు, లేదా మీకు దానికి యాక్సెస్ ఉండకపోవచ్చు.",
+      "unavailableDescription": "కనెక్షన్ విఫలమై ఉండవచ్చు, లేదా ఆ అంశం తొలగించబడి ఉండవచ్చు లేదా మీకు దానికి యాక్సెస్ ఉండకపోవచ్చు.",
       "accessDeniedMergeRequest": "ఈ మెర్జ్ రిక్వెస్ట్‌ను చూడటానికి మీకు అనుమతి లేదు.",
       "couldNotLoadMergeRequest": "మెర్జ్ రిక్వెస్ట్‌ను లోడ్ చేయలేకపోయాము.",
       "discussionAccessDenied": "ఈ మెర్జ్ రిక్వెస్ట్ చర్చను చూడటానికి మీకు అనుమతి లేదు.",
-      "discussionUnavailableMessage": "ఈ మెర్జ్ రిక్వెస్ట్ తీసివేయబడి ఉండవచ్చు.",
+      "discussionUnavailableMessage": "కనెక్షన్ విఫలమై ఉండవచ్చు, లేదా ఈ మెర్జ్ రిక్వెస్ట్ తీసివేయబడి ఉండవచ్చు.",
       "noDiscussionDescription": "ఈ మెర్జ్ రిక్వెస్ట్‌పై సమీక్ష చర్చలు లేదా సంభాషణలో వ్యాఖ్యలు లేవు.",
       "noFilesChangedDescription": "ఈ మెర్జ్ రిక్వెస్ట్‌లో ఏ ఫైల్‌లోనూ మార్పులు లేవు."
     }

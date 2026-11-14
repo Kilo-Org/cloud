@@ -3173,6 +3173,7 @@
     },
     "pullRequestUnavailable": "Запит на злиття недоступний",
     "pullRequestUnavailableDescription": "Не вдалося відкрити цей PR. Можливо, його видалено, репозиторій приватний або для нього не встановлено застосунок Kilo для GitHub.",
+    "pullRequestDiscussionUnavailableMessage": "Можливо, не вдалося встановити з'єднання, або запит на злиття було видалено.",
     "reconnectNotice": {
       "title": "Термін дії підключення до GitHub минув.",
       "message": "Перевірте підключення ще раз — за потреби вам запропонують підключитися знову.",
@@ -3282,11 +3283,11 @@
       "shareMergeRequest": "Поділитися merge-запитом",
       "viewOnProvider": "Відкрити в {{provider}}",
       "mergeRequestUnavailable": "Merge-запит недоступний",
-      "unavailableDescription": "Можливо, його було видалено або в вас немає до нього доступу.",
+      "unavailableDescription": "Можливо, не вдалося встановити з'єднання, або елемент було видалено чи він недоступний.",
       "accessDeniedMergeRequest": "У вас немає дозволу переглядати цей merge-запит.",
       "couldNotLoadMergeRequest": "Не вдалося завантажити merge-запит",
       "discussionAccessDenied": "У вас немає дозволу переглядати обговорення цього merge-запиту.",
-      "discussionUnavailableMessage": "Цей merge-запит міг бути видалений.",
+      "discussionUnavailableMessage": "Можливо, не вдалося встановити з'єднання, або merge-запит було видалено.",
       "noDiscussionDescription": "У цьому merge-запиті немає гілок рев'ю чи коментарів розмови.",
       "noFilesChangedDescription": "У цьому merge-запиті немає змін файлів."
     }

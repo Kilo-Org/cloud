@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
     "pullRequestUnavailableDescription": "Бұл PR ашылмайды. Ол жойылған, репозиторий жабық немесе оған Kilo GitHub қолданбасы орнатылмаған болуы мүмкін.",
+    "pullRequestDiscussionUnavailableMessage": "Байланыс үзілген болуы мүмкін, немесе біріктіру сұрауы жойылған болуы мүмкін.",
     "accessDeniedDescription": "Бұл біріктіру сұрауын көруге рұқсатыңыз жоқ.",
     "noFilesChanged": "Файлдар өзгермеген",
     "noFilesChangedDescription": "Бұл біріктіру сұрауында файлдарға өзгеріс енгізілмеген.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Біріктіру сұрауымен бөлісу",
       "viewOnProvider": "{{provider}}-да қарау",
       "mergeRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
-      "unavailableDescription": "Ол жойылған болуы мүмкін, немесе оған рұқсатыңыз жоқ.",
+      "unavailableDescription": "Байланыс үзілген болуы мүмкін, немесе элемент жойылған немесе қолжетімсіз болуы мүмкін.",
       "accessDeniedMergeRequest": "Бұл біріктіру сұрауын көруге рұқсатыңыз жоқ.",
       "couldNotLoadMergeRequest": "Біріктіру сұрауын жүктеу мүмкін болмады.",
       "discussionAccessDenied": "Бұл біріктіру сұрауының талқылауын қарауға рұқсатыңыз жоқ.",
-      "discussionUnavailableMessage": "Бұл біріктіру сұрауы жойылған болуы мүмкін.",
+      "discussionUnavailableMessage": "Байланыс үзілген болуы мүмкін, немесе біріктіру сұрауы жойылған болуы мүмкін.",
       "noDiscussionDescription": "Бұл біріктіру сұрауында кодты тексеру талқылаулары да, жалпы пікірлер де жоқ.",
       "noFilesChangedDescription": "Бұл біріктіру сұрауында файлдарға өзгеріс енгізілмеген."
     }

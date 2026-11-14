@@ -3075,6 +3075,7 @@
     },
     "pullRequestUnavailable": "Không thể truy cập PR",
     "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
+    "pullRequestDiscussionUnavailableMessage": "Có thể kết nối đã bị lỗi, hoặc yêu cầu hợp nhất này đã bị xóa.",
     "reconnectNotice": {
       "title": "Kết nối GitHub đã hết hạn.",
       "message": "Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
@@ -3176,11 +3177,11 @@
       "shareMergeRequest": "Chia sẻ merge request",
       "viewOnProvider": "Xem trên {{provider}}",
       "mergeRequestUnavailable": "Không thể truy cập merge request",
-      "unavailableDescription": "Có thể nó đã bị xóa, hoặc bạn không có quyền truy cập.",
+      "unavailableDescription": "Có thể kết nối đã bị lỗi, hoặc mục này đã bị xóa hoặc không thể truy cập.",
       "accessDeniedMergeRequest": "Bạn không có quyền xem merge request này.",
       "couldNotLoadMergeRequest": "Không thể tải merge request.",
       "discussionAccessDenied": "Bạn không có quyền xem thảo luận của merge request này.",
-      "discussionUnavailableMessage": "Merge request này có thể đã bị xóa.",
+      "discussionUnavailableMessage": "Có thể kết nối đã bị lỗi, hoặc merge request này đã bị xóa.",
       "noDiscussionDescription": "Merge request này chưa có chuỗi thảo luận đánh giá hay bình luận nào.",
       "noFilesChangedDescription": "Merge request này không có tệp nào thay đổi."
     }

@@ -480,6 +480,7 @@ vi.mock('@/lib/storage-keys', () => ({
   LAST_ROUTE_KEY: 'last-route',
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   LOGIN_EMAIL_DRAFT_KEY: 'login-email-draft',
+  LOGIN_DRAFT_RECORD_KEY: 'login-draft-record',
   LOGIN_SSO_RECOVERY_DRAFT_KEY: 'login-sso-recovery-draft',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',

@@ -211,7 +211,7 @@ describe('ProfileOverviewScreen terminal error states', () => {
   // The tab keeps this stack across tab switches, so a route that showed a
   // working profile and then loses it leaves nothing to read and nothing to
   // press. The screen returns the tab to its Profile root instead.
-  it('gone after rendering: a terminal refusal returns the Profile tab to its root', async () => {
+  it('gone after rendering: a deleted profile returns the Profile tab to its root', async () => {
     Object.assign(h.query, { data: testProfile(), isPending: false });
 
     const { renderer, queryClient, unmount } = await mountScreen();
@@ -246,6 +246,29 @@ describe('ProfileOverviewScreen terminal error states', () => {
     // empty, and Back stays the way out.
     expect(queryErrorProps(renderer.root).variant).toBe('not-found');
     expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
+    expect(h.dismissAll).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('permission after rendering: the refusal keeps its screen so the reason stays readable', async () => {
+    Object.assign(h.query, { data: testProfile(), isPending: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
+
+    Object.assign(h.query, {
+      isError: true,
+      error: { data: { code: 'FORBIDDEN', httpStatus: 403 } },
+    });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    // A permission answer is about the reader's access, not a deletion: the
+    // screen states it, so leaving would discard the only explanation.
+    expect(queryErrorProps(renderer.root).variant).toBe('permission');
     expect(h.dismissAll).not.toHaveBeenCalled();
 
     unmount();

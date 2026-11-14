@@ -7,26 +7,30 @@ import { type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 /** What the caller's render says about the profile route it serves. */
 type MissingProfileLeave = {
   contentShown: boolean;
-  terminalRefusal: boolean;
+  profileMissing: boolean;
   stack: ProfileManagementStack;
 };
 
 /**
- * Leave a Profile tab route whose profile went away after the screen painted
+ * Leave a Profile tab route whose profile was deleted after the screen painted
  * it, and leave every other refusal where it is.
  *
  * The Profile tab keeps its stack across tab switches, so a route that showed a
- * working profile and later reads a terminal refusal has nothing to show and
- * nothing to press, apart from leaving: the tab stays on the empty screen until
- * the reader finds Back. This returns the tab to the first screen of its own
- * stack, the tab's Profile root, where the Profiles list is one tap away and the
- * stale row has already been refreshed out.
+ * working profile and later reads that the profile is gone has nothing to show
+ * and nothing to press, apart from leaving: the tab stays on the empty screen
+ * until the reader finds Back. This returns the tab to the first screen of its
+ * own stack, the tab's Profile root, where the Profiles list is one tap away and
+ * the stale row has already been refreshed out.
  *
- * The rule is "rendered, then refused", not "the read holds a profile" and not a
+ * The rule is "rendered, then deleted", not "the read holds a profile" and not a
  * timing or focus heuristic. A route opened with a cached profile the server
  * refuses on the first answer never painted that profile, so the reader still
  * has to see why the screen is empty and leave with Back; only a person who read
  * the profile and came back to it gone is stranded.
+ *
+ * A refusal that is not a deletion keeps its own screen even after the profile
+ * painted. A permission denial is an answer about the reader's access, and its
+ * copy is the only place the app states it; leaving would discard the reason.
  *
  * The record names the profile it belongs to, which is what makes a reused route
  * instance safe: the navigator reuses one when it opens the same route name with
@@ -38,7 +42,7 @@ type MissingProfileLeave = {
  */
 export function useLeaveMissingProfileRoute(
   profileId: string,
-  { contentShown, terminalRefusal, stack }: MissingProfileLeave
+  { contentShown, profileMissing, stack }: MissingProfileLeave
 ): void {
   const router = useRouter();
   const routeFocused = useRouteFocused();
@@ -54,12 +58,12 @@ export function useLeaveMissingProfileRoute(
   useEffect(() => {
     // The root `(app)` stack keeps the terminal view: its profile route has no
     // tab stack to return to, so its Back is the whole way out.
-    if (!terminalRefusal || !routeFocused || stack !== 'profileTab') {
+    if (!profileMissing || !routeFocused || stack !== 'profileTab') {
       return;
     }
     if (paintedProfileId !== profileId) {
       return;
     }
     router.dismissAll();
-  }, [paintedProfileId, profileId, routeFocused, router, stack, terminalRefusal]);
+  }, [paintedProfileId, profileId, profileMissing, routeFocused, router, stack]);
 }

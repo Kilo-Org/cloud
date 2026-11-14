@@ -162,11 +162,11 @@ export function ProfileOverviewScreen({
   // same way). A retryable failure keeps the cached profile usable under the
   // banner.
   const showContent = profile !== undefined && (errorView === null || errorView.showRetry);
-  // A terminal refusal of a profile this screen already painted returns the tab
-  // to its root, keyed to the profile it serves; see the hook for the rule.
+  // A deleted profile this screen already painted returns the tab to its root,
+  // keyed to the profile it serves; see the hook for the rule.
   useLeaveMissingProfileRoute(profileId, {
     contentShown: showContent,
-    terminalRefusal: errorView !== null && !errorView.showRetry,
+    profileMissing: errorView?.staleRow === true,
     stack,
   });
 

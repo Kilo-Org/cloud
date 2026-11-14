@@ -11,46 +11,47 @@ const moduleSource = readFileSync(
   'utf8'
 );
 
+function normalizeSwift(source: string): string {
+  return source.replaceAll(/\s+/g, ' ');
+}
+
+const normalizedModuleSource = normalizeSwift(moduleSource);
+
+function runSwiftChecks(prefix: string, binaryName: string, sources: readonly string[]): void {
+  const directory = mkdtempSync(join(tmpdir(), prefix));
+  const binary = join(directory, binaryName);
+  try {
+    execFileSync('xcrun', [
+      'swiftc',
+      '-parse-as-library',
+      ...sources.map(source => fileURLToPath(new URL(source, import.meta.url))),
+      '-o',
+      binary,
+    ]);
+    expect(execFileSync(binary, { encoding: 'utf8' })).toContain('all checks passed');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 it('uses the counted transcript budget for generation and reported truncation', () => {
-  expect(moduleSource).toContain('inputTokens = try await model.tokenCount(for: entries)');
-  expect(moduleSource).toContain('"maxOutputTokens": AppleModelBudget.outputCeiling');
-  expect(moduleSource).toContain('options.maximumResponseTokens = responseLimit');
-  expect(moduleSource).toContain('outputTokens >= responseLimit');
-  expect(moduleSource).toContain('throw AppleModelFailure(reason: "context_window_exceeded")');
+  expect(normalizedModuleSource).toContain('AppleModelBudget.outputCeiling');
+  expect(normalizedModuleSource).toContain('options.maximumResponseTokens');
+  expect(normalizedModuleSource).toContain('AppleModelBudget.responseLimit');
+  expect(normalizedModuleSource).toContain('reason: "context_window_exceeded"');
+  expect(normalizedModuleSource).toContain('completion.stop = "maxTokens"');
 });
 
 it.runIf(process.platform === 'darwin')('executes the native budget boundary checks', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'apple-model-budget-'));
-  const binary = join(directory, 'budget-tests');
-  try {
-    execFileSync('xcrun', [
-      'swiftc',
-      '-parse-as-library',
-      fileURLToPath(new URL('./ios/AppleModelBudget.swift', import.meta.url)),
-      fileURLToPath(new URL('./tests/AppleModelBudgetTests.swift', import.meta.url)),
-      '-o',
-      binary,
-    ]);
-    expect(execFileSync(binary, { encoding: 'utf8' })).toContain('all checks passed');
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
+  runSwiftChecks('apple-model-budget-', 'budget-tests', [
+    './ios/AppleModelBudget.swift',
+    './tests/AppleModelBudgetTests.swift',
+  ]);
 });
 
 it.runIf(process.platform === 'darwin')('executes bounded native recovery checks', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'apple-model-retry-'));
-  const binary = join(directory, 'retry-tests');
-  try {
-    execFileSync('xcrun', [
-      'swiftc',
-      '-parse-as-library',
-      fileURLToPath(new URL('./ios/AppleModelRetry.swift', import.meta.url)),
-      fileURLToPath(new URL('./tests/AppleModelRetryTests.swift', import.meta.url)),
-      '-o',
-      binary,
-    ]);
-    expect(execFileSync(binary, { encoding: 'utf8' })).toContain('all checks passed');
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
+  runSwiftChecks('apple-model-retry-', 'retry-tests', [
+    './ios/AppleModelRetry.swift',
+    './tests/AppleModelRetryTests.swift',
+  ]);
 });

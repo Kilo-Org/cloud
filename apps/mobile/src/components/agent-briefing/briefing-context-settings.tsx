@@ -81,6 +81,14 @@ export function BriefingContextSettings({
     enabled: !offline && valid,
     staleTime: 0,
   });
+  type LimitQuote =
+    | { readonly kind: 'invalid' }
+    | { readonly kind: 'quoted'; readonly quote: typeof estimate.data };
+  // An unparsable field disables the query, so the last estimate cannot speak
+  // for the current limits: invalid paints the line alone, never a stale quote.
+  const limitQuote: LimitQuote = valid
+    ? { kind: 'quoted', quote: estimate.data }
+    : { kind: 'invalid' };
   const update = useMutation(
     trpc.agentBriefing.updateContextPreferences.mutationOptions({
       onMutate: async input => {
@@ -255,20 +263,19 @@ export function BriefingContextSettings({
         <Text className="text-xs text-muted-foreground">
           {t('agentBriefing.snapshotSafeguards')}
         </Text>
-        {!valid ? (
-          <Text className="text-sm text-destructive">{t('agentBriefing.invalidSafeguards')}</Text>
-        ) : null}
       </View>
-      {estimate.data?.canGenerate ? (
+      {limitQuote.kind === 'invalid' ? (
+        <Text className="text-sm text-destructive">{t('agentBriefing.invalidSafeguards')}</Text>
+      ) : limitQuote.quote?.canGenerate ? (
         <Text className="text-xs text-muted-foreground">
           {t('agentBriefing.estimate', {
-            estimate: briefingMoney(estimate.data.estimatedCostMicrodollars, i18n.language),
-            maximum: briefingMoney(estimate.data.maximumCostMicrodollars, i18n.language),
+            estimate: briefingMoney(limitQuote.quote.estimatedCostMicrodollars, i18n.language),
+            maximum: briefingMoney(limitQuote.quote.maximumCostMicrodollars, i18n.language),
           })}
         </Text>
       ) : (
         <Text className="text-xs text-muted-foreground">
-          {t(briefingEstimateUnavailableKey(estimate.data?.unavailableReason))}
+          {t(briefingEstimateUnavailableKey(limitQuote.quote?.unavailableReason))}
         </Text>
       )}
       {estimate.isError ? (

@@ -23,7 +23,13 @@ describe('Watchwood browser signup', () => {
   let cleanup: () => void;
   const fetchMock = jest.fn<typeof fetch>();
   const initialize =
-    jest.fn<(options: { org_id: string; safety_identifier: string }) => Promise<unknown>>();
+    jest.fn<
+      (options: {
+        org_id: string;
+        safety_identifier: string;
+        use_device_cookie: boolean;
+      }) => Promise<unknown>
+    >();
   const getToken = jest.fn<() => Promise<unknown>>();
 
   function installSdk() {
@@ -157,6 +163,7 @@ describe('Watchwood browser signup', () => {
     expect(initialize).toHaveBeenCalledWith({
       org_id: enabledContext.org_id,
       safety_identifier: enabledContext.safety_identifier,
+      use_device_cookie: true,
     });
     expect(getToken).not.toHaveBeenCalled();
     expect(jest.getTimerCount()).toBe(0);
@@ -178,9 +185,27 @@ describe('Watchwood browser signup', () => {
 
     expect(getToken).toHaveBeenCalledTimes(2);
     expect(initialize.mock.calls).toEqual([
-      [{ org_id: enabledContext.org_id, safety_identifier: enabledContext.safety_identifier }],
-      [{ org_id: renewedContext.org_id, safety_identifier: renewedContext.safety_identifier }],
-      [{ org_id: renewedContext.org_id, safety_identifier: renewedContext.safety_identifier }],
+      [
+        {
+          org_id: enabledContext.org_id,
+          safety_identifier: enabledContext.safety_identifier,
+          use_device_cookie: true,
+        },
+      ],
+      [
+        {
+          org_id: renewedContext.org_id,
+          safety_identifier: renewedContext.safety_identifier,
+          use_device_cookie: true,
+        },
+      ],
+      [
+        {
+          org_id: renewedContext.org_id,
+          safety_identifier: renewedContext.safety_identifier,
+          use_device_cookie: true,
+        },
+      ],
     ]);
     const postedBodies = fetchMock.mock.calls
       .filter(([, options]) => options?.method === 'POST')
@@ -304,6 +329,7 @@ describe('Watchwood browser signup', () => {
     expect(initialize).toHaveBeenCalledWith({
       org_id: enabledContext.org_id,
       safety_identifier: enabledContext.safety_identifier,
+      use_device_cookie: true,
     });
   });
 

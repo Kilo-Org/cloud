@@ -109,6 +109,9 @@ test('fingerprint options include iOS platform and only skip the Expo extra sect
     'modules/*/android/**',
     'modules/*/src/**',
     'modules/**/*.test.ts',
+    'modules/kilo-ssh/rust/target/**',
+    'modules/kilo-ssh/ios/Generated/**',
+    'modules/kilo-ssh/ios/Frameworks/**',
   ]);
   // SourceSkips.ExpoConfigExtraSection === 4096
   assert.equal(options.sourceSkips & 4096, 4096);

@@ -45,3 +45,25 @@ apps/web/src/app/api/organizations/\[id\]/guardrails/mcp-connections/route\.test
 # credential-free value; the earlier commit stays in branch history. Exclude the
 # fixture path so the synthetic URI does not fail the scan.
 dev/seed/lib/db\.test\.ts
+
+# SSH test-key fixtures. The kilo-ssh Rust tests parse and authenticate with
+# throwaway private keys made for the OpenSSH test containers only; no server
+# outside those containers trusts them.
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ed25519$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ed25519_encrypted$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ed25519\.pk8\.pem$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ecdsa_p256$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ecdsa_p256\.pk8\.pem$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ecdsa_p256\.sec1\.pem$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ecdsa_p384$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_rsa$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_rsa\.pk8\.encrypted\.pem$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_rsa\.pk8\.pem$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_rsa\.pkcs1\.pem$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/unsupported\.pem$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/age-cli-passphrase\.age$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ed25519\.pub$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ed25519_encrypted\.pub$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ecdsa_p256\.pub$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_ecdsa_p384\.pub$
+^apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/id_rsa\.pub$

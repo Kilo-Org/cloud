@@ -1,0 +1,1031 @@
+//! Sessions: connect, authenticate, run commands, and open shell channels.
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use russh::client::{
+    AuthResult, ChannelOpenHandle, Config, DisconnectReason, Handle,
+    KeyboardInteractiveAuthResponse, Msg, Session,
+};
+use russh::keys::ssh_key;
+use russh::keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, PublicKeyOrCertificate};
+use russh::{Channel, ChannelMsg, ChannelOpenFailure, Disconnect};
+use tokio::sync::Notify;
+use tokio::time::Instant;
+
+use crate::error::SshError;
+use crate::forward::{self, ForwardConfig, ForwardHandle, ForwardSink, RemoteForwards};
+use crate::key::load_private_key;
+use crate::runtime;
+use crate::sftp::SftpClient;
+use crate::shell::{ByteSink, ShellChannel};
+
+/// The keepalives a session may miss before russh gives up on the server.
+const KEEPALIVE_MAX: usize = 3;
+/// Unprocessed packets russh buffers per channel before backpressure.
+const CHANNEL_BUFFER_SIZE: usize = 256;
+const EXEC_OUTPUT_LIMIT: usize = 16 * 1024 * 1024;
+
+#[derive(Debug, uniffi::Record)]
+pub struct ConnectConfig {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub auth: AuthMethod,
+    /// Server-wait budget. Time spent answering host-key and authentication
+    /// prompts is excluded; server time before and between prompts still counts.
+    pub connect_timeout_ms: u32,
+    /// Idle keepalive period; `0` disables keepalives.
+    pub keepalive_interval_s: u32,
+}
+
+#[derive(Debug, uniffi::Enum)]
+pub enum AuthMethod {
+    Password {
+        password: String,
+    },
+    Key {
+        private_key_openssh: String,
+        passphrase: Option<String>,
+    },
+    KeyboardInteractive,
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct Prompt {
+    pub text: String,
+    /// Whether the answer may be displayed as it is typed.
+    pub echo: bool,
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct ExecResult {
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub exit_status: Option<u32>,
+}
+
+/// Decisions the core cannot make on its own: trust in the server and answers
+/// to interactive authentication prompts.
+///
+/// Both methods are awaited inside the connection, so the implementation may
+/// suspend for as long as the user needs.
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait SessionHandler: Send + Sync {
+    /// Called once per key exchange with the server's host key. Returning
+    /// `false` aborts the connection with [`SshError::HostKeyRejected`].
+    async fn verify_host_key(
+        &self,
+        host: String,
+        port: u16,
+        algorithm: String,
+        public_key_base64: String,
+        fingerprint_sha256: String,
+    ) -> bool;
+
+    /// Called with each question the server asks. Returning `None` aborts
+    /// authentication with [`SshError::AuthCancelled`].
+    async fn keyboard_interactive(
+        &self,
+        name: String,
+        instructions: String,
+        prompts: Vec<Prompt>,
+    ) -> Option<Vec<String>>;
+
+    /// Called when the connection ends without the app asking for it.
+    fn on_disconnect(&self, reason: String);
+}
+
+/// The session's channel handle, shared with the forwards it owns.
+///
+/// Every operation the app asks for after connecting takes `&Handle`, so the
+/// handle is shared rather than locked: a slow channel open, forward or SFTP
+/// request cannot block the others or the disconnect that would end it.
+pub(crate) type SessionHandle = Arc<Handle<ClientHandler>>;
+
+#[derive(uniffi::Object)]
+pub struct SshSession {
+    handle: SessionHandle,
+    handshake: Arc<Handshake>,
+    forwards: Arc<RemoteForwards>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct UserWait {
+    started: Option<Instant>,
+    elapsed: Duration,
+}
+
+impl UserWait {
+    fn elapsed_at(&self, now: Instant) -> Duration {
+        self.elapsed
+            + self.started.map_or(Duration::ZERO, |started| {
+                now.saturating_duration_since(started)
+            })
+    }
+}
+
+struct Handshake {
+    host: String,
+    port: u16,
+    timeout_ms: u32,
+    user_wait: Mutex<UserWait>,
+    user_wait_changed: Notify,
+    host_key_rejected: AtomicBool,
+    closed_by_app: AtomicBool,
+}
+
+impl Handshake {
+    fn new(config: &ConnectConfig) -> Self {
+        Self {
+            host: config.host.clone(),
+            port: config.port,
+            timeout_ms: config.connect_timeout_ms.max(1),
+            user_wait: Mutex::new(UserWait::default()),
+            user_wait_changed: Notify::new(),
+            host_key_rejected: AtomicBool::new(false),
+            closed_by_app: AtomicBool::new(false),
+        }
+    }
+
+    async fn ask_user<T>(&self, question: impl Future<Output = T>) -> T {
+        self.user_wait.lock().expect("user wait").started = Some(Instant::now());
+        self.user_wait_changed.notify_one();
+        let answer = question.await;
+        {
+            let mut wait = self.user_wait.lock().expect("user wait");
+            let started = wait.started.take().expect("an open question");
+            wait.elapsed += started.elapsed();
+        }
+        self.user_wait_changed.notify_one();
+        answer
+    }
+}
+
+#[uniffi::export]
+impl SshSession {
+    /// Connects and authenticates, reporting host-key and prompt decisions to
+    /// `handler` while it does.
+    #[uniffi::constructor]
+    pub async fn connect(
+        config: ConnectConfig,
+        handler: Arc<dyn SessionHandler>,
+    ) -> Result<Arc<Self>, SshError> {
+        runtime::run(connect(config, handler)).await
+    }
+
+    /// Connects through `jump`, which must already be authenticated: the stream
+    /// to the target is a `direct-tcpip` channel of the jump session. Chaining
+    /// more than one bastion composes, because each jump is itself a session.
+    #[uniffi::constructor]
+    pub async fn connect_via(
+        jump: Arc<SshSession>,
+        config: ConnectConfig,
+        handler: Arc<dyn SessionHandler>,
+    ) -> Result<Arc<Self>, SshError> {
+        runtime::run(connect_via(jump, config, handler)).await
+    }
+
+    /// Opens a pty-backed shell whose output goes to `sink`.
+    pub async fn open_shell(
+        &self,
+        term: String,
+        cols: u32,
+        rows: u32,
+        sink: Arc<dyn ByteSink>,
+    ) -> Result<Arc<ShellChannel>, SshError> {
+        let mut channel = self.handle.channel_open_session().await?;
+
+        channel
+            .request_pty(true, &term, cols, rows, 0, 0, &[])
+            .await?;
+        channel.request_shell(true).await?;
+        await_success(&mut channel).await?;
+        await_success(&mut channel).await?;
+
+        Ok(Arc::new(ShellChannel::start(channel, sink)))
+    }
+
+    /// Runs one command against a fresh session channel.
+    /// Combined stdout and stderr are limited to 16 MiB; excess output closes
+    /// the channel and returns `OutputLimit` without disconnecting the session.
+    pub async fn exec(&self, command: String) -> Result<ExecResult, SshError> {
+        let mut channel = self.handle.channel_open_session().await?;
+        channel.exec(true, command.into_bytes()).await?;
+
+        let mut result = ExecResult {
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+            exit_status: None,
+        };
+
+        loop {
+            match exec_message(&mut result, channel.wait().await) {
+                Ok(true) => break,
+                Ok(false) => {}
+                Err(error) => {
+                    let _ = channel.close().await;
+                    return Err(error);
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Opens the SFTP subsystem on a new channel of this session.
+    pub async fn open_sftp(&self) -> Result<Arc<SftpClient>, SshError> {
+        let handle = Arc::clone(&self.handle);
+
+        runtime::run(async move {
+            let mut channel = handle.channel_open_session().await?;
+            channel.request_subsystem(true, "sftp").await?;
+            await_success(&mut channel).await?;
+
+            let session = russh_sftp::client::SftpSession::new(channel.into_stream())
+                .await
+                .map_err(SshError::from)?;
+
+            Ok(Arc::new(SftpClient::new(session)))
+        })
+        .await
+    }
+
+    /// Listens on the device and tunnels each connection to
+    /// `dest_host:dest_port` from the server's network.
+    pub async fn start_local_forward(
+        &self,
+        config: ForwardConfig,
+        events: Arc<dyn ForwardSink>,
+    ) -> Result<Arc<ForwardHandle>, SshError> {
+        let session = Arc::clone(&self.handle);
+
+        runtime::run(async move { forward::start_local(session, config, events).await }).await
+    }
+
+    /// Asks the server to listen and tunnels each connection it accepts to
+    /// `dest_host:dest_port` on the device.
+    pub async fn start_remote_forward(
+        &self,
+        config: ForwardConfig,
+        events: Arc<dyn ForwardSink>,
+    ) -> Result<Arc<ForwardHandle>, SshError> {
+        let session = Arc::clone(&self.handle);
+        let forwards = Arc::clone(&self.forwards);
+
+        runtime::run(async move { forward::start_remote(session, forwards, config, events).await })
+            .await
+    }
+
+    /// Ends the connection. Shell channels close and report it through their
+    /// sink; [`SessionHandler::on_disconnect`] is not called.
+    pub async fn disconnect(&self) -> Result<(), SshError> {
+        if self.handshake.closed_by_app.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        self.handle
+            .disconnect(Disconnect::ByApplication, "", "")
+            .await
+            .map_err(SshError::from)
+    }
+}
+
+impl SshSession {
+    async fn open_bastion_channel(
+        &self,
+        host: &str,
+        port: u16,
+        budget: Duration,
+    ) -> Result<Channel<Msg>, SshError> {
+        let connecting = self.handle.channel_open_direct_tcpip(
+            host.to_string(),
+            u32::from(port),
+            "127.0.0.1",
+            0,
+        );
+
+        tokio::time::timeout(budget, connecting)
+            .await
+            .map_err(|_| SshError::Timeout {
+                message: format!("opening a channel to {host}:{port}"),
+            })?
+            .map_err(|error| SshError::Forwarding {
+                message: format!("the bastion refused {host}:{port}: {error}"),
+            })
+    }
+}
+
+/// RFC 4254 extended data type for stderr.
+const STDERR_EXTENDED_DATA: u32 = 1;
+
+async fn connect(
+    config: ConnectConfig,
+    handler: Arc<dyn SessionHandler>,
+) -> Result<Arc<SshSession>, SshError> {
+    let handshake = Arc::new(Handshake::new(&config));
+    let forwards = Arc::new(RemoteForwards::default());
+    let client_handler = ClientHandler::new(
+        &config,
+        Arc::clone(&handler),
+        Arc::clone(&handshake),
+        Arc::clone(&forwards),
+    );
+    let connecting = russh::client::connect(
+        Arc::new(client_config(&config)),
+        (config.host.clone(), config.port),
+        client_handler,
+    );
+
+    let handle = await_handshake(connecting, &handshake).await?;
+
+    finish(config, handler, handshake, forwards, handle).await
+}
+
+async fn connect_via(
+    jump: Arc<SshSession>,
+    config: ConnectConfig,
+    handler: Arc<dyn SessionHandler>,
+) -> Result<Arc<SshSession>, SshError> {
+    let channel = jump
+        .open_bastion_channel(
+            &config.host,
+            config.port,
+            Duration::from_millis(u64::from(config.connect_timeout_ms.max(1))),
+        )
+        .await?;
+    let handshake = Arc::new(Handshake::new(&config));
+    let forwards = Arc::new(RemoteForwards::default());
+    let client_handler = ClientHandler::new(
+        &config,
+        Arc::clone(&handler),
+        Arc::clone(&handshake),
+        Arc::clone(&forwards),
+    );
+    let connecting = russh::client::connect_stream(
+        Arc::new(client_config(&config)),
+        channel.into_stream(),
+        client_handler,
+    );
+
+    let handle = await_handshake(connecting, &handshake).await?;
+
+    finish(config, handler, handshake, forwards, handle).await
+}
+
+async fn finish(
+    config: ConnectConfig,
+    handler: Arc<dyn SessionHandler>,
+    handshake: Arc<Handshake>,
+    forwards: Arc<RemoteForwards>,
+    mut handle: Handle<ClientHandler>,
+) -> Result<Arc<SshSession>, SshError> {
+    let authenticating = authenticate(&mut handle, &config, handler.as_ref(), &handshake);
+    bound_by(
+        authenticating,
+        &handshake,
+        &format!("authenticating to {}:{}", handshake.host, handshake.port),
+    )
+    .await?;
+
+    Ok(Arc::new(SshSession {
+        handle: Arc::new(handle),
+        handshake,
+        forwards,
+    }))
+}
+
+/// Waits for the handshake within the connection budget.
+async fn await_handshake<C>(
+    connecting: C,
+    handshake: &Handshake,
+) -> Result<Handle<ClientHandler>, SshError>
+where
+    C: Future<Output = Result<Handle<ClientHandler>, SshError>>,
+{
+    let reporting_host_key = async {
+        match connecting.await {
+            Ok(handle) => Ok(handle),
+            Err(_) if handshake.host_key_rejected.load(Ordering::SeqCst) => {
+                Err(SshError::HostKeyRejected)
+            }
+            Err(error) => Err(error),
+        }
+    };
+
+    bound_by(
+        reporting_host_key,
+        handshake,
+        &format!("connecting to {}:{}", handshake.host, handshake.port),
+    )
+    .await
+}
+
+async fn bound_by<T, C>(work: C, handshake: &Handshake, description: &str) -> Result<T, SshError>
+where
+    C: Future<Output = Result<T, SshError>>,
+{
+    let timeout = Duration::from_millis(u64::from(handshake.timeout_ms));
+    let mut work = std::pin::pin!(work);
+    let (started, waited_before) = {
+        let wait = handshake.user_wait.lock().expect("user wait");
+        let started = Instant::now();
+        (started, wait.elapsed_at(started))
+    };
+    let deadline = started + timeout;
+
+    loop {
+        let changed = handshake.user_wait_changed.notified();
+        let wait = *handshake.user_wait.lock().expect("user wait");
+        let resumed_deadline = deadline + wait.elapsed.saturating_sub(waited_before);
+
+        tokio::select! {
+            outcome = &mut work => return outcome,
+            () = changed => {}
+            () = tokio::time::sleep_until(resumed_deadline), if wait.started.is_none() => {
+                let wait = handshake.user_wait.lock().expect("user wait");
+                if wait.started.is_none()
+                    && Instant::now() >= deadline + wait.elapsed.saturating_sub(waited_before)
+                {
+                    return Err(SshError::Timeout {
+                        message: description.to_string(),
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn client_config(config: &ConnectConfig) -> Config {
+    Config {
+        nodelay: true,
+        channel_buffer_size: CHANNEL_BUFFER_SIZE,
+        keepalive_interval: (config.keepalive_interval_s > 0)
+            .then(|| Duration::from_secs(u64::from(config.keepalive_interval_s))),
+        keepalive_max: KEEPALIVE_MAX,
+        ..Config::default()
+    }
+}
+
+async fn authenticate(
+    handle: &mut Handle<ClientHandler>,
+    config: &ConnectConfig,
+    handler: &dyn SessionHandler,
+    handshake: &Handshake,
+) -> Result<(), SshError> {
+    match &config.auth {
+        AuthMethod::Password { password } => {
+            let result = handle
+                .authenticate_password(config.username.clone(), password.clone())
+                .await?;
+
+            accepted(result, "the server rejected the password")
+        }
+        AuthMethod::Key {
+            private_key_openssh,
+            passphrase,
+        } => {
+            let key = Arc::new(load_private_key(private_key_openssh, passphrase.as_deref())?.key);
+            // RSA needs the strongest hash the server accepts; every other
+            // algorithm ignores it.
+            let hash_alg = handle.best_supported_rsa_hash().await?.flatten();
+            let result = handle
+                .authenticate_publickey(
+                    config.username.clone(),
+                    PrivateKeyWithHashAlg::new(key, hash_alg),
+                )
+                .await?;
+
+            accepted(result, "the server rejected the key")
+        }
+        AuthMethod::KeyboardInteractive => {
+            let mut response = handle
+                .authenticate_keyboard_interactive_start(config.username.clone(), None)
+                .await?;
+
+            loop {
+                match response {
+                    KeyboardInteractiveAuthResponse::Success => return Ok(()),
+                    KeyboardInteractiveAuthResponse::Failure { .. } => {
+                        return Err(SshError::AuthFailed {
+                            message: "the server rejected the answers".to_string(),
+                        });
+                    }
+                    KeyboardInteractiveAuthResponse::InfoRequest {
+                        name,
+                        instructions,
+                        prompts,
+                    } => {
+                        let asked = prompts
+                            .iter()
+                            .map(|prompt| Prompt {
+                                text: prompt.prompt.clone(),
+                                echo: prompt.echo,
+                            })
+                            .collect::<Vec<_>>();
+                        let expected = asked.len();
+
+                        let answers = handshake
+                            .ask_user(handler.keyboard_interactive(name, instructions, asked))
+                            .await
+                            .ok_or(SshError::AuthCancelled)?;
+                        if answers.len() != expected {
+                            return Err(SshError::Protocol {
+                                message: format!(
+                                    "answered {expected} prompts with {} answers",
+                                    answers.len()
+                                ),
+                            });
+                        }
+
+                        response = handle
+                            .authenticate_keyboard_interactive_respond(answers)
+                            .await?;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn accepted(result: AuthResult, rejected: &str) -> Result<(), SshError> {
+    match result {
+        AuthResult::Success => Ok(()),
+        AuthResult::Failure {
+            remaining_methods, ..
+        } => Err(SshError::AuthFailed {
+            message: format!("{rejected}; the server still accepts {remaining_methods:?}"),
+        }),
+    }
+}
+
+/// Waits for the server's answer to a channel request.
+async fn await_success(channel: &mut Channel<russh::client::Msg>) -> Result<(), SshError> {
+    loop {
+        match channel.wait().await {
+            Some(ChannelMsg::Success) => return Ok(()),
+            Some(ChannelMsg::Failure) => {
+                return Err(SshError::Protocol {
+                    message: "the server refused the channel request".to_string(),
+                });
+            }
+            Some(ChannelMsg::Close) | None => {
+                return Err(SshError::ChannelClosed {
+                    message: "the channel closed before the request was answered".to_string(),
+                });
+            }
+            Some(_) => {}
+        }
+    }
+}
+
+/// Folds one channel message from an exec request into `result`, returning
+/// whether the channel finished.
+fn exec_message(result: &mut ExecResult, message: Option<ChannelMsg>) -> Result<bool, SshError> {
+    match message {
+        Some(ChannelMsg::Data { data }) => append_exec_output(result, &data, false)?,
+        Some(ChannelMsg::ExtendedData { data, ext }) => {
+            append_exec_output(result, &data, ext == STDERR_EXTENDED_DATA)?;
+        }
+        Some(ChannelMsg::ExitStatus { exit_status }) => result.exit_status = Some(exit_status),
+        Some(ChannelMsg::Failure) => {
+            return Err(SshError::Protocol {
+                message: "the server refused the exec request".to_string(),
+            });
+        }
+        Some(ChannelMsg::Close) | None => return Ok(true),
+        Some(_) => {}
+    }
+
+    Ok(false)
+}
+
+fn append_exec_output(result: &mut ExecResult, data: &[u8], stderr: bool) -> Result<(), SshError> {
+    if data.len() > EXEC_OUTPUT_LIMIT - result.stdout.len() - result.stderr.len() {
+        return Err(SshError::OutputLimit {
+            message: format!("combined exec output exceeds {EXEC_OUTPUT_LIMIT} bytes"),
+        });
+    }
+    if stderr {
+        result.stderr.extend_from_slice(data);
+    } else {
+        result.stdout.extend_from_slice(data);
+    }
+    Ok(())
+}
+
+pub(crate) struct ClientHandler {
+    host: String,
+    port: u16,
+    app: Arc<dyn SessionHandler>,
+    handshake: Arc<Handshake>,
+    forwards: Arc<RemoteForwards>,
+}
+
+impl ClientHandler {
+    fn new(
+        config: &ConnectConfig,
+        app: Arc<dyn SessionHandler>,
+        handshake: Arc<Handshake>,
+        forwards: Arc<RemoteForwards>,
+    ) -> Self {
+        Self {
+            host: config.host.clone(),
+            port: config.port,
+            app,
+            handshake,
+            forwards,
+        }
+    }
+}
+
+impl russh::client::Handler for ClientHandler {
+    type Error = SshError;
+
+    async fn check_server_key(
+        &mut self,
+        server_key: &PublicKeyOrCertificate,
+    ) -> Result<bool, Self::Error> {
+        let (algorithm, public_key_base64, fingerprint) = match server_key {
+            PublicKeyOrCertificate::PublicKey { key, .. } => (
+                key.algorithm().to_string(),
+                key.public_key_base64(),
+                key.fingerprint(HashAlg::Sha256).to_string(),
+            ),
+            PublicKeyOrCertificate::Certificate(certificate) => {
+                let key = ssh_key::PublicKey::from(certificate.public_key().clone());
+                (
+                    key.algorithm().to_string(),
+                    key.public_key_base64(),
+                    key.fingerprint(HashAlg::Sha256).to_string(),
+                )
+            }
+        };
+
+        let accepted = self
+            .handshake
+            .ask_user(self.app.verify_host_key(
+                self.host.clone(),
+                self.port,
+                algorithm,
+                public_key_base64,
+                fingerprint,
+            ))
+            .await;
+
+        if !accepted {
+            self.handshake
+                .host_key_rejected
+                .store(true, Ordering::SeqCst);
+        }
+
+        Ok(accepted)
+    }
+
+    /// Routes a connection the server accepted on a remote forward to the
+    /// destination the app asked for, or declines it when no forward owns the
+    /// port.
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        channel: Channel<Msg>,
+        connected_address: &str,
+        connected_port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        let Some(destination) = self.forwards.destination(connected_address, connected_port) else {
+            reply.reject(ChannelOpenFailure::ConnectFailed).await;
+            return Ok(());
+        };
+
+        reply.accept().await;
+        runtime::spawn(forward::pump_forwarded(channel, destination));
+
+        Ok(())
+    }
+
+    async fn disconnected(
+        &mut self,
+        reason: DisconnectReason<Self::Error>,
+    ) -> Result<(), Self::Error> {
+        if !self.handshake.closed_by_app.load(Ordering::SeqCst) {
+            let text = match reason {
+                DisconnectReason::ReceivedDisconnect(info) => {
+                    format!("{:?}: {}", info.reason_code, info.message)
+                }
+                DisconnectReason::Error(error) => error.to_string(),
+            };
+            self.app.on_disconnect(text);
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(keepalive_interval_s: u32, connect_timeout_ms: u32) -> ConnectConfig {
+        ConnectConfig {
+            host: "example.test".to_string(),
+            port: 2222,
+            username: "test".to_string(),
+            auth: AuthMethod::Password {
+                password: "secret".to_string(),
+            },
+            connect_timeout_ms,
+            keepalive_interval_s,
+        }
+    }
+
+    #[test]
+    fn keepalive_interval_zero_disables_keepalives() {
+        assert_eq!(client_config(&config(0, 1_000)).keepalive_interval, None);
+        assert_eq!(
+            client_config(&config(30, 1_000)).keepalive_interval,
+            Some(Duration::from_secs(30))
+        );
+    }
+
+    #[test]
+    fn interactive_sessions_use_nodelay_and_no_inactivity_timeout() {
+        let client = client_config(&config(30, 1_000));
+
+        assert!(client.nodelay);
+        assert!(client.inactivity_timeout.is_none());
+        assert_eq!(client.keepalive_max, KEEPALIVE_MAX);
+    }
+
+    fn empty_result() -> ExecResult {
+        ExecResult {
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+            exit_status: None,
+        }
+    }
+
+    #[test]
+    fn exec_caps_combined_output_without_appending_the_overflow() {
+        for ext in [STDERR_EXTENDED_DATA, 2] {
+            let mut result = empty_result();
+            result.stdout.resize(EXEC_OUTPUT_LIMIT - 1, 0);
+            assert!(
+                !exec_message(
+                    &mut result,
+                    Some(ChannelMsg::ExtendedData {
+                        data: vec![0].into(),
+                        ext,
+                    })
+                )
+                .unwrap()
+            );
+            let error = exec_message(
+                &mut result,
+                Some(ChannelMsg::Data {
+                    data: vec![0].into(),
+                }),
+            )
+            .unwrap_err();
+            assert_eq!(error.category(), "OutputLimit");
+            assert_eq!(result.stdout.len() + result.stderr.len(), EXEC_OUTPUT_LIMIT);
+        }
+    }
+
+    #[test]
+    fn exec_folds_output_and_exit_status() {
+        let mut result = empty_result();
+
+        assert!(
+            !exec_message(
+                &mut result,
+                Some(ChannelMsg::Data {
+                    data: b"out".as_slice().into(),
+                })
+            )
+            .expect("stdout")
+        );
+        assert!(
+            !exec_message(
+                &mut result,
+                Some(ChannelMsg::ExtendedData {
+                    data: b"err".as_slice().into(),
+                    ext: STDERR_EXTENDED_DATA,
+                })
+            )
+            .expect("stderr")
+        );
+        assert!(
+            !exec_message(
+                &mut result,
+                Some(ChannelMsg::ExtendedData {
+                    data: b"note".as_slice().into(),
+                    ext: 2,
+                })
+            )
+            .expect("other extended data")
+        );
+        assert!(
+            !exec_message(&mut result, Some(ChannelMsg::ExitStatus { exit_status: 7 }))
+                .expect("exit status")
+        );
+        assert!(!exec_message(&mut result, Some(ChannelMsg::Eof)).expect("eof"));
+        assert!(exec_message(&mut result, Some(ChannelMsg::Close)).expect("close"));
+        assert!(exec_message(&mut result, None).expect("stream end"));
+
+        assert_eq!(result.stdout, b"outnote");
+        assert_eq!(result.stderr, b"err");
+        assert_eq!(result.exit_status, Some(7));
+    }
+
+    #[test]
+    fn exec_reports_a_refused_request() {
+        let mut result = empty_result();
+
+        let error = exec_message(&mut result, Some(ChannelMsg::Failure))
+            .expect_err("a refused exec request must fail");
+
+        assert!(
+            matches!(error, SshError::Protocol { .. }),
+            "unexpected error: {error:?}"
+        );
+    }
+
+    #[test]
+    fn the_session_handle_is_shared_between_tasks() {
+        fn assert_shared<T: Send + Sync + Clone>() {}
+
+        assert_shared::<SessionHandle>();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_expires() {
+        let handshake = Handshake::new(&config(0, 1_000));
+
+        let error = bound_by(
+            std::future::pending::<Result<(), SshError>>(),
+            &handshake,
+            "connecting",
+        )
+        .await
+        .expect_err("a step the server never answers must time out");
+
+        assert!(
+            matches!(error, SshError::Timeout { .. }),
+            "unexpected error: {error:?}"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_pauses_while_the_user_answers() {
+        let handshake = Handshake::new(&config(0, 1_000));
+        let started = Instant::now();
+
+        let answer = bound_by(
+            async {
+                handshake
+                    .ask_user(tokio::time::sleep(Duration::from_secs(30)))
+                    .await;
+                Ok(())
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await;
+
+        assert!(answer.is_ok(), "a question may stay open past the budget");
+        assert!(
+            started.elapsed() >= Duration::from_secs(30),
+            "the budget expired while the user was answering"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_preserves_time_after_a_prompt() {
+        let handshake = Handshake::new(&config(0, 1_000));
+
+        let answer = bound_by(
+            async {
+                handshake
+                    .ask_user(tokio::time::sleep(Duration::from_millis(1_500)))
+                    .await;
+                tokio::time::sleep(Duration::from_millis(750)).await;
+                Ok(())
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await;
+
+        assert!(answer.is_ok(), "only 750 ms of the budget was used");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_excludes_prompts_shorter_than_the_budget() {
+        let handshake = Handshake::new(&config(0, 1_000));
+
+        let answer = bound_by(
+            async {
+                for _ in 0..2 {
+                    handshake
+                        .ask_user(tokio::time::sleep(Duration::from_millis(200)))
+                        .await;
+                    tokio::time::sleep(Duration::from_millis(350)).await;
+                }
+                Ok(())
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await;
+
+        assert!(answer.is_ok(), "only 700 ms of the budget was used");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_bounds_server_time_across_prompts() {
+        let handshake = Handshake::new(&config(0, 1_000));
+        let started = Instant::now();
+
+        let error = bound_by(
+            async {
+                tokio::time::sleep(Duration::from_millis(750)).await;
+                handshake
+                    .ask_user(tokio::time::sleep(Duration::from_millis(1_500)))
+                    .await;
+                std::future::pending::<Result<(), SshError>>().await
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await
+        .expect_err("server time still consumes the budget");
+
+        assert!(matches!(error, SshError::Timeout { .. }));
+        assert!(
+            (Duration::from_millis(2_500)..Duration::from_millis(2_510))
+                .contains(&started.elapsed()),
+            "the timeout must exclude exactly the user wait: {:?}",
+            started.elapsed()
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_observes_prompts_on_another_task() {
+        let handshake = Arc::new(Handshake::new(&config(0, 1_000)));
+        let prompt_handshake = Arc::clone(&handshake);
+        let prompt = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            prompt_handshake
+                .ask_user(tokio::time::sleep(Duration::from_millis(1_500)))
+                .await;
+        });
+        let started = Instant::now();
+
+        let error = bound_by(
+            std::future::pending::<Result<(), SshError>>(),
+            &handshake,
+            "connecting",
+        )
+        .await
+        .expect_err("host-key verification cannot unbound server time");
+        prompt.await.expect("prompt task");
+
+        assert!(matches!(error, SshError::Timeout { .. }));
+        assert!(
+            (Duration::from_millis(2_500)..Duration::from_millis(2_510))
+                .contains(&started.elapsed()),
+            "the timeout must exclude exactly the user wait: {:?}",
+            started.elapsed()
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_bounds_time_before_the_first_prompt() {
+        let handshake = Handshake::new(&config(0, 1_000));
+        let asked = AtomicBool::new(false);
+
+        let error = bound_by(
+            async {
+                tokio::time::sleep(Duration::from_millis(1_100)).await;
+                handshake
+                    .ask_user(async {
+                        asked.store(true, Ordering::SeqCst);
+                    })
+                    .await;
+                Ok(())
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await
+        .expect_err("waiting for the first prompt consumes the budget");
+
+        assert!(matches!(error, SshError::Timeout { .. }));
+        assert!(!asked.load(Ordering::SeqCst));
+    }
+}

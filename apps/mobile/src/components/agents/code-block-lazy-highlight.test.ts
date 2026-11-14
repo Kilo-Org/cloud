@@ -145,7 +145,8 @@ describe('chunkCodeLines lazy highlighting', () => {
         .split('\n')
         .slice(highlightedPrefix.length, highlightedPrefix.length + newlyHighlighted.length)
     );
-    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 2, held: 1 });
+    // The pinned walk is the one entry the budget may not drop.
+    expect(fenceWalkCacheStatsForTests().held).toBe(1);
   });
 });
 

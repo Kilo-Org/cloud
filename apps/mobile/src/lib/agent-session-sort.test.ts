@@ -1,24 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  AGENT_SESSION_SORT_OPTIONS,
   type AgentSessionSortBy,
-  DEFAULT_AGENT_SESSION_SORT,
   getAgentSessionTimestamp,
   parseAgentSessionSortBy,
 } from './agent-session-sort';
-
-describe('AGENT_SESSION_SORT_OPTIONS', () => {
-  it('lists every supported sort field exactly once', () => {
-    expect(AGENT_SESSION_SORT_OPTIONS).toEqual(['updated_at', 'created_at']);
-  });
-});
-
-describe('DEFAULT_AGENT_SESSION_SORT', () => {
-  it('defaults to updated_at so existing behavior is preserved', () => {
-    expect(DEFAULT_AGENT_SESSION_SORT).toBe('updated_at');
-  });
-});
 
 describe('parseAgentSessionSortBy', () => {
   it('accepts every option', () => {

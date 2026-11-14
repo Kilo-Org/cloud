@@ -1391,6 +1391,41 @@ export type AuthorizedSessionMessages = {
 };
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
+/**
+ * tRPC wire input for `cliSessionsV2.getSessionMessagesPage`, the paginated
+ * access-checked history call the mobile client and the web app both make
+ * against the web router (which forwards the page read to this contract's
+ * worker RPC). Sharing the schema keeps tRPC-level validation identical to
+ * the worker's own bounded reader.
+ *
+ * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and defaults
+ * to `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE` when omitted, so the request is
+ * always bounded before it reaches the session store. `cursor` is the opaque
+ * continuation cursor validated by `validateKiloSdkMessagesCursor`; a caller
+ * receives one from a previous page and passes it back to walk older history.
+ */
+export const getSessionMessagesPageInputSchema = z
+  .object({
+    session_id: z.string().min(1),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
+    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+  })
+  .superRefine((params, ctx) => {
+    if (params.cursor === undefined) return;
+    if (!validateKiloSdkMessagesCursor(params.cursor)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cursor'],
+        message: 'cursor is not a valid message cursor',
+      });
+    }
+  });
+
 export type SessionIngestRpcMethods = {
   publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;
   recordCloudAgentSessionHarness: (

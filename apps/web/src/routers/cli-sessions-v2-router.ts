@@ -52,16 +52,13 @@ import {
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
-  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
   WORKSPACE_REQUIRES_ROOT_SESSION,
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
   projectKnownCloudAgentPath,
-  validateKiloSdkMessagesCursor,
+  getSessionMessagesPageInputSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
@@ -589,35 +586,6 @@ function worktreeMembershipCondition(userId: string, organizationId: string | nu
 
 const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
-
-/**
- * Input for the paginated `getSessionMessagesPage` endpoint. Mirrors the
- * worker-bound contract in `@kilocode/session-ingest-contracts` so tRPC-level
- * input validation matches the worker's access-checked RPC and HTTP route.
- * The `limit` default is applied here so the procedure body always sees a
- * positive page size and the client receives a bounded request.
- */
-const GetSessionMessagesPageInputSchema = z
-  .object({
-    session_id: sessionIdField,
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
-  })
-  .superRefine((params, ctx) => {
-    if (params.cursor === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid message cursor',
-      });
-    }
-  });
 
 /**
  * Verify the user owns the session and still has access to its organization.
@@ -2140,7 +2108,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * retryable from non-retryable failures without inferring retry semantics.
    */
   getSessionMessagesPage: baseProcedure
-    .input(GetSessionMessagesPageInputSchema)
+    .input(getSessionMessagesPageInputSchema)
     .query(async ({ ctx, input }) => {
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 

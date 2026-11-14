@@ -6,7 +6,7 @@ import * as z from 'zod';
  * the value here MUST stay in sync with the zod enum in the web router
  * (`ListSessionsInputSchema.orderBy` / `SearchInputSchema.orderBy`).
  */
-export const AGENT_SESSION_SORT_OPTIONS = ['updated_at', 'created_at'] as const;
+const AGENT_SESSION_SORT_OPTIONS = ['updated_at', 'created_at'] as const;
 
 export type AgentSessionSortBy = (typeof AGENT_SESSION_SORT_OPTIONS)[number];
 

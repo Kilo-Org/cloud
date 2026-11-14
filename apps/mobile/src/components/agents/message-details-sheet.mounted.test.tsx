@@ -45,9 +45,9 @@ vi.mock('@tanstack/react-query', () => ({
     mutate: (input: unknown) => {
       options.onSuccess({ receiptId: 'receipt-1' }, input);
     },
-    mutateAsync: async (input: unknown) => {
+    mutateAsync: (input: unknown) => {
       options.onSuccess({ receiptId: 'receipt-1' }, input);
-      return { receiptId: 'receipt-1' };
+      return Promise.resolve({ receiptId: 'receipt-1' });
     },
   }),
 }));

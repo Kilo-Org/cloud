@@ -13,11 +13,15 @@ function declaredTelemetry(error: Error): unknown {
 }
 
 describe('SessionHistoryFailureError', () => {
-  it.each([
+  // Literal rows, so a changed or swapped message or code fails below. The
+  // guard case underneath keeps the table exhaustive as kinds are added.
+  const FAILURE_ROWS = [
     ['retryable_failure', 'Session history temporarily unavailable', 'INTERNAL_SERVER_ERROR'],
     ['too_large', 'Session history too large to load', 'UNPROCESSABLE_CONTENT'],
     ['invalid_data', 'Session history is unavailable', 'UNPROCESSABLE_CONTENT'],
-  ] as const)(
+  ] as const;
+
+  it.each(FAILURE_ROWS)(
     'keeps the %s failure name, message and code the preview reads',
     (kind, message, code) => {
       const error = new SessionHistoryFailureError(SESSION_HISTORY_FAILURES[kind]);
@@ -27,6 +31,14 @@ describe('SessionHistoryFailureError', () => {
       expect(error.code).toBe(code);
     }
   );
+
+  it('lists a row for every declared failure kind', () => {
+    // `SessionHistoryFailureKind` derives from the object, so a new kind cannot
+    // fail to type-check the table above; this case fails instead.
+    expect(Object.keys(SESSION_HISTORY_FAILURES).sort()).toEqual(
+      FAILURE_ROWS.map(([kind]) => kind).sort()
+    );
+  });
 
   it('files the expected transient outage as one warning with its own kind', () => {
     const error = new SessionHistoryFailureError(SESSION_HISTORY_FAILURES.retryable_failure);

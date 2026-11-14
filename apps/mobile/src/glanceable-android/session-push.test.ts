@@ -122,13 +122,38 @@ describe('approveFollowedSession', () => {
       expect.objectContaining({
         target: {
           kiloSessionId: 'session-1',
-          statusUpdatedAt: '2026-10-12T09:55:00.000Z',
           organizationId: 'org-1',
           approvalKey: 'c'.repeat(64),
         },
       })
     );
     expect(lastCard()).toMatchObject({ approveLabel: null, approvalKey: null });
+  });
+
+  it('never forwards the card fallback clock as the server raise time', async () => {
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
+    /* A row from an old payload has no `statusUpdatedAt`, so the card's
+       `statusSince` is the device clock at follow time. Forwarding it as a
+       server raise would name a raise the server never sent; the ack must stay
+       status-only instead. */
+    followSession(
+      { id: 'session-1', title: 'Migrate the billing webhooks', status: 'permission' },
+      CTX,
+      NOW
+    );
+    expect(lastCard()).toMatchObject({ sessionId: 'session-1', approvalKey: null });
+
+    await expect(approveFollowedSession('session-1', 'e'.repeat(64))).resolves.toBe(true);
+
+    expect(mocks.runGlanceableApprove).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: {
+          kiloSessionId: 'session-1',
+          organizationId: 'org-1',
+          approvalKey: 'e'.repeat(64),
+        },
+      })
+    );
   });
 
   it('leaves the card asking when the request is retryable', async () => {

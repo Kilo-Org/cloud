@@ -411,7 +411,6 @@ describe('handleGlanceableInteraction on a session card', () => {
         target: {
           kiloSessionId: 'session-3',
           organizationId: 'org-1',
-          statusUpdatedAt: null,
           approvalKey: KEY,
         },
       })

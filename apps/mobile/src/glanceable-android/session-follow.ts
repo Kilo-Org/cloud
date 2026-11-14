@@ -381,12 +381,7 @@ export async function approveFollowedSession(
     return false;
   }
   const result = await runGlanceableApprove({
-    target: {
-      kiloSessionId: sessionId,
-      organizationId: stored.ctx.organizationId,
-      approvalKey,
-      statusUpdatedAt: stored.content?.statusSince ?? null,
-    },
+    target: { kiloSessionId: sessionId, organizationId: stored.ctx.organizationId, approvalKey },
     now: () => Date.now(),
   });
   if (result.kind === 'approved' || result.kind === 'gone') {

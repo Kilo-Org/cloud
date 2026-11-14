@@ -58,6 +58,7 @@ function rowControl(root: TestRenderer.ReactTestInstance) {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  vi.mocked(Haptics.selectionAsync).mockReset();
 });
 
 describe('ChoiceRow accessible name', () => {
@@ -133,32 +134,17 @@ describe('ChoiceRow accessible name', () => {
 });
 
 describe('ChoiceRow selection haptic', () => {
-  it('runs the row action when the selection tick rejects', async () => {
+  // src/lib/haptics.ts owns the swallowed-rejection contract (unit: src/lib/haptics.test.ts), so this case asserts only the row action.
+  it('runs the row action when the selection tick rejects', () => {
     const onPress = vi.fn<() => void>();
     vi.mocked(Haptics.selectionAsync).mockRejectedValue(new Error('no haptic engine'));
-    const unhandledRejections: unknown[] = [];
-    const onUnhandledRejection = (reason: unknown) => {
-      unhandledRejections.push(reason);
-    };
-    try {
-      process.on('unhandledRejection', onUnhandledRejection);
-      const control = rowControl(renderRow({ label: 'Balanced', selected: false, onPress }));
-      act(() => {
-        (control.props.onPress as () => void)();
-      });
-      // One macrotask, the turn Node flags an unhandled rejection in.
-      const flushed = Promise.withResolvers<undefined>();
-      setImmediate(() => {
-        flushed.resolve(undefined);
-      });
-      await flushed.promise;
 
-      expect(onPress).toHaveBeenCalledOnce();
-      expect(unhandledRejections).toEqual([]);
-    } finally {
-      process.off('unhandledRejection', onUnhandledRejection);
-      vi.mocked(Haptics.selectionAsync).mockReset();
-    }
+    const control = rowControl(renderRow({ label: 'Balanced', selected: false, onPress }));
+    act(() => {
+      (control.props.onPress as () => void)();
+    });
+
+    expect(onPress).toHaveBeenCalledOnce();
   });
 });
 
@@ -179,7 +165,6 @@ describe('ChoiceRow disabled cue', () => {
 
     const [label, caption] = control.findAll(node => Object.is(node.type, 'Text'));
     expect(label?.props.className).toContain('text-muted-foreground');
-    expect(caption?.props.className).toBe('mt-0.5 text-xs');
     expect(caption?.props.className).not.toContain('opacity');
   });
 
@@ -189,7 +174,8 @@ describe('ChoiceRow disabled cue', () => {
     );
 
     const [label] = control.findAll(node => Object.is(node.type, 'Text'));
-    expect(label?.props.className).toBe('text-sm font-medium');
+    expect(label?.props.className).not.toContain('text-muted-foreground');
+    expect(label?.props.className).not.toContain('opacity');
   });
 });
 

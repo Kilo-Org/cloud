@@ -31,7 +31,7 @@ import {
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
-import { firstNonEmpty } from '@/lib/utils';
+import { cn, firstNonEmpty } from '@/lib/utils';
 
 type MemberLimitFormProps = Readonly<{
   memberId: string;
@@ -119,19 +119,35 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         className="text-sm"
       />
 
-      <Button disabled={!canSave} loading={mutations.updateMember.isPending} onPress={onSave}>
-        <Text className="text-primary-foreground">{t('common.save')}</Text>
+      {/* This footer has one filled action, so the fill keeps the scheme's
+          brand olive in both themes: the dark theme's accent fill glares at
+          this width and drops the hue the light sheet shows, which is why the
+          session screens fill their large action with the muted selection
+          olive too. An invalid amount keeps the button's own muted disabled
+          fill, so the label still reads as unavailable. */}
+      <Button
+        className={canSave ? 'bg-primary dark:bg-selection' : undefined}
+        disabled={!canSave}
+        loading={mutations.updateMember.isPending}
+        onPress={onSave}
+      >
+        <Text
+          className={cn('text-primary-foreground', canSave && 'dark:text-selection-foreground')}
+        >
+          {t('common.save')}
+        </Text>
       </Button>
 
       {currentLimit != null && (
+        // Removing the limit sits beside the forward action, so it keeps the
+        // destructive ink and paints no fill of its own: Save stays the only
+        // filled control in the sheet.
         <Button
-          variant="destructive"
+          variant="outline-destructive"
           disabled={mutations.updateMember.isPending}
           onPress={onRemove}
         >
-          <Text className="text-destructive-foreground">
-            {t('organization.memberLimit.removeLimit')}
-          </Text>
+          {t('organization.memberLimit.removeLimit')}
         </Button>
       )}
     </>

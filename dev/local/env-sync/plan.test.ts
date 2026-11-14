@@ -834,32 +834,33 @@ test('points the local auto routing worker at the local gateway and seeds its se
   }
 });
 
-test('generates a blank BYOC credential secret and seeds the cloud-agent-next Secrets Store binding from it', () => {
+test('seeds the cloud-agent-next BYOC Secrets Store binding from the local env file', () => {
   const readRepoFile = (relPath: string) =>
     fs.readFileSync(new URL(`../../../${relPath}`, import.meta.url), 'utf-8');
   const repo = createRepo({
     '.env.local': 'INTERNAL_API_SECRET=local-internal-secret\nBYOC_INTERNAL_API_SECRET=\n',
     [`${workerDir}/package.json`]: readRepoFile(`${workerDir}/package.json`),
     [`${workerDir}/wrangler.jsonc`]: readRepoFile(`${workerDir}/wrangler.jsonc`),
-    [`${workerDir}/.dev.vars.example`]:
-      '# @from BYOC_INTERNAL_API_SECRET\nBYOC_SERVICE_CREDENTIAL=""\n',
+    [`${workerDir}/.dev.vars.example`]: 'R2_ATTACHMENTS_BUCKET=""\n',
   });
   try {
     withFakePnpm('', () => {
-      // A blank generated local secret is scheduled for creation instead of being left empty.
-      const freshPlan = computePlan(repo.root, new Set(['cloud-agent-next']));
-      assert.deepEqual(freshPlan.envLocalAutoCreates, [
-        { key: 'BYOC_INTERNAL_API_SECRET', command: 'openssl', args: ['rand', '-base64', '32'] },
-      ]);
+      // An empty value cannot seed the store, so the binding stays a reported gap.
+      const emptyPlan = computePlan(repo.root, new Set(['cloud-agent-next']));
+      assert.equal(
+        emptyPlan.secretStoreAutoCreates.some(
+          create => create.binding.secret_name === 'BYOC_INTERNAL_API_SECRET_PROD'
+        ),
+        false
+      );
 
-      // Once that value lands in .env.local, dev:env seeds the worker's Secrets Store from it.
+      // The generated value reaches the store entry through the base-key fallback.
       writeFile(
         repo.root,
         '.env.local',
         'INTERNAL_API_SECRET=local-internal-secret\nBYOC_INTERNAL_API_SECRET=synthetic-byoc-key\n'
       );
       const seededPlan = computePlan(repo.root, new Set(['cloud-agent-next']));
-      assert.deepEqual(seededPlan.envLocalAutoCreates, []);
       const seeded = seededPlan.secretStoreAutoCreates.find(
         create =>
           create.workerDir === workerDir &&
@@ -868,6 +869,7 @@ test('generates a blank BYOC credential secret and seeds the cloud-agent-next Se
       assert.ok(seeded);
       assert.equal(seeded.sourceKey, 'BYOC_INTERNAL_API_SECRET');
       assert.equal(seeded.value, 'synthetic-byoc-key');
+      assert.equal(seeded.binding.binding, 'BYOC_INTERNAL_API_SECRET_PROD');
     });
   } finally {
     repo.cleanup();

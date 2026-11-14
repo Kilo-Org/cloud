@@ -193,6 +193,7 @@ vi.mock('@/lib/pr-review/merge/pr-operation-ledger', () => ({
 // cannot resolve; the gate's decision is flipped per test instead.
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => connectivity.value,
+  connectionRefusesWrites: () => connectivity.value === 'offline',
 }));
 
 vi.mock('@/lib/pr-review/discussion/use-review-discussion-mutations', () => ({

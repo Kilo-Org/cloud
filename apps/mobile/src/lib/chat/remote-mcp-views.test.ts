@@ -50,6 +50,7 @@ vi.mock('./remote-mcp-store', () => ({
 vi.mock('@/lib/auth/auth-epoch', () => ({ currentAuthEpoch: () => 0 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => 'online',
+  connectionRefusesWrites: () => false,
 }));
 vi.mock('./remote-mcp-oauth-provider', () => ({ remoteMcpOAuthProvider: () => ({}) }));
 

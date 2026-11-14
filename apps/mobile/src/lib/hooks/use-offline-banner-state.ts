@@ -9,6 +9,7 @@ import {
   createOfflineBannerStore,
   type OfflineBannerStore,
   type OfflineBannerTimer,
+  phaseBlocksWrites,
 } from '@/lib/offline-banner-state';
 
 const netInfoSource: ConnectivitySource = {
@@ -73,4 +74,12 @@ export function useCommittedConnectivityStatus(): BannerState {
  */
 export function getCommittedConnectivityStatus(): BannerState {
   return getStore().state();
+}
+
+/**
+ * True while a write cannot complete. Gates refuse with their inline retryable
+ * failure instead of dispatching into a transport that just went away.
+ */
+export function connectionRefusesWrites(): boolean {
+  return phaseBlocksWrites(getStore().phase());
 }

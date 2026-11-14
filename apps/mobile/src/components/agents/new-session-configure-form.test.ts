@@ -1098,7 +1098,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-it('holds the rows below the repository section until its final height is known', async () => {
+  it('holds the rows below the repository section until its final height is known', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention

@@ -26,6 +26,15 @@ const CreditAdmissionResponseSchema = z.object({
 });
 
 /**
+ * Bound on the credit admission read. The launch holds the analysis claim while
+ * it runs, so a peer that accepts the request and never answers must not hold
+ * that claim: the request carries its own deadline, and an aborted read reports
+ * the same unreadable outcome as any other unanswered read, which keeps it
+ * retryable.
+ */
+export const ADMISSION_READ_TIMEOUT_MS = 10_000;
+
+/**
  * Reads the Cloud Agent peer's analysis credit decision before this service
  * runs a triage model call and prepares a Cloud Agent session. The peer's
  * existing balance rule decides; nothing is re-derived here and the
@@ -53,11 +62,15 @@ const CreditAdmissionResponseSchema = z.object({
  * Repeating the same request inside the same attempt cannot change that
  * credential, and the outcome is recorded with its own failure code instead of
  * spending the finding's remaining attempts.
+ *
+ * `timeoutMs` exists for tests, which need a short bound to observe the
+ * deadline; callers use the default.
  */
 export async function readAnalysisCreditAdmission(params: {
   env: CloudflareEnv;
   authToken: string;
   organizationId?: string;
+  timeoutMs?: number;
 }): Promise<AnalysisCreditAdmission> {
   const input = JSON.stringify(
     params.organizationId ? { organizationId: params.organizationId } : {}
@@ -70,6 +83,7 @@ export async function readAnalysisCreditAdmission(params: {
         {
           method: 'GET',
           headers: { Authorization: `Bearer ${params.authToken}` },
+          signal: AbortSignal.timeout(params.timeoutMs ?? ADMISSION_READ_TIMEOUT_MS),
         }
       )
     );

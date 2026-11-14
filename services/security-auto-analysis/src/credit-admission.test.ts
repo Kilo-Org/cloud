@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { readAnalysisCreditAdmission, type AnalysisCreditAdmission } from './credit-admission.js';
+import {
+  ADMISSION_READ_TIMEOUT_MS,
+  readAnalysisCreditAdmission,
+  type AnalysisCreditAdmission,
+} from './credit-admission.js';
 
 const AUTH_TOKEN = 'control-token';
 const ORGANIZATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -36,6 +40,27 @@ function unavailableMessage(result: AnalysisCreditAdmission): string {
     throw new Error(`Expected an unavailable decision, received ${result.outcome}`);
   }
   return result.message;
+}
+
+// A peer that accepts the request and never answers: the promise only settles
+// when the request's own deadline aborts the signal. The request is retained
+// here because its abort listener lives with the request's signal, so a request
+// reachable only from a promise that never settles may be collected before the
+// deadline fires.
+const IN_FLIGHT_REQUESTS: Request[] = [];
+
+function answerOnlyOnAbort(request: Request, onAbort?: () => void): Promise<Response> {
+  IN_FLIGHT_REQUESTS.push(request);
+  const { promise, reject } = Promise.withResolvers<Response>();
+  request.signal.addEventListener(
+    'abort',
+    () => {
+      onAbort?.();
+      reject(request.signal.reason);
+    },
+    { once: true }
+  );
+  return promise;
 }
 
 const PEER_RESPONSES: Array<() => Promise<Response>> = [
@@ -81,6 +106,16 @@ describe('readAnalysisCreditAdmission request', () => {
       )}`
     );
     expect(request.headers.get('Authorization')).toBe(`Bearer ${AUTH_TOKEN}`);
+  });
+
+  it('carries an abort signal for both payer kinds', async () => {
+    for (const organizationId of [undefined, ORGANIZATION_ID]) {
+      const { env, requests } = createEnv(async () => admissionResponse({ outcome: 'admitted' }));
+
+      await readAnalysisCreditAdmission({ env, authToken: AUTH_TOKEN, organizationId });
+
+      expect(singleRequest(requests).signal).toBeInstanceOf(AbortSignal);
+    }
   });
 });
 
@@ -193,5 +228,33 @@ describe('readAnalysisCreditAdmission unreadable answers', () => {
 
     expect(messages).toHaveLength(PEER_RESPONSES.length);
     expect(messages.join('\n')).not.toContain(AUTH_TOKEN);
+  });
+});
+
+describe('readAnalysisCreditAdmission deadline', () => {
+  it('bounds the read at ten seconds unless a test passes a shorter bound', () => {
+    expect(ADMISSION_READ_TIMEOUT_MS).toBe(10_000);
+  });
+
+  it('ends the read when a peer that never answers hits the admission deadline', async () => {
+    let aborted = false;
+    const { env, requests } = createEnv(async request =>
+      answerOnlyOnAbort(request, () => {
+        aborted = true;
+      })
+    );
+
+    const startedAt = Date.now();
+    const result = await readAnalysisCreditAdmission({
+      env,
+      authToken: AUTH_TOKEN,
+      timeoutMs: 20,
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(elapsedMs).toBeLessThan(2000);
+    expect(aborted).toBe(true);
+    expect(unavailableMessage(result)).toBe('Cloud Agent credit admission request failed');
+    expect(singleRequest(requests).signal.aborted).toBe(true);
   });
 });

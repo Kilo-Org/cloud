@@ -1,13 +1,25 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { describe, expect, it, vi } from 'vitest';
 
+import {
+  directoryConflicts,
+  eventFailures,
+  parkedActivations,
+  parkedEvents,
+  syncState,
+} from '../../src/db/sqlite-schema';
+import type { ScimSyncDO } from '../../src/dos/ScimSyncDO';
 import {
   CONFLICT_RETRY_BUDGET_MS,
   CURSOR_KEY,
   DRAIN_BUDGET_MS,
+  LAST_POLL_KEY,
   PAGE_LIMIT,
+  PARKED_EVENT_RETENTION_MS,
   SEED_CURSOR_KEY,
 } from '../../src/util/constants';
+import { logger } from '../../src/util/logger';
 import { resolveSecret } from '../../src/util/secret';
 import {
   activationWithNonListDomains,
@@ -969,6 +981,256 @@ describe('scheduling', () => {
     expect(status.nextAlarmAt).not.toBeNull();
   });
 });
+
+/**
+ * Retention is decided by `parked_at`, so these tests seed rows through the
+ * Durable Object's own drizzle handle: only a seeded date puts a row outside
+ * the window without waiting 30 days, and the loop's park path always writes
+ * `Date.now()`.
+ */
+describe('parked-event retention', () => {
+  it('removes only the rows strictly older than the window', async () => {
+    const target = stub('retention-boundary');
+    // Frozen so the alarm's `Date.now()` is the same instant the rows are
+    // measured from: a few milliseconds of real time between seeding and the
+    // tick would otherwise expire the row parked exactly on the cutoff.
+    steppingClock(0);
+    const now = Date.now();
+    const retention = PARKED_EVENT_RETENTION_MS;
+    const infoSpy = vi.spyOn(logger, 'info');
+
+    await seedParked(target, [
+      { eventId: 'expired', parkedAt: now - retention - 1 },
+      // Exactly on the cutoff: the comparison is strict, so this row survives
+      // this tick and the next one removes it.
+      { eventId: 'at_cutoff', parkedAt: now - retention },
+      { eventId: 'inside', parkedAt: now - retention + 1 },
+    ]);
+    harness({ pages: [[]] });
+
+    await runInDurableObject(target, instance => instance.alarm());
+
+    const state = await readState(target);
+    expect(state.parked.sort()).toEqual(['at_cutoff', 'inside']);
+    // `/status` counts what is retained, so the expired row is not in it.
+    expect((await target.getStatus()).parkedCount).toBe(2);
+    // The count the operator sees in the log is the one row this fixture put
+    // outside the window, not the three the table held.
+    expect(infoSpy).toHaveBeenCalledWith('SCIM sync expired parked events', { removed: 1 });
+  });
+
+  it('is a no-op on an empty table and safe to repeat', async () => {
+    const target = stub('retention-empty');
+    harness({ pages: [[]] });
+
+    await runInDurableObject(target, async (instance, instanceState) => {
+      await instance.alarm();
+      expect(await instanceState.storage.getAlarm()).not.toBeNull();
+
+      // A second tick deletes nothing either, and the loop is still armed
+      // afterwards: an empty prune must not look like a failed one.
+      await instance.alarm();
+      expect(await instanceState.storage.getAlarm()).not.toBeNull();
+    });
+
+    const state = await readState(target);
+    expect(state.parked).toEqual([]);
+    expect((await target.getStatus()).parkedCount).toBe(0);
+  });
+
+  it('leaves the cursor and every other table untouched', async () => {
+    const target = stub('retention-live-state');
+    const now = Date.now();
+    harness({ pages: [[]] });
+
+    await runInDurableObject(target, (_instance, instanceState) => {
+      const db = drizzle(instanceState.storage);
+      db.insert(syncState)
+        .values([
+          { key: CURSOR_KEY, value: 'evt_cursor' },
+          // An empty seed is what a poll under the unset `WORKOS_EVENT_CURSOR`
+          // writes, so the alarm's poll reads these rows as live state instead
+          // of treating the cursor as an operator override.
+          { key: SEED_CURSOR_KEY, value: '' },
+        ])
+        .run();
+      db.insert(eventFailures)
+        .values({
+          event_id: 'evt_held',
+          event_type: 'dsync.group.created',
+          attempts: 2,
+          last_class: 'conflict',
+          last_status: 409,
+          last_error: 'directory_not_found',
+          first_failed_at: now - 1_000,
+          last_attempt_at: now - 500,
+        })
+        .run();
+      db.insert(directoryConflicts)
+        .values({
+          directory_id: 'directory_01',
+          event_id: 'evt_held',
+          first_conflict_at: now - 1_000,
+        })
+        .run();
+      db.insert(parkedActivations)
+        .values({ directory_id: 'directory_02', parked_at: now - 1_000 })
+        .run();
+      db.insert(parkedEvents)
+        .values([
+          {
+            event_id: 'evt_fresh',
+            event_type: 'dsync.user.created',
+            class: 'terminal',
+            status: 400,
+            error: 'seeded',
+            attempts: 1,
+            parked_at: now - 1_000,
+          },
+          {
+            event_id: 'evt_expired',
+            event_type: 'dsync.user.created',
+            class: 'terminal',
+            status: 400,
+            error: 'seeded',
+            attempts: 1,
+            parked_at: now - PARKED_EVENT_RETENTION_MS - 1,
+          },
+        ])
+        .run();
+    });
+
+    await runInDurableObject(target, instance => instance.alarm());
+
+    const survivors = await runInDurableObject(target, (_instance, instanceState) => {
+      const db = drizzle(instanceState.storage);
+      const rows = db.select().from(syncState).all();
+      return {
+        cursor: rows.find(row => row.key === CURSOR_KEY)?.value,
+        seed: rows.find(row => row.key === SEED_CURSOR_KEY)?.value,
+        held: db
+          .select()
+          .from(eventFailures)
+          .all()
+          .map(row => row.event_id),
+        conflicts: db
+          .select()
+          .from(directoryConflicts)
+          .all()
+          .map(row => row.directory_id),
+        activations: db
+          .select()
+          .from(parkedActivations)
+          .all()
+          .map(row => row.directory_id),
+      };
+    });
+
+    expect(survivors).toEqual({
+      cursor: 'evt_cursor',
+      seed: '',
+      held: ['evt_held'],
+      conflicts: ['directory_01'],
+      activations: ['directory_02'],
+    });
+    const state = await readState(target);
+    expect(state.parked).toEqual(['evt_fresh']);
+    expect((await target.getStatus()).parkedCount).toBe(1);
+  });
+
+  it('logs a failed prune and still polls and reschedules', async () => {
+    const target = stub('retention-prune-failure');
+    const io = harness({ pages: [[directoryEvent('evt_1')]] });
+    const errorSpy = vi.spyOn(logger, 'error');
+    const message = 'sqlite did not answer';
+
+    await runInDurableObject(target, async (instance, instanceState) => {
+      // `state.pruneParkedEvents` is an ESM namespace export, and workerd makes
+      // those bindings read-only, so `vi.spyOn` cannot patch it. Overriding the
+      // instance's own method is the narrow seam that fails one tick's prune;
+      // the prototype method is untouched, and the original is put back.
+      const seam = instance as unknown as { pruneParkedEvents: () => void };
+      const original = seam.pruneParkedEvents;
+      seam.pruneParkedEvents = () => {
+        throw new Error(message);
+      };
+      try {
+        await instance.alarm();
+      } finally {
+        seam.pruneParkedEvents = original;
+      }
+
+      expect(await instanceState.storage.getAlarm()).not.toBeNull();
+      expect(await instanceState.storage.get(LAST_POLL_KEY)).not.toBeNull();
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith('SCIM sync parked-event prune failed', {
+      error: message,
+    });
+    // The poll ran anyway, so nothing was lost to the failed delete: the next
+    // tick retries it with a later cutoff.
+    expect(io.calls).toHaveLength(1);
+    expect((await readState(target)).rows[CURSOR_KEY]).toBe('evt_1');
+  });
+
+  it('keeps a parked row readable while the stream replays inside the window', async () => {
+    const target = stub('retention-replay');
+
+    // The shared request contract rejects this activation's body, so it parks
+    // without an HTTP call and the row appears deterministically.
+    harness({ pages: [[activationWithRejectedBody('evt_parked')]] });
+    const parked = await runInDurableObject(target, instance => instance.poll());
+    expect(parked.eventsParked).toBe(1);
+    expect((await readState(target)).parked).toEqual(['evt_parked']);
+
+    // A tick inside the window keeps it.
+    harness({ pages: [[]] });
+    await runInDurableObject(target, instance => instance.alarm());
+    expect((await readState(target)).parked).toEqual(['evt_parked']);
+    expect((await target.getStatus()).parkedCount).toBe(1);
+
+    // An operator rewinds to before it and the replay applies the same event
+    // id: a successful apply removes the held failure, never the park record.
+    await withCursorVar('evt_0', async () => {
+      harness({ pages: [[directoryEvent('evt_parked')]] });
+      const replay = await runInDurableObject(target, instance => instance.poll());
+
+      expect(replay.cursorSource).toBe('var');
+      expect(replay.eventsApplied).toBe(1);
+      expect(replay.cursor).toBe('evt_parked');
+      const state = await readState(target);
+      expect(state.rows[CURSOR_KEY]).toBe('evt_parked');
+      expect(state.parked).toEqual(['evt_parked']);
+    });
+  });
+});
+
+/**
+ * Writes `parked_events` rows at the dates the retention test needs. The loop
+ * itself always parks at `Date.now()`, so a row outside the window can only be
+ * seeded.
+ */
+async function seedParked(
+  target: DurableObjectStub<ScimSyncDO>,
+  rows: { eventId: string; parkedAt: number }[]
+): Promise<void> {
+  await runInDurableObject(target, (_instance, instanceState) => {
+    const db = drizzle(instanceState.storage);
+    db.insert(parkedEvents)
+      .values(
+        rows.map(row => ({
+          event_id: row.eventId,
+          event_type: 'dsync.user.created',
+          class: 'terminal',
+          status: 400,
+          error: 'seeded',
+          attempts: 1,
+          parked_at: row.parkedAt,
+        }))
+      )
+      .run();
+  });
+}
 
 /**
  * `WORKOS_EVENT_CURSOR` is a var, so overriding it is how an operator resets

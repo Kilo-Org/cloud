@@ -37,7 +37,7 @@ import {
   moveMcpEnabled,
   setMcpEnabled as persistMcpEnabled,
 } from './kilo-mcp';
-import { releaseNativeModelRound } from './native-model-client';
+import { releaseNativeModelRound } from './native-round-slot';
 import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';

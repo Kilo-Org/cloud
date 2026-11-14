@@ -413,7 +413,7 @@ let continued: string[] = [];
  * session id.
  */
 const releasedRounds = vi.hoisted(() => ({ owners: [] as string[] }));
-vi.mock('./native-model-client', () => ({
+vi.mock('./native-round-slot', () => ({
   releaseNativeModelRound: async (owner: string) => {
     await Promise.resolve();
     releasedRounds.owners.push(owner);

@@ -21,7 +21,6 @@ import {
 } from './native-request';
 
 export { IMAGE_NOT_SENT } from './native-request';
-export { releaseNativeModelRound } from './native-round-slot';
 
 /** What an on-device provider says about itself. Reasons are stable codes, never raw text. */
 export type NativeAvailability = {

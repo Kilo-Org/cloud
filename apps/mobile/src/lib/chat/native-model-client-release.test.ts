@@ -2,11 +2,8 @@ import { type ModelClientService, type ModelEvent, type ModelRequest } from '@ki
 import { Effect, Result, Stream } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  type NativeAvailability,
-  nativeModelClient,
-  releaseNativeModelRound,
-} from './native-model-client';
+import { type NativeAvailability, nativeModelClient } from './native-model-client';
+import { releaseNativeModelRound } from './native-round-slot';
 import {
   answerWith,
   AVAILABLE,

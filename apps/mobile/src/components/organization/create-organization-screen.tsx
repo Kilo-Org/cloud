@@ -181,7 +181,9 @@ export function CreateOrganizationScreen() {
         {message == null ? null : (
           <Text
             className={
-              message.tone === 'error' ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
+              message.tone === 'error'
+                ? 'text-sm text-destructive'
+                : 'text-sm text-muted-foreground'
             }
           >
             {message.text}

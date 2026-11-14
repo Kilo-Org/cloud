@@ -189,14 +189,24 @@ export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
  * The box an in-field clear control renders at the end of a search field.
  *
  * The control sits inside the field's content box next to its `TextInput`, so
- * this box carries `DESIGN.md:364`'s 44pt target on its own node rather than
- * through `hitSlop`: `hitSlop` grows the touch region but not the frame an
- * accessibility audit reads, and a reach toward the input would take taps the
- * field itself should get. 44pt is also the shared single-line `Input`'s
- * `min-h-[44px]`, so a field whose content height that input already sets keeps
- * its height, and the box has no side-dependent slop to resolve in RTL.
+ * this box carries the target on its own node rather than through `hitSlop`:
+ * `hitSlop` grows the touch region but not the frame a control-size audit
+ * reads, and a reach toward the input would take taps the field itself should
+ * get. The box is {@link ICON_TARGET_DP}, not the 44pt design target, because
+ * Android lays a control out in whole physical pixels and a 44pt box measures
+ * under the target there; this is the reason {@link COMPACT_CONTROL_HIT_SLOP_DP}
+ * reaches past 44pt instead of onto it.
+ *
+ * A box taller than the shared single-line `Input`'s `min-h-[44px]` would grow
+ * the field, so it cancels the extra height in layout with the field's own
+ * vertical padding: `-my-[7px]` is 7pt a side, exactly the field's `py-2` at
+ * NativeWind's 14pt rem, so the box lays out on 48 - 14 = 34pt — under the
+ * input's floor, so the field keeps its height — while the box still paints and
+ * hit-tests its whole height, overflowing 7pt a side into that padding and
+ * staying inside the field's own frame. The same shape as
+ * `LINE_ACTION_BOX_CLASS` on a line of copy.
  */
-export const FIELD_CLEAR_BOX_CLASS = 'h-[44px] w-[44px] items-center justify-center';
+export const FIELD_CLEAR_BOX_CLASS = 'h-[48px] w-[48px] -my-[7px] items-center justify-center';
 
 /**
  * Per-side `hitSlop` of the shared `Button`'s compact size (`sm`), whose

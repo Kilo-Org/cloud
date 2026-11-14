@@ -4,7 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { FIELD_CLEAR_BOX_CLASS, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS, ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerRow } from '@/lib/model-picker-rows';
 import { type ModelPickerBridge } from '@/lib/picker-bridge';
@@ -529,11 +529,11 @@ describe('ModelPickerContent deferred search', () => {
     // One box width/height pair only: compiling the class is what proves the
     // real box, so a second, conflicting pair cannot hide behind the order
     // Tailwind emits its rules in. The exported box carries the whole
-    // `h-[44px] w-[44px] items-center justify-center` quartet, whose literal
-    // pixel pair is pinned in `tap-target.test.ts`.
+    // `h-[48px] w-[48px] -my-[7px] items-center justify-center` quartet, whose
+    // literal values are pinned in `tap-target.test.ts`.
     expect(clear.props.className).toContain(FIELD_CLEAR_BOX_CLASS);
-    // No slop at all: the box already reaches the target, and a reach across
-    // the row's `gap-2` toward the input would take the field's own taps.
+    // No slop at all: the box itself is the target, and a reach across the
+    // row's `gap-2` toward the input would take the field's own taps.
     expect(clear.props.hitSlop).toBeUndefined();
 
     // The compiled box, not its class text, is what the control lays out.
@@ -542,8 +542,8 @@ describe('ModelPickerContent deferred search', () => {
       width?: number;
     }[];
     const box = Object.assign({}, ...declarations) as { height: number; width: number };
-    expect(box.height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-    expect(box.width).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(box.height).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
     // Placement is the call site's logical trailing margin, not a physical one:
     // `-me-3` is the pill's own `px-3` (10.5pt at the app's 14pt rem), so the

@@ -280,18 +280,18 @@ export function ModelPickerContent() {
                 </View>
               ) : null}
             </View>
-            {/* In-field clear, on every platform: `clearButtonMode` is iOS
-                only, so Android rendered the query with no way to reset it.
-                The frame, not the 16pt glyph, is what an accessibility audit
-                reads, so the control renders a box that carries the 44pt target
-                on its own node. It adds no `hitSlop`: the box already reaches
-                the target, and a reach across `gap-2` would take taps the
-                search field should get. 44 is also the `Input` box's own
-                minimum height, so the field keeps its height. `-me-3` (the
-                pill's own `px-3`) puts the box's trailing edge on the pill's
-                edge, so the glyph keeps nearly its old inset and the whole box
-                stays inside the pill's frame, where iOS still delivers a tap;
-                it is a logical margin, so RTL mirrors it with the row. */}
+            {/* In-field clear, on every platform: the native clear affordance is not
+                available on the platform without one, so the field carries its
+                own control. The frame, not the 16pt glyph, is what a
+                control-size audit reads, so the control renders a box that
+                carries the whole target on its own node, and it adds no
+                `hitSlop`: the box already reaches past the target, and a reach
+                across `gap-2` would take taps the search field should get. The
+                box cancels its own extra height, so the field keeps its height.
+                `-me-3` (the field's own `px-3`) puts the box's trailing edge on
+                the field's edge, so the whole box stays inside the field's
+                frame; it is a logical margin, so it mirrors with the row in
+                right-to-left layouts. */}
             {search.length > 0 ? (
               <Pressable
                 onPress={handleClearSearch}

@@ -228,13 +228,9 @@ async function authFor(
       fail(entry, 'key-missing');
       return null;
     }
-    if (!entry.keyUnlocked) {
-      const unlocked = await requireKeyAccess(i18n.t('ssh.session.keyPrompt'));
-      if (!unlocked) {
-        fail(entry, 'AuthCancelled');
-        return null;
-      }
-      entry.keyUnlocked = true;
+    if (!(await requireKeyAccess(i18n.t('ssh.session.keyPrompt')))) {
+      fail(entry, 'AuthCancelled');
+      return null;
     }
     const passphrase = entry.passphrase ?? key.passphrase ?? undefined;
     try {

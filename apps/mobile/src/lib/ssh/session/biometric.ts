@@ -10,6 +10,8 @@ import { AppState } from 'react-native';
  */
 let unlocked = false;
 let watching = false;
+let foreground = 0;
+let pending: Promise<boolean> | null = null;
 
 function watchAppState(): void {
   if (watching) {
@@ -17,8 +19,10 @@ function watchAppState(): void {
   }
   watching = true;
   AppState.addEventListener('change', state => {
-    if (state !== 'active') {
+    if (state === 'background') {
       unlocked = false;
+      foreground += 1;
+      pending = null;
     }
   });
 }
@@ -29,10 +33,29 @@ function watchAppState(): void {
  * native module this build does not carry — all of which mean no key is sent.
  */
 export async function requireKeyAccess(promptMessage: string): Promise<boolean> {
+  watchAppState();
+  if (AppState.currentState === 'background') {
+    return false;
+  }
   if (unlocked) {
     return true;
   }
-  watchAppState();
+  if (pending !== null) {
+    return pending;
+  }
+  const period = foreground;
+  const request = unlock(promptMessage, period);
+  pending = request;
+  try {
+    return await request;
+  } finally {
+    if (pending === request) {
+      pending = null;
+    }
+  }
+}
+
+async function unlock(promptMessage: string, period: number): Promise<boolean> {
   try {
     // Imported inside the guard: `requireNativeModule` throws at module load
     // when the build carries no such module, so a static import would take
@@ -49,8 +72,11 @@ export async function requireKeyAccess(promptMessage: string): Promise<boolean> 
       promptMessage,
       disableDeviceFallback: false,
     });
+    if (foreground !== period || AppState.currentState === 'background') {
+      return false;
+    }
     unlocked = result.success;
-    return result.success;
+    return unlocked;
   } catch {
     return false;
   }

@@ -96,7 +96,6 @@ async function adoptRegistrySessions(): Promise<Rehydration> {
       promptsHostId: null,
       jumpSessionIds: item.jumpSessionIds,
       passphrase: null,
-      keyUnlocked: false,
       connecting: false,
       connectTargets: [],
     });

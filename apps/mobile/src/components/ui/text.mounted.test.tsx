@@ -170,6 +170,9 @@ describe('Text eyebrow letterspacing', () => {
         'tracking-[1.5px]',
       ])
     );
+    // The size belongs to the script, so Latin copy keeps the variant's 10px
+    // even in an RTL interface: no RTL-script size twin merges in.
+    expect(classes).not.toContain('text-[13px]');
   });
 
   it.each([false, true])('drops the mono family from Arabic copy (RTL=%s)', isRTL => {
@@ -183,6 +186,12 @@ describe('Text eyebrow letterspacing', () => {
     // both hold in either direction.
     expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
     expect(ownStyles(node)).toContainEqual({ letterSpacing: 0 });
+    // The size is the script's too: without the capitals and the tracking the
+    // Arabic label would keep only the 10px variant size, so it takes the 13px
+    // twin and `cn` (twMerge) drops the variant's `text-[10px]` — in either
+    // interface, since the interface only decides the display treatment.
+    expect(classes).toEqual(expect.arrayContaining(['text-[13px]']));
+    expect(classes).not.toContain('text-[10px]');
 
     if (isRTL) {
       expect(classes).not.toContain('uppercase');
@@ -206,15 +215,17 @@ describe('Text eyebrow letterspacing', () => {
     const classes = hostClasses(
       mountTextTree(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
     );
-    expect(classes).toEqual(expect.arrayContaining(['text-[10px]']));
     if (isRTL) {
+      // Arabic copy takes the script's 13px twin in an RTL interface too.
+      expect(classes).toEqual(expect.arrayContaining(['text-[13px]']));
+      expect(classes).not.toContain('text-[10px]');
       // Arabic copy in an RTL interface also drops the mono family.
       expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
       expect(classes).not.toContain('uppercase');
       expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
     } else {
       expect(classes).toEqual(
-        expect.arrayContaining(['font-mono-medium', 'uppercase', 'tracking-[1.5px]'])
+        expect.arrayContaining(['font-mono-medium', 'text-[10px]', 'uppercase', 'tracking-[1.5px]'])
       );
     }
   });

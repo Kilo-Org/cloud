@@ -73,6 +73,21 @@ const HEADING_A11Y = new Map<TextVariant, { role: Role; level: string }>([
  */
 export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
 
+/**
+ * The RTL-script twin of the eyebrow's size. The Latin display treatment leans
+ * on full capitals and letterspacing, and a joined/Arabic-script label can take
+ * neither: its tracking is reset (`NATURAL_LETTER_SPACING`) and its capitals do
+ * not exist, so without them the label kept only the 10px size — measured in an
+ * Arabic interface, `الفواتير` inked 25.9 x 9.14 dp against the Latin
+ * `FATURAS`' 50.67 x 7.62 dp. The script takes the line's height and stroke
+ * weight from the size instead; 13px is the size whose line box matches the
+ * Latin capitals' cap height. The script is the copy's, not the interface's,
+ * exactly like `withoutMonoFamily`. Kept in step with the reserved eyebrow twin
+ * in `screen-header.tsx`, which holds this same line box before the label
+ * arrives.
+ */
+export const EYEBROW_RTL_SCRIPT_DISPLAY = 'text-[13px]';
+
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
 function Text({
@@ -113,6 +128,9 @@ function Text({
   const classes = cn(
     textVariants({ variant }),
     variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
+    // `cn` merges last-wins, so the script's 13px replaces the variant's 10px
+    // and a caller's own `text-*` still has the final word after it.
+    variant === 'eyebrow' && isRtlScript && EYEBROW_RTL_SCRIPT_DISPLAY,
     textClass,
     className
   );

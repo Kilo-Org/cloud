@@ -169,6 +169,21 @@ function findSideInsetWrapper(root: TestInstance): TestInstance {
   return wrapper;
 }
 
+/**
+ * The zero-width, clipped band `reserveTitleSpace` lays out beside the heading:
+ * the only View laid out at no width, holding the eyebrow twin and the title's
+ * cap so the header's text area keeps one height for every line count.
+ */
+function findReservedBand(root: TestInstance): TestInstance {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      String(node.props.className ?? '')
+        .split(' ')
+        .includes('w-0')
+  );
+}
+
 function deriveTitleFontSize(className: string): number {
   const arbitrary = /text-\[(\d+)px\]/.exec(className);
   if (arbitrary) {
@@ -788,13 +803,7 @@ describe('ScreenHeader mounted', () => {
       reserveTitleSpace: true,
     });
 
-    const band = renderer.root.find(
-      node =>
-        typeof node.type === 'string' &&
-        String(node.props.className ?? '')
-          .split(' ')
-          .includes('w-0')
-    );
+    const band = findReservedBand(renderer.root);
     // The band holds one eyebrow line and the title's two-line cap, so the row
     // keeps its height for a title that paints one line: the body below never
     // moves when the name arrives and wraps.
@@ -811,6 +820,49 @@ describe('ScreenHeader mounted', () => {
     // it instead of above the empty line the cap reserves.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    renderer.unmount();
+  });
+
+  // The band holds the arriving label's line box, not a blank's: an
+  // Arabic-script eyebrow takes the 13px twin of the token
+  // (`EYEBROW_RTL_SCRIPT_DISPLAY`), whose line box the mono 10px no-break
+  // space the band used to lay out is too short for, so the header grew the
+  // moment the label arrived.
+  it("holds the arriving label's line box in the reserved band", () => {
+    const renderer = renderHeader({
+      title: 'الفواتير',
+      reserveEyebrow: true,
+      reservedEyebrow: 'الفواتير',
+      reserveTitleSpace: true,
+    });
+
+    const twin = findReservedBand(renderer.root).findAll(node => String(node.type) === 'Eyebrow');
+    expect(twin).toHaveLength(1);
+    expect(twin[0]?.children).toEqual(['الفواتير']);
+    renderer.unmount();
+  });
+
+  it('keeps the reserved label out of the accessibility tree and the visible eyebrow readable', () => {
+    const renderer = renderHeader({
+      title: 'الفواتير',
+      eyebrow: 'الفواتير',
+      reservedEyebrow: 'الفواتير',
+      reserveTitleSpace: true,
+    });
+
+    const band = findReservedBand(renderer.root);
+    expect(band.props['aria-hidden']).toBe(true);
+    // The twin is still clipped to no width: it holds height only, so the
+    // reserved label it now lays out paints nothing.
+    expect(band.props.className).toContain('w-0');
+    expect(band.props.className).toContain('overflow-hidden');
+
+    // Only the visible slot is the header's labelled eyebrow.
+    const labelled = renderer.root.findAll(
+      node => String(node.type) === 'Eyebrow' && node.props.accessible === true
+    );
+    expect(labelled).toHaveLength(1);
+    expect(labelled[0]?.children).toEqual(['الفواتير']);
     renderer.unmount();
   });
 

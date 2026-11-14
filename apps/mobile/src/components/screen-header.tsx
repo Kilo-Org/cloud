@@ -156,6 +156,16 @@ type ScreenHeaderProps = {
   reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
+  /**
+   * Render this label in the reserve twin instead of the no-break space, so the
+   * reserved eyebrow line holds the exact line box of the label that replaces
+   * it — in every script: Arabic-script copy takes the 13px eyebrow twin
+   * (`EYEBROW_RTL_SCRIPT_DISPLAY`), whose line box is taller than the mono 10px
+   * space, so a boundary that reserved with the space grew the header when the
+   * label arrived. The reserve paints nothing either way (a zero-width, clipped,
+   * `aria-hidden` twin), so this is the label's metrics, not its text.
+   */
+  reservedEyebrow?: string;
   reserveEyebrow?: boolean;
   centerTitle?: boolean;
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
@@ -311,6 +321,7 @@ export function ScreenHeader({
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
+  reservedEyebrow,
   reserveEyebrow = false,
   size = 'default',
   headerRight,
@@ -480,7 +491,14 @@ export function ScreenHeader({
           accessibilityElementsHidden={!eyebrow}
           importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
         >
-          {eyebrow ?? '\u00A0'}
+          {/*
+            Before the caller's label exists the slot holds the label that will
+            fill it (`reservedEyebrow`), not a bare space: the space's mono 10px
+            line box is shorter than Arabic-script copy's 13px one, so the
+            header grew the moment the label arrived. The text is transparent
+            and hidden from assistive readers until `eyebrow` itself is set.
+          */}
+          {eyebrow ?? reservedEyebrow ?? '\u00A0'}
         </Eyebrow>
       ) : null}
       {titleNode}
@@ -534,7 +552,9 @@ export function ScreenHeader({
   // height and no line-height constant.
   const reservedTitleBand = reserveTitleSpace ? (
     <View className="w-0 overflow-hidden" aria-hidden>
-      {eyebrow || reserveEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
+      {eyebrow || reserveEyebrow ? (
+        <Eyebrow className="mb-0.5">{reservedEyebrow ?? eyebrow ?? blankEyebrow}</Eyebrow>
+      ) : null}
       <View className={reservedTitleHeightClass(size, titleLines)} />
     </View>
   ) : null;

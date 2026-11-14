@@ -18,7 +18,14 @@ export function OrganizationInvoicesScreen() {
     // selection, access denied, unavailable) never fills that line, so it keeps
     // its own header height.
     return (
-      <OrganizationBoundary title={t('organization.invoices.title')} reserveEyebrow={isResolving} />
+      <OrganizationBoundary
+        title={t('organization.invoices.title')}
+        reserveEyebrow={isResolving}
+        // The reserved line holds this label's own line box: Arabic-script copy
+        // takes the 13px eyebrow twin, taller than the mono 10px space the
+        // reserve would otherwise hold, so the header cannot grow on the swap.
+        eyebrow={t('organization.invoices.title')}
+      />
     );
   }
 

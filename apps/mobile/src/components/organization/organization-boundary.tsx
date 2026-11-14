@@ -28,6 +28,13 @@ type OrganizationBoundaryProps = Readonly<{
    * when the resolved screen swaps the label in.
    */
   reserveEyebrow?: boolean;
+  /**
+   * The label the boundary's `ScreenHeader` receives once the membership
+   * resolves. It only sizes the reserved line: the boundary paints no eyebrow,
+   * so the band holds this label's line box — Arabic-script copy is 13px, whose
+   * line box the mono 10px space the reserve would otherwise use cannot hold.
+   */
+  eyebrow?: string;
   /** Explicit org id (e.g. deep-link `?org=`) replacing the persisted selection for this render. */
   organizationIdOverride?: string;
   /** Overrides the default boundary icon (PR-review passes its own glyph). */
@@ -60,6 +67,7 @@ type OrganizationBoundaryProps = Readonly<{
 export function OrganizationBoundary({
   title,
   reserveEyebrow,
+  eyebrow,
   organizationIdOverride,
   icon = Building2,
 }: OrganizationBoundaryProps = {}) {
@@ -162,7 +170,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} />
+      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} reservedEyebrow={eyebrow} />
       {content}
     </View>
   );

@@ -1,5 +1,7 @@
 import * as z from 'zod';
+import { BUILTIN_AGENT_SLUGS } from '../contracts/agents';
 import { overLimitMessage, overTotalMessage } from '../contracts/limit-copy';
+import { skillCompanionFileIssues } from '../contracts/skill-companion-files';
 
 /**
  * Field constraints for the session (runtime) delivery contract, mirrored from
@@ -34,67 +36,36 @@ export const RUNTIME_LIMITS = {
   MAX_RUNTIME_KILO_COMMAND_DESCRIPTION: 2_000,
 } as const;
 
-/** Built-in mode slugs recognized by the CLI. */
-export const RUNTIME_BUILTIN_AGENT_SLUGS = new Set<string>([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
-
-const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
+/** Built-in mode slugs recognized by the CLI; the same reserved set as the profile contract. */
+export const RUNTIME_BUILTIN_AGENT_SLUGS = new Set<string>(BUILTIN_AGENT_SLUGS);
 
 const RuntimeSkillFilesContractSchema = z
-  .record(
-    z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH),
-    z
-      .string()
-      .max(
-        RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE,
-        overLimitMessage(
-          'Skill companion file',
-          RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE
-        )
-      )
-  )
-  .refine(
-    files => Object.keys(files).length <= RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES,
-    `A skill may have at most ${RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
-  )
+  .record(z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH), z.string())
   .superRefine((files, ctx) => {
-    let total = 0;
-    for (const [path, content] of Object.entries(files)) {
-      if (!SKILL_FILE_PATH_PATTERN.test(path)) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
-      if (path.startsWith('/') || path.includes('..') || path.includes('//')) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
-      if (path === 'SKILL.md' || path.toLowerCase() === 'skill.md') {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'SKILL.md must be passed as rawMarkdown, not inside files',
-        });
-        return;
-      }
-      total += content.length;
-    }
-    if (total > RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
-      ctx.addIssue({
-        code: 'custom',
-        message: overTotalMessage(
-          'Skill companion files',
-          total,
-          RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL
-        ),
-      });
-    }
+    skillCompanionFileIssues(
+      files,
+      {
+        maxFiles: RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES,
+        maxFileSize: RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE,
+        maxTotalSize: RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL,
+        tooManyFiles: `A skill may have at most ${RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`,
+        pathInvalidCharacters: path => `Skill file path rejected: ${path}`,
+        pathRejected: path => `Skill file path rejected: ${path}`,
+        manifestInFiles: 'SKILL.md must be passed as rawMarkdown, not inside files',
+        fileTooLarge: () =>
+          overLimitMessage(
+            'Skill companion file',
+            RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE
+          ),
+        totalTooLarge: total =>
+          overTotalMessage(
+            'Skill companion files',
+            total,
+            RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL
+          ),
+      },
+      message => ctx.addIssue({ code: 'custom', message })
+    );
   });
 
 export const RuntimeSkillContractSchema = z.object({

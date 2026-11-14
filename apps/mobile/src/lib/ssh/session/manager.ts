@@ -29,12 +29,11 @@ export function openSession(host: SshHost): string {
     prompts: null,
     passwords: new Map(),
     authHostId: null,
-    promptsHostId: null,
     jumpSessionIds: [],
     passphrase: null,
     connecting: false,
     attemptAbort: null,
-    connectTargets: [],
+    connectAttemptId: null,
   };
   live.set(id, entry);
   writeSession({

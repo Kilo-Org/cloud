@@ -10,6 +10,7 @@ import { autoStartForwards, resetSessionForwards } from '../forwards-runtime';
 import { getHost, type SshHost, updateHost } from '../hosts';
 import { getKey } from '../keys';
 import { nativeErrorCode, sshPackage } from '../native';
+import { newId } from '../id';
 import { quoteShellArg } from '../shell-quote';
 import { sshDatabase } from '../store';
 import { MAX_RECONNECT_ATTEMPTS, reconnectDelayMs } from './backoff';
@@ -49,19 +50,21 @@ async function openChain(
     await disconnectAll(opened);
     return false;
   }
+  entry.connectAttemptId = newId();
   const options: ConnectOptions = {
     // Only the session the person opened carries its row's id: a jump hop's
     // connection has no screen of its own, so a reload must not adopt it.
     appSessionId: hops.length === 1 ? entry.id : '',
+    attemptId: entry.connectAttemptId,
     host: hop.hostname,
     port: hop.port,
     username: hop.username,
     auth,
   };
-  entry.promptsHostId = auth.type === 'keyboardInteractive' ? hop.id : null;
   try {
     const nativeSessionId =
       via === null ? await ssh.connect(options) : await ssh.connectVia(via, options);
+    entry.connectAttemptId = null;
     opened.push(nativeSessionId);
     if (!stillOpen(entry)) {
       await disconnectAll(opened);
@@ -115,7 +118,6 @@ export async function attempt(entry: LiveSession): Promise<void> {
     }
     entry.attempt += 1;
     setPhase(entry, { kind: 'connecting', attempt: entry.attempt });
-    entry.connectTargets = chain.map(hop => ({ host: hop.hostname, port: hop.port }));
 
     const ssh = await sshPackage();
     if (!(await openChain({ entry, db, ssh, opened }, chain, null))) {
@@ -150,8 +152,7 @@ export async function attempt(entry: LiveSession): Promise<void> {
   } finally {
     entry.attemptAbort = null;
     entry.connecting = false;
-    entry.connectTargets = [];
-    entry.promptsHostId = null;
+    entry.connectAttemptId = null;
   }
 }
 
@@ -169,6 +170,7 @@ export function fail(entry: LiveSession, reason: SshCloseReason, hop?: SshHost):
   entry.prompts = null;
   entry.hostKey = null;
   const failedHost = hop ?? entry.host;
+  entry.connectAttemptId = null;
   if (reason === 'AuthFailed' && failedHost.authMethod === 'password') {
     entry.passwords.delete(failedHost.id);
     entry.authHostId = failedHost.id;

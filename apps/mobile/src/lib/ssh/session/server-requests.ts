@@ -16,7 +16,7 @@ import { type SshHostKeyAwaiting, type SshHostKeyDecision } from './types';
 
 /** A host key was offered: judge it against the store and ask if it is new. */
 export function handleHostKey(request: HostKeyRequest): void {
-  const entry = findConnecting(request.host, request.port);
+  const entry = findConnecting(request.attemptId);
   if (entry === null) {
     void answerHostKey(request.requestId, false);
     return;
@@ -66,8 +66,8 @@ export function handleDisconnect(notice: DisconnectNotice): void {
 
 /** A keyboard-interactive round the server is waiting on. */
 export function handlePrompts(request: KeyboardInteractiveRequest): void {
-  const entry = findAwaitingPrompts();
-  if (entry === null) {
+  const entry = findConnecting(request.attemptId);
+  if (entry?.prompts !== null) {
     answerPrompts(request.requestId, null);
     return;
   }
@@ -94,7 +94,7 @@ async function judgeOfferedKey(entry: LiveSession, request: HostKeyRequest): Pro
     knownFingerprintSha256: null,
   };
   const verdict = await readVerdict(awaiting);
-  if (verdict === null || !stillOpen(entry)) {
+  if (verdict === null || !stillOpen(entry) || entry.connectAttemptId !== request.attemptId) {
     await answerHostKey(request.requestId, false);
     return;
   }
@@ -166,27 +166,12 @@ async function sendPrompts(requestId: string, answers: string[] | null): Promise
   }
 }
 
-/**
- * The session a host key belongs to. The core reports the key before it hands
- * back a session id, so the attempt in flight for that host — the target or one
- * of its hops — is the one the key decides for.
- */
-function findConnecting(host: string, port: number): LiveSession | null {
-  for (const entry of live.values()) {
-    if (
-      entry.connecting &&
-      entry.connectTargets.some(target => target.host === host && target.port === port)
-    ) {
-      return entry;
-    }
+function findConnecting(attemptId: string): LiveSession | null {
+  if (!attemptId) {
+    return null;
   }
-  return null;
-}
-
-/** The session a keyboard-interactive round belongs to, for the same reason. */
-function findAwaitingPrompts(): LiveSession | null {
   for (const entry of live.values()) {
-    if (entry.connecting && entry.prompts === null && entry.promptsHostId !== null) {
+    if (entry.connecting && entry.connectAttemptId === attemptId) {
       return entry;
     }
   }

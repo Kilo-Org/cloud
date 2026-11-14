@@ -93,12 +93,11 @@ async function adoptRegistrySessions(): Promise<Rehydration> {
       prompts: null,
       passwords: new Map(),
       authHostId: null,
-      promptsHostId: null,
       jumpSessionIds: item.jumpSessionIds,
       passphrase: null,
       connecting: false,
       attemptAbort: null,
-      connectTargets: [],
+      connectAttemptId: null,
     });
     writeSession({
       id,

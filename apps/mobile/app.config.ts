@@ -239,7 +239,9 @@ const config: ExpoConfig = {
       ...(isProductionBuild ? {} : { 'com.apple.developer.fileprovider.testing-mode': true }),
     },
     infoPlist: {
-      ITSAppUsesNonExemptEncryption: false,
+      // The bundled SSH client (modules/kilo-ssh) ships its own encryption:
+      // the SSH transport ciphers and the age export format.
+      ITSAppUsesNonExemptEncryption: true,
       // Custom LAN backends require an app-level approval before each endpoint
       // can use HTTP. ATS stays enabled for public HTTPS endpoints.
       NSAppTransportSecurity: { NSAllowsLocalNetworking: true },

@@ -138,6 +138,36 @@ describe('usePersistedAgentSessionFilters persistence', () => {
     expect(store.write).not.toHaveBeenCalled();
   });
 
+  it('retries a failed write when Apply repeats the filters on screen', async () => {
+    // Regression: the no-op Apply returned before the write, so a save that
+    // failed could never be retried without changing a filter first.
+    store.read.mockResolvedValue(null);
+    const api = mount();
+    await flush();
+    store.write.mockRejectedValueOnce(new Error('the keychain is locked'));
+
+    act(() => {
+      api().setFilters({ platformFilter: ['cli'], projectFilter: [] });
+    });
+    await flush();
+    expect(toasts.error).toHaveBeenCalledExactlyOnceWith('common.couldNotSaveSetting');
+    expect(store.write).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      api().setFilters({ platformFilter: ['cli'], projectFilter: [] });
+    });
+    await flush();
+
+    expect(store.write).toHaveBeenCalledTimes(2);
+
+    // Let the retry settle, so the shared save chain holds nothing for the next
+    // case.
+    while (pendingWrites.length > 0) {
+      pendingWrites.shift()?.();
+    }
+    await flush();
+  });
+
   it('writes two rapid edits in order, behind one shared save chain', async () => {
     store.read.mockResolvedValue(null);
     const api = mount();

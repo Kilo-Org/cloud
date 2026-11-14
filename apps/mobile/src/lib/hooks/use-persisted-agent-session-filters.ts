@@ -41,6 +41,9 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
     createDefaultAgentSessionFilters()
   );
   const [saved, setSaved] = useState<SavedFilters>({ kind: 'loading' });
+  // Bumped by an Apply that repeats the filters on screen, so the save effect
+  // runs again after a write failed.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let isActive = true;
@@ -96,7 +99,7 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
     };
 
     void saveFilters();
-  }, [filters, saved, storageKey]);
+  }, [attempt, filters, saved, storageKey]);
 
   const markEdited = useCallback(() => {
     setSaved(prev => (prev.kind === 'unreadable' ? { kind: 'unreadable', edited: true } : prev));
@@ -111,13 +114,24 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
    */
   const applyFilters = useCallback(
     (next: AgentSessionFilters) => {
-      if (sameAgentSessionFilters(next, filters)) {
+      if (!sameAgentSessionFilters(next, filters)) {
+        markEdited();
+        setFiltersState(next);
         return;
       }
-      markEdited();
-      setFiltersState(next);
+      /* The draft is what is already on screen. That is only a no-op when the
+         store is known to hold it: a write that failed leaves the value it was
+         meant to replace, and Apply is the person asking to try again. */
+      const known = saved.kind === 'ready' || saved.kind === 'unreadable' ? saved : undefined;
+      const storeHoldsThem =
+        known !== undefined &&
+        (known.kind === 'ready' ? sameAgentSessionFilters(known.stored, next) : !known.edited);
+      if (storeHoldsThem) {
+        return;
+      }
+      setAttempt(previous => previous + 1);
     },
-    [filters, markEdited]
+    [filters, markEdited, saved]
   );
 
   const setFilters = applyFilters;

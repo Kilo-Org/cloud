@@ -39,12 +39,18 @@ export function pressSingleCustom(answer: SingleAnswer): SingleAnswer {
   return answer.kind === 'custom' ? answer : { kind: 'custom' };
 }
 
-/** Select the custom field for a single-choice question while it holds text; empty text clears it. */
+/**
+ * Select the custom field for a single-choice question while it holds text.
+ *
+ * Empty text clears a custom answer and nothing else: typing a space in the
+ * field of a question that has a preset selected leaves that preset selected,
+ * because the field is not what the card will submit.
+ */
 export function typeSingleCustom(answer: SingleAnswer, hasText: boolean): SingleAnswer {
-  if (!hasText) {
-    return SINGLE_NONE;
+  if (answer.kind === 'custom') {
+    return hasText ? answer : SINGLE_NONE;
   }
-  return answer.kind === 'custom' ? answer : { kind: 'custom' };
+  return hasText ? { kind: 'custom' } : answer;
 }
 
 /** Add or remove one preset, keeping the custom field when it is already in use. */

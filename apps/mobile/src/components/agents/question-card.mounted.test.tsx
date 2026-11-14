@@ -40,12 +40,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/a11y/announce', () => a11yMocks);
 
-// Custom answer selection contract (final cumulative r7):
-// - Multiple choice: the custom choice is a checkbox. Re-activating it
-//   unchecks it, and clearing its text also unchecks it so it never reads as
-//   selected with no content.
-// - Single choice: the custom choice is a radio that stays selected on
-//   re-activation, and picking a preset option deselects it.
+// Custom answer contract: a multi-choice custom answer is a checkbox that
+// unchecks on re-activation or an empty field; a single-choice one is a radio
+// that stays selected, and a preset press replaces it.
 
 type Question = {
   question: string;
@@ -55,13 +52,15 @@ type Question = {
   custom?: boolean;
 };
 
-function makeQuestion(overrides: { multiple?: boolean; custom?: boolean } = {}): Question[] {
+function makeQuestion(
+  overrides: { multiple?: boolean; custom?: boolean; description?: string } = {}
+): Question[] {
   return [
     {
       question: 'How should the agent proceed?',
       header: 'Agent needs input',
       options: [
-        { label: 'Continue', description: '' },
+        { label: 'Continue', description: overrides.description ?? '' },
         { label: 'Stop', description: '' },
       ],
       multiple: overrides.multiple ?? false,
@@ -69,6 +68,8 @@ function makeQuestion(overrides: { multiple?: boolean; custom?: boolean } = {}):
     },
   ];
 }
+
+const DESCRIBED = makeQuestion({ description: 'Deploy to production' });
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -199,29 +200,22 @@ describe('QuestionCard custom answer selection', () => {
     vi.useRealTimers();
   });
 
-  it('unchecks the custom answer when re-activated for multiple choice', async () => {
+  it('unchecks a multi-choice custom answer on re-activation and on an empty field', async () => {
     const renderer = await renderCard(makeQuestion({ multiple: true }));
-
     press(customChoice(renderer.root));
     expect(customChoiceChecked(renderer.root)).toBe(true);
 
     press(customChoice(renderer.root));
     expect(customChoiceChecked(renderer.root)).toBe(false);
-  });
-
-  it('unchecks the custom answer when its text is cleared for multiple choice', async () => {
-    const renderer = await renderCard(makeQuestion({ multiple: true }));
 
     typeCustomText(renderer.root, 'Manual input');
     expect(customChoiceChecked(renderer.root)).toBe(true);
-
     typeCustomText(renderer.root, '');
     expect(customChoiceChecked(renderer.root)).toBe(false);
   });
 
-  it('keeps the custom answer selected when re-activated for single choice', async () => {
+  it('keeps a single-choice custom answer selected on re-activation', async () => {
     const renderer = await renderCard(makeQuestion({ multiple: false }));
-
     press(customChoice(renderer.root));
     expect(customChoiceChecked(renderer.root)).toBe(true);
 
@@ -240,8 +234,7 @@ describe('QuestionCard custom answer selection', () => {
   });
 
   it('pressing a preset after typing replaces the custom field instead of leaving text the card will not send', async () => {
-    // Regression: the preset press left the typed text in the field, and the
-    // payload silently dropped it.
+    // Regression: the preset press left the typed text the payload dropped.
     let submitted: string[][] = [];
     const renderer = await renderCard(makeQuestion({ multiple: false }), answers => {
       submitted = answers;
@@ -282,18 +275,26 @@ describe('QuestionCard custom answer selection', () => {
     expect(submitted).toEqual([['deploy staging']]);
   });
 
+  it('keeps a chosen preset when the custom field is emptied', async () => {
+    // Regression: empty custom text cleared the whole answer, so a space removed
+    // the preset the card would have submitted.
+    let submitted: string[][] = [];
+    const renderer = await renderCard(makeQuestion({ multiple: false }), answers => {
+      submitted = answers;
+    });
+
+    press(optionButton(renderer.root, 'Continue'));
+    typeCustomText(renderer.root, ' ');
+
+    press(submitAction(renderer.root));
+    expect({ checked: customChoiceChecked(renderer.root), submitted }).toEqual({
+      checked: false,
+      submitted: [['Continue']],
+    });
+  });
+
   it('renders an option description as a subtitle under its label', async () => {
-    const renderer = await renderCard([
-      {
-        question: 'How should the agent proceed?',
-        header: 'Agent needs input',
-        options: [
-          { label: 'Continue', description: 'Deploy to production' },
-          { label: 'Stop', description: '' },
-        ],
-        custom: true,
-      },
-    ]);
+    const renderer = await renderCard(DESCRIBED);
 
     expect(optionTextLines(renderer.root, 'Continue')).toEqual([
       'Continue',
@@ -304,25 +305,13 @@ describe('QuestionCard custom answer selection', () => {
   });
 
   it('announces an option description in its accessible name, never only as a hint', async () => {
-    const renderer = await renderCard([
-      {
-        question: 'How should the agent proceed?',
-        header: 'Agent needs input',
-        options: [
-          { label: 'Continue', description: 'Deploy to production' },
-          { label: 'Stop', description: '' },
-        ],
-        custom: true,
-      },
-    ]);
+    const renderer = await renderCard(DESCRIBED);
 
-    // TalkBack reads a node's hint text, not the tooltip React Native fills
-    // from `accessibilityHint`, so the subtitle has to be part of the name.
+    // TalkBack reads a node's hint, not the tooltip `accessibilityHint` fills.
     const described = optionButton(renderer.root, 'Continue');
     expect(described?.props.accessibilityLabel).toBe('Continue, Deploy to production');
     expect(described?.props.accessibilityHint).toBeUndefined();
 
-    // An option without a description keeps its bare label and no hint.
     expect(optionButton(renderer.root, 'Stop')?.props.accessibilityLabel).toBe('Stop');
     expect(optionButton(renderer.root, 'Stop')?.props.accessibilityHint).toBeUndefined();
   });

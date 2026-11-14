@@ -2366,10 +2366,13 @@
     "couldNotLoadDescription": "Bạn chưa thể xem các phiên đang hoạt động cho đến khi tải xong dữ liệu.",
     "currentDeviceUnidentified": "Không thể xác định thiết bị hiện tại.",
     "kiloApp": "Ứng dụng Kilo",
+    "kiloAppAndroid": "Ứng dụng Kilo · Android",
+    "kiloAppIos": "Ứng dụng Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Không có phiên đang hoạt động",
     "noSessionsDescription": "Đăng nhập vào ứng dụng Kilo trên thiết bị khác để thiết bị đó xuất hiện tại đây.",
-    "onlyKiloAppSignIns": "Chỉ các phiên đăng nhập qua ứng dụng Kilo xuất hiện tại đây. Các phiên đăng nhập qua trình soạn thảo mã và CLI không được liệt kê.",
     "signedIn": "Đăng nhập lúc {{signedIn}} · Hoạt động gần nhất {{lastSeen}}",
+    "signInScopeNote": "Các phiên đăng nhập qua ứng dụng Kilo và Kilo CLI xuất hiện tại đây. Các phiên đăng nhập qua trình soạn thảo mã không được liệt kê.",
     "thisDevice": "Thiết bị này",
     "webBrowser": "Trình duyệt web",
     "viewProfile": "Xem hồ sơ",
@@ -2378,7 +2381,7 @@
     "sessionSignedOut": "Đã đăng xuất phiên.",
     "signOutThisDeviceTitle": "Đăng xuất khỏi thiết bị này?",
     "signOutThisSessionTitle": "Đăng xuất phiên này?",
-    "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",
+    "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Hoạt động gần nhất {{lastSeen}}. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",
     "unknownDevice": "Thiết bị không xác định"
   },
   "forceUpdate": {

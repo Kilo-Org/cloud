@@ -2366,10 +2366,13 @@
     "couldNotLoadDescription": "載入完成前，無法查看目前登入的工作階段。",
     "currentDeviceUnidentified": "無法辨識目前的裝置。",
     "kiloApp": "Kilo 應用程式",
+    "kiloAppAndroid": "Kilo 應用程式 · Android",
+    "kiloAppIos": "Kilo 應用程式 · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "沒有已登入的工作階段",
     "noSessionsDescription": "在其他裝置上登入 Kilo 應用程式後，該裝置就會顯示在這裡。",
-    "onlyKiloAppSignIns": "這裡只會顯示 Kilo 應用程式的登入工作階段，不會列出編輯器與 CLI 的登入工作階段。",
     "signedIn": "登入時間：{{signedIn}} · 最後上線：{{lastSeen}}",
+    "signInScopeNote": "這裡會顯示來自 Kilo 應用程式與 Kilo CLI 的登入。編輯器的登入不會列出。",
     "thisDevice": "此裝置",
     "webBrowser": "網頁瀏覽器",
     "viewProfile": "檢視個人資料",
@@ -2378,7 +2381,7 @@
     "sessionSignedOut": "工作階段已登出。",
     "signOutThisDeviceTitle": "登出此裝置？",
     "signOutThisSessionTitle": "登出此工作階段？",
-    "signOutThisSessionMessage": "{{device}} 將登出，但最長仍可存取 API 一小時。",
+    "signOutThisSessionMessage": "{{device}} 將登出，最後上線：{{lastSeen}}。最長仍可存取 API 一小時。",
     "unknownDevice": "未知裝置"
   },
   "forceUpdate": {

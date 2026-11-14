@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "Твоите активни сесии не се достапни додека не заврши вчитувањето.",
     "currentDeviceUnidentified": "Не успеа препознавањето на тековниот уред.",
     "kiloApp": "Апликација Kilo",
+    "kiloAppAndroid": "Апликација Kilo · Android",
+    "kiloAppIos": "Апликација Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Нема активни сесии",
     "noSessionsDescription": "Најави се во апликацијата Kilo на друг уред и тој ќе се прикаже тука.",
-    "onlyKiloAppSignIns": "Тука се прикажуваат само најавувањата во апликацијата Kilo. Најавувањата преку уредувачот и CLI не се наведени.",
     "signedIn": "Најава: {{signedIn}} · Последна активност: {{lastSeen}}",
+    "signInScopeNote": "Тука се прикажуваат најавувањата во апликацијата Kilo и во Kilo CLI. Најавувањата преку уредувачот не се наведени.",
     "thisDevice": "Овој уред",
     "viewProfile": "Прикажи профил",
     "webBrowser": "Веб прелистувач",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "Сесијата е одјавена.",
     "signOutThisDeviceTitle": "Да се одјави овој уред?",
     "signOutThisSessionTitle": "Да се одјави оваа сесија?",
-    "signOutThisSessionMessage": "Уредот {{device}} ќе се одјави. Може да го задржи пристапот до API уште најмногу еден час.",
+    "signOutThisSessionMessage": "Уредот {{device}} ќе се одјави. Последна активност: {{lastSeen}}. Може да го задржи пристапот до API уште најмногу еден час.",
     "unknownDevice": "Непознат уред"
   },
   "forceUpdate": {

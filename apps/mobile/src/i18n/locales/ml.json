@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "ഇത് ലോഡ് ആകുന്നതുവരെ നിങ്ങളുടെ സജീവ സെഷനുകൾ ലഭ്യമല്ല.",
     "currentDeviceUnidentified": "നിലവിലെ ഉപകരണം തിരിച്ചറിയാൻ കഴിഞ്ഞില്ല.",
     "kiloApp": "Kilo ആപ്പ്",
+    "kiloAppAndroid": "Kilo ആപ്പ് · Android",
+    "kiloAppIos": "Kilo ആപ്പ് · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "സജീവ സെഷനുകളൊന്നുമില്ല",
     "noSessionsDescription": "മറ്റൊരു ഉപകരണത്തിലെ Kilo ആപ്പിൽ സൈൻ ഇൻ ചെയ്താൽ ആ ഉപകരണം ഇവിടെ കാണാം.",
-    "onlyKiloAppSignIns": "Kilo ആപ്പിൽ സൈൻ ഇൻ ചെയ്ത സെഷനുകൾ മാത്രമേ ഇവിടെ കാണൂ. എഡിറ്ററിലെയും CLI-യിലെയും സെഷനുകൾ ഇവിടെ കാണിക്കില്ല.",
     "signedIn": "സൈൻ ഇൻ ചെയ്തത് {{signedIn}} · അവസാനം സജീവമായത് {{lastSeen}}",
+    "signInScopeNote": "Kilo ആപ്പിലും Kilo CLI-യിലും സൈൻ ഇൻ ചെയ്ത സെഷനുകൾ ഇവിടെ കാണാം. എഡിറ്ററിലെ സെഷനുകൾ ഇവിടെ കാണിക്കില്ല.",
     "thisDevice": "ഈ ഉപകരണം",
     "viewProfile": "പ്രൊഫൈൽ കാണുക",
     "webBrowser": "വെബ് ബ്രൗസർ",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "സെഷൻ സൈൻ ഔട്ട് ചെയ്തു.",
     "signOutThisDeviceTitle": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
     "signOutThisSessionTitle": "ഈ സെഷനിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
-    "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ആകും. അതിൽ നിന്ന് ഒരു മണിക്കൂർ വരെ API ഉപയോഗിക്കാൻ കഴിഞ്ഞേക്കാം.",
+    "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ആകും. അവസാനം സജീവമായത് {{lastSeen}}. അതിൽ നിന്ന് ഒരു മണിക്കൂർ വരെ API ഉപയോഗിക്കാൻ കഴിഞ്ഞേക്കാം.",
     "unknownDevice": "അജ്ഞാത ഉപകരണം"
   },
   "forceUpdate": {

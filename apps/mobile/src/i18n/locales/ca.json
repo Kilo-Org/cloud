@@ -2961,10 +2961,13 @@
     "couldNotLoadDescription": "Les teves sessions actives no estaran disponibles fins que s'hagin carregat les dades.",
     "currentDeviceUnidentified": "No s'ha pogut identificar el dispositiu actual.",
     "kiloApp": "Aplicació de Kilo",
+    "kiloAppAndroid": "Aplicació de Kilo · Android",
+    "kiloAppIos": "Aplicació de Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "No hi ha sessions actives",
     "noSessionsDescription": "Inicia la sessió a l'aplicació de Kilo en un altre dispositiu i apareixerà aquí.",
-    "onlyKiloAppSignIns": "Aquí només apareixen els inicis de sessió de l'aplicació de Kilo. No es mostren els de l'editor ni els del CLI.",
     "signedIn": "Inici de sessió: {{signedIn}} · Última activitat: {{lastSeen}}",
+    "signInScopeNote": "Aquí apareixen els inicis de sessió de l'aplicació de Kilo i del Kilo CLI. No es mostren els de l'editor.",
     "thisDevice": "Aquest dispositiu",
     "webBrowser": "Navegador web",
     "viewProfile": "Mostra el perfil",
@@ -2973,7 +2976,7 @@
     "sessionSignedOut": "Sessió tancada.",
     "signOutThisDeviceTitle": "Vols tancar la sessió d'aquest dispositiu?",
     "signOutThisSessionTitle": "Vols tancar aquesta sessió?",
-    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Pot mantenir l'accés a l'API fins a una hora.",
+    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Última activitat: {{lastSeen}}. Pot mantenir l'accés a l'API fins a una hora.",
     "unknownDevice": "Dispositiu desconegut"
   },
   "forceUpdate": {

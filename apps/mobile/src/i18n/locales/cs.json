@@ -3013,10 +3013,13 @@
     "couldNotLoadDescription": "Dokud se seznam nenačte, vaše aktivní relace nejsou dostupné.",
     "currentDeviceUnidentified": "Aktuální zařízení se nepodařilo rozpoznat.",
     "kiloApp": "Aplikace Kilo",
+    "kiloAppAndroid": "Aplikace Kilo · Android",
+    "kiloAppIos": "Aplikace Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Žádné aktivní relace",
     "noSessionsDescription": "Přihlaste se do aplikace Kilo na jiném zařízení. Pak se zde zobrazí.",
-    "onlyKiloAppSignIns": "Zde se zobrazují pouze přihlášení do aplikace Kilo. Přihlášení v editoru a CLI nejsou uvedena.",
     "signedIn": "Přihlášení: {{signedIn}} · Poslední aktivita: {{lastSeen}}",
+    "signInScopeNote": "Zde se zobrazují přihlášení do aplikace Kilo a do Kilo CLI. Přihlášení v editoru nejsou uvedena.",
     "thisDevice": "Toto zařízení",
     "webBrowser": "Webový prohlížeč",
     "viewProfile": "Zobrazit profil",
@@ -3025,7 +3028,7 @@
     "sessionSignedOut": "Relace byla odhlášena.",
     "signOutThisDeviceTitle": "Odhlásit toto zařízení?",
     "signOutThisSessionTitle": "Odhlásit tuto relaci?",
-    "signOutThisSessionMessage": "Zařízení {{device}} se odhlásí. Přístup k API mu může zůstat ještě až hodinu.",
+    "signOutThisSessionMessage": "Zařízení {{device}} se odhlásí. Poslední aktivita: {{lastSeen}}. Přístup k API mu může zůstat ještě až hodinu.",
     "unknownDevice": "Neznámé zařízení"
   },
   "forceUpdate": {

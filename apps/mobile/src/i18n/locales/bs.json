@@ -2961,10 +2961,13 @@
     "couldNotLoadDescription": "Tvoje aktivne sesije nisu dostupne dok se podaci ne učitaju.",
     "currentDeviceUnidentified": "Nije moguće prepoznati trenutni uređaj.",
     "kiloApp": "Aplikacija Kilo",
+    "kiloAppAndroid": "Aplikacija Kilo · Android",
+    "kiloAppIos": "Aplikacija Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Nema aktivnih sesija",
     "noSessionsDescription": "Prijavi se u aplikaciju Kilo na drugom uređaju da se prikaže ovdje.",
-    "onlyKiloAppSignIns": "Ovdje se prikazuju samo prijave u aplikaciju Kilo. Prijave iz uređivača koda i CLI-ja nisu navedene.",
     "signedIn": "Prijava: {{signedIn}} · Posljednja aktivnost: {{lastSeen}}",
+    "signInScopeNote": "Ovdje se prikazuju prijave u aplikaciju Kilo i Kilo CLI. Prijave iz uređivača koda nisu navedene.",
     "thisDevice": "Ovaj uređaj",
     "webBrowser": "Web preglednik",
     "viewProfile": "Pogledaj profil",
@@ -2973,7 +2976,7 @@
     "sessionSignedOut": "Sesija odjavljena.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
-    "signOutThisSessionMessage": "Uređaj {{device}} bit će odjavljen. Može zadržati pristup API-ju još najviše sat vremena.",
+    "signOutThisSessionMessage": "Uređaj {{device}} bit će odjavljen. Posljednja aktivnost: {{lastSeen}}. Može zadržati pristup API-ju još najviše sat vremena.",
     "unknownDevice": "Nepoznati uređaj"
   },
   "forceUpdate": {

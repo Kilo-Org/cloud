@@ -2909,10 +2909,13 @@
     "couldNotLoadDescription": "Iziseshini zakho ezisebenzayo azitholakali kuze kuphele lokhu kulayisha.",
     "currentDeviceUnidentified": "Asikwazanga ukuhlonza idivayisi yamanje.",
     "kiloApp": "Uhlelo lokusebenza lwe-Kilo",
+    "kiloAppAndroid": "Uhlelo lokusebenza lwe-Kilo · Android",
+    "kiloAppIos": "Uhlelo lokusebenza lwe-Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Azikho iziseshini ezisebenzayo",
     "noSessionsDescription": "Ngena ngemvume ngohlelo lokusebenza lwe-Kilo kwenye idivayisi, bese ivela lapha.",
-    "onlyKiloAppSignIns": "Kuvela lapha kuphela ukungena ngemvume ngohlelo lokusebenza lwe-Kilo. Ukungena ngemvume ngesihleli sekhodi nange-CLI akuveli kulolu hlu.",
     "signedIn": "Kungene ngemvume: {{signedIn}} · Kugcine ukubonwa: {{lastSeen}}",
+    "signInScopeNote": "Ukungena ngemvume ngohlelo lokusebenza lwe-Kilo nange-Kilo CLI kuvela lapha. Ukungena ngemvume ngesihleli sekhodi akuveli kulolu hlu.",
     "thisDevice": "Le divayisi",
     "webBrowser": "Isiphequluli sewebhu",
     "viewProfile": "Buka iphrofayili",
@@ -2921,7 +2924,7 @@
     "sessionSignedOut": "Iseshini ikhishiwe ku-akhawunti.",
     "signOutThisDeviceTitle": "Uyafuna ukuphuma ngemvume kule divayisi?",
     "signOutThisSessionTitle": "Uyafuna ukuphuma ngemvume kule seshini?",
-    "signOutThisSessionMessage": "{{device}} izokhishwa ku-akhawunti. Isengafinyelela ku-API isikhathi esifinyelela ehoreni elilodwa.",
+    "signOutThisSessionMessage": "{{device}} izokhishwa ku-akhawunti. Kugcine ukubonwa: {{lastSeen}}. Isengafinyelela ku-API isikhathi esifinyelela ehoreni elilodwa.",
     "unknownDevice": "Idivayisi engaziwa"
   },
   "forceUpdate": {

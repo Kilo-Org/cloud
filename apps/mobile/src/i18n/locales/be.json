@@ -3013,10 +3013,13 @@
     "couldNotLoadDescription": "Актыўныя сеансы будуць недаступныя да завяршэння загрузкі даных.",
     "currentDeviceUnidentified": "Не ўдалося вызначыць бягучую прыладу.",
     "kiloApp": "Праграма Kilo",
+    "kiloAppAndroid": "Праграма Kilo · Android",
+    "kiloAppIos": "Праграма Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Няма актыўных сеансаў",
     "noSessionsDescription": "Увайдзіце ў праграму Kilo на іншай прыладзе, і яна з'явіцца тут.",
-    "onlyKiloAppSignIns": "Тут паказваюцца толькі ўваходы праз праграму Kilo. Уваходы праз рэдактар і CLI не паказваюцца.",
     "signedIn": "Уваход: {{signedIn}} · Апошняя актыўнасць: {{lastSeen}}",
+    "signInScopeNote": "Тут паказваюцца ўваходы праз праграму Kilo і праз Kilo CLI. Уваходы праз рэдактар не паказваюцца.",
     "thisDevice": "Гэтая прылада",
     "webBrowser": "Вэб-браўзер",
     "viewProfile": "Праглядзець профіль",
@@ -3025,7 +3028,7 @@
     "sessionSignedOut": "Сеанс завершаны.",
     "signOutThisDeviceTitle": "Выйсці з уліковага запісу на гэтай прыладзе?",
     "signOutThisSessionTitle": "Завяршыць гэты сеанс?",
-    "signOutThisSessionMessage": "Сеанс на прыладзе {{device}} будзе завершаны. Доступ да API можа захоўвацца яшчэ да гадзіны.",
+    "signOutThisSessionMessage": "Сеанс на прыладзе {{device}} будзе завершаны. Апошняя актыўнасць: {{lastSeen}}. Доступ да API можа захоўвацца яшчэ да гадзіны.",
     "unknownDevice": "Невядомая прылада"
   },
   "forceUpdate": {

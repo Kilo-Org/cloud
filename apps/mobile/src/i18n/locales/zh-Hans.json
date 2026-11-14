@@ -2366,10 +2366,13 @@
     "couldNotLoadDescription": "加载完成后，才能查看当前登录的设备。",
     "currentDeviceUnidentified": "无法识别当前设备。",
     "kiloApp": "Kilo 应用",
+    "kiloAppAndroid": "Kilo 应用 · Android",
+    "kiloAppIos": "Kilo 应用 · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "暂无已登录的设备",
     "noSessionsDescription": "在其他设备上登录 Kilo 应用后，即可在这里看到该设备。",
-    "onlyKiloAppSignIns": "这里仅列出 Kilo 应用的登录会话，不含编辑器和 CLI 的登录会话。",
     "signedIn": "登录于 {{signedIn}} · 最后在线 {{lastSeen}}",
+    "signInScopeNote": "这里会显示来自 Kilo 应用和 Kilo CLI 的登录。编辑器的登录不会列出。",
     "thisDevice": "此设备",
     "webBrowser": "浏览器",
     "viewProfile": "查看个人资料",
@@ -2378,7 +2381,7 @@
     "sessionSignedOut": "会话已退出登录。",
     "signOutThisDeviceTitle": "在此设备上退出登录？",
     "signOutThisSessionTitle": "退出此登录会话？",
-    "signOutThisSessionMessage": "{{device}} 将退出登录，但其 API 访问权限最多仍可保留一小时。",
+    "signOutThisSessionMessage": "{{device}} 将退出登录，最后在线 {{lastSeen}}。其 API 访问权限最多仍可保留一小时。",
     "unknownDevice": "未知设备"
   },
   "forceUpdate": {

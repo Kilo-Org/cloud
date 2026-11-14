@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
+  type DbTransaction,
   lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
@@ -40,6 +41,38 @@ import type { GitHubAppType } from '../app-selector';
  * GitHub Installation Event Handlers
  * Handles: created, deleted, suspend, unsuspend
  */
+
+/**
+ * Admission rule for both automatic repair paths of an installation-created
+ * delivery: an association attaches to the canonical installation only when no
+ * other live association holds it. A live association is one in PENDING or
+ * ACTIVE status that is not disconnected, whether or not it is already bound to
+ * a canonical row. Callers already hold the installation identity lock.
+ */
+async function hasOtherLiveAssociation(
+  tx: DbTransaction,
+  appType: GitHubAppType,
+  installationId: string,
+  exceptIntegrationId: string
+): Promise<boolean> {
+  const [otherAssociation] = await tx
+    .select({ id: platform_integrations.id })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        effectiveAppTypeCondition(appType),
+        eq(platform_integrations.platform_installation_id, installationId),
+        inArray(platform_integrations.integration_status, [
+          INTEGRATION_STATUS.PENDING,
+          INTEGRATION_STATUS.ACTIVE,
+        ]),
+        isNull(platform_integrations.github_disconnected_at),
+        ne(platform_integrations.id, exceptIntegrationId)
+      )
+    );
+  return Boolean(otherAssociation);
+}
 
 export async function handleInstallationCreated(
   payload: InstallationCreatedPayload,
@@ -81,24 +114,49 @@ export async function handleInstallationCreated(
     scopes: installationData.events,
     repositoryAccess: installationData.repository_selection,
   });
-  const activeUnboundMatches = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        appTypeCondition,
-        eq(platform_integrations.platform_installation_id, installationData.installation_id),
-        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
-        isNull(platform_integrations.github_installation_id),
-        isNull(platform_integrations.github_disconnected_at)
-      )
+  const activeRepair = await db.transaction(async tx => {
+    await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
+    const candidates = await tx
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          appTypeCondition,
+          eq(platform_integrations.platform_installation_id, installationData.installation_id),
+          eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
+          isNull(platform_integrations.github_installation_id),
+          isNull(platform_integrations.github_disconnected_at)
+        )
+      );
+    if (candidates.length !== 1)
+      return { ok: false as const, reason: 'no_sole_candidate' as const };
+    const candidate = candidates[0];
+    if (!candidate) return { ok: false as const, reason: 'no_sole_candidate' as const };
+    if (
+      await hasOtherLiveAssociation(tx, appType, installationData.installation_id, candidate.id)
+    ) {
+      return {
+        ok: false as const,
+        reason: 'competing_association' as const,
+        integrationId: candidate.id,
+      };
+    }
+    await bindGitHubIntegrationToCanonicalInstallation(
+      {
+        integrationId: candidate.id,
+        installationId: installationData.installation_id,
+        appType,
+      },
+      tx
     );
-  if (activeUnboundMatches.length === 1 && activeUnboundMatches[0]) {
-    await bindGitHubIntegrationToCanonicalInstallation({
-      integrationId: activeUnboundMatches[0].id,
-      installationId: installationData.installation_id,
-      appType,
+    return { ok: true as const };
+  });
+  if (!activeRepair.ok && activeRepair.reason === 'competing_association') {
+    logExceptInTest('GitHub installation repair declined:', {
+      installation_id: installationData.installation_id,
+      integration_id: activeRepair.integrationId,
+      reason: activeRepair.reason,
     });
   }
   const targetMatches =
@@ -135,38 +193,18 @@ export async function handleInstallationCreated(
     if (legacyMatches.length === 1) pending = legacyMatches[0];
   }
   if (pending) {
-    // The exclusivity decision, the pending-row completion, and the canonical
-    // binding must be one serialized unit. Otherwise a competing verified
-    // connection can commit between the check and the bind and leave two
-    // active tenant associations on one canonical installation while
-    // sharing_mode stays exclusive — i.e. the pending request bypasses
-    // sharing admission entirely. The advisory lock is the same one
-    // connectVerifiedGitHubInstallation/bindGitHubIntegrationToCanonicalInstallation
-    // take on the installation identity, so both paths serialize here.
+    // The decision, the pending-row completion, and the canonical binding run
+    // as one serialized unit under the installation identity lock, the same
+    // lock connectVerifiedGitHubInstallation and
+    // bindGitHubIntegrationToCanonicalInstallation take. Admission therefore
+    // holds under concurrency for every writer of this installation identity.
     const completed = await db.transaction(async tx => {
       await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
-      // Count every OTHER live association for this installation, not only
-      // those already bound to a canonical row. With connection management
-      // disabled the legacy callback commits an unbound association and binds
-      // it in a separate step, so a bound-only check would miss that peer and
-      // auto-attach a second tenant to the same installation.
-      const [competingAssociation] = await tx
-        .select({ id: platform_integrations.id })
-        .from(platform_integrations)
-        .where(
-          and(
-            eq(platform_integrations.platform, PLATFORM.GITHUB),
-            appTypeCondition,
-            eq(platform_integrations.platform_installation_id, installationData.installation_id),
-            ne(platform_integrations.id, pending.id),
-            isNull(platform_integrations.github_disconnected_at),
-            inArray(platform_integrations.integration_status, [
-              INTEGRATION_STATUS.PENDING,
-              INTEGRATION_STATUS.ACTIVE,
-            ])
-          )
-        );
-      if (competingAssociation) {
+      // A live association may be bound or unbound, so peers are counted by
+      // status rather than by whether they already carry a canonical binding.
+      if (
+        await hasOtherLiveAssociation(tx, appType, installationData.installation_id, pending.id)
+      ) {
         return { ok: false as const, reason: 'competing_association' as const };
       }
       const completion = await autoCompleteInstallation(

@@ -26,17 +26,32 @@ jest.mock('@/lib/bot-identity', () => ({
   unlinkTeamKiloUsers: jest.fn(async () => undefined),
 }));
 
-// Test-controlled pause inside the pending completion, used only by the
-// controlled-concurrency test below. The mock factory references this object
-// only when the mocked function is called (long after initialization), so the
-// hoisted factory never touches it while it is still uninitialized.
+// Test-controlled pauses inside the pending completion and inside the canonical
+// binding, used only by the controlled-concurrency tests below. The mock factory
+// references this object only when the mocked function is called (long after
+// initialization), so the hoisted factory never touches it while it is still
+// uninitialized.
 const autoCompleteGateState: {
   gate: Promise<void> | null;
   entered: Promise<void> | null;
   release: (() => void) | null;
   markEntered: (() => void) | null;
+  bindGate: Promise<void> | null;
+  bindEntered: Promise<void> | null;
+  releaseBind: (() => void) | null;
+  markBindEntered: (() => void) | null;
   failBind: boolean;
-} = { gate: null, entered: null, release: null, markEntered: null, failBind: false };
+} = {
+  gate: null,
+  entered: null,
+  release: null,
+  markEntered: null,
+  bindGate: null,
+  bindEntered: null,
+  releaseBind: null,
+  markBindEntered: null,
+  failBind: false,
+};
 
 jest.mock('@/lib/integrations/db/github-installations', () => {
   const actual = jest.requireActual<typeof GitHubInstallationsModule>(
@@ -48,6 +63,8 @@ jest.mock('@/lib/integrations/db/github-installations', () => {
       ...args: Parameters<typeof actual.bindGitHubIntegrationToCanonicalInstallation>
     ) => {
       if (autoCompleteGateState.failBind) throw new Error('bind failed');
+      autoCompleteGateState.markBindEntered?.();
+      if (autoCompleteGateState.bindGate) await autoCompleteGateState.bindGate;
       return actual.bindGitHubIntegrationToCanonicalInstallation(...args);
     },
   };
@@ -70,12 +87,21 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => {
 });
 
 function installAutoCompleteGate() {
-  autoCompleteGateState.gate = new Promise<void>(resolve => {
-    autoCompleteGateState.release = resolve;
-  });
-  autoCompleteGateState.entered = new Promise<void>(resolve => {
-    autoCompleteGateState.markEntered = resolve;
-  });
+  const gate = Promise.withResolvers<void>();
+  autoCompleteGateState.gate = gate.promise;
+  autoCompleteGateState.release = gate.resolve;
+  const entered = Promise.withResolvers<void>();
+  autoCompleteGateState.entered = entered.promise;
+  autoCompleteGateState.markEntered = entered.resolve;
+}
+
+function installBindGate() {
+  const gate = Promise.withResolvers<void>();
+  autoCompleteGateState.bindGate = gate.promise;
+  autoCompleteGateState.releaseBind = gate.resolve;
+  const entered = Promise.withResolvers<void>();
+  autoCompleteGateState.bindEntered = entered.promise;
+  autoCompleteGateState.markBindEntered = entered.resolve;
 }
 
 const ownerId = 'oauth/installation-handler-db-owner';
@@ -167,6 +193,45 @@ async function canonicalSharingMode(installationId: string) {
   return canonical?.sharingMode;
 }
 
+async function canonicalInstallationId(installationId: string) {
+  const [canonical] = await db
+    .select({ id: github_app_installations.id })
+    .from(github_app_installations)
+    .where(
+      and(
+        eq(github_app_installations.github_app_type, 'standard'),
+        eq(github_app_installations.installation_id, installationId)
+      )
+    );
+  return canonical?.id;
+}
+
+async function insertActiveUnboundAssociation(input: {
+  organizationId: string;
+  installationId: string;
+  githubAppType?: 'standard' | 'lite';
+  connectionRole?: 'workflow' | 'agent_only' | null;
+}) {
+  const inserted = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_organization_id: input.organizationId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: input.installationId,
+      github_app_type: input.githubAppType ?? 'standard',
+      github_connection_role: input.connectionRole ?? null,
+      platform_account_id: String(ACCOUNT_ID),
+      platform_account_login: ACCOUNT_LOGIN,
+      integration_status: 'active',
+      repository_access: 'all',
+    })
+    .returning();
+  const association = inserted[0];
+  if (!association) throw new Error('Expected the active unbound association');
+  return association;
+}
+
 describe('handleInstallationCreated sharing-admission serialization', () => {
   beforeEach(async () => {
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
@@ -190,7 +255,20 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
     ]);
   });
 
-  afterEach(cleanupDbForTest);
+  afterEach(async () => {
+    // A test that fails on a gate assertion must not leave the pause installed
+    // for the tests that follow it.
+    autoCompleteGateState.gate = null;
+    autoCompleteGateState.entered = null;
+    autoCompleteGateState.release = null;
+    autoCompleteGateState.markEntered = null;
+    autoCompleteGateState.bindGate = null;
+    autoCompleteGateState.bindEntered = null;
+    autoCompleteGateState.releaseBind = null;
+    autoCompleteGateState.markBindEntered = null;
+    autoCompleteGateState.failBind = false;
+    await cleanupDbForTest();
+  });
 
   test('leaves a pending request pending when another tenant already owns the installation', async () => {
     const organizationA = await createTestOrganization('Handler DB Pending A', ownerId, 0);
@@ -359,10 +437,11 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
     const requester = await createTestOrganization('Handler DB Legacy Pending', ownerId, 0);
     const installationId = '575757';
 
-    // The legacy (management-disabled) callback commits its association for
-    // this installation and binds it in a separate step. Two such rows exist
-    // here, so the active-unbound repair path does not converge them before
-    // the pending completion runs.
+    // The fixture rows stand for legacy associations that are already
+    // committed against this installation and not yet bound to a canonical
+    // row; the callback that wrote them is not part of this test. Two such
+    // rows exist here, so the repair path does not converge them to a single
+    // candidate before the pending completion runs.
     const legacyRows = await db
       .insert(platform_integrations)
       .values(
@@ -408,6 +487,507 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
     // Invariant: never two live tenants on one installation.
     const bound = await boundAssociations(installationId);
     expect(bound.length).toBeLessThanOrEqual(1);
+  });
+
+  test('binds the sole active unbound association to the canonical installation', async () => {
+    const organization = await createTestOrganization('Handler DB Sole Candidate', ownerId, 0);
+    const installationId = '600601';
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organization.id,
+      installationId,
+      connectionRole: 'workflow',
+    });
+
+    // The delivery records the canonical row, so the repair attaches the
+    // association to it without changing the sharing mode from its default.
+    await expect(canonicalSharingMode(installationId)).resolves.toBeUndefined();
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation recorded' });
+
+    const canonicalId = await canonicalInstallationId(installationId);
+    if (!canonicalId) throw new Error('Expected the canonical installation row');
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter?.github_installation_id).toBe(canonicalId);
+
+    const rows = await boundAssociations(installationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(candidate.id);
+    await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+  });
+
+  test('leaves an active unbound association unbound while another tenant holds the installation', async () => {
+    const organizationA = await createTestOrganization('Handler DB Repair Peer A', ownerId, 0);
+    const organizationB = await createTestOrganization('Handler DB Repair Peer B', otherOwnerId, 0);
+    const installationId = '600602';
+
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      verifiedConnectionData(installationId, otherOwnerId)
+    );
+    if (!connected.ok) throw new Error('Expected the first tenant to connect');
+
+    // UQ_platform_integrations_github_workflow_identity allows one workflow-role
+    // association per installation identity, so an association that still waits
+    // for its canonical binding carries no connection role.
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organizationA.id,
+      installationId,
+    });
+    await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter).toMatchObject({
+      integration_status: 'active',
+      github_installation_id: null,
+    });
+
+    const rows = await boundAssociations(installationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.owned_by_organization_id).toBe(organizationB.id);
+    await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+  });
+
+  test('leaves the workflow candidate unbound while a bound legacy peer holds the installation', async () => {
+    const legacyOrganization = await createTestOrganization(
+      'Handler DB Legacy Bound Peer',
+      otherOwnerId,
+      0
+    );
+    const candidateOrganization = await createTestOrganization(
+      'Handler DB Legacy Bound Candidate',
+      ownerId,
+      0
+    );
+    const installationId = '600611';
+
+    const inserted = await db
+      .insert(github_app_installations)
+      .values({
+        github_app_type: 'standard',
+        installation_id: installationId,
+        account_id: String(ACCOUNT_ID),
+        account_login: ACCOUNT_LOGIN,
+        account_type: 'Organization',
+        repository_access: 'all',
+        lifecycle_state: 'active',
+        observed_at: new Date().toISOString(),
+      })
+      .returning({ id: github_app_installations.id });
+    const canonical = inserted[0];
+    if (!canonical) throw new Error('Expected the canonical installation row');
+
+    // The peer is a legacy association that already points at the canonical
+    // installation.
+    const legacyInserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: legacyOrganization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        platform_account_id: String(ACCOUNT_ID),
+        platform_account_login: ACCOUNT_LOGIN,
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    const legacyPeer = legacyInserted[0];
+    if (!legacyPeer) throw new Error('Expected the legacy peer');
+
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: candidateOrganization.id,
+      installationId,
+      connectionRole: 'workflow',
+    });
+    await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation recorded' });
+
+    const rows = await boundAssociations(installationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(legacyPeer.id);
+
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter).toMatchObject({
+      integration_status: 'active',
+      github_installation_id: null,
+    });
+    await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+  });
+
+  test('leaves the sole candidate unbound while a pending peer projects the installation', async () => {
+    const organization = await createTestOrganization('Handler DB Pending Peer', ownerId, 0);
+    const peerOrganization = await createTestOrganization(
+      'Handler DB Pending Peer Two',
+      otherOwnerId,
+      0
+    );
+    const installationId = '600603';
+
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organization.id,
+      installationId,
+      connectionRole: 'workflow',
+    });
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: peerOrganization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        platform_account_id: String(ACCOUNT_ID),
+        platform_account_login: ACCOUNT_LOGIN,
+        platform_requester_account_id: '9999',
+        integration_status: 'pending',
+        repository_access: 'all',
+      })
+      .returning();
+    const peer = inserted[0];
+    if (!peer) throw new Error('Expected the pending peer');
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter).toMatchObject({ github_installation_id: null });
+
+    const [peerAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, peer.id));
+    expect(peerAfter).toMatchObject({
+      integration_status: 'pending',
+      platform_installation_id: installationId,
+      github_installation_id: null,
+    });
+
+    await expect(boundAssociations(installationId)).resolves.toHaveLength(0);
+  });
+
+  test('binds the sole candidate when a pending request carries no installation projection', async () => {
+    const organization = await createTestOrganization(
+      'Handler DB Pending No Projection',
+      ownerId,
+      0
+    );
+    const requesterOrganization = await createTestOrganization(
+      'Handler DB Pending No Projection Two',
+      otherOwnerId,
+      0
+    );
+    const installationId = '600604';
+
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organization.id,
+      installationId,
+      connectionRole: 'workflow',
+    });
+    const pending = await insertPendingRequest(requesterOrganization.id, '9999');
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation recorded' });
+
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter?.github_installation_id).not.toBeNull();
+
+    const [pendingAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(pendingAfter).toMatchObject({
+      integration_status: 'pending',
+      platform_installation_id: null,
+      github_installation_id: null,
+    });
+
+    const rows = await boundAssociations(installationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(candidate.id);
+  });
+
+  test('serializes the active repair with a concurrent verified connection', async () => {
+    const organizationA = await createTestOrganization('Handler DB Repair Race A', ownerId, 0);
+    const organizationB = await createTestOrganization('Handler DB Repair Race B', otherOwnerId, 0);
+    const installationId = '600605';
+
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organizationA.id,
+      installationId,
+      connectionRole: 'workflow',
+    });
+    await expect(canonicalSharingMode(installationId)).resolves.toBeUndefined();
+
+    installBindGate();
+    const handlerPromise = handleInstallationCreated(createdPayload(installationId), 'standard');
+    // The repair has taken the installation identity and is paused before
+    // the canonical binding.
+    await autoCompleteGateState.bindEntered;
+
+    const verifiedPromise = connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      verifiedConnectionData(installationId, otherOwnerId)
+    );
+    // The wait being observed is a Postgres advisory lock, so real time is
+    // the only clock that can prove the promise stays unsettled.
+    const timer = Promise.withResolvers<'pending'>();
+    setTimeout(() => timer.resolve('pending'), 250);
+    const firstSettled = await Promise.race([
+      verifiedPromise.then(() => 'settled' as const),
+      timer.promise,
+    ]);
+
+    // The verified connection waits on the installation identity, so it
+    // cannot commit a second tenant while the repair is in flight.
+    expect(firstSettled).toBe('pending');
+    await expect(boundAssociations(installationId)).resolves.toHaveLength(0);
+
+    autoCompleteGateState.releaseBind?.();
+    const [response, verifiedResult] = await Promise.all([handlerPromise, verifiedPromise]);
+
+    expect(response.status).toBe(200);
+    expect(verifiedResult).toEqual({ ok: false, reason: 'shared_installation_disabled' });
+
+    const rows = await boundAssociations(installationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(candidate.id);
+    await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+  }, 30000);
+
+  test('admits allowlisted shared tenants besides an unbound legacy association', async () => {
+    const organizationA = await createTestOrganization('Handler DB Sharing A', ownerId, 0);
+    const organizationB = await createTestOrganization('Handler DB Sharing B', otherOwnerId, 0);
+    const organizationC = await createTestOrganization('Handler DB Sharing C', ownerId, 0);
+    const organizationD = await createTestOrganization('Handler DB Sharing D', otherOwnerId, 0);
+    const installationId = '600606';
+
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = [
+      organizationB.id,
+      organizationD.id,
+    ].join(',');
+
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      verifiedConnectionData(installationId, ownerId)
+    );
+    if (!first.ok) throw new Error('Expected the first tenant to connect');
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      verifiedConnectionData(installationId, otherOwnerId)
+    );
+    if (!second.ok) throw new Error('Expected the shared tenant to connect');
+
+    const third = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationD.id },
+      verifiedConnectionData(installationId, ownerId)
+    );
+    expect(third).toMatchObject({ ok: true });
+    await expect(boundAssociations(installationId)).resolves.toHaveLength(3);
+
+    // A live, shared installation still admits allowlisted tenants, and the
+    // association that holds no canonical binding stays unbound beside them.
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organizationC.id,
+      installationId,
+    });
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter).toMatchObject({ github_installation_id: null });
+
+    const admitted = await boundAssociations(installationId);
+    expect(admitted.map(row => row.owned_by_organization_id).sort()).toEqual(
+      [organizationA.id, organizationB.id, organizationD.id].sort()
+    );
+    await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
+  }, 30000);
+
+  test('binds the sole candidate beside a disconnected former tenant', async () => {
+    const organization = await createTestOrganization('Handler DB Recovery Candidate', ownerId, 0);
+    const formerOrganization = await createTestOrganization(
+      'Handler DB Recovery Former Tenant',
+      otherOwnerId,
+      0
+    );
+    const installationId = '600607';
+
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organization.id,
+      installationId,
+      connectionRole: 'workflow',
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: formerOrganization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: installationId,
+      github_app_type: 'standard',
+      platform_account_id: String(ACCOUNT_ID),
+      platform_account_login: ACCOUNT_LOGIN,
+      integration_status: 'suspended',
+      suspended_at: new Date().toISOString(),
+      suspended_by: 'local_disconnect',
+      github_disconnected_at: new Date().toISOString(),
+      repository_access: 'all',
+    });
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation recorded' });
+
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter?.github_installation_id).not.toBeNull();
+
+    const rows = await boundAssociations(installationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(candidate.id);
+  });
+
+  test('binds the standard candidate when a lite association uses the same installation number', async () => {
+    const organization = await createTestOrganization('Handler DB App Type Standard', ownerId, 0);
+    const liteOrganization = await createTestOrganization(
+      'Handler DB App Type Lite',
+      otherOwnerId,
+      0
+    );
+    const installationId = '600608';
+
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organization.id,
+      installationId,
+      connectionRole: 'workflow',
+    });
+    const lite = await insertActiveUnboundAssociation({
+      organizationId: liteOrganization.id,
+      installationId,
+      githubAppType: 'lite',
+      connectionRole: 'workflow',
+    });
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter?.github_installation_id).not.toBeNull();
+
+    const [liteAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, lite.id));
+    expect(liteAfter).toMatchObject({
+      github_app_type: 'lite',
+      integration_status: 'active',
+      github_installation_id: null,
+    });
+
+    const rows = await boundAssociations(installationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(candidate.id);
+  });
+
+  test('records the delivery without binding when no active unbound association exists', async () => {
+    const organization = await createTestOrganization('Handler DB No Candidate', ownerId, 0);
+    const installationId = '600609';
+
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        platform_account_id: String(ACCOUNT_ID),
+        platform_account_login: ACCOUNT_LOGIN,
+        integration_status: 'suspended',
+        suspended_at: new Date().toISOString(),
+        suspended_by: 'local_disconnect',
+        github_disconnected_at: new Date().toISOString(),
+        repository_access: 'all',
+      })
+      .returning();
+    const inactive = inserted[0];
+    if (!inactive) throw new Error('Expected the suspended association');
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation recorded' });
+
+    const [inactiveAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, inactive.id));
+    expect(inactiveAfter).toMatchObject({
+      integration_status: 'suspended',
+      github_disconnected_at: expect.any(String),
+      github_installation_id: null,
+    });
+    await expect(boundAssociations(installationId)).resolves.toHaveLength(0);
+  });
+
+  test('rolls back the repair when the canonical binding fails', async () => {
+    const organization = await createTestOrganization('Handler DB Repair Rollback', ownerId, 0);
+    const installationId = '600610';
+
+    const candidate = await insertActiveUnboundAssociation({
+      organizationId: organization.id,
+      installationId,
+      connectionRole: 'workflow',
+    });
+
+    autoCompleteGateState.failBind = true;
+    await expect(
+      handleInstallationCreated(createdPayload(installationId), 'standard')
+    ).rejects.toThrow('bind failed');
+    autoCompleteGateState.failBind = false;
+
+    // The repair runs inside one transaction, so a binding failure leaves the
+    // candidate unbound and the canonical row untouched.
+    const [candidateAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, candidate.id));
+    expect(candidateAfter).toMatchObject({ github_installation_id: null });
+    await expect(boundAssociations(installationId)).resolves.toHaveLength(0);
   });
 
   test('recovers the connected tenant when a disconnected former tenant is also present', async () => {

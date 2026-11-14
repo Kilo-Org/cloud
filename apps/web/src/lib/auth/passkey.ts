@@ -207,6 +207,56 @@ function readPresentedChallenge(response: {
 }
 
 /**
+ * Refuse a ceremony whose client data names another challenge. A response can
+ * omit the client data challenge or carry one that cannot be parsed, so only a
+ * readable mismatch is refused here; verification still runs against the
+ * stored challenge.
+ */
+function assertPresentedChallenge(
+  response: { response?: { clientDataJSON?: unknown } },
+  storedChallenge: string
+): void {
+  const presentedChallenge = readPresentedChallenge(response);
+  if (presentedChallenge !== null && presentedChallenge !== storedChallenge) {
+    throw new PasskeyVerificationError('WRONG_CHALLENGE');
+  }
+}
+
+/**
+ * Normalize a failed WebAuthn call: our own refusal keeps its code, and every
+ * library throw becomes `VERIFICATION_FAILED`, so library detail never reaches
+ * the client.
+ */
+function normalizeVerificationFailure(error: unknown): never {
+  if (error instanceof PasskeyVerificationError) {
+    throw error;
+  }
+  throw new PasskeyVerificationError('VERIFICATION_FAILED');
+}
+
+/**
+ * Store a freshly minted challenge and return the opaque id the client echoes
+ * back. The row carries the ceremony it authorizes and, for registration, the
+ * owner it was minted for; authentication is usernameless, so its owner is
+ * null.
+ */
+async function storeChallenge(
+  challenge: string,
+  ceremony: PasskeyCeremony,
+  kiloUserId: string | null
+): Promise<string> {
+  const challengeId = randomUUID();
+  await db.insert(passkey_challenges).values({
+    id: challengeId,
+    challenge,
+    kind: ceremony,
+    kilo_user_id: kiloUserId,
+    expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
+  });
+  return challengeId;
+}
+
+/**
  * Create the WebAuthn registration options for a signed-in user and store the
  * challenge server-side.
  *
@@ -245,14 +295,7 @@ export async function createRegistrationOptions(
     },
   });
 
-  const challengeId = randomUUID();
-  await db.insert(passkey_challenges).values({
-    id: challengeId,
-    challenge: options.challenge,
-    kind: 'registration',
-    kilo_user_id: kiloUserId,
-    expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
-  });
+  const challengeId = await storeChallenge(options.challenge, 'registration', kiloUserId);
 
   return { challengeId, options };
 }
@@ -290,10 +333,7 @@ export async function verifyRegistration(
     throw new PasskeyVerificationError('VERIFICATION_FAILED');
   }
 
-  const presentedChallenge = readPresentedChallenge(response);
-  if (presentedChallenge !== null && presentedChallenge !== challenge.challenge) {
-    throw new PasskeyVerificationError('WRONG_CHALLENGE');
-  }
+  assertPresentedChallenge(response, challenge.challenge);
 
   let registrationInfo: Awaited<ReturnType<typeof verifyRegistrationResponse>>['registrationInfo'];
   try {
@@ -311,10 +351,7 @@ export async function verifyRegistration(
     }
     registrationInfo = verification.registrationInfo;
   } catch (error) {
-    if (error instanceof PasskeyVerificationError) {
-      throw error;
-    }
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    normalizeVerificationFailure(error);
   }
 
   const { credential, credentialDeviceType, credentialBackedUp, aaguid } = registrationInfo;
@@ -375,14 +412,7 @@ export async function createAuthenticationOptions(): Promise<AuthenticationOptio
     userVerification: 'preferred',
   });
 
-  const challengeId = randomUUID();
-  await db.insert(passkey_challenges).values({
-    id: challengeId,
-    challenge: options.challenge,
-    kind: 'authentication',
-    kilo_user_id: null,
-    expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
-  });
+  const challengeId = await storeChallenge(options.challenge, 'authentication', null);
 
   return { challengeId, options };
 }
@@ -437,10 +467,7 @@ export async function verifyAuthentication(
 
   const challenge = await consumeChallenge(challengeId, 'authentication');
 
-  const presentedChallenge = readPresentedChallenge(response);
-  if (presentedChallenge !== null && presentedChallenge !== challenge.challenge) {
-    throw new PasskeyVerificationError('WRONG_CHALLENGE');
-  }
+  assertPresentedChallenge(response, challenge.challenge);
 
   const [credential] = await db
     .select()
@@ -472,10 +499,7 @@ export async function verifyAuthentication(
     }
     newCounter = verification.authenticationInfo.newCounter;
   } catch (error) {
-    if (error instanceof PasskeyVerificationError) {
-      throw error;
-    }
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    normalizeVerificationFailure(error);
   }
 
   if (credential.sign_count !== 0 && newCounter <= credential.sign_count) {

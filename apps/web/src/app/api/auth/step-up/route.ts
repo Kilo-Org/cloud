@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 
-import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
+import { checkFirewallRateLimit, firewallRateLimitRefusal } from '@/lib/auth/firewall-rate-limit';
 import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
 import { getWebRelyingParty } from '@/lib/auth/passkey';
 import {
@@ -86,12 +86,8 @@ export async function POST(request: NextRequest) {
       rateLimitKey: rateLimitKey(action, user.id),
     }
   );
-  if (limit === 'limited') {
-    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
-  }
-  if (limit === 'unavailable') {
-    return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
-  }
+  const refusal = firewallRateLimitRefusal(limit);
+  if (refusal) return refusal;
 
   try {
     if (parsed.data.action === 'options') {

@@ -7,7 +7,7 @@ import {
   verifyRegistration,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
-import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
+import { checkFirewallRateLimit, firewallRateLimitRefusal } from '@/lib/auth/firewall-rate-limit';
 import { registrationResponseSchema } from '@/lib/auth/passkey-response';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
@@ -113,12 +113,8 @@ export async function POST(request: NextRequest) {
         request,
         rateLimitKey: registrationRateLimitKey(user.id),
       });
-      if (limit === 'limited') {
-        return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
-      }
-      if (limit === 'unavailable') {
-        return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
-      }
+      const refusal = firewallRateLimitRefusal(limit);
+      if (refusal) return refusal;
 
       const reauth = await refuseStaleEnrollment({
         userId: user.id,

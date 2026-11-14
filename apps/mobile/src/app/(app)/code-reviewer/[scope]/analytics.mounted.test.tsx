@@ -260,8 +260,7 @@ describe('CodeReviewerAnalytics retryable failure', () => {
   it('withholds Retry from a dashboard error that cannot recover', () => {
     queries.dashboard.data = undefined;
     queries.dashboard.isError = true;
-    // A terminal tRPC code: `PRECONDITION_FAILED` is not in the shared
-    // `TERMINAL_TRPC_CODES`, so the screen keeps a Retry for it.
+    // A code the shared terminal list carries, so retrying cannot recover it.
     queries.dashboard.error = { data: { code: 'UNPROCESSABLE_CONTENT', httpStatus: 422 } };
     const renderer = mountScreen();
 

@@ -834,6 +834,46 @@ test('points the local auto routing worker at the local gateway and seeds its se
   }
 });
 
+test('generates a blank BYOC credential secret and seeds the cloud-agent-next Secrets Store binding from it', () => {
+  const readRepoFile = (relPath: string) =>
+    fs.readFileSync(new URL(`../../../${relPath}`, import.meta.url), 'utf-8');
+  const repo = createRepo({
+    '.env.local': 'INTERNAL_API_SECRET=local-internal-secret\nBYOC_INTERNAL_API_SECRET=\n',
+    [`${workerDir}/package.json`]: readRepoFile(`${workerDir}/package.json`),
+    [`${workerDir}/wrangler.jsonc`]: readRepoFile(`${workerDir}/wrangler.jsonc`),
+    [`${workerDir}/.dev.vars.example`]:
+      '# @from BYOC_INTERNAL_API_SECRET\nBYOC_SERVICE_CREDENTIAL=""\n',
+  });
+  try {
+    withFakePnpm('', () => {
+      // A blank generated local secret is scheduled for creation instead of being left empty.
+      const freshPlan = computePlan(repo.root, new Set(['cloud-agent-next']));
+      assert.deepEqual(freshPlan.envLocalAutoCreates, [
+        { key: 'BYOC_INTERNAL_API_SECRET', command: 'openssl', args: ['rand', '-base64', '32'] },
+      ]);
+
+      // Once that value lands in .env.local, dev:env seeds the worker's Secrets Store from it.
+      writeFile(
+        repo.root,
+        '.env.local',
+        'INTERNAL_API_SECRET=local-internal-secret\nBYOC_INTERNAL_API_SECRET=synthetic-byoc-key\n'
+      );
+      const seededPlan = computePlan(repo.root, new Set(['cloud-agent-next']));
+      assert.deepEqual(seededPlan.envLocalAutoCreates, []);
+      const seeded = seededPlan.secretStoreAutoCreates.find(
+        create =>
+          create.workerDir === workerDir &&
+          create.binding.secret_name === 'BYOC_INTERNAL_API_SECRET_PROD'
+      );
+      assert.ok(seeded);
+      assert.equal(seeded.sourceKey, 'BYOC_INTERNAL_API_SECRET');
+      assert.equal(seeded.value, 'synthetic-byoc-key');
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('auto-creates kilo-chat gateway Secrets Store binding from kiloclaw dev vars', () => {
   const repo = createRepo({
     '.env.local': 'NEXTAUTH_SECRET=local-nextauth-secret\n',

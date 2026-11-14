@@ -1770,6 +1770,8 @@
       "events": "Hadisələr",
       "eventConfidence": "Etibarlılıq: {{confidence}}",
       "eventReason": "Səbəb: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} hadisə",
       "eventsCount_other": "{{displayCount}} hadisə",
       "generated": "Hesabat {{generatedAt}} tarixində yaradılıb.",

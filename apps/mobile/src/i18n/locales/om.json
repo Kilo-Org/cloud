@@ -1770,6 +1770,8 @@
       "events": "Taateewwan",
       "eventConfidence": "Amanamummaa: {{confidence}}",
       "eventReason": "Sababa: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} taatee",
       "eventsCount_other": "{{displayCount}} taateewwan",
       "generated": "{{generatedAt}} irratti uumame.",

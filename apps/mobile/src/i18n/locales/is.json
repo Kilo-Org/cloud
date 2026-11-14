@@ -1770,6 +1770,8 @@
       "events": "Atburðir",
       "eventConfidence": "Vissu: {{confidence}}",
       "eventReason": "Ástæða: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} atburður",
       "eventsCount_other": "{{displayCount}} atburðir",
       "generated": "Skýrslan var búin til {{generatedAt}}.",

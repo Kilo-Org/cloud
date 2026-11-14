@@ -1770,6 +1770,8 @@
       "events": "მოვლენები",
       "eventConfidence": "სანდოობა: {{confidence}}",
       "eventReason": "მიზეზი: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} მოვლენა",
       "eventsCount_other": "{{displayCount}} მოვლენა",
       "generated": "შექმნის დრო: {{generatedAt}}.",

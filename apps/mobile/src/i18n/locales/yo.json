@@ -1770,6 +1770,8 @@
       "events": "Àwọn ìṣẹ̀lẹ̀",
       "eventConfidence": "Ìgbẹ́kẹ̀lé: {{confidence}}",
       "eventReason": "Ìdí: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ìṣẹ̀lẹ̀",
       "eventsCount_other": "{{displayCount}} ìṣẹ̀lẹ̀",
       "generated": "A ṣe é ní {{generatedAt}}.",

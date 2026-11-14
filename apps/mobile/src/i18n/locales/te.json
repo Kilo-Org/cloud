@@ -1770,6 +1770,8 @@
       "events": "సంఘటనలు",
       "eventConfidence": "విశ్వాసం: {{confidence}}",
       "eventReason": "కారణం: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} సంఘటన",
       "eventsCount_other": "{{displayCount}} సంఘటనలు",
       "generated": "రూపొందించిన సమయం: {{generatedAt}}.",

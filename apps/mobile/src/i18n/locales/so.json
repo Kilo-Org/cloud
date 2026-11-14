@@ -1770,6 +1770,8 @@
       "events": "Dhacdooyin",
       "eventConfidence": "Kalsooni: {{confidence}}",
       "eventReason": "Sabab: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} dhacdooyin",
       "eventsCount_other": "{{displayCount}} dhacdooyin",
       "generated": "Waxaa la soo saaray {{generatedAt}}.",

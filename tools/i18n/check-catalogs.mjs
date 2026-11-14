@@ -204,6 +204,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'securityAgent.findingDetails.cve',
   'securityAgent.findingDetails.ghsa',
   'securityAgent.findingDetails.sourceDependabot',
+  // The audit report's change lines hold no prose of their own: a `$t()` label
+  // reference, one separator, and two placeholders the catalog's own status or
+  // severity words fill. A catalog that keeps the English connector reads in
+  // its own language once the reference and the values resolve, so an
+  // identical value is the finished translation, not a missing one.
+  'securityAgent.auditReport.eventSeverityChange',
+  'securityAgent.auditReport.eventStatusChange',
   'agentChat.toolCard.toolBash',
   'agentChat.toolCard.toolGlob',
   'agentChat.toolCard.toolGrep',

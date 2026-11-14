@@ -1770,6 +1770,8 @@
       "events": "ಘಟನೆಗಳು",
       "eventConfidence": "ವಿಶ್ವಾಸ: {{confidence}}",
       "eventReason": "ಕಾರಣ: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ಘಟನೆ",
       "eventsCount_other": "{{displayCount}} ಘಟನೆಗಳು",
       "generated": "{{generatedAt}} ರಂದು ರಚಿಸಲಾಗಿದೆ.",

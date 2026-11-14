@@ -111,6 +111,20 @@ const FINDING = {
       afterState: { status: 'ignored', reason_code: 'not_used' },
       metadata: { reason_code: 'not_used', confidence: 'high' },
     }),
+    auditEvent({
+      id: 'e4',
+      action: 'security.finding.status_change',
+      label: 'Status changed',
+      beforeState: { status: 'open' },
+      afterState: { status: 'fixed' },
+    }),
+    auditEvent({
+      id: 'e5',
+      action: 'security.finding.severity_changed',
+      label: 'Severity changed',
+      beforeState: { severity: 'critical' },
+      afterState: { severity: 'high' },
+    }),
   ],
 };
 
@@ -200,6 +214,14 @@ describe('AuditReportScreen evidence', () => {
     const root = renderScreen();
 
     expect(textStrings(root.root)).toContain('Confidence: Medium');
+  });
+
+  it('shows the previous and new value of a status and a severity change', () => {
+    const root = renderScreen();
+    const strings = textStrings(root.root);
+
+    expect(strings).toContain('Status: Open → Fixed');
+    expect(strings).toContain('Severity: Critical → High');
   });
 
   it('reads each summary figure as one element with its count and label', () => {

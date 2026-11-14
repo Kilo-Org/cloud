@@ -986,6 +986,8 @@
       "events": "이벤트",
       "eventConfidence": "신뢰도: {{confidence}}",
       "eventReason": "사유: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}}개 이벤트",
       "eventsCount_other": "{{displayCount}}개 이벤트",
       "generated": "{{generatedAt}}에 생성되었습니다.",

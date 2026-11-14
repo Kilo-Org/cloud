@@ -1770,6 +1770,8 @@
       "events": "ព្រឹត្តិការណ៍",
       "eventConfidence": "ភាពជឿជាក់៖ {{confidence}}",
       "eventReason": "ហេតុផល៖ {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity)៖ {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status)៖ {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} ព្រឹត្តិការណ៍",
       "eventsCount_other": "{{displayCount}} ព្រឹត្តិការណ៍",
       "generated": "បានបង្កើតនៅ {{generatedAt}}។",

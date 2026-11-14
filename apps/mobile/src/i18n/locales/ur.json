@@ -1770,6 +1770,8 @@
       "events": "واقعات",
       "eventConfidence": "اعتماد: {{confidence}}",
       "eventReason": "وجہ: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} سے {{next}} تک",
+      "eventStatusChange": "$t(common.status): {{previous}} سے {{next}} تک",
       "eventsCount_one": "{{displayCount}} واقعہ",
       "eventsCount_other": "{{displayCount}} واقعات",
       "generated": "رپورٹ {{generatedAt}} کو تیار کی گئی۔",

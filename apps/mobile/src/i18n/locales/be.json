@@ -1842,6 +1842,8 @@
       "events": "Падзеі",
       "eventConfidence": "Упэўненасць: {{confidence}}",
       "eventReason": "Прычына: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} падзея",
       "eventsCount_few": "{{displayCount}} падзеі",
       "eventsCount_many": "{{displayCount}} падзей",

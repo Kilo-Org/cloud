@@ -990,6 +990,8 @@
       "events": "Події",
       "eventConfidence": "Впевненість: {{confidence}}",
       "eventReason": "Причина: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} подія",
       "eventsCount_few": "{{displayCount}} події",
       "eventsCount_many": "{{displayCount}} подій",

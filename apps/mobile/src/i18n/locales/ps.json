@@ -1770,6 +1770,8 @@
       "events": "پېښې",
       "eventConfidence": "باور: {{confidence}}",
       "eventReason": "دلیل: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): له {{previous}} څخه {{next}} ته",
+      "eventStatusChange": "$t(common.status): له {{previous}} څخه {{next}} ته",
       "eventsCount_one": "{{displayCount}} پېښه",
       "eventsCount_other": "{{displayCount}} پېښې",
       "generated": "په {{generatedAt}} جوړ شو.",

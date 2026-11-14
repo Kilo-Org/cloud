@@ -986,6 +986,8 @@
       "events": "事件",
       "eventConfidence": "信心度：{{confidence}}",
       "eventReason": "原因：{{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity)：{{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status)：{{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} 個事件",
       "eventsCount_other": "{{displayCount}} 個事件",
       "generated": "已於 {{generatedAt}} 產生。",

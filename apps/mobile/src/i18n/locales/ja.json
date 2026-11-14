@@ -986,6 +986,8 @@
       "events": "イベント",
       "eventConfidence": "信頼度：{{confidence}}",
       "eventReason": "理由：{{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity)：{{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status)：{{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}}件のイベント",
       "eventsCount_other": "{{displayCount}}件のイベント",
       "generated": "{{generatedAt}}に生成しました。",

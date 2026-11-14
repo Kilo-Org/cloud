@@ -1770,6 +1770,8 @@
       "events": "Evènman",
       "eventConfidence": "Konfyans: {{confidence}}",
       "eventReason": "Rezon: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} evènman",
       "eventsCount_other": "{{displayCount}} evènman",
       "generated": "Rapò a pwodui {{generatedAt}}.",

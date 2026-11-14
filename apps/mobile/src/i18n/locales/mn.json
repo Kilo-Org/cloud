@@ -1770,6 +1770,8 @@
       "events": "Үйл явдлууд",
       "eventConfidence": "Итгэл: {{confidence}}",
       "eventReason": "Шалтгаан: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} үйл явдал",
       "eventsCount_other": "{{displayCount}} үйл явдал",
       "generated": "{{generatedAt}} үед үүсгэсэн.",

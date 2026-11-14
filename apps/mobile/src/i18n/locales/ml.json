@@ -1770,6 +1770,8 @@
       "events": "സംഭവങ്ങൾ",
       "eventConfidence": "വിശ്വാസ്യത: {{confidence}}",
       "eventReason": "കാരണം: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} സംഭവം",
       "eventsCount_other": "{{displayCount}} സംഭവങ്ങൾ",
       "generated": "{{generatedAt}}-ൽ തയ്യാറാക്കി.",

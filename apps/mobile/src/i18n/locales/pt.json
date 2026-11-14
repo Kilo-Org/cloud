@@ -1812,6 +1812,8 @@
       "events": "Eventos",
       "eventConfidence": "Confiança: {{confidence}}",
       "eventReason": "Motivo: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} evento",
       "eventsCount_many": "{{displayCount}} eventos",
       "eventsCount_other": "{{displayCount}} eventos",

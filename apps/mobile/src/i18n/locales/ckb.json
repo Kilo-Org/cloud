@@ -1770,6 +1770,8 @@
       "events": "ڕووداوەکان",
       "eventConfidence": "دڵنیایی: {{confidence}}",
       "eventReason": "هۆکار: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): لە {{previous}} بۆ {{next}}",
+      "eventStatusChange": "$t(common.status): لە {{previous}} بۆ {{next}}",
       "eventsCount_one": "{{displayCount}} ڕووداو",
       "eventsCount_other": "{{displayCount}} ڕووداو",
       "generated": "لە {{generatedAt}} دروست کراوە.",

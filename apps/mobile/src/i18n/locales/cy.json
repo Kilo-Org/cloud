@@ -1914,6 +1914,8 @@
       "events": "Digwyddiadau",
       "eventConfidence": "Hyder: {{confidence}}",
       "eventReason": "Rheswm: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_zero": "{{displayCount}} digwyddiad",
       "eventsCount_one": "{{displayCount}} digwyddiad",
       "eventsCount_two": "{{displayCount}} digwyddiad",

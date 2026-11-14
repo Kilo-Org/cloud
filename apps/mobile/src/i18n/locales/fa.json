@@ -1770,6 +1770,8 @@
       "events": "رویدادها",
       "eventConfidence": "اطمینان: {{confidence}}",
       "eventReason": "دلیل: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): از {{previous}} به {{next}}",
+      "eventStatusChange": "$t(common.status): از {{previous}} به {{next}}",
       "eventsCount_one": "{{displayCount}} رویداد",
       "eventsCount_other": "{{displayCount}} رویداد",
       "generated": "این گزارش در {{generatedAt}} تولید شده است.",

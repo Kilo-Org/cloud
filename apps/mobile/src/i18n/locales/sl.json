@@ -1842,6 +1842,8 @@
       "events": "Dogodki",
       "eventConfidence": "Zaupanje: {{confidence}}",
       "eventReason": "Razlog: {{reason}}",
+      "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
+      "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} dogodek",
       "eventsCount_two": "{{displayCount}} dogodka",
       "eventsCount_few": "{{displayCount}} dogodki",

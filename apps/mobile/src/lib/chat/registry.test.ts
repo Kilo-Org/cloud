@@ -327,6 +327,10 @@ vi.mock('./remote-mcp', () => ({
 }));
 vi.mock('./kilo-mcp', () => ({
   ensureKiloMcp: mcp.ensure,
+  mcpChoiceFor: async (sessionId: string) => {
+    await Promise.resolve();
+    return mcp.enabled.get(sessionId) === undefined ? null : false;
+  },
   mcpEnabledFor: async (sessionId: string) => {
     await Promise.resolve();
     return mcp.enabled.get(sessionId) ?? true;
@@ -353,6 +357,15 @@ vi.mock('./kilo-mcp', () => ({
   kiloMcpToolNames: () => mcp.tools.map(tool => tool.definition.name),
 }));
 const storedQuestions = vi.hoisted(() => new Map<string, string>());
+/**
+ * Holds the next per-chat choice write open, and refuses the next few, so a test
+ * decides when a tap's write lands and whether it is refused.
+ */
+const choiceWrites = vi.hoisted(() => ({
+  scope: 'chat-web-search',
+  gate: undefined as Promise<void> | undefined,
+  refuse: 0,
+}));
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   encryptedDatabase: async () => {
     await Promise.resolve();
@@ -364,6 +377,13 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   },
   setItem: async (scope: string, key: string, value: string) => {
     await Promise.resolve();
+    if (scope === choiceWrites.scope) {
+      await choiceWrites.gate;
+      if (choiceWrites.refuse > 0) {
+        choiceWrites.refuse -= 1;
+        throw new Error('the choice could not be written');
+      }
+    }
     storedQuestions.set(`${scope}:${key}`, value);
   },
   removeItem: async (scope: string, key: string) => {
@@ -444,13 +464,14 @@ const {
   refreshChatTools,
   releaseChat,
   retryChat,
+  retryChatFlag,
   retryKiloMcp,
   say,
-  setMcpEnabled,
-  setWebSearchEnabled,
+  setChatFlag,
   startChat,
   stopChat,
 } = await import('./registry');
+const { chatFlagValueOf } = await import('./chat-flag');
 const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./scope');
 const { askedIn, firstQuestionIn, forgetAsked, keptIn } = await import('./pending');
@@ -515,6 +536,8 @@ beforeEach(async () => {
   failAnswerFor = undefined;
   creditsFailureFor = undefined;
   storedQuestions.clear();
+  choiceWrites.gate = undefined;
+  choiceWrites.refuse = 0;
   clonedWith = undefined;
   clonesMade = 0;
   storedEffort = null;
@@ -635,7 +658,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     expect(mcp.ensure).not.toHaveBeenCalled();
 
     mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
-    await setMcpEnabled(opened, true);
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: true });
     await settled();
 
     expect(mcp.ensure).toHaveBeenCalledWith(
@@ -653,7 +676,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await settled();
     expect(snapshotOf(opened).sessionId).toBe('s1');
 
-    await setMcpEnabled(opened, false);
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
     await settled();
 
     /* The tool set is frozen for the life of a session, so turning it off is a
@@ -671,7 +694,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
     await settled();
 
-    await setMcpEnabled(opened, false);
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
     await settled();
 
     /* Never under an answer that is still coming: the chat has not moved. */
@@ -683,6 +706,38 @@ describe('the Kilo MCP tools a chat is opened with', () => {
 
     expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('reports a saved choice whose move was refused as behind, and the retry moves the chat onto it', async () => {
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
+    await settled();
+
+    missingCloneFor = opened;
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
+
+    /* The choice is the person's and the store holds it; only this session is
+       not on it. So the flag is saved and says how far behind it is, rather than
+       reporting the tap as a failure that lost the choice. */
+    expect(snapshotOf(opened).kiloTools).toEqual({
+      kind: 'saved',
+      choice: false,
+      application: 'behind',
+    });
+    expect(mcp.enabled.get(opened)).toBe(false);
+
+    missingCloneFor = undefined;
+    await retryChatFlag({ sessionId: opened, place, flag: 'kiloTools' });
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+    expect(snapshotOf(opened).kiloTools).toEqual({
+      kind: 'saved',
+      choice: false,
+      application: 'current',
+    });
   });
 
   it('opens a stored chat whose tool names no longer resolve, on the names now held', async () => {
@@ -787,7 +842,7 @@ describe('web search in a chat', () => {
     expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
 
     storedTools = ['time', ...SETTINGS];
-    await setWebSearchEnabled(opened, true);
+    await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: true });
     await settled();
 
     expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
@@ -796,16 +851,97 @@ describe('web search in a chat', () => {
   it('moves an idle Kilo chat off web search when the person turns it off', async () => {
     storedTools = [...BASE, ...SETTINGS];
 
-    await setWebSearchEnabled(opened, false);
+    await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
     await settled();
 
     expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
+  it('keeps a tap that lands before the chat is entered when the stored choice is read', async () => {
+    /* The mount read used to resolve after a tap and put the stored value back
+       over it while the store held the tapped one. The read runs inside the
+       chat's turn now, so a tap enqueued first has already written. */
+    storedTools = [...BASE, ...SETTINGS];
+    storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'on');
+    const released = Promise.withResolvers<void>();
+    choiceWrites.gate = released.promise;
+
+    const tap = setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
+    const enter = enterChat(place, opened);
+    released.resolve();
+    await tap;
+    await enter;
+    await settled();
+
+    expect(snapshotOf(opened).webSearch).toEqual({
+      kind: 'saved',
+      choice: false,
+      application: 'current',
+    });
+    /* One move, onto the names turning it off implies, and the choice went with
+       the chat it moved onto. */
+    expect(clonesMade).toBe(1);
+    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
+    expect(storedQuestions.get(`${choiceWrites.scope}:s2`)).toBe('off');
+  });
+
+  it('leaves the stored choice on screen when two taps are both refused', async () => {
+    storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'off');
+    await enterChat(place, opened);
+    await settled();
+    expect(chatFlagValueOf(snapshotOf(opened).webSearch, true)).toBe(false);
+
+    choiceWrites.refuse = 2;
+    await expect(
+      setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: true })
+    ).rejects.toThrow('the choice could not be written');
+    await expect(
+      setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false })
+    ).rejects.toThrow('the choice could not be written');
+
+    expect(chatFlagValueOf(snapshotOf(opened).webSearch, true)).toBe(false);
+    expect(storedQuestions.get(`${choiceWrites.scope}:${opened}`)).toBe('off');
+  });
+
+  it('keeps a first tap that landed when a second is refused', async () => {
+    storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'off');
+    await enterChat(place, opened);
+    await settled();
+
+    choiceWrites.refuse = 1;
+    await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: true });
+    await expect(
+      setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false })
+    ).rejects.toThrow('the choice could not be written');
+
+    expect(chatFlagValueOf(snapshotOf(opened).webSearch, false)).toBe(true);
+  });
+
+  it('applies a tap and the question started together in one order', async () => {
+    /* The tap's write, the move it causes and the question's move are one queue
+       per chat: the question is asked on the session the tap made, and the
+       choice is carried to it rather than read and deleted in between. */
+    storedTools = [...BASE, ...SETTINGS];
+    const released = Promise.withResolvers<void>();
+    choiceWrites.gate = released.promise;
+
+    const tap = setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
+    const send = say(opened, { text: 'hello', images: [] }, { model: 'kilo/two', effort: null });
+    released.resolve();
+    await tap;
+    await send;
+    await settled();
+
+    const landed = snapshotOf(opened).sessionId;
+    expect(landed).toBe('s3');
+    expect(storedQuestions.get(`${choiceWrites.scope}:${landed}`)).toBe('off');
+    expect(asked.at(-1)).toEqual({ sessionId: 's3', text: 'hello' });
+  });
+
   it('keeps the person choice when the chat moves onto another model', async () => {
     storedTools = [...BASE, ...SETTINGS];
-    await setWebSearchEnabled(opened, false);
+    await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
     await settled();
     storedTools = ['time', ...SETTINGS];
 

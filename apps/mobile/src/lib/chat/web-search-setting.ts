@@ -16,10 +16,21 @@ export function webSearchDefault(model: string): boolean {
   return decodeLocalTarget(model) === null && decodeBackendTarget(model) === null;
 }
 
+/**
+ * The choice on disk, or null when the person never made one for this chat.
+ *
+ * Null is not "off": a chat nobody chose for takes the model's default, which a
+ * separate function decides because it depends on where the question goes.
+ */
+export async function webSearchChoiceFor(sessionId: string): Promise<boolean | null> {
+  const stored = await getItem(PREFERENCE_SCOPE, sessionId);
+  return stored === null ? null : stored === ON;
+}
+
 /** Whether web search is offered in one chat, on the model its next question goes to. */
 export async function webSearchEnabledFor(sessionId: string, model: string): Promise<boolean> {
-  const stored = await getItem(PREFERENCE_SCOPE, sessionId);
-  return stored === null ? webSearchDefault(model) : stored === ON;
+  const choice = await webSearchChoiceFor(sessionId);
+  return choice ?? webSearchDefault(model);
 }
 
 export async function setWebSearchEnabled(sessionId: string, enabled: boolean): Promise<void> {

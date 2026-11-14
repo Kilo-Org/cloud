@@ -332,7 +332,18 @@ export function forgetKiloMcp(): void {
  * value is written under the session id, exactly as the unanswered question is.
  */
 export async function mcpEnabledFor(sessionId: string): Promise<boolean> {
-  return (await getItem(PREFERENCE_SCOPE, sessionId)) !== OFF;
+  return (await mcpChoiceFor(sessionId)) !== false;
+}
+
+/**
+ * The choice on disk, or null when the person never made one.
+ *
+ * Null is not "off": the switch draws its own default for a chat nobody chose
+ * for, and the default is on, so a chat with no stored value must not read as
+ * an off choice.
+ */
+export async function mcpChoiceFor(sessionId: string): Promise<boolean | null> {
+  return (await getItem(PREFERENCE_SCOPE, sessionId)) === OFF ? false : null;
 }
 
 export async function setMcpEnabled(sessionId: string, enabled: boolean): Promise<void> {

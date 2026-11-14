@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { type Tool } from '@kilocode/harness-sdk';
 
 import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
+import { type ChatFlag } from '@/lib/chat/chat-flag';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 
 import {
@@ -31,11 +32,17 @@ const tool = (name: string): Tool => ({
   run: () => Effect.succeed(''),
 });
 
+/** The chat's flag for a choice that is on disk, on this session unless said otherwise. */
+const saved = (
+  choice: boolean | null,
+  application: 'current' | 'moving' | 'behind' = 'current'
+): ChatFlag => ({ kind: 'saved', choice, application });
+
 describe('what the Kilo MCP sheet shows', () => {
   it('lists the tools the server answered with, and offers no CTA', () => {
     const view = mcpSettingsView(
       { status: 'ready', tools: [tool('mcp_kilo_read-file'), tool('mcp_kilo_list-files')] },
-      true
+      saved(true)
     );
 
     expect(view).toMatchObject({
@@ -48,7 +55,7 @@ describe('what the Kilo MCP sheet shows', () => {
   });
 
   it('offers a Retry when the server could not be reached', () => {
-    const view = mcpSettingsView({ status: 'failed', kind: 'unreachable', retryable: true }, true);
+    const view = mcpSettingsView({ status: 'failed', kind: 'unreachable', retryable: true }, saved(true));
 
     expect(view).toMatchObject({
       enabled: true,
@@ -59,7 +66,7 @@ describe('what the Kilo MCP sheet shows', () => {
   });
 
   it('names a refused credential, and still offers a Retry', () => {
-    const view = mcpSettingsView({ status: 'failed', kind: 'unauthorized', retryable: true }, true);
+    const view = mcpSettingsView({ status: 'failed', kind: 'unauthorized', retryable: true }, saved(true));
 
     expect(view).toMatchObject({
       statusKey: 'modelChat.mcp.unauthorized',
@@ -68,7 +75,7 @@ describe('what the Kilo MCP sheet shows', () => {
   });
 
   it('offers no CTA, reads off, and locks the switch when the server is not there', () => {
-    const view = mcpSettingsView({ status: 'failed', kind: 'missing', retryable: false }, true);
+    const view = mcpSettingsView({ status: 'failed', kind: 'missing', retryable: false }, saved(true));
 
     /* The setting is still on, so a tap would write what is already stored and
        the switch would snap back: a live switch here does nothing. */
@@ -81,7 +88,7 @@ describe('what the Kilo MCP sheet shows', () => {
   });
 
   it('says there are none when the server answered with an empty list', () => {
-    const view = mcpSettingsView({ status: 'ready', tools: [] }, true);
+    const view = mcpSettingsView({ status: 'ready', tools: [] }, saved(true));
 
     expect(view).toMatchObject({
       enabled: true,
@@ -92,7 +99,7 @@ describe('what the Kilo MCP sheet shows', () => {
   });
 
   it('reads off, with no server contacted, when the chat has the setting off', () => {
-    const view = mcpSettingsView({ status: 'ready', tools: [tool('mcp_kilo_read-file')] }, false);
+    const view = mcpSettingsView({ status: 'ready', tools: [tool('mcp_kilo_read-file')] }, saved(false));
 
     expect(view).toMatchObject({
       enabled: false,
@@ -105,13 +112,48 @@ describe('what the Kilo MCP sheet shows', () => {
   });
 
   it('shows the switch working while a discovery is in flight', () => {
-    const view = mcpSettingsView({ status: 'connecting' }, true);
+    const view = mcpSettingsView({ status: 'connecting' }, saved(true));
 
     expect(view).toMatchObject({
       enabled: true,
       statusKey: 'modelChat.mcp.connecting',
       busy: true,
       retry: false,
+    });
+  });
+
+  it('draws a saved on-choice this chat is not on with the not-applied line and a Retry', () => {
+    const view = mcpSettingsView(
+      { status: 'ready', tools: [tool('mcp_kilo_read-file')] },
+      saved(true, 'behind')
+    );
+
+    /* The choice is the person's and the store holds it; only this session is
+       not on it, so the switch keeps the saved value and the recovery is a
+       Retry rather than a second tap. */
+    expect(view).toMatchObject({
+      enabled: true,
+      toggleable: true,
+      statusKey: 'modelChat.mcp.notApplied',
+      descriptionKey: 'modelChat.mcp.notAppliedDescription',
+      toolCount: 0,
+      retry: true,
+      busy: false,
+      tone: 'warn',
+    });
+  });
+
+  it('draws a saved off-choice this chat is not on as off, not as on', () => {
+    const view = mcpSettingsView(
+      { status: 'ready', tools: [tool('mcp_kilo_read-file')] },
+      saved(false, 'behind')
+    );
+
+    expect(view).toMatchObject({
+      enabled: false,
+      toggleable: true,
+      statusKey: 'modelChat.mcp.notApplied',
+      retry: true,
     });
   });
 });
@@ -273,7 +315,7 @@ describe('the remote server rows', () => {
 
 describe('the Kilo row', () => {
   it('offers enable and disable only', () => {
-    const row = kiloServerRow(mcpSettingsView({ status: 'ready', tools: [] }, true));
+    const row = kiloServerRow(mcpSettingsView({ status: 'ready', tools: [] }, saved(true)));
 
     expect(row).toMatchObject({
       enabled: true,
@@ -284,7 +326,7 @@ describe('the Kilo row', () => {
   });
 
   it('carries the view it was given, so the sheet draws one row shape', () => {
-    const view = mcpSettingsView({ status: 'failed', kind: 'unreachable', retryable: true }, true);
+    const view = mcpSettingsView({ status: 'failed', kind: 'unreachable', retryable: true }, saved(true));
 
     expect(kiloServerRow(view)).toEqual({ ...view, canEdit: false, canDelete: false });
   });

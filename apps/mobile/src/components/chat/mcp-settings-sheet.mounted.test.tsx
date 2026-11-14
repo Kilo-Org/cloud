@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpSettingsSheet, useMcpSettings } from '@/components/chat/mcp-settings-sheet';
 import { useWebSearchSetting } from '@/components/chat/web-search-row';
 import { i18n } from '@/i18n';
+import { type ChatFlag } from '@/lib/chat/chat-flag';
 import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
 import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import {
@@ -41,6 +42,12 @@ const h = vi.hoisted(() => {
   const confirmRequest: {
     value: null | { title: string; message: string; confirmLabel: string; onConfirm: () => void };
   } = { value: null };
+  /* The chat's own state, which is where both switches live now: the sheet
+     draws the flag and the registry owns the write. */
+  const initialFlags: { webSearch: ChatFlag; kiloTools: ChatFlag } = {
+    webSearch: { kind: 'saved', choice: true, application: 'current' },
+    kiloTools: { kind: 'saved', choice: true, application: 'current' },
+  };
   return {
     group,
     servers,
@@ -48,6 +55,7 @@ const h = vi.hoisted(() => {
     discovered,
     kilo,
     confirmRequest,
+    chat: { value: initialFlags },
     confirm: vi.fn((request: typeof confirmRequest.value) => {
       confirmRequest.value = request;
     }),
@@ -74,12 +82,11 @@ const h = vi.hoisted(() => {
     }),
     ensureRemoteMcp: vi.fn(),
     refreshChatTools: vi.fn(),
-    setMcpEnabled: vi.fn(),
+    setChatFlag: vi.fn(),
+    retryChatFlag: vi.fn(),
     retryKiloMcp: vi.fn(),
-    mcpEnabledFor: vi.fn(),
-    setWebSearchEnabled: vi.fn(),
-    webSearchEnabledFor: vi.fn(),
     watchKiloMcp: vi.fn(() => () => undefined),
+    watchChat: vi.fn(() => () => undefined),
   };
 });
 
@@ -123,20 +130,23 @@ vi.mock('@/lib/chat/remote-mcp', () => ({
 
 vi.mock('@/lib/chat/kilo-mcp', () => ({
   kiloMcpState: () => h.kilo.value,
-  mcpEnabledFor: h.mcpEnabledFor,
   watchKiloMcp: h.watchKiloMcp,
+}));
+
+vi.mock('@/lib/chat/state', () => ({
+  snapshotOf: () => h.chat.value,
+  watch: h.watchChat,
 }));
 
 vi.mock('@/lib/chat/registry', () => ({
   refreshChatTools: h.refreshChatTools,
+  retryChatFlag: h.retryChatFlag,
   retryKiloMcp: h.retryKiloMcp,
-  setMcpEnabled: h.setMcpEnabled,
-  setWebSearchEnabled: h.setWebSearchEnabled,
+  setChatFlag: h.setChatFlag,
 }));
 
 vi.mock('@/lib/chat/web-search-setting', () => ({
   webSearchDefault: (model: string) => !model.startsWith('local:'),
-  webSearchEnabledFor: h.webSearchEnabledFor,
 }));
 
 vi.mock('react-native', () => ({
@@ -185,7 +195,7 @@ function noop(): void {
 
 function Harness({ sessionId, model = 'kilo/one' }: { sessionId: string; model?: string }) {
   const settings = useMcpSettings(place, sessionId);
-  const webSearch = useWebSearchSetting(sessionId, model);
+  const webSearch = useWebSearchSetting(place, sessionId, model);
   held.settings = settings;
   return createElement(McpSettingsSheet, { visible: true, onClose: noop, settings, webSearch });
 }
@@ -292,10 +302,12 @@ beforeEach(() => {
   h.hasLoaded.value = true;
   h.discovered.value = [];
   h.kilo.value = { status: 'ready', tools: [] };
-  h.mcpEnabledFor.mockResolvedValue(true);
-  h.setMcpEnabled.mockResolvedValue(undefined);
-  h.webSearchEnabledFor.mockResolvedValue(true);
-  h.setWebSearchEnabled.mockResolvedValue(undefined);
+  h.chat.value = {
+    webSearch: { kind: 'saved', choice: true, application: 'current' },
+    kiloTools: { kind: 'saved', choice: true, application: 'current' },
+  };
+  h.setChatFlag.mockResolvedValue(undefined);
+  h.retryChatFlag.mockResolvedValue(undefined);
   h.retryKiloMcp.mockResolvedValue(undefined);
   h.refreshChatTools.mockResolvedValue(undefined);
   h.ensureRemoteMcp.mockResolvedValue([]);
@@ -309,54 +321,71 @@ afterEach(() => {
 });
 
 describe('the web search switch', () => {
-  it('shows the chat choice and keeps a new position once the chat moved', async () => {
-    h.webSearchEnabledFor.mockResolvedValue(false);
-    await mount('local:gguf:qwen.gguf');
+  it('draws the chat flag, and the model default for a chat nobody chose for', async () => {
+    h.chat.value = {
+      ...h.chat.value,
+      webSearch: { kind: 'saved', choice: false, application: 'current' },
+    };
+    await mount('kilo/one');
 
     expect(preferenceRow('Search the web')?.props.value).toBe(false);
-
-    await tapRow('Search the web', true);
-    await flush();
-
-    expect(h.setWebSearchEnabled).toHaveBeenCalledWith('s1', true);
-    expect(preferenceRow('Search the web')?.props.value).toBe(true);
   });
 
-  it('goes back and says why when the chat cannot be moved', async () => {
-    h.setWebSearchEnabled.mockRejectedValue(new Error('the chat could not be moved'));
+  it('asks the registry for the choice on a tap', async () => {
     await mount();
 
     await tapRow('Search the web', false);
     await flush();
 
+    expect(h.setChatFlag).toHaveBeenCalledWith({
+      sessionId: 's1',
+      place,
+      flag: 'webSearch',
+      next: false,
+    });
+  });
+
+  it('keeps the stored choice and says why when the choice is refused', async () => {
+    h.setChatFlag.mockRejectedValue(new Error('the choice could not be written'));
+    await mount();
+
+    await tapRow('Search the web', false);
+    await flush();
+
+    /* The flag is the only value on screen: a refused write leaves the stored
+       choice where it was. */
     expect(preferenceRow('Search the web')?.props.value).toBe(true);
-    expect(h.toastError).toHaveBeenCalledWith('the chat could not be moved');
+    expect(h.toastError).toHaveBeenCalledWith('the choice could not be written');
   });
 });
 
 describe('the Kilo MCP switch', () => {
-  it('keeps the new position when the write and the move land', async () => {
+  it('asks the registry for the choice on a tap', async () => {
     await mount();
 
     await tapRow('Use Kilo tools', false);
 
-    expect(held.settings?.view.enabled).toBe(false);
-    expect(h.setMcpEnabled).toHaveBeenCalledWith('s1', false);
+    expect(h.setChatFlag).toHaveBeenCalledWith({
+      sessionId: 's1',
+      place,
+      flag: 'kiloTools',
+      next: false,
+    });
     expect(h.toastError).not.toHaveBeenCalled();
   });
 
-  it('goes back and says why when the chat cannot be moved', async () => {
-    h.setMcpEnabled.mockRejectedValue(new Error('the chat could not be moved'));
+  it('keeps the stored choice and says why when the choice is refused', async () => {
+    h.setChatFlag.mockRejectedValue(new Error('the choice could not be written'));
     await mount();
 
     await tapRow('Use Kilo tools', false);
 
     expect(held.settings?.view.enabled).toBe(true);
-    expect(h.toastError).toHaveBeenCalledWith('the chat could not be moved');
+    expect(h.toastError).toHaveBeenCalledWith('the choice could not be written');
   });
 
   it('says something went wrong when the failure carries no reason', async () => {
-    h.setMcpEnabled.mockRejectedValue('no reason');
+    h.setChatFlag.mockRejectedValue('no reason');
     await mount();
 
     await tapRow('Use Kilo tools', false);
@@ -365,32 +394,43 @@ describe('the Kilo MCP switch', () => {
     expect(h.toastError).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
   });
 
-  it('drops a setting that answers late for the session that left', async () => {
-    const left = Promise.withResolvers<boolean>();
-    const arrived = Promise.withResolvers<boolean>();
-    h.mcpEnabledFor.mockReturnValueOnce(left.promise).mockReturnValueOnce(arrived.promise);
+  it('draws the not-applied line and moves the chat onto the saved choice from its Retry', async () => {
+    /* A saved off whose move failed: the switch keeps the saved value, the sheet
+       says the tools were not added, and the recovery is the Retry. */
+    h.chat.value = {
+      ...h.chat.value,
+      kiloTools: { kind: 'saved', choice: false, application: 'behind' },
+    };
+    const pending = Promise.withResolvers<undefined>();
+    h.retryChatFlag.mockReturnValue(pending.promise);
+    await mount();
 
-    renderer = TestRenderer.create(createElement(Harness, { sessionId: 's1' }));
-    // The first session's read is in flight and must not be flushed yet.
+    expect(held.settings?.view.enabled).toBe(false);
+    expect(texts()).toContain(i18n.t('modelChat.mcp.notApplied'));
+    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(false);
+
     await act(async () => {
-      await Promise.resolve();
-    });
-    await act(async () => {
-      renderer?.update(createElement(Harness, { sessionId: 's2' }));
-      await Promise.resolve();
-    });
-    await act(async () => {
-      arrived.resolve(true);
-      await Promise.resolve();
-    });
-    await act(async () => {
-      left.resolve(false);
+      held.settings?.retry();
       await Promise.resolve();
     });
 
-    expect(h.mcpEnabledFor).toHaveBeenCalledWith('s1');
-    expect(h.mcpEnabledFor).toHaveBeenCalledWith('s2');
-    expect(held.settings?.view.enabled).toBe(true);
+    /* One recovery per failure: a saved choice is moved onto this chat, not
+       asked of the server again. */
+    expect(h.retryChatFlag).toHaveBeenCalledWith({
+      sessionId: 's1',
+      place,
+      flag: 'kiloTools',
+    });
+    expect(h.retryKiloMcp).not.toHaveBeenCalled();
+    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(true);
+
+    await act(async () => {
+      pending.resolve(undefined);
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(false);
   });
 
   it('says why when the Retry itself fails', async () => {

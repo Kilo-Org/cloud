@@ -205,6 +205,7 @@ function isDisabled(renderer: ReactTestRenderer, label: string): boolean {
 }
 
 const BODY_EMPTY = 'Comment body cannot be empty.';
+const NOT_RECORDED = 'We could not record this action. Please try again later.';
 
 beforeEach(() => {
   createComment.publish.current = null;
@@ -285,13 +286,13 @@ describe('PrReviewCommentComposer submit phase', () => {
     typeBody(renderer, 'hello');
     await pressAndSettle(renderer, 'Comment now');
 
-    expect(hasCopy(renderer, 'We could not record this action. Please try again later.')).toBe(true);
+    expect(hasCopy(renderer, NOT_RECORDED)).toBe(true);
     // The intent never reached the ledger: the same body must not be retried.
     expect(isDisabled(renderer, 'Comment now')).toBe(true);
 
     // An edit is a new intent, so the line retires and the CTA returns.
     typeBody(renderer, 'hello again');
-    expect(hasCopy(renderer, 'We could not record this action. Please try again later.')).toBe(false);
+    expect(hasCopy(renderer, NOT_RECORDED)).toBe(false);
     expect(isDisabled(renderer, 'Comment now')).toBe(false);
   });
 

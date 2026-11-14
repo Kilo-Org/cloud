@@ -41,9 +41,13 @@ export function useWebSearchSetting(
 
   const setEnabled = useCallback(
     (next: boolean) => {
-      void setChatFlag({ sessionId, place, flag: 'webSearch', next }).catch(error => {
-        toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
-      });
+      void (async () => {
+        try {
+          await setChatFlag({ sessionId, place, flag: 'webSearch', next });
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+        }
+      })();
     },
     [place, sessionId, t]
   );

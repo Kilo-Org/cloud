@@ -19,7 +19,7 @@ export type ChatFlagName = 'webSearch' | 'kiloTools';
 export type ChatFlagApplication = 'current' | 'moving' | 'behind';
 
 /** A choice that is on disk, and how far this chat is from it. */
-export type ChatFlagSaved = {
+type ChatFlagSaved = {
   /** `true` on, `false` off, `null` never chosen (the switch draws its fallback). */
   readonly choice: boolean | null;
   readonly application: ChatFlagApplication;
@@ -49,35 +49,36 @@ const UNKNOWN: ChatFlagSaved = { choice: null, application: 'current' };
 
 /** The saved part of a flag, which is what a tap and a refusal carry. */
 function savedPartOf(flag: ChatFlag): ChatFlagSaved {
-  switch (flag.kind) {
-    case 'saved':
-      return { choice: flag.choice, application: flag.application };
-    case 'picking':
-      return flag.was;
-    case 'refused':
-      return flag.was;
-    case 'reading':
-      return UNKNOWN;
-    case 'unread':
-      return UNKNOWN;
+  if (flag.kind === 'saved') {
+    return { choice: flag.choice, application: flag.application };
   }
+  if (flag.kind === 'picking' || flag.kind === 'refused') {
+    return flag.was;
+  }
+  return UNKNOWN;
 }
 
 /** The value the switch draws: the tap, else the saved choice, else the fallback. */
 export function chatFlagValueOf(flag: ChatFlag, fallback: boolean): boolean {
   switch (flag.kind) {
     case 'reading':
+    case 'unread': {
       return fallback;
-    case 'unread':
-      return fallback;
-    case 'saved':
+    }
+    case 'saved': {
       return flag.choice ?? fallback;
-    case 'picking':
+    }
+    case 'picking': {
       return flag.next;
-    case 'refused':
+    }
+    case 'refused': {
       // A refusal is told from a saved choice by the toast the tap reported: the
       // switch itself only goes back to what was on disk.
       return flag.was.choice ?? fallback;
+    }
+    default: {
+      return fallback;
+    }
   }
 }
 

@@ -113,12 +113,13 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
 
   const setEnabled = useCallback(
     (next: boolean) => {
-      /* The switch moves at once, inside the registry's operation: it shows the
-         tap, then the saved choice, and a refused write puts the saved choice
-         back. Saying why is the whole of what is left here. */
-      void setChatFlag({ sessionId, place, flag: 'kiloTools', next }).catch(error => {
-        toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
-      });
+      void (async () => {
+        try {
+          await setChatFlag({ sessionId, place, flag: 'kiloTools', next });
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+        }
+      })();
     },
     [place, sessionId, t]
   );
@@ -130,11 +131,9 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
         /* A choice that is saved but not applied is moved onto this chat; a
            server that never answered is asked again. They are different
            failures with different recoveries. */
-        if (chatFlagBehind(kiloTools)) {
-          await retryChatFlag({ sessionId, place, flag: 'kiloTools' });
-        } else {
-          await retryKiloMcp(sessionId);
-        }
+        await (chatFlagBehind(kiloTools)
+          ? retryChatFlag({ sessionId, place, flag: 'kiloTools' })
+          : retryKiloMcp(sessionId));
       } catch (error) {
         /* A Retry can fail before it reaches the server — the chat may not be
            movable — and the sheet then keeps the failure it already showed.

@@ -54,6 +54,7 @@ let failOpenFor: string | undefined = undefined;
 let missingToolsFor: string | undefined = undefined;
 /** A session id whose stored names no longer resolve when it is cloned onto. */
 let missingCloneFor: string | undefined = undefined;
+let failCloneFor: string | undefined = undefined;
 /** A session id whose history read fails, so the half-open path can be exercised. */
 let failHistoryFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
@@ -266,6 +267,9 @@ vi.mock('@kilocode/harness-sdk', () => {
       onto: { readonly tools?: readonly string[]; readonly model?: string } | undefined
     ) => {
       clonedWith = onto;
+      if (failCloneFor === id) {
+        return Effect.fail(new Error('the session could not be cloned'));
+      }
       /* A clone that names no tools keeps the stored set, so it is the one that
          fails when the registry no longer holds those names. */
       if (missingCloneFor === id && onto?.tools === undefined) {
@@ -463,6 +467,7 @@ const {
   enterChat,
   refreshChatTools,
   releaseChat,
+  releaseEveryChat,
   retryChat,
   retryChatFlag,
   retryKiloMcp,
@@ -532,6 +537,7 @@ beforeEach(async () => {
   missingToolsFor = undefined;
   missingCloneFor = undefined;
   failHistoryFor = undefined;
+  failCloneFor = undefined;
   failForgetFor = undefined;
   failAnswerFor = undefined;
   creditsFailureFor = undefined;
@@ -714,7 +720,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     opened = await startChat(place, { model: 'kilo/one', effort: null });
     await settled();
 
-    missingCloneFor = opened;
+    failCloneFor = opened;
     await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
 
     /* The choice is the person's and the store holds it; only this session is
@@ -727,7 +733,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     });
     expect(mcp.enabled.get(opened)).toBe(false);
 
-    missingCloneFor = undefined;
+    failCloneFor = undefined;
     await retryChatFlag({ sessionId: opened, place, flag: 'kiloTools' });
     await settled();
 
@@ -864,12 +870,12 @@ describe('web search in a chat', () => {
        chat's turn now, so a tap enqueued first has already written. */
     storedTools = [...BASE, ...SETTINGS];
     storedQuestions.set(`${choiceWrites.scope}:${opened}`, 'on');
-    const released = Promise.withResolvers<void>();
-    choiceWrites.gate = released.promise;
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
 
     const tap = setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
     const enter = enterChat(place, opened);
-    released.resolve();
+    gate.resolve(undefined);
     await tap;
     await enter;
     await settled();
@@ -909,8 +915,8 @@ describe('web search in a chat', () => {
     await enterChat(place, opened);
     await settled();
 
-    choiceWrites.refuse = 1;
     await setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: true });
+    choiceWrites.refuse = 1;
     await expect(
       setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false })
     ).rejects.toThrow('the choice could not be written');
@@ -923,12 +929,12 @@ describe('web search in a chat', () => {
        per chat: the question is asked on the session the tap made, and the
        choice is carried to it rather than read and deleted in between. */
     storedTools = [...BASE, ...SETTINGS];
-    const released = Promise.withResolvers<void>();
-    choiceWrites.gate = released.promise;
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
 
     const tap = setChatFlag({ sessionId: opened, place, flag: 'webSearch', next: false });
     const send = say(opened, { text: 'hello', images: [] }, { model: 'kilo/two', effort: null });
-    released.resolve();
+    gate.resolve(undefined);
     await tap;
     await send;
     await settled();
@@ -2059,13 +2065,9 @@ describe('opening a chat where it was recorded', () => {
     expect(snapshotOf(opened)).toMatchObject({ status: 'idle', turns: [TURN], failureKey: null });
   });
 
-  it('leaves a chat a tool retry moved while the chat was being let go', async () => {
-    /* The retry reads the chat, then waits on the server. The chat is let go
-       from another place in that wait, and the retry lands on the session it
-       moved onto after the chat has left the live ones. */
-    /* The chat this run starts carries no scope of its own, so it is opened
-       from the store first: the one that continues is the chat whose close a
-       test can hold open. */
+  it('does not revive a chat when a tool retry finishes discovery during its close', async () => {
+    /* Discovery starts first, but its move must wait for the close that took
+       the chat's turn while the server was answering. */
     await releaseChat(opened);
     await enterChat(place, opened);
     continued = [];
@@ -2087,21 +2089,18 @@ describe('opening a chat where it was recorded', () => {
 
     server.resolve(undefined);
     await settled();
-    const carried = snapshotOf(opened).sessionId;
-    expect(carried).toBe('s2');
+    expect(clonesMade).toBe(0);
 
     gate.resolve(undefined);
     await Promise.all([foreign, retrying]);
     await settled();
 
-    /* The let-go id settles for itself and says nothing about the chat that
-       carried on: that one is live, and it keeps its transcript. */
-    expect(snapshotOf(carried)).toMatchObject({
+    expect(clonesMade).toBe(0);
+    expect(snapshotOf(opened)).toMatchObject({
       status: 'idle',
-      turns: [TURN],
-      failureKey: null,
+      model: '',
+      failureKey: 'queryError.notFoundDescription',
     });
-    await releaseChat(carried);
   });
 
   it('keeps an organization’s chat out of the personal place', async () => {
@@ -2193,6 +2192,74 @@ describe('opening a chat where it was recorded', () => {
       turns: [],
       failureKey: 'queryError.notFoundDescription',
     });
+  });
+});
+
+describe('releasing a chat with queued operations', () => {
+  it('releases the successor after a pending flag turn and its waiting successor settle', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+    const picking = setChatFlag({
+      sessionId: opened,
+      place,
+      flag: 'webSearch',
+      next: false,
+    });
+    await settled();
+    const waiting = setChatFlag({
+      sessionId: opened,
+      place: null,
+      flag: 'webSearch',
+      next: true,
+    });
+    const releasing = releaseChat(opened);
+    gate.resolve(undefined);
+    await Promise.all([picking, waiting, releasing]);
+
+    expect(clonesMade).toBe(1);
+    expect(snapshotOf('s2').model).toBe('');
+  });
+
+  it('settles a release without skipping a reopen waiting behind it', async () => {
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    continued = [];
+    const gate = Promise.withResolvers<undefined>();
+    closing = gate.promise;
+    const releasing = releaseChat(opened);
+    await settled();
+    const reopening = enterChat(place, opened);
+    gate.resolve(undefined);
+    await Promise.all([releasing, reopening]);
+
+    expect(continued).toEqual([opened]);
+    expect(snapshotOf(opened).model).toBe('kilo/one');
+  });
+
+  it('drains and forgets unopened flags before sign-out or account switch can continue', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    choiceWrites.gate = gate.promise;
+    const picking = setChatFlag({
+      sessionId: 'unopened',
+      place: null,
+      flag: 'webSearch',
+      next: false,
+    });
+    await settled();
+    const waiting = setChatFlag({
+      sessionId: 'unopened',
+      place: null,
+      flag: 'webSearch',
+      next: true,
+    });
+    const releasing = releaseEveryChat();
+    await settled();
+    expect(snapshotOf('unopened').webSearch.kind).toBe('picking');
+    gate.resolve(undefined);
+    await Promise.all([picking, waiting, releasing]);
+
+    expect(storedQuestions.get(`${choiceWrites.scope}:unopened`)).toBe('on');
+    expect(snapshotOf('unopened').webSearch.kind).toBe('reading');
   });
 });
 

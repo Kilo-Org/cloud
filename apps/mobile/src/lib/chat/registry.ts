@@ -32,8 +32,8 @@ import {
 import {
   type ChatFlag,
   type ChatFlagApplication,
-  type ChatFlagName,
   chatFlagBehind,
+  type ChatFlagName,
   flagApplication,
   flagPersisted,
   flagPicked,
@@ -189,9 +189,10 @@ type ChatTurn = {
   tail: Promise<void>;
   /** Operations waiting for their turn; a close skips the ones that may be skipped. */
   readonly waiting: Set<{ readonly skippable: boolean; skip: () => void }>;
+  forgotten: boolean;
 };
 
-const turns = new Map<string, ChatTurn>();
+const chatTurns = new Map<string, ChatTurn>();
 
 /**
  * One runtime per scope, because whose credit pays is part of the wiring and a
@@ -368,11 +369,10 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
     return;
   }
   await runTurn(sessionId, { skippable: false }, async () => {
-    await openIn(place, sessionId);
-    /* Both flags are read here, inside the turn the open holds: a tap that was
-       enqueued first has already written, so this cannot put the stored choice
-       over it, and a tap enqueued after it is ordered behind the read. */
-    await ensureFlags(sessionId);
+    const current = resolveSessionId(sessionId);
+    await openIn(place, current);
+    /* Both flags are read inside the open's turn, after any earlier tap. */
+    await ensureFlags(current);
   });
 }
 
@@ -385,19 +385,23 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
  */
 function turnOf(sessionId: string): ChatTurn {
   const current = resolveSessionId(sessionId);
-  const held = turns.get(current);
+  const held = chatTurns.get(current);
   if (held !== undefined) {
     return held;
   }
-  for (const [key, turn] of turns) {
+  for (const [key, turn] of chatTurns) {
     if (resolveSessionId(key) === current) {
-      turns.delete(key);
-      turns.set(current, turn);
+      chatTurns.delete(key);
+      chatTurns.set(current, turn);
       return turn;
     }
   }
-  const created: ChatTurn = { tail: Promise.resolve(), waiting: new Set() };
-  turns.set(current, created);
+  const created: ChatTurn = {
+    tail: Promise.resolve(),
+    waiting: new Set(),
+    forgotten: false,
+  };
+  chatTurns.set(current, created);
   return created;
 }
 
@@ -418,20 +422,42 @@ function runTurn<T>(
   const turn = turnOf(sessionId);
   const previous = turn.tail;
   const gate = Promise.withResolvers<boolean>();
-  const ticket = { skippable: options.skippable, skip: () => gate.resolve(false) };
+  const ticket = {
+    skippable: options.skippable,
+    skip: () => {
+      gate.resolve(false);
+    },
+  };
   turn.waiting.add(ticket);
-  const done = (async () => ((await gate.promise) ? work() : undefined))();
-  turn.tail = done
-    .then(
-      () => undefined,
-      () => undefined
-    )
-    .finally(() => {
+  const done = (async () => {
+    if (!(await gate.promise)) {
+      return undefined;
+    }
+    turn.waiting.delete(ticket);
+    const result = await work();
+    return result;
+  })();
+  const tail = (async () => {
+    await previous;
+    gate.resolve(true);
+    try {
+      await done;
+    } catch {
+      /* A waiter owns the ordering, not the preceding caller's failure. */
+    } finally {
       turn.waiting.delete(ticket);
-    });
-  /* The predecessor's settlement opens this one's gate. A close may open it
-     first, as "skipped" — settling twice is a no-op, so the first answer wins. */
-  void previous.then(() => gate.resolve(true));
+      if (turn.forgotten && turn.waiting.size === 0) {
+        for (const [key, held] of chatTurns) {
+          if (held === turn) {
+            chatTurns.delete(key);
+          }
+        }
+      }
+    }
+  })();
+  /* A skipped finalizer may finish before its predecessor, but the queue must
+     still wait for that predecessor before starting another operation. */
+  turn.tail = tail;
   return done;
 }
 
@@ -444,16 +470,10 @@ function skipWaitingTurns(sessionId: string): void {
   }
 }
 
-/** Drops a chat's turn record, beside `forgetState`, so no queue outlives the chat. */
+/** Retires the queue only after its last waiter, including a reopen, finishes. */
 function forgetTurn(sessionId: string): void {
-  for (const [key, turn] of turns) {
-    if (resolveSessionId(key) === sessionId) {
-      for (const ticket of turn.waiting) {
-        ticket.skip();
-      }
-      turns.delete(key);
-    }
-  }
+  skipWaitingTurns(sessionId);
+  turnOf(sessionId).forgotten = true;
 }
 
 /**
@@ -853,9 +873,15 @@ export async function say(
     /* The move takes the chat's turn, so a flag tap cannot be split from its
        own persist while this chat is being copied onto another session. */
     const from = current;
-    const moved = await runTurn(from, { skippable: false }, () =>
-      ontoForUse(from, { model, effort }, held)
-    );
+    const moved = await runTurn(from, { skippable: false }, async () => {
+      const landed = resolveSessionId(from);
+      const live = chats.get(landed);
+      if (live === undefined) {
+        throw new Error('the chat is not open');
+      }
+      const result = await ontoForUse(landed, { model, effort }, live);
+      return result;
+    });
     current = moved ?? snapshotOf(from).sessionId;
     const chat = chats.get(current);
     if (chat === undefined) {
@@ -1314,7 +1340,15 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
          the close that waits on the answer's settle. The close opens the gate
          first, which is what keeps a close from deadlocking on itself. */
       const from = current;
-      const moved = await runTurn(from, { skippable: true }, () => ontoTools(from, chat));
+      const moved = await runTurn(from, { skippable: true }, async () => {
+        const landed = resolveSessionId(from);
+        const live = chats.get(landed);
+        if (live === undefined || live.closing) {
+          return landed;
+        }
+        const result = await ontoTools(landed, live);
+        return result;
+      });
       current = moved ?? snapshotOf(from).sessionId;
       if (!failed) {
         change(current, { failed: null, failureKey: null });
@@ -1610,15 +1644,16 @@ function writeFlagOf(flag: ChatFlagName, sessionId: string, value: ChatFlag): vo
 async function applyFlag(flag: ChatFlagName, sessionId: string, place: ChatPlace): Promise<void> {
   const id = snapshotOf(sessionId).sessionId;
   const chat = chats.get(id);
-  if (flag === 'kiloTools' && chat !== undefined && KILO_MCP_URL !== undefined) {
-    /* Turning it on has to reach the server: a chat that had the feature off
-       never ran a discovery, and moving it onto the base tools alone would snap
-       the switch back off. An open, so the same bound an open gets. */
-    if (await mcpEnabledFor(id)) {
-      await ensureKiloMcp(chat, 'automatic');
-    }
+  /* Enabling a chat that never discovered tools must reach the server first. */
+  if (
+    flag === 'kiloTools' &&
+    chat !== undefined &&
+    KILO_MCP_URL !== undefined &&
+    (await mcpEnabledFor(id))
+  ) {
+    await ensureKiloMcp(chat, 'automatic');
   }
-  if (chat !== undefined && chat.answering !== undefined) {
+  if (chat?.answering !== undefined) {
     /* Never under an answer: the tool set would change between two rounds of
        one question. The settle applies it. */
     chat.pendingTools ??= true;
@@ -1655,11 +1690,9 @@ export async function setChatFlag(options: {
     const id = resolveSessionId(sessionId);
     writeFlagOf(flag, id, flagPicked(readFlagOf(flag, id), next));
     try {
-      if (flag === 'webSearch') {
-        await persistWebSearchEnabled(id, next);
-      } else {
-        await persistMcpEnabled(id, next);
-      }
+      await (flag === 'webSearch'
+        ? persistWebSearchEnabled(id, next)
+        : persistMcpEnabled(id, next));
     } catch (error) {
       /* The write was refused: the switch goes back to the stored choice and
          the tap is reported. */
@@ -1709,8 +1742,7 @@ export async function retryChatFlag(options: {
 }
 
 /** The phases that still owe a read of the stored choice. */
-const awaitingRead = (flag: ChatFlag): boolean =>
-  flag.kind === 'reading' || flag.kind === 'unread';
+const awaitingRead = (flag: ChatFlag): boolean => flag.kind === 'reading' || flag.kind === 'unread';
 
 /** A stored choice, or the fact that reading it failed. */
 type ReadChoice = { readonly ok: true; readonly choice: boolean | null } | { readonly ok: false };
@@ -1791,7 +1823,13 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
     chat.pendingTools ??= true;
     return;
   }
-  await runTurn(current, { skippable: true }, () => ontoTools(current, chat));
+  await runTurn(current, { skippable: true }, async () => {
+    const landed = resolveSessionId(current);
+    const live = chats.get(landed);
+    if (live !== undefined && !live.closing) {
+      await ontoTools(landed, live);
+    }
+  });
 }
 
 /**
@@ -1858,8 +1896,8 @@ async function endChat(sessionId: string, chat: Chat): Promise<void> {
   chat.waiting.length = 0;
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
-  forgetState(sessionId);
   forgetTurn(sessionId);
+  forgetState(sessionId);
 }
 
 /**
@@ -1871,12 +1909,13 @@ async function endChat(sessionId: string, chat: Chat): Promise<void> {
  * chat running and the old id pointing at one nobody ended.
  */
 export async function releaseChat(sessionId: string): Promise<void> {
-  const current = snapshotOf(sessionId).sessionId;
-  await runTurn(current, { skippable: false }, async () => {
+  await runTurn(sessionId, { skippable: false }, async () => {
+    const current = resolveSessionId(sessionId);
     const chat = chats.get(current);
     if (chat === undefined) {
       /* Deleting a chat that was never opened still has a state subscribed by
          the row that was tapped, so it is forgotten here too. */
+      forgetTurn(current);
       forgetState(current);
       return;
     }
@@ -1893,9 +1932,9 @@ export async function releaseEveryChat(): Promise<void> {
   /* A chat with a queued flag write but no live session is drained too: the
      preferences are deleted after this returns, and a write that landed after
      that would restore a choice the sign-out just removed. */
-  for (const sessionId of [...turns.keys()]) {
+  for (const sessionId of chatTurns.keys()) {
     // eslint-disable-next-line no-await-in-loop -- each chat's queue finishes before the next is waited on: their writes share one database
-    await turnOf(sessionId).tail;
+    await releaseChat(sessionId);
   }
   for (const runtime of runtimes.values()) {
     // eslint-disable-next-line no-await-in-loop -- close each runtime after all of its sessions

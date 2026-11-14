@@ -3362,7 +3362,7 @@
       "limitLabel": "Gündəlik limit (USD)",
       "memberNotFound": "Üzv tapılmadı.",
       "noLimitPlaceholder": "Limit yoxdur",
-      "permissionDenied": "Yalnız təşkilat sahibi istifadə limitlərini idarə edə bilər.",
+      "permissionDenied": "Yalnız təşkilat sahibi və ya administratoru istifadə limitlərini idarə edə bilər.",
       "removeLimit": "Limiti götür",
       "title": "Gündəlik istifadə limiti",
       "blankError": "Məbləğ daxil et və ya aşağıdakı «Limiti götür» düyməsindən istifadə et.",

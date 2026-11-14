@@ -3362,7 +3362,7 @@
       "limitLabel": "Korlát (USD naponta)",
       "memberNotFound": "A tag nem található.",
       "noLimitPlaceholder": "Nincs korlát",
-      "permissionDenied": "Csak a szervezet tulajdonosa kezelheti a használati korlátokat.",
+      "permissionDenied": "A használati korlátokat csak a szervezet tulajdonosa vagy adminisztrátora kezelheti.",
       "removeLimit": "Korlát eltávolítása",
       "title": "Napi használati korlát",
       "blankError": "Adj meg egy összeget, vagy koppints az alábbi Korlát eltávolítása gombra.",

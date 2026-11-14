@@ -3367,7 +3367,7 @@
       "limitLabel": "Giới hạn (USD mỗi ngày)",
       "memberNotFound": "Không tìm thấy thành viên.",
       "noLimitPlaceholder": "Không giới hạn",
-      "permissionDenied": "Chỉ chủ sở hữu tổ chức mới có thể quản lý giới hạn sử dụng.",
+      "permissionDenied": "Chỉ chủ sở hữu hoặc quản trị viên tổ chức mới có thể quản lý giới hạn sử dụng.",
       "removeLimit": "Bỏ giới hạn",
       "title": "Giới hạn sử dụng hằng ngày",
       "blankError": "Hãy nhập số tiền hoặc chọn Bỏ giới hạn bên dưới.",

@@ -3367,7 +3367,7 @@
       "limitLabel": "Batas (USD per hari)",
       "memberNotFound": "Anggota tidak ditemukan.",
       "noLimitPlaceholder": "Tanpa batas",
-      "permissionDenied": "Hanya pemilik organisasi yang dapat mengelola batas penggunaan.",
+      "permissionDenied": "Hanya pemilik atau admin organisasi yang dapat mengelola batas penggunaan.",
       "removeLimit": "Hapus batas",
       "title": "Batas penggunaan harian",
       "blankError": "Masukkan jumlah atau ketuk Hapus batas di bawah.",

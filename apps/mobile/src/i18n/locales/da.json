@@ -3362,7 +3362,7 @@
       "limitLabel": "Grænse (USD pr. dag)",
       "memberNotFound": "Medlemmet blev ikke fundet.",
       "noLimitPlaceholder": "Ingen grænse",
-      "permissionDenied": "Kun organisationsejeren kan administrere forbrugsgrænser.",
+      "permissionDenied": "Kun en ejer eller administrator i organisationen kan administrere forbrugsgrænser.",
       "removeLimit": "Fjern grænse",
       "title": "Daglig forbrugsgrænse",
       "blankError": "Angiv et beløb, eller tryk på Fjern grænse nedenfor.",

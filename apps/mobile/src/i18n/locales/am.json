@@ -3362,7 +3362,7 @@
       "limitLabel": "የቀን ገደብ (USD)",
       "memberNotFound": "አባሉ አልተገኘም።",
       "noLimitPlaceholder": "ገደብ የለም",
-      "permissionDenied": "የአጠቃቀም ገደቦችን ማስተዳደር የሚችለው የድርጅቱ ባለቤት ብቻ ነው።",
+      "permissionDenied": "የአጠቃቀም ገደቦችን ማስተዳደር የሚችሉት የድርጅቱ ባለቤት ወይም አስተዳዳሪ ብቻ ናቸው።",
       "removeLimit": "ገደቡን ያስወግዱ",
       "title": "የዕለት አጠቃቀም ገደብ",
       "blankError": "መጠን ያስገቡ፣ ወይም ከታች «ገደቡን ያስወግዱ»ን ይንኩ።",

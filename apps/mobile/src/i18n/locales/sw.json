@@ -3362,7 +3362,7 @@
       "limitLabel": "Kikomo (USD kwa siku)",
       "memberNotFound": "Mwanachama hakupatikana.",
       "noLimitPlaceholder": "Hakuna kikomo",
-      "permissionDenied": "Mmiliki wa shirika pekee anaweza kusimamia vikomo vya matumizi.",
+      "permissionDenied": "Ni mmiliki au msimamizi wa shirika pekee anayeweza kusimamia vikomo vya matumizi.",
       "removeLimit": "Ondoa kikomo",
       "title": "Kikomo cha matumizi ya kila siku",
       "blankError": "Weka kiasi au uguse Ondoa kikomo hapa chini.",

@@ -3415,7 +3415,7 @@
       "limitLabel": "Limită (USD pe zi)",
       "memberNotFound": "Membrul nu a fost găsit.",
       "noLimitPlaceholder": "Fără limită",
-      "permissionDenied": "Doar proprietarul organizației poate gestiona limitele de utilizare.",
+      "permissionDenied": "Doar proprietarul sau un administrator al organizației poate gestiona limitele de utilizare.",
       "removeLimit": "Elimină limita",
       "title": "Limită zilnică de utilizare",
       "blankError": "Introdu o sumă sau atinge „Elimină limita” mai jos.",

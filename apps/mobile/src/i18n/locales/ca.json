@@ -3415,7 +3415,7 @@
       "limitLabel": "Límit (USD per dia)",
       "memberNotFound": "No s'ha trobat el membre.",
       "noLimitPlaceholder": "Sense límit",
-      "permissionDenied": "Només el propietari de l'organització pot gestionar els límits d'ús.",
+      "permissionDenied": "Només un propietari o administrador de l'organització pot gestionar els límits d'ús.",
       "removeLimit": "Treu el límit",
       "title": "Límit d'ús diari",
       "blankError": "Introdueix un import o treu el límit amb el botó de sota.",

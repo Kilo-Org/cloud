@@ -3362,7 +3362,7 @@
       "limitLabel": "Muga (USD eguneko)",
       "memberNotFound": "Ez da kidea aurkitu.",
       "noLimitPlaceholder": "Mugarik gabe",
-      "permissionDenied": "Erakundearen jabeak soilik kudea ditzake erabilera-mugak.",
+      "permissionDenied": "Erakundearen jabeak edo administratzaileak soilik kudea ditzake erabilera-mugak.",
       "removeLimit": "Kendu muga",
       "title": "Eguneko erabilera-muga",
       "blankError": "Sartu zenbateko bat edo sakatu beheko Kendu muga botoia.",

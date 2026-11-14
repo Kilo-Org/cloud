@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the surface, role-gate and validation cases share the sheet's mounted harness. */
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -193,6 +194,38 @@ describe('organization sheet surfaces', () => {
       const { renderer, unmount } = await renderWithProviders(element);
       expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
       expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
+      unmount();
+    }
+  );
+});
+
+describe('MemberLimitSheet role gate', () => {
+  function deniedEmptyState(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+    // `PermissionDenied` is not mocked here, so its description reaches the
+    // stubbed `EmptyState` as a prop.
+    return propsOf(renderer.root.find(node => String(node.type) === 'EmptyState'));
+  }
+
+  it('opens the limit form for an admin, who manages members like the web card', async () => {
+    boundary.role = 'admin';
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    expect(renderer.root.findAll(node => String(node.type) === 'FormField')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'Button').length).toBeGreaterThan(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    unmount();
+  });
+
+  it.each([{ role: 'member' }, { role: 'billing_manager' }])(
+    'denies a $role with the shared role copy',
+    async ({ role }) => {
+      boundary.role = role;
+      const { renderer, unmount } = await mountLimitForm(1200);
+
+      expect(deniedEmptyState(renderer).description).toBe(
+        i18n.t('organization.memberLimit.permissionDenied')
+      );
+      expect(renderer.root.findAll(node => String(node.type) === 'FormField')).toHaveLength(0);
       unmount();
     }
   );

@@ -166,6 +166,7 @@ export function OrganizationMembersScreen() {
                 item.member.id !== currentUserId &&
                 (item.member.role !== 'owner' || canManageOwners)
               }
+              canManageLimit={canManageMembers && item.member.id !== currentUserId}
               callerRole={role}
               enableUsageLimits={enableUsageLimits}
               isSalesDemo={isSalesDemo}

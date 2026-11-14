@@ -3367,7 +3367,7 @@
       "limitLabel": "每日上限（USD）",
       "memberNotFound": "找不到成員。",
       "noLimitPlaceholder": "無限制",
-      "permissionDenied": "只有組織擁有者可以管理用量限制。",
+      "permissionDenied": "只有組織擁有者或管理員可以管理用量限制。",
       "removeLimit": "移除限制",
       "title": "每日用量限制",
       "blankError": "請輸入金額，或點一下下方的「移除限制」。",

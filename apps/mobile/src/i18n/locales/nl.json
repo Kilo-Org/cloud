@@ -3367,7 +3367,7 @@
       "limitLabel": "Limiet (USD per dag)",
       "memberNotFound": "Het lid is niet gevonden.",
       "noLimitPlaceholder": "Geen limiet",
-      "permissionDenied": "Alleen de eigenaar van de organisatie kan gebruikslimieten beheren.",
+      "permissionDenied": "Alleen een eigenaar of beheerder van de organisatie kan gebruikslimieten beheren.",
       "removeLimit": "Limiet verwijderen",
       "title": "Dagelijkse gebruikslimiet",
       "blankError": "Voer een bedrag in of tik hieronder op Limiet verwijderen.",

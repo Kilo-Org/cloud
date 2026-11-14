@@ -3473,7 +3473,7 @@
       "limitLabel": "Limit (USD dziennie)",
       "memberNotFound": "Nie znaleziono członka.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Tylko właściciel organizacji może zarządzać limitami wydatków.",
+      "permissionDenied": "Tylko właściciel lub administrator organizacji może zarządzać limitami wydatków.",
       "removeLimit": "Usuń limit",
       "title": "Dzienny limit wydatków",
       "blankError": "Wpisz kwotę lub wybierz „Usuń limit” poniżej.",

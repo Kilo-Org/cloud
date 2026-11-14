@@ -3362,7 +3362,7 @@
       "limitLabel": "Piirang (USD päevas)",
       "memberNotFound": "Liiget ei leitud.",
       "noLimitPlaceholder": "Piirangut pole",
-      "permissionDenied": "Kasutuspiiranguid saab hallata ainult organisatsiooni omanik.",
+      "permissionDenied": "Kasutuspiiranguid saavad hallata ainult organisatsiooni omanik või administraator.",
       "removeLimit": "Eemalda piirang",
       "title": "Päevane kasutuspiirang",
       "blankError": "Sisesta summa või eemalda piirang alloleva nupuga.",

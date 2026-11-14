@@ -3362,7 +3362,7 @@
       "limitLabel": "Perk (USD per dag)",
       "memberNotFound": "Die lid kon nie gevind word nie.",
       "noLimitPlaceholder": "Geen perk nie",
-      "permissionDenied": "Slegs die organisasie se eienaar kan gebruiksperke bestuur.",
+      "permissionDenied": "Slegs 'n eienaar of administrateur van die organisasie kan gebruiksperke bestuur.",
       "removeLimit": "Verwyder perk",
       "title": "Daaglikse gebruiksperk",
       "blankError": "Voer 'n bedrag in of tik hieronder op Verwyder perk.",

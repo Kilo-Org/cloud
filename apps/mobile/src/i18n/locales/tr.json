@@ -3367,7 +3367,7 @@
       "limitLabel": "Günlük sınır (USD)",
       "memberNotFound": "Üye bulunamadı.",
       "noLimitPlaceholder": "Sınır yok",
-      "permissionDenied": "Kullanım sınırlarını yalnızca kuruluş sahibi yönetebilir.",
+      "permissionDenied": "Kullanım sınırlarını yalnızca kuruluş sahibi veya yöneticisi yönetebilir.",
       "removeLimit": "Sınırı kaldır",
       "title": "Günlük kullanım sınırı",
       "blankError": "Bir tutar gir veya aşağıdaki “Sınırı kaldır” düğmesini kullan.",

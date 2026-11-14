@@ -4675,7 +4675,7 @@
       "unlock": "Kuusaa bani",
       "apply": "Kuusaa galchi",
       "mergeStrategy": "Walfaakkaattoota darbi",
-      "mergeDescription": "Hostoota jiran labeliin, furtuuwwan mallattoo qubaaniin fi hostoota beekaman patterniin qabi. Snippiiwwan fi hidhaawwan dabarsaa wal fakkaatanis ni qabama.",
+      "mergeDescription": "Hostoota labelii, maqaa hostii, poortii fi fayyadamaa wal fakkaataa qaban qabi, furtuuwwan mallattoo qubaa wal fakkaataa qaban qabi, hostoota beekamanis patternii fi algooritmii furtuu wal fakkaataa qaban qabi. Snippiiwwan fi hidhaawwan dabarsaa wal fakkaatanis ni qabama.",
       "conflicts": "Meeshaa kana irratti qabame",
       "outcomeTitle": "Bu'aa galchuu",
       "toSkip": "Kan darbamu",

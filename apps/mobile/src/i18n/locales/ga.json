@@ -4870,7 +4870,7 @@
       "unlock": "Díghlasáil cúltaca",
       "apply": "Iompórtáil cúltaca",
       "mergeStrategy": "Scipeáil dúbláin",
-      "mergeDescription": "Coinnítear óstaigh atá ann cheana de réir lipéid, eochracha de réir méarlorg agus óstaigh aitheanta de réir patrúin. Coinnítear blúirí agus ceangail seolta a mheaitseálann freisin.",
+      "mergeDescription": "Coinnítear óstaigh nuair a mheaitseálann an lipéad, an t-óstainm, an port agus an t-úsáideoir, eochracha nuair a mheaitseálann an méarlorg, agus óstaigh aitheanta nuair a mheaitseálann an patrún agus an t-algartam eochrach. Coinnítear blúirí agus ceangail seolta a mheaitseálann freisin.",
       "conflicts": "Coinnithe ar an bhfeiste seo",
       "outcomeTitle": "Toradh an iompórtála",
       "toSkip": "Le scipeáil",

@@ -4675,7 +4675,7 @@
       "unlock": "Debloke sovgad",
       "apply": "Enpòte sovgad",
       "mergeStrategy": "Sote doublon",
-      "mergeDescription": "Kenbe ot ki deja egziste yo dapre etikèt, kle dapre anprent ak ot yo konnen dapre modèl. Kòmand anrejistre ak redireksyon ki matche yo tou kenbe.",
+      "mergeDescription": "Kenbe ot ki gen menm etikèt, non ot, pò ak itilizatè, kle ki gen menm anprent, ak ot yo konnen ki gen menm modèl ak menm algoritm kle. Kòmand anrejistre ak redireksyon ki matche yo tou kenbe.",
       "conflicts": "Kenbe sou aparèy sa a",
       "outcomeTitle": "Rezilta enpòtasyon",
       "toSkip": "Pou sote",

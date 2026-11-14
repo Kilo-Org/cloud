@@ -4675,7 +4675,7 @@
       "unlock": "Zaxira nusxasi qulfini ochish",
       "apply": "Zaxira nusxasini import qilish",
       "mergeStrategy": "Dublikatlarni o‘tkazib yuborish",
-      "mergeDescription": "Mavjud hostlarni yorliq bo‘yicha, kalitlarni barmoq izi bo‘yicha va ma’lum hostlarni naqsh bo‘yicha saqlang. Mos keluvchi parchalar va yo‘naltirish bog‘lanishlari ham saqlanadi.",
+      "mergeDescription": "Yorliq, host nomi, port va foydalanuvchi bir xil bo‘lgan hostlarni, barmoq izi bir xil bo‘lgan kalitlarni va naqsh hamda kalit algoritmi bir xil bo‘lgan ma’lum hostlarni saqlang. Mos keluvchi parchalar va yo‘naltirish bog‘lanishlari ham saqlanadi.",
       "conflicts": "Bu qurilmada qoldirilgan",
       "outcomeTitle": "Import natijasi",
       "toSkip": "O‘tkazib yuboriladiganlar",

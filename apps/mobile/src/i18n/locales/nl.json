@@ -4675,7 +4675,7 @@
       "unlock": "Back-up ontgrendelen",
       "apply": "Back-up importeren",
       "mergeStrategy": "Duplicaten overslaan",
-      "mergeDescription": "Bestaande hosts worden behouden op label, sleutels op vingerafdruk en bekende hosts op patroon. Overeenkomende snippets en doorschakelkoppelingen worden ook behouden.",
+      "mergeDescription": "Hosts worden behouden wanneer label, hostnaam, poort en gebruiker overeenkomen, sleutels wanneer de vingerafdruk overeenkomt en bekende hosts wanneer patroon en sleutelalgoritme overeenkomen. Overeenkomende snippets en doorschakelkoppelingen worden ook behouden.",
       "conflicts": "Behouden op dit apparaat",
       "outcomeTitle": "Resultaat van de import",
       "toSkip": "Over te slaan",

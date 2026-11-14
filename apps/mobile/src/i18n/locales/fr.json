@@ -4740,7 +4740,7 @@
       "unlock": "Déverrouiller la sauvegarde",
       "apply": "Importer la sauvegarde",
       "mergeStrategy": "Ignorer les doublons",
-      "mergeDescription": "Conservez les hôtes existants par libellé, les clés par empreinte et les hôtes connus par motif. Les extraits et les liaisons de redirection correspondants sont également conservés.",
+      "mergeDescription": "Conservez les hôtes ayant le même libellé, nom d'hôte, port et utilisateur, les clés ayant la même empreinte et les hôtes connus ayant le même motif et le même algorithme de clé. Les extraits et les liaisons de redirection correspondants sont également conservés.",
       "conflicts": "Conservé sur cet appareil",
       "outcomeTitle": "Résultat de l’importation",
       "toSkip": "À ignorer",

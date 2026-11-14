@@ -4740,7 +4740,7 @@
       "unlock": "Desbloquear copia de seguridad",
       "apply": "Importar copia de seguridad",
       "mergeStrategy": "Omitir duplicados",
-      "mergeDescription": "Conserva los hosts existentes por etiqueta, las claves por huella y los hosts conocidos por patrón. También se conservan los fragmentos y las vinculaciones de reenvío coincidentes.",
+      "mergeDescription": "Conserva los hosts con la misma etiqueta, nombre de host, puerto y usuario, las claves con la misma huella y los hosts conocidos con el mismo patrón y algoritmo de clave. También se conservan los fragmentos y las vinculaciones de reenvío coincidentes.",
       "conflicts": "Conservados en este dispositivo",
       "outcomeTitle": "Resultado de la importación",
       "toSkip": "Por omitir",

@@ -4675,7 +4675,7 @@
       "unlock": "Buka kunci cadangan",
       "apply": "Impor cadangan",
       "mergeStrategy": "Lewati duplikat",
-      "mergeDescription": "Pertahankan host yang ada berdasarkan label, kunci berdasarkan sidik jari, dan host dikenal berdasarkan pola. Snippet dan pengikatan penerusan yang cocok juga dipertahankan.",
+      "mergeDescription": "Pertahankan host dengan label, nama host, port, dan pengguna yang sama, kunci dengan sidik jari yang sama, dan host dikenal dengan pola dan algoritme kunci yang sama. Snippet dan pengikatan penerusan yang cocok juga dipertahankan.",
       "conflicts": "Dipertahankan di perangkat ini",
       "outcomeTitle": "Hasil impor",
       "toSkip": "Untuk dilewati",

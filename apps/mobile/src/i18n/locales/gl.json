@@ -4675,7 +4675,7 @@
       "unlock": "Desbloquear copia de seguranza",
       "apply": "Importar copia de seguranza",
       "mergeStrategy": "Omitir duplicados",
-      "mergeDescription": "Mantéñense os hosts existentes por etiqueta, as chaves por impresión dixital e os hosts coñecidos por patrón. Tamén se manteñen os fragmentos e as vinculacións de reenvío coincidentes.",
+      "mergeDescription": "Mantéñense os hosts que teñan a mesma etiqueta, nome de host, porto e usuario, as chaves que teñan a mesma impresión dixital e os hosts coñecidos que teñan o mesmo patrón e algoritmo de chave. Tamén se manteñen os fragmentos e as vinculacións de reenvío coincidentes.",
       "conflicts": "Mantidos neste dispositivo",
       "outcomeTitle": "Resultado da importación",
       "toSkip": "Para omitir",

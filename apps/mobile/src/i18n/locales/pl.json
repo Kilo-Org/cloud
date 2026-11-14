@@ -4805,7 +4805,7 @@
       "unlock": "Odblokuj kopię zapasową",
       "apply": "Importuj kopię zapasową",
       "mergeStrategy": "Pomiń duplikaty",
-      "mergeDescription": "Zachowaj istniejące hosty według etykiety, klucze według odcisku i znane hosty według wzorca. Pasujące fragmenty i powiązania przekierowań również są zachowywane.",
+      "mergeDescription": "Zachowaj hosty z tą samą etykietą, nazwą hosta, portem i użytkownikiem, klucze z tym samym odciskiem oraz znane hosty z tym samym wzorcem i algorytmem klucza. Pasujące fragmenty i powiązania przekierowań również są zachowywane.",
       "conflicts": "Zachowano na tym urządzeniu",
       "outcomeTitle": "Wynik importu",
       "toSkip": "Do pominięcia",

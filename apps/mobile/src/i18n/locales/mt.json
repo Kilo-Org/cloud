@@ -4870,7 +4870,7 @@
       "unlock": "Iftaħ il-backup",
       "apply": "Importa l-backup",
       "mergeStrategy": "Aqbeż id-duplikati",
-      "mergeDescription": "Żomm il-hosts eżistenti bil-label, iċ-ċwievet bil-fingerprint u l-hosts magħrufa bil-pattern. Is-siltiet u l-bindings tal-forwards li jaqblu jinżammu wkoll.",
+      "mergeDescription": "Żomm il-hosts bl-istess label, hostname, port u user, iċ-ċwievet bl-istess fingerprint, u l-hosts magħrufa bl-istess pattern u algoritmu taċ-ċavetta. Is-siltiet u l-bindings tal-forwards li jaqblu jinżammu wkoll.",
       "conflicts": "Miżmuma fuq dan l-apparat",
       "outcomeTitle": "Riżultat tal-import",
       "toSkip": "Li jinqabżu",

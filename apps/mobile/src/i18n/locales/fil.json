@@ -4675,7 +4675,7 @@
       "unlock": "I-unlock ang backup",
       "apply": "I-import ang backup",
       "mergeStrategy": "Laktawan ang mga duplicate",
-      "mergeDescription": "Panatilihin ang mga kasalukuyang host ayon sa label, mga key ayon sa fingerprint, at mga kilalang host ayon sa pattern. Pinananatili rin ang mga katugmang snippet at binding ng forward.",
+      "mergeDescription": "Panatilihin ang mga host na may parehong label, hostname, port at user, ang mga key na may parehong fingerprint, at ang mga kilalang host na may parehong pattern at key algorithm. Pinananatili rin ang mga katugmang snippet at binding ng forward.",
       "conflicts": "Pinanatili sa device na ito",
       "outcomeTitle": "Resulta ng pag-import",
       "toSkip": "Laktawan",

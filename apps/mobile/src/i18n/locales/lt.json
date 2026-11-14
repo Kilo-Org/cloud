@@ -4805,7 +4805,7 @@
       "unlock": "Atrakinti atsarginę kopiją",
       "apply": "Importuoti atsarginę kopiją",
       "mergeStrategy": "Praleisti dublikatus",
-      "mergeDescription": "Esami hostai išsaugomi pagal žymą, raktai – pagal atspaudą, o žinomi hostai – pagal šabloną. Atitinkami fragmentai ir peradresavimų susiejimai taip pat išsaugomi.",
+      "mergeDescription": "Hostai išsaugomi, kai sutampa žyma, hosto vardas, prievadas ir naudotojas, raktai – kai sutampa atspaudas, o žinomi hostai – kai sutampa šablonas ir rakto algoritmas. Atitinkami fragmentai ir peradresavimų susiejimai taip pat išsaugomi.",
       "conflicts": "Išsaugota šiame įrenginyje",
       "outcomeTitle": "Importavimo rezultatas",
       "toSkip": "Praleisti",

@@ -4805,7 +4805,7 @@
       "unlock": "Odomknúť zálohu",
       "apply": "Importovať zálohu",
       "mergeStrategy": "Preskočiť duplikáty",
-      "mergeDescription": "Zachovajú sa existujúci hostitelia podľa označenia, kľúče podľa odtlačku a známi hostitelia podľa vzoru. Zodpovedajúce úryvky a väzby presmerovaní sa tiež zachovajú.",
+      "mergeDescription": "Zachovajú sa hostitelia s rovnakým označením, názvom hostiteľa, portom a používateľom, kľúče s rovnakým odtlačkom a známi hostitelia s rovnakým vzorom a algoritmom kľúča. Zodpovedajúce úryvky a väzby presmerovaní sa tiež zachovajú.",
       "conflicts": "Zachované v tomto zariadení",
       "outcomeTitle": "Výsledok importu",
       "toSkip": "Na preskočenie",

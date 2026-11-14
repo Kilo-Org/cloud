@@ -4675,7 +4675,7 @@
       "unlock": "Desblokeatu babeskopia",
       "apply": "Inportatu babeskopia",
       "mergeStrategy": "Saltatu bikoiztuak",
-      "mergeDescription": "Mantendu lehendik dauden ostalariak etiketaren arabera, gakoak hatz-markaren arabera eta ostalari ezagunak ereduaren arabera. Bat datozen zatiak eta birbideratze-loturak ere mantentzen dira.",
+      "mergeDescription": "Mantendu ostalariak etiketak, ostalari-izenak, atakak eta erabiltzaileak bat datozenean, gakoak hatz-marka bat datorrenean eta ostalari ezagunak eredua eta gako-algoritmoa bat datozenean. Bat datozen zatiak eta birbideratze-loturak ere mantentzen dira.",
       "conflicts": "Gailu honetan mantenduak",
       "outcomeTitle": "Inportazioaren emaitza",
       "toSkip": "Saltzeko",

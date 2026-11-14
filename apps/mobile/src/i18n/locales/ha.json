@@ -4675,7 +4675,7 @@
       "unlock": "Buɗe ajiye",
       "apply": "Shigo da ajiye",
       "mergeStrategy": "Tsallake kwafi",
-      "mergeDescription": "Adana hosts ɗin da suka wanzu bisa ga lakabi, maɓallai bisa ga sawun yatsa da hosts da aka sani bisa ga tsari. Ana kuma adana gajerun umarni masu dacewa da haɗin turawa.",
+      "mergeDescription": "Adana hosts ɗin idan lakabi, hostname, port da mai amfani duk sun dace, maɓallai idan sawun yatsa ya dace, da hosts da aka sani idan tsari da algorithm ɗin maɓalli sun dace. Ana kuma adana gajerun umarni masu dacewa da haɗin turawa.",
       "conflicts": "An adana a wannan na'urar",
       "outcomeTitle": "Sakamakon shigo da",
       "toSkip": "Don tsallake",

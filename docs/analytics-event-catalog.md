@@ -46,8 +46,10 @@ enum strings, integer counts, `duration_ms` integers, and booleans.
 
 A cataloged event's own schema may declare a denied term as a closed enum, and
 runtime redaction reads those carve-outs from the schema: `auth_method` on
-`ssh_connect_succeeded` and `ssh_connect_failed` is the only one. The same key
-on another event, or on an uncataloged dynamic payload, is still scrubbed.
+`ssh_connect_succeeded` and `ssh_connect_failed` is the only one. The carve-out
+requires a closed enum (`z.enum`, a literal, or a union of those); a free-text
+property that happens to carry a denied name is not carved out. The same key on
+another event, or on an uncataloged dynamic payload, is still scrubbed.
 
 Two enforcement layers:
 

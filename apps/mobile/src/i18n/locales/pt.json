@@ -4746,7 +4746,7 @@
       "unlock": "Desbloquear cópia de segurança",
       "apply": "Importar cópia de segurança",
       "mergeStrategy": "Ignorar duplicados",
-      "mergeDescription": "Manter os anfitriões existentes por etiqueta, as chaves por impressão digital e os anfitriões conhecidos por padrão. Os comandos guardados e as associações de reencaminhamento correspondentes também são mantidos.",
+      "mergeDescription": "Manter os anfitriões com a mesma etiqueta, nome do anfitrião, porta e utilizador, as chaves com a mesma impressão digital e os anfitriões conhecidos com o mesmo padrão e algoritmo de chave. Os comandos guardados e as associações de reencaminhamento correspondentes também são mantidos.",
       "conflicts": "Mantidos neste dispositivo",
       "outcomeTitle": "Resultado da importação",
       "toSkip": "A ignorar",

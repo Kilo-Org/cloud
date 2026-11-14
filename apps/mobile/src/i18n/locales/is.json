@@ -4675,7 +4675,7 @@
       "unlock": "Opna öryggisafrit",
       "apply": "Flytja inn öryggisafrit",
       "mergeStrategy": "Sleppa tvítekningum",
-      "mergeDescription": "Núverandi netþjónar eru geymdir eftir merki, lyklar eftir fingrafari og þekktir netþjónar eftir mynstri. Brot og framsendingartengingar sem passa eru einnig geymdar.",
+      "mergeDescription": "Netþjónar eru geymdir þegar merki, vélarheiti, gátt og notandi passa, lyklar þegar fingrafarið passar og þekktir netþjónar þegar mynstur og lykilreiknirit passa. Brot og framsendingartengingar sem passa eru einnig geymdar.",
       "conflicts": "Geymt á þessu tæki",
       "outcomeTitle": "Niðurstaða innflutnings",
       "toSkip": "Til að sleppa",

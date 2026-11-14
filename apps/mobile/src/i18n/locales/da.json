@@ -4675,7 +4675,7 @@
       "unlock": "Lås backup op",
       "apply": "Importér backup",
       "mergeStrategy": "Spring dubletter over",
-      "mergeDescription": "Behold eksisterende værter efter etiket, nøgler efter fingeraftryk og kendte værter efter mønster. Matchende snippets og videresendelsesbindinger beholdes også.",
+      "mergeDescription": "Behold værter med samme etiket, værtsnavn, port og bruger, nøgler med samme fingeraftryk og kendte værter med samme mønster og nøglealgoritme. Matchende snippets og videresendelsesbindinger beholdes også.",
       "conflicts": "Beholdt på denne enhed",
       "outcomeTitle": "Importresultat",
       "toSkip": "Springes over",

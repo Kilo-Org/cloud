@@ -4675,7 +4675,7 @@
       "unlock": "Buka kunci sandaran",
       "apply": "Import sandaran",
       "mergeStrategy": "Langkau pendua",
-      "mergeDescription": "Kekalkan hos sedia ada mengikut label, kunci mengikut cap jari dan hos diketahui mengikut corak. Serpihan dan pengikatan pemajuan yang sepadan juga dikekalkan.",
+      "mergeDescription": "Kekalkan hos dengan label, nama hos, port dan pengguna yang sama, kunci dengan cap jari yang sama, dan hos diketahui dengan corak dan algoritma kunci yang sama. Serpihan dan pengikatan pemajuan yang sepadan juga dikekalkan.",
       "conflicts": "Dikekalkan pada peranti ini",
       "outcomeTitle": "Hasil import",
       "toSkip": "Untuk dilangkau",

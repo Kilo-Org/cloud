@@ -20,7 +20,8 @@ import org.json.JSONObject
  * this module owns the native caches and pins the launcher surfaces. The payload is
  * committed synchronously because [QuickSettingsTileService] reads it in a cold
  * process, and the shortcuts are published with `setDynamicShortcuts` so an action
- * whose url is null disappears from the launcher.
+ * the payload leaves out disappears from the launcher. The New agent action is
+ * required, so a payload without it is rejected before the cache is touched.
  *
  * App shortcuts are a framework API from API 25, so an API 24 device shows none;
  * the tile (API 24+) still works there.
@@ -45,25 +46,49 @@ class KiloLauncherSurfacesModule : Module() {
 
   private fun cacheSurfaces(payloadJson: String) {
     val payload = JSONObject(payloadJson)
+    // The New agent action is the one action JS always publishes and the one the
+    // sign-out clear keeps: reject a payload without it before anything is written.
     val surfaces =
       CachedSurfaces(
-        newAgentUrl = payload.stringOrNull(LauncherSurfacesStore.KEY_NEW_AGENT_URL),
-        newAgentLabel = payload.stringOrNull(LauncherSurfacesStore.KEY_NEW_AGENT_LABEL),
-        needsInputUrl = payload.stringOrNull(LauncherSurfacesStore.KEY_NEEDS_INPUT_URL),
-        needsInputLabel = payload.stringOrNull(LauncherSurfacesStore.KEY_NEEDS_INPUT_LABEL),
-        openLastSessionUrl = payload.stringOrNull(LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_URL),
-        openLastSessionLabel = payload.stringOrNull(LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_LABEL),
+        newAgent =
+          requireNotNull(
+            payload.action(
+              LauncherSurfacesStore.KEY_NEW_AGENT_URL,
+              LauncherSurfacesStore.KEY_NEW_AGENT_LABEL,
+            )
+          ) {
+            "The launcher surfaces payload must carry the New agent url and label"
+          },
+        needsInput =
+          payload.action(
+            LauncherSurfacesStore.KEY_NEEDS_INPUT_URL,
+            LauncherSurfacesStore.KEY_NEEDS_INPUT_LABEL,
+          ),
+        openLastSession =
+          payload.action(
+            LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_URL,
+            LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_LABEL,
+          ),
       )
 
     val editor =
       LauncherSurfacesStore.prefs(context)
         .edit()
-        .putOrRemove(LauncherSurfacesStore.KEY_NEW_AGENT_URL, surfaces.newAgentUrl)
-        .putOrRemove(LauncherSurfacesStore.KEY_NEW_AGENT_LABEL, surfaces.newAgentLabel)
-        .putOrRemove(LauncherSurfacesStore.KEY_NEEDS_INPUT_URL, surfaces.needsInputUrl)
-        .putOrRemove(LauncherSurfacesStore.KEY_NEEDS_INPUT_LABEL, surfaces.needsInputLabel)
-        .putOrRemove(LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_URL, surfaces.openLastSessionUrl)
-        .putOrRemove(LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_LABEL, surfaces.openLastSessionLabel)
+        .putAction(
+          LauncherSurfacesStore.KEY_NEW_AGENT_URL,
+          LauncherSurfacesStore.KEY_NEW_AGENT_LABEL,
+          surfaces.newAgent,
+        )
+        .putAction(
+          LauncherSurfacesStore.KEY_NEEDS_INPUT_URL,
+          LauncherSurfacesStore.KEY_NEEDS_INPUT_LABEL,
+          surfaces.needsInput,
+        )
+        .putAction(
+          LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_URL,
+          LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_LABEL,
+          surfaces.openLastSession,
+        )
     check(editor.commit()) { "Cannot cache the launcher surfaces payload" }
 
     pinDynamicShortcuts(surfaces)
@@ -75,40 +100,42 @@ class KiloLauncherSurfacesModule : Module() {
     val editor =
       LauncherSurfacesStore.prefs(context)
         .edit()
-        .remove(LauncherSurfacesStore.KEY_NEEDS_INPUT_URL)
-        .remove(LauncherSurfacesStore.KEY_NEEDS_INPUT_LABEL)
-        .remove(LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_URL)
-        .remove(LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_LABEL)
+        .putAction(
+          LauncherSurfacesStore.KEY_NEEDS_INPUT_URL,
+          LauncherSurfacesStore.KEY_NEEDS_INPUT_LABEL,
+          null,
+        )
+        .putAction(
+          LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_URL,
+          LauncherSurfacesStore.KEY_OPEN_LAST_SESSION_LABEL,
+          null,
+        )
     check(editor.commit()) { "Cannot clear the launcher surfaces payload" }
 
     pinDynamicShortcuts(LauncherSurfacesStore.read(context))
     requestTileRefresh()
   }
 
-  private fun pinDynamicShortcuts(surfaces: CachedSurfaces) {
+  private fun pinDynamicShortcuts(surfaces: CachedSurfaces?) {
     if (Build.VERSION.SDK_INT < 25) {
       return
     }
     val shortcuts = mutableListOf<ShortcutInfo>()
-    surfaces.newAgentUrl?.let {
-      shortcuts += shortcut(SHORTCUT_NEW_AGENT, surfaces.newAgentLabel, it)
-    }
-    surfaces.needsInputUrl?.let {
-      shortcuts += shortcut(SHORTCUT_NEEDS_INPUT, surfaces.needsInputLabel, it)
-    }
-    surfaces.openLastSessionUrl?.let {
-      shortcuts += shortcut(SHORTCUT_OPEN_LAST_SESSION, surfaces.openLastSessionLabel, it)
+    if (surfaces != null) {
+      shortcuts += shortcut(SHORTCUT_NEW_AGENT, surfaces.newAgent)
+      surfaces.needsInput?.let { shortcuts += shortcut(SHORTCUT_NEEDS_INPUT, it) }
+      surfaces.openLastSession?.let { shortcuts += shortcut(SHORTCUT_OPEN_LAST_SESSION, it) }
     }
     shortcutManager().setDynamicShortcuts(shortcuts)
   }
 
-  private fun shortcut(id: String, label: String?, url: String): ShortcutInfo {
+  private fun shortcut(id: String, action: SurfaceAction): ShortcutInfo {
     val builder =
       ShortcutInfo.Builder(context, id)
-        .setShortLabel(label ?: id)
-        .setLongLabel(label ?: id)
+        .setShortLabel(action.label)
+        .setLongLabel(action.label)
         .setIcon(Icon.createWithResource(context, R.drawable.kilo_launcher_surfaces_shortcut))
-        .setIntent(actionIntent(context, url))
+        .setIntent(actionIntent(context, action.url))
     // setLongLived(boolean) is API 29: unguarded it throws NoSuchMethodError on an
     // API 25-28 device and the whole shortcut publish (and the tile refresh) is lost.
     if (Build.VERSION.SDK_INT >= 29) {

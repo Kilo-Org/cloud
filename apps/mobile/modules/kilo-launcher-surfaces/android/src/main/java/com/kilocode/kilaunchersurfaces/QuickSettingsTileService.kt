@@ -9,10 +9,11 @@ import android.service.quicksettings.TileService
 /**
  * Quick-settings tile for the Kilo launcher surface.
  *
- * The tile is not a plain launcher: [onClick] decides at tap time between the
- * cached Needs input url and the New agent url, and only falls back to the app's
- * launcher intent when nothing has ever been published. The label mirrors the same
- * decision in [applyCachedSurfaces], so the tile says what it will open.
+ * The tile is not a plain launcher: [onClick] opens the url of the cached
+ * [CachedSurfaces.tileAction] and [applyCachedSurfaces] labels the tile from the
+ * same value, so the tile says what it will open. Only when nothing has ever been
+ * published does the tile fall back to the static label and the app's launcher
+ * intent.
  *
  * `setSurfaces` / `clearDynamicSurfaces` request a listening refresh, so a publish
  * updates a placed tile without the app being open.
@@ -38,22 +39,16 @@ class QuickSettingsTileService : TileService() {
   /** Push the cached payload into the tile the service is currently bound to. */
   private fun applyCachedSurfaces() {
     val tile = qsTile ?: return
-    val surfaces = LauncherSurfacesStore.read(this)
-    val fallback = getString(R.string.kilo_launcher_surfaces_tile_label)
     tile.label =
-      if (surfaces.hasPendingInput) {
-        surfaces.needsInputLabel ?: fallback
-      } else {
-        surfaces.newAgentLabel ?: fallback
-      }
+      LauncherSurfacesStore.read(this)?.tileAction?.label
+        ?: getString(R.string.kilo_launcher_surfaces_tile_label)
     tile.state = Tile.STATE_ACTIVE
     tile.updateTile()
   }
 
   override fun onClick() {
     super.onClick()
-    val surfaces = LauncherSurfacesStore.read(this)
-    val url = surfaces.needsInputUrl ?: surfaces.newAgentUrl
+    val url = LauncherSurfacesStore.read(this)?.tileAction?.url
     val intent =
       if (url != null) {
         actionIntent(this, url)

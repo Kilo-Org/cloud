@@ -69,6 +69,8 @@ export type NativeModelBridge = {
 /** A generation that asked for tools and waits, between two rounds, for their results. */
 type HeldRound = {
   readonly id: string;
+  /** The exchange that owns it: the `cacheKey` its request carried, one per chat. */
+  readonly owner: string | undefined;
   readonly calls: readonly string[];
   readonly hasText: boolean;
 };
@@ -118,15 +120,25 @@ function answer(
       results.every(result => held.calls.includes(result.callId))
         ? { id: held.id, results }
         : undefined;
+    /* The exchange that asked is the only one that may drop its own round. The
+       owner asks again with no results when its turn was abandoned under the
+       tools — Stop, the chat closed, a sign-out — and that round can never be
+       answered, so it is cancelled instead of holding the bridge busy forever. */
+    const abandoned =
+      held !== undefined &&
+      resumption === undefined &&
+      results === undefined &&
+      held.owner !== undefined &&
+      held.owner === request.cacheKey;
     // Another chat's generation is between two rounds: it is live, and this
     // request has nothing that answers it. Refuse rather than cancel it or
     // steal its slot. The slot is untouched for the round that owns it.
-    if (held !== undefined && resumption === undefined) {
+    if (held !== undefined && resumption === undefined && !abandoned) {
       return Effect.fail(nativeModelFailure('busy', false));
     }
-    // The round this request answers starts here, so the bridge is free again
-    // until that round asks for tools itself.
-    if (resumption !== undefined) {
+    // The round this request answers — or replaces — starts here, so the bridge
+    // is free again until that round asks for tools itself.
+    if (resumption !== undefined || abandoned) {
       provider.loop = { kind: 'free' };
     }
     let id = resumption?.id ?? native.id;
@@ -186,6 +198,7 @@ function answer(
         kind: 'waiting',
         round: {
           id,
+          owner: request.cacheKey,
           calls: calls.map(call => call.id),
           hasText: hasPreviousText || output.trim() !== '',
         },
@@ -275,6 +288,11 @@ function answer(
       }
     };
     const run = async () => {
+      // The abandoned round's native generation is stopped by its own owner, so
+      // no other chat's generation is ever touched here.
+      if (abandoned) {
+        await stopNative(held.id);
+      }
       if (resumption !== undefined) {
         await bridge.resume?.(resumption.id, resumption.results).catch(rejected);
         return;

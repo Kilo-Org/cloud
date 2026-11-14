@@ -219,7 +219,7 @@ describe('native on-device model client with tools', () => {
     // Another chat asks the same on-device model while this one waits between
     // rounds. It must not cancel the round that owns the generation, and it
     // must not take its slot.
-    const refused = await collect(bridge, client.stream(request));
+    const refused = await collect(bridge, client.stream({ ...request, cacheKey: 'chat-b' }));
     expect(Result.isFailure(refused) && backendFailureKey(refused.failure)).toBe(
       'modelChat.localModels.busy'
     );
@@ -238,6 +238,33 @@ describe('native on-device model client with tools', () => {
     ]);
     expect(second.map(event => event.kind)).toEqual(['delta', 'done']);
     expect(bridge.generate).toHaveBeenCalledOnce();
+  });
+
+  it('cancels the round that chat abandoned, and starts a fresh generation', async () => {
+    // Stop, a closed chat, or a sign-out interrupts a turn while its tools run:
+    // the round can never be answered, and holding it would leave the shared
+    // on-device model busy for every later ask.
+    let round = 0;
+    const { bridge } = toolBridge((native, send) => {
+      round += 1;
+      if (round === 1) {
+        send({ id: native.id, kind: 'toolCalls', calls: [call] });
+        return;
+      }
+      send({ id: native.id, kind: 'delta', text: 'Fresh answer.' });
+      send({ id: native.id, kind: 'done', stop: 'end', usageSource: 'unavailable' });
+    });
+    const client = nativeModelClient(bridge);
+    await said(client);
+    const waiting = bridge.generate.mock.calls[0]?.[0].id;
+
+    // The same chat asks again, with no results: it is a new exchange.
+    const next = await said(client);
+
+    expect(next.map(event => event.kind)).toEqual(['delta', 'done']);
+    expect(bridge.cancel).toHaveBeenCalledExactlyOnceWith(waiting);
+    expect(bridge.generate).toHaveBeenCalledTimes(2);
+    expect(bridge.generate.mock.calls[1]?.[0].id).not.toBe(waiting);
   });
 
   it('refuses results that answer no waiting generation, and leaves that round alone', async () => {

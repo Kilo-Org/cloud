@@ -132,11 +132,6 @@ export function canManageProvider(input: {
   /** The caller's organization role. An unresolved role (`undefined`) offers nothing. */
   role: string | undefined;
   action: IntegrationAction;
-  /**
-   * Whether the connection already exists. A replacement connect asks for the
-   * same roles as a first connect, so the answer does not depend on it.
-   */
-  installed?: boolean;
 }): boolean {
   if (input.scope === 'personal') {
     return true;
@@ -158,7 +153,9 @@ export function providerRowBlocked(input: {
   installed?: boolean;
 }): boolean {
   return !canManageProvider({
-    ...input,
+    provider: input.provider,
+    scope: input.scope,
+    role: input.role,
     action: input.installed ? 'disconnect' : 'connect',
   });
 }

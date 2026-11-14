@@ -69,25 +69,13 @@ describe('canManageProvider', () => {
   const MATRIX: {
     provider: IntegrationProvider;
     action: 'connect' | 'disconnect';
-    installed?: boolean;
     allowed: string[];
   }[] = [
     { provider: 'github', action: 'connect', allowed: ['owner', 'admin'] },
     { provider: 'github', action: 'disconnect', allowed: ['owner', 'admin'] },
     { provider: 'slack', action: 'connect', allowed: ['owner', 'admin'] },
     { provider: 'slack', action: 'disconnect', allowed: ['owner', 'admin'] },
-    {
-      provider: 'gitlab',
-      action: 'connect',
-      installed: false,
-      allowed: ['owner', 'admin', 'billing_manager'],
-    },
-    {
-      provider: 'gitlab',
-      action: 'connect',
-      installed: true,
-      allowed: ['owner', 'admin', 'billing_manager'],
-    },
+    { provider: 'gitlab', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
     { provider: 'gitlab', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
     { provider: 'discord', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
     { provider: 'discord', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
@@ -102,22 +90,18 @@ describe('canManageProvider', () => {
 
   const ROLES = ['owner', 'admin', 'billing_manager', 'member'] as const;
 
-  it.each(MATRIX)(
-    '$provider $action (installed=$installed) admits exactly $allowed',
-    ({ provider, action, installed, allowed }) => {
-      for (const role of ROLES) {
-        expect(
-          canManageProvider({
-            provider,
-            scope: 'organization',
-            role,
-            action,
-            installed: installed ?? false,
-          })
-        ).toBe(allowed.includes(role));
-      }
+  it.each(MATRIX)('$provider $action admits exactly $allowed', ({ provider, action, allowed }) => {
+    for (const role of ROLES) {
+      expect(
+        canManageProvider({
+          provider,
+          scope: 'organization',
+          role,
+          action,
+        })
+      ).toBe(allowed.includes(role));
     }
-  );
+  });
 
   it('offers nothing while the viewer role is still unresolved', () => {
     for (const provider of INTEGRATION_PROVIDERS) {

@@ -73,7 +73,6 @@ export function IntegrationProviderRow({
     scope,
     role,
     action: 'connect',
-    installed: row.installed,
   });
   const canDisconnect = canManageProvider({
     provider: row.provider,

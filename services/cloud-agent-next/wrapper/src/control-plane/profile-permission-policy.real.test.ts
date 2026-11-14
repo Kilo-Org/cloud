@@ -379,9 +379,8 @@ suite('pinned Kilo profile permission narrowing', () => {
       const keys = Object.keys(written.bash ?? {});
       expect(keys.indexOf('ls *')).toBeLessThan(keys.indexOf('*|*'));
 
-      // Measured on the pinned CLI: a pipeline is evaluated as separate
-      // segments, so a whole-command rule such as `*|*` decides neither part
-      // while `*>*` sees the redirect form below.
+      // The composed entry keeps the session's rule order, so the rule for the
+      // redirect form follows the allowance and the redirect is refused.
       requestToolOnce(fixture, [
         {
           name: 'bash',

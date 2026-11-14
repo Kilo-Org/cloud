@@ -258,7 +258,7 @@ function composeRuleMap(
     composed.push(...refusals.filter(([refusalPattern]) => refusalPattern === pattern));
     for (const [allowPattern, allowAction] of entries) {
       if (allowAction !== 'allow' || allowPattern === pattern) continue;
-      if (!matchesKiloPermissionPattern(allowPattern, pattern)) continue;
+      if (!patternIsCoveredBy(allowPattern, pattern)) continue;
       composed.push([allowPattern, 'ask']);
     }
     composed.push(...refusals.filter(([refusalPattern]) => refusalPattern !== pattern));

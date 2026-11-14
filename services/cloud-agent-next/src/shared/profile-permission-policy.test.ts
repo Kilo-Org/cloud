@@ -377,9 +377,11 @@ describe('narrowProfilePermission', () => {
     const composed = narrowProfilePermission(session, {
       bash: { 'gh pr diff *': 'ask' },
     }) as PermissionMap;
-    // The session's catch-all refusal is written before the ask and covers every
-    // command, so it is carried after the ask and the ask decides nothing; the
-    // session's allow names a command outside the ask's reach.
+    // A session that delivers profile agents writes one rule per tool, so this
+    // catch-all shape exists only for a map no profile agent reaches; it is kept
+    // here to prove the composed entry stays within the session either way. The
+    // refusal covers every command, so it is carried after the ask and the ask
+    // decides nothing.
     expect(composed['bash']).toEqual({ 'gh pr diff *': 'ask', '*': 'deny' });
     expect(resolve(session, composed, 'bash', 'gh pr diff 1')).toBe('deny');
     expect(resolve(session, composed, 'bash', 'cat x')).toBe('deny');
@@ -421,6 +423,18 @@ describe('narrowProfilePermission', () => {
     expect(composed['bash']).toEqual({ 'git push *': 'ask' });
     expect(resolve(session, composed, 'bash', 'git status')).toBe('allow');
     expect(resolve(session, composed, 'bash', 'git push origin main')).toBe('ask');
+  });
+
+  it('does not carry a session allow that reaches past the ask', () => {
+    const session: PermissionMap = { bash: { 'a*c': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'a?c': 'ask' },
+    }) as PermissionMap;
+    // The session's allow reaches commands the ask does not name, so it stays
+    // out of the composed map and those commands keep the session's verdict.
+    expect(composed['bash']).toEqual({ 'a?c': 'ask' });
+    expect(resolve(session, composed, 'bash', 'axc')).toBe('ask');
+    expect(resolve(session, composed, 'bash', 'abbc')).toBe('allow');
   });
 
   it('does not let an agent ask widen a flat session denial', () => {

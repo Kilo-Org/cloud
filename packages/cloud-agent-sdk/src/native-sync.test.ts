@@ -516,7 +516,7 @@ test('unreadable pending inventory clears controls without blocking later ordere
   expect(state?.pending.permissions.map(item => item.id)).toEqual(['old']);
   socket.frame('remote.state', { incarnation: 'runner', runID: 'run', pending: null }, 2, 'events');
   await flush();
-  expect(state?.pending).toEqual({ permissions: [], questions: [] });
+  expect(state?.pending).toEqual({ permissions: [], questions: [], unreadablePermissions: [] });
   socket.frame(
     'permission.asked',
     { incarnation: 'runner', runID: 'run', data: { data: { id: 'invalid' } } },
@@ -540,6 +540,36 @@ test('unreadable pending inventory clears controls without blocking later ordere
   expect(state?.pending.permissions.map(item => item.id)).toEqual(['new']);
   expect(state?.connection).toBe('connected');
   expect(FakeSocket.sockets).toHaveLength(1);
+  connection.close();
+});
+
+test('an unreadable live permission is published by identity until the runner replies', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame(
+    'permission.asked',
+    { incarnation: 'runner', runID: 'run', data: { data: { id: 'perm-unreadable' } } },
+    1,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.permissions).toEqual([]);
+  expect(state?.pending.unreadablePermissions).toEqual([{ requestId: 'perm-unreadable' }]);
+  socket.frame(
+    'permission.replied',
+    { incarnation: 'runner', runID: 'run', data: { data: { requestID: 'perm-unreadable' } } },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.unreadablePermissions).toEqual([]);
   connection.close();
 });
 

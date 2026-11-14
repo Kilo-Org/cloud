@@ -358,13 +358,26 @@ describe('clearLastRoute', () => {
 });
 
 describe('record shape', () => {
-  it('carries the href, the account and a timestamp', () => {
-    const record: LastRouteRecord = {
-      href: '/(app)',
-      userId: 'u1',
-      storedAt: 5,
-    };
-    _setLastRouteForTests(record);
-    expect(getLastRouteSnapshot()).toEqual(record);
+  it('records the href, the account and a timestamp through the write path', () => {
+    // The layout's repair consumes (and latches) before any write is accepted.
+    consumeLastRouteForRepair('u1');
+    recordLastRoute('/(app)/(tabs)/(0_home)', 'u1');
+
+    const snapshot = getLastRouteSnapshot();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.href).toBe('/(app)/(tabs)/(0_home)');
+    expect(snapshot?.userId).toBe('u1');
+    expect(snapshot?.storedAt).toBeTypeOf('number');
+    expect(getLastRoute('u1')).toBe('/(app)/(tabs)/(0_home)');
+  });
+
+  it('hydrates the href, the account and a timestamp off the mirror', async () => {
+    store.set(KEY, recordFor('/(app)/(tabs)/(0_home)', 'u1'));
+    await _hydrateLastRouteForTests();
+
+    const snapshot = getLastRouteSnapshot();
+    expect(snapshot?.href).toBe('/(app)/(tabs)/(0_home)');
+    expect(snapshot?.userId).toBe('u1');
+    expect(snapshot?.storedAt).toBeTypeOf('number');
   });
 });

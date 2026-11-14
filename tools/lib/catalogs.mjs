@@ -5,9 +5,11 @@
  * a plural family is a set of keys that differ only by their category suffix,
  * a family may count through `{{count}}`, and only a family with both `_one` and
  * `_other` is complete enough to be owed by every locale. Those are facts about
- * the catalogs, not rules of either gate, so they live here. Each audit keeps
- * its own allowlists, wording and exit behavior, including what it does with a
- * key that is not a plural category.
+ * the catalogs, not rules of either gate, so they live here. So is which
+ * families a locale must complete before its copy can count: both audits ask
+ * that question, so the answer lives here too. Each audit keeps its own
+ * allowlists, wording and exit behavior, including what it does with a key that
+ * is not a plural category.
  */
 
 /** The plural categories i18next selects from, as they end a catalog key. */
@@ -105,4 +107,39 @@ export function familiesOwedByEveryLocale(english) {
       family => declaresPluralFamily(english, family) && !numeralFamilies.has(family)
     )
   );
+}
+
+/**
+ * The categories a locale lacks, by family base, for every family it must
+ * complete: a Map from the family base to the categories the tag selects that
+ * the locale does not carry, in the tag's category order.
+ *
+ * A family the locale declares itself — a member key with a category suffix —
+ * must carry every category its tag selects, whatever English ships. A family
+ * English declares and every locale owes (`familiesOwedByEveryLocale`) is
+ * mandatory only when the locale carries the family's flat base key; a locale
+ * whose copy inflects no word keeps that one string and renders it at every
+ * count. Every other family is not this locale's problem: a locale that lacks
+ * an owed family's base key is a key-parity finding, not a category finding.
+ *
+ * A complete family is absent from the Map, so an empty Map means the locale is
+ * complete. Both audits ask this question, so the answer lives here and neither
+ * audit carries the rule.
+ */
+export function missingPluralCategories(english, locale, tag) {
+  const required = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+  const owed = familiesOwedByEveryLocale(english);
+  const localeFamilies = pluralFamilyBases(locale);
+  const missing = new Map();
+  for (const family of new Set([...pluralFamilyBases(english), ...localeFamilies])) {
+    const mandatory = localeFamilies.has(family) || (owed.has(family) && locale.has(family));
+    if (!mandatory) {
+      continue;
+    }
+    const absent = required.filter(category => !locale.has(`${family}_${category}`));
+    if (absent.length > 0) {
+      missing.set(family, absent);
+    }
+  }
+  return missing;
 }

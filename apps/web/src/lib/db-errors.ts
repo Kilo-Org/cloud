@@ -23,6 +23,17 @@ export function getPostgresErrorCode(error: unknown): string | null {
   return null;
 }
 
+/**
+ * SQLSTATE codes that signal a transient lock or timeout failure, for which the
+ * same transaction can be retried: deadlock detected (40P01), lock not available
+ * (55P03) and query canceled, including statement timeout (57014).
+ */
+export const RETRYABLE_TRANSACTION_SQLSTATES: ReadonlySet<string> = new Set([
+  '40P01',
+  '55P03',
+  '57014',
+]);
+
 /** True when `error` is a PostgreSQL unique-constraint violation (SQLSTATE 23505). */
 export function isUniqueViolation(error: unknown): boolean {
   return getPostgresErrorCode(error) === '23505';

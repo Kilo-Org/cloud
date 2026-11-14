@@ -156,6 +156,7 @@ type Transport = {
   retryRemoteModels?: () => void;
   /** Re-discover the remote slash command catalog for the current owner. No-op when no owner is known or a request is already in flight. */
   retryRemoteCommands?: () => void;
+  retryBackgroundActivity?: () => void;
   /**
    * Ask the currently connected CLI owner to create a new remote session and
    * return its branded `KiloSessionId`. Session-scoped: the current Kilo
@@ -205,6 +206,10 @@ type TransportFactory = (sink: TransportSink) => Transport;
  * by closing over the cloudAgentSessionId.
  */
 type CloudAgentApi = {
+  getBackgroundActivity?: (payload: {
+    sessionId: CloudAgentSessionId;
+    signal?: AbortSignal;
+  }) => Promise<unknown>;
   send: (payload: {
     sessionId: CloudAgentSessionId;
     payload: CloudAgentSendPayload;

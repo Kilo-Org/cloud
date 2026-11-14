@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 
-import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
+import { getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 import type * as PasskeyClientTypes from '@/lib/auth/passkey-client';
@@ -266,10 +266,6 @@ describe('use-native-auth error mapping', () => {
     expect(message).toContain('More sign-in options');
     // Non-retryable: must not suggest trying again.
     expect(message).not.toMatch(/try again|retry/i);
-  });
-
-  it('ADMISSION_CHALLENGE_FAILED sentinel exists for catch blocks', () => {
-    expect(ADMISSION_CHALLENGE_FAILED).toBe('admission_challenge_failed');
   });
 });
 

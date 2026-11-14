@@ -65,6 +65,7 @@ import { useLocalComposer } from './local-sessions/use-local-composer';
 import { TranscriptStatusSlot } from './TranscriptStatusSlot';
 import { ComposerContextLine } from './ComposerContextLine';
 import { CurrentTaskList } from './CurrentTaskList';
+import { SessionBackgroundActivityStrip } from './BackgroundActivityStrip';
 import { getCurrentTodos } from './current-todos';
 import { useCloudThreadScroll } from './assistant-ui/use-cloud-thread-scroll';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
@@ -1853,6 +1854,20 @@ export default function CloudChatPage({
                           </div>
 
                           <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
+                            {transcriptPhase !== 'opening' && (
+                              <div className="flex min-w-0 items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] has-[button]:mb-1">
+                                <CurrentTaskList
+                                  todos={
+                                    isReadOnly || activeQuestion || activePermission
+                                      ? null
+                                      : currentTodos
+                                  }
+                                />
+                                <SessionBackgroundActivityStrip
+                                  onOpenChildSession={handleOpenTopLevelChildSession}
+                                />
+                              </div>
+                            )}
                             {isReadOnly &&
                               (!isLoading &&
                               sessionIdFromParams &&
@@ -1908,9 +1923,6 @@ export default function CloudChatPage({
                                     />
                                   </div>
                                 )}
-                                <div className="px-[max(1rem,calc(50%_-_27rem))]">
-                                  <CurrentTaskList todos={currentTodos} />
-                                </div>
                                 {sessionErrorMessage !== null && (
                                   <div className="-mb-2 px-[max(1rem,calc(50%_-_27rem))]">
                                     <SessionErrorNotice

@@ -18,6 +18,7 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { codeFailureMessage, DOWNLOAD_CODE_PATTERN } from '@/lib/data-export-code';
 import { getDataExportFailureMessage, shareDataExport } from '@/lib/data-export-download';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
@@ -38,6 +39,7 @@ export function DataExportScreen() {
   const { t } = useTranslation();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const colors = useThemeColors();
   const codeRef = useRef('');
   const [exportId, setExportId] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
@@ -200,7 +202,7 @@ export function DataExportScreen() {
             request.mutate(undefined);
           }}
         >
-          <FileText size={16} />
+          <FileText size={16} color={colors.primaryForeground} />
           <Text>{t('profile.dataExport.request')}</Text>
         </Button>
         {body}
@@ -238,7 +240,7 @@ export function DataExportScreen() {
                 download.mutate({ exportId, code, challengeId });
               }}
             >
-              <Share size={16} />
+              <Share size={16} color={colors.foreground} />
               <Text>{t('profile.dataExport.download')}</Text>
             </Button>
             {codeError === null ? null : (

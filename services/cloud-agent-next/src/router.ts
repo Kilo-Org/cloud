@@ -31,6 +31,7 @@ import {
   listHostedWorkspaces,
 } from './router/handlers/hosted-workspace-list.js';
 import { getHostedWorkspaceStatus } from './router/handlers/hosted-workspace-status.js';
+import { refreshHostedWorkspacePullRequest } from './router/handlers/hosted-workspace-pull-request-refresh.js';
 import {
   getHostedWorkspaceChangeFile,
   getHostedWorkspaceChanges,
@@ -64,6 +65,7 @@ export const appRouter = router({
   listHostedWorkspaces,
   getHostedWorkspace,
   getHostedWorkspaceStatus,
+  refreshHostedWorkspacePullRequest,
   getHostedWorkspaceChanges,
   refreshHostedWorkspaceChanges,
   getHostedWorkspaceChangeFile,

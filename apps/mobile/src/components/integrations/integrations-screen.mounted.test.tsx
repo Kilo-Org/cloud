@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- cohesive mounted suite for the integrations hub state and deep-link scope contract */
+/* eslint-disable max-lines -- cohesive mounted suite for the integrations hub state, the shared owner note, the header subtitle, and the deep-link scope contract */
 
 // The integrations hub serves both scopes: the personal one shows every
 // connection the account owns, and the organization one hides the actions the
@@ -9,13 +9,14 @@ import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import IntegrationsRoute from '@/app/(app)/(tabs)/(3_profile)/integrations';
 import { IntegrationsScreen } from './integrations-screen';
 
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
-const MEMBER_HINT = 'Ask an organization owner or admin to change these connections.';
+/** The catalog value, so a copy edit does not need a test edit. */
+const SHARED_NOTE = i18n.t('integrations.managedByOwner');
 
 const GITHUB_CONNECTION = {
   id: 'gh-1',
@@ -35,7 +36,7 @@ const state = vi.hoisted(() => ({
   githubConnections: { data: [] as unknown[] | undefined, isPending: false },
   role: undefined as string | undefined,
   orgResolved: true,
-  orgs: [] as { organizationId: string; role?: string }[],
+  orgs: [] as { organizationId: string; organizationName?: string; role?: string }[],
   permissionDenied: false,
 }));
 const calls = vi.hoisted(() => ({
@@ -142,7 +143,8 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string }) => createElement('ScreenHeaderMock', props),
+  ScreenHeader: (props: { title?: string; subtitle?: string }) =>
+    createElement('ScreenHeaderMock', props),
 }));
 
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
@@ -236,7 +238,12 @@ beforeEach(() => {
   account.setOrganizationId.mockImplementation((next: string | null) => {
     account.written.push(next);
   });
-  state.orgs = [{ organizationId: 'org-1' }, { organizationId: 'org-b' }];
+  // Each entry is a membership row as `useOrgBoundary` returns it, so the
+  // header can name the organization the scope belongs to.
+  state.orgs = [
+    { organizationId: 'org-1', organizationName: 'Acme' },
+    { organizationId: 'org-b', organizationName: 'Acme Research' },
+  ];
   routeParams.org = undefined;
   state.statuses = statusState();
   state.githubConnections = { data: [], isPending: false };
@@ -320,21 +327,62 @@ describe('IntegrationsScreen', () => {
     expect(calls.disconnect).toHaveBeenCalledWith({ provider: 'slack', githubIntegrationId: null });
   });
 
-  it('lets a member make the first GitLab connect and hides the manager actions', () => {
+  it('shows one shared note to a member whose organization rows offer nothing', () => {
     state.role = 'member';
+    state.statuses.data = [
+      { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
+      { platform: 'slack', installed: true, installation: { teamName: 'Acme Slack' } },
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    const root = mount('org-1').root;
+
+    // Every action a member's role cannot take leaves its row without a
+    // control, and the hub names the one role that can change them once, above
+    // the list, instead of under each row.
+    for (const title of ['GitHub', 'Slack', 'Bitbucket']) {
+      expect(actionOf(rowTitled(root, title))).toBeNull();
+    }
+    expect(texts(root).filter(text => text === SHARED_NOTE)).toHaveLength(1);
+    // A row the server would accept keeps its button: `resolveGitLabOAuthOwner`
+    // asks for billing roles only when a connect replaces an existing
+    // integration, so a member's first connect is offered.
+    expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
+  });
+
+  it('shows no shared note to an owner, who is offered every row', () => {
+    state.role = 'owner';
     state.statuses.data = [
       { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
       { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
     ];
-    const renderer = mount('org-1');
-    const root = renderer.root;
+    const root = mount('org-1').root;
 
-    expect(actionOf(rowTitled(root, 'GitHub'))).toBeNull();
-    expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
-    // `resolveGitLabOAuthOwner` only needs billing roles to replace an existing
-    // integration, so a member's first connect is accepted.
-    expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
-    expect(texts(root)).not.toContain(MEMBER_HINT);
+    expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
+    expect(texts(root)).not.toContain(SHARED_NOTE);
+  });
+
+  it('shows no shared note and no organization name in the personal scope', () => {
+    state.role = 'member';
+    state.statuses.data = [
+      { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
+    ];
+    const root = mount().root;
+
+    // The personal scope belongs to the viewer, so every row offers its action
+    // and nothing needs explaining.
+    expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
+    expect(texts(root)).not.toContain(SHARED_NOTE);
+    const header = findOne(root, 'ScreenHeaderMock')[0];
+    expect(header?.props.title).toBe('Integrations');
+    expect(header?.props.subtitle).toBeUndefined();
+  });
+
+  it('names the organization in the header of the organization scope', () => {
+    state.role = 'member';
+    const header = findOne(mount('org-1').root, 'ScreenHeaderMock')[0];
+
+    expect(header?.props.title).toBe('Integrations');
+    expect(header?.props.subtitle).toBe('Acme');
   });
 
   it('retries a failed read from the error state', () => {

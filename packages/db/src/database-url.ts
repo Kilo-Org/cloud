@@ -26,21 +26,28 @@ export function computeDatabaseUrl(): string {
   return url.toString();
 }
 
+/**
+ * WHATWG `URL` keeps the user, password, host and database name percent-encoded, while `pg` only
+ * decodes parts it parses itself out of a `connectionString`. The config here is built by hand and
+ * handed to `pg.Pool` without one, so the escapes must be decoded before they reach the server. A
+ * malformed escape throws `URIError`, matching `pg-connection-string`.
+ */
 export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
   const databaseUrl = new URL(postgresUrl);
+  const host = decodeURIComponent(databaseUrl.hostname);
   const clientConfig: ClientConfig = {
-    user: databaseUrl.username,
-    password: databaseUrl.password,
-    host: databaseUrl.hostname,
+    user: decodeURIComponent(databaseUrl.username),
+    password: decodeURIComponent(databaseUrl.password),
+    host,
     port: Number(databaseUrl.port),
-    database: databaseUrl.pathname.slice(1),
+    database: decodeURIComponent(databaseUrl.pathname.slice(1)),
   };
 
   if (process.env.DATABASE_CA) {
     clientConfig.ssl = {
       ca: process.env.DATABASE_CA.replace(/\\n/g, '\n'),
       rejectUnauthorized: true,
-      servername: databaseUrl.hostname,
+      servername: host,
     };
   } else {
     clientConfig.ssl = resolveSslFromSslmode(databaseUrl);

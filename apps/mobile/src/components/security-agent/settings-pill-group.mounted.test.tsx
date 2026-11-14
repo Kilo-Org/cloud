@@ -18,7 +18,7 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ primary: '#111111', mutedForeground: '#222222' }),
+  useThemeColors: () => ({ foreground: '#111111', mutedForeground: '#222222' }),
 }));
 
 const OPTIONS = [
@@ -97,14 +97,12 @@ describe('PillGroup disabled cue', () => {
     expect(check?.props.color).toBe('#222222');
   });
 
-  it('keeps an editable group on the full-strength selected label and accent', () => {
+  it('keeps an editable group on the full-strength selected label', () => {
     const [label] = renderGroup(false).findAll(
       node => Object.is(node.type, 'Text') && Object.is(node.props.children, 'High')
     );
-    const [check] = renderGroup(false).findAll(node => Object.is(node.type, 'Check'));
 
     expect(String(label?.props.className).split(/\s+/)).toContain('text-foreground');
-    expect(check?.props.color).toBe('#111111');
   });
 });
 

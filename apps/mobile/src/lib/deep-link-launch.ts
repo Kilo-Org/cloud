@@ -311,6 +311,9 @@ export function getPendingDeepLink(): string | null {
   return consumePendingDeepLink()?.href ?? null;
 }
 
+/** A consumed pending destination together with the organization it belongs to. */
+export type ConsumedPendingDeepLink = { href: string; organizationId: string | null };
+
 /**
  * Get-and-clear of the pending destination together with the organization it
  * belongs to. The single gated consumer in `_layout.tsx` reads both: the
@@ -318,13 +321,33 @@ export function getPendingDeepLink(): string | null {
  * first fetch runs in the session's context. `organizationId` is null when the
  * destination carries none (Personal, or a source that never had one).
  */
-export function consumePendingDeepLink(): { href: string; organizationId: string | null } | null {
+export function consumePendingDeepLink(): ConsumedPendingDeepLink | null {
   const result =
     pendingDeepLink === null
       ? null
       : { href: pendingDeepLink, organizationId: pendingDeepLinkOrganizationId };
   clearPendingDeepLink();
   return result;
+}
+
+/**
+ * The single gated consumer step `_layout.tsx` runs: the organization switches
+ * the app before the href navigates, so the route's first fetch runs in the
+ * session's context. A destination with no organization leaves the selection
+ * untouched; a null destination does nothing.
+ */
+export function applyConsumedPendingDeepLink(
+  pending: ConsumedPendingDeepLink | null,
+  setOrganizationId: (organizationId: string) => void,
+  navigate: (href: string) => void
+): void {
+  if (pending === null) {
+    return;
+  }
+  if (pending.organizationId !== null) {
+    setOrganizationId(pending.organizationId);
+  }
+  navigate(pending.href);
 }
 
 /**

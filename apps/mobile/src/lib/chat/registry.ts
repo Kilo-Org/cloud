@@ -1189,6 +1189,13 @@ async function settle(
     await forgetAsked(sessionId);
   }
   chat.answering = undefined;
+  if (failure !== null) {
+    /* A failed exchange ends without `halt`: it can fail between two tool rounds
+       — the model became unavailable while its tools ran — and the round left
+       waiting can never be answered. It is released here, or every other chat
+       on that model is refused until this one asks again. */
+    await releaseNativeModelRound(sessionId);
+  }
   change(sessionId, {
     turns,
     answering: [],

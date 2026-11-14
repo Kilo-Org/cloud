@@ -619,6 +619,21 @@ describe('what a chat is opened with', () => {
   });
 });
 
+describe('an exchange that fails before its tools answer', () => {
+  it('releases the on-device round it leaves waiting', async () => {
+    /* The exchange can fail between two tool rounds — the model became
+       unavailable while its tools ran — and `settle` ends it without `halt`.
+       The round it left waiting can never be answered, so it is released here
+       or every other chat on that model stays refused. */
+    failAnswerFor = opened;
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(snapshotOf(opened).failed).not.toBeNull();
+    expect(releasedRounds.owners).toEqual(['s1']);
+  });
+});
+
 describe('ending an exchange while its tools run', () => {
   it('releases the on-device round on Stop, on closing the chat and on sign-out', async () => {
     /* An interrupted exchange can leave an on-device generation waiting for tool

@@ -72,9 +72,7 @@ vi.mock('./count-format', () => ({
 }));
 
 vi.mock('./ensure-notification-channels', () => ({
-  ensureAndroidNotificationChannels: vi.fn(async () => {
-    await Promise.resolve();
-  }),
+  ensureAndroidNotificationChannels: vi.fn(() => Promise.resolve(true)),
 }));
 
 const NOW = Date.parse('2026-10-12T10:00:00.000Z');

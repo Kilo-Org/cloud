@@ -232,8 +232,16 @@ async function tryStartOrUpdate(
   if (granted) {
     // Android 8+ drops a post whose channel does not exist yet, and the JS side
     // owns channel creation, so the channel is ensured before the first start.
-    await ensureAndroidNotificationChannels();
+    const channelsReady = await ensureAndroidNotificationChannels();
     if (epoch !== startEpoch || (!carryNotice && !hasCurrentWork(snapshot))) {
+      return;
+    }
+    if (!channelsReady) {
+      // The channel the post needs does not exist, so the framework would drop it.
+      // The start stays owned by this epoch: a teardown that ran while the pass was
+      // outstanding already cleared `pending` and advanced the epoch, and the fence
+      // above would have returned.
+      pending = { snapshot, ctx };
       return;
     }
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
@@ -306,13 +314,18 @@ async function retryPendingStart(): Promise<void> {
   }
   // Same fence as the first start: the channel must exist before the post.
   const epoch = startEpoch;
-  await ensureAndroidNotificationChannels();
+  const channelsReady = await ensureAndroidNotificationChannels();
   if (
     epoch !== startEpoch ||
     pending !== p ||
     !getLiveActivityEnabled() ||
     !hasCurrentWork(p.snapshot)
   ) {
+    return;
+  }
+  if (!channelsReady) {
+    // `pending` already owns `p`; reassigning it would resurrect a start a
+    // teardown cleared. The next foreground retries the pass.
     return;
   }
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/update can post while awaiting the channel

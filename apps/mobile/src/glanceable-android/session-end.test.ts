@@ -56,9 +56,7 @@ vi.mock('./session-notification', () => ({
 }));
 
 vi.mock('./ensure-notification-channels', () => ({
-  ensureAndroidNotificationChannels: vi.fn(async () => {
-    await Promise.resolve();
-  }),
+  ensureAndroidNotificationChannels: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({

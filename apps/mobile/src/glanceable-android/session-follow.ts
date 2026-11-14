@@ -207,12 +207,15 @@ export function restoreFollowedSessionCards(
  * "not followed".
  */
 export async function restoreFollowedSessionCardsFromStorage(): Promise<boolean> {
-  await ensureAndroidNotificationChannels();
   const ctx = await readStoredContext();
   if (ctx === 'unavailable') {
     return false;
   }
+  // Reconcile first: another account's or scope's card is pruned even when the
+  // channel pass fails, and reconciliation posts nothing that needs a channel
+  // (the only native call is the existing card restore).
   restoreFollowedSessionCards(ctx);
+  await ensureAndroidNotificationChannels();
   return true;
 }
 

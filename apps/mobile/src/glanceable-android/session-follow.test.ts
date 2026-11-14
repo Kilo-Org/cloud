@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => ({
   }),
   setAndroidSessionScope: vi.fn(),
   runGlanceableApprove: vi.fn(),
+  ensureAndroidNotificationChannels: vi.fn(() => Promise.resolve(true)),
 }));
 
 // The card builder reads the app's locale and number formatting through the
@@ -65,9 +66,7 @@ vi.mock('./session-notification', () => ({
 }));
 
 vi.mock('./ensure-notification-channels', () => ({
-  ensureAndroidNotificationChannels: vi.fn(async () => {
-    await Promise.resolve();
-  }),
+  ensureAndroidNotificationChannels: mocks.ensureAndroidNotificationChannels,
 }));
 
 vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
@@ -104,6 +103,7 @@ beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   setLiveActivityEnabledValue(true);
   setNotificationPermissionGrantedValue(true);
+  mocks.ensureAndroidNotificationChannels.mockResolvedValue(true);
 });
 
 describe('followSession', () => {
@@ -285,5 +285,25 @@ describe('restoreFollowedSessionCards', () => {
       userId: 'user-1',
       organizationId: 'org-1',
     });
+  });
+
+  it('cancels a foreign-scope card before the channel pass, even when it fails', async () => {
+    _setStoredContextReaderForTests(() => CTX);
+    mocks.ensureAndroidNotificationChannels.mockResolvedValue(false);
+    mocks.getStoredSessionCards.mockReturnValue([
+      { sessionId: 'session-7', userId: 'user-1', organizationId: null, approvalKey: null },
+    ]);
+
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(true);
+
+    // The card another scope left behind is pruned even though the channels could
+    // not be created: reconciliation owns the cards, the channel pass only the post.
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('session-7');
+    expect(mocks.pruneSessionCards).toHaveBeenCalledWith([]);
+    expect(mocks.ensureAndroidNotificationChannels).toHaveBeenCalledTimes(1);
+    expect(mocks.dismissSessionCard.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.ensureAndroidNotificationChannels.mock.invocationCallOrder[0] ??
+        Number.POSITIVE_INFINITY
+    );
   });
 });

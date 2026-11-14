@@ -101,7 +101,7 @@ const mocks = vi.hoisted(() => {
     },
     // The sink owns only the ensure call; channel creation lives in @/lib/notifications.
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
-    ensureAndroidNotificationChannels: vi.fn(() => Promise.resolve()),
+    ensureAndroidNotificationChannels: vi.fn(() => Promise.resolve(true)),
     getNotification: () => notification,
     getRequestedNotificationDeadline: () => notificationDeadline,
     getWidgetDeadline: () => widgetDeadline,
@@ -544,7 +544,7 @@ describe('androidSink start and update', () => {
   });
 
   it('waits for channel creation before concurrent starts can post', async () => {
-    const channels = Promise.withResolvers<undefined>();
+    const channels = Promise.withResolvers<boolean>();
     mocks.ensureAndroidNotificationChannels
       .mockReturnValueOnce(channels.promise)
       .mockReturnValueOnce(channels.promise);
@@ -556,7 +556,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).not.toHaveBeenCalled();
     expect(mocks.native.update).not.toHaveBeenCalled();
 
-    channels.resolve(undefined);
+    channels.resolve(true);
     await flushAsync();
 
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
@@ -567,6 +567,43 @@ describe('androidSink start and update', () => {
       channelId: 'agent-progress',
       alerting: false,
     });
+  });
+
+  it('does not post when the channel pass reported failure, and starts on the next foreground', async () => {
+    mocks.ensureAndroidNotificationChannels.mockResolvedValue(false);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+
+    mocks.ensureAndroidNotificationChannels.mockResolvedValue(true);
+    handleAppStateActive();
+    await flushAsync();
+
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not resurrect a start that a teardown cleared while the channel pass was outstanding', async () => {
+    const channels = Promise.withResolvers<boolean>();
+    mocks.ensureAndroidNotificationChannels.mockReturnValueOnce(channels.promise);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    expect(mocks.ensureAndroidNotificationChannels).toHaveBeenCalledTimes(1);
+
+    // The scope ended while the channel pass was open.
+    androidSink.publish(snapshotFor([], MIXED.revision + 1, 'privacy'));
+    channels.resolve(false);
+    await flushAsync();
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+
+    // The cleared start stays cleared: a later foreground posts nothing.
+    handleAppStateActive();
+    await flushAsync();
+    expect(mocks.native.start).not.toHaveBeenCalled();
   });
 
   it('keeps the full summary when the device cannot promote', async () => {

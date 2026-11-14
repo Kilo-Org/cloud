@@ -7,8 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Plus } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
+
+type AddFailure = { readonly kind: 'add-failed'; readonly message: string };
 
 /**
  * The add row at the top of a list. Submitting adds the to-do and clears the
@@ -20,21 +23,22 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
   const colors = useThemeColors();
   const inputRef = useRef<TextInput>(null);
   const textRef = useRef('');
-  const addingRef = useRef(false);
   const [hasText, setHasText] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<AddFailure>();
 
   async function submit() {
-    const title = textRef.current.trim();
-    if (title.length === 0 || addingRef.current) {
+    const attempt = begin();
+    if (attempt === null) {
       return;
     }
-    addingRef.current = true;
-    setAdding(true);
-    setFailed(false);
+    const title = textRef.current.trim();
+    if (title.length === 0) {
+      attempt.fail({ kind: 'add-failed', message: t('todos.list.addFailed') });
+      return;
+    }
     try {
       await onAdd(title);
+      attempt.succeed();
       // The user may have kept typing for the next to-do while this one was in
       // flight; only the submitted title leaves the field.
       if (textRef.current.trim() === title) {
@@ -45,10 +49,7 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
     } catch {
       // The title stays in the field, so the row's status line below is the
       // only report the retry needs.
-      setFailed(true);
-    } finally {
-      addingRef.current = false;
-      setAdding(false);
+      attempt.fail({ kind: 'add-failed', message: t('todos.list.addFailed') });
     }
   }
 
@@ -63,6 +64,7 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
             textRef.current = text;
             const next = text.trim().length > 0;
             setHasText(current => (current === next ? current : next));
+            clearWhere(f => f.kind === 'add-failed');
           }}
           onSubmitEditing={() => {
             void submit();
@@ -74,7 +76,7 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
         />
         <Button
           size="sm"
-          disabled={!hasText || adding}
+          disabled={!hasText || feedback.status === 'pending'}
           onPress={() => {
             void submit();
           }}
@@ -84,10 +86,7 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
           <Text>{t('todos.list.add')}</Text>
         </Button>
       </View>
-      <AccessibleStatus
-        message={failed ? t('todos.list.addFailed') : null}
-        className="px-1 text-sm"
-      />
+      <AccessibleStatus message={failure?.message ?? null} className="px-1 text-sm" />
     </View>
   );
 }

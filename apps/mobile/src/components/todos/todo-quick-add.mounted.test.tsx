@@ -192,6 +192,18 @@ describe('To-do quick add', () => {
     expect(inputField().value).toBe('Second task');
   });
 
+  it('clears the failed-add line on the next keystroke', async () => {
+    state.onAdd.mockRejectedValueOnce(new Error('offline'));
+    type('Buy milk');
+    await pressAdd();
+    expect(errorLine()).toBe(i18n.t('todos.list.addFailed'));
+
+    type('Buy milk and eggs');
+
+    expect(errorLine()).toBeNull();
+    expect(addButton().disabled).toBe(false);
+  });
+
   it('sends one add when pressed again while the first is in flight', async () => {
     const pending = Promise.withResolvers<undefined>();
     state.onAdd.mockReturnValueOnce(pending.promise);

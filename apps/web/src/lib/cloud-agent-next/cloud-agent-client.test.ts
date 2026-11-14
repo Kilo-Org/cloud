@@ -1549,7 +1549,7 @@ describe('CloudAgentNextClient endpoint capture', () => {
 
   it('passes the endpoint extra payload through unchanged', async () => {
     const error = new Error('Worker unavailable');
-    const createTerminal = jest.fn(async () => {
+    const createTerminal = jest.fn(async (_input: { cloudAgentSessionId: string }) => {
       throw error;
     });
     mockCreateTRPCClient.mockReturnValueOnce({ createTerminal: { mutate: createTerminal } });

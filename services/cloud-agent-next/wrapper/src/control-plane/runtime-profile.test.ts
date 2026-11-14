@@ -739,13 +739,15 @@ describe('runtime profile permission narrowing', () => {
           {
             slug: 'reviewer',
             name: 'Reviewer',
-            config: { permission: { bash: { 'git push': 'deny' } } },
+            config: {
+              permission: { bash: { 'git push': 'deny', 'npm *': 'allow' } },
+            },
           },
         ],
       });
       const entries = await readAgentEntries(home);
-      // The agent's own denial survives and the session's denial reaches the
-      // file too, which a verbatim copy of the agent map cannot produce.
+      // The agent's own denial survives, and the allowance for a pattern the
+      // session does not write is dropped, so this differs from the agent map.
       expect(entries.reviewer?.permission).toEqual({
         bash: { 'git push': 'deny' },
       });

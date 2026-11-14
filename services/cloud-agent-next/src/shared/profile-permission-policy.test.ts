@@ -48,9 +48,13 @@ describe('narrowProfilePermission', () => {
     const narrowed = narrowProfilePermission(reviewSession, {
       bash: { 'git log --oneline': 'allow', 'git push origin main': 'allow', npm: 'deny' },
     });
-    expect(narrowed).toEqual({
-      bash: { 'git log --oneline': 'allow', npm: 'deny' },
-    });
+    expect(narrowed).toEqual({ bash: { npm: 'deny' } });
+  });
+
+  it('keeps an agent allowance written with a pattern the session allows', () => {
+    expect(
+      narrowProfilePermission(reviewSession, { bash: { 'git log *': 'allow', 'ls *': 'allow' } })
+    ).toEqual({ bash: { 'git log *': 'allow', 'git push': 'deny', 'git push *': 'deny' } });
   });
 
   it('keeps an inspection allow whose wider refusal the session overrides later', () => {
@@ -62,7 +66,9 @@ describe('narrowProfilePermission', () => {
     ).toEqual({ bash: { 'git status': 'allow' } });
   });
 
-  it('omits an agent allowance that the session refuses', () => {
+  it('omits an agent allowance the session does not write itself', () => {
+    // A wildcard allowance covers patterns the session decides, so the entry is
+    // omitted and the session map governs.
     expect(narrowProfilePermission(reviewSession, { bash: { '*': 'allow' } })).toBeUndefined();
   });
 
@@ -70,13 +76,15 @@ describe('narrowProfilePermission', () => {
     const session: PermissionMap = {
       bash: { '*': 'deny', 'git *': 'allow', 'git push *': 'deny' },
     };
-    // The session allows most git commands and refuses pushes, so an agent
-    // allowance for all of git is wider than the session on pushes.
-    expect(narrowProfilePermission(session, { bash: { 'git *': 'allow' } })).toBeUndefined();
-    // An allowance the session permits for its whole range survives.
+    // The session allows most git commands and refuses pushes, so the agent
+    // allowance runs with the session's push refusal placed after it.
+    expect(narrowProfilePermission(session, { bash: { 'git *': 'allow' } })).toEqual({
+      bash: { 'git *': 'allow', 'git push *': 'deny' },
+    });
+    // An allowance for patterns the session does not write is omitted.
     expect(
       narrowProfilePermission(session, { bash: { 'git log *': 'allow', 'git push *': 'allow' } })
-    ).toEqual({ bash: { 'git log *': 'allow' } });
+    ).toBeUndefined();
   });
 
   it('keeps the explicit allow exception inside a mixed global deny and read allow', () => {
@@ -114,7 +122,9 @@ describe('narrowProfilePermission', () => {
   it('keeps a flat ask action when the session sets no restriction', () => {
     expect(narrowProfilePermission({}, 'ask')).toBe('ask');
     expect(narrowProfilePermission({ todowrite: 'allow' }, 'ask')).toBe('ask');
-    expect(narrowProfilePermission({ edit: 'deny' }, 'ask')).toBeUndefined();
+    expect(narrowProfilePermission({ edit: 'deny' }, 'ask')).toBe('ask');
+    expect(narrowProfilePermission({ edit: 'deny' }, 'allow')).toBeUndefined();
+    expect(narrowProfilePermission({}, 'allow')).toBe('allow');
   });
 
   it('ignores a rule value that carries no action and keeps the rest of the tool', () => {

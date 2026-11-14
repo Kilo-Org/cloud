@@ -32,58 +32,41 @@ export function matchesKiloPermissionPattern(input: string, pattern: string): bo
   return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
 }
 
-/** The last rule that matches `pattern`, with the position it holds. */
-function lastMatchingRule(
-  rules: PermissionRuleMap,
-  pattern: string
-): { action: PermissionAction; index: number } | undefined {
+function lastAllowIndex(rules: PermissionRuleMap): number {
   const entries = Object.entries(rules);
   for (let index = entries.length - 1; index >= 0; index--) {
-    const entry = entries[index];
-    if (entry === undefined) continue;
-    if (matchesKiloPermissionPattern(pattern, entry[0])) {
-      return { action: entry[1], index };
-    }
+    if (entries[index]?.[1] === 'allow') return index;
   }
-  return undefined;
-}
-
-/** Two patterns overlap when either one matches the other written as a value. */
-function patternsOverlap(left: string, right: string): boolean {
-  return matchesKiloPermissionPattern(right, left) || matchesKiloPermissionPattern(left, right);
-}
-
-/**
- * Keep an agent allowance only when the session permits the same patterns. The
- * session's rule for the pattern must be an allow, and no later session
- * refusal may cover that pattern.
- */
-function sessionPermitsPattern(session: PermissionRuleMap | undefined, pattern: string): boolean {
-  if (session === undefined) return true;
-  const permitted = lastMatchingRule(session, pattern);
-  if (permitted?.action !== 'allow') return false;
-  const entries = Object.entries(session);
-  for (let index = permitted.index + 1; index < entries.length; index++) {
-    const entry = entries[index];
-    if (entry === undefined) continue;
-    if (entry[1] === 'deny' && patternsOverlap(entry[0], pattern)) return false;
-  }
-  return true;
+  return -1;
 }
 
 /**
  * Combine a session pattern map with an agent pattern map. Every agent
- * restriction survives, and an agent allowance survives only where the session
- * permits those patterns.
+ * restriction survives, an agent allowance survives only for a pattern the
+ * session itself allows, and the session's trailing refusals are placed last so
+ * they decide any call an agent allowance would otherwise cover.
  */
 function composeRuleMap(
   session: PermissionRuleMap | undefined,
   agent: PermissionRuleMap
 ): PermissionRuleMap | undefined {
+  if (session === undefined) return { ...agent };
   const composed: PermissionRuleMap = {};
   for (const [pattern, action] of Object.entries(agent)) {
-    if (action !== 'deny' && !sessionPermitsPattern(session, pattern)) continue;
+    // A pattern the session does not allow cannot carry an allowance; the
+    // session decides it. An agent refusal always applies.
+    if (action !== 'deny' && session[pattern] !== 'allow') continue;
     composed[pattern] = action;
+  }
+  // Only an allowance needs protection from the session's trailing refusals; a
+  // map of refusals alone already decides every call it matches.
+  if (Object.values(composed).some(action => action !== 'deny')) {
+    const trailingFrom = lastAllowIndex(session);
+    Object.entries(session).forEach(([pattern, action], index) => {
+      if (action === 'deny' && index > trailingFrom && composed[pattern] === undefined) {
+        composed[pattern] = 'deny';
+      }
+    });
   }
   return Object.keys(composed).length > 0 ? composed : undefined;
 }
@@ -100,11 +83,11 @@ export function narrowProfilePermission(
   agent: AgentPermission
 ): PermissionValue | PermissionMap | undefined {
   if (isPermissionAction(agent)) {
-    // A flat action covers every tool, so it applies only when the session sets
-    // no restriction. Otherwise the entry is omitted and the session policy
-    // governs the agent.
-    if (agent === 'deny') return 'deny';
-    return Object.values(session).some(value => valueHasDenial(value)) ? undefined : agent;
+    // A flat action covers every tool. A refusal and an ask apply as written; a
+    // flat allowance is omitted when the session restricts any tool, so the
+    // session policy governs that agent.
+    if (agent !== 'allow') return agent;
+    return Object.values(session).some(value => valueHasDenial(value)) ? undefined : 'allow';
   }
   if (typeof agent !== 'object' || agent === null) return undefined;
   const narrowed: PermissionMap = {};

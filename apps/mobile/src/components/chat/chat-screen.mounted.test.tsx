@@ -513,6 +513,12 @@ describe('the chat header', () => {
     // before the title. The compact phone width still holds the chat's name
     // beside the pill and its two controls, so the header keeps one row there
     // and the Beta notice yields instead (see `ChatTitle`).
+    //
+    // The reserve is the pill's 127.25 dp at font scale 1 — its 44 dp ring
+    // button, a dp of border on each side and the 8.75 leading padding, plus the
+    // 72.5 reserved value row — and the two 48 dp icon controls with the
+    // cluster's 7 dp between them.
+    expect(widths.headerRightWidth).toBe(237.25);
     expect(shouldStackHeaderActions(360, 1, widths)).toBe(false);
     // An ordinary phone width holds the name and its notice, so the header
     // keeps the single-row layout it has everywhere else.
@@ -531,8 +537,11 @@ describe('the chat header', () => {
     const atLargeScale = headerPropsOf(await mount());
 
     // The icon controls are fixed boxes; the pill's readings are text. A large
-    // font therefore widens the cluster by the readings alone.
-    expect(atLargeScale.headerRightWidth).toBeGreaterThan(atDefaultScale.headerRightWidth);
+    // font therefore widens the cluster by the readings alone: 54.75 dp of pill
+    // chrome plus 72.5 per scale unit, and the same two 48 dp controls between
+    // their 7 dp gaps.
+    expect(atDefaultScale.headerRightWidth).toBe(237.25);
+    expect(atLargeScale.headerRightWidth).toBe(309.75);
     expect(atLargeScale.titleMinWidth).toBe(atDefaultScale.titleMinWidth);
     // A window the unscaled reserve keeps on one row is too narrow for the row
     // at this scale, and the header must reflow it rather than squeeze the

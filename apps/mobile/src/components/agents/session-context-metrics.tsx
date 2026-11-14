@@ -44,10 +44,10 @@ const RING_SIZE = 28;
 const RING_STROKE = 3;
 
 /**
- * The pill holds the ring, then the two value slots its reading fills. `gap-1.5`
- * keeps the reading clear of the ring, and the row's own `gap-1` separates the
- * percentage from the cost, so the parts of a settled reading each stand on
- * their own.
+ * The pill lays out the two value slots its reading fills, then the ring. The
+ * row's own `gap-1` separates the percentage from the cost, and the ring
+ * button's own inner padding separates the reserved row from the ring: the pill
+ * needs no gap of its own between them.
  *
  * Each slot is laid out at the width of the widest reading it can paint and
  * paints nothing itself, so a slot whose value has not arrived keeps that width
@@ -61,24 +61,51 @@ const RING_STROKE = 3;
  * right edge. Inside the capped pill the slots give up width before the pill
  * does, and each reading keeps to one line.
  *
- * The padding and the ring-to-reading gap are `px-2.5` and `gap-1.5` rather than
- * the wider `px-3` and `gap-2`: the reserved slots make the pill the widest
- * control in the header, and the compact window gives the title exactly the
- * rest, so those few dp were the difference between the title's own badge
- * fitting and being clipped by its row.
+ * The ring ends the pill rather than leading it, so its own round button sits in
+ * the header's action group beside the two icon controls. `ps-2.5 pe-0` leaves
+ * the leading padding around the reserved row and none at the end: the ring
+ * button's capsule reaches the pill's edge, and the cluster's own `gap-2` — the
+ * same 7 dp the two icon controls keep between them — then separates it from
+ * the control beside the pill. Every dp between the ring and that control is the
+ * gap the header itself gives its controls, so nothing reads as a control that
+ * drifted away from its neighbours.
+ *
+ * The row ends flush against the ring button's border, and the button's own
+ * inner padding — its 44 dp box around a 28 dp ring, 7 dp on each side — is what
+ * separates the reading from the ring. That is why the pill carries no `gap-1.5`
+ * of its own: the same clearance came out of the button, and the pill is the
+ * header's widest control, so the reserved dp it saves is room the title keeps.
+ *
+ * Exactly one chrome is visible in every state, and only the one that has
+ * something to show wears it. While the pill paints a reading or the loading bar
+ * it wears the outer capsule, and the ring button stays transparent inside it.
+ * While it paints nothing — a settled empty chat — the outer capsule goes
+ * transparent and the ring button wears the capsule instead, so the header shows
+ * one round, bordered, filled button where a reading would be, not a wide empty
+ * box with a ring floating at its leading edge.
  *
  * The border is always there, one dp on every side, and only its colour and the
- * fill follow the reading: a pill that paints a reading wears the capsule, and
- * a settled pill that paints none shows the ring alone. The box keeps its size
- * either way, so the ring and the slots do not move by the border's width when
- * the first reading arrives.
+ * fill follow the reading, on both boxes: the pill and its ring button each keep
+ * their border slot, so neither the box nor the button moves by a border's width
+ * when the first reading arrives.
  */
-const PILL_CLASS =
-  'h-[44px] shrink min-w-0 flex-row items-center gap-1.5 rounded-full border px-2.5';
-/** The capsule a pill wears while it paints a reading. */
+const PILL_CLASS = 'h-[44px] shrink min-w-0 flex-row items-center rounded-full border ps-2.5 pe-0';
+/** The capsule worn while the pill paints a reading: the pill's own. */
 const PILL_CAPSULE_CLASS = 'border-border bg-secondary';
-/** The chrome a settled pill wears while it paints nothing: the ring alone. */
+/** The chrome a settled pill wears while it paints nothing: transparent outer box. */
 const PILL_BARE_CLASS = 'border-transparent';
+
+/**
+ * The ring's own round button: a 44 dp box at the pill's trailing edge, one dp
+ * of border on every side and fully rounded, so the ring is drawn inside a
+ * control rather than floating in an empty box.
+ */
+const RING_BUTTON_CLASS =
+  'h-full w-[44px] shrink-0 items-center justify-center rounded-full border';
+/** The fill a ring button wears while it is the pill's only visible chrome. */
+const RING_BUTTON_CAPSULE_CLASS = 'border-border bg-secondary';
+/** The chrome a ring button wears inside the pill's own capsule. */
+const RING_BUTTON_BARE_CLASS = 'border-transparent bg-transparent';
 const VALUE_ROW_CLASS = 'min-w-0 shrink flex-row items-center gap-1';
 const VALUE_SLOT_CLASS = 'min-w-0 shrink justify-center';
 const PRIMARY_VALUE_CLASS = 'text-xs tabular-nums';
@@ -198,24 +225,17 @@ export function SessionContextMetrics({
   // takes its size instead of naming one.
   const valueRowLoading = content.costSlot === 'loading';
   const sizers = getPillSlotSizers();
-  // A pill that paints nothing at all wears no capsule: on a settled empty chat
-  // an empty wide capsule reads as a control that broke or never finished
-  // loading. The box keeps its full size and its border slot, so the ring stays
-  // where it is and the capsule appears around it once the first reading
-  // arrives.
-  const chromeClass =
-    content.primary !== null || costLabel !== null || valueRowLoading
-      ? PILL_CAPSULE_CLASS
-      : PILL_BARE_CLASS;
+  // Exactly one chrome is visible at a time. A pill that paints nothing at all
+  // shows none of its own: on a settled empty chat an empty wide capsule reads
+  // as a control that broke or never finished loading. The ring button takes
+  // the capsule instead, so the header shows the one control the pill has to
+  // offer there, and the first reading swaps the two without moving either box.
+  const showsReading = content.primary !== null || costLabel !== null || valueRowLoading;
+  const chromeClass = showsReading ? PILL_CAPSULE_CLASS : PILL_BARE_CLASS;
+  const ringChromeClass = showsReading ? RING_BUTTON_BARE_CLASS : RING_BUTTON_CAPSULE_CLASS;
 
   const body = (
     <>
-      <ContextUsageRing
-        size={RING_SIZE}
-        strokeWidth={RING_STROKE}
-        arcFraction={content.arcFraction}
-        tone={content.tone}
-      />
       <View className={VALUE_ROW_CLASS}>
         <PillValueSlot
           sizer={sizers.percentage}
@@ -233,6 +253,14 @@ export function SessionContextMetrics({
             <Skeleton className="h-2 w-full rounded-[2px] bg-muted-soft" />
           </View>
         ) : null}
+      </View>
+      <View className={cn(RING_BUTTON_CLASS, ringChromeClass)}>
+        <ContextUsageRing
+          size={RING_SIZE}
+          strokeWidth={RING_STROKE}
+          arcFraction={content.arcFraction}
+          tone={content.tone}
+        />
       </View>
     </>
   );

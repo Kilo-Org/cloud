@@ -102,9 +102,12 @@ export const PILL_LAYOUT_TOKENS = [
   'h-[44px]',
   'flex-row',
   'items-center',
-  'gap-1.5',
   'rounded-full',
-  'px-2.5',
+  // The ring ends the pill: its own 44dp button sits at the trailing edge, so
+  // the padding is leading-only and the header's own cluster gap separates that
+  // button from the controls beside the pill.
+  'ps-2.5',
+  'pe-0',
   // The header row hands the trailing cluster a capped 50% box, but RN's
   // default flexShrink is 0. Without these the pill keeps its natural width
   // and paints past the row's right edge instead of compressing.
@@ -117,7 +120,8 @@ export const PILL_LAYOUT_TOKENS = [
  * asserted as a whole class token, never as a substring: `border` is a prefix of
  * both `border-transparent` and `border-border`, so a substring check would pass
  * even if the width lived only in one of the two chrome classes — which would
- * make the settled pill two dp narrower than the reading pill.
+ * make one chrome's box narrower than the other's. The pill and the ring button
+ * each keep their own border slot and are asserted with the same token.
  */
 export const PILL_BORDER_WIDTH_TOKEN = 'border';
 
@@ -129,7 +133,10 @@ export function hasClassToken(className: string, token: string): boolean {
 /** The capsule a pill wears only while it paints a reading. */
 export const PILL_CAPSULE_TOKENS = ['border-border', 'bg-secondary'] as const;
 
-/** The chrome a settled pill wears while it paints nothing: the ring alone. */
+/**
+ * The chrome a settled pill wears while it paints nothing: its own box goes
+ * transparent, and the ring's trailing button carries the capsule instead.
+ */
 export const PILL_BARE_TOKENS = ['border-transparent'] as const;
 
 export function expectHiddenPill(root: React.ReactElement): void {

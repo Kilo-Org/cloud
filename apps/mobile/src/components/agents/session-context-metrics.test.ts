@@ -31,6 +31,46 @@ function sizersOf(pill: React.ReactElement): React.ReactElement[] {
   return findAll(pill, el => el.type === 'Text' && classNameOf(el).includes('opacity-0'));
 }
 
+/** The 44dp box the ring draws inside, at the pill's trailing edge. */
+const RING_BUTTON_WIDTH_TOKEN = 'w-[44px]';
+
+const RING_BUTTON_LAYOUT_TOKENS = [
+  'h-full',
+  RING_BUTTON_WIDTH_TOKEN,
+  'shrink-0',
+  'items-center',
+  'justify-center',
+  'rounded-full',
+] as const;
+
+/** The ring's own container: the pill's only trailing child. */
+function ringButtonOf(pill: React.ReactElement): React.ReactElement {
+  const [button] = findAll(
+    pill,
+    el => el.type === 'View' && hasClassToken(classNameOf(el), RING_BUTTON_WIDTH_TOKEN)
+  );
+  if (button === undefined) {
+    throw new Error('expected the ring button');
+  }
+  return button;
+}
+
+/**
+ * The pill body's children in layout order. The body is one fragment, so the
+ * elements the walk sees are the row it reserves and the ring that ends it.
+ */
+function bodyChildrenOf(pill: React.ReactElement): React.ReactElement[] {
+  const body: unknown = propsOf(pill).children;
+  if (body === null || typeof body !== 'object' || !('props' in body)) {
+    throw new Error('expected the pill body');
+  }
+  const { props } = body;
+  if (props === null || typeof props !== 'object' || !('children' in props)) {
+    return [];
+  }
+  return Array.isArray(props.children) ? (props.children as React.ReactElement[]) : [];
+}
+
 describe('SessionContextMetrics', () => {
   it.each([
     { hasMessages: true, cost: null },
@@ -345,12 +385,14 @@ describe('SessionContextMetrics', () => {
     expect(propsOf(pillOf(bare(true))).accessibilityLabel ?? '').not.toContain('usage unavailable');
   });
 
-  // A pill that paints nothing wears no capsule: an empty wide capsule beside
-  // the ring reads as a control that broke or never finished loading. The
-  // border slot stays one dp wide, so the ring and the slots hold their
-  // positions and the capsule appears around the same box once a reading
-  // arrives.
-  it('wears the capsule only while it paints a reading', () => {
+  // Exactly one chrome is visible in every state, and it is the one that has
+  // something to show. A pill that paints nothing shows none of its own — an
+  // empty wide capsule beside a ring reads as a control that broke or never
+  // finished loading — and its ring's trailing button carries the capsule
+  // instead, so the header shows one round bordered button where a reading will
+  // appear. Each box keeps its own one-dp border slot, so the swap moves
+  // neither of them.
+  it('wears exactly one capsule: the pill while it reads, the ring button while it does not', () => {
     const onPress = vi.fn<() => void>();
     const expectLayout = (className: string) => {
       for (const token of PILL_LAYOUT_TOKENS) {
@@ -362,7 +404,8 @@ describe('SessionContextMetrics', () => {
       expect(hasClassToken(className, PILL_BORDER_WIDTH_TOKEN)).toBe(true);
     };
     const expectBare = (root: React.ReactElement) => {
-      const className = classNameOf(pillOf(root));
+      const pill = pillOf(root);
+      const className = classNameOf(pill);
       expectLayout(className);
       for (const token of PILL_BARE_TOKENS) {
         expect(className).toContain(token);
@@ -370,14 +413,40 @@ describe('SessionContextMetrics', () => {
       for (const token of PILL_CAPSULE_TOKENS) {
         expect(className).not.toContain(token);
       }
+      // The ring ends the pill and draws inside its own button, which wears the
+      // capsule the pill gave up.
+      const ringButton = ringButtonOf(pill);
+      expect(bodyChildrenOf(pill).at(-1)).toBe(ringButton);
+      expect(findAll(ringButton, el => el.type === 'ContextUsageRing')).toHaveLength(1);
+      for (const token of RING_BUTTON_LAYOUT_TOKENS) {
+        expect(classNameOf(ringButton)).toContain(token);
+      }
+      for (const token of PILL_CAPSULE_TOKENS) {
+        expect(classNameOf(ringButton)).toContain(token);
+      }
+      expect(hasClassToken(classNameOf(ringButton), PILL_BORDER_WIDTH_TOKEN)).toBe(true);
+      // The reserved row still leads the ring, both slots laid out and neither
+      // painting a value.
+      expect(sizersOf(pill)).toHaveLength(2);
+      expect(visibleTextsOf(pill)).toHaveLength(0);
     };
     const expectCapsule = (root: React.ReactElement) => {
-      const className = classNameOf(pillOf(root));
+      const pill = pillOf(root);
+      const className = classNameOf(pill);
       expectLayout(className);
       for (const token of PILL_CAPSULE_TOKENS) {
         expect(className).toContain(token);
       }
       expect(className).not.toContain('border-transparent');
+      // The pill's own capsule is the only chrome: the ring button inside it is
+      // transparent, with its border slot still one dp wide.
+      const ringButton = ringButtonOf(pill);
+      for (const token of PILL_CAPSULE_TOKENS) {
+        expect(classNameOf(ringButton)).not.toContain(token);
+      }
+      expect(classNameOf(ringButton)).toContain('border-transparent');
+      expect(classNameOf(ringButton)).toContain('bg-transparent');
+      expect(hasClassToken(classNameOf(ringButton), PILL_BORDER_WIDTH_TOKEN)).toBe(true);
     };
 
     // Settled empty chat, and a transcript that reported nothing yet.
@@ -387,16 +456,17 @@ describe('SessionContextMetrics', () => {
     expectBare(
       render({ info: undefined, totalCostMicrodollars: null, hasMessages: true, onPress })
     );
-    // The resolving open paints its bar, so it keeps the capsule.
-    expectCapsule(
-      render({
-        info: undefined,
-        totalCostMicrodollars: null,
-        hasMessages: false,
-        loading: true,
-        onPress,
-      })
-    );
+    // The resolving open paints its bar over the reserved row, so the pill keeps
+    // the capsule and the ring button gives it up.
+    const loading = render({
+      info: undefined,
+      totalCostMicrodollars: null,
+      hasMessages: false,
+      loading: true,
+      onPress,
+    });
+    expectCapsule(loading);
+    expect(findAll(pillOf(loading), el => el.type === 'Skeleton')).toHaveLength(1);
     // Any reading wears the capsule.
     expectCapsule(
       render({ info: info(), totalCostMicrodollars: 150_000, hasMessages: true, onPress })

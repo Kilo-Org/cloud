@@ -361,6 +361,14 @@ describe('getHeaderPillWidth', () => {
     expect(atTwo).toBeLessThan(atOne * 2);
   });
 
+  // Read off the pill's classes: the 44dp ring button, its two border dp and the
+  // 8.75 leading padding hold 54.75 dp, and the reserved value row adds 72.5 at
+  // scale 1.
+  it('reserves the pill its chrome and its readings', () => {
+    expect(getHeaderPillWidth(1)).toBe(127.25);
+    expect(getHeaderPillWidth(2)).toBe(199.75);
+  });
+
   it('reads a missing or unusable scale as the default', () => {
     expect(getHeaderPillWidth(Number.NaN)).toBe(getHeaderPillWidth(1));
     expect(getHeaderPillWidth(0)).toBe(getHeaderPillWidth(1));

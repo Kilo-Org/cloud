@@ -157,26 +157,26 @@ export function getPillSlotSizers() {
 }
 
 /**
- * The pill's fixed chrome, in dp: its 28dp ring, its border, its `px-2.5`
- * padding, the `gap-1.5` between the ring and the value row, and the row's own
- * `gap-1`. The classes compile at the app's 14pt rem, so the padding is 8.75 a
- * side and the two gaps are 5.25 and 3.5. None of it is text, so none of it
- * follows the font scale.
+ * The pill's fixed chrome, in dp: its trailing ring button (44 wide, the button
+ * the ring draws inside), its border, and the `ps-2.5` leading padding. The
+ * classes compile at the app's 14pt rem, so the padding is 8.75. None of it is
+ * text, so none of it follows the font scale.
  */
-const PILL_CHROME_WIDTH = 28 + 2 + 2 * 8.75 + 5.25 + 3.5;
+const PILL_CHROME_WIDTH = 44 + 2 + 8.75;
 
 /**
- * The two value slots' reserved readings at font scale 1, in dp: the sizers the
- * slots lay out, plus the slack the painted pill leaves beside them. Both
- * readings are `Text`, so both follow the system font scale.
+ * The widest reserved value row at font scale 1, in dp: the two slots' sizers
+ * plus the row's own `gap-1`, rounded up so the reserve never undercuts the row
+ * the pill paints. Both readings are `Text`, so it still follows the font scale.
  */
-const PILL_READINGS_WIDTH = 128 - PILL_CHROME_WIDTH;
+const PILL_READINGS_WIDTH = 72.5;
 
 /**
- * Width the pill lays out at, in dp, at a font scale: its fixed chrome plus its
- * reserved readings scaled. A header that reserves its trailing cluster uses
- * this, so the width it reserves is the width the pill paints at that scale —
- * and a reading that arrives still fills the slot it already showed.
+ * Width the pill lays out at, in dp, at a font scale: its fixed chrome — the
+ * trailing ring button, its border and its leading padding — plus its reserved
+ * readings scaled. A header that reserves its trailing cluster uses this, so the
+ * width it reserves is the width the pill paints at that scale — and a reading
+ * that arrives still fills the slot it already showed.
  */
 export function getHeaderPillWidth(fontScale: number): number {
   const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;

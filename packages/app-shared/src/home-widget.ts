@@ -196,11 +196,16 @@ export function buildHomeWidgetData(
 }
 
 /**
- * The confirmed check time and the moment its refresh window lapses. The
- * presentation's `stale` flag and the timeline entry that flips it both read
- * this one pair, so the native aging boundary cannot disagree with the flag.
+ * Decide four linked presentation facts once: terminal, primaryKind,
+ * checkedAt, and staleAt. The presentation's `stale` flag and the timeline
+ * boundary both read `staleAt`, so native aging cannot disagree with the flag.
  */
-function staleness(data: HomeWidgetData): { checkedAt: string | null; staleAt: number | null } {
+function staleness(data: HomeWidgetData): {
+  terminal: boolean;
+  primaryKind: GlanceableStatusKind | null;
+  checkedAt: string | null;
+  staleAt: number | null;
+} {
   const { snapshot } = data;
   const terminal = isTerminalGlanceableStatus(snapshot.status);
   const primaryKind = terminal ? null : (PRIORITY.find(kind => snapshot[kind] > 0) ?? null);
@@ -208,6 +213,8 @@ function staleness(data: HomeWidgetData): { checkedAt: string | null; staleAt: n
     terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
   const confirmedAt = timestampMs(checkedAt);
   return {
+    terminal,
+    primaryKind,
     checkedAt,
     staleAt: confirmedAt === null ? null : confirmedAt + refreshInterval(snapshot),
   };
@@ -219,9 +226,7 @@ export function buildHomeWidgetPresentation(
   now: number
 ): HomeWidgetPresentation {
   const { snapshot, details } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status);
-  const primaryKind = terminal ? null : (PRIORITY.find(kind => snapshot[kind] > 0) ?? null);
-  const { checkedAt, staleAt } = staleness(data);
+  const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
   const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
   const scheduledAt = snapshot.scheduled > 0 ? timestampToIso(snapshot.scheduledAt) : null;
   return {

@@ -1,13 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { LIVE_ACTIVITY_MAX_LIFETIME_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { buildHomeWidgetDetails, HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 
 import { LIVE_ACTIVITY_RELEVANCE, sessionLiveActivityContentStateSchema } from './push-data';
 import {
   aggregateLiveActivityRelevance,
   buildSessionLiveActivityContentState,
-  SESSION_LIVE_ACTIVITY_MAX_AGE_MS,
   sessionLiveActivityRelevance,
   sessionLiveActivityTitle,
 } from './session-live-activity';
@@ -387,12 +385,6 @@ describe('buildSessionLiveActivityContentState', () => {
     } finally {
       parse.mockRestore();
     }
-  });
-});
-
-describe('SESSION_LIVE_ACTIVITY_MAX_AGE_MS', () => {
-  it('is the whole Live Activity lifetime the shared snapshot expiry uses', () => {
-    expect(SESSION_LIVE_ACTIVITY_MAX_AGE_MS).toBe(LIVE_ACTIVITY_MAX_LIFETIME_MS);
   });
 });
 

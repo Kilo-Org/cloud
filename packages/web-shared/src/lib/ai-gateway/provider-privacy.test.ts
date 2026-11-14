@@ -145,16 +145,17 @@ describe('composeProviderPreferences', () => {
   });
 
   it('uses the organization routes when the request has no only list', () => {
+    const requestProvider: OpenRouterProviderConfig = { ignore: ['azure'], zdr: true };
     expect(
       composeProviderPreferences({
-        requestProvider: { ignore: ['azure'], zdr: true },
+        requestProvider,
         organizationOnly: ['openai', 'azure'],
-        effectivePrivacy: getEffectiveProviderPrivacy({ ignore: ['azure'], zdr: true }),
+        effectivePrivacy: getEffectiveProviderPrivacy(requestProvider),
       })
     ).toEqual({ kind: 'eligible', provider: { ignore: ['azure'], zdr: true, only: ['openai'] } });
   });
 
-  it.each([
+  it.each<[OpenRouterProviderConfig, string[]]>([
     [{ only: ['azure'] }, ['openai']],
     [{ ignore: ['openai'] }, ['openai']],
   ])('reports no eligible provider for request %j and routes %j', (requestProvider, routes) => {
@@ -168,19 +169,20 @@ describe('composeProviderPreferences', () => {
   });
 
   it('treats an empty request only list as no restriction', () => {
+    const noRestriction: OpenRouterProviderConfig = { only: [] };
     expect(
       composeProviderPreferences({
-        requestProvider: { only: [] },
+        requestProvider: noRestriction,
         organizationOnly: undefined,
-        effectivePrivacy: getEffectiveProviderPrivacy({ only: [] }),
+        effectivePrivacy: getEffectiveProviderPrivacy(noRestriction),
       })
     ).toEqual({ kind: 'eligible', provider: { only: [] } });
 
     expect(
       composeProviderPreferences({
-        requestProvider: { only: [] },
+        requestProvider: noRestriction,
         organizationOnly: ['openai', 'azure'],
-        effectivePrivacy: getEffectiveProviderPrivacy({ only: [] }),
+        effectivePrivacy: getEffectiveProviderPrivacy(noRestriction),
       })
     ).toEqual({ kind: 'eligible', provider: { only: ['openai', 'azure'] } });
   });

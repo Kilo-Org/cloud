@@ -246,9 +246,6 @@ describe('fetchMobileSessionSnapshotPage', () => {
     await fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {});
 
     expect(mocks.getSessionMessagesPageQuery).toHaveBeenCalledWith({ session_id: 'ses_123' });
-    const call = mocks.getSessionMessagesPageQuery.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(call).toBeDefined();
-    expect(call.limit).toBeUndefined();
   });
 
   it('defaults the wire limit to the shared page size when only the session id is sent', () => {

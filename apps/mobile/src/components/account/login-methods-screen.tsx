@@ -84,8 +84,8 @@ function ProviderRow({
  *
  * The screen refuses a last-method tap itself, without asking the server, and
  * that sentence retires as soon as the loaded list shows a second method; a
- * server refusal stands until the next unlink, because the server's answer is
- * about the account, not about the list this render drew.
+ * server refusal stands until the reader's next tap on a row, because the
+ * server's answer is about the account, not about the list this render drew.
  *
  * Adding a method is the web's round trip (the OAuth callback needs the browser
  * session that starts it), so the row opens the connected-accounts page in the
@@ -144,6 +144,10 @@ export function LoginMethodsScreen() {
     // outcome this tap cannot deliver.
     if (methodCount < 2) {
       setLastMethodRefusal(true);
+      // This tap answers for the list it drew, so an answer to an earlier tap
+      // must not wait behind it: once the refusal retires, that sentence would
+      // sit beside rows it never described.
+      setUnlinkError(null);
       return;
     }
     setLastMethodRefusal(false);

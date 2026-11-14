@@ -25,6 +25,7 @@ import {
 import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { getMarkdownHeadingStyles, type MarkdownPalette } from './markdown-palette';
+import { rtlListItems } from './markdown-rtl-list-items';
 
 type MarkdownEnrichedProps = {
   value: string;
@@ -175,11 +176,20 @@ export function MarkdownEnriched({
       ),
     [value, images, displayable, t]
   );
+  // Android resolves each paragraph from its own first strong character and
+  // gives a list no alignment, so a bullet's marker and text stay on the
+  // physical left while the heading and every other block name the interface
+  // start edge. The iOS renderer indents a list from the paragraph's own
+  // direction, so only Android needs the mark.
+  const renderedMarkdown = useMemo(
+    () => (Platform.OS === 'android' && I18nManager.isRTL ? rtlListItems(markdown) : markdown),
+    [markdown]
+  );
   return (
     <>
       <EnrichedMarkdownText
         flavor="github"
-        markdown={markdown}
+        markdown={renderedMarkdown}
         markdownStyle={markdownStyle}
         selectable={selectable}
         // A long press on a message opens the host's message details; the

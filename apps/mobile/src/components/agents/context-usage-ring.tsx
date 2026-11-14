@@ -2,12 +2,12 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { type ContextTone, getIndeterminateArcFraction } from './context-usage-display';
+import { type ContextTone } from './context-usage-display';
 
 type ContextUsageRingProps = {
   size?: number;
   strokeWidth?: number;
-  /** Clamped [0,1] arc length. Undefined renders a stable partial neutral arc. */
+  /** Arc share in [0,1]. Undefined (unknown capacity) renders the track alone. */
   arcFraction: number | undefined;
   tone: ContextTone;
   testID?: string;
@@ -27,6 +27,14 @@ function toneColor(tone: ContextTone, colors: ReturnType<typeof useThemeColors>)
   return colors[TONE_COLORS[tone]];
 }
 
+/** The arc share in [0,1], or undefined when the fraction is not a real number. */
+function getClampedFraction(arcFraction: number | undefined): number | undefined {
+  if (arcFraction === undefined || !Number.isFinite(arcFraction)) {
+    return undefined;
+  }
+  return Math.min(1, Math.max(0, arcFraction));
+}
+
 export function ContextUsageRing({
   size = DEFAULT_SIZE,
   strokeWidth = DEFAULT_STROKE,
@@ -39,10 +47,11 @@ export function ContextUsageRing({
   const circumference = 2 * Math.PI * radius;
   const trackColor = colors.ringTrack;
   const arcColor = toneColor(tone, colors);
-  // Undefined percentage → indeterminate: a stable partial neutral arc so the
-  // visual is clearly "we don't know", not a broken empty ring.
-  const effectiveFraction = arcFraction ?? getIndeterminateArcFraction();
-  const dashLength = Math.max(0, Math.min(1, effectiveFraction)) * circumference;
+  // The track always marks that the ring exists. The arc appears only for a
+  // known, non-zero share: undefined capacity and a settled zero both read as
+  // "nothing to show", not as work in progress.
+  const fraction = getClampedFraction(arcFraction);
+  const dashLength = fraction === undefined ? 0 : fraction * circumference;
   const dashGap = circumference - dashLength;
   const rotation = -90;
 
@@ -63,17 +72,19 @@ export function ContextUsageRing({
         strokeWidth={strokeWidth}
         fill="none"
       />
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={arcColor}
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeDasharray={`${dashLength} ${dashGap}`}
-        fill="none"
-        transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
-      />
+      {fraction === undefined || fraction === 0 ? null : (
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={arcColor}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={`${dashLength} ${dashGap}`}
+          fill="none"
+          transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
+        />
+      )}
     </Svg>
   );
 }

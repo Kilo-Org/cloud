@@ -250,7 +250,13 @@ describe('getSecurityAnalysisPresentation', () => {
 });
 
 describe('getSecurityDeadlinePresentation', () => {
-  const now = new Date('2026-07-08 12:00:00+00');
+  // Build fixtures from local calendar components so the calendar-day branches
+  // (startOfDay/calendarDaysDiff in presentation.ts) hold in every host timezone.
+  function localTimestamp(year: number, monthIndex: number, day: number, hour = 12): string {
+    return new Date(year, monthIndex, day, hour, 0, 0, 0).toISOString();
+  }
+
+  const now = new Date(2026, 6, 8, 12, 0, 0, 0);
 
   it('marks a finding fixed before its deadline as success', () => {
     const finding = makeFinding({
@@ -296,22 +302,38 @@ describe('getSecurityDeadlinePresentation', () => {
     });
   });
 
-  it.each<[string, string, string]>([
-    ['1 day overdue', '2026-07-07 12:00:00+00', '1 day overdue'],
-    ['plural days overdue', '2026-07-04 12:00:00+00', '4 days overdue'],
-    ['due today', '2026-07-08 20:00:00+00', 'Due today'],
-    ['due tomorrow', '2026-07-09 12:00:00+00', 'Due tomorrow'],
-    ['due in 3 days (within warning window)', '2026-07-11 12:00:00+00', 'Due in 3 days'],
-    ['due in 12 days (beyond warning window)', '2026-07-20 12:00:00+00', 'Due in 12 days'],
-  ])('reports %s', (_description, slaDueAt, expectedLabel) => {
+  it.each<[string, string, string, string, number?]>([
+    ['1 day overdue', localTimestamp(2026, 6, 7), '1 day overdue', 'overdue', 1],
+    ['plural days overdue', localTimestamp(2026, 6, 4), '4 days overdue', 'overdue', 4],
+    ['overdue earlier today', localTimestamp(2026, 6, 8, 9), 'Overdue', 'overdue', 0],
+    ['due today', localTimestamp(2026, 6, 8, 20), 'Due today', 'due-today'],
+    ['due tomorrow', localTimestamp(2026, 6, 9), 'Due tomorrow', 'due-tomorrow'],
+    [
+      'due in 3 days (within warning window)',
+      localTimestamp(2026, 6, 11),
+      'Due in 3 days',
+      'due-in',
+      3,
+    ],
+    [
+      'due in 12 days (beyond warning window)',
+      localTimestamp(2026, 6, 20),
+      'Due in 12 days',
+      'due-in',
+      12,
+    ],
+  ])('reports %s', (_description, slaDueAt, expectedLabel, expectedKind, expectedDays) => {
     const finding = makeFinding({ status: 'open', sla_due_at: slaDueAt });
-    expect(getSecurityDeadlinePresentation(finding, now).label).toBe(expectedLabel);
+    const presentation = getSecurityDeadlinePresentation(finding, now);
+    expect(presentation.label).toBe(expectedLabel);
+    expect(presentation.state.kind).toBe(expectedKind);
+    expect('days' in presentation.state ? presentation.state.days : undefined).toBe(expectedDays);
   });
 
   it('tones overdue findings as danger and near-term deadlines as warning', () => {
-    const overdue = makeFinding({ status: 'open', sla_due_at: '2026-07-07 12:00:00+00' });
-    const dueToday = makeFinding({ status: 'open', sla_due_at: '2026-07-08 20:00:00+00' });
-    const farOut = makeFinding({ status: 'open', sla_due_at: '2026-07-20 12:00:00+00' });
+    const overdue = makeFinding({ status: 'open', sla_due_at: localTimestamp(2026, 6, 7) });
+    const dueToday = makeFinding({ status: 'open', sla_due_at: localTimestamp(2026, 6, 8, 20) });
+    const farOut = makeFinding({ status: 'open', sla_due_at: localTimestamp(2026, 6, 20) });
     expect(getSecurityDeadlinePresentation(overdue, now)).toMatchObject({
       tone: 'danger',
       icon: 'alert-triangle',

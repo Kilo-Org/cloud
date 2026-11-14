@@ -98,12 +98,33 @@ describe('<RepoToggleRow>', () => {
     });
   });
 
-  it('leaves a public row on its plain name', () => {
+  it('names a public row with its full name', () => {
     const root = renderRow(
       <RepoToggleRow repo={{ id: 1, fullName: 'owner/repo' }} selected onPress={noop} />
     );
     expect(root.findAllByType(LOCK)).toHaveLength(0);
-    expect(root.findByType(CHOICE_ROW).props.accessibleName).toBeUndefined();
+    expect(root.findByType(CHOICE_ROW).props).toMatchObject({
+      accessibleName: 'owner/repo',
+      selected: true,
+    });
+  });
+
+  it('names every row it renders, enabled or disabled', () => {
+    const variants = [
+      { repo: { id: 1, fullName: 'owner/repo' }, name: 'owner/repo' },
+      {
+        repo: { id: 2, fullName: 'acme/api', private: true },
+        name: 'acme/api | common.privateRepositoryA11y',
+      },
+    ];
+    for (const disabled of [false, true]) {
+      for (const variant of variants) {
+        const root = renderRow(
+          <RepoToggleRow repo={variant.repo} selected={false} disabled={disabled} onPress={noop} />
+        );
+        expect(root.findByType(CHOICE_ROW).props.accessibleName).toBe(variant.name);
+      }
+    }
   });
 
   it('dims the name itself when the row cannot be picked', () => {

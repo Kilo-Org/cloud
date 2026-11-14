@@ -84,6 +84,22 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       };
     case 'signInCode':
       return { code: '482913', email: 'user@example.com', expires_in: '10 minutes' };
+    case 'accountLinkCode':
+      return {
+        code: '482913',
+        email: 'user@example.com',
+        provider_name: 'GitHub',
+        expires_in: '10 minutes',
+      };
+    case 'newSignInMethod':
+      return {
+        email: 'user@example.com',
+        provider_name: 'GitHub',
+        linked_identity: 'octocat (user@example.com)',
+        connected_accounts_link: new RawHtml(
+          `<a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>`
+        ),
+      };
     case 'balanceAlert':
       return { minimum_balance: '10', organization_url };
     case 'spendAlert':

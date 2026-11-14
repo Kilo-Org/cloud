@@ -66,7 +66,7 @@ function isCurrent(target: Registration): boolean {
   return (
     target.epoch === registerEpoch &&
     isCurrentAuthEpoch(target.authEpoch) &&
-    (target === scopeRegistration || target === observation.registration)
+    (target === scopeRegistration || target === observation.binding?.registration)
   );
 }
 
@@ -215,7 +215,7 @@ const delivery: GlanceableDelivery = {
       return unregisterSessionActivityToken(activityToken);
     }
     const includeScope = lifetime !== 'activity';
-    let instance = observation.instance;
+    let instance = observation.binding?.instance ?? null;
     if (Platform.OS === 'ios' && instance === null && activityToken === undefined) {
       try {
         instance = getActiveAgentsLiveActivity().getInstances().at(-1) ?? null;

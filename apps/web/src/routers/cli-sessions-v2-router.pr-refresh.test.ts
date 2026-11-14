@@ -35,11 +35,13 @@ const RAW_CACHE_UPDATED_AT = '2026-01-01 00:00:00.123+00';
 const selectChain = {
   from: jest.fn(),
   leftJoin: jest.fn(),
+  leftJoinLateral: jest.fn(),
   where: jest.fn(),
   limit: jest.fn(),
 };
 selectChain.from.mockReturnValue(selectChain);
 selectChain.leftJoin.mockReturnValue(selectChain);
+selectChain.leftJoinLateral.mockReturnValue(selectChain);
 selectChain.where.mockReturnValue(selectChain);
 const mockLimit = selectChain.limit;
 
@@ -338,6 +340,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   selectChain.from.mockReturnValue(selectChain);
   selectChain.leftJoin.mockReturnValue(selectChain);
+  selectChain.leftJoinLateral.mockReturnValue(selectChain);
   selectChain.where.mockReturnValue(selectChain);
   mockSelect.mockReturnValue(selectChain);
   mockInsert.mockReturnValue({ values: mockInsertValues });
@@ -463,6 +466,10 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       reviewDecision: 'approved',
       reviewDecisionPending: false,
       platform: 'github',
+      baseRef: null,
+      stackNumber: null,
+      stackPosition: null,
+      stackSize: null,
     });
   });
 
@@ -531,6 +538,10 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       reviewDecision: 'approved',
       reviewDecisionPending: false,
       platform: 'github',
+      baseRef: null,
+      stackNumber: null,
+      stackPosition: null,
+      stackSize: null,
     });
     expect(mockInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -575,7 +586,10 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       retryAt: RETRY_AT,
     });
 
-    await expect(refresh()).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+    await expect(refresh()).rejects.toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+      cause: { reason: 'throttled', retryAt: RETRY_AT.toISOString() },
+    });
 
     expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
       expect.objectContaining({ user }),
@@ -605,12 +619,27 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       retryAt: RETRY_AT,
     });
 
-    await expect(refresh()).rejects.toMatchObject({ code });
+    await expect(refresh()).rejects.toMatchObject({
+      code,
+      cause: { reason, retryAt: RETRY_AT.toISOString() },
+    });
 
     expect(mockFetchPullRequestByNumber).not.toHaveBeenCalled();
     expect(mockFetchPullRequestObservations).not.toHaveBeenCalled();
     expect(mockInsert).not.toHaveBeenCalled();
     expect(mockDeferPrRefresh).not.toHaveBeenCalled();
+  });
+
+  it('tags a missing GitHub integration with a structured reason', async () => {
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockGetIntegrationForOwner.mockResolvedValueOnce(null);
+
+    await expect(refresh()).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      cause: { reason: 'no_integration' },
+    });
   });
 
   it('does not claim the budget when the session has no usable PR link', async () => {
@@ -965,6 +994,10 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       reviewDecision: 'changes_requested',
       reviewDecisionPending: false,
       platform: 'github',
+      baseRef: null,
+      stackNumber: null,
+      stackPosition: null,
+      stackSize: null,
     });
     expect(result.associatedPr?.title).not.toBe('Stale fetch');
     expect(result.associatedPr?.headSha).not.toBe(FETCHED_HEAD_SHA);

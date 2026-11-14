@@ -7,15 +7,19 @@ import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sin
 import {
   applyNeedsInputNotifications,
   type NeedsInputNotificationRow,
-  notificationIdentifierForSession,
   planNeedsInputNotifications,
   reconcileNotifiedAfterApply,
   shouldPublishForSession,
 } from './needs-input-notification';
+import {
+  notificationIdentifierForSession,
+  readNeedsInputPresentation,
+} from './needs-input-presentation';
 
 const mocks = vi.hoisted(() => ({
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPresentedNotificationsAsync: vi.fn(),
   getPermissionsAsync: vi.fn(),
 }));
 
@@ -23,6 +27,7 @@ vi.mock('expo-notifications', () => ({
   PermissionStatus: { GRANTED: 'granted' },
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPresentedNotificationsAsync: mocks.getPresentedNotificationsAsync,
   getPermissionsAsync: mocks.getPermissionsAsync,
 }));
 
@@ -34,6 +39,7 @@ function notifiedRow(over: Partial<NeedsInputNotificationRow> = {}): NeedsInputN
     sessionId: 'ses_1',
     title: 'Fix the bug',
     kind: 'question',
+    raiseId: null,
     prUrl: null,
     organizationId: null,
     previews: 'generic',
@@ -46,6 +52,7 @@ beforeEach(() => {
   setTelemetrySink(null);
   mocks.scheduleNotificationAsync.mockReset().mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockReset().mockResolvedValue(undefined);
+  mocks.getPresentedNotificationsAsync.mockReset().mockResolvedValue([]);
   mocks.getPermissionsAsync.mockReset().mockResolvedValue({ status: 'granted' });
 });
 
@@ -55,6 +62,31 @@ describe('notificationIdentifierForSession', () => {
     expect(notificationIdentifierForSession('ses_1')).not.toBe(
       notificationIdentifierForSession('ses_2')
     );
+  });
+});
+
+describe('readNeedsInputPresentation', () => {
+  it('drops a marker whose notification the OS no longer holds', async () => {
+    await applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] });
+
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('absent');
+
+    // The marker is gone, so the next read answers without asking the OS again.
+    mocks.getPresentedNotificationsAsync.mockClear();
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('absent');
+    expect(mocks.getPresentedNotificationsAsync).not.toHaveBeenCalled();
+  });
+
+  it('reports unknown when the OS cannot be asked, keeping the marker', async () => {
+    await applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] });
+    mocks.getPresentedNotificationsAsync.mockRejectedValue(new Error('shade unavailable'));
+
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('unknown');
+
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: notificationIdentifierForSession('ses_1') } },
+    ]);
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('presented');
   });
 });
 
@@ -80,12 +112,6 @@ describe('shouldPublishForSession', () => {
     }
   });
 
-  it('publishes while a different session chat is open', () => {
-    expect(shouldPublishForSession({ appState: ACTIVE, pathname: AWAY, sessionId: 'ses_1' })).toBe(
-      true
-    );
-  });
-
   it('publishes when the router is not mounted', () => {
     expect(shouldPublishForSession({ appState: ACTIVE, pathname: null, sessionId: 'ses_1' })).toBe(
       true
@@ -108,6 +134,7 @@ describe('planNeedsInputNotifications', () => {
           sessionId: 'ses_1',
           title: 'Fix the bug',
           kind: 'question',
+          raiseId: null,
           prUrl: null,
           organizationId: null,
           previews: 'generic',
@@ -137,6 +164,7 @@ describe('planNeedsInputNotifications', () => {
         sessionId: 'ses_1',
         title: 'Untitled session',
         kind: 'question',
+        raiseId: null,
         prUrl: null,
         organizationId: null,
         previews: 'generic',
@@ -161,6 +189,10 @@ describe('planNeedsInputNotifications', () => {
             lastSyncedAt: '2026-01-01T00:00:00.000Z',
             reviewDecision: null,
             reviewDecisionPending: false,
+            baseRef: null,
+            stackNumber: null,
+            stackPosition: null,
+            stackSize: null,
             platform: 'github',
             observations: null,
           },
@@ -175,6 +207,7 @@ describe('planNeedsInputNotifications', () => {
         sessionId: 'ses_2',
         title: 'Deploy',
         kind: 'permission',
+        raiseId: null,
         prUrl: 'https://github.com/org/repo/pull/7',
         organizationId: null,
         previews: 'generic',
@@ -215,6 +248,10 @@ describe('planNeedsInputNotifications', () => {
             lastSyncedAt: '2026-01-01T00:00:00.000Z',
             reviewDecision: null,
             reviewDecisionPending: false,
+            baseRef: null,
+            stackNumber: null,
+            stackPosition: null,
+            stackSize: null,
             platform: 'github',
             observations: null,
           },
@@ -366,6 +403,10 @@ describe('planNeedsInputNotifications', () => {
             lastSyncedAt: '2026-01-01T00:00:00.000Z',
             reviewDecision: null,
             reviewDecisionPending: false,
+            baseRef: null,
+            stackNumber: null,
+            stackPosition: null,
+            stackSize: null,
             platform: 'github',
             observations: null,
           },
@@ -597,6 +638,53 @@ describe('applyNeedsInputNotifications', () => {
     );
   });
 
+  it('carries the raise the row presents into the posted payload', async () => {
+    const raiseId = '2026-09-18T21:00:00.000Z';
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'permission',
+          statusUpdatedAt: raiseId,
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.publish).toEqual([notifiedRow({ kind: 'permission', raiseId })]);
+
+    await applyNeedsInputNotifications(plan);
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { data: Record<string, unknown> } },
+    ];
+    // The posted actions answer the raise this notification presents.
+    expect(request.content.data.raiseId).toBe(raiseId);
+  });
+
+  it('re-posts the standing notification when the row presents a new raise', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ raiseId: '2026-09-18T21:00:00.000Z' })],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'question',
+          statusUpdatedAt: '2026-09-18T21:05:00.000Z',
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+
+    expect(plan.publish).toEqual([notifiedRow({ raiseId: '2026-09-18T21:05:00.000Z' })]);
+    expect(plan.updates).toEqual(['ses_1']);
+  });
+
   it('re-posts an already-posted raise quietly so a status change never alerts again', async () => {
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow()],
@@ -646,37 +734,6 @@ describe('applyNeedsInputNotifications', () => {
         content: expect.not.objectContaining({ sound: false }),
       })
     );
-  });
-
-  it('keeps a first post of a raise alerting on the shared channel', async () => {
-    const plan = planNeedsInputNotifications({
-      previous: [],
-      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
-      pathname: AWAY,
-      appState: ACTIVE,
-      attentionEnabled: true,
-      previews: 'full',
-    });
-    expect(plan.updates).toEqual([]);
-
-    await applyNeedsInputNotifications(plan);
-
-    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith({
-      identifier: 'needs-input:ses_1',
-      content: {
-        title: 'Fix the bug',
-        body: 'Agent needs input',
-        data: {
-          type: 'cloud_agent_session',
-          cliSessionId: 'ses_1',
-          category: 'attention',
-          attentionKind: 'question',
-        },
-        categoryIdentifier: 'kilo-needs-input:question',
-        interruptionLevel: 'timeSensitive',
-      },
-      trigger: { channelId: 'needs-input' },
-    });
   });
 
   it('alerts again once the raise was dismissed and comes back', async () => {

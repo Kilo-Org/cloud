@@ -274,9 +274,9 @@ export async function tagOpenAiChatGptByokModels<
   );
   if (!byokModelIds) return models;
   return models.map(model =>
-    model.hasUserByokAvailable === true || !byokModelIds.has(model.id)
+    model.hasUserByokAvailable !== true && !byokModelIds.has(model.id)
       ? model
-      : { ...model, hasUserByokAvailable: true }
+      : { ...model, hasUserByokAvailable: true, isFree: false }
   );
 }
 
@@ -299,6 +299,7 @@ export function buildOpenAiChatGptProvider(
 
   return {
     type: 'openai-chatgpt',
+    inferenceProviderId: 'openai-chatgpt',
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},

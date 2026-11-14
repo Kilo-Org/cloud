@@ -78,7 +78,8 @@ function summaryTexts(renderer: TestRenderer.ReactTestRenderer): string[] {
 function findNavigatorPressable(
   root: TestRenderer.ReactTestInstance
 ): TestRenderer.ReactTestInstance {
-  return root.findByProps({ accessibilityLabel: 'Open file navigator' });
+  // By test id, not by label: the label is translated.
+  return root.findByProps({ testID: 'pr-files-summary' });
 }
 
 describe('PrDiffFileListHeader summary copy', () => {
@@ -102,6 +103,25 @@ describe('PrDiffFileListHeader summary copy', () => {
     const renderer = mountHeader({ viewedCount: 2, totalListed: 40, isTruncated: true });
 
     expect(summaryTexts(renderer)).toEqual(['2 of 40 viewed', '(listed)']);
+  });
+
+  it('agrees the French participle with the listed total', async () => {
+    await i18n.changeLanguage('fr');
+    try {
+      // French selects its singular category for 0 and 1, so a one-file list
+      // must render the singular participle the catalogs now carry.
+      expect(summaryTexts(mountHeader({ viewedCount: 0, totalListed: 1 }))).toEqual([
+        '0 sur 1 consulté',
+      ]);
+      expect(summaryTexts(mountHeader({ viewedCount: 3, totalListed: 3 }))).toEqual([
+        '3 sur 3 consultés',
+      ]);
+      expect(
+        summaryTexts(mountHeader({ viewedCount: 1, totalListed: 1, isTruncated: true }))
+      ).toEqual(['1 sur 1 consulté', '(affichés)']);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
 

@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, asc, desc, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, isNull, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import {
   requireNumericPlatformRepositories,
@@ -24,6 +24,9 @@ import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
   fetchGitHubRepositories,
+  GitHubRateLimitError,
+  isGitHubRateLimitError,
+  toGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -42,6 +45,65 @@ export async function listIntegrations(owner: Owner) {
     .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id));
 
   return integrations;
+}
+
+/**
+ * Which of these connections `uninstallApp` can remove upstream, judged by the
+ * same rule `uninstallExclusiveGitHubInstallation` applies: a `workflow`-role
+ * association whose installation has no other locally connected association.
+ * The hub reads this instead of guessing from the list alone, so it never
+ * offers a native Disconnect the server would refuse.
+ */
+export async function listNativelyUninstallableIds(
+  integrations: readonly PlatformIntegration[]
+): Promise<Set<string>> {
+  const candidates = integrations.filter(
+    integration =>
+      integration.github_connection_role === 'workflow' &&
+      integration.platform_installation_id != null
+  );
+  const installationIds = [
+    ...new Set(candidates.map(integration => integration.platform_installation_id as string)),
+  ];
+  if (installationIds.length === 0) {
+    return new Set();
+  }
+
+  // Every owner's association can share one installation, so the sibling count
+  // is read across the table, exactly as the uninstall transaction does.
+  const connected = await db
+    .select({
+      installationId: platform_integrations.platform_installation_id,
+      appType: platform_integrations.github_app_type,
+    })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        inArray(platform_integrations.platform_installation_id, installationIds),
+        isNull(platform_integrations.github_disconnected_at)
+      )
+    );
+
+  const countKey = (installationId: string, appType: string | null) =>
+    `${installationId}:${appType ?? 'standard'}`;
+  const counts = new Map<string, number>();
+  for (const row of connected) {
+    if (!row.installationId) continue;
+    const key = countKey(row.installationId, row.appType);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return new Set(
+    candidates
+      .filter(
+        integration =>
+          counts.get(
+            countKey(integration.platform_installation_id as string, integration.github_app_type)
+          ) === 1
+      )
+      .map(integration => integration.id)
+  );
 }
 
 /**
@@ -81,15 +143,17 @@ export async function checkUserPendingInstallation(userId: string) {
  * This includes:
  * - 404 Not Found: Installation was deleted
  * - 401 Unauthorized: App credentials revoked
- * - 403 Forbidden: App was suspended or access revoked
+ * - 403 Forbidden: App was suspended or access revoked, unless GitHub answered
+ *   with a rate limit instead. 403 carries both meanings, and a limited request
+ *   proves nothing about the installation, so it is not "gone".
  */
 export function isInstallationGoneError(error: unknown): boolean {
-  // Octokit errors have a status property
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status: number }).status;
-    return status === 404 || status === 401 || status === 403;
-  }
-  return false;
+  // Octokit errors carry the HTTP status.
+  if (!error || typeof error !== 'object' || !('status' in error)) return false;
+  const status = error.status;
+  if (typeof status !== 'number') return false;
+  if (status === 403) return !isGitHubRateLimitError(error);
+  return status === 404 || status === 401;
 }
 
 /**
@@ -130,6 +194,12 @@ export async function uninstallApp(
         try {
           await deleteGitHubInstallation(installationId, appType);
         } catch (error) {
+          // A rate-limited delete proves nothing about the installation, so
+          // surface the typed limit and let the transaction roll back instead
+          // of removing the local association for an installation that is
+          // still installed upstream.
+          const rateLimitError = toGitHubRateLimitError(error);
+          if (rateLimitError) throw rateLimitError;
           if (!isInstallationGoneError(error)) throw error;
         }
       },
@@ -139,6 +209,14 @@ export async function uninstallApp(
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'Disconnect this Kilo connection instead of uninstalling the shared GitHub App',
+      });
+    }
+    if (error instanceof GitHubRateLimitError) {
+      const minutes = Math.max(1, Math.round((error.resetAt.getTime() - Date.now()) / 60_000));
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: `GitHub rate limit reached. Try again in about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+        cause: error,
       });
     }
     errorExceptInTest('Failed to delete GitHub installation', { error });

@@ -73,6 +73,14 @@ export const normalUnconditionalNotifications: KiloNotification[] = [
     },
     showIn: ['extension', 'cli'],
   },
+  {
+    id: 'mercury-autocomplete-retired-nov-12',
+    title: 'Mercury Autocomplete Is Being Retired',
+    message:
+      'Autocomplete with Inception Mercury is being retired. Autocomplete will switch to Codestral automatically; no action needed.',
+    showIn: ['extension'],
+    expiresAt: '2026-12-12T08:00:00Z',
+  },
 ];
 
 export async function generateUserNotifications(

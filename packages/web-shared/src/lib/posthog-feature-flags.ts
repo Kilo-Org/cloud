@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 
@@ -7,7 +7,8 @@ import { captureException, startSpan } from '@sentry/nextjs';
 const posthogClient = PostHogClient();
 
 /**
- * Generic server action to check if a PostHog feature flag is enabled (boolean flags)
+ * Server helper to check if a PostHog feature flag is enabled (boolean flags).
+ * Call it from server components, route handlers, or other server modules.
  * @param flagName - The name of the PostHog feature flag to check
  * @param distinctId - Optional distinct ID for the feature flag request (defaults to 'server-config-fetch')
  * @returns Boolean indicating if the flag is enabled, or false if not found/error

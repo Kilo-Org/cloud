@@ -14,6 +14,7 @@ import {
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ExecResult, ProcessOptions } from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
+import { prepareRoots } from './workspace-roots.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
 
 /**
@@ -841,5 +842,25 @@ describe('preparing real repositories in two roots', () => {
     } finally {
       await fs.rm(base, { recursive: true, force: true });
     }
+  });
+});
+
+describe('narrowing a route to its roots', () => {
+  it('applies a stacked base only to the root that carries it', () => {
+    const baseSha = 'a'.repeat(40);
+    const [api, web] = rootSpec().roots ?? [];
+    if (api === undefined || web === undefined) throw new Error('missing roots');
+    const roots = prepareRoots(
+      rootSpec({
+        baseBranch: 'feature/parent',
+        baseSha,
+        roots: [{ ...api, baseBranch: 'feature/parent', baseSha }, web],
+      }),
+      undefined
+    );
+    expect(roots.map(root => [root.spec.baseBranch, root.spec.baseSha])).toEqual([
+      ['feature/parent', baseSha],
+      [undefined, undefined],
+    ]);
   });
 });

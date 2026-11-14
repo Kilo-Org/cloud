@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { EncryptJWT, jwtDecrypt } from 'jose';
 import { z } from 'zod';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { ClaudeBillingOwnerSchema } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/payer-state';
 
 /**
  * The in-flight Claude billing connection, kept server side in an encrypted
@@ -19,8 +20,8 @@ const PENDING_LIFETIME_SECONDS = 10 * 60;
 const pendingSchema = z.object({
   /** The Kilo user who started the connection; the callback must match it. */
   kiloUserId: z.string().min(1),
-  /** `personal` for the person's own account, otherwise the organization ID. */
-  owner: z.string().min(1),
+  /** The connection the approval completes: personal, member, or shared services. */
+  owner: ClaudeBillingOwnerSchema,
   returnPath: z.string().startsWith('/'),
   state: z.string().min(1),
   codeVerifier: z.string().min(1),

@@ -6,7 +6,7 @@ import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/de
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { sendUpstreamAttemptWithByokFailover } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -24,7 +24,7 @@ import {
   paidModelAuthRequiredResponse,
   anonymousFreeModelLimitResponse,
   accountFreeModelLimitResponse,
-  modelDoesNotExistOnOpenRouterResponse,
+  unknownModelResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -65,7 +65,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { admitEnkryptGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/admission';
-import { extractRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import { extractRequestParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   parseLlmProxyRequest,
   readLlmProxyHeaders,
@@ -204,15 +204,17 @@ export async function handleLlmProxyRequest(
       ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased)
       : anonymousBalance
   );
-  const organizationGroupPolicyPromise = callerPromise.then(async caller => {
+  const organizationGroupContextPromise = callerPromise.then(async caller => {
     if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
-    const context = await getOrganizationGroupPolicyContext({
+    return await getOrganizationGroupPolicyContext({
       organizationId: caller.organizationId,
       subject: { type: 'member', kiloUserId: caller.user.id },
       fromDb: readDb,
     });
-    return evaluateEffectiveModelAccessPolicy(context);
   });
+  const organizationGroupPolicyPromise = organizationGroupContextPromise.then(
+    context => context && evaluateEffectiveModelAccessPolicy(context)
+  );
   // Some early returns do not await organization policy. Keep those paths from
   // surfacing policy-context failures as unhandled rejections.
   void organizationGroupPolicyPromise.catch(() => {});
@@ -221,12 +223,15 @@ export async function handleLlmProxyRequest(
   const usageId = randomUUID();
 
   const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
-    ([caller, account]) => admitEnkryptGuardrail(caller, account)
+    ([caller, account]) =>
+      admitEnkryptGuardrail(caller, account, () =>
+        organizationGroupContextPromise.then(context => context?.groupIds ?? [])
+      )
   );
   if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;
 
   // Like the bouncer decide, the guardrail scan overlaps routing work. Its blocking detectors are
-  // awaited just before the upstream call; log-only detectors are never awaited. Segments are
+  // awaited just before the upstream call; log-only detectors are never awaited. Parts are
   // extracted inside the promise so an extraction failure rejects the guardrail, failing closed.
   const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.resolve(enkryptAdmission.inputGuardrail).then(
@@ -237,9 +242,7 @@ export async function handleLlmProxyRequest(
           microdollarUsageId: usageId,
           apiKind: requestBodyParsed.kind,
           clientRequestId: headers.clientRequestId,
-          segments: extractRequestSegments(requestBodyParsed, {
-            includeToolResults: inputGuardrail.config.scanToolResults,
-          }),
+          parts: extractRequestParts(requestBodyParsed),
         }
     ),
     request.signal
@@ -372,7 +375,7 @@ export async function handleLlmProxyRequest(
 
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
   const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
-  providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
+  providerMetadataCapture?.captureEnkryptReport(() => enkryptGuardrail.report());
   const providerPolicy = await resolveProviderAndPolicy({
     request: requestBodyParsed,
     model: effectiveModelIdLowerCased,
@@ -390,41 +393,47 @@ export async function handleLlmProxyRequest(
     organizationGroupPolicyPromise,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
-  const { providerResult, isNonTrialEnterprise, dataRegion } = providerPolicy;
+  const { route, failoverRoutes, isNonTrialEnterprise, dataRegion } = providerPolicy;
 
-  console.debug(`Routing request to ${providerResult.provider.type}`, {
-    byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
+  console.debug(`Routing request to ${route.provider.type}`, {
+    byokProviderIds: route.userByok?.map(byok => byok.providerId) ?? null,
   });
 
   const promptInfo = extractPromptInfo(requestBodyParsed);
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
+    samples: requestedSamples(requestBodyParsed.body),
+    // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the
+    // usage context, which reaches Sentry and several helpers.
+    promptSimHash: simHash64(lastUserPromptText(requestBodyParsed) ?? ''),
+  };
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
     api_kind: requestBodyParsed.kind,
-    provider: providerResult.provider.type,
+    provider: route.provider.type,
     requested_model: effectiveModelIdLowerCased,
-    is_free: providerResult.isFree,
+    is_free: route.isFree,
     custom_llm_pricing: customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
     isStreaming: requestBodyParsed.body.stream === true,
-    user_byok: !!providerResult.userByok,
+    user_byok: !!route.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     feature,
     auto_model: autoModel,
     clientRequestId: headers.clientRequestId,
     usageId,
     providerMetadataCapture,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
-      samples: requestedSamples(requestBodyParsed.body),
-      // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the
-      // usage context, which reaches Sentry and several helpers.
-      promptSimHash: simHash64(lastUserPromptText(requestBodyParsed) ?? ''),
-    }),
+    bouncer: await (bouncer.kind === 'signed-in'
+      ? bouncer.usage(
+          bouncerUsageFields,
+          balanceAndSettingsPromise.then(({ payer }) => payer)
+        )
+      : bouncer.usage(bouncerUsageFields)),
   };
 
   setTag('ui.ai_model', requestBodyParsed.body.model);
@@ -450,7 +459,7 @@ export async function handleLlmProxyRequest(
     session_id: usageContext.session_id,
     vercel_request_id: headers.vercelRequestId,
     request: requestBodyParsed,
-    enkrypt: enkryptGuardrail.requestLogs,
+    enkrypt: (captureResponse?: boolean) => enkryptGuardrail.requestLogs(captureResponse),
   };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(
@@ -463,7 +472,7 @@ export async function handleLlmProxyRequest(
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
-      providerId: providerResult.provider.type,
+      providerId: route.provider.type,
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });
@@ -471,48 +480,58 @@ export async function handleLlmProxyRequest(
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
-  const attempt = await sendUpstreamAttempt({
-    providerContext: providerResult,
-    request: requestBodyParsed,
-    requestedModel: effectiveModelIdLowerCased,
-    fraudHeaders,
-    userId: user.id,
-    organizationId: organizationId ?? null,
-    sessionId: headers.sessionId,
-    taskId: headers.taskId,
-    isNonTrialEnterprise,
-    search: url.search,
-    method: request.method,
-    signal: request.signal,
-    vercelRequestId: headers.vercelRequestId,
-    dataRegion,
-    costLimit:
-      requestCostLimit !== null && requestCostBalance
-        ? {
-            maximumMicrodollars: requestCostLimit,
-            availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
-          }
-        : undefined,
-  });
-  if (attempt.type === 'invalid-openrouter-model') {
-    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  const {
+    attempt,
+    providerContext,
+    request: sentRequest,
+    failoverAttempts,
+  } = await sendUpstreamAttemptWithByokFailover(
+    {
+      providerContext: route,
+      request: requestBodyParsed,
+      requestedModel: effectiveModelIdLowerCased,
+      fraudHeaders,
+      userId: user.id,
+      organizationId: organizationId ?? null,
+      sessionId: headers.sessionId,
+      taskId: headers.taskId,
+      isNonTrialEnterprise,
+      search: url.search,
+      method: request.method,
+      signal: request.signal,
+      vercelRequestId: headers.vercelRequestId,
+      dataRegion,
+      costLimit:
+        requestCostLimit !== null && requestCostBalance
+          ? {
+              maximumMicrodollars: requestCostLimit,
+              availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
+            }
+          : undefined,
+    },
+    failoverRoutes
+  );
+  if (failoverAttempts) providerMetadataCapture?.captureByokFailoverAttempts(failoverAttempts);
+  if (attempt.type === 'unknown-gateway-model') {
+    return unknownModelResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
+  usageContext.provider = providerContext.provider.type;
 
   const { settings: organizationSettings } = await balanceAndSettingsPromise;
   return await respondToUpstream({
     upstream: attempt,
-    request: requestBodyParsed,
+    request: sentRequest,
     model: effectiveModelIdLowerCased,
     requestedModel: requestedModelLowerCased,
-    providerResult,
+    providerResult: providerContext,
     user,
     organizationId,
     usageContext,
     upstreamSpan: openrouterRequestSpan,
     requestStartedAt,
     briefingSettlementToken: request.headers.get(BRIEFING_SETTLEMENT_HEADER),
-    logging: requestLogging,
+    logging: { ...requestLogging, request: sentRequest },
     enkryptOutputScan:
       organizationId && !isAnonymousContext(user)
         ? resolveEnkryptOutputScan(

@@ -334,7 +334,6 @@ export async function subscribeToCodingPlan(
     }
 
     const plaintext = decryptApiKey(inventoryKey.encrypted_api_key, BYOK_ENCRYPTION_KEY);
-    const envelope = byokDataKey ? encryptByokWithDataKey(plaintext, byokDataKey) : null;
     const [installedByok] = await tx
       .insert(byok_api_keys)
       .values({
@@ -342,8 +341,7 @@ export async function subscribeToCodingPlan(
         kilo_user_id: userId,
         organization_id: null,
         provider_id: plan.providerId,
-        encrypted_api_key: encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY),
-        encrypted_api_key_envelope: envelope,
+        encrypted_api_key_envelope: encryptByokWithDataKey(plaintext, byokDataKey),
         management_source: 'coding_plan',
         created_by: userId,
       })
@@ -571,6 +569,7 @@ export async function reassignSubscriptionCredential(
         throw credentialReassignmentError('Subscription has no assigned credential to reassign.');
       }
       if (
+        !byokDataKey ||
         installedByokKeyId !== preview?.installedByokKeyId ||
         subscription.userId !== preview.userId ||
         subscription.providerId !== preview.providerId
@@ -617,13 +616,9 @@ export async function reassignSubscriptionCredential(
       }
 
       const plaintext = decryptApiKey(claimed.encrypted_api_key, BYOK_ENCRYPTION_KEY);
-      const envelope = byokDataKey ? encryptByokWithDataKey(plaintext, byokDataKey) : null;
       const byokUpdateResult = await tx
         .update(byok_api_keys)
-        .set({
-          encrypted_api_key: encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY),
-          encrypted_api_key_envelope: envelope,
-        })
+        .set({ encrypted_api_key_envelope: encryptByokWithDataKey(plaintext, byokDataKey) })
         .where(
           and(
             eq(byok_api_keys.id, installedByokKeyId),
@@ -1169,7 +1164,7 @@ export async function replaceInventoryCredential(
         inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
       )
     );
-  const dataKeys = new Map<string, ByokDataKey | null>();
+  const dataKeys = new Map<string, ByokDataKey>();
   try {
     await Promise.all(
       previewKeys.map(async installedKey => {
@@ -1273,15 +1268,16 @@ export async function replaceInventoryCredential(
           // key needs its own envelope rather than one shared value.
           for (const installedKey of installedKeys) {
             const dataKey = dataKeys.get(installedKey.id);
-            if (dataKey === undefined) {
+            if (!dataKey) {
               throw inventoryReplacementError(
                 'Assigned subscriptions changed during replacement. Refresh and try again.'
               );
             }
-            const envelope = dataKey ? encryptByokWithDataKey(normalizedApiKey, dataKey) : null;
             await tx
               .update(byok_api_keys)
-              .set({ encrypted_api_key: encryptedApiKey, encrypted_api_key_envelope: envelope })
+              .set({
+                encrypted_api_key_envelope: encryptByokWithDataKey(normalizedApiKey, dataKey),
+              })
               .where(eq(byok_api_keys.id, installedKey.id));
           }
         }

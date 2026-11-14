@@ -26,6 +26,301 @@ afterAll(async () => {
   await schemaTestDb.pool.end();
 });
 
+describe('cloud agent stacked workspace schema', () => {
+  let userId: string;
+  let otherUserId: string;
+  let organizationId: string;
+  let otherOrganizationId: string;
+
+  beforeEach(async () => {
+    userId = `oauth/schema-sidebar-${crypto.randomUUID()}`;
+    otherUserId = `oauth/schema-sidebar-${crypto.randomUUID()}`;
+    organizationId = crypto.randomUUID();
+    otherOrganizationId = crypto.randomUUID();
+    await schemaTestDb.db.insert(schema.kilocode_users).values(
+      [userId, otherUserId].map(id => ({
+        id,
+        google_user_email: `${id}@example.com`,
+        google_user_name: 'Sidebar schema test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      }))
+    );
+    await schemaTestDb.db.insert(schema.organizations).values([
+      { id: organizationId, name: 'Sidebar schema organization' },
+      { id: otherOrganizationId, name: 'Other sidebar schema organization' },
+    ]);
+  });
+
+  afterEach(async () => {
+    await schemaTestDb.db
+      .delete(schema.cloud_agent_worktrees)
+      .where(inArray(schema.cloud_agent_worktrees.kilo_user_id, [userId, otherUserId]));
+    await schemaTestDb.db
+      .delete(schema.kilocode_users)
+      .where(inArray(schema.kilocode_users.id, [userId, otherUserId]));
+    await schemaTestDb.db
+      .delete(schema.organizations)
+      .where(inArray(schema.organizations.id, [organizationId, otherOrganizationId]));
+  });
+
+  it('nulls a deleted worktree parent without losing the child base or sidebar position', async () => {
+    const parentId = `workspace_${crypto.randomUUID()}`;
+    const childId = `workspace_${crypto.randomUUID()}`;
+    const baseSha = 'a'.repeat(40);
+    await schemaTestDb.db.insert(schema.cloud_agent_worktrees).values({
+      worktree_id: parentId,
+      kilo_user_id: userId,
+    });
+    const [child] = await schemaTestDb.db
+      .insert(schema.cloud_agent_worktrees)
+      .values({
+        worktree_id: childId,
+        kilo_user_id: userId,
+        parent_worktree_id: parentId,
+        base_branch: 'feature/parent',
+        base_sha: baseSha,
+        sidebar_position: 'a0',
+      })
+      .returning();
+    expect(child).toMatchObject({ parent_worktree_id: parentId });
+    await expect(
+      schemaTestDb.db.insert(schema.cloud_agent_worktrees).values({
+        worktree_id: `workspace_${crypto.randomUUID()}`,
+        kilo_user_id: userId,
+        parent_worktree_id: `workspace_${crypto.randomUUID()}`,
+      })
+    ).rejects.toMatchObject({ cause: { code: '23503' } });
+
+    await schemaTestDb.db
+      .delete(schema.cloud_agent_worktrees)
+      .where(eq(schema.cloud_agent_worktrees.worktree_id, parentId));
+    const children = await schemaTestDb.db
+      .select()
+      .from(schema.cloud_agent_worktrees)
+      .where(eq(schema.cloud_agent_worktrees.worktree_id, childId));
+    expect(children).toEqual([
+      expect.objectContaining({
+        parent_worktree_id: null,
+        base_branch: 'feature/parent',
+        base_sha: baseSha,
+        sidebar_position: 'a0',
+      }),
+    ]);
+  });
+
+  it('defaults user settings to manual order and no overrides, with one row per user', async () => {
+    const settings = await schemaTestDb.db
+      .insert(schema.cloud_agent_user_settings)
+      .values([{ kilo_user_id: userId }, { kilo_user_id: otherUserId, workspace_order: 'created' }])
+      .returning();
+    expect(settings).toEqual([
+      expect.objectContaining({ workspace_order: 'manual', builtin_agents: {} }),
+      expect.objectContaining({ workspace_order: 'created', builtin_agents: {} }),
+    ]);
+    await expect(
+      schemaTestDb.db.insert(schema.cloud_agent_user_settings).values({ kilo_user_id: userId })
+    ).rejects.toMatchObject({ cause: { code: '23505' } });
+    await expect(
+      schemaTestDb.db.execute(sql`
+        UPDATE cloud_agent_user_settings SET workspace_order = 'invalid'
+        WHERE kilo_user_id = ${userId}
+      `)
+    ).rejects.toMatchObject({
+      cause: { constraint: 'cloud_agent_user_settings_workspace_order_check' },
+    });
+  });
+
+  it('defaults manual folders and scopes smart preset uniqueness by owner and organization', async () => {
+    const manualFolders = await schemaTestDb.db
+      .insert(schema.cloud_agent_workspace_folders)
+      .values([
+        { kilo_user_id: userId, name: 'Manual one', position: 0 },
+        { kilo_user_id: userId, name: 'Manual two', position: 1 },
+      ])
+      .returning();
+    for (const folder of manualFolders) {
+      expect(folder).toMatchObject({ kind: 'manual', smart_preset: null, sort_mode: 'manual' });
+    }
+    const smartFolder = {
+      kilo_user_id: userId,
+      name: 'Needs you',
+      position: 2,
+      kind: 'smart',
+      smart_preset: 'needs_you',
+    } as const;
+    const smartFolders = await schemaTestDb.db
+      .insert(schema.cloud_agent_workspace_folders)
+      .values([
+        smartFolder,
+        { ...smartFolder, organization_id: organizationId },
+        { ...smartFolder, organization_id: otherOrganizationId },
+        { ...smartFolder, kilo_user_id: otherUserId, organization_id: organizationId },
+        { ...smartFolder, kilo_user_id: otherUserId },
+        { ...smartFolder, smart_preset: 'in_review', sort_mode: 'created' },
+        { ...smartFolder, smart_preset: 'done', sort_mode: 'activity' },
+      ])
+      .returning();
+    expect(smartFolders).toHaveLength(7);
+    for (const scope of [null, organizationId]) {
+      await expect(
+        schemaTestDb.db
+          .insert(schema.cloud_agent_workspace_folders)
+          .values({ ...smartFolder, organization_id: scope })
+      ).rejects.toMatchObject({ cause: { code: '23505' } });
+    }
+  });
+
+  it.each([
+    ['invalid', null, 'manual', 'kind'],
+    ['manual', 'needs_you', 'manual', 'smart_preset'],
+    ['smart', null, 'manual', 'smart_preset'],
+    ['smart', 'invalid', 'manual', 'smart_preset'],
+    ['manual', null, 'invalid', 'sort_mode'],
+  ])('rejects folder kind=%s preset=%s sort=%s', async (kind, preset, sort, constraint) => {
+    await expect(
+      schemaTestDb.db.execute(sql`
+        INSERT INTO cloud_agent_workspace_folders
+          (kilo_user_id, name, position, kind, smart_preset, sort_mode)
+        VALUES (${userId}, 'Invalid folder', 0, ${kind}, ${preset}, ${sort})
+      `)
+    ).rejects.toMatchObject({
+      cause: { constraint: `cloud_agent_workspace_folders_${constraint}_check` },
+    });
+  });
+});
+
+it('migration 0345 preserves retry safety around its concurrent indexes', () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0345_cloud_agent_stacked_workspaces.sql'),
+    'utf8'
+  );
+  const statements = migration.split('--> statement-breakpoint').map(statement => statement.trim());
+  const commitPosition = statements.indexOf('COMMIT;');
+  expect(statements.slice(commitPosition, commitPosition + 11)).toEqual([
+    'COMMIT;',
+    'SET statement_timeout = 0;',
+    'DROP INDEX CONCURRENTLY IF EXISTS "IDX_cli_sessions_v2_user_activity";',
+    'DROP INDEX CONCURRENTLY IF EXISTS "UQ_cloud_agent_workspace_folders_smart_preset";',
+    'DROP INDEX CONCURRENTLY IF EXISTS "IDX_cloud_agent_worktrees_parent_worktree_id";',
+    'CREATE INDEX CONCURRENTLY "IDX_cli_sessions_v2_user_activity" ON "cli_sessions_v2" USING btree ("kilo_user_id",coalesce("last_activity_at", "created_at"));',
+    expect.stringMatching(
+      /^CREATE UNIQUE INDEX CONCURRENTLY "UQ_cloud_agent_workspace_folders_smart_preset" /
+    ),
+    'CREATE INDEX CONCURRENTLY "IDX_cloud_agent_worktrees_parent_worktree_id" ON "cloud_agent_worktrees" USING btree ("parent_worktree_id") WHERE "cloud_agent_worktrees"."parent_worktree_id" is not null;',
+    'RESET statement_timeout;',
+    'BEGIN;',
+    expect.stringContaining('cloud_agent_workspace_folders_kind_check'),
+  ]);
+  expect(statements[0]).toContain(
+    "IF to_regclass('public.cloud_agent_user_settings') IS NULL THEN"
+  );
+  expect(statements[0]).toContain('CREATE TABLE "cloud_agent_user_settings"');
+  expect(statements[0]).toContain('ADD COLUMN "base_sha" text;');
+  expect(statements[0]).toMatch(/END IF;\s*END \$\$;$/);
+});
+
+it('migration 0345 backfills old owners and folders to activity and copies built-in agent overrides', async () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0345_cloud_agent_stacked_workspaces.sql'),
+    'utf8'
+  );
+  const backfills = migration
+    .split('-->  statement-breakpoint')
+    .slice(1)
+    .map(statement => statement.trim());
+  expect(backfills).toHaveLength(3);
+  expect(backfills[0]).toContain('INSERT INTO "cloud_agent_user_settings"');
+  expect(backfills[1]).toContain('FROM "cloud_agent_builtin_agent_settings"');
+  expect(backfills[2]).toContain('UPDATE "cloud_agent_workspace_folders"');
+
+  await schemaTestDb.db.transaction(async tx => {
+    for (const table of [
+      'cloud_agent_user_settings',
+      'cloud_agent_builtin_agent_settings',
+      'cloud_agent_worktrees',
+      'cloud_agent_workspace_folders',
+    ]) {
+      await tx.execute(
+        sql.raw(`CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING ALL) ON COMMIT DROP`)
+      );
+    }
+    const organizationId = crypto.randomUUID();
+    await tx.insert(schema.cloud_agent_worktrees).values([
+      { worktree_id: 'old-personal-one', kilo_user_id: 'oauth/old-owner' },
+      { worktree_id: 'old-personal-two', kilo_user_id: 'oauth/old-owner' },
+      { worktree_id: 'old-org', kilo_user_id: 'oauth/old-owner', organization_id: organizationId },
+      { worktree_id: 'old-other-owner', kilo_user_id: 'oauth/other-owner' },
+      { worktree_id: 'old-explicit-preference', kilo_user_id: 'oauth/explicit-owner' },
+    ]);
+    await tx.insert(schema.cloud_agent_user_settings).values({
+      kilo_user_id: 'oauth/explicit-owner',
+      workspace_order: 'created',
+    });
+    const oldOwnerAgents = { explore: { model: 'kilo/anthropic/claude-haiku-4.5' } };
+    const agentsOnlyAgents = { plan: { disable: true } };
+    await tx.insert(schema.cloud_agent_builtin_agent_settings).values([
+      { user_id: 'oauth/old-owner', agents: oldOwnerAgents },
+      { user_id: 'oauth/agents-only-owner', agents: agentsOnlyAgents },
+    ]);
+    const oldFolders = await tx
+      .insert(schema.cloud_agent_workspace_folders)
+      .values([
+        { kilo_user_id: 'oauth/old-owner', name: 'Old personal', position: 0 },
+        {
+          kilo_user_id: 'oauth/old-owner',
+          organization_id: organizationId,
+          name: 'Old organization',
+          position: 0,
+        },
+        { kilo_user_id: 'oauth/folder-only-owner', name: 'No worktree', position: 0 },
+      ])
+      .returning();
+    for (const statement of backfills) await tx.execute(sql.raw(statement));
+    const settings = await tx.select().from(schema.cloud_agent_user_settings);
+    expect(settings).toHaveLength(4);
+    expect(settings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kilo_user_id: 'oauth/old-owner',
+          workspace_order: 'activity',
+          builtin_agents: oldOwnerAgents,
+        }),
+        expect.objectContaining({
+          kilo_user_id: 'oauth/other-owner',
+          workspace_order: 'activity',
+          builtin_agents: {},
+        }),
+        expect.objectContaining({
+          kilo_user_id: 'oauth/explicit-owner',
+          workspace_order: 'created',
+          builtin_agents: {},
+        }),
+        expect.objectContaining({
+          kilo_user_id: 'oauth/agents-only-owner',
+          workspace_order: 'manual',
+          builtin_agents: agentsOnlyAgents,
+        }),
+      ])
+    );
+    const updatedFolders = await tx.select().from(schema.cloud_agent_workspace_folders);
+    expect(updatedFolders).toHaveLength(oldFolders.length);
+    for (const folder of oldFolders) {
+      expect(updatedFolders).toContainEqual({ ...folder, sort_mode: 'activity' });
+    }
+    const [newSettings] = await tx
+      .insert(schema.cloud_agent_user_settings)
+      .values({ kilo_user_id: 'oauth/new-owner' })
+      .returning();
+    expect(newSettings).toMatchObject({ workspace_order: 'manual', builtin_agents: {} });
+    const [newFolder] = await tx
+      .insert(schema.cloud_agent_workspace_folders)
+      .values({ kilo_user_id: 'oauth/new-owner', name: 'New folder', position: 0 })
+      .returning();
+    expect(newFolder).toMatchObject({ kind: 'manual', smart_preset: null, sort_mode: 'manual' });
+  });
+});
+
 it('webhook profile migration preserves saved rows and only relaxes the explicit profile requirement', async () => {
   const migration = fs.readFileSync(
     path.join(__dirname, 'migrations/0297_white_lenny_balinger.sql'),

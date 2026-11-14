@@ -12,6 +12,7 @@ import {
 import type { EncryptedData } from '@kilocode/db/schema-types';
 import { inArray, like } from 'drizzle-orm';
 
+import { createByokEnvelope } from '../lib/byok';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
@@ -465,6 +466,19 @@ async function seedScenario(scenario: string, key: Buffer, users: SeedUser[]): P
   const now = new Date();
   const db = getSeedDb();
   const inventoryFixtures = makeInventoryFixtures();
+  const byokFixtures = await Promise.all(
+    SUBSCRIPTION_FIXTURES.filter(subscription => subscription.status !== 'canceled').map(
+      async subscription => {
+        const user = getUser(users, subscription.slug);
+        const id = randomUUID();
+        const envelope = await createByokEnvelope(
+          { key_id: id, owner_type: 'user', owner_id: user.id, provider_id: PROVIDER_ID },
+          plaintextCredential(scenario, inventorySlugForSubscription(subscription.slug))
+        );
+        return { id, userId: user.id, envelope };
+      }
+    )
+  );
 
   return db.transaction(async tx => {
     await tx.insert(kilocode_users).values(
@@ -529,22 +543,18 @@ async function seedScenario(scenario: string, key: Buffer, users: SeedUser[]): P
     const byokRows = await tx
       .insert(byok_api_keys)
       .values(
-        SUBSCRIPTION_FIXTURES.filter(subscription => subscription.status !== 'canceled').map(
-          subscription => {
-            const user = getUser(users, subscription.slug);
-            return {
-              kilo_user_id: user.id,
+        byokFixtures.map(
+          fixture =>
+            ({
+              id: fixture.id,
+              kilo_user_id: fixture.userId,
               organization_id: null,
               provider_id: PROVIDER_ID,
-              encrypted_api_key: encryptCredential(
-                plaintextCredential(scenario, inventorySlugForSubscription(subscription.slug)),
-                key
-              ),
+              encrypted_api_key_envelope: fixture.envelope,
               management_source: 'coding_plan',
-              created_by: user.id,
+              created_by: fixture.userId,
               is_enabled: true,
-            } satisfies typeof byok_api_keys.$inferInsert;
-          }
+            }) satisfies typeof byok_api_keys.$inferInsert
         )
       )
       .returning({ id: byok_api_keys.id, userId: byok_api_keys.kilo_user_id });

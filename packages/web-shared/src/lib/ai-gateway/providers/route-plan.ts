@@ -274,10 +274,9 @@ export function isKeyPlanStep(step: RoutePlanStep): step is KeyPlanStep {
  * decrypts a key or calls KMS.
  *
  * - The keys come in the owner's route order, each with its decision.
- * - A "Sign in with ChatGPT" connection is not in the key list. For an eligible OpenAI responses
- *   request it goes right before the first provider or gateway key that serves, so only the keys
- *   ranked above that key come first; when no such key serves, it goes after every key. The
- *   request's `provider.ignore` does not move it.
+ * - A "Sign in with ChatGPT" connection takes precedence over every key for an eligible OpenAI
+ *   responses request, matching Claude linked billing. The request's `provider.ignore` does not
+ *   move it.
  * - A key the request ignores serves after every other key.
  * - BYOK requests are never billed to Kilo, so when no key serves a catalog id that a catalog-mode
  *   key serves over another API kind, the request fails with the unsupported-API error.
@@ -288,12 +287,7 @@ export async function planRoutes(inputs: RoutePlanInputs): Promise<RoutePlanStep
   const steps: RoutePlanStep[] = [...keySteps];
 
   if (await getOpenAiChatGptCandidateModel(inputs.apiKind, inputs.requestedModel)) {
-    const firstServingGatewayRouted = keySteps.findIndex(
-      step => step.route !== 'direct-byok' && step.decision === 'serves'
-    );
-    steps.splice(firstServingGatewayRouted === -1 ? steps.length : firstServingGatewayRouted, 0, {
-      route: 'chatgpt',
-    });
+    steps.unshift({ route: 'chatgpt' });
   }
 
   const ignored = keySteps.find(

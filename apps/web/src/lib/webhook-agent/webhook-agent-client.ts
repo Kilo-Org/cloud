@@ -23,6 +23,7 @@ export type TriggerConfigResponse = {
   model: string | null;
   variant?: string | null;
   sandboxAllocation?: SandboxAllocation;
+  environmentId?: string | null;
   promptTemplate: string;
   profileId?: string | null;
   bodySchema?: WebhookBodySchema | null;
@@ -50,6 +51,7 @@ export type CreateTriggerInput = {
   model?: string;
   variant?: string;
   sandboxAllocation?: SandboxAllocation;
+  environmentId?: string | null;
   promptTemplate: string;
   profileId?: string | null;
   bodySchema?: WebhookBodySchema | null;
@@ -74,6 +76,7 @@ export type UpdateTriggerInput = {
   model?: string;
   variant?: string | null;
   sandboxAllocation?: SandboxAllocation | null;
+  environmentId?: string | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string | null;

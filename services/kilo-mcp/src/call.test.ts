@@ -44,6 +44,43 @@ const testCatalog: Catalog = {
     searchBlob:
       'cliSessions.search Search the user CLI sessions by keyword. clisessions search query limit',
   },
+  'reports.echo': {
+    path: 'reports.echo',
+    kind: 'query',
+    summary: 'Echo a short string back.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'string',
+      minLength: 1,
+      maxLength: 100,
+    },
+    tags: ['reports'],
+    searchBlob: 'reports.echo Echo a short string back. reports echo string',
+  },
+  'previews.list': {
+    path: 'previews.list',
+    kind: 'query',
+    summary: 'List preview services for a worktree or a cloud agent session.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      anyOf: [
+        {
+          type: 'object',
+          properties: { worktreeId: { type: 'string', minLength: 1 } },
+          required: ['worktreeId'],
+          additionalProperties: false,
+        },
+        {
+          type: 'object',
+          properties: { cloudAgentSessionId: { type: 'string', minLength: 1 } },
+          required: ['cloudAgentSessionId'],
+          additionalProperties: false,
+        },
+      ],
+    },
+    tags: ['previews'],
+    searchBlob: 'previews.list List preview services for a worktree or a cloud agent session.',
+  },
   'admin.getMetrics': {
     path: 'admin.getMetrics',
     kind: 'query',
@@ -65,6 +102,20 @@ const testCatalog: Catalog = {
     },
     tags: ['debug'],
     searchBlob: 'debug.getState Read the debug platform state. debug getstate state',
+    debug: true,
+  },
+  'debug.echoText': {
+    path: 'debug.echoText',
+    kind: 'query',
+    summary: 'Echo a string back from the debug router.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'string',
+      minLength: 1,
+      maxLength: 100,
+    },
+    tags: ['debug'],
+    searchBlob: 'debug.echoText Echo a string back from the debug router. debug echotext string',
     debug: true,
   },
   'organizations.create': {
@@ -340,6 +391,117 @@ describe('callCatalogEndpoint', () => {
     const headers = init.headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer tok_123');
     expect(headers['x-kilocode-organizationid']).toBe('org-uuid-1');
+  });
+
+  it('decodes a JSON-encoded object input against the published schema and forwards the object', async () => {
+    // `call` publishes `input` with a description and no JSON Schema `type`
+    // (the catalog row decides the shape), so some MCP clients send a
+    // structured value as a JSON string. The schema still decides: the decoded
+    // value reaches tRPC, never the encoding.
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: { sessions: [] } } }));
+    const outcome = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'cliSessions.search',
+      input: '{"query":"deploy"}',
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    expect(outcome).toEqual({ text: '{"sessions":[]}', truncated: false });
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(new URL(url).searchParams.get('input')).toBe('{"query":"deploy"}');
+  });
+
+  it('decodes a JSON-encoded object for a mutation and posts the object as the body', async () => {
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: { id: 'org-new' } } }));
+    const outcome = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.create',
+      input: '{"name":"acme"}',
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    expect(outcome).toEqual({ text: '{"id":"org-new"}', truncated: false });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new URL(url).searchParams.has('input')).toBe(false);
+    expect(init.body).toBe('{"name":"acme"}');
+  });
+
+  it('forwards a legitimate string input untouched, even when it looks like JSON', async () => {
+    // A string-schema row takes the string itself; decoding it would replace
+    // the value the endpoint describes.
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: 'you sent it' } }));
+    const outcome = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'reports.echo',
+      input: '{"verbose":true}',
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    expect(outcome.text).toBe('"you sent it"');
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    // A query sends `JSON.stringify(input)`, so a string input rides the URL
+    // quoted, never as the bare object JSON a decoded value would produce.
+    expect(new URL(url).searchParams.get('input')).toBe(JSON.stringify('{"verbose":true}'));
+  });
+
+  it('decodes a JSON-encoded object for a composite (anyOf) schema too', async () => {
+    // Catalog rows with more than one accepted shape publish anyOf/oneOf; the
+    // decode is validation-driven, so it needs no schema-keyword walk.
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: [] } }));
+    await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'previews.list',
+      input: '{"cloudAgentSessionId":"workspace_1"}',
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(new URL(url).searchParams.get('input')).toBe('{"cloudAgentSessionId":"workspace_1"}');
+  });
+
+  it('still rejects a string that does not decode to a schema-valid value', async () => {
+    for (const [path, input] of [
+      ['cliSessions.search', 'not json'],
+      // `null` is never forwarded: the call path reads it as "no input".
+      ['cliSessions.search', 'null'],
+      ['organizations.list', '{"query":"deploy"}'],
+    ] as const) {
+      const fetchImpl = vi.fn();
+      const error = await callCatalogEndpoint({
+        catalog: testCatalog,
+        path,
+        input,
+        auth,
+        webBaseUrl: WEB_BASE_URL,
+        fetchImpl,
+      }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(JsonRpcFailure);
+      expect((error as JsonRpcFailure).code).toBe(-32602);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  });
+
+  it('reports the decoded object violations when a JSON string decodes to an invalid object', async () => {
+    const fetchImpl = vi.fn();
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'cliSessions.search',
+      input: '{"query":""}',
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).code).toBe(-32602);
+    const violations = (error as JsonRpcFailure).data?.['violations'] as string[];
+    // The violation names the field the decoded object got wrong, not the
+    // string type the client happened to use.
+    expect(violations.join('; ')).toContain('minLength');
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('forwards a valid mutation as a POST with a JSON body, no input param, and the same headers as the GET case', async () => {
@@ -973,6 +1135,46 @@ describe('requestProtectedCall', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('records the decoded value for a JSON-encoded object input, not its encoding', async () => {
+    const fetchImpl = vi.fn();
+    const requests = fakeRequestsStore({ id: 'req-json' });
+    const outcome = await requestProtectedCall({
+      catalog: testCatalog,
+      path: 'debug.getState',
+      input: '{"verbose":true}',
+      auth: protectedAuth,
+      requests,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    expect(JSON.parse(outcome.text)).toMatchObject({
+      status: 'otp_required',
+      request_id: 'req-json',
+    });
+    // The approved payload is the object the schema describes, so the OTP
+    // execution step re-validates and runs exactly that value.
+    expect(requests.created[0]?.inputJson).toBe('{"verbose":true}');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('records a legitimate string input for a string-schema row as a JSON string', async () => {
+    const fetchImpl = vi.fn();
+    const requests = fakeRequestsStore({ id: 'req-text' });
+    await requestProtectedCall({
+      catalog: testCatalog,
+      path: 'debug.echoText',
+      input: '{"verbose":true}',
+      auth: protectedAuth,
+      requests,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    // The row takes a string, so the string itself is the approved payload and
+    // must not be decoded into an object.
+    expect(requests.created[0]?.inputJson).toBe('"{\\"verbose\\":true}"');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('fails closed with a retryable refusal when the pending-request store is missing', async () => {
     const fetchImpl = vi.fn();
     const error = await requestProtectedCall({
@@ -1051,6 +1253,20 @@ describe('executeProtectedCall', () => {
     expect(url).toBe(
       'https://app.kilo.ai/api/trpc/debug.getState?input=%7B%22verbose%22%3Atrue%7D'
     );
+  });
+
+  it('runs a recorded string payload for a string-schema row as that string', async () => {
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: 'ok' } }));
+    await executeProtectedCall({
+      catalog: testCatalog,
+      path: 'debug.echoText',
+      inputJson: '"{\\"verbose\\":true}"',
+      auth: protectedAuth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(new URL(url).searchParams.get('input')).toBe(JSON.stringify('{"verbose":true}'));
   });
 
   it('runs a no-input guarded call with no input param', async () => {

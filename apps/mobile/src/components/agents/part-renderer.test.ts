@@ -2,6 +2,7 @@
 import {
   type PatchPart,
   type ReasoningPart,
+  type StoredMessage,
   type TextPart,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
@@ -13,6 +14,8 @@ import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { PartRenderer } from './part-renderer';
+import { CompactionSeparator } from './compaction-separator';
+import { assistantMessage } from './message-bubble-test-utils';
 import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
 import { PatchToolCardBody } from './tool-cards/patch-tool-card';
@@ -77,6 +80,23 @@ function makeReasoningPart(text: string, ended = true): ReasoningPart {
     time: { start: 1, end: ended ? 2 : undefined },
   };
 }
+
+it('passes message status to the compaction separator', () => {
+  const message = assistantMessage('compaction');
+  // eslint-disable-next-line new-cap -- Inspect the component's unrendered tree.
+  const element = PartRenderer({
+    part: { id: 'part', sessionID: 's1', messageID: 'compaction', type: 'compaction', auto: false },
+    messageInfo: message.info,
+    isStreaming: true,
+  });
+  expect(element?.type).toBe(CompactionSeparator);
+  expect(
+    React.isValidElement<{ info?: StoredMessage['info'] }>(element) && element.props.info
+  ).toBe(message.info);
+  expect(
+    React.isValidElement<{ isStreaming?: boolean }>(element) && element.props.isStreaming
+  ).toBe(true);
+});
 
 function makeTextPart(text: string, synthetic?: boolean, ended = true): TextPart {
   const part: TextPart = {

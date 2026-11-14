@@ -15,6 +15,7 @@ import { useCloudAgentSettingsDeepLink } from './useCloudAgentSettingsDeepLink';
  * - `/cloud?settings=environments` opens Environments.
  * - `/cloud?settings=profiles` opens the Profiles section for the caller's
  *   personal profiles.
+ * - `/cloud?settings=sidebar` opens Sidebar.
  * - `/organizations/<id>/cloud?settings=compute` opens Compute.
  *
  * Switching tabs updates `settings` so the URL always reflects the active

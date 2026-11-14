@@ -19,16 +19,22 @@ const t = i18n.getFixedT('en');
  */
 describe('providerPrMergeTitles', () => {
   it('names the GitLab merge action without restating the merge request', () => {
-    expect(providerPrMergeTitles(t, 'gitlab')).toEqual({ action: 'Merge', confirm: 'Merge?' });
+    expect(providerPrMergeTitles(t, 'gitlab')).toEqual({
+      action: 'Merge',
+      title: 'Merge',
+      confirm: 'Merge?',
+    });
   });
 
   it('keeps the pull-request titles on the GitHub and Bitbucket arms', () => {
     expect(providerPrMergeTitles(t, 'github')).toEqual({
       action: 'Merge pull request',
+      title: 'Merge pull request',
       confirm: 'Merge pull request?',
     });
     expect(providerPrMergeTitles(t, 'bitbucket')).toEqual({
       action: 'Merge pull request',
+      title: 'Merge pull request',
       confirm: 'Merge pull request?',
     });
   });

@@ -36,8 +36,11 @@ const boundary = vi.hoisted(() => ({
   requireSeats: false,
   seatCount: { used: 1, total: 1 },
   balance: 5_000_000,
+  plan: 'teams' as 'teams' | 'enterprise',
+  isTrialExpiredForEnforcement: false,
 }));
 const routerPush = vi.hoisted(() => vi.fn());
+const openExternalUrlMock = vi.hoisted(() => vi.fn());
 const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
@@ -69,10 +72,23 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       balance: boundary.balance,
       requireSeats: boundary.requireSeats,
       seatCount: boundary.seatCount,
+      plan: boundary.plan,
+      isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
     },
     isResolving: false,
   }),
   useOrgWithMembers: () => membersQuery,
+  // Mirrors the hook's derivation over the same mocked membership payload.
+  useOrgParentLink: (_organizationId: string | null, listParentLink: string | null | undefined) => {
+    const membershipParentLink = membersQuery.data?.parent_organization_id;
+    const reportedParentLink = listParentLink ?? membershipParentLink;
+    return {
+      membership: membersQuery,
+      parentLink: reportedParentLink ?? (membershipParentLink === null ? null : undefined),
+      membershipUnavailable:
+        membersQuery.data == null && (membersQuery.isError || membersQuery.isPaused),
+    };
+  },
   useOrgKiloPassSummary: (_organizationId: string, enabled: boolean) => {
     kiloPassQuery.enabled.push(enabled);
     return { data: undefined, isError: false, refetch: vi.fn() };
@@ -108,10 +124,10 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.test' }));
 
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }));
 
 vi.mock('@/lib/format', () => ({
-  formatMoney: (amount: number) => `$${amount}`,
+  formatPrefixedMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
 }));
 
@@ -150,6 +166,12 @@ vi.mock('@/components/organization/org-kilo-pass-row-state', async importOrigina
 });
 vi.mock('@/components/organization/org-usage-stats', () => ({ OrgUsageStats: 'OrgUsageStats' }));
 
+// The block's own paint (icon, tint, action press) is covered by its mounted
+// test; this suite asserts which plan state the hub hands it.
+vi.mock('@/components/organization/plan-refusal', () => ({
+  OrganizationPlanRefusal: 'OrganizationPlanRefusal',
+}));
+
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: () => null,
 }));
@@ -181,11 +203,25 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 
+// Every icon the hub composes, including the web-settings rows' own set: the
+// row table resolves them at module scope, so a missing export fails collection.
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
+  Building2: 'Building2',
+  Cpu: 'Cpu',
+  CreditCard: 'CreditCard',
   FileText: 'FileText',
+  KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
+  Lock: 'Lock',
+  Mail: 'Mail',
   Pencil: 'Pencil',
+  Plug: 'Plug',
   Receipt: 'Receipt',
+  ScrollText: 'ScrollText',
+  Server: 'Server',
+  Shield: 'Shield',
+  SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
   Wallet: 'Wallet',
 }));
@@ -258,10 +294,13 @@ beforeEach(() => {
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
   boundary.balance = 5_000_000;
+  boundary.plan = 'teams';
+  boundary.isTrialExpiredForEnforcement = false;
   hideBalancePref.hideBalance = false;
   hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
   routerPush.mockClear();
+  openExternalUrlMock.mockClear();
   kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
@@ -308,6 +347,12 @@ describe('Organization hub card', () => {
     // the button once the copy beside it left.
     const trailing: object | null | undefined = balance?.props.trailing;
     expect(isValidElement(trailing) && trailing.type === AddCreditsRow).toBe(true);
+    // `inline` drops the control's own block, and `lineAction` keeps the
+    // amount's line one text line tall instead of growing it to 48 dp.
+    const trailingProps = isValidElement<{ inline?: boolean; lineAction?: boolean }>(trailing)
+      ? trailing.props
+      : undefined;
+    expect(trailingProps).toMatchObject({ inline: true, lineAction: true });
     unmount();
   });
 
@@ -319,6 +364,95 @@ describe('Organization hub card', () => {
       .find(node => node.props.label === i18n.t('organization.hub.balance'));
     expect(balance?.props.value).toBe('$5');
     expect(balance?.props.trailing).toBeUndefined();
+    unmount();
+  });
+});
+
+describe('Organization hub plan', () => {
+  const planRow = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.plan'));
+  const refusals = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root.findAllByType('OrganizationPlanRefusal');
+
+  it('names the plan in every state, in the card the seats belong to', async () => {
+    const entitled = await renderHub();
+
+    const entitledRow = planRow(entitled.renderer);
+    expect(entitledRow?.props.value).toBe(i18n.t('organization.hub.planTeams'));
+    // The row never overrides its value ink: the tier reads like every other
+    // value in the card.
+    expect(entitledRow?.props.valueTone).toBeUndefined();
+    // An entitled organization is not warned about a state it is not in, and it
+    // carries no status segment.
+    expect(entitledRow?.props.valueStatus).toBeUndefined();
+    expect(refusals(entitled.renderer)).toHaveLength(0);
+    entitled.unmount();
+
+    boundary.plan = 'enterprise';
+    boundary.isTrialExpiredForEnforcement = true;
+    const lapsed = await renderHub();
+
+    // A lapsed organization keeps its tier named and states the status beside
+    // it: the bare tier beside a block that says there is no active plan reads
+    // as a plan that is still running. The tier keeps the row's ordinary ink and
+    // the status carries the warning, so the name does not glow with it.
+    const lapsedRow = planRow(lapsed.renderer);
+    expect(lapsedRow?.props.value).toBe(i18n.t('organization.hub.planEnterprise'));
+    expect(lapsedRow?.props.valueTone).toBeUndefined();
+    expect(lapsedRow?.props.valueStatus).toMatchObject({
+      label: i18n.t('organization.hub.planStatusLapsed'),
+      tone: 'danger',
+    });
+    lapsed.unmount();
+  });
+
+  it('explains a lapsed plan with the state alone, leaving the step to the action', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const [refusal] = refusals(renderer);
+    expect(refusal?.props.message).toBe(i18n.t('organization.hub.planEnded'));
+    // The billing action below the sentence is the next step, so the message
+    // must not repeat the instruction the surfaces without an action carry.
+    expect(refusal?.props.message).not.toBe(i18n.t('common.organizationTrialEnded'));
+    unmount();
+  });
+
+  it('opens the web billing page for a role that can change the plan', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const action = refusals(renderer)[0]?.props.action as
+      | { label: string; onPress: () => void }
+      | undefined;
+    expect(action?.label).toBe(i18n.t('organization.hub.manageBilling'));
+    act(() => {
+      action?.onPress();
+    });
+
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      'https://app.kilo.test/organizations/org-1/subscriptions',
+      { label: i18n.t('organization.hub.manageBilling') }
+    );
+    unmount();
+  });
+
+  it('keeps the explanation and drops the action for a member', async () => {
+    boundary.role = 'member';
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const [refusal] = refusals(renderer);
+    // The web billing page refuses this role, so the block states the state
+    // without offering a control that would fail, and it keeps the sentence
+    // that names who can end it.
+    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal?.props.action).toBeUndefined();
     unmount();
   });
 });
@@ -759,6 +893,40 @@ describe('Organization hub billing card while its data loads', () => {
     });
     expect(membersQuery.refetch).toHaveBeenCalledOnce();
     expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    unmount();
+  });
+});
+
+describe('Organization hub integrations rows', () => {
+  it('names the in-app screen and the web page apart, and opens each where it says', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // Both rows carry the same Plug glyph and reach different places, so the
+    // titles are the only thing that tells them apart.
+    const rows = renderer.root
+      .findAllByType('ConfigureRow')
+      .filter(node => node.props.icon === 'Plug');
+    expect(rows.map(node => node.props.title)).toEqual([
+      i18n.t('integrations.title'),
+      i18n.t('organization.settingsOnWeb.integrations'),
+    ]);
+
+    const [inApp, web] = rows;
+    if (inApp === undefined || web === undefined) {
+      throw new Error('the hub shows both integrations rows');
+    }
+    act(() => {
+      (inApp.props.onPress as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/integrations?org=org-1');
+
+    act(() => {
+      (web.props.onPress as () => void)();
+    });
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      'https://app.kilo.test/organizations/org-1/integrations',
+      { label: i18n.t('organization.settingsOnWeb.integrations') }
+    );
     unmount();
   });
 });

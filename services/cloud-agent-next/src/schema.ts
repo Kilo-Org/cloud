@@ -15,9 +15,6 @@ export const Limits = {
   MAX_SETUP_COMMAND_LENGTH: SETUP_SCRIPT_LIMITS.MAX_LENGTH,
   MAX_MCP_SERVERS: 20,
   ...RuntimeProfileLimits,
-  MAX_RUNTIME_INSTRUCTIONS: 50,
-  MAX_RUNTIME_INSTRUCTION_NAME_LENGTH: 100,
-  MAX_RUNTIME_INSTRUCTION_CONTENT: 100_000,
   SESSION_TTL_DAYS: 90,
   SESSION_TTL_MS: 90 * 24 * 60 * 60 * 1000, // 90 days in milliseconds
   /** Maximum source sessions in one local-worktree-to-cloud continuation. */

@@ -134,6 +134,10 @@ export function BitbucketOverview({
     (data.repositorySelectionMode === 'all' || data.selectedRepositoryIds.length > 0);
   const isReady = readiness.data?.ready !== false;
   const canEnableAutoReview = hasRepoSelection && isReady;
+  // The workspace line under the Automatic reviews label is optional: a
+  // readiness read without a workspace slug paints the label alone, so the row
+  // keeps one line and matches the sibling Follow REVIEW.md row.
+  const autoReviewsWorkspace = readiness.data?.workspace?.slug;
   const rows =
     data == null
       ? null
@@ -197,9 +201,11 @@ export function BitbucketOverview({
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
-                    <Text variant="muted" className="text-xs">
-                      {readiness.data?.workspace?.slug ?? ''}
-                    </Text>
+                    {autoReviewsWorkspace ? (
+                      <Text variant="muted" className="text-xs">
+                        {autoReviewsWorkspace}
+                      </Text>
+                    ) : null}
                   </View>
                   <Switch
                     accessibilityLabel={t('codeReviewer.autoReviews')}

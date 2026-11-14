@@ -20,7 +20,8 @@ export function AuthErrorNotification({
     return (
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Error">
-          An account already exists with this email. Did you use a different login method?
+          An account already exists with this email, and it already has this type of sign-in method
+          linked. Sign in with the original account for that method.
         </ErrorNotificationBox>
       </div>
     );
@@ -142,6 +143,16 @@ export function AuthErrorNotification({
             contact support
           </a>{' '}
           if you need help accessing it.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'EMAIL-REQUIRED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Email Address Required">
+          This sign-in method did not share an email address, so it cannot identify an account. Add
+          an email address to the provider, or use a different sign-in method.
         </ErrorNotificationBox>
       </div>
     );

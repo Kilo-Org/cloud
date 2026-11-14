@@ -23,7 +23,7 @@ import {
   markOrganizationAsDeleted,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
-import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-internal-api';
 
 const mockAfterResponse = jest.fn(async (_work: () => void | Promise<void>) => {});
 
@@ -31,7 +31,7 @@ jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+jest.mock('@/lib/cloud-agent-next/cloud-agent-internal-api', () => ({
   closeCloudAgentOrgStreams: jest.fn().mockResolvedValue(undefined),
 }));
 

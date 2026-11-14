@@ -411,19 +411,6 @@ export function storedMessageCostUsd(
   });
 }
 
-export function computeRunningAssistantCostUsd(
-  rows: Array<{ item_data: string; item_data_r2_key?: string | null }>
-): number {
-  let total = 0;
-  for (const row of rows) {
-    total += storedAssistantMessageCostUsd({
-      item_data: row.item_data,
-      item_data_r2_key: row.item_data_r2_key ?? null,
-    });
-  }
-  return nonNegative(total);
-}
-
 const ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
 export const COST_PERSIST_THROTTLE_MS = 30_000;
 

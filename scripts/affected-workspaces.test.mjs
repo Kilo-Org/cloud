@@ -10,12 +10,20 @@ import {
   selectGroups,
 } from './affected-workspaces.mjs';
 
-const workspace = (name, dir, dependencies = {}) => ({ name, dir, manifest: { dependencies } });
+const workspace = (name, dir, dependencies = {}, scripts = { test: 'vitest run' }) => ({
+  name,
+  dir,
+  manifest: { dependencies, scripts },
+});
 const items = [
   workspace('@kilocode/db', 'packages/db'),
   workspace('@kilocode/trpc', 'packages/trpc', { '@kilocode/db': 'workspace:*' }),
+  workspace('@kilocode/harness-sdk', 'packages/harness-sdk'),
   workspace('web', 'apps/web', { '@kilocode/db': 'workspace:*' }),
-  workspace('kilo-app', 'apps/mobile', { '@kilocode/trpc': 'workspace:*' }),
+  workspace('kilo-app', 'apps/mobile', {
+    '@kilocode/trpc': 'workspace:*',
+    '@kilocode/harness-sdk': 'workspace:*',
+  }),
   workspace('agent', 'services/agent'),
   workspace('agent-wrapper', 'services/agent/wrapper'),
   workspace('leaf', 'services/leaf'),
@@ -102,11 +110,8 @@ test('an unattributable or global change selects everything', () => {
     'unknown/file.ts',
     '.github/workflows/ci.yml',
     'scripts/affected-workspaces.mjs',
-    '.github/actions/trpc-declarations/action.yml',
-    '.github/actions/harness-sdk-build/action.yml',
+    'scripts/changed-dependencies.mjs',
     '.github/actions/ttsc-plugin-cache/action.yml',
-    'scripts/trpc-declaration-key.mjs',
-    'scripts/harness-sdk-build-key.mjs',
     'scripts/ttsc-plugin-key.mjs',
     'scripts/build-key-inputs.mjs',
   ]) {
@@ -116,6 +121,53 @@ test('an unattributable or global change selects everything', () => {
     assert.deepEqual(result.full_checks, ['lint', 'typecheck'], file);
   }
   assert.equal(select(['<no base revision>']).full, true);
+});
+
+test('a single-package build action selects its package and that package readers', () => {
+  for (const file of [
+    '.github/actions/trpc-declarations/action.yml',
+    'scripts/trpc-declaration-key.mjs',
+  ]) {
+    assert.deepEqual(select([file]), {
+      full: false,
+      reasons: [],
+      full_checks: [],
+      dirs: ['apps/mobile', 'packages/trpc'],
+      packages: ['@kilocode/trpc', 'kilo-app'],
+      ...noTests,
+    });
+  }
+  for (const file of [
+    '.github/actions/harness-sdk-build/action.yml',
+    '.github/actions/harness-sdk-build/step.sh',
+    'scripts/harness-sdk-build-key.mjs',
+  ]) {
+    assert.deepEqual(select([file]).dirs, ['apps/mobile', 'packages/harness-sdk'], file);
+  }
+  // The trpc rows run only on a full check, so the key change starts no
+  // typecheck row; the rest lint group still covers every workspace it lints.
+  assert.deepEqual(selectGroups(select(['scripts/trpc-declaration-key.mjs'])), {
+    typecheck_groups: [],
+    lint_groups: ['rest'],
+  });
+});
+
+test('an action no table attributes stays global', () => {
+  for (const file of [
+    '.github/actions/pnpm-store/action.yml',
+    '.github/actions/pnpm-store/cleanup/cleanup.cjs',
+    '.github/actions/brand-new-action/action.yml',
+  ]) {
+    assert.equal(select([file]).full, true, file);
+  }
+  // A global path in the same diff keeps the whole selection full.
+  assert.equal(
+    select([
+      '.github/actions/trpc-declarations/action.yml',
+      '.github/actions/pnpm-store/action.yml',
+    ]).full,
+    true
+  );
 });
 
 test('a check script change runs only that check everywhere', () => {
@@ -395,8 +447,87 @@ test('a file inside a workspace selects it, including a test file', () => {
     assert.equal(isNeutral(file), false, file);
     const result = select([file]);
     assert.equal(result.full, false, file);
-    assert.ok(result.dirs.includes(dir), file);
+    // A test file cannot change the types its workspace exports, so the
+    // workspace keeps its own checks and selects no reader.
+    assert.deepEqual(result.dirs, [dir], file);
+    assert.deepEqual(result.test_only_dirs, [], file);
   }
+});
+
+test('a test-only change keeps the full selection for a workspace without tests', () => {
+  // No `test` script means no test matrix row: another workspace's runner may be
+  // the only one that runs these files, so the readers stay selected.
+  const runnerless = [
+    workspace('host', 'services/host'),
+    workspace('host-part', 'services/host/part', {}, {}),
+    workspace('consumer', 'services/consumer', { 'host-part': 'workspace:*' }),
+  ];
+  const result = selectAffected({
+    items: runnerless,
+    changedFiles: ['services/host/part/src/a.test.ts'],
+    dependencyDirs: [],
+    references: [],
+  });
+  assert.deepEqual(result.packages, ['consumer', 'host', 'host-part']);
+});
+
+test('a test file beside a source file in the same workspace keeps the fan-out', () => {
+  // One non-test file in the workspace is enough: its exports can change, so the
+  // readers stay selected.
+  assert.deepEqual(
+    select(['packages/db/src/schema.test.ts', 'packages/db/src/schema.ts']).packages,
+    ['@kilocode/db', '@kilocode/trpc', 'kilo-app', 'web']
+  );
+});
+
+test('a test-only workspace that reads a changed workspace still selects its readers', () => {
+  // The workspace entered the selection through its test file and also reads a
+  // changed workspace, so its own sources carry that change to its readers.
+  const chain = [
+    workspace('a', 'packages/a'),
+    workspace('b', 'packages/b', { a: 'workspace:*' }),
+    workspace('c', 'packages/c', { b: 'workspace:*' }),
+  ];
+  const result = selectAffected({
+    items: chain,
+    changedFiles: ['packages/a/src/a.ts', 'packages/b/src/b.test.ts'],
+    dependencyDirs: [],
+    references: [],
+  });
+  assert.deepEqual(result.packages, ['a', 'b', 'c']);
+});
+
+test('a test-only change does not run a reader test that reads other files', () => {
+  const references = [['services/leaf/src/copy.test.ts', 'apps/mobile/src/i18n/en.json', true]];
+  const testOnly = selectAffected({
+    items: dataItems,
+    changedFiles: ['apps/mobile/src/app/index.test.tsx'],
+    dependencyDirs: [],
+    references,
+  });
+  assert.deepEqual(testOnly.dirs, ['apps/mobile']);
+  assert.deepEqual(testOnly.test_only_dirs, []);
+  // The workspace-level read rule stays for a change that is not test-only.
+  const source = selectAffected({
+    items: dataItems,
+    changedFiles: ['apps/mobile/src/app/index.tsx'],
+    dependencyDirs: [],
+    references,
+  });
+  assert.deepEqual(source.test_only_dirs, ['services/leaf']);
+});
+
+test('a test-only change runs a reader test that reads the changed file', () => {
+  const changed = 'apps/mobile/src/__tests__/fixtures.json';
+  const result = selectAffected({
+    items: dataItems,
+    changedFiles: [changed],
+    dependencyDirs: [],
+    references: [['services/leaf/src/copy.test.ts', changed, true]],
+  });
+  assert.deepEqual(result.dirs, ['apps/mobile']);
+  assert.deepEqual(result.test_only_dirs, ['services/leaf']);
+  assert.deepEqual(result.test_only_files, ['services/leaf/src/copy.test.ts']);
 });
 
 test('the neutral filter keeps every path a check reads', () => {

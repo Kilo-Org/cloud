@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
+// The class the widget store writes. The mocked module supplies it, the way the
+// native one does at load.
+const AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY = 1;
 
 vi.mock('expo-secure-store', () => ({
+  // Inlined: a `vi.mock` factory is hoisted above the module's own constants.
+  AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 1,
   getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
     return store.get(key) ?? null;
@@ -19,8 +24,16 @@ vi.mock('expo-secure-store', () => ({
 
 /* eslint-disable import/first */
 import * as SecureStore from 'expo-secure-store';
-import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
-import { deleteAccountMetadata, writeAccountMetadata } from './account-metadata-write';
+import {
+  ACTIVE_USER_ID_KEY,
+  ORGANIZATION_STORAGE_KEY,
+  SESSION_FILTERS_KEY,
+} from '@/lib/storage-keys';
+import {
+  deleteAccountMetadata,
+  setAccountMetadata,
+  writeAccountMetadata,
+} from './account-metadata-write';
 import { bumpAuthEpoch } from './auth-epoch';
 /* eslint-enable import/first */
 
@@ -108,5 +121,22 @@ describe('account-metadata-write', () => {
 
     await Promise.all([block, filtersWrite, del]);
     expect(store.has(SESSION_FILTERS_KEY)).toBe(false);
+  });
+
+  it.each([ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY])(
+    'writes the %s identity hint with the widget class',
+    async key => {
+      await setAccountMetadata(key, 'value');
+
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(key, 'value', {
+        keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+      });
+    }
+  );
+
+  it('leaves every other account metadata key on the default class', async () => {
+    await setAccountMetadata(SESSION_FILTERS_KEY, '{}');
+
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(SESSION_FILTERS_KEY, '{}');
   });
 });

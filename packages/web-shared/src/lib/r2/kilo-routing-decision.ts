@@ -3,6 +3,7 @@ import type {
   EnkryptOutputGuardrailReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type {
+  ByokFailoverAttempt,
   KiloRoutingDecisionRecord,
   ProviderRoutingDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
@@ -23,6 +24,8 @@ export type AiProviderMetadataCapture = {
   captureEnkryptReport: (report: () => Promise<EnkryptGuardrailReport | null>) => void;
   /** Called at upload time, after the response. */
   captureEnkryptOutputReport: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
+  /** Awaited at upload time, after the response. */
+  captureByokFailoverAttempts: (attempts: Promise<readonly ByokFailoverAttempt[]>) => void;
   waitFor: (promise: Promise<unknown>) => void;
 };
 
@@ -37,6 +40,7 @@ export function createAiProviderMetadataCapture(
   let parsing: Promise<void> | undefined;
   let enkryptReport: (() => Promise<EnkryptGuardrailReport | null>) | undefined;
   let enkryptOutputReport: (() => Promise<EnkryptOutputGuardrailReport>) | undefined;
+  let byokFailoverAttempts: (() => Promise<readonly ByokFailoverAttempt[]>) | undefined;
   const readReport = async <T>(name: string, report: (() => Promise<T>) | undefined) =>
     report?.().catch((error: unknown) => {
       errorExceptInTest(`[${LOG_SOURCE}] ${name} failed; archived without it`, {
@@ -63,15 +67,17 @@ export function createAiProviderMetadataCapture(
         body: async () => {
           if (parsing) await Promise.race([parsing, vercel.completed]);
           const metadata = vercel.snapshot();
-          const [enkrypt, enkryptOutput] = await Promise.all([
+          const [enkrypt, enkryptOutput, failoverAttempts] = await Promise.all([
             readReport('Enkrypt report', enkryptReport),
             readReport('Enkrypt output report', enkryptOutputReport),
+            readReport('BYOK failover attempts', byokFailoverAttempts),
           ]);
           return JSON.stringify({
             ...record,
             ...(metadata ? { vercel: { metadata } } : {}),
             ...(enkrypt ? { enkrypt } : {}),
             ...(enkryptOutput ? { enkrypt_output: enkryptOutput } : {}),
+            ...(failoverAttempts?.length ? { byok_failover_attempts: failoverAttempts } : {}),
           });
         },
       });
@@ -84,6 +90,9 @@ export function createAiProviderMetadataCapture(
     },
     captureEnkryptOutputReport(report) {
       enkryptOutputReport = report;
+    },
+    captureByokFailoverAttempts(attempts) {
+      byokFailoverAttempts = () => attempts;
     },
     waitFor(promise) {
       parsing = promise.then(

@@ -45,6 +45,8 @@ export function sessionWorkspace(
     isLaunch: member => launch !== undefined && sameRepositoryIdentity(member.identity, launch),
   });
   const generatedBranch = metadata.workspace?.generatedBranchName;
+  const baseBranch = metadata.repository?.baseBranch;
+  const baseSha = metadata.repository?.baseSha;
   const roots = workspace.roots.flatMap((root): ControlPlaneWorkspaceRoot[] => {
     const { repository } = root;
     if (repository === null) return [];
@@ -57,6 +59,9 @@ export function sessionWorkspace(
         git: { url, platform: repository.identity.platform },
         branch: repository.branch,
         ...(mode ? { branchMode: mode } : {}),
+        // A stacked base names a branch of the launch repository only.
+        ...(root.launch && baseBranch !== undefined ? { baseBranch } : {}),
+        ...(root.launch && baseSha !== undefined ? { baseSha } : {}),
       },
     ];
   });

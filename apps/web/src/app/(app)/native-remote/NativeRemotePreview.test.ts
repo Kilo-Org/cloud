@@ -280,7 +280,7 @@ it('feeds canonical live native messages into the existing Cloud transcript and 
     },
     snapshot: { position: 1, revision: 1 },
     messages: [],
-    pending: { permissions: [], questions: [] },
+    pending: { permissions: [], questions: [], unreadablePermissions: [] },
     events: [],
     commands: {},
   };

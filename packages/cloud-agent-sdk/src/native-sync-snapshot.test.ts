@@ -832,7 +832,9 @@ describe('canonical native snapshot projection', () => {
       ])
     );
     expect(projection.messages[2]?.info).toMatchObject({ summary: true });
-    expect(projection.messages[4]?.info).toMatchObject({ error: { name: 'MessageAbortedError' } });
+    expect(projection.messages[2]?.parts[0]).toMatchObject({ type: 'compaction' });
+    expect(projection.messages[4]?.info).toMatchObject({ id: 'msg_pending' });
+    expect(projection.messages[5]?.info).toMatchObject({ error: { name: 'MessageAbortedError' } });
   });
 
   it('retains incomplete native metadata but does not project it as an empty complete answer', async () => {

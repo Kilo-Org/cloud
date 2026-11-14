@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "செயலில் உள்ள முகவர்களில் ஒரு புதுப்பிப்பு உள்ளது"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "பணி முடிந்தது"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "தோல்வி: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "குறுக்கீடு: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

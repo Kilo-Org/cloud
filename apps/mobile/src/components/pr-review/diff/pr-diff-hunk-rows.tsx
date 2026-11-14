@@ -127,6 +127,18 @@ export function ExpandSeparatorRow({
           end: formatNumber(windowEnd, i18n.language),
         });
   }
+  // The press loads `DEFAULT_EXPAND_WINDOW` and the loader clamps that slice to
+  // `endLine`, so a short known gap reveals `windowSize` lines. The label names
+  // that same window: a row with loaded context announces the visible message
+  // with its range, an untouched row names the window alone.
+  // i18n-dup-ok: 'prReview.hunkRows.expandLinesOfContext_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
+  const expandLabel =
+    isUnknownEnd || isPartial
+      ? expandText
+      : t('prReview.hunkRows.expandLinesOfContext', {
+          count: windowSize,
+          displayCount: formatNumber(windowSize, i18n.language),
+        });
 
   return (
     <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
@@ -136,15 +148,7 @@ export function ExpandSeparatorRow({
         }}
         className="flex-row items-center gap-1 active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel={
-          // i18n-dup-ok: 'prReview.hunkRows.expandLinesOfContext_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
-          isUnknownEnd
-            ? t('prReview.hunkRows.expandContext')
-            : t('prReview.hunkRows.expandLinesOfContext', {
-                count: DEFAULT_EXPAND_WINDOW,
-                displayCount: formatNumber(DEFAULT_EXPAND_WINDOW, i18n.language),
-              })
-        }
+        accessibilityLabel={expandLabel}
       >
         <ChevronDown size={12} color={colors.info} />
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}

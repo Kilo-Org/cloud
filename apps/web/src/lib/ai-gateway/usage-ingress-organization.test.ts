@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {}, readDb: {} }));
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
@@ -12,7 +12,7 @@ jest.mock('@kilocode/worker-utils/account-access', () => ({
   isOrganizationMember: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  getBlacklistedDomains: async () => [],
+  isEmailBlacklisted: async () => false,
 }));
 jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,
@@ -53,7 +53,7 @@ const user = {
   is_admin: false,
 } as User;
 const send = jest
-  .fn<Promise<void>, [UsageRecordRequest, { contentType: 'json' }]>()
+  .fn<Promise<void>, [LlmUsageQueueMessage, { contentType: 'json' }]>()
   .mockResolvedValue(undefined);
 // Load the actual Worker handler without importing its runtime globals into the Next.js typecheck.
 const { handleFetch } = jest.requireActual<{

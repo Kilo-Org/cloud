@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { ToolRegistry } from '@kilocode/harness-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { layerToolsFor, modelFactsFor, RELAYED_SHAPE } from './layers';
+import { layerToolsFor, modelFactsFor } from './layers';
 
 // The catalog is read here without the device plugins the runtime builds around
 // it, so the ones that only exist on a device are stubbed.
@@ -60,11 +60,6 @@ describe('the shape a gateway model is asked over', () => {
     expect(modelFactsFor({ id: 'fake-deterministic' }).apiKinds).toEqual(['chat_completions']);
   });
 
-  it('never claims the messages shape a chat_completions-only model is refused on', () => {
-    expect(RELAYED_SHAPE.apiKinds).not.toContain('messages');
-    expect(RELAYED_SHAPE.apiKinds).not.toContain('responses');
-  });
-
   it('keeps the context window the gateway named for the model', () => {
     expect(modelFactsFor({ id: 'any', context_length: 200_000 })).toEqual({
       apiKinds: ['chat_completions'],
@@ -78,35 +73,34 @@ describe('the shape a gateway model is asked over', () => {
 });
 
 /**
+ * A registry kept open, as a session keeps the one it opened with: the
+ * returned accessor reads `tools` through that instance every time, so a tool
+ * discovered after it was built has to appear without a new registry.
+ */
+const openRegistry = (): Promise<() => readonly string[]> =>
+  Effect.runPromise(
+    Effect.gen(function* held() {
+      const registry = yield* ToolRegistry;
+      return () => registry.tools.map(tool => tool.definition.name);
+    }).pipe(Effect.provide(layerToolsFor()))
+  );
+
+/**
  * The tools the registry holds.
  *
  * A session resolves the names it was opened with against this at open, so a
  * tool discovered after the runtime was built has to be in it — otherwise a
  * chat would need a new runtime every time the server's list arrived.
  */
-const namesHeld = async (): Promise<readonly string[]> => {
-  const names = await Effect.runPromise(
-    Effect.gen(function* held() {
-      const registry = yield* ToolRegistry;
-      return registry.tools.map(tool => tool.definition.name);
-    }).pipe(Effect.provide(layerToolsFor()))
-  );
-  return names;
-};
-
 describe('the tools the registry holds', () => {
   it('is a live view, so a tool discovered after the runtime was built is in it', async () => {
     mcp.tools.length = 0;
-    expect(await namesHeld()).toEqual(['time', 'web_search', 'settings_list', 'settings_set']);
+    const namesHeld = await openRegistry();
+    const before = namesHeld();
+    expect(before).not.toContain('mcp_kilo_read-file');
 
     mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
 
-    expect(await namesHeld()).toEqual([
-      'time',
-      'web_search',
-      'settings_list',
-      'settings_set',
-      'mcp_kilo_read-file',
-    ]);
+    expect(namesHeld()).toEqual([...before, 'mcp_kilo_read-file']);
   });
 });

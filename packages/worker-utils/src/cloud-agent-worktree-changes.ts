@@ -31,11 +31,26 @@ const baseRefSchema = z
   .min(1)
   .max(1024)
   .refine(ref => !ref.startsWith('-') && !ref.includes('\0'), 'Invalid comparison ref');
+export const worktreeChangesBaseRefFallbackSchema = z
+  .object({
+    requested: baseRefSchema,
+    used: baseRefSchema,
+  })
+  .strict();
+
 export const worktreeChangesComparisonSchema = z
   .object({
     baseRef: baseRefSchema,
     mergeBase: commitSchema,
     head: commitSchema,
+    baseRefFallback: worktreeChangesBaseRefFallbackSchema.optional(),
+  })
+  .strict();
+
+export const worktreeChangesRemoteDivergenceSchema = z
+  .object({
+    ahead: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    behind: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   })
   .strict();
 
@@ -80,6 +95,7 @@ export const worktreeChangesCaptureRequestSchema = z
 const captureFields = {
   revision: worktreeChangesRevisionSchema,
   comparison: worktreeChangesComparisonSchema,
+  remoteDivergence: worktreeChangesRemoteDivergenceSchema.optional(),
   files: z.array(worktreeChangesFileSchema).max(MAX_WORKTREE_CHANGES_FILES),
   truncated: z.boolean(),
 };
@@ -405,6 +421,8 @@ export const getWorktreeFileOutputSchema = z.discriminatedUnion('status', [
 export type WorktreeChangesFile = z.infer<typeof worktreeChangesFileSchema>;
 export type WorktreeChangesCaptureRequest = z.infer<typeof worktreeChangesCaptureRequestSchema>;
 export type WorktreeChangesCapture = z.infer<typeof worktreeChangesCaptureSchema>;
+export type WorktreeChangesBaseRefFallback = z.infer<typeof worktreeChangesBaseRefFallbackSchema>;
+export type WorktreeChangesRemoteDivergence = z.infer<typeof worktreeChangesRemoteDivergenceSchema>;
 export type GetWorktreeChangesOutput = z.infer<typeof getWorktreeChangesOutputSchema>;
 export type RefreshWorktreeChangesOutput = z.infer<typeof refreshWorktreeChangesOutputSchema>;
 export type WorktreeFileOmissionReason = z.infer<typeof worktreeFileOmissionReasonSchema>;

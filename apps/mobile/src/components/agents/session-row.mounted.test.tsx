@@ -147,6 +147,7 @@ const session: StoredSession = {
   total_cost_microdollars: 120_000,
   created_at: '2026-08-28T10:00:00.000Z',
   updated_at: '2026-08-28T11:55:00.000Z',
+  last_activity_at: null,
   version: 0,
   associatedPr: null,
 };
@@ -284,7 +285,7 @@ describe('StoredSessionRow live speech', () => {
       await i18n.changeLanguage('es');
     });
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      'Fix login bug, EN DIRECTO, CLI y hace 5 minutos'
+      'Fix login bug, EN DIRECTO, CLI, hace 5 minutos'
     );
     expect(texts(renderer)).toContain('HACE 5 MINUTOS');
     expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(1);

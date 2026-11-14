@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import {
   COMPATIBLE_USER_AGENT,
+  type DirectByokAiSdkProvider,
   type DirectByokModel,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
@@ -61,10 +61,12 @@ function getDirectByokAiSdkProvider(
   provider: DirectByokProvider,
   model: DirectByokModel,
   id: string
-) {
-  return provider.getModelChatApi
-    ? AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)]
-    : getAiSdkProvider(id, provider.id);
+): DirectByokAiSdkProvider | undefined {
+  if (provider.getModelChatApi) {
+    return AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)];
+  }
+  const choice = provider.getAiSdkProvider?.(id);
+  return choice ? choice.aiSdkProvider : getAiSdkProvider(id);
 }
 
 function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
@@ -105,6 +107,7 @@ function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
     ),
     default_parameters: {},
     hasUserByokAvailable: true,
+    isFree: false,
     opencode: withLegacyVariants({
       ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
       reasoning_options:
@@ -325,6 +328,15 @@ export async function getDirectByokModelsForUser(userId: string) {
 }
 
 /**
+ * The URL string of a fetch input: a string as it arrives, a `URL` by its `href`, and a `Request`
+ * by its `url`. Interpolating the input would turn a `Request` into `[object Request]`.
+ */
+function fetchInputUrlString(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
+/**
  * An AI SDK provider for calling `modelId` with a stored credential, such as for
  * key tests. It applies the resolved upstream's Chat Completions URL and auth;
  * the model is resolved by id alone, so it must be one the provider serves over
@@ -349,12 +361,9 @@ export async function createAiSdkProvider(
     baseURL: chatCompletionsUrl,
     apiKey: awsBedrock || apiKeyHeader ? undefined : apiKey,
     name: 'openaiCompatible',
-    headers: {
-      ...(apiKeyHeader === 'x-api-key' && { 'x-api-key': apiKey }),
-      ...(directByokProvider.id === 'opencode-go' && { 'x-opencode-session': randomUUID() }),
-    },
+    headers: directByokProvider.chatCompletionsHeaders(upstream),
     fetch: async (url, init) => {
-      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : String(url);
+      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : fetchInputUrlString(url);
       const headers = new Headers(init?.headers);
       headers.set('user-agent', COMPATIBLE_USER_AGENT);
       if (!awsBedrock || typeof init?.body !== 'string') {

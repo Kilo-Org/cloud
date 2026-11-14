@@ -9,7 +9,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-review';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
 import '@/i18n';
@@ -26,6 +26,7 @@ const config = vi.hoisted(() => ({
 }));
 
 const provider = vi.hoisted(() => ({ status: 'connected' }));
+const integrationAccount = vi.hoisted(() => ({ login: 'alice' as string | undefined }));
 const connectivity = vi.hoisted(() => ({ known: true }));
 const platformError = vi.hoisted(() => ({
   variants: [] as string[],
@@ -43,12 +44,17 @@ const permission = vi.hoisted(() => ({
   canManage: true,
 }));
 
+const webhookWarning = vi.hoisted(() => ({ shown: false }));
+const saveMutation = vi.hoisted(() => ({ isPending: false, mutate: vi.fn() }));
+
 const mintInstallState = vi.hoisted(() =>
   vi.fn(() => Promise.resolve({ token: 'install-state-token' }))
 );
 const launchBrowser = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
+
+const councilUi = vi.hoisted(() => ({ allowed: false }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -158,6 +164,10 @@ vi.mock('@/lib/code-reviewer-config', () => ({
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
+vi.mock('@/lib/hooks/use-reviewer-council', () => ({
+  useCouncilGate: () => ({ allowed: councilUi.allowed, pending: false }),
+  useCouncilUiEnabled: () => councilUi.allowed,
+}));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => provider,
   PERSONAL_SCOPE: 'personal',
@@ -165,20 +175,20 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    data: { connected: true, integration: { accountLogin: 'alice' } },
+    data: { connected: true, integration: { accountLogin: integrationAccount.login } },
     refetch: vi.fn(),
   }),
   useGitLabStatus: () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    data: { connected: true, integration: { accountLogin: 'alice' } },
+    data: { connected: true, integration: { accountLogin: integrationAccount.login } },
     refetch: vi.fn(),
   }),
-  useGitLabWebhookWarning: () => ({ hasWebhookSyncWarning: false }),
+  useGitLabWebhookWarning: () => ({ hasWebhookSyncWarning: webhookWarning.shown }),
   useReviewConfig: () => config,
   useReviewerPermission: () => permission,
-  useSaveReviewConfig: () => ({ isPending: false, mutate: vi.fn() }),
+  useSaveReviewConfig: () => saveMutation,
   useToggleReviewer: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -285,7 +295,11 @@ beforeEach(() => {
   permission.status = 'ready';
   permission.canEdit = true;
   permission.canManage = true;
+  webhookWarning.shown = false;
+  saveMutation.isPending = false;
+  saveMutation.mutate.mockClear();
   provider.status = 'connected';
+  integrationAccount.login = 'alice';
   connectivity.known = true;
   platformError.variants = [];
   platformError.backFallbacks = [];
@@ -650,6 +664,101 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
     expect(texts).toContain(
       'Only organization owners, admins, and billing managers can change these settings.'
     );
+  });
+});
+
+describe('PlatformOverviewScreen Automatic reviews account line', () => {
+  /** The muted line painted under the Automatic reviews label, when present. */
+  function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.variant === 'muted')
+      .map(node => node.props.children);
+  }
+
+  it('paints the connected account under the label', async () => {
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'gitlab');
+
+    expect(accountLines(renderer)).toEqual(['alice']);
+  });
+
+  it('paints the label alone so the row keeps one line without a login', async () => {
+    // An empty line here made the card taller than the sibling Follow REVIEW.md
+    // row and lifted the label above the switch's centre.
+    integrationAccount.login = undefined;
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'gitlab');
+
+    expect(accountLines(renderer)).toEqual([]);
+  });
+});
+
+describe('PlatformOverviewScreen GitLab webhook warning', () => {
+  const SELECTION = [7, 11];
+
+  /** Rendered copy of an element subtree, before it becomes host nodes. */
+  function elementCopy(node: unknown): string[] {
+    if (node == null) {
+      return [];
+    }
+    if (typeof node === 'string') {
+      return [node];
+    }
+    if (Array.isArray(node)) {
+      return node.flatMap(item => elementCopy(item));
+    }
+    if (typeof node !== 'object') {
+      return [];
+    }
+    if ('children' in node) {
+      return elementCopy(node.children);
+    }
+    if ('props' in node && node.props != null && typeof node.props === 'object') {
+      return 'children' in node.props ? elementCopy(node.props.children) : [];
+    }
+    return [];
+  }
+
+  /** Controls whose own rendered copy includes `label`. */
+  function controlsLabelled(
+    renderer: TestRenderer.ReactTestRenderer,
+    label: string
+  ): TestRenderer.ReactTestInstance[] {
+    return renderer.root
+      .findAllByType('Pressable')
+      .filter(node => elementCopy(node.props.children).includes(label));
+  }
+
+  function renderWarning(scope = 'org-1'): Promise<TestRenderer.ReactTestRenderer> {
+    webhookWarning.shown = true;
+    config.data = makeConfig({
+      repositorySelectionMode: 'selected',
+      selectedRepositoryIds: SELECTION,
+    });
+    return render(scope, 'gitlab');
+  }
+
+  it('re-runs the sync with the current selection for an editor', async () => {
+    const renderer = await renderWarning();
+    const [retry] = controlsLabelled(renderer, 'Retry');
+
+    expect(retry?.props.disabled).toBe(false);
+    await press(retry as TestRenderer.ReactTestInstance);
+    // The PATCH routers sync project hooks only for a patch that carries the
+    // selection, so the retry re-sends the current one.
+    expect(saveMutation.mutate).toHaveBeenCalledWith({ selectedRepositoryIds: SELECTION });
+  });
+
+  it('keeps the retry disabled for a member who cannot edit', async () => {
+    permission.canEdit = false;
+    const renderer = await renderWarning();
+    const [retry] = controlsLabelled(renderer, 'Retry');
+
+    expect(collectText(renderer.toJSON())).toContain('Webhook setup incomplete');
+    expect(retry?.props.disabled).toBe(true);
   });
 });
 

@@ -40,11 +40,16 @@ const assertion = {
   clientExtensionResults: {},
 };
 
-function createRequest(body: unknown): NextRequest {
+function createRequest(body: unknown, headers: Record<string, string> = {}): NextRequest {
   return new NextRequest('http://localhost:3000/api/auth/passkey/authenticate', {
     method: 'POST',
     body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '203.0.113.7' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-vercel-forwarded-for': '203.0.113.7, 70.41.3.18',
+      'x-forwarded-for': '198.51.100.9',
+      ...headers,
+    },
   });
 }
 
@@ -111,6 +116,24 @@ describe('POST /api/auth/passkey/authenticate', () => {
       rateLimitKey: 'passkey-verify:203.0.113.7',
     });
     expect(mockVerifyAuthentication).not.toHaveBeenCalled();
+  });
+
+  it('keeps one options bucket for the platform-observed address', async () => {
+    mockCreateAuthenticationOptions.mockResolvedValue({
+      challengeId,
+      options: { challenge: 'stored-challenge', allowCredentials: [] },
+    } as never);
+
+    await POST(createRequest({ action: 'options' }));
+    await POST(
+      createRequest(
+        { action: 'options' },
+        { 'x-forwarded-for': '192.0.2.44, 10.0.0.1', 'x-real-ip': '198.51.100.4' }
+      )
+    );
+
+    const keys = mockCheckRateLimit.mock.calls.map(call => call[1]?.rateLimitKey);
+    expect(keys).toEqual(['passkey-options:203.0.113.7', 'passkey-options:203.0.113.7']);
   });
 
   it('refuses verification when the verify limiter reports not-found', async () => {

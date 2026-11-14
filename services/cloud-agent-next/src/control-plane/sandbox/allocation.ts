@@ -6,6 +6,7 @@ import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { ControlPlaneFailureReason } from '../../shared/control-plane-protocol.js';
 import type { AgentSandboxProvider } from '../../types.js';
 import type { SandboxProviderConfiguration } from '../../sandbox-control/provider.js';
+import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 
 export type SandboxTimers = ControlPlaneTimers['sandbox'];
 
@@ -96,6 +97,11 @@ export type AllocationEvent =
   | { type: 'provider-ref'; at: number; allocationId: string; providerRef: string }
   | { type: 'startup-failed'; at: number; allocationId: string; code: StartupFailureCode }
   | { type: 'created'; at: number; allocationId: string; providerRef: string }
+  /**
+   * A snapshot launch retry starts with its own attempt bound. The create
+   * deadline moves to that bound, so the alarm does not expire the retry.
+   */
+  | { type: 'snapshot-retry'; at: number; allocationId: string; createDeadlineAt: number }
   | {
       type: 'create-failed';
       at: number;
@@ -103,6 +109,7 @@ export type AllocationEvent =
       nextAllocationId: string;
       /** Whether the routes table still has a pending attempt deadline (M2). */
       retryAllowed: boolean;
+      retryDeadlineAt?: number;
     }
   | {
       type: 'hello-accepted';
@@ -127,7 +134,12 @@ export type AllocationEvent =
     }
   | { type: 'provider-gone'; at: number }
   /** `reason` is why the caller stops the sandbox; every stop must name one. */
-  | { type: 'stop-requested'; at: number; reason: ControlPlaneFailureReason }
+  | {
+      type: 'stop-requested';
+      at: number;
+      reason: ControlPlaneFailureReason;
+      billingFailure?: CustomerBillingFailure;
+    }
   | {
       type: 'stop-result';
       at: number;
@@ -323,6 +335,13 @@ export function reduceAllocation(
       };
     }
 
+    case 'snapshot-retry': {
+      if (state.kind !== 'creating' || state.allocationId !== event.allocationId) {
+        return { state, effects: NO_EFFECTS };
+      }
+      return { state: { ...state, createDeadlineAt: event.createDeadlineAt }, effects: NO_EFFECTS };
+    }
+
     case 'create-failed': {
       if (state.kind !== 'creating' || state.allocationId !== event.allocationId) {
         return { state, effects: NO_EFFECTS };
@@ -335,7 +354,10 @@ export function reduceAllocation(
             ...state,
             allocationId: event.nextAllocationId,
             providerRef: null,
-            createDeadlineAt: event.at + timers.providerCreateRetryMs,
+            createDeadlineAt: Math.min(
+              event.at + timers.providerCreateRetryMs,
+              event.retryDeadlineAt ?? Infinity
+            ),
           },
           effects: NO_EFFECTS,
         };

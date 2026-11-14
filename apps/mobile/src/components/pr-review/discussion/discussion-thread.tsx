@@ -109,8 +109,8 @@ export function DiscussionThread({
   const scope = useProviderPrScope({ owner, repo, number });
   const capabilities = providerPrCapabilities(scope.ref.platform);
   const isGithub = scope.ref.platform === 'github';
-  const canReply = capabilities.canComment;
-  const canResolve = capabilities.canResolveThreads;
+  const canReply = capabilities.canComment.supported;
+  const canResolve = capabilities.canResolveThreads.supported;
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
   const addReaction = useAddReactionMutation(thread.threadId);

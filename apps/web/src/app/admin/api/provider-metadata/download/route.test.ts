@@ -98,6 +98,7 @@ function exportedIds(entries: Record<string, Uint8Array>) {
 
 describe('GET /admin/api/provider-metadata/download', () => {
   let admin: User;
+  let plainAdmin: User;
 
   beforeEach(async () => {
     jest.replaceProperty(process, 'env', {
@@ -109,7 +110,8 @@ describe('GET /admin/api/provider-metadata/download', () => {
     });
     mockedRecordAdminAction.mockClear();
     fakeR2.objects.clear();
-    admin = await insertTestUser({ is_admin: true });
+    admin = await insertTestUser({ is_admin: true, can_export_api_request_logs: true });
+    plainAdmin = await insertTestUser({ is_admin: true });
     mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
   });
 
@@ -123,7 +125,7 @@ describe('GET /admin/api/provider-metadata/download', () => {
       .delete(microdollar_usage_metadata)
       .where(inArray(microdollar_usage_metadata.id, usageIds));
     await db.delete(microdollar_usage).where(eq(microdollar_usage.kilo_user_id, TEST_USER_ID));
-    await db.delete(kilocode_users).where(eq(kilocode_users.id, admin.id));
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [admin.id, plainAdmin.id]));
   });
 
   it('returns the auth failure without reading rows or auditing', async () => {
@@ -138,6 +140,36 @@ describe('GET /admin/api/provider-metadata/download', () => {
 
     expect(response).toBe(authFailedResponse);
     expect(send).not.toHaveBeenCalled();
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('requires export access, not base admin, before reading rows or objects', async () => {
+    await insertUsage([{}]);
+    const send = jest.spyOn(fakeR2, 'send');
+    mockedGetUserFromAuth.mockResolvedValue({ user: plainAdmin, authFailedResponse: null });
+
+    const response = await GET(createRequest());
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'API request log export access required' });
+    expect(send).not.toHaveBeenCalled();
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('applies a permission change to a session that is already signed in', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { ...plainAdmin, can_export_api_request_logs: true },
+      authFailedResponse: null,
+    });
+
+    expect((await GET(createRequest())).status).toBe(403);
+
+    await db
+      .update(kilocode_users)
+      .set({ can_export_api_request_logs: true })
+      .where(eq(kilocode_users.id, plainAdmin.id));
+
+    expect((await GET(createRequest({ userId: '' }))).status).toBe(404);
     expect(mockedRecordAdminAction).not.toHaveBeenCalled();
   });
 

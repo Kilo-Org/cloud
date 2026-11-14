@@ -1,13 +1,14 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   CodeReviewCouncilConfigSchema,
+  EnkryptInputGuardrailSettingsSchema,
   ModelsSchema,
+  VercelModelsSchema,
   OpenRouterPricing,
   OpenRouterProvider,
   OrganizationSettingsSchema,
-  StoredModelSchema,
 } from './schema-types';
-import type { StoredModel } from './schema-types';
+import type { GatewayModel } from './schema-types';
 
 describe('CodeReviewCouncilConfigSchema', () => {
   const specialist = (id: string) => ({
@@ -58,6 +59,21 @@ describe('OpenRouterProvider', () => {
   });
 });
 
+describe('EnkryptInputGuardrailSettingsSchema', () => {
+  it.each([false, true])('strips legacy scan_tool_results: %s', scan_tool_results => {
+    const settings = {
+      enabled: true,
+      detectors: { injection_attack: { enabled: true, action: 'block' } },
+      group_id: '00000000-0000-4000-8000-000000000003',
+    };
+
+    const parsed = EnkryptInputGuardrailSettingsSchema.parse({ ...settings, scan_tool_results });
+
+    expect(parsed).toEqual(settings);
+    expect(parsed).not.toHaveProperty('scan_tool_results');
+  });
+});
+
 describe('OrganizationSettingsSchema org_auto_model', () => {
   it('accepts bounded route maps and a fallback model', () => {
     const result = OrganizationSettingsSchema.safeParse({
@@ -96,6 +112,27 @@ describe('OrganizationSettingsSchema org_auto_model', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('VercelModelsSchema', () => {
+  it('drops malformed description fields without rejecting the model', () => {
+    const result = VercelModelsSchema.parse({
+      data: [
+        {
+          id: 'vendor/model',
+          name: 'Model',
+          type: 'language',
+          context_window: '128k',
+          modalities: { input: ['text'] },
+          pricing: { input: 1 },
+          deprecated_at: 'soon',
+          reasoning_options: [{ type: 'effort', values: ['low'] }, { values: ['high'] }],
+        },
+      ],
+    });
+
+    expect(result.data[0]).toEqual({ id: 'vendor/model', name: 'Model', type: 'language' });
   });
 });
 
@@ -227,6 +264,19 @@ describe('ModelsSchema', () => {
 
     expect(result.data.map(model => model.type)).toEqual([...types, undefined]);
   });
+
+  it('includes model reasoning metadata', () => {
+    const reasoning = {
+      mandatory: false,
+      supported_efforts: ['high', 'medium', 'low', 'none'],
+    } satisfies GatewayModel['reasoning'];
+
+    const result = ModelsSchema.parse({
+      data: [{ id: 'openai/gpt-5.2', name: 'OpenAI: GPT-5.2', reasoning }],
+    });
+
+    expect(result.data[0].reasoning).toEqual(reasoning);
+  });
 });
 
 describe('OpenRouterPricing', () => {
@@ -238,21 +288,5 @@ describe('OpenRouterPricing', () => {
     });
 
     expect(pricing.discount).toBe(0.5);
-  });
-});
-
-describe('StoredModelSchema', () => {
-  it('includes model reasoning metadata', () => {
-    const storedModel: StoredModel = {
-      id: 'openai/gpt-5.2',
-      name: 'OpenAI: GPT-5.2',
-      reasoning: {
-        mandatory: false,
-        supported_efforts: ['high', 'medium', 'low', 'none'],
-      },
-      endpoints: [],
-    };
-
-    expect(StoredModelSchema.parse(storedModel).reasoning).toEqual(storedModel.reasoning);
   });
 });

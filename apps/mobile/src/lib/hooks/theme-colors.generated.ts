@@ -25,7 +25,7 @@ export const lightColors = {
   hairSoft: 'rgba(20, 15, 10, 0.05)',
   controlIdle: '#F0EEE6',
   skeletonFill: '#F0EEE6',
-  ringTrack: 'rgba(20, 15, 10, 0.05)',
+  ringTrack: 'rgba(20, 15, 10, 0.3)',
   accentSoft: '#FFDD00',
   accentSoftForeground: '#1A1A10',
   accentSoftTint: '#4F5A1029',
@@ -46,6 +46,7 @@ export const lightColors = {
   rowSage: '#587C1D',
   rowMoss: '#467C1D',
   rowFern: '#357C1D',
+  rowPine: '#237C1D',
 } as const;
 
 export const darkColors = {
@@ -94,4 +95,5 @@ export const darkColors = {
   rowSage: '#C4EB84',
   rowMoss: '#B1EB84',
   rowFern: '#9EEB84',
+  rowPine: '#8BEB84',
 } as const;

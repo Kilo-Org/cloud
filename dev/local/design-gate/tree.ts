@@ -18,6 +18,8 @@ const ProbeNodeSchema = z.object({
   rect: RectSchema,
   layoutRect: RectSchema.optional(),
   owners: z.array(z.string()).optional(),
+  /** The route file of the screen that renders the node, from the probe. */
+  screen: z.string().optional(),
   text: z.string().optional(),
   testID: z.string().optional(),
   label: z.string().optional(),
@@ -95,6 +97,16 @@ const STACK_TAGS = new Set(['RNSScreenStack']);
 const SHEET_HOST_TAG = 'ViewManagerAdapter_ExpoUI_HostView';
 const SHEET_CONTENT_TAG = 'ViewManagerAdapter_ExpoUI_RNHostView';
 const IGNORED_TAGS = new Set(['DebuggingOverlay', 'RNSScreenStackHeaderConfig']);
+/**
+ * Development-only overlays that float above whatever screen is measured.
+ *
+ * The React Native error overlay reports a development warning that a release
+ * build never shows, and it covers the screen's own controls, so measuring it
+ * reported the overlay's buttons overlapping the screen's: a finding about the
+ * instrument, not the product. The overlay also appears only when something
+ * logs, which made a comparison depend on whether a warning happened to fire.
+ */
+const IGNORED_OWNERS = new Set(['LogBoxButton', 'LogBoxNotificationContainer', 'LogBoxInspector']);
 const LIST_OWNERS = new Set(['FlashList', 'RecyclerView']);
 const CONTROL_ROLES = new Set(['button', 'link', 'tab', 'switch', 'menuitem']);
 const GENERIC_OWNERS = new Set([
@@ -315,6 +327,7 @@ export function contentBox(node: LayoutNode, isRTL: boolean, box: Rect = node.re
 function hidden(node: ProbeNode): boolean {
   return (
     tags.isIgnored(node.tag) ||
+    (node.owners ?? []).some(owner => IGNORED_OWNERS.has(owner)) ||
     node.style?.display === 'none' ||
     node.style?.opacity === 0 ||
     (tags.isScreen(node.tag) && node.screenState === 0)

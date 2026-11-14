@@ -15,7 +15,8 @@ import { REQUEST_TIMEOUT_MS } from '../util/constants';
  * - `applied`: the call landed, so the event's next call may run and the
  *   cursor may be committed once they all have.
  * - `conflict`: a dependency the stream can still supply is missing. Hold the
- *   cursor and retry, bounded by `CONFLICT_RETRY_BUDGET_MS`, then park.
+ *   cursor and retry, bounded by `CONFLICT_RETRY_BUDGET_MS` for the event and
+ *   again for its directory, then park.
  * - `terminal`: nothing the directory can send repairs it. Park immediately.
  * - `unavailable`: the app could not apply the event, and nothing about the
  *   event says it is unapplicable. Hold the cursor and retry indefinitely;

@@ -8,6 +8,8 @@ import {
   startIdempotencyKey,
   stopIdempotencyKey,
   usageContextFingerprint,
+  containerBillingStatusInputSchema,
+  type ContainerBillingStatusRpcMethods,
   type ContainerUsageRpcMethods,
   type HeartbeatAck,
   type RecordAck,
@@ -17,8 +19,15 @@ import {
   type RecordStopInput,
   type UsageContext,
 } from '@kilocode/container-usage';
-import { applyHeartbeat, applyStart, applyStop } from './postgres';
+import {
+  applyHeartbeat,
+  applyStart,
+  applyStop,
+  getContainerUsageDb,
+  resolveBillingMode,
+} from './postgres';
 import { billingConfigFromEnv } from './billing-config';
+import { notifyOrganizationBalanceAlert } from './balance-alert';
 
 function assertContextMatches(
   input: RecordHeartbeatInput | RecordStopInput,
@@ -68,8 +77,21 @@ function logRpcOutcome(
 
 export class ContainerUsageMeter
   extends WorkerEntrypoint<Cloudflare.Env>
-  implements ContainerUsageRpcMethods
+  implements ContainerUsageRpcMethods, ContainerBillingStatusRpcMethods
 {
+  async getBillingMode(
+    input: Parameters<ContainerBillingStatusRpcMethods['getBillingMode']>[0]
+  ): Promise<'shadow' | 'paid'> {
+    const parsed = containerBillingStatusInputSchema.parse(input);
+    return resolveBillingMode(
+      getContainerUsageDb(this.env),
+      billingConfigFromEnv(this.env),
+      parsed.service,
+      parsed.subject,
+      new Date()
+    );
+  }
+
   async recordStart(input: RecordStartInput): Promise<RecordStartResult> {
     const result = await this.applyStart(input);
     if (result.kind === 'rejected') {
@@ -157,6 +179,8 @@ export class ContainerUsageMeter
       throw error;
     }
     logRpcOutcome('heartbeat', parsed.service, 'accepted', { dedup: result.dedup });
+    if (result.organizationBalanceAlert)
+      this.ctx.waitUntil(notifyOrganizationBalanceAlert(this.env, result.organizationBalanceAlert));
     return {
       intervalId: id,
       durable: 'pg',
@@ -191,6 +215,8 @@ export class ContainerUsageMeter
       throw error;
     }
     logRpcOutcome('stop', parsed.service, 'accepted', { dedup: result.dedup });
+    if (result.organizationBalanceAlert)
+      this.ctx.waitUntil(notifyOrganizationBalanceAlert(this.env, result.organizationBalanceAlert));
     return { intervalId: id, durable: 'pg', dedup: result.dedup };
   }
 }

@@ -1,4 +1,8 @@
-import type { PreparationAttempt, PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
+import {
+  isPreparationCancellation,
+  type PreparationAttempt,
+  type PreparationStepSnapshot,
+} from '@kilocode/cloud-agent-sdk';
 import { formatAttemptDuration, humanizePhaseLabel } from './preparation-phases';
 import { formatSnapshotTime } from './snapshot-display';
 
@@ -10,6 +14,7 @@ export type PreparationRowSummary =
   | { kind: 'phase'; text: string }
   | { kind: 'command'; command: string; commandIndex?: number; commandCount?: number }
   | { kind: 'completed'; duration?: string }
+  | { kind: 'stopped'; duration?: string }
   | { kind: 'failed'; error?: string }
   | { kind: 'incomplete'; text: string };
 
@@ -19,7 +24,11 @@ export function summarizePreparationAttempt(attempt: PreparationAttempt): Prepar
   // can be `failed` AND carry `restore_incomplete`. The step's own text stays
   // readable in the details drawer, but the row must not mask the failure.
   if (attempt.status === 'failed') {
-    return { kind: 'failed', error: attempt.safeError ?? lastFailedStepError(attempt.steps) };
+    const error = attempt.safeError ?? lastFailedStepError(attempt.steps);
+    if (isPreparationCancellation(attempt.safeError) || isPreparationCancellation(error)) {
+      return { kind: 'stopped', duration: formatAttemptDuration(attempt) };
+    }
+    return { kind: 'failed', error };
   }
   // A completed (or still-running) attempt can carry the named incomplete-restore
   // step; surface it before the completion collapse so the fact stays visible.
@@ -64,6 +73,7 @@ export function preparationSummaryLine(attempt: PreparationAttempt): string {
 function preparationSummaryTitle(summary: PreparationRowSummary): string {
   if (summary.kind === 'incomplete') return summary.text;
   if (summary.kind === 'failed') return 'Preparation failed';
+  if (summary.kind === 'stopped') return 'Preparation stopped';
   if (summary.kind === 'completed') return 'Environment prepared';
   return 'Preparing environment';
 }
@@ -75,7 +85,12 @@ function preparationSummaryTitle(summary: PreparationRowSummary): string {
  * fall back to the humanized label for steps that never reported one.
  */
 export function phaseDisplayText(step: PreparationStepSnapshot): string {
-  const detail = step.latestDetail ?? humanizePhaseLabel(step);
+  let detail = step.latestDetail ?? humanizePhaseLabel(step);
+  // Older preparation history includes rollout, cached-settings and build
+  // diagnostics after this label. Successful snapshot use needs no warning.
+  if (step.key === 'environment_snapshot' && detail.startsWith('Using environment snapshot')) {
+    detail = 'Using environment snapshot';
+  }
   if (step.snapshotCapturedAt === undefined) return detail;
   const warningStart = detail.indexOf(';');
   const labelEnd = warningStart === -1 ? detail.length : warningStart;
@@ -100,4 +115,14 @@ export function extractTickerLines(outputTail: string | undefined, maxLines = 3)
 function lastFailedStepError(steps: readonly PreparationStepSnapshot[]): string | undefined {
   return steps.findLast(step => step.status === 'failed' && step.safeError !== undefined)
     ?.safeError;
+}
+
+/**
+ * The reader's text for a preparation error. A user Stop is stored as the
+ * control plane's route reason, so the raw code never reaches the row or the
+ * details drawer as a failure.
+ */
+export function preparationFailureText(error: string | undefined): string | undefined {
+  if (error === undefined) return undefined;
+  return isPreparationCancellation(error) ? 'Environment preparation was stopped' : error;
 }

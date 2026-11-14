@@ -23,11 +23,7 @@ import {
   resolveByocVercelAccessConfig,
   type ByocVercelCredential,
 } from '../byoc/vercel-credential-resolver.js';
-import { getVercelRuntimeArtifacts } from '../byoc/vercel-runtime-artifacts.js';
-import {
-  getVercelRuntimeIdentity,
-  VERCEL_RUNTIME_BUN_VERSION,
-} from '../byoc/vercel-runtime-identity.js';
+import { getVercelRuntimeIdentity } from '../byoc/vercel-runtime-identity.js';
 import {
   VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG,
   VERCEL_CLOUD_AGENT_RESOURCE_TAG,
@@ -40,7 +36,6 @@ import {
   type VercelSandboxCreateEnvelope,
   type VercelSandboxSnapshot,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { logger } from '../logger.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import {
@@ -53,12 +48,19 @@ import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { resolveSecret } from '../auth.js';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../shared/control-plane-protocol.js';
-import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
-import { VERCEL_BASE_SYSTEM_SETUP, VERCEL_BASE_NODE_SETUP } from '../byoc/vercel-runtime-base.js';
 import {
-  installPinnedNpmPackageScript,
-  toolchainVerificationScript,
-} from '../shared/runtime-toolchain.js';
+  VERCEL_BASE_SYSTEM_SETUP,
+  VERCEL_BASE_NODE_SETUP,
+  VERCEL_BASE_GH_STACK_SETUP,
+} from '../byoc/vercel-runtime-base.js';
+import { toolchainVerificationScript } from '../shared/runtime-toolchain.js';
+import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
+import {
+  hasStartupMarker,
+  markedStartupCommand,
+} from '../sandbox-control/startup-command-marker.js';
+import { ProviderCreationError } from '../sandbox-control/provider.js';
+import { selectStartup } from '../sandbox-control/startup-selection.js';
 import { withDORetry } from '../utils/do-retry.js';
 
 const BUILD_ALARM_DELAY_MS = 1_000;
@@ -67,7 +69,6 @@ const MAX_RETRY_DELAY_MS = 60_000;
 const MAX_RETRIES = RETRY_DELAY_MS.length;
 const BUILDER_TIMEOUT_MS = 10 * 60_000;
 const SNAPSHOT_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1_000;
-const PINNED_BUN_VERSION = VERCEL_RUNTIME_BUN_VERSION;
 
 const SnapshotBuildOwnerSchema = byocVercelOwnerSchema;
 
@@ -91,8 +92,6 @@ const BuildStepSchema = z.enum([
   'create_builder',
   'install_system_dependencies',
   'install_node_dependencies',
-  'upload_runtime_artifacts',
-  'verify_runtime_artifacts',
   'snapshot_builder',
   'create_validator',
   'launch_validator_wrapper',
@@ -100,6 +99,18 @@ const BuildStepSchema = z.enum([
   'stop_validator',
   'confirm_terminal',
 ]);
+
+const RETIRED_BUILD_STEPS = new Set(['upload_runtime_artifacts', 'verify_runtime_artifacts']);
+
+/**
+ * Removed steps can still be stored by a build that started before this deploy.
+ * Resume from the current install step: the downloaded runtime makes the old
+ * artifact installer unnecessary, and re-running install is safe.
+ */
+function currentBuildStep(step: string): z.infer<typeof BuildStepSchema> {
+  if (RETIRED_BUILD_STEPS.has(step)) return 'install_node_dependencies';
+  return BuildStepSchema.parse(step);
+}
 
 type BuildDb = ReturnType<typeof drizzle>;
 type BuildRow = typeof vercelSnapshotBuilds.$inferSelect;
@@ -112,6 +123,13 @@ class SnapshotBuildOwnershipLostError extends Error {
   constructor() {
     super('snapshot_build_ownership_lost');
     this.name = 'SnapshotBuildOwnershipLostError';
+  }
+}
+
+class SnapshotBuildRetryableError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'SnapshotBuildRetryableError';
   }
 }
 
@@ -135,6 +153,10 @@ function operationId(prefix: string, generation: string): string {
 
 function controlId(generation: string): string {
   return `ses-byoc-validator-${generation.replace(/-/g, '').slice(0, 32)}`;
+}
+
+function callHomeMarker(generation: string): string {
+  return `byoc-call-home:${generation}`;
 }
 
 function requiredBuildField(value: string | null, error: string): string {
@@ -180,6 +202,7 @@ const NAMED_BUILD_FAILURES = new Set([
   'validator_command_missing',
   'validator_control_missing',
   'provider_configuration_failed',
+  'runtime_startup_unavailable',
 ]);
 
 function failureCode(error: unknown): string {
@@ -232,6 +255,7 @@ function logSnapshotBuildFailure(
 
 function isRetryable(error: unknown): boolean {
   if (error instanceof ByocCredentialMissingError) return false;
+  if (error instanceof SnapshotBuildRetryableError) return true;
   if (error instanceof ByocCredentialResolverError) return true;
   if (error instanceof VercelSandboxRestError) {
     return (
@@ -543,7 +567,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       const identity = terminalConfirmed
         ? await this.external(ownershipFromRow(next), async () => {
             try {
-              return await getVercelRuntimeIdentity(this.env);
+              return await getVercelRuntimeIdentity();
             } catch {
               return undefined;
             }
@@ -606,7 +630,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     config: VercelSandboxRuntimeConfig
   ): Promise<BuildRow | null> {
     const owner = ownerFromRow(state);
-    switch (BuildStepSchema.parse(state.step)) {
+    switch (currentBuildStep(state.step)) {
       case 'validating_access': {
         if (config.scope !== 'project' && !state.team_slug) {
           const team = await this.external(state, () => client.inspectTeam());
@@ -665,61 +689,10 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           '-lc',
           [
             VERCEL_BASE_NODE_SETUP,
-            installPinnedNpmPackageScript('kilo'),
-            toolchainVerificationScript(['bun', 'kilo']),
+            VERCEL_BASE_GH_STACK_SETUP,
+            toolchainVerificationScript(['bun']),
             'case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac',
             'git --version >/dev/null',
-          ].join('\n'),
-        ]);
-        return this.next(state, { step: 'upload_runtime_artifacts' });
-      }
-      case 'upload_runtime_artifacts': {
-        const builderSessionId = requiredBuildField(
-          state.builder_session_id,
-          'builder_session_missing'
-        );
-        const artifacts = await this.external(state, () => getVercelRuntimeArtifacts());
-        const controlWrapper = artifacts.find(
-          artifact => artifact.path === 'usr/local/bin/kilocode-control-plane-wrapper.js'
-        );
-        const supervisor = artifacts.find(
-          artifact => artifact.path === 'usr/local/bin/kilocode-control-plane-supervisor.sh'
-        );
-        if (!controlWrapper || !supervisor) throw new Error('runtime_artifact_missing');
-        const manifest = JSON.stringify({
-          runtimeBuildId: state.runtime_build_id,
-          wrapperVersion: WRAPPER_VERSION,
-          runtime: 'node24',
-          bunVersion: PINNED_BUN_VERSION,
-          controlWrapperSha256: controlWrapper.sha256,
-          controlPlaneSupervisorSha256: supervisor.sha256,
-        });
-        await this.external(state, () =>
-          client.writeFiles(builderSessionId, '/tmp', [
-            { path: 'kilocode-control-plane-wrapper.js', content: controlWrapper.bytes },
-            { path: 'kilocode-control-plane-supervisor.sh', content: supervisor.bytes },
-            { path: 'kilo-runtime-manifest.json', content: manifest },
-          ])
-        );
-        return this.next(state, { step: 'verify_runtime_artifacts' });
-      }
-      case 'verify_runtime_artifacts': {
-        const builderSessionId = requiredBuildField(
-          state.builder_session_id,
-          'builder_session_missing'
-        );
-        await this.runCommand(state, client, builderSessionId, 'bash', [
-          '-lc',
-          [
-            'set -euo pipefail',
-            'sudo install -m 0755 /tmp/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js',
-            'sudo install -m 0755 /tmp/kilocode-control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh',
-            'sudo install -m 0644 /tmp/kilo-runtime-manifest.json /usr/local/share/kilo/runtime-manifest.json',
-            'test -f /usr/local/bin/kilocode-control-plane-wrapper.js',
-            toolchainVerificationScript(['bun', 'kilo']),
-            `test "$(node --version | cut -c1-3)" = "v24"`,
-            `control_hash="$(sha256sum /usr/local/bin/kilocode-control-plane-wrapper.js | cut -d' ' -f1)"`,
-            `jq -e --arg build ${JSON.stringify(state.runtime_build_id)} --arg bun ${JSON.stringify(PINNED_BUN_VERSION)} --arg control "$control_hash" '.runtimeBuildId == $build and .bunVersion == $bun and .controlWrapperSha256 == $control' /usr/local/share/kilo/runtime-manifest.json >/dev/null`,
           ].join('\n'),
         ]);
         return this.next(state, {
@@ -774,9 +747,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             client.listCommands(validatorSessionId)
           );
           const matches = commands.filter(command =>
-            command.args.some(argument =>
-              argument.includes(`byoc-call-home:${state.build_generation}`)
-            )
+            hasStartupMarker(command.args, callHomeMarker(state.build_generation))
           );
           if (matches.length > 1) throw new Error('validator_call_home_ambiguous');
           const command = matches[0];
@@ -811,6 +782,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           sandboxName: state.validator_name,
           sessionId: validatorSessionId,
         });
+        const expiresAt = (session.startedAt ?? session.requestedAt) + session.timeout;
         const prepared = this.next(state, { validator_control_id: validatorControlId });
         if (!this.save(prepared)) throw new SnapshotBuildOwnershipLostError();
         await this.external(prepared, () =>
@@ -833,22 +805,42 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
                     runtime: 'node24',
                   },
                   createdAt: session.requestedAt,
-                  expiresAt: (session.startedAt ?? session.requestedAt) + session.timeout,
+                  expiresAt,
                 },
                 credentialHash,
               }),
             'seedByocValidatorControl'
           )
         );
+        const selection = selectStartup(this.env, 'vercel');
+        if (selection.mode !== 'downloaded') throw new Error('provider_configuration_failed');
+        const startup = await this.external(prepared, async () => {
+          try {
+            return await downloadedStartup({
+              env: this.env,
+              descriptor: selection.descriptor,
+              sandboxId: validatorControlId,
+              allocationId,
+              deadlineAt: expiresAt,
+            });
+          } catch (error) {
+            if (error instanceof ProviderCreationError)
+              throw new Error('provider_configuration_failed');
+            throw new SnapshotBuildRetryableError('runtime_startup_unavailable', { cause: error });
+          }
+        });
+        let launched: { command: string; args: string[] };
+        try {
+          launched = markedStartupCommand(startup, callHomeMarker(state.build_generation));
+        } catch {
+          throw new Error('provider_configuration_failed');
+        }
         const intent = this.next(prepared, { validator_wrapper_requested: 1 });
         if (!this.save(intent)) throw new SnapshotBuildOwnershipLostError();
         const command = await this.external(intent, () =>
           client.executeCommand(validatorSessionId, {
-            command: 'sh',
-            args: [
-              '-lc',
-              `exec ${CONTROL_SUPERVISOR_PATH} # byoc-call-home:${state.build_generation}`,
-            ],
+            command: launched.command,
+            args: launched.args,
             cwd: '/',
             env: {
               ...buildControlWrapperLaunchEnv({
@@ -860,7 +852,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
               PROVIDER_INSTANCE_ID: providerRef,
               [CONTROL_PLANE_ALLOCATION_ID_ENV]: allocationId,
             },
-            sudo: false,
+            sudo: startup.user === 'root',
             wait: false,
           })
         );
@@ -1111,7 +1103,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       setupStep:
         ready || state.step === 'project_failure' || state.step === 'cleanup'
           ? null
-          : BuildStepSchema.parse(state.step),
+          : currentBuildStep(state.step),
       setupError: null,
       teamSlug: state.team_slug,
       projectSlug: state.project_slug,

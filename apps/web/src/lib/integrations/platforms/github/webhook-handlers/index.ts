@@ -9,3 +9,4 @@ export { handleInstallationRepositories } from './installation-repositories-hand
 export { handlePullRequest } from './pull-request-handler';
 export { upsertCliSessionPullRequestsFromWebhook } from './upsert-cli-session-pull-requests';
 export { upsertCliSessionPullRequestReviewFromWebhook } from './upsert-cli-session-pull-request-review';
+export { linkStackedPullRequestsFromWebhook } from './stack-linking';

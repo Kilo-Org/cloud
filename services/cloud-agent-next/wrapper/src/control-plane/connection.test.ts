@@ -6,6 +6,8 @@ import {
   WORKTREE_RUNTIME_VERSION,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
+  RUNTIME_INSTRUCTIONS_HEADER,
+  RUNTIME_INSTRUCTIONS_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
@@ -189,6 +191,9 @@ it('advertises worktree support without changing the strict legacy hello', () =>
     expect(socket.options?.headers?.[WORKSPACE_CONFIGURATION_HEADER]).toBe(
       WORKSPACE_CONFIGURATION_VERSION
     );
+    expect(socket.options?.headers?.[RUNTIME_INSTRUCTIONS_HEADER]).toBe(
+      RUNTIME_INSTRUCTIONS_VERSION
+    );
     socket.onopen?.();
     expect(socket.frames[0]).toEqual({
       type: 'hello',
@@ -200,6 +205,7 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       redactsNamedSecrets: true,
       installsSkillsSh: true,
       startCommands: true,
+      worktreeGit: true,
     });
   });
 });
@@ -1026,6 +1032,7 @@ describe('createControlPlaneConnection', () => {
         redactsNamedSecrets: true,
         installsSkillsSh: true,
         startCommands: true,
+        worktreeGit: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

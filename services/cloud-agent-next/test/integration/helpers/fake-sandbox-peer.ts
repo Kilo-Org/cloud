@@ -1,13 +1,18 @@
 import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session/session-do.js';
 import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
-import type { PreviewTargetResult } from '../../../src/control-plane/sandbox/preview-target.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+} from '../../../src/control-plane/sandbox/preview-target.js';
 import type { SandboxStatusSnapshot } from '../../../src/shared/sandbox-status.js';
 import type { WorkspaceBillingProjection } from '../../../src/shared/workspace-runtime-status.js';
+import type { ControlPlanePrepareInputWithSelection } from '../../../src/control-plane/session/sandbox-selection.js';
 import type {
   ControlPlaneAnswerPayload,
+  ControlPlaneCancelWorkspacePayload,
+  ControlPlaneCancelWorkspaceResult,
   ControlPlaneDeliverPayload,
   ControlPlaneDeliverResult,
-  ControlPlanePrepareInput,
   ControlPlaneRouteView,
 } from '../../../src/shared/control-plane-protocol.js';
 
@@ -58,20 +63,29 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   /** Optional queues; each call shifts one, then falls back to the scalar. */
   prepareViews: ControlPlaneRouteView[] = [];
   deliverResults: ControlPlaneDeliverResult[] = [];
-  readonly prepareCalls: ControlPlanePrepareInput[] = [];
+  readonly prepareCalls: ControlPlanePrepareInputWithSelection[] = [];
   readonly deliverCalls: ControlPlaneDeliverPayload[] = [];
   readonly abortCalls: string[] = [];
   readonly answerCalls: ControlPlaneAnswerPayload[] = [];
+  readonly cancelWorkspaceCalls: ControlPlaneCancelWorkspacePayload[] = [];
+  /** Authoritative workspace phase, including a sibling's preparation. */
+  workspacePreparing = false;
+  /** The epoch/at the fake returns and expects on the next prepare. */
+  stopEpoch = 0;
+  stopAt = 0;
+  cancelWorkspaceError: Error | null = null;
 
   /** A view/update carrying this peer's attempt id, for direct `onRoute` calls. */
   view(state: 'preparing' | 'ready' | 'reconnecting'): ControlPlaneRouteView {
     return { state, attemptId: this.attemptId };
   }
 
-  async prepare(input: ControlPlanePrepareInput): Promise<ControlPlaneRouteView> {
+  async prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView> {
     this.prepareCalls.push(input);
     if (this.prepareError !== null) throw this.prepareError;
-    return injectAttempt(this.prepareViews.shift() ?? this.prepareView, this.attemptId);
+    const view = injectAttempt(this.prepareViews.shift() ?? this.prepareView, this.attemptId);
+    this.workspacePreparing = view.state === 'preparing';
+    return view;
   }
 
   async deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult> {
@@ -88,6 +102,19 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     return 'sent';
   }
 
+  async cancelWorkspace(
+    payload: ControlPlaneCancelWorkspacePayload
+  ): Promise<ControlPlaneCancelWorkspaceResult> {
+    this.cancelWorkspaceCalls.push(payload);
+    if (this.cancelWorkspaceError !== null) throw this.cancelWorkspaceError;
+    if (this.stopEpoch === 0 || payload.requestedAt > this.stopAt) {
+      this.stopEpoch += 1;
+      this.stopAt = Math.max(this.stopAt, payload.requestedAt);
+    }
+    this.workspacePreparing = false;
+    return { stopEpoch: this.stopEpoch, stopAt: this.stopAt };
+  }
+
   async answer(payload: ControlPlaneAnswerPayload): Promise<'sent'> {
     this.answerCalls.push(payload);
     return 'sent';
@@ -98,7 +125,13 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   async status(payload: { sessionId: string }) {
     this.statusCalls.push(payload.sessionId);
     if (this.statusError !== null) throw this.statusError;
-    return { sessionId: payload.sessionId, view: injectAttempt(this.prepareView, this.attemptId) };
+    return {
+      sessionId: payload.sessionId,
+      view: injectAttempt(this.prepareView, this.attemptId),
+      workspacePreparing: this.workspacePreparing,
+      workspaceStopEpoch: this.stopEpoch,
+      workspaceStopAt: this.stopAt,
+    };
   }
 
   async getRuntimeCredentialProxyFence(): Promise<ControlRuntimeCredentialProxyFence | null> {
@@ -147,10 +180,10 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
       allocationRef: 'sbx',
     },
   };
-  readonly previewTargetCalls: string[] = [];
+  readonly previewTargetCalls: PreviewSandboxScope[] = [];
 
-  async previewTarget(sessionId: string): Promise<PreviewTargetResult> {
-    this.previewTargetCalls.push(sessionId);
+  async previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult> {
+    this.previewTargetCalls.push(scope);
     return this.previewTargetResult;
   }
 }

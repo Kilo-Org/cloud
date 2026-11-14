@@ -1,6 +1,28 @@
 import type { AgentSandboxProvider } from '../../types.js';
 import type { AllocationKind } from './allocation.js';
-import type { RouteState } from './routes.js';
+import type { RouteRecord } from './routes.js';
+
+export type PreviewSandboxScope = {
+  ownerId: string;
+  organizationId: string | null;
+  scopeId: string;
+};
+
+export function hasPreviewWorkspaceBinding(
+  routes: readonly RouteRecord[],
+  scope: PreviewSandboxScope
+): boolean {
+  return routes.some(route => {
+    const source = route.credentialSource;
+    return (
+      source !== null &&
+      source.userId === scope.ownerId &&
+      (source.orgId ?? null) === scope.organizationId &&
+      (source.scopeId ?? route.sessionId) === scope.scopeId &&
+      (source.workspaceId === undefined || source.workspaceId === scope.scopeId)
+    );
+  });
+}
 
 export type PreviewProviderCoordinates = {
   provider: 'cloudflare-containers';
@@ -17,7 +39,6 @@ export type PreviewTargetResult =
 export type ResolvedPreviewTarget = { status: 'ineligible' } | PreviewTargetResult;
 
 export type PreviewTargetSnapshot = {
-  routeState: RouteState | null;
   allocationKind: AllocationKind;
   providerRef: string | null;
   provider: AgentSandboxProvider;
@@ -30,12 +51,6 @@ export function resolvePreviewTarget(snapshot: PreviewTargetSnapshot): PreviewTa
   if (snapshot.provider === 'vercel' || snapshot.provider === 'cloudflare') {
     return { status: 'unsupported_provider' };
   }
-
-  // No route means this session is not routed to the sandbox.
-  if (snapshot.routeState === null || snapshot.routeState === 'failed') {
-    return { status: 'not_running' };
-  }
-  if (snapshot.routeState === 'preparing') return { status: 'not_ready' };
 
   if (snapshot.allocationKind === 'creating' || snapshot.allocationKind === 'starting') {
     return { status: 'not_ready' };

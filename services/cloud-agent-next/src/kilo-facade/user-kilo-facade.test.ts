@@ -2901,6 +2901,26 @@ describe('hosted native routes', () => {
     expect(sandboxGet).not.toHaveBeenCalled();
   });
 
+  it('answers a hosted session status with only the requested session', async () => {
+    const nativeLiveRead = vi.fn(async () => ({
+      ok: true as const,
+      result: {
+        [siblingKiloSessionId]: { type: 'idle' },
+        [kiloSessionId]: { type: 'busy', directory: '/workspace/private' },
+      },
+    }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/session/status?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({ nativeLiveRead }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ [kiloSessionId]: { type: 'busy' } });
+  });
+
   it('requires the hosted directory selector for collection reads', async () => {
     const nativeLiveRead = vi.fn();
     const response = await handleKiloFacadeRequest({
@@ -2989,6 +3009,7 @@ describe('hosted native routes', () => {
         compatibilityDelivery: 'queued' as const,
         messageId: 'msg_1',
       }));
+      const validatePromptBalance = vi.fn(async () => ({ success: true as const }));
       const response = await handleKiloFacadeRequest({
         request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
           method: 'POST',
@@ -3003,9 +3024,15 @@ describe('hosted native routes', () => {
         env: envStub(),
         userId: 'usr_1',
         authToken: 'token',
-        deps: hostedDeps({ admitPrompt }),
+        deps: hostedDeps({ admitPrompt, validatePromptBalance }),
       });
       expect(response.status).toBe(204);
+      expect(validatePromptBalance).toHaveBeenCalledWith({
+        env: expect.anything(),
+        authToken: 'token',
+        userId: 'usr_1',
+        cloudAgentSessionId: workspaceSession,
+      });
       expect(admitPrompt).toHaveBeenCalledWith(
         expect.objectContaining({
           cloudAgentSessionId: workspaceSession,
@@ -3018,7 +3045,39 @@ describe('hosted native routes', () => {
     }
   );
 
+  it('answers a command turn with the payer balance failure', async () => {
+    const admitPrompt = vi.fn();
+    const validatePromptBalance = vi.fn(async () => ({
+      success: false as const,
+      status: 402 as const,
+      message: 'Insufficient credits',
+    }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
+        method: 'POST',
+        body: JSON.stringify({ command: 'commit' }),
+      }),
+      env: envStub(),
+      userId: 'usr_1',
+      authToken: 'token',
+      deps: hostedDeps({ admitPrompt, validatePromptBalance }),
+    });
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_BALANCE_VALIDATION_FAILED',
+      message: 'Insufficient credits',
+    });
+    expect(validatePromptBalance).toHaveBeenCalledWith({
+      env: expect.anything(),
+      authToken: 'token',
+      userId: 'usr_1',
+      cloudAgentSessionId: workspaceSession,
+    });
+    expect(admitPrompt).not.toHaveBeenCalled();
+  });
+
   it('refuses a balance bypass on the native command route', async () => {
+    const validatePromptBalance = vi.fn();
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
         method: 'POST',
@@ -3028,8 +3087,12 @@ describe('hosted native routes', () => {
       env: envStub(),
       userId: 'usr_1',
       authToken: 'token',
-      deps: hostedDeps(),
+      deps: hostedDeps({ validatePromptBalance }),
     });
-    expect([400, 204]).toContain(response.status);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_BALANCE_BYPASS_UNSUPPORTED',
+    });
+    expect(validatePromptBalance).not.toHaveBeenCalled();
   });
 });

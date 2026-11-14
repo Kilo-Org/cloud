@@ -260,10 +260,17 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       kilo_user_id: user.id,
       provider_id: 'openai',
       created_by: user.id,
-      encrypted_api_key: {
-        iv: randomBytes(12).toString('base64'),
-        data: randomBytes(32).toString('base64'),
-        authTag: randomBytes(16).toString('base64'),
+      encrypted_api_key_envelope: {
+        encrypted_data: {
+          iv: randomBytes(12).toString('base64'),
+          data: randomBytes(32).toString('base64'),
+          authTag: randomBytes(16).toString('base64'),
+        },
+        wrapped_dek: randomBytes(32).toString('base64'),
+        kms_key_id: 'dev-seed-deletion',
+        kms_key_version: '1',
+        algorithm: 'aes-256-gcm',
+        envelope_version: 1,
       },
     });
 

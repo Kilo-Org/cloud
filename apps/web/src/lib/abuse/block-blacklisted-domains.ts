@@ -82,7 +82,8 @@ const BATCHES_PER_REQUEST = 50;
 const BLOCKED_REASON = 'domainblocked';
 
 export async function backfillBlockBlacklistedDomainsBatch(params: {
-  actorId: string;
+  /** Null records a scheduled system block. */
+  actorId: string | null;
   domains: string[];
 }): Promise<BlockBlacklistedDomainsBackfillResponse> {
   if (params.domains.length === 0) {

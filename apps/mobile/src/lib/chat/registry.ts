@@ -616,6 +616,12 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
  *
  * Its bubble carries the same failure footer and Copy to composer it had in the
  * slot, and a Retry that asks it again.
+ *
+ * One send keeps one bubble. Two sends of the same words that both failed read
+ * as two bubbles, each stating the failure of its own attempt, because each
+ * send is a question the person asked rather than a repeat of the last one.
+ * Only asking an existing bubble again through its Retry folds into that
+ * bubble, which `says` and the slot's record already handle.
  */
 async function keepAsked(sessionId: string): Promise<void> {
   const held = snapshotOf(sessionId);
@@ -625,13 +631,21 @@ async function keepAsked(sessionId: string): Promise<void> {
   if (held.asked === null || held.status !== 'idle') {
     return;
   }
-  const outcome: Displaced['outcome'] = held.failureKey === null ? 'stopped' : 'failed';
+  /* What the question itself failed with. The record names it when the write
+     that keeps it landed; a refused write leaves the state's key as the only
+     copy. The state's key can also be a later tool-set move's failure, which is
+     why the record wins whenever it names a cause. */
+  const recorded = await askedIn(sessionId).catch(() => null);
+  const failureKey = recorded?.failureKey ?? held.failureKey;
+  const outcome: Displaced['outcome'] = failureKey === null ? 'stopped' : 'failed';
   const askedFrom = held.askedFrom;
   if (askedFrom !== null) {
     /* It is already in the transcript, where it was said. This attempt is the
        one its bubble stands for now, so only how it ended is written down. */
     change(sessionId, {
-      displaced: held.displaced.map(one => (one.id === askedFrom ? { ...one, outcome } : one)),
+      displaced: held.displaced.map(one =>
+        one.id === askedFrom ? { ...one, outcome, failureKey } : one
+      ),
       asked: null,
       askedImages: [],
       askedModel: null,
@@ -657,6 +671,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     effort: held.askedEffort,
     afterTurns: held.turns.length,
     outcome,
+    failureKey,
   };
   change(sessionId, {
     displaced: [...snapshotOf(sessionId).displaced, stored],

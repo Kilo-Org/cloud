@@ -1,8 +1,7 @@
-import * as SecureStore from '@/lib/auth/secure-store';
 import { persistQueryClientSubscribe } from '@tanstack/react-query-persist-client';
 import { useEffect, useRef } from 'react';
 
-import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { setAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { clearScope } from '@/lib/persist/encrypted-kv';
@@ -98,16 +97,14 @@ export function CachePersistenceMount() {
       })();
     }
 
-    // Record the identity hint for the next cold start. `writeAccountMetadata`
-    // fences the write on the auth epoch; sign-out deletes it. The write is
-    // best effort and its rejection is swallowed so a SecureStore failure can
-    // never escape as an unhandled rejection (a failed hint only costs a
-    // future warm start).
+    // Record the identity hint for the next cold start. `setAccountMetadata`
+    // fences the write on the auth epoch and gives this key the class a locked
+    // push needs; sign-out deletes it. The write is best effort and its
+    // rejection is swallowed so a SecureStore failure can never escape as an
+    // unhandled rejection (a failed hint only costs a future warm start).
     void (async () => {
       try {
-        await writeAccountMetadata(ACTIVE_USER_ID_KEY, async () => {
-          await SecureStore.setItemAsync(ACTIVE_USER_ID_KEY, userId);
-        });
+        await setAccountMetadata(ACTIVE_USER_ID_KEY, userId);
       } catch {
         // Best effort: a failed identity hint only costs a future warm start.
       }

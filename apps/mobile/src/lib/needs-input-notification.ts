@@ -43,9 +43,17 @@ import {
 
 import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessions-live';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { postedRaiseChanged } from '@/lib/notification-raise';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { getLanguageSnapshot, i18n } from '@/i18n';
+
+import {
+  clearPostedNeedsInputNotification,
+  markNeedsInputPosted,
+  needsInputSessionOfIdentifier,
+  notificationIdentifierForSession,
+} from './needs-input-presentation';
 
 /** The two raise kinds a cached row can be in. */
 type NeedsInputAttentionKind = 'question' | 'permission';
@@ -63,6 +71,11 @@ export type NeedsInputNotificationRow = {
   sessionId: string;
   title: string;
   kind: NeedsInputAttentionKind;
+  /**
+   * The raise this post presents: the cached row's own status time, or null
+   * when it carries none. The posted actions answer this raise.
+   */
+  raiseId: string | null;
   prUrl: string | null;
   organizationId: string | null;
   /**
@@ -137,43 +150,6 @@ export type NeedsInputPlanInput = {
   previews?: NotificationPreviews;
 };
 
-/** The identifier a session's needs-input notification is posted and replaced under. */
-export function notificationIdentifierForSession(kiloSessionId: string): string {
-  return `needs-input:${kiloSessionId}`;
-}
-
-const IDENTIFIER_PREFIX = 'needs-input:';
-
-/**
- * True when a notification request identifier belongs to the app's own
- * needs-input post. The foreground handler reads it so it can suppress the
- * server's attention push without suppressing the app's own notification,
- * which carries the same parsed payload (both must dispatch the same actions).
- */
-export function isAppOwnedNeedsInputNotification(identifier: string | null | undefined): boolean {
-  return (identifier ?? '').startsWith(IDENTIFIER_PREFIX);
-}
-
-// The sessions whose app-owned needs-input notification is currently posted.
-// In-memory like the mount's notified set: a fresh process posts nothing until
-// the cached rows raise again, so a restart can only under-report (a duplicate
-// server push may show once), never suppress a raise that has no notification.
-const postedSessions = new Set<string>();
-
-/**
- * Whether the app's own needs-input notification for this session is currently
- * on screen. Read by the foreground handler to suppress the server's attention
- * push — the app's notification is already the presentation.
- */
-export function isNeedsInputNotificationPosted(kiloSessionId: string): boolean {
-  return postedSessions.has(kiloSessionId);
-}
-
-/** Drop the posted marker once the raise's presentation is gone (result or dismissal). */
-export function clearPostedNeedsInputNotification(kiloSessionId: string): void {
-  postedSessions.delete(kiloSessionId);
-}
-
 /** The raise kind, or null when the row is not waiting for input. */
 function attentionKindFor(status: string | null | undefined): NeedsInputAttentionKind | null {
   if (!isAttentionStatus(status)) {
@@ -229,6 +205,7 @@ function toNotificationRow(
     // instead of the raw identifier (SPOT-DEFECT e7.png).
     title: sessionDisplayTitle(row.title) ?? i18n.t('agents.sessionRow.untitled'),
     kind,
+    raiseId: row.statusUpdatedAt ?? null,
     prUrl: row.associatedPr?.url ?? null,
     organizationId: row.organizationId ?? null,
     previews,
@@ -344,11 +321,9 @@ function needsRepublish(
   notifiedRow: NeedsInputNotificationRow | undefined,
   next: NeedsInputNotificationRow
 ): boolean {
-  if (notifiedRow === undefined) {
-    return true;
-  }
   return (
-    notifiedRow.kind !== next.kind ||
+    notifiedRow === undefined ||
+    postedRaiseChanged(notifiedRow, next) ||
     notifiedRow.prUrl !== next.prUrl ||
     notifiedRow.previews !== next.previews ||
     (next.previews === 'full' && notifiedRow.title !== next.title)
@@ -364,6 +339,7 @@ function pushDataForRow(
     cliSessionId: row.sessionId,
     category: 'attention',
     attentionKind: row.kind,
+    ...(row.raiseId === null ? {} : { raiseId: row.raiseId }),
     ...(row.prUrl === null ? {} : { prUrl: row.prUrl }),
     ...(row.organizationId === null ? {} : { organizationId: row.organizationId }),
   };
@@ -443,7 +419,7 @@ async function publishRow(
       // routes to the shared attention channel, iOS reads it as a null trigger.
       trigger: { channelId: androidChannelIdForPushData(data) },
     });
-    postedSessions.add(row.sessionId);
+    markNeedsInputPosted(row.sessionId);
     return true;
   } catch (error) {
     reportFailure('publish', error);
@@ -454,8 +430,9 @@ async function publishRow(
 async function dismissIdentifier(identifier: string): Promise<boolean> {
   try {
     await Notifications.dismissNotificationAsync(identifier);
-    if (identifier.startsWith(IDENTIFIER_PREFIX)) {
-      postedSessions.delete(identifier.slice(IDENTIFIER_PREFIX.length));
+    const postedSession = needsInputSessionOfIdentifier(identifier);
+    if (postedSession !== null) {
+      clearPostedNeedsInputNotification(postedSession);
     }
     return true;
   } catch (error) {

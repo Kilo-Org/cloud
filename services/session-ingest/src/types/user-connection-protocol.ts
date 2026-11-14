@@ -23,6 +23,65 @@ const instanceSchema = z.object({
 
 export type Instance = z.infer<typeof instanceSchema>;
 
+// -- Heartbeat session bounds -------------------------------------------------
+
+// The heartbeat session list and every free-form string in one row carry
+// explicit limits, so the work one heartbeat describes is fixed by the
+// contract. Each limit keeps clear margin over the values a supported producer
+// sends in that field.
+
+// The presence relay advertises at most 100 sessions, the socket attachment
+// frame holds roughly 270 minimal rows, and a CLI advertises only sessions with
+// an active status entry.
+export const MAX_HEARTBEAT_SESSIONS = 256;
+// Session identifiers are `ses_` plus 26 characters; the session-sync contract
+// caps an entity id at 256.
+export const MAX_HEARTBEAT_SESSION_ID_LENGTH = 256;
+// Statuses are idle, busy, question, permission, retry and scheduled;
+// `permission` is the longest at 10 characters.
+export const MAX_HEARTBEAT_STATUS_LENGTH = 64;
+// Five times the 200-character titles the web rename route, the VS Code rename
+// helper and the mobile rename dialog allow; a generated title is one line.
+export const MAX_HEARTBEAT_TITLE_LENGTH = 1024;
+// A normalized git remote URL; the sibling `prLink.prUrl` uses the same bound.
+export const MAX_HEARTBEAT_GIT_URL_LENGTH = 2048;
+// A per-session branch; the create-session contract caps `gitBranch` and
+// `baseBranch` at 256.
+export const MAX_HEARTBEAT_GIT_BRANCH_LENGTH = 256;
+// A parent identifier is another session id, so it shares that bound.
+export const MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH = 256;
+// An ISO-8601 timestamp at millisecond precision is 24 characters; keep room
+// for a producer that sends a longer zone offset.
+export const MAX_HEARTBEAT_SCHEDULED_AT_LENGTH = 64;
+
+/**
+ * A metadata string of at most `max` characters; a longer value is shortened
+ * to the limit, and a cut never leaves a lone high surrogate.
+ */
+const boundedMetadata = (max: number) =>
+  z
+    .string()
+    .transform(value =>
+      value.length > max ? value.slice(0, max).replace(/[\uD800-\uDBFF]$/, '') : value
+    );
+
+// Reads the advertised session count from a frame independently of the full
+// heartbeat contract, so a frame outside the limits above is reported with its
+// size.
+const HeartbeatSessionsEnvelopeSchema = z.object({
+  type: z.literal('heartbeat'),
+  sessions: z.array(z.unknown()),
+});
+
+/**
+ * Advertised session count of a heartbeat frame, valid or not. Returns
+ * undefined for any other shape.
+ */
+export function heartbeatSessionCount(parsed: unknown): number | undefined {
+  const envelope = HeartbeatSessionsEnvelopeSchema.safeParse(parsed);
+  return envelope.success ? envelope.data.sessions.length : undefined;
+}
+
 export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('heartbeat'),
@@ -47,55 +106,64 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
     // persists it in the WebSocket attachment and exposes it via
     // `getConnectedInstances()`.
     instance: instanceSchema.optional(),
-    sessions: z.array(
-      z.object({
-        id: z.string(),
-        status: z.string(),
-        // Wake time for a `scheduled` session (ISO-8601). Sent beside `status`;
-        // absent for every other status and on legacy CLIs that predate
-        // scheduling. A producer that serializes the absent field as an explicit
-        // null, or a value that is not a time at all, reads as absent: rejecting
-        // the value would fail `CLIOutboundMessageSchema` and drop the whole
-        // heartbeat, so the session would never reach `sessions.list`.
-        scheduledAt: z.string().optional().catch(undefined),
-        title: z.string(),
-        gitUrl: z.string().optional(),
-        gitBranch: z.string().optional(),
-        parentSessionId: z.string().optional(),
-        // Platform the session is running on (e.g. "darwin", "linux", "vscode").
-        // Optional for backward compatibility with legacy CLIs.
-        platform: z.string().max(32).optional(),
-        // Pull-request link reported by the CLI. Distinct from `platform`
-        // above, which is the client OS and stays unchanged. Absent on legacy
-        // CLIs that predate this field.
-        prLink: z
-          .object({
-            platform: z.string().min(1).max(32),
-            prUrl: z.string().max(2048),
-            prNumber: z.number().int().positive(),
-            // Branch the session pushed and the commit it pushed to that
-            // branch. Optional for older CLIs; these fields supply per-session
-            // evidence for verification. Like parallel ingest, null means no
-            // evidence; normalize it to the legacy absent form without catching
-            // other errors.
-            headRef: z
-              .string()
-              .min(1)
-              .max(256)
-              .nullable()
-              .optional()
-              .transform(value => value ?? undefined),
-            headSha: z
-              .string()
-              .min(1)
-              .max(64)
-              .nullable()
-              .optional()
-              .transform(value => value ?? undefined),
-          })
-          .optional(),
-      })
-    ),
+    sessions: z
+      .array(
+        z.object({
+          // Identity fields keep a hard limit: a cut id would name a different
+          // session, and a cut status could read as another known status.
+          id: z.string().max(MAX_HEARTBEAT_SESSION_ID_LENGTH),
+          status: z.string().max(MAX_HEARTBEAT_STATUS_LENGTH),
+          // Wake time for a `scheduled` session (ISO-8601). Sent beside `status`;
+          // absent for every other status and on legacy CLIs that predate
+          // scheduling. A producer that serializes the absent field as an explicit
+          // null, a value that is not a time at all, or a value longer than a
+          // timestamp is treated as absent, so the field stays optional in the
+          // parsed row.
+          scheduledAt: z
+            .string()
+            .max(MAX_HEARTBEAT_SCHEDULED_AT_LENGTH)
+            .optional()
+            .catch(undefined),
+          // Display metadata is shortened to its limit.
+          title: boundedMetadata(MAX_HEARTBEAT_TITLE_LENGTH),
+          gitUrl: boundedMetadata(MAX_HEARTBEAT_GIT_URL_LENGTH).optional(),
+          gitBranch: boundedMetadata(MAX_HEARTBEAT_GIT_BRANCH_LENGTH).optional(),
+          parentSessionId: z.string().max(MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH).optional(),
+          // Platform the session is running on (e.g. "darwin", "linux", "vscode").
+          // Optional for backward compatibility with legacy CLIs.
+          platform: z.string().max(32).optional(),
+          // Pull-request link reported by the CLI. Distinct from `platform`
+          // above, which is the client OS and stays unchanged. Absent on legacy
+          // CLIs that predate this field.
+          prLink: z
+            .object({
+              platform: z.string().min(1).max(32),
+              prUrl: z.string().max(2048),
+              prNumber: z.number().int().positive(),
+              // Branch the session pushed and the commit it pushed to that
+              // branch. Optional for older CLIs; these fields supply per-session
+              // evidence for verification. Like parallel ingest, null means no
+              // evidence; normalize it to the legacy absent form without catching
+              // other errors.
+              headRef: z
+                .string()
+                .min(1)
+                .max(256)
+                .nullable()
+                .optional()
+                .transform(value => value ?? undefined),
+              headSha: z
+                .string()
+                .min(1)
+                .max(64)
+                .nullable()
+                .optional()
+                .transform(value => value ?? undefined),
+            })
+            .optional(),
+        })
+      )
+      .max(MAX_HEARTBEAT_SESSIONS),
   }),
   z.object({
     type: z.literal('event'),

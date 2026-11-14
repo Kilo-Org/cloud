@@ -16,6 +16,11 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  contextSegmentClassName,
+  interactiveContextSegmentClassName,
+  SegmentText,
+} from '@/components/cloud-agent-next/session-context-segments';
 import { type ProfileSummaryWithOwner } from '@/hooks/useCloudAgentProfiles';
 import { useSessionProfileLayers } from '@/hooks/useSessionProfileLayers';
 import { useCloudAgentSettingsDeepLink } from '@/components/cloud-agent-next/settings/useCloudAgentSettingsDeepLink';
@@ -113,15 +118,19 @@ export function ProfilePickerPopover({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
+            type="button"
             className={cn(
-              'inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
-              'border border-border/50 bg-muted/30 hover:bg-muted/60 hover:border-border',
-              'text-muted-foreground hover:text-foreground',
-              open && 'border-border bg-muted/60 text-foreground'
+              contextSegmentClassName,
+              interactiveContextSegmentClassName,
+              open && 'bg-muted/60 text-foreground'
             )}
           >
-            <Layers className="h-3 w-3 shrink-0" />
-            {chipName ? <span className="font-medium">{chipName}</span> : <span>No profile</span>}
+            <Layers className="size-3.5 shrink-0" aria-hidden="true" />
+            {chipName ? (
+              <SegmentText className="max-w-48 font-medium">{chipName}</SegmentText>
+            ) : (
+              <span>No profile</span>
+            )}
             <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>

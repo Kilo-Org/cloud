@@ -108,7 +108,8 @@ broken. No credentials, hosted messages, deployment or load are run by local che
 ## Deployment path and capacity
 
 `deploy-staging.yml` deploys gateway and writer through
-`stage-vercel-deployment.yml` from the same tested SHA, after DB startup/migrations.
+`stage-vercel-deployment.yml` from the same tested SHA. Both staging deploys start
+beside the database gate; the Worker deploys and the release record wait for it.
 The shared workflow uses **Vercel CLI 59.5.0** and `vercel deploy --target=staging`;
 the Vercel project Root Directories must be `apps/ai-gateway` and `apps/web`.
 Record the actual project settings/build adapter version when deployed; those

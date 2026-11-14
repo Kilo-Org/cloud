@@ -19,7 +19,8 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { BrowseCommandsDialog } from '../BrowseCommandsDialog';
-import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
+import { CloudAgentModeCombobox } from '../CloudAgentModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -90,8 +91,11 @@ type CloudComposerProps = {
   canInterrupt?: boolean;
   disabled?: boolean;
   textareaDisabled?: boolean;
+  toolbarDisabled?: boolean;
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   isStreaming?: boolean;
+  /** Environment preparation runs without an agent turn; Stop still applies. */
+  isPreparing?: boolean;
   placeholder?: string;
   /** Why sending waits while typing is open, such as a chat that still loads; shown on the send button. */
   sendUnavailableReason?: string;
@@ -110,6 +114,7 @@ type CloudComposerProps = {
   pinnedModelOption?: ModelOption;
   /** Whether models are loading */
   isLoadingModels?: boolean;
+  onModelPickerIntent?: () => void;
   /** Callback when mode changes */
   onModeChange?: (mode: AgentMode) => void;
   /** Callback when model changes */
@@ -124,6 +129,15 @@ type CloudComposerProps = {
   showToolbar?: boolean;
   /** Restore a failed prompt only when this composer owns the submitted draft. */
   initialValue?: string;
+  /**
+   * A failed send the server accepted after all. The composer restored the text
+   * from `initialValue`/its own failed submission; the confirmed message is now
+   * in the transcript, so that restored text must leave the input — otherwise it
+   * sits in two places and the next Send posts it twice. An edit the reader made
+   * after the restore keeps the text as their next message. `sequence` counts
+   * deliveries so one record is applied once.
+   */
+  withdrawnFailedPrompt?: { text: string; sequence: number } | null;
   /** Custom modes exposed by the session's profile stack (shown in picker) */
   customModeOptions?: ModeOption<AgentMode>[];
   /** When true, the model picker is rendered read-only (e.g. agent has a model override). */
@@ -150,8 +164,10 @@ export function CloudComposer({
   canInterrupt = false,
   disabled = false,
   textareaDisabled = disabled,
+  toolbarDisabled = disabled,
   inputRef,
   isStreaming = false,
+  isPreparing = false,
   placeholder = 'Type your message...',
   sendUnavailableReason,
   slashCommands = [],
@@ -160,6 +176,7 @@ export function CloudComposer({
   modelOptions = [],
   pinnedModelOption,
   isLoadingModels = false,
+  onModelPickerIntent,
   onModeChange,
   onModelChange,
   variant,
@@ -167,6 +184,7 @@ export function CloudComposer({
   availableVariants = [],
   showToolbar = false,
   initialValue,
+  withdrawnFailedPrompt,
   attachmentUploadOptions,
   attachmentsEnabled = true,
   customModeOptions,
@@ -301,6 +319,48 @@ export function CloudComposer({
     writeInputValue(initialValue);
     textareaRef.current?.focus();
   }, [initialValue, conversationKey, writeInputValue]);
+
+  // The send turned out to be delivered: withdraw the text this composer put
+  // back for it. Only the untouched restore goes — a draft the reader typed
+  // after the restore is the next message — and the conversation-scoped
+  // snapshot of that failed send goes with it, so switching chats cannot bring
+  // the duplicate back.
+  const appliedWithdrawnSequenceRef = useRef(0);
+  useEffect(() => {
+    if (withdrawnFailedPrompt === null || withdrawnFailedPrompt === undefined) return;
+    if (withdrawnFailedPrompt.sequence <= appliedWithdrawnSequenceRef.current) return;
+    appliedWithdrawnSequenceRef.current = withdrawnFailedPrompt.sequence;
+    const key = conversationKey ?? DEFAULT_CONVERSATION_KEY;
+    const submission = submissionsRef.current.get(key);
+    // The record carries the prompt as it was sent, which is trimmed; the
+    // composer may hold it with trailing whitespace from a paste or an IME.
+    const restoredText = withdrawnFailedPrompt.text.trim();
+    const sameText = (value: string | undefined) =>
+      value !== undefined && value.trim() === restoredText;
+    const showsRestoredText = sameText(valueRef.current);
+    const snapshot = composerSnapshotsRef.current.get(key);
+    const snapshotHoldsRestored =
+      snapshot !== undefined && sameText(snapshot.text) ? snapshot : undefined;
+    if (snapshotHoldsRestored !== undefined) {
+      // The snapshot's own previews are revoked by the removal below; deleting
+      // it first would only leak the URLs it held.
+      composerSnapshotsRef.current.delete(key);
+    }
+    if (!showsRestoredText) return;
+    writeInputValue('');
+    // The delivered send owns the files it carried, so the chips this restore
+    // put back are removed through the upload hook: that path revokes each
+    // preview and releases its pending key, and it leaves chips the reader
+    // added afterwards alone.
+    if (snapshotHoldsRestored !== undefined) {
+      for (const attachment of snapshotHoldsRestored.attachments) {
+        attachmentUpload.removeAttachment(attachment.id);
+      }
+    }
+    if (sameText(submission?.text)) {
+      submissionsRef.current.delete(key);
+    }
+  }, [withdrawnFailedPrompt, conversationKey, writeInputValue, attachmentUpload]);
 
   // Resolve the pinned model's display name from the allowed models list, so the
   // locked-read-only toolbar shows the same label as the ModelCombobox. Falls
@@ -797,10 +857,11 @@ export function CloudComposer({
                 pinnedModelOption={pinnedModelOption}
                 onModelChange={onModelChange}
                 isLoadingModels={isLoadingModels}
+                onModelPickerIntent={onModelPickerIntent}
                 variant={variant}
                 availableVariants={availableVariants}
                 onVariantChange={onVariantChange}
-                disabled={disabled || isStreaming}
+                disabled={toolbarDisabled || isStreaming}
                 modelPickerDisabled={modelPickerDisabled}
                 modelPickerTooltip={modelPickerTooltip}
                 variantPickerDisabled={variantPickerDisabled}
@@ -815,13 +876,12 @@ export function CloudComposer({
                 {!mode && isLoadingModels ? (
                   <Skeleton className="h-9 w-[77px] shrink-0 motion-reduce:animate-none" />
                 ) : (
-                  <ModeCombobox
+                  <CloudAgentModeCombobox
                     value={mode}
                     onValueChange={onModeChange}
-                    options={NEXT_MODE_OPTIONS}
                     customOptions={customModeOptions}
                     variant="compact"
-                    disabled={disabled || isStreaming}
+                    disabled={toolbarDisabled || isStreaming}
                     className="min-w-0"
                   />
                 )}
@@ -842,13 +902,14 @@ export function CloudComposer({
                   </Tooltip>
                 ) : (
                   <ModelCombobox
+                    onLoadModels={onModelPickerIntent}
                     models={modelOptions}
                     pinnedModel={pinnedModelOption}
                     value={model}
                     onValueChange={onModelChange}
                     variant="compact"
                     isLoading={isLoadingModels}
-                    disabled={disabled || isStreaming}
+                    disabled={toolbarDisabled || isStreaming}
                     className="min-w-0"
                   />
                 )}
@@ -874,7 +935,7 @@ export function CloudComposer({
                         variants={availableVariants}
                         value={variant}
                         onValueChange={onVariantChange}
-                        disabled={disabled || isStreaming}
+                        disabled={toolbarDisabled || isStreaming}
                         className="min-w-0"
                       />
                     )}
@@ -905,7 +966,7 @@ export function CloudComposer({
               <Paperclip className="h-4 w-4" />
             </UIButton>
           )}
-          {isStreaming && (
+          {(isStreaming || isPreparing) && (
             <UIButton
               type="button"
               variant="destructive"
@@ -913,7 +974,16 @@ export function CloudComposer({
               onClick={handleStop}
               disabled={!canInterrupt || !onStop}
               className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
-              aria-label="Stop response"
+              aria-label={
+                isPreparing
+                  ? 'Stop workspace preparation'
+                  : 'Stop response or workspace preparation'
+              }
+              title={
+                isPreparing
+                  ? 'Stop preparation and all chats in this workspace'
+                  : 'Stop this response. If any chat is preparing, stop all chats in this workspace.'
+              }
             >
               <Square className="h-4 w-4" />
             </UIButton>

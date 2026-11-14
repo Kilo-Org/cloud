@@ -2,9 +2,18 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
-import { AgentConversationItemView } from './agent-conversation-events';
-import { createToolCall } from '@/src/shared/agent-conversation';
+import { fireEvent, render } from '@testing-library/react';
+import {
+  AgentConversationItemView,
+  retryStartEvents,
+  withRetryOnlyOnLatestError,
+} from './agent-conversation-events';
+import {
+  createAssistantMessage,
+  createConversationErrorEvent,
+  createToolCall,
+  createUserMessage,
+} from '@/src/shared/agent-conversation';
 import type {
   AgentConversationEvent,
   GroupedConversationItem,
@@ -28,7 +37,8 @@ type ToolResultEvent = Extract<AgentConversationEvent, { type: 'tool-result' }>;
 describe('workflow tool exchange rendering', () => {
   const renderToolExchange = (
     toolCall: ToolCallEvent,
-    result: ToolResultEvent
+    result: ToolResultEvent,
+    tabLabels?: ReadonlyMap<number, string>
   ): ReturnType<typeof render> => {
     const item: GroupedConversationItem = {
       result,
@@ -36,7 +46,7 @@ describe('workflow tool exchange rendering', () => {
       type: 'tool-exchange',
     };
 
-    return render(<AgentConversationItemView item={item} />);
+    return render(<AgentConversationItemView item={item} tabLabels={tabLabels} />);
   };
 
   it('renders a successful run_workflow with result and pages visited', () => {
@@ -58,11 +68,12 @@ describe('workflow tool exchange rendering', () => {
       },
     };
 
-    const { container } = renderToolExchange(toolCall, result);
+    const { container } = renderToolExchange(toolCall, result, new Map([[7, 'Kilo - Wikipedia']]));
 
     expect(container.textContent).toContain('run_workflow');
     expect(container.textContent).toContain('completed');
-    expect(container.textContent).toContain('tab 7');
+    expect(container.textContent).toContain('Kilo - Wikipedia');
+    expect(container.textContent).not.toContain('tab 7');
     expect(container.textContent).toContain('workflowId');
     expect(container.textContent).toContain('42');
     expect(container.textContent).toContain('2');
@@ -208,11 +219,14 @@ describe('playwright browser tool exchange rendering', () => {
       type: 'tool-exchange',
     };
 
-    const { container } = render(<AgentConversationItemView item={item} />);
+    const { container } = render(
+      <AgentConversationItemView item={item} tabLabels={new Map([[7, 'Example Domain']])} />
+    );
 
     expect(container.textContent).toContain('Navigate to a URL');
     expect(container.textContent).toContain('completed');
-    expect(container.textContent).toContain('tab 7');
+    expect(container.textContent).toContain('Example Domain');
+    expect(container.textContent).not.toContain('tab 7');
     expect(container.textContent).toContain('Arguments');
     expect(container.textContent).toContain('https://example.com');
     expect(container.textContent).toContain('Example Domain');
@@ -405,5 +419,150 @@ describe('agent tool exchange rendering', () => {
     expect(image?.getAttribute('src')).toContain('data:image/png;base64,');
     expect(image?.getAttribute('alt')).toBe('Image produced by browser_screenshot');
     expect(container.textContent).not.toContain('captured');
+  });
+});
+
+describe('markdown links', () => {
+  const renderAssistantText = (text: string): ReturnType<typeof render> =>
+    render(
+      <AgentConversationItemView item={{ event: createAssistantMessage(text), type: 'event' }} />
+    );
+
+  const renderUserText = (text: string): ReturnType<typeof render> =>
+    render(<AgentConversationItemView item={{ event: createUserMessage(text), type: 'event' }} />);
+
+  it('opens a web link elsewhere instead of navigating the panel', () => {
+    const assistant = renderAssistantText('[Example](https://example.com/path)');
+    const assistantLink = assistant.container.querySelector('a');
+    expect(assistantLink?.getAttribute('href')).toBe('https://example.com/path');
+    expect(assistantLink?.getAttribute('target')).toBe('_blank');
+    expect(assistantLink?.getAttribute('rel')).toBe('noopener noreferrer');
+
+    const user = renderUserText('[Example](https://example.com/path)');
+    const userLink = user.container.querySelector('a');
+    expect(userLink?.getAttribute('href')).toBe('https://example.com/path');
+    expect(userLink?.getAttribute('target')).toBe('_blank');
+    expect(userLink?.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  it('keeps a mailto link and refuses any other scheme', () => {
+    const mail = renderAssistantText('[Mail](mailto:help@kilo.ai)');
+    expect(mail.container.querySelector('a')?.getAttribute('href')).toBe('mailto:help@kilo.ai');
+
+    const userMail = renderUserText('[Mail](mailto:help@kilo.ai)');
+    expect(userMail.container.querySelector('a')?.getAttribute('href')).toBe('mailto:help@kilo.ai');
+
+    const script = renderAssistantText('[Run](javascript:alert(1))');
+    expect(script.container.querySelector('a')).toBeNull();
+    expect(script.container.textContent).toContain('Run');
+
+    const userScript = renderUserText('[Run](javascript:alert(1))');
+    expect(userScript.container.querySelector('a')).toBeNull();
+    expect(userScript.container.textContent).toContain('Run');
+  });
+});
+
+describe('running tool call rendering', () => {
+  it('renders the tool row in a running state while the call is in flight', () => {
+    const toolCall = createToolCall({ arguments: {}, name: 'kilo_browser_snapshot', tabId: 7 });
+
+    const { container } = render(
+      <AgentConversationItemView item={{ toolCall, type: 'tool-exchange' }} />
+    );
+
+    expect(container.querySelector('details')).not.toBeNull();
+    expect(container.textContent).toContain('Page snapshot');
+    expect(container.textContent).toContain('running');
+    // Nothing to report yet, and no empty Arguments block for a call that takes none.
+    expect(container.textContent).not.toContain('Arguments');
+    expect(container.textContent).not.toContain('Result');
+    expect(container.querySelector('svg')).not.toBeNull();
+  });
+
+  it('hides the Arguments block when the call takes no arguments', () => {
+    const toolCall = createToolCall({ arguments: {}, name: 'kilo_browser_snapshot', tabId: 7 });
+    const result = {
+      id: 'tr-1',
+      ok: true,
+      toolCallId: toolCall.id,
+      type: 'tool-result' as const,
+      value: 'Snapshot text',
+    };
+
+    const { container } = render(
+      <AgentConversationItemView item={{ result, toolCall, type: 'tool-exchange' }} />
+    );
+
+    expect(container.textContent).toContain('completed');
+    expect(container.textContent).not.toContain('Arguments');
+    expect(container.textContent).toContain('Snapshot text');
+  });
+});
+
+describe('error notice rendering', () => {
+  it('shows the failure as an alert and retries the turn on Retry', () => {
+    const event = createConversationErrorEvent({ retry: 'turn', title: 'The server is busy.' });
+    const onRetryError = vi.fn();
+
+    const { container, getByRole } = render(
+      <AgentConversationItemView item={{ event, type: 'event' }} onRetryError={onRetryError} />
+    );
+
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(container.textContent).toContain('The server is busy.');
+    fireEvent.click(getByRole('button', { name: 'Retry' }));
+    expect(onRetryError).toHaveBeenCalledWith(event);
+  });
+
+  it('offers the credits link instead of Retry when repeating cannot help', () => {
+    const event = createConversationErrorEvent({
+      action: { href: 'https://app.kilo.ai/credits', label: 'Add credits' },
+      detail: 'Your balance is zero.',
+      title: "You're out of credits.",
+    });
+
+    const { getByRole, queryByRole } = render(
+      <AgentConversationItemView item={{ event, type: 'event' }} onRetryError={vi.fn()} />
+    );
+
+    expect(queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(getByRole('link', { name: 'Add credits' }).getAttribute('target')).toBe('_blank');
+  });
+});
+
+describe('error retry scope', () => {
+  it('retries the user message the error answered, not the newest one', () => {
+    const earlierUser = createUserMessage('first question');
+    const earlierAnswer = createAssistantMessage('first answer');
+    const user = createUserMessage('second question');
+    const partial = createAssistantMessage('half an answer');
+    const error = createConversationErrorEvent({ retry: 'turn', title: 'The server is busy.' });
+    const events = [earlierUser, earlierAnswer, user, partial, error];
+
+    expect(retryStartEvents(events, error.id)).toStrictEqual([earlierUser, earlierAnswer, user]);
+  });
+
+  it('refuses to retry an error a later user message superseded', () => {
+    const error = createConversationErrorEvent({ retry: 'turn', title: 'The server is busy.' });
+    const first = createUserMessage('first question');
+    const second = createUserMessage('second question');
+    const events = [first, error, second];
+
+    expect(retryStartEvents(events, error.id)).toBeUndefined();
+  });
+
+  it('drops the retry affordance only from an error the transcript moved past', () => {
+    const moved = createConversationErrorEvent({ retry: 'turn', title: 'Old failure.' });
+    const latest = createConversationErrorEvent({ retry: 'turn', title: 'New failure.' });
+    const kept = withRetryOnlyOnLatestError([
+      createUserMessage('first question'),
+      moved,
+      createUserMessage('second question'),
+      latest,
+    ]);
+
+    expect(kept[1]).toMatchObject({ title: 'Old failure.', type: 'error' });
+    expect(kept[1]).not.toHaveProperty('retry');
+    expect(kept[3]).toMatchObject({ retry: 'turn', type: 'error' });
   });
 });

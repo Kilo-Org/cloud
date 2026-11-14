@@ -1,13 +1,27 @@
-import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import type { EnvironmentSummary } from '@kilocode/cloud-agent-profile';
 import {
   getSandboxAllocationRequest,
   type SandboxAllocation,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import type * as EnvironmentHooks from '@/hooks/useCloudAgentEnvironments';
 import type { TriggerForm as TriggerFormComponent, TriggerFormProps } from './TriggerForm';
+
+const environmentsRefetch = jest.fn();
+const mockUseCloudAgentEnvironments = jest.fn<typeof EnvironmentHooks.useCloudAgentEnvironments>();
+
+jest.mock('@/hooks/useCloudAgentEnvironments', () => {
+  const actual = jest.requireActual<typeof EnvironmentHooks>('@/hooks/useCloudAgentEnvironments');
+  return {
+    ...actual,
+    useCloudAgentEnvironments: (options: Parameters<typeof actual.useCloudAgentEnvironments>[0]) =>
+      mockUseCloudAgentEnvironments(options),
+  };
+});
 
 jest.mock('sonner', () => ({ toast: { error: jest.fn(), success: jest.fn() } }));
 jest.mock('next-auth/react', () => ({
@@ -80,12 +94,21 @@ jest.mock('@/components/ui/select', () => ({
     value: string;
     onValueChange: (value: string) => void;
     disabled?: boolean;
-  }) =>
-    createElement(
+  }) => {
+    const trigger = React.Children.toArray(children).find(
+      (child): child is React.ReactElement<{ id?: string }> =>
+        React.isValidElement<{ id?: string }>(child) && typeof child.props.id === 'string'
+    );
+    return createElement(
       'div',
-      { 'data-container-allocation': value, 'data-disabled': String(disabled) },
+      {
+        'data-container-allocation': value,
+        'data-select-id': trigger?.props.id,
+        'data-disabled': String(disabled),
+      },
       withSelectProps(children, { onValueChange, selectDisabled: disabled })
-    ),
+    );
+  },
   SelectTrigger: ({ children }: { children: React.ReactNode }) =>
     createElement(React.Fragment, {}, children),
   SelectValue: () => null,
@@ -145,16 +168,27 @@ jest.mock('@/components/cloud-agent/RepoProfileBindingsDialog', () => ({
 }));
 jest.mock('@/components/shared/RepositoryCombobox', () => ({
   RepositoryCombobox: ({
+    value,
     onValueChange,
     disabled,
   }: {
+    value: string;
     onValueChange: (value: string) => void;
     disabled?: boolean;
   }) =>
     createElement(
-      'button',
-      { type: 'button', disabled, onClick: () => onValueChange('kilo/other') },
-      'select-repository'
+      'div',
+      {},
+      createElement(
+        'button',
+        { type: 'button', disabled, onClick: () => onValueChange(value) },
+        'reselect-repository'
+      ),
+      createElement(
+        'button',
+        { type: 'button', disabled, onClick: () => onValueChange('kilo/other') },
+        'select-repository'
+      )
     ),
 }));
 jest.mock('@/components/shared/ModeCombobox', () => ({
@@ -250,6 +284,17 @@ jest.mock('@/components/shared/VariantCombobox', () => ({
 jest.mock('./ScheduleBuilder', () => ({ ScheduleBuilder: () => null }));
 jest.mock('./TimezoneSelector', () => ({ TimezoneSelector: () => null }));
 
+beforeEach(() => {
+  environmentsRefetch.mockReset();
+  mockUseCloudAgentEnvironments.mockReset();
+  mockUseCloudAgentEnvironments.mockReturnValue({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: environmentsRefetch,
+  } as unknown as ReturnType<typeof EnvironmentHooks.useCloudAgentEnvironments>);
+});
+
 type LinkedomModule = {
   parseHTML: (html: string) => { window: Record<string, unknown>; document: Document };
 };
@@ -314,6 +359,78 @@ function initialData(variant?: string, activationMode: 'webhook' | 'scheduled' =
   };
 }
 
+const environmentId = '00000000-0000-4000-8000-000000000006';
+const otherEnvironmentId = '00000000-0000-4000-8000-000000000007';
+
+function githubEnvironment(
+  overrides: { id?: string; name?: string; repoFullName?: string } = {}
+): EnvironmentSummary {
+  return {
+    id: overrides.id ?? environmentId,
+    name: overrides.name ?? 'Trigger environment',
+    platform: 'github',
+    repoFullName: overrides.repoFullName ?? 'kilo/cloud',
+    gitlabCloneUrl: null,
+    bitbucketWorkspaceUuid: null,
+    bitbucketRepositoryUuid: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    plainVarCount: 0,
+    secretCount: 0,
+    commandCount: 0,
+    sandboxAllocation: null,
+    configurationRevision: 1,
+  };
+}
+
+const multiRepositoryEnvironment: EnvironmentSummary = {
+  id: '00000000-0000-4000-8000-000000000008',
+  name: 'Multi repository environment',
+  repositories: [
+    { platform: 'github', repoFullName: 'kilo/cloud' },
+    { platform: 'github', repoFullName: 'kilo/api' },
+  ],
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  plainVarCount: 0,
+  secretCount: 0,
+  commandCount: 0,
+  sandboxAllocation: null,
+  configurationRevision: 1,
+};
+
+function environmentsResult(
+  overrides: {
+    data?: EnvironmentSummary[];
+    isLoading?: boolean;
+    isError?: boolean;
+  } = {}
+) {
+  return {
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: environmentsRefetch,
+    ...overrides,
+  } as unknown as ReturnType<typeof EnvironmentHooks.useCloudAgentEnvironments>;
+}
+
+function selectEnvironment(container: HTMLElement, value: string) {
+  const select = container.querySelector('[data-select-id="environmentId"]');
+  if (!select) throw new Error('environment select missing');
+  const item = select.querySelector<HTMLButtonElement>(`[data-select-item="${value}"]`);
+  if (!item) throw new Error(`environment option not found: ${value}`);
+  act(() => item.click());
+}
+
+function expectSubmittedEnvironmentToBeUnchanged(
+  onSubmit: jest.Mock<TriggerFormProps['onSubmit']>
+) {
+  const [submission] = onSubmit.mock.calls.at(-1) ?? [];
+  if (!submission) throw new Error('form submission missing');
+  expect(submission.environmentId).toBeUndefined();
+}
+
 function submit(container: HTMLElement) {
   const form = container.querySelector('form');
   if (!form) throw new Error('form not found');
@@ -370,7 +487,9 @@ function sandboxCapabilities(
 }
 
 function selectSandbox(container: HTMLElement, value: SandboxAllocation | 'automatic') {
-  const item = container.querySelector<HTMLButtonElement>(`[data-select-item="${value}"]`);
+  const select = container.querySelector('[data-select-id="sandboxAllocation"]');
+  if (!select) throw new Error('sandbox select missing');
+  const item = select.querySelector<HTMLButtonElement>(`[data-select-item="${value}"]`);
   if (!item) throw new Error(`sandbox option not found: ${value}`);
   act(() => item.click());
 }
@@ -782,7 +901,7 @@ describe('TriggerForm sandbox allocation', () => {
       });
       expect(
         mounted.container
-          .querySelector('[data-container-allocation]')
+          .querySelector('[data-select-id="sandboxAllocation"]')
           ?.getAttribute('data-container-allocation')
       ).toBe('automatic');
       submit(mounted.container);
@@ -792,7 +911,7 @@ describe('TriggerForm sandbox allocation', () => {
       selectSandbox(mounted.container, 'cloudflare-containers-standard-4');
       expect(
         mounted.container
-          .querySelector('[data-container-allocation]')
+          .querySelector('[data-select-id="sandboxAllocation"]')
           ?.getAttribute('data-container-allocation')
       ).toBe('cloudflare-containers-standard-4');
       submit(mounted.container);
@@ -844,14 +963,14 @@ describe('TriggerForm sandbox allocation', () => {
 
   it('hides fresh allocation from ineligible users but preserves a saved allocation and clearing it', async () => {
     const fresh = render({ canSetSandboxAllocation: false });
-    expect(fresh.container.querySelector('[data-container-allocation]')).toBeNull();
+    expect(fresh.container.querySelector('[data-select-id="sandboxAllocation"]')).toBeNull();
 
     act(() => root?.unmount());
     const saved = render({
       canSetSandboxAllocation: false,
       initialData: { ...initialData(), sandboxAllocation: 'vercel-large' },
     });
-    expect(saved.container.querySelector('[data-container-allocation]')).not.toBeNull();
+    expect(saved.container.querySelector('[data-select-id="sandboxAllocation"]')).not.toBeNull();
     selectSandbox(saved.container, 'automatic');
     submit(saved.container);
     await act(async () => Promise.resolve());
@@ -871,7 +990,7 @@ describe('TriggerForm sandbox allocation', () => {
     submit(mounted.container);
     expect(mounted.onSubmit).not.toHaveBeenCalled();
 
-    expect(mounted.container.querySelector('[data-container-allocation]')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-select-id="sandboxAllocation"]')).not.toBeNull();
     selectSandbox(mounted.container, 'automatic');
     submit(mounted.container);
     await act(async () => Promise.resolve());
@@ -922,7 +1041,7 @@ describe('TriggerForm sandbox allocation', () => {
       root?.render(createElement(TriggerForm, { ...mounted.allProps, isLoadingCapabilities: true }))
     );
 
-    const select = mounted.container.querySelector('[data-container-allocation]');
+    const select = mounted.container.querySelector('[data-select-id="sandboxAllocation"]');
     expect(select?.getAttribute('data-disabled')).toBe('true');
     const selectedItem = mounted.container.querySelector<HTMLButtonElement>(
       '[data-select-item="cloudflare-containers-standard-4"]'
@@ -1086,7 +1205,7 @@ describe('TriggerForm sandbox allocation', () => {
     expect(legacy?.textContent).toContain('(unavailable)');
     expect(
       mounted.container
-        .querySelector('[data-container-allocation]')
+        .querySelector('[data-select-id="sandboxAllocation"]')
         ?.getAttribute('data-container-allocation')
     ).toBe('isolated-standard');
     expect(mounted.container.textContent).toContain('The saved sandbox is no longer offered.');
@@ -1119,6 +1238,237 @@ describe('TriggerForm sandbox allocation', () => {
 
     click(mounted.container, 'select-repository');
     expect(onRepositoryChange).toHaveBeenCalledWith('kilo/other');
+  });
+});
+
+describe('TriggerForm environments', () => {
+  let root: Root | undefined;
+  let cleanup: (() => void) | undefined;
+
+  afterEach(() => {
+    if (root) act(() => root?.unmount());
+    root = undefined;
+    cleanup?.();
+    cleanup = undefined;
+  });
+
+  function render(props: Partial<TriggerFormProps>) {
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    root = createRoot(dom.container);
+    const onSubmit = jest.fn<TriggerFormProps['onSubmit']>();
+    onSubmit.mockResolvedValue(undefined);
+    const allProps: TriggerFormProps = {
+      mode: 'edit',
+      initialData: initialData(),
+      repositories: [],
+      models,
+      onSubmit,
+      ...props,
+    };
+    act(() => root?.render(createElement(TriggerForm, allProps)));
+    return { container: dom.container, onSubmit, allProps };
+  }
+
+  it('shows a saved selection and keeps an unchanged environment undefined in edit submissions', async () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({ data: [githubEnvironment()] })
+    );
+    const mounted = render({
+      initialData: { ...initialData(), environmentId },
+    });
+
+    const saved = mounted.container.querySelector(`[data-select-item="${environmentId}"]`);
+    expect(saved).not.toBeNull();
+    expect(saved?.textContent).toContain('Trigger environment');
+    expect(mounted.container.textContent).toContain('Repositories: kilo/cloud');
+
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedEnvironmentToBeUnchanged(mounted.onSubmit);
+  });
+
+  it('keeps an unavailable saved environment disabled and unchanged', async () => {
+    const mounted = render({
+      initialData: { ...initialData(), environmentId },
+    });
+
+    const saved = mounted.container.querySelector<HTMLButtonElement>(
+      `[data-select-item="${environmentId}"]`
+    );
+    expect(saved).not.toBeNull();
+    expect(saved).toHaveProperty('disabled', true);
+    expect(saved?.textContent).toContain('Saved environment (unavailable)');
+    expect(mounted.container.textContent).toContain(
+      'The saved environment is no longer available for this repository.'
+    );
+
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedEnvironmentToBeUnchanged(mounted.onSubmit);
+  });
+
+  it('submits a changed environment and clears an existing selection to null', async () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({
+        data: [githubEnvironment(), githubEnvironment({ id: otherEnvironmentId, name: 'Other' })],
+      })
+    );
+    const mounted = render({
+      initialData: { ...initialData(), environmentId },
+    });
+
+    selectEnvironment(mounted.container, otherEnvironmentId);
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ environmentId: otherEnvironmentId })
+    );
+
+    selectEnvironment(mounted.container, 'automatic');
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ environmentId: null })
+    );
+  });
+
+  it('submits a selected environment and explicit no-environment value in create mode', async () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({ data: [githubEnvironment()] })
+    );
+    const mounted = render({ mode: 'create' });
+
+    selectEnvironment(mounted.container, environmentId);
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ environmentId }));
+
+    selectEnvironment(mounted.container, 'automatic');
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ environmentId: null })
+    );
+  });
+
+  it('preserves the selected environment when the current repository is reselected', async () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({ data: [githubEnvironment()] })
+    );
+    const mounted = render({ mode: 'create' });
+
+    selectEnvironment(mounted.container, environmentId);
+    click(mounted.container, 'reselect-repository');
+    expect(
+      mounted.container
+        .querySelector('[data-select-id="environmentId"]')
+        ?.getAttribute('data-container-allocation')
+    ).toBe(environmentId);
+
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ environmentId }));
+  });
+
+  it('clears the selected environment when the repository changes', async () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({ data: [githubEnvironment()] })
+    );
+    const mounted = render({ mode: 'create' });
+
+    selectEnvironment(mounted.container, environmentId);
+    expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      organizationId: undefined,
+      repository: { platform: 'github', fullName: 'kilo/cloud' },
+    });
+
+    click(mounted.container, 'select-repository');
+    expect(
+      mounted.container
+        .querySelector('[data-select-id="environmentId"]')
+        ?.getAttribute('data-container-allocation')
+    ).toBe('automatic');
+    expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      organizationId: undefined,
+      repository: { platform: 'github', fullName: 'kilo/other' },
+    });
+
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ environmentId: null })
+    );
+  });
+
+  it('queries environments without a repository', () => {
+    render({ mode: 'create', initialData: { ...initialData(), githubRepo: '' } });
+
+    expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      organizationId: undefined,
+      repository: undefined,
+    });
+  });
+
+  it('queries organization scope independently of runAsCreator', () => {
+    const mounted = render({ mode: 'create', organizationId: 'org-1' });
+
+    expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      organizationId: 'org-1',
+      repository: { platform: 'github', fullName: 'kilo/cloud' },
+    });
+
+    click(mounted.container, 'test-creator');
+    expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      organizationId: 'org-1',
+      repository: { platform: 'github', fullName: 'kilo/cloud' },
+    });
+  });
+
+  it('shows the loading state and disables the environment select', () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({ data: undefined, isLoading: true })
+    );
+    const mounted = render({});
+
+    expect(mounted.container.textContent).toContain('Loading environments...');
+    expect(
+      mounted.container
+        .querySelector('[data-select-id="environmentId"]')
+        ?.getAttribute('data-disabled')
+    ).toBe('true');
+  });
+
+  it('shows only Automatic when no environments match', () => {
+    const mounted = render({});
+
+    expect(mounted.container.textContent).toContain(
+      'Automatic uses the matching environment when exactly one exists'
+    );
+    expect(mounted.container.querySelector('[data-select-item="automatic"]')).not.toBeNull();
+    expect(mounted.container.querySelector(`[data-select-item="${environmentId}"]`)).toBeNull();
+  });
+
+  it('shows the load error and retries', () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({ data: undefined, isError: true })
+    );
+    const mounted = render({});
+
+    expect(mounted.container.textContent).toContain('Environments could not be loaded.');
+    click(mounted.container, 'Retry environments');
+    expect(environmentsRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists every repository of a multi-repository environment', () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({ data: [multiRepositoryEnvironment] })
+    );
+    const mounted = render({
+      initialData: { ...initialData(), environmentId: multiRepositoryEnvironment.id },
+    });
+
+    expect(mounted.container.textContent).toContain('Repositories: kilo/cloud, kilo/api');
   });
 });
 
@@ -1155,8 +1505,62 @@ describe('TriggerForm save and invoke', () => {
         })
       )
     );
-    return { container: dom.container, onSaveAndInvoke };
+    return { container: dom.container, onSubmit, onSaveAndInvoke };
   }
+
+  it('blocks running with an unavailable saved environment but still allows saving', async () => {
+    const mounted = render({
+      initialData: { ...initialData('high', 'scheduled'), environmentId },
+    });
+    const invokeButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      button => button.textContent === 'Save and invoke now'
+    );
+    expect(invokeButton).toHaveProperty('disabled', true);
+    click(mounted.container, 'Save and invoke now');
+    await act(async () => Promise.resolve());
+    expect(mounted.onSaveAndInvoke).not.toHaveBeenCalled();
+
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedEnvironmentToBeUnchanged(mounted.onSubmit);
+  });
+
+  it.each(['automatic', otherEnvironmentId])(
+    'allows running after replacing an unavailable environment with %s',
+    async selection => {
+      mockUseCloudAgentEnvironments.mockReturnValue(
+        environmentsResult({ data: [githubEnvironment({ id: otherEnvironmentId })] })
+      );
+      const mounted = render({
+        initialData: { ...initialData('high', 'scheduled'), environmentId },
+      });
+
+      selectEnvironment(mounted.container, selection);
+      click(mounted.container, 'Save and invoke now');
+      await act(async () => Promise.resolve());
+
+      expect(mounted.onSaveAndInvoke).toHaveBeenCalledWith(
+        expect.objectContaining({ environmentId: selection === 'automatic' ? null : selection })
+      );
+    }
+  );
+
+  it.each([{ isLoading: true }, { isError: true }])(
+    'does not treat an unconfirmed environment as unavailable with %o',
+    async state => {
+      mockUseCloudAgentEnvironments.mockReturnValue(
+        environmentsResult({ data: undefined, ...state })
+      );
+      const mounted = render({
+        initialData: { ...initialData('high', 'scheduled'), environmentId },
+      });
+
+      click(mounted.container, 'Save and invoke now');
+      await act(async () => Promise.resolve());
+
+      expect(mounted.onSaveAndInvoke).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('uses current validated scheduled form data with the same omission mapping', async () => {
     const mounted = render({});

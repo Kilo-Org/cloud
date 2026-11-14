@@ -7,7 +7,7 @@ import { expect, it, vi } from 'vitest';
 import { unstable_readConfig, unstable_startWorker } from 'wrangler';
 import { usage } from './usage.test-fixture';
 
-it('reports workerd overload and per-item decisions', async () => {
+async function testQueueRetryDelay(randomValue: number) {
   const calls: unknown[] = [];
   let statuses: (number | 'recorded' | 'duplicate' | 'admission')[] = [];
   let mixedStatus: number | 'admission' | undefined;
@@ -64,12 +64,17 @@ it('reports workerd overload and per-item decisions', async () => {
       config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href),
     });
     const config = join(directory, 'wrangler.json');
+    const main = join(directory, 'entry.ts');
+    await writeFile(
+      main,
+      `import worker from ${JSON.stringify(fileURLToPath(new URL('./index.ts', import.meta.url).href))}; Math.random = () => ${randomValue}; export default worker;`
+    );
     // Compile the production entrypoint with its compatibility settings, without remote bindings.
     await writeFile(
       config,
       JSON.stringify({
         name: 'usage-overload-runtime',
-        main: fileURLToPath(new URL('./index.ts', import.meta.url).href),
+        main,
         compatibility_date: service.compatibility_date,
         compatibility_flags: service.compatibility_flags,
         vars: {
@@ -199,7 +204,22 @@ it('reports workerd overload and per-item decisions', async () => {
       expect(result.explicitAcks).toEqual([]);
       expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-0']);
     }
-    expect(calls).toHaveLength(41);
+    for (const status of ['admission', 429, 503, 400] as const) {
+      statuses = [status];
+      const result = await entrypoint.queue('local-usage', [{ ...messages[0], attempts: 1 }]);
+      expect(result.outcome).toBe(status === 400 ? 'ok' : 'exception');
+      expect(result.explicitAcks).toEqual([]);
+      expect(result.retryMessages).toEqual([
+        {
+          msgId: 'queue-0',
+          delaySeconds:
+            status === 'admission'
+              ? 1 + Math.floor(randomValue * 4)
+              : 60 + Math.floor(randomValue * 61),
+        },
+      ]);
+    }
+    expect(calls).toHaveLength(45);
     const serialized = JSON.stringify(logs);
     expect(serialized).toContain('usage_ingest_handler_entry');
     expect(serialized).toContain('batch_id');
@@ -229,4 +249,10 @@ it('reports workerd overload and per-item decisions', async () => {
       await rm(directory, { recursive: true, force: true });
     }
   }
-}, 30_000);
+}
+
+it.each([0, 0.25, 0.5, 0.99])(
+  'reports workerd overload and direct retry delay with random %s',
+  testQueueRetryDelay,
+  30_000
+);

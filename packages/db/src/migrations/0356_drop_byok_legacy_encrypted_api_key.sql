@@ -1,0 +1,1 @@
+ALTER TABLE "byok_api_keys" DROP COLUMN "encrypted_api_key";

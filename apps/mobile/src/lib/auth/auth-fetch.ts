@@ -7,7 +7,7 @@ import {
   classifyAuthResponse,
   reportAuthTerminalFailure,
 } from '@/lib/auth/auth-response-class';
-import { parseAuthError } from '@/lib/auth/native-auth-contract';
+import { parseAuthError, type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 
 const stringCodeErrorSchema = z.object({ code: z.string() });
@@ -25,6 +25,8 @@ export type PostAuthFailure = {
   ssoOrganizationId: string | undefined;
   /** The sign-in methods a `SIGNUP-STEP-UP` refusal admits, unfiltered. */
   signupMethods?: string[];
+  /** The pending link a `DIFFERENT-OAUTH` refusal offers, when the server created one. */
+  pendingLink?: PendingLinkOffer;
   /** The HTTP status the route answered with; absent when it never answered. */
   httpStatus?: number;
   /** True for a refusal retrying cannot change (a 401, or a 4xx with no retry guidance). */
@@ -99,6 +101,7 @@ export async function postAuth(
         errorCode: parsed?.code,
         ssoOrganizationId: parsed?.ssoOrganizationId,
         signupMethods: parsed?.signupMethods,
+        pendingLink: parsed?.pendingLink,
         httpStatus: response.status,
         terminal: classified.kind === 'terminal',
         retryAfterMs: classified.kind === 'retry' ? classified.retryAfterMs : undefined,

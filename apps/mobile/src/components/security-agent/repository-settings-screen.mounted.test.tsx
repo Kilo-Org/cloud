@@ -120,6 +120,9 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
   },
 }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
+vi.mock('@/components/security-agent/orphaned-findings-card', () => ({
+  OrphanedFindingsCard: 'OrphanedFindingsCard',
+}));
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
 }));

@@ -68,6 +68,9 @@ const keptEntrySchema = z.object({
   afterTurns: z.number().int().nonnegative(),
   // A question kept before the outcome was recorded failed its answer.
   outcome: z.enum(['failed', 'stopped']).default('failed'),
+  /* Why it failed, so its bubble can state the same cause after the slot moved
+     on. A question kept before this was written says nothing about one. */
+  failureKey: z.string().nullable().default(null),
 });
 /** The stored list, before any entry is read: one broken entry is dropped alone. */
 const keptRecordsSchema = z.array(z.unknown());

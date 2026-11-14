@@ -22,6 +22,7 @@ import { isSessionStartRateLimited } from '@/lib/code-reviews/core/session-start
 import { selectFixReviewCommentsForReview } from '@/lib/code-reviews/fix-review/select-comments';
 import { resolveBotModelSlug } from '@/lib/bot/model';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { isSameOriginSubmission } from '@/lib/auth/same-origin';
 import { createCallerFactory, createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { TRPCError } from '@trpc/server';
@@ -53,26 +54,6 @@ function confirmationPath(reviewId: string): string {
 
 function redirectToError(error: string) {
   return relativeRedirect(`/code-reviews?error=${error}`);
-}
-
-/**
- * True when a submission comes from the app origin: `Origin`, which the browser
- * sends on every form POST, names the host it addressed, or `Sec-Fetch-Site`
- * reports this origin.
- */
-function isSameOriginSubmission(request: NextRequest): boolean {
-  const origin = request.headers.get('origin');
-  if (origin) {
-    let originHost: string;
-    try {
-      originHost = new URL(origin).host;
-    } catch {
-      return false;
-    }
-    return originHost === (request.headers.get('host') ?? request.nextUrl.host);
-  }
-
-  return request.headers.get('sec-fetch-site') === 'same-origin';
 }
 
 export async function GET(_request: NextRequest, context: RouteContext) {

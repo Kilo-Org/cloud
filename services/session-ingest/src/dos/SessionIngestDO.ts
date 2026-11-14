@@ -66,7 +66,6 @@ import {
 import {
   adjustRunningAssistantCostUsd,
   assistantMessageCostUsd,
-  computeRunningAssistantCostUsd,
   computeSessionMetrics,
   COST_DIVERGENCE_TOLERANCE_USD,
   COST_PERSIST_THROTTLE_MS,
@@ -80,6 +79,7 @@ import {
   type TerminationReason,
 } from './session-metrics';
 import { readSessionMetricsWindow } from './session-metrics-window';
+import { readStoredRunningAssistantCostUsd } from './running-cost-seed';
 import migrations from '../../drizzle/migrations';
 import { refreshGlanceableSessions } from '../remote-session-notifications';
 import {
@@ -1084,15 +1084,13 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     // The running cost is committed with the rows, so a persist reads a stored total instead
     // of the session's message history. A session without one — created before the total
-    // existed, or a clone destination — seeds it from its stored rows once.
+    // existed, or a clone destination — seeds it from its stored rows once: bounded batches
+    // that sum the stored contribution of every message row, reading a body only for a row
+    // that predates the column. The write lands after the last batch, so the key marks a
+    // complete seed and a later batch never repeats it.
     let runningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
     if (runningCostUsd === null && costWindowOpen) {
-      const messageRows = this.db
-        .select({ item_data: ingestItems.item_data })
-        .from(ingestItems)
-        .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
-        .all();
-      runningCostUsd = computeRunningAssistantCostUsd(messageRows);
+      runningCostUsd = readStoredRunningAssistantCostUsd(this.db);
       writeIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY, runningCostUsd);
     }
 

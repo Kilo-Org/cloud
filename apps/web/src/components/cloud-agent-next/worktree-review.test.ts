@@ -1,6 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
+import { MAX_WORKTREE_REVIEW_PROMPT_LENGTH } from '@kilocode/app-shared/worktree-review';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+
 jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
   iterateOverDiff: () => [],
 }));
@@ -30,3 +33,10 @@ it('passes the worktree review ESM domain regressions', () => {
     error: '',
   });
 }, 30_000);
+
+it('keeps the shared review prompt cap equal to the cloud agent prompt cap', () => {
+  // The shared module cannot import the SDK (the SDK builds on it), so the two
+  // caps are declared separately. A review longer than the worker accepts would
+  // only fail at the very end of the review, so assert the caps cannot drift.
+  expect(MAX_WORKTREE_REVIEW_PROMPT_LENGTH).toBe(CLOUD_AGENT_PROMPT_MAX_LENGTH);
+});

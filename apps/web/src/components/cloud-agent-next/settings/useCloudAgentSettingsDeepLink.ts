@@ -17,7 +17,9 @@ export function resolveSettingsDeepLink(settings: string | null): SettingsDeepLi
   if (settings === '' || settings === 'general') return { open: true, initialSection: 'general' };
   if (settings === 'environments') return { open: true, initialSection: 'environments' };
   if (settings === 'profiles') return { open: true, initialSection: 'profiles' };
+  if (settings === 'sidebar') return { open: true, initialSection: 'sidebar' };
   if (settings === 'compute') return { open: true, initialSection: 'compute' };
+  if (settings === 'preferences') return { open: true, initialSection: 'preferences' };
   return { open: false, initialSection: 'general' };
 }
 

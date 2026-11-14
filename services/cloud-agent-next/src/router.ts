@@ -21,6 +21,7 @@ import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
 import { createSessionEgressAuditHandlers } from './router/handlers/session-egress-audit.js';
 import { listChildSessions } from './router/handlers/list-child-sessions.js';
+import { createSessionWorktreeGitHandlers } from './router/handlers/session-worktree-git.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
 import { listPreviewServices } from './router/handlers/preview-services.js';
@@ -30,6 +31,16 @@ import {
   listHostedWorkspaces,
 } from './router/handlers/hosted-workspace-list.js';
 import { getHostedWorkspaceStatus } from './router/handlers/hosted-workspace-status.js';
+import { refreshHostedWorkspacePullRequest } from './router/handlers/hosted-workspace-pull-request-refresh.js';
+import {
+  getHostedWorkspaceChangeFile,
+  getHostedWorkspaceChanges,
+  refreshHostedWorkspaceChanges,
+} from './router/handlers/hosted-workspace-changes.js';
+import {
+  getHostedWorkspacePullRequest,
+  getHostedWorkspacePullRequestFile,
+} from './router/handlers/hosted-workspace-pull-request.js';
 import {
   buildEnvironment,
   cancelEnvironmentBuild,
@@ -37,10 +48,14 @@ import {
   getEnvironmentBuildStatus,
   notifyEnvironmentDeleted,
 } from './router/handlers/environment-build.js';
-import { getSessionMessagesPage } from './router/handlers/session-history.js';
+import {
+  getSessionMessagesPage,
+  getSessionToolPartDetail,
+} from './router/handlers/session-history.js';
 
 export const appRouter = router({
   getSessionMessagesPage,
+  getSessionToolPartDetail,
   deleteWorktree,
   getSandboxSelectionOptions,
   getPreviewOptions,
@@ -50,6 +65,12 @@ export const appRouter = router({
   listHostedWorkspaces,
   getHostedWorkspace,
   getHostedWorkspaceStatus,
+  refreshHostedWorkspacePullRequest,
+  getHostedWorkspaceChanges,
+  refreshHostedWorkspaceChanges,
+  getHostedWorkspaceChangeFile,
+  getHostedWorkspacePullRequest,
+  getHostedWorkspacePullRequestFile,
   buildEnvironment,
   getEnvironmentBuildStatus,
   getEnvironmentBuildLogs,
@@ -69,6 +90,7 @@ export const appRouter = router({
   ...createHostedWorkspaceContinuationHandlers(),
   ...createSessionWorktreeChangesHandlers(),
   ...createSessionEgressAuditHandlers(),
+  ...createSessionWorktreeGitHandlers(),
 });
 
 export type AppRouter = typeof appRouter;

@@ -4,6 +4,7 @@ import { toast } from 'sonner-native';
 
 import {
   describePrefillFallback,
+  isRepoSeedPending,
   type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
@@ -65,6 +66,17 @@ export type UseNewSessionPrefillTargetsInput = {
   repositories: { platform: string; fullName: string }[];
   // !isLoadingRepos && !isReposError && repositories.length > 0
   reposSettled: boolean;
+  /**
+   * The provider queries' own first-load state: true once each finished
+   * loading, whether or not it errored and whether or not any rows came back.
+   * A paused or disabled query counts as resolved.
+   *
+   * This is not `reposSettled`, which also requires no error and at least one
+   * row: a prefill can only seed in the render `reposSettled` turns true, so a
+   * repo the lists cannot satisfy must let the repository region settle
+   * instead of holding it — and the form's rows below it — forever.
+   */
+  providerQueriesResolved: boolean;
   models: { id: string; variants: string[] }[];
   // !isLoadingModels && !isModelsError && models.length > 0
   modelsSettled: boolean;
@@ -89,7 +101,14 @@ export type UseNewSessionPrefillTargetsInput = {
  * `resolveStoredRepoSelection`).
  */
 export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsInput) {
-  const { repositories, reposSettled, models, modelsSettled, storedRepo = null } = input;
+  const {
+    repositories,
+    reposSettled,
+    providerQueriesResolved,
+    models,
+    modelsSettled,
+    storedRepo = null,
+  } = input;
   const prefill = useNewSessionPrefill();
   const [selectedRepo, setSelectedRepo] = useState('');
   const hasAppliedRepo = useRef(false);
@@ -133,5 +152,15 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
     }
   }, [prefill, reposSettled, modelsSettled, repositories, models]);
 
-  return { selectedRepo, setSelectedRepo };
+  return {
+    selectedRepo,
+    setSelectedRepo,
+    /** Whether the route prefill can still replace the selection. */
+    repoSeedPending: isRepoSeedPending({
+      prefillRepo: prefill.repo,
+      applied: hasAppliedRepo.current,
+      selectedRepo,
+      providerQueriesResolved,
+    }),
+  };
 }

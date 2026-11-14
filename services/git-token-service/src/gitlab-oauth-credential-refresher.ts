@@ -5,6 +5,7 @@ import {
   GitLabOAuthCredentialRowSchema,
   buildGitLabOAuthCredentialAad,
 } from '@kilocode/worker-utils/gitlab-credential';
+import { normalizeGitLabInstanceUrl } from '@kilocode/worker-utils/gitlab-url';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -12,7 +13,6 @@ import {
   type GitLabCredentialCryptoEnv,
 } from './gitlab-credential-crypto.js';
 import type { GitLabOAuthCredentialRefresher as GitLabOAuthCredentialRefresherContract } from './gitlab-credential-service.js';
-import { normalizeGitLabInstanceUrl } from './gitlab-url.js';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
 import {
   claimRefreshLease,

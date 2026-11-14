@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: read
+  # Preparation can read this SHA's runtime-publication workflow runs.
+  actions: read
 
 concurrency:
   group: cloud-agent-e2e-deploy
@@ -18,7 +20,8 @@ jobs:
     # Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Runtime preparation may wait up to 45 minutes for the exact-SHA handoff.
+    timeout-minutes: 75
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
@@ -51,6 +54,19 @@ jobs:
       - name: Deploy fake-LLM Worker
         working-directory: services/cloud-agent-next
         run: test/e2e/deploy/deploy-fake-llm.sh deploy
+
+      - name: Prepare downloaded Cloud Agent runtime
+        working-directory: services/cloud-agent-next
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          # Read-only: lets preparation stop waiting once the SHA's publication has failed.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$SOURCE_SHA"
 
       - name: Deploy Cloud Agent e2e Worker
         working-directory: services/cloud-agent-next

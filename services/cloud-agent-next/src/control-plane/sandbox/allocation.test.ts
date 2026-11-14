@@ -95,6 +95,55 @@ describe('allocation stop-ladder exhaustion', () => {
   });
 });
 
+describe('allocation snapshot launch retry', () => {
+  const creating: AllocationState = {
+    ...initialAllocationState(),
+    kind: 'creating',
+    allocationId: 'alloc-1',
+    providerRef: 'ref-1',
+    createDeadlineAt: 300_000,
+    createAttempt: 1,
+  };
+
+  it('moves the create deadline to the retry bound', () => {
+    const reduction = reduceAllocation(
+      creating,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    expect(reduction.state).toEqual({ ...creating, createDeadlineAt: 610_000 });
+    expect(reduction.effects).toEqual([]);
+  });
+
+  it('keeps the retry from expiring at the first attempt deadline', () => {
+    const { state } = reduceAllocation(
+      creating,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    const tick = reduceAllocation(
+      state,
+      { type: 'tick', at: 320_000, nextAllocationId: 'alloc-2', retryAllowed: true },
+      TIMERS
+    );
+    expect(tick.state).toBe(state);
+    expect(tick.effects).toEqual([]);
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(610_000);
+  });
+
+  it.each([
+    ['another allocation', { ...creating, allocationId: 'alloc-2' }],
+    ['a connected allocation', { ...creating, kind: 'connected' as const }],
+  ])('ignores a retry for %s', (_name, state) => {
+    const reduction = reduceAllocation(
+      state,
+      { type: 'snapshot-retry', at: 310_000, allocationId: 'alloc-1', createDeadlineAt: 610_000 },
+      TIMERS
+    );
+    expect(reduction.state).toBe(state);
+  });
+});
+
 describe('allocation idle deadline while disconnected', () => {
   it('stops on the idle deadline when it is the earlier deadline', () => {
     // Activity at 0, so the idle deadline is 10 min. The socket closed at 9 min
@@ -310,6 +359,23 @@ describe('allocation create retry', () => {
     );
     expect(due.effects).toEqual([{ type: 'create', allocationId: 'alloc-3' }]);
     expect(due.state.createDeadlineAt).toBe(retryAt + TIMERS.providerCreateMs);
+  });
+
+  it('does not wait beyond an admission deadline during the create retry pause', () => {
+    const retryDeadlineAt = CREATE_FAILED_AT + 5_000;
+    const { state } = reduceAllocation(
+      creatingState(),
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT,
+        allocationId: 'alloc-1',
+        nextAllocationId: 'alloc-2',
+        retryAllowed: true,
+        retryDeadlineAt,
+      },
+      TIMERS
+    );
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(retryDeadlineAt);
   });
 
   it('stops instead of retrying when no route attempt time remains', () => {

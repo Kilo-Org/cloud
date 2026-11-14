@@ -14,7 +14,6 @@ export default {
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  transformRequest() {},
   models: cachedDirectByokModelList('synthetic'),
   provider_listing: {
     dataPolicy: {

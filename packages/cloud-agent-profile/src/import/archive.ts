@@ -1,4 +1,6 @@
 import { unzipSync, type UnzipFileInfo } from 'fflate';
+import { CONFIG_FILE_NAMES } from './config-file';
+import { IMPORT_CATEGORY_DIRECTORY_NAMES } from './directory-names';
 import {
   MAX_IMPORT_ARCHIVE_ENTRIES,
   MAX_IMPORT_ARCHIVE_EXPANDED_BYTES,
@@ -34,19 +36,6 @@ export class ImportArchiveError extends Error {
     this.code = code;
   }
 }
-
-/** Directory names that mark a real config root; a sole top-level directory with one of these names is not a wrapper. */
-const CONFIG_DIRECTORY_NAMES = new Set([
-  'agent',
-  'agents',
-  'command',
-  'commands',
-  'skills',
-  'instructions',
-]);
-
-/** Config file names that mark a real config root, so a bare config file is not treated as a wrapper. */
-const CONFIG_FILE_NAMES = new Set(['kilo.json', 'kilo.jsonc']);
 
 const JUNK_SEGMENT_NAMES = new Set(['__macosx', '.git', 'node_modules']);
 const JUNK_FILE_NAMES = new Set(['.ds_store', 'thumbs.db', 'desktop.ini']);
@@ -93,21 +82,30 @@ function isJunkPath(path: string): boolean {
 }
 
 /**
+ * The sole top-level directory of `paths`, and only when every path is nested
+ * inside it. Returns null for an empty list, for two or more top-level names,
+ * and when a path sits at the root.
+ */
+function soleTopLevelDirectory(paths: string[]): string | null {
+  if (paths.length === 0) return null;
+  const topLevelNames = new Set(paths.map(path => path.split('/')[0]));
+  if (topLevelNames.size !== 1) return null;
+  if (!paths.every(path => path.includes('/'))) return null;
+  return [...topLevelNames][0];
+}
+
+/**
  * Strip a single outer wrapper directory. A sole top-level directory is only
  * stripped when it is not a known config directory name, not a config file
  * name, and contains at least one nested entry — so an archive rooted at
  * `agent/` or `skills/` (an unwrapped single category) keeps its path.
  */
 export function resolveConfigRoot(paths: string[]): string | null {
-  if (paths.length === 0) return null;
-  const topLevelNames = new Set(paths.map(path => path.split('/')[0]));
-  if (topLevelNames.size !== 1) return null;
+  const top = soleTopLevelDirectory(paths);
+  if (top === null) return null;
 
-  const [top] = topLevelNames;
   const lower = top.toLowerCase();
-  if (CONFIG_DIRECTORY_NAMES.has(lower) || CONFIG_FILE_NAMES.has(lower)) return null;
-  if (!paths.every(path => path.includes('/'))) return null;
-
+  if (IMPORT_CATEGORY_DIRECTORY_NAMES.has(lower) || CONFIG_FILE_NAMES.has(lower)) return null;
   return top;
 }
 
@@ -119,11 +117,7 @@ export function resolveConfigRoot(paths: string[]): string | null {
  * `SKILL.md` keeps its paths, and mixed roots are left alone.
  */
 export function resolveSkillBundleRoot(paths: string[]): string | null {
-  if (paths.length === 0) return null;
-  const topLevelNames = new Set(paths.map(path => path.split('/')[0]));
-  if (topLevelNames.size !== 1) return null;
-  if (!paths.every(path => path.includes('/'))) return null;
-  return [...topLevelNames][0];
+  return soleTopLevelDirectory(paths);
 }
 
 function decodeArchive(

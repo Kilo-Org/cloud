@@ -409,6 +409,61 @@ describe('useSaveReviewConfig mutationFn payload shape', () => {
   });
 });
 
+describe('useSaveReviewConfig GitLab webhook warning flag', () => {
+  const WARNING_KEY = ['codeReviewerGitLabWebhookWarning', 'org_42', 'gitlab'];
+
+  it('leaves the stored warning alone for an edit that does not touch the selection', async () => {
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ focusAreas: ['security'] });
+
+    // The server syncs project hooks only for a selection patch, so an
+    // unrelated save must not dismiss a warning it never re-checked.
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+
+  it('records a selection save whose sync reported errors', async () => {
+    orgPatchMutateMock.mockResolvedValue({
+      success: true,
+      webhookSync: { errors: ['repo 7 webhook sync failed'] },
+    });
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ selectedRepositoryIds: [7] });
+
+    expect(setQueryDataMock).toHaveBeenCalledWith(WARNING_KEY, true);
+  });
+
+  it('clears the warning once the selection sync reports no errors', async () => {
+    orgPatchMutateMock.mockResolvedValue({ success: true, webhookSync: { errors: [] } });
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ selectedRepositoryIds: [7] });
+
+    expect(setQueryDataMock).toHaveBeenCalledWith(WARNING_KEY, false);
+  });
+
+  it('leaves the stored warning alone for a mode save, which never syncs hooks', async () => {
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ repositorySelectionMode: 'all' });
+
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves the stored warning alone when a selection save reports no sync', async () => {
+    // The PATCH routers answer `webhookSync: null` when they skip the sync:
+    // no connected integration, or no stored hook secret. Such a save proved
+    // nothing about the stored hooks.
+    orgPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ selectedRepositoryIds: [7] });
+
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('useSaveReviewConfig onError', () => {
   it('toasts the thrown error message and does not call invalidateQueries from onError', async () => {
     personalPatchMutateMock.mockReset();

@@ -50,10 +50,10 @@ it('calls a local HTTP writer from workerd and checks the acknowledgement', asyn
     await writeFile(
       main,
       `
-    import { recordUsage } from ${JSON.stringify(clientPath)};
+    import { recordLlmUsage } from ${JSON.stringify(clientPath)};
     export default {
       async fetch(request) {
-        return Response.json(await recordUsage(await request.json(), {
+        return Response.json(await recordLlmUsage(await request.json(), {
           url: ${JSON.stringify(writerUrl)}, secret: 'synthetic-writer-secret'
         }));
       }

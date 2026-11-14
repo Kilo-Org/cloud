@@ -24,7 +24,6 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { Env, SandboxId } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 import { buildSandboxBillingInput } from '../container-usage-context.js';
-import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
@@ -171,7 +170,7 @@ export function buildControlPlanePromptPayload(input: {
  */
 export function buildControlPlaneSandboxSelection(
   metadata: SessionMetadata,
-  env: Env,
+  _env: Env,
   sandboxId: SandboxId
 ): ControlPlaneSandboxSelection {
   const provider = metadata.workspace?.sandboxProvider ?? 'cloudflare';
@@ -192,11 +191,7 @@ export function buildControlPlaneSandboxSelection(
       ...(sandboxKind ? { sandboxKind } : {}),
     };
   }
-  const enforcementRequested = isCloudAgentContainerBillingEnabled(env, metadata.identity);
-  const billing = {
-    ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
-    enforcementRequested,
-  };
+  const billing = buildSandboxBillingInput(metadata, sandboxId);
   const pinned = {
     billing,
     ...(sandboxKind ? { sandboxKind } : {}),

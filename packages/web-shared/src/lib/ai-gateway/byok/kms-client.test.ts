@@ -28,6 +28,11 @@ import {
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_DATA_KEY_CACHE_TTL_SECONDS } from '@kilocode/web-shared/lib/ai-gateway/byok/data-key-cache';
+import {
+  readBodyText,
+  readJsonBody,
+  requestUrlOf,
+} from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const mockRedis = jest.requireMock<{
   redisClient: {
@@ -69,9 +74,9 @@ function installFakeKms() {
   const calls: Call[] = [];
   const dataKeys = new Map<string, { dataKey: string; context: ByokKmsContext }>();
   const fakeFetch = jest.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    const target = new URL(String(url));
+    const target = new URL(requestUrlOf(url));
     calls.push({ url: target, init: init ?? {} });
-    const body = JSON.parse(String(init?.body));
+    const body = readJsonBody(init?.body) as ByokKmsContext & { wrapped_dek?: string };
     if (target.pathname === '/data-key') {
       const dataKey = randomBytes(32).toString('base64');
       const wrapped = `wrapped-${dataKeys.size}`;
@@ -129,14 +134,14 @@ afterEach(() => {
 });
 
 describe('byok kms client', () => {
-  test('returns null when the service is not configured', async () => {
+  test('refuses to encrypt when the service is not configured', async () => {
     delete process.env.BYOK_KMS_SERVICE_URL;
     const { fakeFetch } = installFakeKms();
 
-    expect(getByokKmsClientConfig()).toBeNull();
+    expect(() => getByokKmsClientConfig()).toThrow('BYOK_KMS_SERVICE_URL is required');
     await expect(
       encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
-    ).resolves.toBeNull();
+    ).rejects.toThrow('BYOK_KMS_SERVICE_URL is required');
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 
@@ -157,11 +162,11 @@ describe('byok kms client', () => {
       authorization: 'Bearer token-1',
       'content-type': 'application/json',
     });
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+    expect(readJsonBody(calls[0].init.body)).toEqual({
       ...context,
       actor_user_id: 'user-1',
     });
-    expect(String(calls[0].init.body)).not.toContain('sk-secret');
+    expect(readBodyText(calls[0].init.body)).not.toContain('sk-secret');
     expect(envelope).toMatchObject({
       wrapped_dek: 'wrapped-0',
       kms_key_id: 'alias/test',
@@ -176,9 +181,8 @@ describe('byok kms client', () => {
     const { calls } = installFakeKms();
 
     const dataKey = await createByokDataKey({ context, actorUserId });
-    if (!dataKey) throw new Error('expected data key');
     expect(calls).toHaveLength(1);
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+    expect(readJsonBody(calls[0].init.body)).toEqual({
       ...context,
       actor_user_id: 'user-1',
     });
@@ -193,7 +197,9 @@ describe('byok kms client', () => {
     delete process.env.BYOK_KMS_SERVICE_URL;
     const { fakeFetch } = installFakeKms();
 
-    await expect(createByokDataKey({ context, actorUserId })).resolves.toBeNull();
+    await expect(createByokDataKey({ context, actorUserId })).rejects.toThrow(
+      'BYOK_KMS_SERVICE_URL is required'
+    );
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 
@@ -210,7 +216,6 @@ describe('byok kms client', () => {
       context: orgContext,
       actorUserId,
     });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(decryptByokEnvelope(envelope, orgContext)).resolves.toBe('sk-secret');
 
@@ -221,7 +226,7 @@ describe('byok kms client', () => {
       authorization: 'Bearer token-1',
       'content-type': 'application/json',
     });
-    expect(JSON.parse(String(calls[1].init.body))).toEqual({
+    expect(readJsonBody(calls[1].init.body)).toEqual({
       ...orgContext,
       wrapped_dek: envelope.wrapped_dek,
       kms_key_id: envelope.kms_key_id,
@@ -232,11 +237,10 @@ describe('byok kms client', () => {
   test('never sends the BYOK key or its envelope ciphertext to the service', async () => {
     const { calls } = installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     await decryptByokEnvelope(envelope, context);
 
     for (const call of calls) {
-      const sent = `${call.url.href}${String(call.init.body ?? '')}`;
+      const sent = `${call.url.href}${readBodyText(call.init.body ?? '')}`;
       expect(sent).not.toContain('sk-secret');
       expect(sent).not.toContain(envelope.encrypted_data.data);
     }
@@ -245,7 +249,6 @@ describe('byok kms client', () => {
   test('fails to decrypt with a mismatched context', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(
       decryptByokEnvelope(envelope, { ...context, provider_id: 'openai' })
@@ -255,7 +258,6 @@ describe('byok kms client', () => {
   test('fails to decrypt when the key id differs from the one the data key was created for', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(decryptByokEnvelope(envelope, { ...context, key_id: 'key-9' })).rejects.toThrow(
       'status 400'
@@ -495,7 +497,6 @@ describe('byok kms client', () => {
   test('envelope decrypt fails when the service is not configured', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     delete process.env.BYOK_KMS_SERVICE_URL;
 
     await expect(decryptByokEnvelope(envelope, context)).rejects.toThrow('BYOK_KMS_SERVICE_URL');
@@ -504,7 +505,6 @@ describe('byok kms client', () => {
   test('stored envelope is decryptable with the data key returned by the service', async () => {
     const { fakeFetch } = installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     const response = await fakeFetch('http://kms.test/decrypt', {
       method: 'POST',
@@ -526,7 +526,6 @@ describe('byok data key cache', () => {
 
   async function storedEnvelope(apiKey = 'sk-secret') {
     const envelope = await encryptByokForStorage({ apiKey, context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     return envelope;
   }
 

@@ -36,10 +36,10 @@ export const PINNED_CLIS = {
     reportedVersion: KILO_CLI_VERSION,
   },
   kilo2: {
-    version: '0.0.0-v2-25',
-    sha256: 'a1f514de218e9066f40fcde7ea31dba6655fda5ae8933a0bd3432d05156a9363',
+    version: '0.0.0-v2-91',
+    sha256: '9f5065586c98c190b33f5ce232d99c663abd1a007d5da13e1d26236e6d49666a',
     executable: 'package/bin/kilo2',
-    reportedVersion: 'kilo2 v0.0.0-v2-25',
+    reportedVersion: 'kilo2 v0.0.0-v2-91',
   },
 } as const satisfies Record<
   RuntimeHarness,

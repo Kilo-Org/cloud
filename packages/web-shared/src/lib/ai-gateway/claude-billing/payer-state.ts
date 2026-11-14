@@ -5,18 +5,76 @@ import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { getClaudeBillingConnection, type ClaudeBillingOwner } from './store';
+import { getGrantedClaudeBillingConnection, type ClaudeBillingOwner } from './store';
+import { claudeBillingOwnerMatches } from './owner';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
 export const ClaudeBillingOwnerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('personal'), kiloUserId: z.string().min(1) }),
-  z.object({ kind: z.literal('organization'), organizationId: z.uuid() }),
+  z.object({
+    kind: z.literal('member'),
+    kiloUserId: z.string().min(1),
+    organizationId: z.uuid(),
+  }),
+  z.object({ kind: z.literal('shared_services'), organizationId: z.uuid() }),
 ]) satisfies z.ZodType<ClaudeBillingOwner>;
+
+/**
+ * The owner on the internal payer-state wire between the gateway and the web
+ * app. The gateway deploys first, so each side must read the other's previous
+ * release: `organization` alone names the shared-services connection, which is
+ * the organization connection that release knew, and `organization` with a
+ * person names that member's own connection.
+ */
+export const ClaudeBillingPayerOwnerSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('personal'), kiloUserId: z.string().min(1) }),
+    z.object({
+      kind: z.literal('organization'),
+      organizationId: z.uuid(),
+      kiloUserId: z.string().min(1).optional(),
+    }),
+  ])
+  .transform((wire): ClaudeBillingOwner => {
+    if (wire.kind === 'personal') return wire;
+    return wire.kiloUserId
+      ? { kind: 'member', kiloUserId: wire.kiloUserId, organizationId: wire.organizationId }
+      : { kind: 'shared_services', organizationId: wire.organizationId };
+  });
+
+function payerOwnerWire(owner: ClaudeBillingOwner): z.input<typeof ClaudeBillingPayerOwnerSchema> {
+  switch (owner.kind) {
+    case 'personal':
+      return owner;
+    case 'member':
+      return {
+        kind: 'organization',
+        organizationId: owner.organizationId,
+        kiloUserId: owner.kiloUserId,
+      };
+    case 'shared_services':
+      return { kind: 'organization', organizationId: owner.organizationId };
+  }
+}
 
 export const ClaudeBillingPayerStateSchema = z.object({
   status: z.enum(ClaudeBillingConnectionStatus),
   user_profile_id: z.string().min(1),
   connected_at: z.iso.datetime().nullable(),
+  /**
+   * The person the row belongs to, null for an organization-owned row. The
+   * cross-region read requires the requesting person for a personal or member
+   * owner, and null for a shared-services owner.
+   */
+  kilo_user_id: z.string().nullable().optional(),
+  /**
+   * The organization of an organization-owned row, null for a personal row. The
+   * cross-region read requires the requested organization for a member or
+   * shared-services owner, and null or absent for a personal owner.
+   */
+  organization_id: z.uuid().nullable().optional(),
+  /** The person who linked it last; every release since #10300 answers with it. */
+  created_by: z.string().min(1).optional(),
 });
 export type ClaudeBillingPayerState = z.infer<typeof ClaudeBillingPayerStateSchema>;
 const responseSchema = z.object({ connection: ClaudeBillingPayerStateSchema.nullable() });
@@ -29,6 +87,9 @@ export function claudeBillingPayerState(
         status: row.status,
         user_profile_id: row.user_profile_id,
         connected_at: row.connected_at ? new Date(row.connected_at).toISOString() : null,
+        kilo_user_id: row.kilo_user_id,
+        organization_id: row.organization_id,
+        created_by: row.created_by,
       }
     : null;
 }
@@ -38,19 +99,22 @@ export async function getAuthoritativeClaudeBillingState(
 ): Promise<ClaudeBillingPayerState | null> {
   // A stale absent row would switch payer after connect. Read the primary in
   // Frankfurt; SFO delegates there without holding a cross-region pool connection.
-  if (!isUSRegion()) return claudeBillingPayerState(await getClaudeBillingConnection(owner, db));
+  if (!isUSRegion())
+    return claudeBillingPayerState(await getGrantedClaudeBillingConnection(owner, db));
   if (!INTERNAL_API_SECRET) throw new Error('Claude payer-state authentication is not configured');
   const response = await fetchClaudeWithRetry(
     new URL('/api/internal/claude-billing/payer-state', APP_URL).toString(),
     async () => ({
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-internal-api-key': INTERNAL_API_SECRET },
-      body: JSON.stringify(owner),
+      body: JSON.stringify(payerOwnerWire(owner)),
       cache: 'no-store',
     }),
     status => status === 429 || status >= 500,
     AbortSignal.timeout(15_000)
   );
   if (!response.ok) throw new Error(`Claude payer-state read failed with HTTP ${response.status}`);
-  return responseSchema.parse(await response.json()).connection;
+  const { connection } = responseSchema.parse(await response.json());
+  if (!connection || !claudeBillingOwnerMatches(connection, owner)) return null;
+  return connection;
 }

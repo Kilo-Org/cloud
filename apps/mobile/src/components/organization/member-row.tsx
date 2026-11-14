@@ -9,16 +9,25 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatMoney } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
+import { assignableMemberRoles } from './organization-role-options';
+
 type MemberRowProps = {
   member: ActiveOrgMember;
-  /** Caller is owner and this isn't their own row. */
+  /** Caller may change this member's role or remove them: management role, not their own, owner rows owner-only. */
   canManage: boolean;
+  /** Caller may set this member's daily usage limit. */
+  canManageLimit: boolean;
+  /** Caller's own organization role; it decides which roles the menu offers. */
+  callerRole: OrgRole | undefined;
   enableUsageLimits: boolean;
+  /** Organization is a sales demo, so spend may be paired with its limit. */
+  isSalesDemo: boolean;
   organizationId: string;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -35,12 +44,13 @@ export function roleLabel(role: OrgRole): string {
   return i18n.t(ROLE_LABEL_KEYS[role]);
 }
 
-const ROLE_OPTIONS: OrgRole[] = ['owner', 'admin', 'member', 'billing_manager'];
-
 export function MemberRow({
   member,
   canManage,
+  canManageLimit,
+  callerRole,
   enableUsageLimits,
+  isSalesDemo,
   organizationId,
   last,
 }: Readonly<MemberRowProps>) {
@@ -78,15 +88,21 @@ export function MemberRow({
     return true;
   }
 
-  const roleOptions: MenuSheetOption[] = ROLE_OPTIONS.map(role => ({
+  const assignableRoles = assignableMemberRoles(callerRole);
+  const roleOptions: MenuSheetOption[] = assignableRoles.map(role => ({
     label: roleLabel(role),
     selected: role === member.role,
   }));
 
+  // Each action carries its own gate: a limit-only caller (an admin facing an
+  // owner row) still gets a menu, while role change and removal stay
+  // owner-only there.
   const actionOptions: MenuSheetOption[] = [
-    { label: t('organization.members.changeRole') },
-    ...(enableUsageLimits ? [{ label: t('organization.members.setDailyUsageLimit') }] : []),
-    { label: t('organization.members.removeMember'), destructive: true },
+    ...(canManage ? [{ label: t('organization.members.changeRole') }] : []),
+    ...(canManageLimit && enableUsageLimits
+      ? [{ label: t('organization.members.setDailyUsageLimit') }]
+      : []),
+    ...(canManage ? [{ label: t('organization.members.removeMember'), destructive: true }] : []),
   ];
 
   function onSelectRole(role: OrgRole) {
@@ -117,6 +133,29 @@ export function MemberRow({
       },
     });
   }
+
+  // Today's spend against the member's own daily limit, on the same terms as
+  // web's member card (`DailyUsageLimitDisplay`): the server strips
+  // `currentDailyUsageUsd` for a caller whose role may not read other members'
+  // usage, and web only pairs the two amounts for a sales-demo organization.
+  // Every other case keeps the limit line alone, which every role may see.
+  const currentDailyUsageUsd =
+    'currentDailyUsageUsd' in member ? member.currentDailyUsageUsd : null;
+  // A money amount's symbol is neutral to the paragraph's direction, so each
+  // run keeps its own left-to-right order inside the pair.
+  const dailyLimit = member.dailyUsageLimitUsd;
+  const limitText =
+    dailyLimit == null ? null : isolateLtrBidiText(formatMoney(dailyLimit, i18n.language));
+  const spendText =
+    isSalesDemo && currentDailyUsageUsd != null
+      ? isolateLtrBidiText(formatMoney(currentDailyUsageUsd, i18n.language))
+      : null;
+  // Web pairs the two amounts only when both exist and the organization is a
+  // sales demo; every other case keeps the limit line alone.
+  const pairLine = limitText != null && spendText != null ? `${spendText} / ${limitText}` : null;
+  const spendLine =
+    pairLine ??
+    (limitText == null ? null : t('organization.members.limitPerDay', { amount: limitText }));
 
   function actionFor(index: number): (() => void) | null {
     const label = actionOptions[index]?.label;
@@ -164,18 +203,14 @@ export function MemberRow({
             {roleLabel(member.role)}
           </Text>
         </View>
-        {member.dailyUsageLimitUsd != null && (
-          <Text className="text-xs text-muted-foreground">
-            {t('organization.members.limitPerDay', {
-              amount: formatMoney(member.dailyUsageLimitUsd, i18n.language),
-            })}
-          </Text>
-        )}
+        {spendLine !== null && <Text className="text-xs text-muted-foreground">{spendLine}</Text>}
       </View>
     </View>
   );
 
-  if (!canManage) {
+  // No action at all, so the row is not pressable: a limit-only row still
+  // opens the menu.
+  if (actionOptions.length === 0) {
     return (
       <View className="px-3">
         {inner}
@@ -225,7 +260,7 @@ export function MemberRow({
         onDismiss={runPendingAction}
         onRequestDismiss={markMenuDismissedItself}
         onSelect={index => {
-          const role = ROLE_OPTIONS[index];
+          const role = assignableRoles[index];
           if (role) {
             chooseAction(() => {
               onSelectRole(role);

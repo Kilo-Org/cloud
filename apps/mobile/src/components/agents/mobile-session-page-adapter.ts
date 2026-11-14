@@ -33,6 +33,11 @@ export type MobileSessionSnapshotRead = {
  * - Null history → empty success page (existing session with zero messages). A genuine
  *   NOT_FOUND is returned as a thrown/rejected TRPCError, never as `history === null`.
  *
+ * Both success arms also carry the page's preparation rows, which are not part
+ * of the message history: a run whose sandbox preparation failed has zero
+ * messages, and opening it shows its own failed stage and reason (with the
+ * question row's Retry and Copy) instead of an empty transcript.
+ *
  * The adapter does not re-validate the tRPC response; it trusts the shared
  * contract and uses structural narrowing to distinguish page from failure.
  *
@@ -66,6 +71,20 @@ export async function readMobileSessionSnapshotPage(
   };
 
   const history = result.history as KiloSdkMessageHistory | null;
+  // The rows a message page cannot carry, shared by both success arms. The
+  // preparation rows come first: a run whose sandbox preparation failed has no
+  // messages at all, and without them the open would paint an empty transcript
+  // instead of the run's own failure. Omitted when the router sends none, so
+  // the SDK's restore keeps the live rows it already holds.
+  // Mobile ships independently of the API: an older server omits the rows, so
+  // the page is read structurally rather than trusted.
+  const preparationAttempts = Array.isArray(result.preparationAttempts)
+    ? result.preparationAttempts
+    : [];
+  const pageState = {
+    ...(result.watermarkEventId != null ? { watermarkEventId: result.watermarkEventId } : {}),
+    ...(preparationAttempts.length > 0 ? { preparationAttempts } : {}),
+  };
   if (history === null) {
     return {
       parentSessionId,
@@ -75,7 +94,7 @@ export async function readMobileSessionSnapshotPage(
         messages: [],
         nextCursor: null,
         omittedItemCount: 0,
-        watermarkEventId: result.watermarkEventId ?? undefined,
+        ...pageState,
       },
     };
   }
@@ -89,7 +108,7 @@ export async function readMobileSessionSnapshotPage(
         messages: history.messages as SessionSnapshotPage['messages'],
         nextCursor: history.nextCursor,
         omittedItemCount: history.omittedItemCount,
-        watermarkEventId: result.watermarkEventId ?? undefined,
+        ...pageState,
       },
     };
   }

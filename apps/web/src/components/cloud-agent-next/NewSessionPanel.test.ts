@@ -9,7 +9,7 @@ import type { NewSessionPanel as NewSessionPanelComponent } from './NewSessionPa
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
 const mockRouterPush = jest.fn();
-const mockRepositoryQueryOptions = jest.fn<(options: unknown) => void>();
+const mockQueryOptions = jest.fn<(options: unknown) => void>();
 const mockQueryClient = {
   setQueryData: jest.fn(),
   invalidateQueries: jest.fn(),
@@ -62,12 +62,11 @@ const mockRepository = {
 };
 let mockRepositories = [mockRepository];
 let mockEnvironments: EnvironmentSummary[] = [];
+let mockBillingMode: 'shadow' | 'paid' | undefined;
 
 function mockQueryResult(options: { __testKind?: string }) {
   const kind = options.__testKind ?? '';
-  if (kind.endsWith('Repositories') || kind.endsWith('bitbucket.getStatus')) {
-    mockRepositoryQueryOptions(options);
-  }
+  mockQueryOptions(options);
   const base = {
     data: undefined as unknown,
     isLoading: false,
@@ -95,6 +94,27 @@ function mockQueryResult(options: { __testKind?: string }) {
   }
   if (kind.endsWith('recentRepositories')) {
     return { ...base, data: { repositories: [] } };
+  }
+  if (kind === 'cloudAgentNext.getSandboxSelectionOptions') {
+    return {
+      ...base,
+      data: {
+        enabled: false,
+        defaultDestination: {
+          provider: { id: 'cloudflare-containers', account: 'kilo' },
+          instanceType: 'standard-3',
+        },
+        options: [],
+      },
+    };
+  }
+  if (kind === 'computeBilling.rates') {
+    return { ...base, data: [{ instance: 'standard-3', hourlyUsd: 0.18, available: true }] };
+  }
+  if (kind === 'computeBilling.personalBillingMode') {
+    return mockBillingMode
+      ? { ...base, data: { billingMode: mockBillingMode } }
+      : { ...base, isError: true };
   }
   if (kind === 'cloudEnvironments.list') {
     return {
@@ -125,6 +145,7 @@ jest.mock('@tanstack/react-query', () => ({
 
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => mockCreateTrpc(),
+  useRawTRPCClient: () => ({}),
 }));
 
 jest.mock('next/navigation', () => ({
@@ -134,6 +155,7 @@ jest.mock('next/navigation', () => ({
 }));
 
 jest.mock('jotai', () => ({
+  atom: () => ({}),
   useAtom: () => [null, jest.fn()],
   useSetAtom: () => jest.fn(),
 }));
@@ -205,9 +227,8 @@ jest.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
 }));
 
 jest.mock('@/components/SetPageTitle', () => ({ SetPageTitle: () => null }));
-jest.mock('@/components/shared/ModeCombobox', () => ({
-  ModeCombobox: () => null,
-  NEXT_MODE_OPTIONS: [],
+jest.mock('./CloudAgentModeCombobox', () => ({
+  CloudAgentModeCombobox: () => null,
 }));
 jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));
 jest.mock('@/components/shared/VariantCombobox', () => ({ VariantCombobox: () => null }));
@@ -442,7 +463,7 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
           ? 'organizations.cloudAgentNext'
           : 'cloudAgentNext';
         for (const provider of ['GitHub', 'GitLab']) {
-          expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
+          expect(mockQueryOptions).toHaveBeenCalledWith(
             expect.objectContaining({
               __testKind: `${repositoryScope}.list${provider}Repositories`,
               staleTime: 15 * 60_000,
@@ -458,7 +479,7 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
           'cloudAgentNext.listBitbucketRepositories',
           'bitbucket.getStatus',
         ]) {
-          expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
+          expect(mockQueryOptions).toHaveBeenCalledWith(
             expect.objectContaining({
               __testKind: `organizations.${procedure}`,
               staleTime: 15 * 60_000,
@@ -509,6 +530,105 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
       }
     }
   );
+});
+
+describe.each(scenarios)('$label NewSessionPanel context layout', scenario => {
+  it('keeps responsive context controls', async () => {
+    jest.clearAllMocks();
+    mockBillingMode = undefined;
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
+    mockEnvironmentListFailed = false;
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+
+    try {
+      act(() =>
+        root.render(createElement(NewSessionPanel, { organizationId: scenario.organizationId }))
+      );
+      await waitForStartButton(dom.container);
+
+      const environmentButton = Array.from(dom.container.querySelectorAll('button')).find(
+        button => button.textContent === 'Choose test environment'
+      );
+      const setupGroup = environmentButton?.parentElement;
+      const contextRow = setupGroup?.parentElement;
+      const context = contextRow?.parentElement;
+      expect(setupGroup?.classList.contains('min-w-min')).toBe(true);
+      expect(setupGroup?.className).toContain('@xl/context:ml-auto');
+      expect(context?.className).toContain('@container/context');
+      expect(contextRow?.className).toContain('flex-col items-start');
+      expect(contextRow?.className).toContain('@xl/context:flex-row');
+      expect(contextRow?.className).not.toContain('flex-wrap');
+      expect(context?.children).toHaveLength(1);
+      expect(context?.textContent).not.toContain('Compute');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+});
+
+describe('NewSessionPanel compute price', () => {
+  async function renderContext(organizationId?: string) {
+    jest.clearAllMocks();
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
+    mockEnvironmentListFailed = false;
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    act(() => root.render(createElement(NewSessionPanel, { organizationId })));
+    await waitForStartButton(dom.container);
+    const context = dom.container.querySelector('[class*="@container/context"]');
+    return {
+      context,
+      cleanup: () => {
+        act(() => root.unmount());
+        dom.cleanup();
+      },
+    };
+  }
+
+  it.each([
+    ['shadow', 'Upcoming compute price: ~$0.18/hr · 2 vCPU / 8 GiB'],
+    ['paid', 'Compute price: ~$0.18/hr · 2 vCPU / 8 GiB'],
+  ] as const)('shows the personal %s-mode price with the container specs', async (mode, text) => {
+    mockBillingMode = mode;
+    const { context, cleanup } = await renderContext();
+    try {
+      expect(context?.lastElementChild?.textContent).toBe(text);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('hides the price when the billing check fails', async () => {
+    mockBillingMode = undefined;
+    const { context, cleanup } = await renderContext();
+    try {
+      expect(context?.children).toHaveLength(1);
+      expect(context?.textContent).not.toContain('Compute');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('shows no price and runs no pricing queries for organizations', async () => {
+    mockBillingMode = 'shadow';
+    const { context, cleanup } = await renderContext('org-123');
+    try {
+      expect(context?.textContent).not.toContain('Compute');
+      expect(mockQueryOptions).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          __testKind: expect.stringMatching(
+            /getSandboxSelectionOptions$|^computeBilling\.(rates|personalBillingMode)$/
+          ),
+        })
+      );
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 describe.each([

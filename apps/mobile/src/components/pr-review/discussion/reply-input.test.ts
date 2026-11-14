@@ -53,6 +53,7 @@ const { alertCalls, getTermsStatusMock, acceptTermsMock, draftLoadMock, connecti
 
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => connectivity.value,
+  connectionRefusesWrites: () => connectivity.value === 'offline',
 }));
 
 vi.mock('react-native', () => ({

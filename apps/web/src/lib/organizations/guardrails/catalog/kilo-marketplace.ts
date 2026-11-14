@@ -57,7 +57,7 @@ function adaptVariant(name: string, content: string): McpCatalogVariant {
       label,
       identityKey: mcpIdentityKey(target),
       target,
-      versionHint: null,
+      versionSpecHint: null,
     };
   }
 
@@ -77,7 +77,7 @@ function adaptVariant(name: string, content: string): McpCatalogVariant {
     label,
     identityKey: mcpIdentityKey(target),
     target,
-    versionHint: launched.versionHint,
+    versionSpecHint: launched.versionSpecHint,
   };
 }
 

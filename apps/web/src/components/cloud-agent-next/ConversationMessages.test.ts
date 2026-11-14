@@ -591,7 +591,7 @@ describe('ConversationMessages', () => {
     expect(html).not.toContain('Reasoning details');
   });
 
-  it('keeps failed tools, assistant errors, and snapshot progress visible with tools collapsed', () => {
+  it('keeps assistant errors and snapshot progress visible while collapsing failed tools', () => {
     const html = renderConversation(
       [
         assistantMessage(
@@ -613,10 +613,10 @@ describe('ConversationMessages', () => {
     );
 
     expect(html).toContain('Initializing snapshot');
-    expect(html).toContain('role="alert"');
-    expect(html).toContain('Verification failed');
+    expect(html).not.toContain('role="alert"');
+    expect(html).not.toContain('Verification failed');
     expect(html).toContain('Model unavailable');
-    expect(buttons(html)).toEqual([expect.stringContaining('1 tool call')]);
+    expect(buttons(html)).toEqual([expect.stringContaining('2 tool calls · 1 failed')]);
   });
 
   it('dispatches the new tool cards as independent rows without a group disclosure', () => {
@@ -841,6 +841,17 @@ describe('ConversationMessages', () => {
       {
         isStreaming: true,
         dynamicMessages: [
+          {
+            info: {
+              id: 'user-2',
+              role: 'user',
+              sessionID: 'ses-1',
+              time: { created: 4 },
+              agent: 'code',
+              model: { providerID: 'test', modelID: 'test' },
+            },
+            parts: [],
+          },
           assistantMessage(
             'assistant-3',
             [reasoningPart('active-reasoning', { time: { start: 5 } })],
@@ -856,7 +867,8 @@ describe('ConversationMessages', () => {
       expect.stringContaining('Thinking'),
     ]);
     expect(html.match(/data-message-role="assistant"/g)).toHaveLength(2);
-    expect(html.match(/<time\b/g)).toHaveLength(1);
+    // The completed answer's timestamp and the later prompt's timestamp.
+    expect(html.match(/<time\b/g)).toHaveLength(2);
     expect(html.indexOf('Message timestamp')).toBeGreaterThan(
       html.indexOf('The previous turn is complete.')
     );
@@ -1112,7 +1124,7 @@ describe('ConversationMessages', () => {
   );
 
   it.each(['pending', 'running'] as const)(
-    'keeps a progress line before %s child activity arrives',
+    'keeps the header status before %s child activity arrives',
     status => {
       const state: ToolPart['state'] =
         status === 'pending'
@@ -1122,7 +1134,8 @@ describe('ConversationMessages', () => {
         assistantMessage('parent', [toolPart('task', 'task', state)]),
       ]);
 
-      expect(html).toContain(status === 'pending' ? 'Delegating...' : 'Working...');
+      expect(html).toContain(`<span>${status === 'pending' ? 'Delegating' : 'Working'}</span>`);
+      expect(html).not.toContain('ml-6');
       expect(html).toContain(`<title>${status === 'pending' ? 'Delegating' : 'Working'}</title>`);
       expect(html).toContain('aria-busy="true"');
       expect(html).not.toContain('0 tool calls');
@@ -1655,6 +1668,15 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).toContain('Thought');
     expect(container.textContent).toContain('pnpm test -- bash-1');
     expect(container.textContent).not.toContain('Output for');
+    const groupContentId = group?.getAttribute('aria-controls');
+    const groupContent = groupContentId ? document.getElementById(groupContentId) : null;
+    expect(groupContent).not.toBeNull();
+    expect(groupContent?.getAttribute('role')).toBe('region');
+    expect(groupContent?.getAttribute('aria-label')).toContain('1 tool call');
+    expect(groupContent?.getAttribute('tabindex')).toBe('0');
+    expect(groupContent?.classList.contains('max-h-[min(24rem,50vh)]')).toBe(true);
+    expect(groupContent?.classList.contains('overflow-y-auto')).toBe(true);
+    expect(groupContent?.classList.contains('overscroll-y-contain')).toBe(true);
 
     renderConversationMessages({
       ...props,
@@ -1677,6 +1699,8 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).toContain('pnpm test -- bash-2');
     expect(group?.textContent).toContain('bash: pnpm test -- bash-2');
     expect(group?.getAttribute('aria-expanded')).toBe('true');
+    expect(groupContent?.getAttribute('aria-label')).toContain('2 tool calls');
+    expect(groupContent?.querySelectorAll('[data-tool-card]')).toHaveLength(3);
 
     renderConversationMessages({ ...props, isStreaming: false });
     expect(group?.textContent).not.toContain('bash:');
@@ -1687,6 +1711,39 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).not.toContain('1 tool call');
     expect(container.textContent).toContain('pnpm test -- bash-1');
   });
+
+  it.each([false, true])(
+    'preserves expanded work when paging prepends the same turn (intro=%s)',
+    withIntro => {
+      const latest = assistantMessage('assistant-2', [toolPart('bash-2')]);
+      const props = baseProps({ collapseTools: true, staticMessages: [latest] });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+      act(() => group?.click());
+      const tool = container.querySelector<HTMLButtonElement>('[data-tool-card] button');
+      act(() => tool?.click());
+      expect(container.textContent).toContain('Output for bash-2');
+
+      renderConversationMessages({
+        ...props,
+        staticMessages: [
+          assistantMessage('assistant-1', [
+            ...(withIntro ? [textPart('intro', 'Inspecting the code')] : []),
+            toolPart('bash-1'),
+          ]),
+          latest,
+        ],
+      });
+
+      expect(container.textContent).toContain('2 tool calls');
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.contains(tool)).toBe(true);
+      expect(tool?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Output for bash-2');
+    }
+  );
 
   it.each(['reasoning', 'todowrite'] as const)(
     'preserves group and tool expansion when leading %s becomes visible while streaming',
@@ -1740,6 +1797,56 @@ describe('ConversationMessages memoization', () => {
       expect(container.textContent).toContain('Output for bash-1');
       expect(container.textContent).toContain(type === 'reasoning' ? 'Thinking' : 'Todos');
       expect(container.textContent).toContain(type === 'reasoning' ? 'Working' : '2 tool calls');
+    }
+  );
+
+  it.each([false, true])(
+    'shows a failure count without opening the tool group (streaming=%s)',
+    isStreaming => {
+      const running = toolPart('bash-1', 'bash', {
+        status: 'running',
+        input: { command: 'pnpm test' },
+        time: { start: 1 },
+      });
+      const props = baseProps({
+        collapseTools: true,
+        isStreaming: true,
+        dynamicMessages: [assistantMessage('assistant-1', [running], { time: { created: 1 } })],
+      });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+
+      renderConversationMessages({
+        ...props,
+        isStreaming,
+        dynamicMessages: [
+          assistantMessage('assistant-1', [
+            {
+              ...running,
+              state: {
+                status: 'error',
+                input: running.state.input,
+                error: 'Command failed',
+                time: { start: 1, end: 2 },
+              },
+            },
+            toolPart('bash-2'),
+          ]),
+        ],
+      });
+
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('false');
+      expect(group?.textContent).toContain('2 tool calls · 1 failed');
+      expect(container.querySelectorAll('button')).toHaveLength(1);
+      expect(container.querySelector('[role="alert"]')).toBeNull();
+      expect(container.textContent).not.toContain('Command failed');
+
+      act(() => group?.click());
+      expect(container.querySelector('[role="region"] [role="alert"]')?.textContent).toContain(
+        'Command failed'
+      );
     }
   );
 
@@ -1799,7 +1906,8 @@ describe('ConversationMessages memoization', () => {
 
     act(() => group?.click());
     expect(container.textContent).not.toContain('Output for bash-2');
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Command failed');
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.textContent).not.toContain('Command failed');
   });
 
   it('does not re-render the active list when only getChildMessages changes', () => {

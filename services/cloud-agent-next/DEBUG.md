@@ -7,7 +7,10 @@ Use this guide when a local Cloud Agent flow stalls, a sandbox behaves unexpecte
 - Worker, Durable Object, router, queue, stream, ingest, callback, and sandbox-control logs are emitted by Wrangler and normally land in `dev/logs/cloud-agent-next.log`.
 - The control wrapper runs inside the sandbox container. Its durable debug log is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`, configured through `WRAPPER_LOG_PATH`).
 - Kilo CLI logs inside the sandbox live under `/tmp/kilo-worktrees/<home>/.local/share/kilo/log/*.log`.
-- The wrapper uploads a bounded archive containing its own log plus the worktree Kilo logs every 30 seconds and again on shutdown. Wrangler shows matching R2 upload traffic.
+- Kilo v2 uses the runtime's actual home, commonly `/home/<id>/.local/share/kilo2/log/opencode.log`.
+  `/root/.local/share/kilo2/log/opencode.log` can contain only the version probe;
+  do not mistake it for the running session's log.
+- The wrapper uploads its log and worktree Kilo v1/v2 logs every 30 seconds and on shutdown. Wrangler shows matching R2 upload traffic.
 - `restore-session` logs print to wrapper stderr and are also mirrored into the wrapper log file, so import/restore traces survive sandbox-side debugging.
 
 ## First Triage
@@ -27,6 +30,7 @@ Useful Worker-log landmarks include:
 - `Wrapper ingest WebSocket accepted`
 - `Client stream WebSocket accepted for setup`
 - `Session message terminalized`
+- `Runtime credential proxy request failed` (`logTag: runtime_proxy_request_failed`): one record per failed Kilo credential-proxy request. `rejectionStage: route` with `pathShape` means the facade has no allowlist entry for that path and answered 404 without an upstream call. When Kilo v2 then cannot load its model catalog, the run fails with `failure_reason = model_catalog_unavailable` (platform) and the user sees "The Kilo model catalog could not be loaded".
 
 ## Worker Logs
 
@@ -62,7 +66,7 @@ List local sandbox containers and their proxy siblings:
 docker ps --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}'
 ```
 
-Cloudflare container sandboxes usually include `SandboxContainers` in the synthesized name and run an image built from `Dockerfile.containers`. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
+Cloudflare container sandboxes usually include `SandboxContainers` in the synthesized name and run an image built from `Dockerfile.containers.runtime-free`, then download the selected CLI and wrapper. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
 
 To inspect one candidate:
 
@@ -152,12 +156,33 @@ Kilo database or WAL files can also be copied when investigating persistence vis
 
 Control-plane sessions upload a bounded wrapper/Kilo file archive plus JSON records from the current wrapper: `wrapper.lifecycle`, `session.execution`, `control.workload`, `control.upload`, and `control.request` for worktree deletion only (`worktree.prepareDeletion`, `worktree.delete`, with `stage`, `worktreeId`, and `sessionCount`). Those records exclude prompts, assistant/tool content, raw errors, credentials, and URLs. The file archive can contain prompts and code. `session.sync` and `accepted_reconciliation` are from the replaced wrapper and are not emitted.
 
-The process is `kilocode-control-plane-wrapper.js`, started by `kilocode-control-plane-supervisor.sh`. Its log file is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`). The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. It also uploads that log plus worktree Kilo log dirs (`/tmp/kilo-worktrees/<home>/.local/share/kilo/log`) as one gzip archive every 30 seconds, and again during shutdown after the JSON flush. R2 keys are:
+The process is `kilocode-control-plane-wrapper.js`, started by `kilocode-control-plane-supervisor.sh`. Its log file is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`). The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills.
+
+The same file uploader includes the wrapper log and native logs in one `files.tar.gz` archive.
+It scans `.local/share/kilo/log` and `.local/share/kilo2/log` beneath each runtime home.
+Homes can use `/home/<home>` or the older `/tmp/kilo-worktrees/<home>` layout.
+Archive paths retain the home name and native log path. The wrapper log keeps its existing archive name.
+Uploads run every 30 seconds and during shutdown after the JSON flush. R2 keys are:
 
 ```text
 logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>.json
 logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/files.tar.gz
 ```
+
+File capture limits are 1 MiB per file, 4 MiB total retained content, and 64 source files.
+The wrapper log has priority. Native logs follow in newest-modified order.
+Large files retain complete lines from their tail, with a `[TRUNCATED: ...]` marker.
+Oversized individual lines are discarded. `TRUNCATED.txt` reports files omitted by the total size or file-count limit.
+These limits leave space for tar headers and gzip overhead beneath the existing 8 MiB upload cap.
+
+The existing output redactor removes recognized credential fields, auth headers, cookies, URL credentials, and all URL queries, including signatures.
+It also remembers known wrapper launch secrets before the wrapper removes them from its environment.
+Redaction precedes final size trimming. Only redacted copies enter the private temporary archive directory; capture does not change source logs.
+Symlinks and files outside the log directories are excluded. Missing or unreadable logs do not prevent other files from uploading.
+Logs can still contain prompts and code; credential redaction is not content anonymization.
+
+Upload retry, timeout, abort, and finalization behavior stays unchanged. Capture does not change turn results or native drain timing.
+The separate legacy v1 `logs.tar.gz` uploader remains unchanged.
 
 `sandboxId` is the logical SandboxControl ID, not the `workspace_*` session ID or physical provider allocation name. Use Worker logs to correlate these IDs. Each allocation/wrapper has separate immutable batches; sort them by the batch `sequence` and record `timestamp`, not the random batch ID. Check `droppedRecords` and `droppedTerminalRecords` for buffer overflow or rejected diagnostic records.
 

@@ -1,11 +1,22 @@
 import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
+import {
+  backgroundActivityInventorySchema,
+  type BackgroundActivityInventory,
+} from '@kilocode/session-ingest-contracts';
+import {
+  cloudToolPartDetailInputSchema,
+  cloudToolPartDetailWireSchema,
+  type CloudToolPartDetailInput,
+  type CloudToolPartDetailWire,
+} from '@kilocode/cloud-agent-sdk/tool-part-detail';
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
-import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
+import { type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   GetEgressAuditResponseSchema,
@@ -46,6 +57,7 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
+import type { WorktreeBranchOperationResult } from '@kilocode/worker-utils/cloud-agent-worktree-operations';
 import {
   baseGetMessageResultNextOutputSchema,
   baseListPreviewServicesNextOutputSchema,
@@ -55,8 +67,10 @@ import {
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
-} from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
-import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
+} from '@cloud-agent-shared/sandbox-status';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
+import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
+import { isTRPCErrorCode } from './cloud-agent-error';
 export type { SendMessagePayload } from './types.js';
 
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
@@ -167,6 +181,12 @@ type PrepareSessionSharedFields = {
   /** Custom agents materialized from the merged profile stack. */
   runtimeAgents?: RuntimeAgentInput[];
   upstreamBranch?: string;
+  /** Start a new branch from this base instead of the repository default. */
+  baseBranch?: string;
+  /** Resolved commit for `baseBranch`; never accepted from a browser. */
+  baseSha?: string;
+  /** The parent worktree when this session starts from another worktree. */
+  parentWorktreeId?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt (required when mode is 'custom') */
@@ -179,7 +199,7 @@ type PrepareSessionSharedFields = {
   createdOnPlatform?: string;
   clientProvenance?: 'browser' | 'mobile';
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
@@ -228,6 +248,7 @@ export type PrepareSessionOutput = {
   /** The Kilo CLI session ID */
   kiloSessionId: string;
   cloudAgentSessionId: string;
+  worktreeId?: CloudAgentWorktreeId;
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed?: boolean;
 };
@@ -357,6 +378,30 @@ export type ListChildSessionsOutput = {
 
 export type GetSessionMessagesPageInput = z.input<typeof cloudSessionMessagesPageInputSchema>;
 
+/** Input for syncWorktreeBranch; the base and fork boundary are resolved server-side. */
+export type SyncWorktreeBranchInput = {
+  cloudAgentSessionId: string;
+  baseBranch?: string;
+  upstreamSha?: string;
+};
+
+/** Input for restackWorktreeBranch; the target base and upstream are resolved server-side. */
+export type RestackWorktreeBranchInput = {
+  cloudAgentSessionId: string;
+  baseBranch?: string;
+  upstreamSha?: string;
+};
+
+/** Adopts a persisted worktree base into a sibling session's DO metadata. */
+export type AdoptWorktreeBaseInput = {
+  cloudAgentSessionId: string;
+  expectedWorktreeId: string;
+  baseBranch: string;
+  baseSha: string;
+};
+
+export type AdoptWorktreeBaseOutput = { success: true };
+
 /** Interactions a cloud-agent session currently waits on. */
 export type GetPendingInteractionsOutput = {
   questions: unknown[];
@@ -366,6 +411,9 @@ export type GetPendingInteractionsOutput = {
 export type GetWorktreeFileInput = GetSessionInput & WorktreeFileQuery;
 
 export type GetEgressAuditInput = GetSessionInput & EgressAuditPagination;
+
+/** The preview target plus the route organization the Worker uses for its UI gate. */
+export type GetPreviewOptionsInput = PreviewTarget & { organizationId?: string };
 
 /** Execution status for getSession response */
 export type ExecutionStatus = {
@@ -403,6 +451,13 @@ export type GetSessionOutput = {
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
+  /** The exact GitHub connection this session's repository was prepared with. */
+  githubIntegrationId?: string;
+  /** Bitbucket repository identity copied from the session's preparation input. */
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
+  /** GitLab project path copied from the session's preparation input. */
+  gitlabProject?: string;
 
   prompt?: string;
   mode?: AgentMode;
@@ -534,8 +589,23 @@ export class CloudAgentBillingError extends Error {
   }
 }
 
-function isTRPCErrorCode(code: unknown): code is TRPC_ERROR_CODE_KEY {
-  return typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code);
+/**
+ * The worker answers these six codes, and a 404, to a delete the caller may
+ * report itself instead of swallowing.
+ */
+const DELETE_SESSION_VISIBLE_CODES = new Set<TRPC_ERROR_CODE_KEY>([
+  'NOT_FOUND',
+  'CONFLICT',
+  'FORBIDDEN',
+  'UNAUTHORIZED',
+  'PRECONDITION_FAILED',
+  'BAD_REQUEST',
+]);
+
+function isDeleteSessionFailureVisible(error: unknown): boolean {
+  const { code, httpStatus } = readCloudAgentErrorFields(error);
+  if (httpStatus === 404) return true;
+  return code !== undefined && isTRPCErrorCode(code) && DELETE_SESSION_VISIBLE_CODES.has(code);
 }
 
 /**
@@ -563,8 +633,8 @@ export function rethrowCloudAgentError(error: unknown): never {
     });
   }
   if (error instanceof TRPCClientError) {
-    const code: unknown = error.data?.code ?? error.shape?.data?.code;
-    if (isTRPCErrorCode(code)) {
+    const { code } = readCloudAgentErrorFields(error);
+    if (code !== undefined && isTRPCErrorCode(code)) {
       const workerError = new TRPCError({ code, message: error.message, cause: error });
       if (getHTTPStatusCodeFromError(workerError) < 500) {
         throw workerError;
@@ -580,7 +650,7 @@ export function rethrowCloudAgentError(error: unknown): never {
 function isInsufficientCreditsError(err: unknown): boolean {
   if (parseCustomerBillingFailure(err)) return false;
   if (err instanceof TRPCClientError) {
-    const httpStatus = err.data?.httpStatus || err.shape?.data?.httpStatus;
+    const { httpStatus } = readCloudAgentErrorFields(err);
     if (httpStatus === 402) {
       return true;
     }
@@ -599,9 +669,7 @@ function preserveBillingFailure(error: unknown): void {
   const billingFailure = parseCustomerBillingFailure(error);
   if (!billingFailure) return;
   const status =
-    error instanceof TRPCClientError
-      ? (error.data?.httpStatus ?? error.shape?.data?.httpStatus)
-      : undefined;
+    error instanceof TRPCClientError ? readCloudAgentErrorFields(error).httpStatus : undefined;
   throw new CloudAgentBillingError(
     billingFailure,
     status === 402 || status === 409 || status === 503 ? status : 503
@@ -665,6 +733,12 @@ type CloudAgentNextTRPCClient = {
   getSessionMessagesPage: {
     query: (input: GetSessionMessagesPageInput) => Promise<unknown>;
   };
+  getBackgroundActivity: {
+    query: (input: GetSessionInput) => Promise<unknown>;
+  };
+  getSessionToolPartDetail: {
+    query: (input: CloudToolPartDetailInput) => Promise<unknown>;
+  };
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
@@ -686,14 +760,23 @@ type CloudAgentNextTRPCClient = {
   getWorktreeFile: {
     query: (input: GetWorktreeFileInput) => Promise<unknown>;
   };
+  syncWorktreeBranch: {
+    mutate: (input: SyncWorktreeBranchInput) => Promise<WorktreeBranchOperationResult>;
+  };
+  restackWorktreeBranch: {
+    mutate: (input: RestackWorktreeBranchInput) => Promise<WorktreeBranchOperationResult>;
+  };
+  adoptWorktreeBase: {
+    mutate: (input: AdoptWorktreeBaseInput) => Promise<AdoptWorktreeBaseOutput>;
+  };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
   };
   getPreviewOptions: {
-    query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
+    query: (input: GetPreviewOptionsInput) => Promise<unknown>;
   };
   listPreviewServices: {
-    query: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
+    query: (input: GetPreviewOptionsInput) => Promise<unknown>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -816,23 +899,9 @@ export class CloudAgentNextClient {
       const result = await this.client.deleteSession.mutate({ sessionId });
       return { success: result.success };
     } catch (error) {
-      if (
-        error instanceof TRPCClientError &&
-        (error.data?.code === 'NOT_FOUND' ||
-          error.shape?.data?.code === 'NOT_FOUND' ||
-          error.data?.code === 'CONFLICT' ||
-          error.shape?.data?.code === 'CONFLICT' ||
-          error.data?.code === 'FORBIDDEN' ||
-          error.shape?.data?.code === 'FORBIDDEN' ||
-          error.data?.code === 'UNAUTHORIZED' ||
-          error.shape?.data?.code === 'UNAUTHORIZED' ||
-          error.data?.code === 'PRECONDITION_FAILED' ||
-          error.shape?.data?.code === 'PRECONDITION_FAILED' ||
-          error.data?.code === 'BAD_REQUEST' ||
-          error.shape?.data?.code === 'BAD_REQUEST' ||
-          error.data?.httpStatus === 404 ||
-          error.shape?.data?.httpStatus === 404)
-      ) {
+      // The calling surfaces show these failures to the user; anything else is
+      // logged and reported as a non-destructive `success: false`.
+      if (error instanceof TRPCClientError && isDeleteSessionFailureVisible(error)) {
         throw error;
       }
 
@@ -1018,6 +1087,21 @@ export class CloudAgentNextClient {
     );
   }
 
+  async getBackgroundActivity(cloudAgentSessionId: string): Promise<BackgroundActivityInventory> {
+    return backgroundActivityInventorySchema.parse(
+      await this.client.getBackgroundActivity.query({ cloudAgentSessionId })
+    );
+  }
+
+  async getSessionToolPartDetail(
+    input: CloudToolPartDetailInput
+  ): Promise<CloudToolPartDetailWire> {
+    const request = cloudToolPartDetailInputSchema.parse(input);
+    return cloudToolPartDetailWireSchema.parse(
+      await this.client.getSessionToolPartDetail.query(request)
+    );
+  }
+
   /** The session's preparation attempts, as its stream replays them. */
   async getPreparationAttempts(cloudAgentSessionId: string): Promise<PreparationAttempt[]> {
     try {
@@ -1110,6 +1194,20 @@ export class CloudAgentNextClient {
     return result;
   }
 
+  async syncWorktreeBranch(input: SyncWorktreeBranchInput): Promise<WorktreeBranchOperationResult> {
+    return await this.client.syncWorktreeBranch.mutate(input);
+  }
+
+  async restackWorktreeBranch(
+    input: RestackWorktreeBranchInput
+  ): Promise<WorktreeBranchOperationResult> {
+    return await this.client.restackWorktreeBranch.mutate(input);
+  }
+
+  async adoptWorktreeBase(input: AdoptWorktreeBaseInput): Promise<AdoptWorktreeBaseOutput> {
+    return await this.client.adoptWorktreeBase.mutate(input);
+  }
+
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {
     try {
       return await this.client.createWorktreeChat.mutate(input);
@@ -1133,15 +1231,13 @@ export class CloudAgentNextClient {
     );
   }
 
-  async getPreviewOptions(input: {
-    cloudAgentSessionId: string;
-  }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
+  async getPreviewOptions(
+    input: GetPreviewOptionsInput
+  ): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
     return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
   }
 
-  async listPreviewServices(input: {
-    cloudAgentSessionId: string;
-  }): Promise<ListPreviewServicesOutput> {
+  async listPreviewServices(input: GetPreviewOptionsInput): Promise<ListPreviewServicesOutput> {
     return baseListPreviewServicesNextOutputSchema.parse(
       await this.client.listPreviewServices.query(input)
     );
@@ -1448,256 +1544,4 @@ export function createCloudAgentNextClientForModel(
     return createSkippedBalanceCheckCloudAgentNextClient(authToken);
   }
   return createCloudAgentNextClient(authToken);
-}
-
-/**
- * Close live Cloud Agent stream sockets for a removed organization member.
- * Best-effort: callers log and continue on failure so member removal never
- * fails because stream close failed.
- */
-export async function closeCloudAgentOrgStreams(
-  userId: string,
-  organizationId: string
-): Promise<void> {
-  const response = await fetch(`${CLOUD_AGENT_NEXT_API_URL}/internal/streams/close`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
-    },
-    body: JSON.stringify({ userId, organizationId }),
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(
-      `Cloud Agent stream close failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
-    );
-  }
-}
-
-// Optional enrichment that runs after the active-session read inside the native
-// widget route's ten-second deadline: a slow identity read drops only the key.
-const WIDGET_APPROVAL_KEY_BUDGET_MS = 1_500;
-
-const widgetApprovalKeyResponseSchema = z.object({
-  approvalKey: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .nullable(),
-  // Absent when an older Worker answers; the session card then shows no command.
-  command: z.string().max(60).nullable().optional(),
-});
-
-/** The approval binding and the pending request's command, both null when none waits. */
-export type CloudAgentWidgetApproval = { approvalKey: string | null; command: string | null };
-
-/**
- * The binding of the oldest pending permission on one owned control-plane
- * session: SHA-256 of `JSON.stringify([kiloSessionId, permissionId])`, computed
- * in the Worker so the raw permission never reaches this process, plus that
- * request's command (one trimmed line, at most 60 characters) for the session
- * card. The Worker re-checks user, organization scope and the Kilo/cloud
- * session pairing; the key grants no authority. Bounded, and throws on any
- * non-OK answer so the caller can drop the identity while keeping counts.
- */
-export async function readCloudAgentWidgetApprovalKey(
-  input: {
-    userId: string;
-    organizationId: string | null;
-    kiloSessionId: string;
-    cloudAgentSessionId: string;
-  },
-  signal?: AbortSignal
-): Promise<CloudAgentWidgetApproval> {
-  const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
-  const response = await fetchWithinBudget(
-    `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-internal-api-key': INTERNAL_API_SECRET,
-      },
-      body: JSON.stringify(input),
-      cache: 'no-store',
-      signal: signal ? AbortSignal.any([budget, signal]) : budget,
-    }
-  );
-  if (!response.ok) {
-    throw new Error(`Cloud Agent widget approval key failed: ${response.status}`);
-  }
-  const parsed = widgetApprovalKeyResponseSchema.parse(await response.json());
-  return { approvalKey: parsed.approvalKey, command: parsed.command ?? null };
-}
-
-export type VercelSnapshotBuildStartInput = (
-  | { organizationId: string; userId?: never }
-  | { userId: string; organizationId?: never }
-) & {
-  credentialId: string;
-  buildGeneration: string;
-};
-
-/**
- * Start an organization-scoped BYOC Vercel snapshot build through the
- * authenticated Cloud Agent internal API. This is intentionally not part of
- * the browser-facing tRPC client.
- */
-export async function startVercelSnapshotBuild(
-  input: VercelSnapshotBuildStartInput
-): Promise<void> {
-  let response: Response;
-  try {
-    response = await fetch(
-      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-snapshot-build/start`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': INTERNAL_API_SECRET,
-        },
-        body: JSON.stringify(input),
-        signal: AbortSignal.timeout(30_000),
-      }
-    );
-  } catch {
-    throw new Error('Cloud Agent snapshot build request failed');
-  }
-
-  if (!response.ok) {
-    throw new Error('Cloud Agent snapshot build request was rejected');
-  }
-}
-
-export type VercelRuntimeIdentity = {
-  wrapperVersion: string;
-  releasedAt: string;
-  digest: string;
-};
-
-export async function getVercelRuntimeIdentity(): Promise<VercelRuntimeIdentity> {
-  let response: Response;
-  try {
-    response = await fetch(`${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-runtime-identity`, {
-      headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(30_000),
-    });
-  } catch {
-    throw new Error('Cloud Agent runtime identity could not be verified');
-  }
-
-  if (!response.ok) {
-    throw new Error('Cloud Agent runtime identity could not be verified');
-  }
-
-  const body: unknown = await response.json().catch(() => null);
-  const parsed = z
-    .object({
-      wrapperVersion: z.string().min(1),
-      releasedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      digest: z.string().min(1),
-    })
-    .safeParse(body);
-  if (!parsed.success) {
-    throw new Error('Cloud Agent runtime identity could not be verified');
-  }
-  return parsed.data;
-}
-
-export async function getVercelComputeEnrollment(organizationId: string): Promise<boolean> {
-  let response: Response;
-  try {
-    response = await fetch(
-      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-enrollment/${encodeURIComponent(organizationId)}`,
-      {
-        headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
-        cache: 'no-store',
-        signal: AbortSignal.timeout(30_000),
-      }
-    );
-  } catch {
-    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
-  }
-
-  if (!response.ok) {
-    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
-  }
-
-  const body: unknown = await response.json().catch(() => null);
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('enrolled' in body) ||
-    typeof body.enrolled !== 'boolean'
-  ) {
-    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
-  }
-
-  return body.enrolled;
-}
-
-export async function getVercelComputeEnrollmentForUser(userId: string): Promise<boolean> {
-  let response: Response;
-  try {
-    response = await fetch(
-      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-enrollment/user/${encodeURIComponent(userId)}`,
-      {
-        headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
-        cache: 'no-store',
-        signal: AbortSignal.timeout(30_000),
-      }
-    );
-  } catch {
-    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
-  }
-
-  if (!response.ok) {
-    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
-  }
-
-  const body: unknown = await response.json().catch(() => null);
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('enrolled' in body) ||
-    typeof body.enrolled !== 'boolean'
-  ) {
-    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
-  }
-
-  return body.enrolled;
-}
-
-/** Exactly one of organizationId or userId must be set. */
-export type VercelSnapshotBuildCleanupInput = VercelSnapshotBuildStartInput & {
-  snapshotId?: string;
-};
-
-export async function cleanupVercelSnapshotBuild(
-  input: VercelSnapshotBuildCleanupInput
-): Promise<void> {
-  let response: Response;
-  try {
-    response = await fetch(
-      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-snapshot-build/cleanup`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': INTERNAL_API_SECRET,
-        },
-        body: JSON.stringify(input),
-        signal: AbortSignal.timeout(30_000),
-      }
-    );
-  } catch {
-    throw new Error('Cloud Agent Vercel compute cleanup could not be completed');
-  }
-
-  if (!response.ok) {
-    throw new Error('Cloud Agent Vercel compute cleanup could not be completed');
-  }
 }

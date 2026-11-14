@@ -24,7 +24,7 @@ const snapshotSchema = z.object({
   prevId: z.string(),
   tables: z.record(z.string(), tableSchema),
 });
-const snapshots = ['0001', '0002', '0003', '0004', '0005'].map(version =>
+const snapshots = ['0001', '0002', '0003', '0004', '0005', '0006'].map(version =>
   snapshotSchema.parse(
     JSON.parse(
       readFileSync(new URL(`./drizzle/meta/${version}_snapshot.json`, import.meta.url), 'utf8')
@@ -37,8 +37,8 @@ describe('restored history migration bundle', () => {
     const baseline = snapshots[0];
     for (let index = 1; index < snapshots.length; index += 1)
       expect(snapshots[index].prevId).toBe(snapshots[index - 1].id);
-    // 0002 is the child-session registry; the history migrations start at 0003.
-    for (let index = 2; index < snapshots.length; index += 1) {
+    // History migrations preserve coordinator messages; 0006 adds billing failures.
+    for (let index = 2; index < snapshots.length - 1; index += 1) {
       expect(snapshots[index].tables.control_plane_messages).toEqual(
         baseline.tables.control_plane_messages
       );
@@ -89,6 +89,7 @@ describe('restored history migration bundle', () => {
       '0003_session_mutation_cursor',
       '0004_history_hydration_stage',
       '0005_native_history_scope',
+      '0006_confused_shiva',
     ]);
     expect(Object.keys(migrations.migrations)).toEqual([
       'm0000',
@@ -97,6 +98,7 @@ describe('restored history migration bundle', () => {
       'm0003',
       'm0004',
       'm0005',
+      'm0006',
     ]);
     expect(migrations.migrations.m0003).toContain('UPDATE `events` SET `mutation_cursor` = `id`');
     expect(migrations.migrations.m0003).toContain('coalesce(max(`mutation_cursor`), 0)');

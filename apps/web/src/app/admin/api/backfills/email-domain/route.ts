@@ -1,45 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db';
-import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
-import { and, isNull, count, not, or, sql } from 'drizzle-orm';
-import { extractEmailDomain } from '@/lib/email-domain';
-
-// Skip soft-deleted and deletion-in-progress users. Soft-deleted emails are
-// already anonymized; in-progress emails are still real, but backfill must not
-// race with deletion.
-export const emailDomainBackfillCandidates = and(
-  isNull(kilocode_users.email_domain),
-  or(
-    isNull(kilocode_users.blocked_reason),
-    not(goneOrDeletingBlockedReasonSql(kilocode_users.blocked_reason))
-  )
-);
+import type { BackfillBatchResult } from '@/lib/backfills/batch';
+import { backfillEmailDomainBatch, countMissingEmailDomains } from '@/lib/backfills/email-domain';
 
 export type EmailDomainCountsResponse = {
   missing: number;
 };
 
-export type EmailDomainBackfillResponse = {
-  processed: number;
-  remaining: boolean;
-};
+export type EmailDomainBackfillResponse = BackfillBatchResult;
 
 export async function GET(): Promise<NextResponse<EmailDomainCountsResponse | { error: string }>> {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const [result] = await db
-    .select({ count: count() })
-    .from(kilocode_users)
-    .where(emailDomainBackfillCandidates);
-
-  return NextResponse.json({ missing: result?.count ?? 0 });
+  return NextResponse.json({ missing: await countMissingEmailDomains() });
 }
-
-const BATCH_SIZE = 1000;
-const BATCHES_PER_REQUEST = 50;
 
 export async function POST(): Promise<
   NextResponse<EmailDomainBackfillResponse | { error: string }>
@@ -47,43 +22,5 @@ export async function POST(): Promise<
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  let totalProcessed = 0;
-
-  for (let i = 0; i < BATCHES_PER_REQUEST; i++) {
-    const rows = await db
-      .select({ id: kilocode_users.id, google_user_email: kilocode_users.google_user_email })
-      .from(kilocode_users)
-      .where(emailDomainBackfillCandidates)
-      .limit(BATCH_SIZE);
-
-    if (rows.length === 0) break;
-
-    const updates = rows
-      .map(row => ({
-        id: row.id,
-        email_domain: extractEmailDomain(row.google_user_email),
-      }))
-      .filter((u): u is { id: string; email_domain: string } => u.email_domain !== null);
-
-    if (updates.length === 0) break;
-
-    await db.execute(sql`
-      UPDATE ${kilocode_users}
-      SET email_domain = domain_updates.email_domain
-      FROM (VALUES ${sql.join(
-        updates.map(u => sql`(${u.id}, ${u.email_domain})`),
-        sql`, `
-      )}) AS domain_updates(id, email_domain)
-      WHERE ${kilocode_users.id} = domain_updates.id
-    `);
-
-    totalProcessed += updates.length;
-
-    if (rows.length < BATCH_SIZE) break;
-  }
-
-  return NextResponse.json({
-    processed: totalProcessed,
-    remaining: totalProcessed === BATCH_SIZE * BATCHES_PER_REQUEST,
-  });
+  return NextResponse.json(await backfillEmailDomainBatch());
 }

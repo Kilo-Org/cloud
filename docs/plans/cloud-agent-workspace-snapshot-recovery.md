@@ -263,7 +263,7 @@ allocations keep working against the new Worker until those allocations stop.
 - Existing descriptors stay valid: under the current code any descriptor still
   present was never invalidated.
 - Ships behind the existing workspace snapshot enrollment
-  (`WORKSPACE_SNAPSHOT_USER_IDS` / `WORKSPACE_SNAPSHOT_ORG_IDS`). Watch:
+  (`WORKSPACE_SNAPSHOT_IDS`). Watch:
   `workspace_snapshot_selection`, `workspace_snapshot_restore`, snapshot start
   failures by reason, non-fatal command failures by kind, and "Start fresh" usage.
 

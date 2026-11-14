@@ -148,6 +148,58 @@ describe('groupAssistantParts', () => {
     ]);
   });
 
+  it('keeps failed tools inside the work group in live mode', () => {
+    const failedTool: ToolPart = {
+      ...makeToolPart('failed', 'bash'),
+      state: { status: 'error', input: {}, error: 'Command failed', time: { start: 1, end: 2 } },
+    };
+    const parts = [
+      makeReasoningPart('reasoning', 'Checking the code'),
+      makeToolPart('read', 'read'),
+      failedTool,
+      makeToolPart('retry', 'bash'),
+    ];
+
+    expect(groupAssistantParts([...parts, makeTextPart('answer', 'Done.')], 'live')).toEqual([
+      { type: 'agent-work', parts, summary: expect.stringContaining('3 tool calls · 1 failed') },
+      { type: 'chat', parts: [expect.objectContaining({ id: 'answer' })] },
+    ]);
+  });
+
+  it('keeps files a tool returned beside that tool, and other files in chat', () => {
+    const file = (id: string): Part => ({
+      id,
+      sessionID: 'ses_1',
+      messageID: 'msg_1',
+      type: 'file',
+      mime: 'image/png',
+      url: '',
+      filename: `/tmp/${id}.png`,
+    });
+    const failedTool: ToolPart = {
+      ...makeToolPart('t3', 'bash'),
+      state: { status: 'error', input: {}, error: 'failed', time: { start: 1, end: 2 } },
+    };
+    const segments = groupAssistantParts(
+      [
+        makeToolPart('t1', 'read'),
+        file('t1_file_0'),
+        makeToolPart('t2', 'read'),
+        file('t2_file_0'),
+        failedTool,
+        file('t3_file_0'),
+        file('attachment'),
+      ],
+      'live'
+    );
+
+    expect(segments.map(segment => [segment.type, segment.parts.map(part => part.id)])).toEqual([
+      ['agent-work', ['t1', 't1_file_0', 't2', 't2_file_0', 't3', 't3_file_0']],
+      ['chat', ['attachment']],
+    ]);
+    expect(segments[0]).toMatchObject({ summary: expect.stringContaining('3 tool calls') });
+  });
+
   it('hides empty reasoning and internal plan tools', () => {
     const planTool: ToolPart = {
       ...makeToolPart('plan', 'plan_enter'),
@@ -217,6 +269,23 @@ describe('summarizeAgentWork', () => {
     expect(
       summarizeAgentWork([makeToolPart('t1', 'read', 1500), makeToolPart('t2', 'edit', 2500)])
     ).toBe('Worked for 4s · 2 tool calls');
+  });
+
+  it.each([false, true])('counts failed tools in the summary (working=%s)', working => {
+    const failedTool: ToolPart = {
+      ...makeToolPart('failed', 'bash'),
+      state: { status: 'error', input: {}, error: 'Command failed', time: { start: 1, end: 2001 } },
+    };
+
+    expect(summarizeAgentWork([failedTool], working)).toBe(
+      `${working ? 'Working' : 'Worked for 2s'} · 1 tool call · 1 failed`
+    );
+    expect(
+      summarizeAgentWork(
+        [failedTool, { ...failedTool, id: 'failed-again' }, makeToolPart('read', 'read')],
+        working
+      )
+    ).toContain('3 tool calls · 2 failed');
   });
 
   it('falls back to Agent work when there is nothing to summarize', () => {

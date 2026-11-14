@@ -1,18 +1,16 @@
-/* eslint-disable max-lines -- the idle login screen owns every provider control, the SSO recovery block, and the email/OTP switch in one surface */
+/* eslint-disable max-lines -- the idle login screen owns every provider control, the SSO recovery block, the pending-link switch, and the email/OTP switch in one surface */
 import { isAvailableAsync as isAppleAuthAvailableAsync } from 'expo-apple-authentication';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
 
-import { AppleLogo } from '@/components/login/apple-logo';
 import { EmailOtpForm } from '@/components/login/email-otp-form';
-import { GoogleLogo } from '@/components/login/google-logo';
+import { PendingLinkAuth } from '@/components/login/pending-link-auth';
+import { ProviderButtons } from '@/components/login/provider-buttons';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
-import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   INLINE_LINK_BOX_CLASS,
@@ -20,37 +18,13 @@ import {
   INLINE_LINK_ROW_CLASS,
   inlineLinkHitSlop,
 } from '@/lib/a11y/tap-target';
+import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
+import { pendingLinkOptions } from '@/lib/auth/pending-link';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { cn } from '@/lib/utils';
-
-// One fixed slot per provider row, taken out of flow at the leading edge. The
-// label is centered over the button's own width, so a mark in the row could not
-// push it off center; out of flow it also cannot change the row's height or the
-// text's box. The slot stretches the row's content height and centers whichever
-// of the mark or the inline spinner the row holds, so swapping an 18pt mark for
-// the spinner moves nothing. All three rows draw a mark in the slot (the
-// passkey row included), so the provider options read as one group.
-//
-// The slot is inset from the rounded edge by the same 16pt the row insets its
-// content: flush at the edge the mark read as cut by the corner, with far less
-// inset than the centered label has from the sides (design review, 2026-10-30).
-// `start` is the leading edge, so in the right-to-left layout the mark takes the
-// same inset from the right edge and clears both corners. Both values are px
-// because native rem is 14pt here, so a spacing step would land off the design's
-// 16pt.
-export const PROVIDER_GLYPH_SLOT_CLASS =
-  'absolute start-[16px] top-0 bottom-0 w-[18px] items-center justify-center';
-
-// The mark's 16pt inset plus its own 18pt width: the row's content box starts
-// where the mark ends, so the centered label can never run under the mark
-// however long the translation is, and the equal start and end insets keep it
-// centered on the button.
-const PROVIDER_ROW_CLASS =
-  'relative min-h-[44px] w-full flex-row justify-center rounded-[8px] px-[34px] py-2.5';
 
 /** The two links the legal sentence exposes as custom accessibility actions. */
 const LEGAL_LINK_ACTIONS = [
@@ -64,14 +38,32 @@ export function IdleAuth({
   initialSsoRecovery = null,
   onBusyChange,
   onSignInStart,
+  pendingLink = null,
+  pendingLinkRefused = false,
+  onPendingLink,
+  onClearPendingLink,
+  onBelowFieldHeightChange,
 }: Readonly<{
-  start: (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
+  start: (mode: 'signin' | 'sso', ssoEmail?: string, pendingLinkToken?: string) => Promise<void>;
   initialEmail?: string;
   initialSsoRecovery?: SsoRecoveryDraft | null;
   onBusyChange?: (busy: boolean) => void;
   /** Fires as a user-initiated sign-in attempt begins, before any request, so
    *  the shell can dismiss a stale error from the previous attempt. */
   onSignInStart?: () => void;
+  /** The pending link being resolved. The shell owns it so a browser attempt cannot lose it. */
+  pendingLink?: PendingLinkOffer | null;
+  /** The browser sign-in route refused `pendingLink` as no longer live. */
+  pendingLinkRefused?: boolean;
+  /** Without it a `DIFFERENT-OAUTH` refusal stays a toast, as before pending links existed. */
+  onPendingLink?: (offer: PendingLinkOffer) => void;
+  onClearPendingLink?: () => void;
+  /**
+   * Reports the height of what the current step renders below its focused
+   * field, for the shell's keyboard reserve. Zero means the step has no
+   * measured block; a step change resets it.
+   */
+  onBelowFieldHeightChange?: (height: number) => void;
 }>) {
   const {
     busy,
@@ -86,9 +78,18 @@ export function IdleAuth({
     ssoRecovery,
     clearSsoRecovery,
     handleSsoError,
-  } = useNativeAuth();
+    pendingLinkFailure,
+    clearPendingLinkFailure,
+  } = useNativeAuth(
+    onPendingLink
+      ? {
+          pendingLink,
+          onPendingLinkOffer: onPendingLink,
+          onPendingLinkResolved: () => onClearPendingLink?.(),
+        }
+      : undefined
+  );
   const { t } = useTranslation();
-  const colors = useThemeColors();
   // The wrapper's label: the translated parts joined the way the row renders
   // them, so the catalog owns every space in the sentence. `termsPrefix` ends
   // with whatever separator the locale puts before the Terms link — a space
@@ -109,6 +110,40 @@ export function IdleAuth({
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
   const emailRef = useRef(initialEmail);
   const browserAuthStartingRef = useRef(false);
+
+  const reportBelowFieldHeight = useCallback(
+    (height: number) => {
+      onBelowFieldHeightChange?.(height);
+    },
+    [onBelowFieldHeightChange]
+  );
+
+  // The landing step's own frames. A message under the input lives inside the
+  // field's block, so what the keyboard can cover below the input is the block
+  // past the input plus the action under it; the two form gaps around that
+  // content belong to the shell's reserve.
+  const [emailBlockHeight, setEmailBlockHeight] = useState(0);
+  const [emailInputBottom, setEmailInputBottom] = useState(0);
+  const [emailActionHeight, setEmailActionHeight] = useState(0);
+
+  // A step's measured block describes only that step: the code step's
+  // refusal-and-action block must not size the reserve on the landing view after
+  // Back, and the landing view's block must not size the code step. Reset on
+  // every change of the rendered step; that step's own layout reports next.
+  const pendingLinkTokenForReset = pendingLink?.token;
+  useEffect(() => {
+    reportBelowFieldHeight(0);
+    setEmailBlockHeight(0);
+    setEmailInputBottom(0);
+    setEmailActionHeight(0);
+  }, [reportBelowFieldHeight, view, pendingLinkTokenForReset]);
+
+  useEffect(() => {
+    if (view !== 'main' || emailBlockHeight === 0 || emailActionHeight === 0) {
+      return;
+    }
+    reportBelowFieldHeight(Math.max(0, emailBlockHeight - emailInputBottom) + emailActionHeight);
+  }, [emailActionHeight, emailBlockHeight, emailInputBottom, reportBelowFieldHeight, view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +176,17 @@ export function IdleAuth({
     }
   }, [emailErrorKey, ssoRecovery]);
 
+  // A newly offered pending link takes over the screen, even from the code step
+  // whose verification produced it.
+  const pendingLinkToken = pendingLink?.token;
+  useEffect(() => {
+    if (pendingLinkToken) {
+      verifyAttemptRef.current += 1;
+      setVerifyError(undefined);
+      setView('main');
+    }
+  }, [pendingLinkToken]);
+
   // Restore an SSO-recovery banner that survived an RTL language reload.
   useEffect(() => {
     if (initialSsoRecovery) {
@@ -164,13 +210,13 @@ export function IdleAuth({
     setSsoRecoveryDraft(ssoRecovery);
   }, [ssoRecovery]);
 
-  const handleSendCode = async () => {
+  const handleSendCode = async (email: string) => {
     onSignInStart?.();
     // Empty input is a field-level error: `useNativeAuth` sets the message and
     // never posts an empty address, and FormField renders it under the field so
     // the landing never looks dead. The same call clears a stale message and
     // reports a rejected address (`INVALID_REQUEST` / `INVALID_EMAIL`).
-    const ok = await requestEmailCode(emailRef.current);
+    const ok = await requestEmailCode(email);
     if (ok) {
       verifyAttemptRef.current += 1;
       setVerifyError(undefined);
@@ -184,10 +230,13 @@ export function IdleAuth({
   const showPasskey = passkeysSupported();
   const showDivider = showApple || googleConfigured || showPasskey;
   const authBusy = busy !== undefined || browserAuthStarting;
+  // The code step for a pending link goes to the existing account's address, not the typed one.
+  const otpEmail = pendingLink ? pendingLink.email : emailRef.current;
 
   // Report the form's busy state to the login shell so it can disable the
-  // language Globe while the OTP form or a busy auth action owns the screen.
-  const authFormBusy = view === 'otp' || authBusy;
+  // language Globe while the OTP form, the pending-link screen, or a busy auth
+  // action owns the screen: the language reload would drop that state.
+  const authFormBusy = view === 'otp' || authBusy || pendingLink !== null;
   useEffect(() => {
     onBusyChange?.(authFormBusy);
   }, [authFormBusy, onBusyChange]);
@@ -200,7 +249,7 @@ export function IdleAuth({
     setBrowserAuthStarting(true);
     onSignInStart?.();
     try {
-      await start('signin');
+      await start('signin', undefined, pendingLink?.token);
     } finally {
       browserAuthStartingRef.current = false;
       setBrowserAuthStarting(false);
@@ -215,7 +264,7 @@ export function IdleAuth({
     setBrowserAuthStarting(true);
     onSignInStart?.();
     try {
-      await start('sso', email);
+      await start('sso', email, pendingLink?.token);
     } finally {
       browserAuthStartingRef.current = false;
       setBrowserAuthStarting(false);
@@ -225,13 +274,16 @@ export function IdleAuth({
   if (view === 'otp') {
     return (
       <EmailOtpForm
-        email={emailRef.current.trim().toLowerCase()}
+        email={otpEmail.trim().toLowerCase()}
         busy={busy}
-        error={verifyError}
+        // A resend that fails has no field to sit under here, and the pending-link options are off
+        // screen, so the code step shows that refusal in its own slot. Without a pending link the
+        // hook toasts it instead and this stays the verify message alone.
+        error={verifyError ?? pendingLinkFailure?.message}
         onVerify={code => {
           const attempt = verifyAttemptRef.current;
           void (async () => {
-            const outcome = await verifyEmailCode(emailRef.current, code);
+            const outcome = await verifyEmailCode(otpEmail, code);
             // A refusal may settle after the user has moved on — edited the
             // code (clearing the message), requested a resend, or gone back.
             // Only the attempt this refusal belongs to may write its message.
@@ -245,12 +297,14 @@ export function IdleAuth({
           // disowns any verify attempt still in flight for the old code.
           verifyAttemptRef.current += 1;
           setVerifyError(undefined);
+          clearPendingLinkFailure();
         }}
         onResend={() => {
           verifyAttemptRef.current += 1;
           setVerifyError(undefined);
+          clearPendingLinkFailure();
           void (async () => {
-            const ok = await requestEmailCode(emailRef.current);
+            const ok = await requestEmailCode(otpEmail);
             if (ok) {
               toast.success(t('login.codeSent'));
             }
@@ -259,148 +313,96 @@ export function IdleAuth({
         onBack={() => {
           verifyAttemptRef.current += 1;
           setVerifyError(undefined);
+          clearPendingLinkFailure();
           setView('main');
         }}
+        onBelowFieldHeightChange={onBelowFieldHeightChange}
       />
+    );
+  }
+
+  const ssoBlock = ssoRecovery && (
+    <View className="gap-2 rounded-md border border-border bg-card p-3">
+      <Text>{t('login.organizationUsesSso')}</Text>
+      <Button
+        size="lg"
+        className="flex-row gap-2"
+        disabled={authBusy}
+        loading={browserAuthStarting}
+        onPress={() => void startSsoAuth(ssoRecovery.email)}
+        accessibilityLabel={t('login.continueWithSso')}
+      >
+        <Text>{t('login.continueWithSso')}</Text>
+      </Button>
+      <Button
+        variant="ghost"
+        disabled={authBusy}
+        onPress={() => {
+          clearSsoRecovery();
+        }}
+        accessibilityLabel={t('login.useDifferentEmail')}
+      >
+        <Text>{t('login.useDifferentEmail')}</Text>
+      </Button>
+    </View>
+  );
+
+  const providerHandlers = {
+    onApple: () => {
+      onSignInStart?.();
+      void signInWithApple();
+    },
+    onGoogle: () => {
+      onSignInStart?.();
+      void signInWithGoogle();
+    },
+    onPasskey: () => {
+      onSignInStart?.();
+      void signInWithPasskey();
+    },
+  };
+
+  if (pendingLink) {
+    return (
+      <View className="gap-3">
+        {ssoBlock}
+        <PendingLinkAuth
+          key={pendingLink.token}
+          offer={pendingLink}
+          options={pendingLinkOptions(pendingLink, {
+            apple: showApple,
+            google: googleConfigured,
+            passkey: showPasskey,
+          })}
+          busy={busy}
+          browserStarting={browserAuthStarting}
+          refused={pendingLinkRefused}
+          // An address the code route rejects has no field here, so it reads beside the options.
+          failure={
+            pendingLinkFailure ??
+            (emailErrorKey ? { message: t(emailErrorKey), retryable: true } : undefined)
+          }
+          {...providerHandlers}
+          onEmailCode={() => void handleSendCode(pendingLink.email)}
+          onBrowser={() => void startBrowserAuth()}
+          onStartAgain={() => onClearPendingLink?.()}
+        />
+      </View>
     );
   }
 
   return (
     <View className="gap-3">
-      {ssoRecovery && (
-        <View className="gap-2 rounded-md border border-border bg-card p-3">
-          <Text>{t('login.organizationUsesSso')}</Text>
-          <Button
-            size="lg"
-            className="flex-row gap-2"
-            disabled={authBusy}
-            loading={browserAuthStarting}
-            onPress={() => void startSsoAuth(ssoRecovery.email)}
-            accessibilityLabel={t('login.continueWithSso')}
-          >
-            <Text>{t('login.continueWithSso')}</Text>
-          </Button>
-          <Button
-            variant="ghost"
-            disabled={authBusy}
-            onPress={() => {
-              clearSsoRecovery();
-            }}
-            accessibilityLabel={t('login.useDifferentEmail')}
-          >
-            <Text>{t('login.useDifferentEmail')}</Text>
-          </Button>
-        </View>
-      )}
+      {ssoBlock}
 
-      {showApple && (
-        // The provider row is ours, not Apple's native control: the native
-        // button titles itself in the device language, which left English
-        // "Sign in with Apple" next to the translated Google and passkey rows
-        // when the app language differed from the device language, and it draws
-        // its own dark border (about twice the design system hairline) that no
-        // buttonStyle can match. The label comes from the catalog
-        // (`login.signInWithApple`), and the mark and outline chrome match the
-        // two rows below it: one border colour and width, one fill, radius,
-        // height and label weight across the three. Apple's HIG requires the
-        // mark and the exact "Sign in with Apple" wording; a custom control
-        // satisfies it, as does the Google button.
-        <Button
-          variant="outline"
-          size="lg"
-          // Same chrome and label axis as the Google and passkey rows below:
-          // the mark is out of flow at the leading edge, so the label centers
-          // on the button's own width at the shared 44pt floor and all three
-          // provider rows keep one height.
-          className={PROVIDER_ROW_CLASS}
-          disabled={authBusy}
-          onPress={() => {
-            onSignInStart?.();
-            void signInWithApple();
-          }}
-          accessibilityLabel={t('login.signInWithApple')}
-        >
-          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
-            {busy === 'apple' ? (
-              <ActivityIndicator size="small" />
-            ) : (
-              <AppleLogo size={18} color={colors.foreground} />
-            )}
-          </View>
-          <Text className="flex-1 text-center text-[17px] font-medium">
-            {t('login.signInWithApple')}
-          </Text>
-        </Button>
-      )}
-
-      {googleConfigured && (
-        <Button
-          variant="outline"
-          size="lg"
-          // min-h (not fixed h) so Dynamic Type can grow the control; keep
-          // Apple-parity 44pt floor and full-width rounded chrome. The row is
-          // pinned to one line (no flex-wrap) so the Google and passkey buttons
-          // keep the same height: a wrapped label made the passkey button a row
-          // taller than the Google button above it (2026-09-20 device finding).
-          // The label takes the whole content width, so it centers on the
-          // button rather than on the space the mark leaves over.
-          className={PROVIDER_ROW_CLASS}
-          disabled={authBusy}
-          onPress={() => {
-            onSignInStart?.();
-            void signInWithGoogle();
-          }}
-          accessibilityLabel={t('login.signInWithGoogle')}
-        >
-          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
-            {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
-          </View>
-          <Text className="flex-1 text-center text-[17px] font-medium">
-            {t('login.signInWithGoogle')}
-          </Text>
-        </Button>
-      )}
-
-      {showPasskey && (
-        <View
-          className={authBusy ? 'opacity-50' : undefined}
-          pointerEvents={authBusy ? 'none' : 'auto'}
-        >
-          <Button
-            variant="outline"
-            size="lg"
-            // min-h (not fixed h) so Dynamic Type can grow the control, matching
-            // the Google button's Apple-parity 44pt floor. The flex-1 label box
-            // gives the copy the whole content width and centers it on the
-            // button, but a label wider than that box still wraps and makes this
-            // row taller than the Google row above it (the Arabic label once
-            // did). The row therefore stays one line only while every catalog's
-            // `login.signInWithPasskey` fits the compact 360dp content width
-            // (248dp at the 17pt label size); the 14 locales whose label was
-            // wider are phrased short for that reason, not for style.
-            className={PROVIDER_ROW_CLASS}
-            disabled={authBusy}
-            onPress={() => {
-              onSignInStart?.();
-              void signInWithPasskey();
-            }}
-            accessibilityLabel={t('login.signInWithPasskey')}
-          >
-            <View className={PROVIDER_GLYPH_SLOT_CLASS}>
-              {busy === 'passkey' ? (
-                <ActivityIndicator size="small" />
-              ) : (
-                // Same leading-glyph slot as the Apple and Google rows, so the
-                // three provider options read as one group.
-                <KeyRound size={18} color={colors.foreground} />
-              )}
-            </View>
-            <Text className="flex-1 text-center text-[17px] font-medium">
-              {t('login.signInWithPasskey')}
-            </Text>
-          </Button>
-        </View>
-      )}
+      <ProviderButtons
+        showApple={showApple}
+        showGoogle={googleConfigured}
+        showPasskey={showPasskey}
+        busy={busy}
+        disabled={authBusy}
+        {...providerHandlers}
+      />
 
       {showDivider && (
         // The border token is 7% white in dark, a hairline that all but
@@ -439,7 +441,7 @@ export function IdleAuth({
         returnKeyType="go"
         onSubmitEditing={() => {
           if (!authBusy) {
-            void handleSendCode();
+            void handleSendCode(emailRef.current);
           }
         }}
         onChangeText={value => {
@@ -448,21 +450,40 @@ export function IdleAuth({
           clearEmailError();
           setLoginEmailDraft(value);
         }}
+        // The field block grows when it renders a message under the input, and
+        // the input's own frame says where that message starts.
+        containerOnLayout={event => {
+          setEmailBlockHeight(event.nativeEvent.layout.height);
+        }}
+        onLayout={event => {
+          const { height, y } = event.nativeEvent.layout;
+          setEmailInputBottom(y + height);
+        }}
       />
-      <Button
-        size="lg"
-        className="flex-row gap-2"
-        disabled={authBusy}
-        loading={busy === 'otp-send'}
-        onPress={() => void handleSendCode()}
-        accessibilityLabel={t('login.continueWithEmail')}
+      {/* The action's own box, so what the keyboard can cover below the input is
+          the message (the field block past the input) plus this action. The
+          legal row and the remaining options stay out of it, so they never lift
+          the field. */}
+      <View
+        onLayout={event => {
+          setEmailActionHeight(event.nativeEvent.layout.height);
+        }}
       >
-        {/* The primary action's label takes the provider rows' 17pt label size;
-            at the button variant's 14pt the filled Continue read weaker than
-            the two outlined ways in below it. The variant keeps the weight
-            (`font-semibold`) and the brand fill. */}
-        <Text className="text-[17px]">{t('common.continue')}</Text>
-      </Button>
+        <Button
+          size="lg"
+          className="flex-row gap-2"
+          disabled={authBusy}
+          loading={busy === 'otp-send'}
+          onPress={() => void handleSendCode(emailRef.current)}
+          accessibilityLabel={t('login.continueWithEmail')}
+        >
+          {/* The primary action's label takes the provider rows' 17pt label size;
+              at the button variant's 14pt the filled Continue read weaker than
+              the two outlined ways in below it. The variant keeps the weight
+              (`font-semibold`) and the brand fill. */}
+          <Text className="text-[17px]">{t('common.continue')}</Text>
+        </Button>
+      </View>
       {/* The sentence is one accessible element: Android's screen reader does
             not keep the row's visual order once the line wraps (in pt-BR the
             tree read the Privacy link before Terms), so the wrapper carries the

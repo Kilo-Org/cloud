@@ -39,6 +39,7 @@ const FAILURE_REASON_LABELS = {
   managed_provider_unavailable: 'Managed provider unavailable',
   managed_provider_authentication: 'Managed provider authentication',
   managed_model_configuration: 'Managed model configuration',
+  model_catalog_unavailable: 'Model catalog unavailable',
   provider_unavailable: 'Provider unavailable',
   provider_disconnect: 'Provider connection lost',
   gateway_unavailable: 'Gateway temporarily unavailable',

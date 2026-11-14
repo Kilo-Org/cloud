@@ -1,4 +1,4 @@
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
@@ -14,7 +14,7 @@ export function isWebSessionCurrent(
 
 export async function revokeWebSessions(
   kiloUserId: User['id'],
-  fromDb: typeof db | DrizzleTransaction = db
+  fromDb: DrizzleConnection = db
 ): Promise<void> {
   await fromDb
     .update(kilocode_users)

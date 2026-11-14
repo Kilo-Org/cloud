@@ -18,7 +18,7 @@ const state: NativeSessionState = {
   connection: 'connected',
   runnerConnected: true,
   events: [],
-  pending: { permissions: [], questions: [] },
+  pending: { permissions: [], questions: [], unreadablePermissions: [] },
   commands: {},
 };
 function frame(type: string, data: Record<string, unknown>, seq = 10): NativeEvent {
@@ -378,7 +378,7 @@ test('pending inventory, full permission/form metadata and settlements survive a
     ...frame('remote.state', {}),
     body: { pending: { permissions: [], questions: [] } },
   });
-  expect(pending).toEqual({ permissions: [], questions: [] });
+  expect(pending).toEqual({ permissions: [], questions: [], unreadablePermissions: [] });
 });
 
 test.each([null, {}, { pending: null }, { pending: { permissions: [] } }])(
@@ -387,22 +387,77 @@ test.each([null, {}, { pending: null }, { pending: { permissions: [] } }])(
     const pending = {
       permissions: [{ id: 'stale', action: 'edit', resources: ['file'] }],
       questions: [{ id: 'stale-question', metadata: { kind: 'question' as const }, fields: [] }],
+      unreadablePermissions: [{ requestId: 'stale-unreadable' }],
     };
     expect(reduceNativePendingRequests(pending, { ...frame('remote.state', {}), body })).toEqual({
       permissions: [],
       questions: [],
+      unreadablePermissions: [],
     });
   }
 );
 
-test('ignores a malformed live permission without losing valid pending requests', () => {
+test('reports a malformed live permission by identity and keeps valid pending requests', () => {
   const pending = {
     permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
     questions: [],
+    unreadablePermissions: [],
   };
   expect(
-    reduceNativePendingRequests(pending, frame('permission.asked', { id: 'invalid' }))
-  ).toEqual(pending);
+    reduceNativePendingRequests(
+      pending,
+      frame('permission.asked', { id: 'invalid', action: 'shell' })
+    )
+  ).toEqual({
+    permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
+    questions: [],
+    unreadablePermissions: [{ requestId: 'invalid' }],
+  });
+  expect(
+    reduceNativePendingRequests(
+      pending,
+      frame('permission.asked', { action: 'shell', resources: ['file'] })
+    )
+  ).toBe(pending);
+});
+
+test('unreadable permission notices replace cards, clear on reply and yield to a readable request', () => {
+  const pending = {
+    permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
+    questions: [],
+    unreadablePermissions: [],
+  };
+  let next = reduceNativePendingRequests(
+    pending,
+    frame('permission.asked', { id: 'perm-1', action: 'shell' })
+  );
+  next = reduceNativePendingRequests(next, frame('permission.asked', { id: 'perm-2' }));
+  expect(next.permissions).toEqual([{ id: 'current', action: 'edit', resources: ['file'] }]);
+  expect(next.unreadablePermissions).toEqual([{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
+  expect(
+    reduceNativePendingRequests(next, frame('permission.replied', { requestID: 'perm-1' }))
+      .unreadablePermissions
+  ).toEqual([{ requestId: 'perm-2' }]);
+  const readable = reduceNativePendingRequests(
+    next,
+    frame('permission.asked', { id: 'perm-2', action: 'shell', resources: ['build'] })
+  );
+  expect(readable.unreadablePermissions).toEqual([{ requestId: 'perm-1' }]);
+  expect(readable.permissions).toMatchObject([
+    { id: 'current' },
+    { id: 'perm-2', action: 'shell', resources: ['build'] },
+  ]);
+  const replaced = reduceNativePendingRequests(
+    pending,
+    frame('permission.asked', { id: 'current', action: 'shell' })
+  );
+  expect(replaced.permissions).toEqual([]);
+  expect(replaced.unreadablePermissions).toEqual([{ requestId: 'current' }]);
+  // A replayed request keeps its place: the list is oldest first.
+  expect(
+    reduceNativePendingRequests(next, frame('permission.asked', { id: 'perm-1' }))
+      .unreadablePermissions
+  ).toEqual([{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
 });
 
 test('native live reduction shares untouched content, ignores late deltas and flags missing ordinals', () => {

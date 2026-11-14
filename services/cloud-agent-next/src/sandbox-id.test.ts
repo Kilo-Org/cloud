@@ -127,23 +127,9 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('selects containers for an isolated control-plane organization', async () => {
+  it('selects native containers for an organization', async () => {
     const selection = await selectSandboxForNewSession({
       env: {},
-      orgId: 'org-id',
-      userId: 'user-id',
-      sessionId: controlSessionId,
-    });
-
-    expect(selection.provider).toBe('cloudflare-containers');
-  });
-
-  it('moves an enforced organization to native containers', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: {
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',
-      },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
@@ -153,40 +139,8 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('uses Cloudflare containers when enforcement is off', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: {
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
-      },
-      orgId: 'org-id',
-      userId: 'user-id',
-      sessionId: controlSessionId,
-    });
-
-    expect(selection.provider).toBe('cloudflare-containers');
-  });
-
-  it('skips Vercel for a personal owner enforced through the user allowlist', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: {
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-        CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user-id',
-      },
-      userId: 'user-id',
-      sessionId: controlSessionId,
-    });
-
-    expect(selection.provider).toBe('cloudflare-containers');
-  });
-
-  it('defaults an enforced owner to containers instead of Vercel', () => {
-    const destination = getDefaultSandboxDestination(
-      {
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',
-      },
-      { userId: 'user-id', orgId: 'org-id' }
-    );
+  it('defaults an owner to native containers', () => {
+    const destination = getDefaultSandboxDestination({}, { userId: 'user-id', orgId: 'org-id' });
 
     expect(destination.provider.id).toBe('cloudflare-containers');
     expect(destination.instanceType).toBe('standard-3');

@@ -14,6 +14,15 @@ import type { GatewayResponsesRequest } from './providers/openrouter/types';
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');
 
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
+}
+
 describe('extractResponsesPromptInfo', () => {
   test('extracts system and developer input messages', () => {
     expect(
@@ -401,6 +410,80 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
   });
 });
 
+describe('parseResponsesMicrodollarUsageFromStream validation', () => {
+  test.each([
+    'not-json',
+    'null',
+    '42',
+    '[]',
+    '{}',
+    '{"type":"response.created"}',
+    '{"type":"response.completed","response":null}',
+    '{"type":"response.created","response":42}',
+    '{"type":"response.output_text.delta"}',
+    '{"type":"response.output_text.delta","delta":42}',
+    '{"type":"response.completed","response":{"usage":{"input_tokens":"invalid"}}}',
+  ])('retains later usage after malformed event %s', async malformedEvent => {
+    const events = [
+      malformedEvent,
+      JSON.stringify({ type: 'response.output_text.delta', delta: 'Hello' }),
+      JSON.stringify({
+        type: 'response.completed',
+        response: {
+          id: 'resp_recovered',
+          model: 'test-model',
+          status: 'completed',
+          usage: {
+            input_tokens: 10,
+            output_tokens: 7,
+            input_tokens_details: { cached_tokens: 3, cache_write_tokens: 2 },
+            cost: 0.002,
+            is_byok: false,
+          },
+        },
+      }),
+    ];
+
+    const result = await parseResponsesMicrodollarUsageFromStream(
+      streamFromText(events.map(event => `data: ${event}\n\n`).join('')),
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({
+      messageId: 'resp_recovered',
+      model: 'test-model',
+      responseContent: 'Hello',
+      inputTokens: 10,
+      outputTokens: 7,
+      cacheHitTokens: 3,
+      cacheWriteTokens: 2,
+      cost_mUsd: 2000,
+      hasError: true,
+      finish_reason: 'completed',
+    });
+  });
+
+  test('treats error:null as no error', async () => {
+    const result = await parseResponsesMicrodollarUsageFromStream(
+      streamFromText(
+        'data: {"type":"error","error":null}\n\n' +
+          'data: {"type":"response.completed","error":null,"response":{"id":"resp_1","model":"model","status":"completed","usage":{"input_tokens":3,"output_tokens":2}}}\n\n'
+      ),
+      'fake-user-id',
+      undefined,
+      'direct-byok',
+      200,
+      true
+    );
+
+    expect(result).toMatchObject({ hasError: false, inputTokens: 3, outputTokens: 2 });
+  });
+});
+
 describe('parseMicrodollarUsageFromString approval tests', () => {
   const openrouterResponsesJson = 'openrouter-responses.log.resp.json';
   test(openrouterResponsesJson, async () => {
@@ -420,5 +503,49 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
+  });
+});
+
+describe('parseResponsesMicrodollarUsageFromString validation', () => {
+  test.each([
+    'not-json',
+    'null',
+    '42',
+    '[]',
+    '{"model":42}',
+    '{"model":"model","usage":{"input_tokens":"invalid"}}',
+    '{"model":"model","output":{}}',
+    '{"model":"model","output":[{"type":"message"}]}',
+    '{"model":"model","output":[{"type":"message","content":[null]}]}',
+    '{"model":"model","output":[{"type":"message","content":[{"type":"output_text"}]}]}',
+    '{"model":"model","provider_metadata":{"gateway":{"routing":{"modelAttempts":{}}}}}',
+  ])('rejects malformed nonstream response %s', response => {
+    expect(() => parseResponsesMicrodollarUsageFromString(response, 200, 'openrouter')).toThrow();
+  });
+
+  test('records an upstream error body without a model as an error', () => {
+    const result = parseResponsesMicrodollarUsageFromString(
+      '{"error":{"code":"rate_limit_exceeded","message":"Rate limited"}}',
+      429,
+      'openrouter'
+    );
+
+    expect(result).toMatchObject({
+      model: null,
+      hasError: true,
+      status_code: 429,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost_mUsd: 0,
+    });
+  });
+
+  test('keeps usage when status is not a string', () => {
+    const result = parseResponsesMicrodollarUsageFromString(
+      '{"model":"model","status":3,"usage":{"input_tokens":10,"output_tokens":2}}',
+      200,
+      'openrouter'
+    );
+    expect(result).toMatchObject({ finish_reason: 3, inputTokens: 10, outputTokens: 2 });
   });
 });

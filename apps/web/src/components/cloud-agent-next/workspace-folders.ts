@@ -83,7 +83,11 @@ export function getWorkspaceFolderDropAction(
   worktreeIds: ReadonlySet<string>
 ): WorkspaceFolderDropAction | null {
   if (!drag || !target) return null;
-  if (target.type === 'folder' && !folders.some(folder => folder.id === target.id)) return null;
+  const targetFolder =
+    target.type === 'folder' ? folders.find(folder => folder.id === target.id) : undefined;
+  if (target.type === 'folder' && targetFolder === undefined) return null;
+  // Smart folders compute their members, so the server refuses manual moves into them.
+  if (drag.type !== 'folder' && targetFolder?.kind === 'smart') return null;
 
   if (drag.type === 'session') {
     // Sessions are only draggable while ungrouped, so Ungrouped has nothing to
@@ -108,6 +112,13 @@ export function getWorkspaceFolderDropAction(
   return reordered.every((id, position) => id === folderIds[position])
     ? null
     : { type: 'reorder-folders', folderIds: reordered };
+}
+
+export function getInitializedSmartDoneFoldersStorageKey(
+  userId: string,
+  organizationId?: string
+): string {
+  return `cloud-workspace-folders:smart-done:${encodeURIComponent(userId)}:${organizationId ? `org:${encodeURIComponent(organizationId)}` : 'personal'}`;
 }
 
 export function getCollapsedWorkspaceFoldersStorageKey(

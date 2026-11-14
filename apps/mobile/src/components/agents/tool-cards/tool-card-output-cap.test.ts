@@ -274,7 +274,9 @@ describe('tool-card output caps removed', () => {
     expect((block.props as { maxLength?: unknown }).maxLength).toBeUndefined();
     const labelTexts = findAll(
       root,
-      el => el.type === 'Text' && (el.props as { children?: unknown }).children === 'command'
+      el =>
+        el.type === 'Text' &&
+        (el.props as { children?: unknown }).children === 'profiles.commandLabel'
     );
     expect(labelTexts).toHaveLength(1);
     // The field value flows through `SelectableText`'s read-only TextInput.

@@ -96,6 +96,37 @@ describe('session event public projection', () => {
     expect(JSON.stringify(projected)).not.toContain('private-provider');
   });
 
+  it('names a native model catalog 404 on the public execution failure event', () => {
+    const projected = publicEventProperties({
+      type: 'conversation.event',
+      properties: {
+        sessionID: 'ses_native',
+        event: {
+          id: 'evt_native',
+          type: 'session.execution.failed',
+          data: {
+            sessionID: 'ses_native',
+            error: {
+              type: 'provider.no-route',
+              message:
+                'Failed to load the Kilo model catalog (HTTP 404). Check your connection and credentials.',
+            },
+          },
+        },
+      },
+    });
+    expect(projected).toMatchObject({
+      event: {
+        data: {
+          error: {
+            type: 'provider.no-route',
+            message: 'The Kilo model catalog could not be loaded',
+          },
+        },
+      },
+    });
+  });
+
   describe.each(carriers)('$type', carrier => {
     it.each([
       {

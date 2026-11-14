@@ -5,15 +5,11 @@ import { catalogNeedsPublication, readSourceCatalog } from './runtime-publicatio
 const preinstalled = { mode: 'preinstalled', image: 'all-in-one' };
 const downloaded = { mode: 'downloaded', image: 'runtime-free' };
 
-test('only a downloaded default or named target needs publication', () => {
-  assert.equal(catalogNeedsPublication({ default: preinstalled, targets: {} }), false);
-  assert.equal(
-    catalogNeedsPublication({ default: preinstalled, targets: { production: preinstalled } }),
-    false
-  );
-  assert.equal(
-    catalogNeedsPublication({ default: preinstalled, targets: { production: downloaded } }),
-    true
+test('every valid target needs publication and retired selections are rejected', () => {
+  assert.throws(() => catalogNeedsPublication({ default: preinstalled, targets: {} }), /Invalid/);
+  assert.throws(
+    () => catalogNeedsPublication({ default: downloaded, targets: { production: preinstalled } }),
+    /Invalid/
   );
   assert.equal(catalogNeedsPublication({ default: downloaded, targets: {} }), true);
   assert.throws(() => catalogNeedsPublication({ default: preinstalled }), /Invalid/);

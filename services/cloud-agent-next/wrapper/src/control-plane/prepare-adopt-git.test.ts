@@ -344,11 +344,10 @@ describe('adopting an environment snapshot against a real repository', () => {
 
       expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
       expect(setupRun(restored.runSetup.mock.calls)).toEqual(['serve']);
-      expect(restored.frames).toContainEqual(
+      expect(restored.frames).not.toContainEqual(
         expect.objectContaining({
           type: 'session.progress',
           step: 'setup',
-          detail: 'Setup already ran in the environment snapshot',
         })
       );
     });
@@ -392,6 +391,9 @@ describe('adopting an environment snapshot against a real repository', () => {
 
       expect(ready(fresh.frames)).toMatchObject({ workspace: 'cloned' });
       expect(setupRun(fresh.runSetup.mock.calls)).toEqual(['serve']);
+      expect(fresh.frames).not.toContainEqual(
+        expect.objectContaining({ type: 'session.progress', step: 'setup' })
+      );
     });
 
     it('runs neither for a workspace this allocation already prepared', async () => {

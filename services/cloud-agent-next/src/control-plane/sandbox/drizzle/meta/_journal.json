@@ -43,6 +43,13 @@
       "when": 1794145671968,
       "tag": "0005_create_attempt_budget",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794258032795,
+      "tag": "0006_third_silhouette",
+      "breakpoints": true
     }
   ]
 }

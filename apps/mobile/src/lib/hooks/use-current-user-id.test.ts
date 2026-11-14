@@ -21,8 +21,9 @@ vi.mock('@tanstack/react-query', () => ({
     subscribe: () => () => undefined,
   },
 }));
-// The hook subscribes to the manager through `useSyncExternalStore`; this suite
-// calls hooks directly, so the mock reads the current snapshot.
+// This suite calls the hook outside a renderer, so the mock reads the current
+// snapshot and drops the subscribe callback. The manager's online/offline edge
+// re-rendering the hook is covered by use-current-user-id.mounted.test.tsx.
 vi.mock('react', () => ({
   useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown): unknown => getSnapshot(),
 }));

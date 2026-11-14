@@ -56,13 +56,29 @@ export async function getExaMonthlyUsage(
   return { usage: total, freeAllowance };
 }
 
+export type ExaUsageWriteOptions = {
+  /**
+   * Bounds the transaction to the caller's remaining budget with transaction-local
+   * `lock_timeout`, `statement_timeout` and `idle_in_transaction_session_timeout`. A caller that
+   * stops awaiting the write at its own deadline needs this so the transaction cannot hold its
+   * connection and locks past that deadline.
+   */
+  deadlineMs?: number;
+};
+
+/** The documented server `statement_timeout`; the caller's remaining budget may only tighten it. */
+const WRITE_ACTIVE_TIMEOUT_MS = 120_000;
+/** A suspended client is idle between statements; this bounds how long its transaction may sit. */
+const WRITE_IDLE_TIMEOUT_MS = 60_000;
+
 /**
  * Records the source row, monthly counter, and charged owner mutation atomically.
  * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge.
  * Low-balance notification scheduling happens only after commit.
  */
 export async function recordExaUsage(
-  record: ExaUsageRecord
+  record: ExaUsageRecord,
+  options: ExaUsageWriteOptions = {}
 ): Promise<ExaUsageWriteResponse['status']> {
   const {
     id,
@@ -79,6 +95,18 @@ export async function recordExaUsage(
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
 
   const outcome = await db.transaction(async tx => {
+    if (options.deadlineMs !== undefined) {
+      const budgetMs = Math.max(1_000, Math.floor(options.deadlineMs));
+      const activeTimeoutMs = Math.min(budgetMs, WRITE_ACTIVE_TIMEOUT_MS);
+      const idleTimeoutMs = Math.min(budgetMs, WRITE_IDLE_TIMEOUT_MS);
+      // PostgreSQL rejects a parameterized SET; Math.floor above proves these are integers.
+      await tx.execute(sql.raw(`SET LOCAL lock_timeout = '${activeTimeoutMs}'`));
+      await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${activeTimeoutMs}'`));
+      await tx.execute(
+        sql.raw(`SET LOCAL idle_in_transaction_session_timeout = '${idleTimeoutMs}'`)
+      );
+    }
+
     const [inserted] = await tx
       .insert(exa_usage_log)
       .values({

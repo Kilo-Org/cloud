@@ -6,7 +6,10 @@ import type {
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { providerPrivacySchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import {
+  providerPreferencesSchema,
+  type providerPrivacySchema,
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import {
   extractHeaderAndLimitLength,
   invalidRequestResponse,
@@ -114,7 +117,7 @@ export function parseLlmProxyRequest(
     }
   }
 
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(request.body.provider);
+  const requestPrivacy = providerPreferencesSchema.optional().safeParse(request.body.provider);
   if (!requestPrivacy.success) return reject(invalidRequestResponse());
 
   if (!ipAddress) {

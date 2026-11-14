@@ -40,6 +40,7 @@ type ApiSession = {
   created_on_platform: string | null;
   created_at: string;
   updated_at: string;
+  last_activity_at?: string | null;
   last_mode?: string | null;
   last_model?: string | null;
   version: number;
@@ -66,6 +67,7 @@ export type DbSession = {
   created_on_platform: string | null;
   created_at: Date;
   updated_at: Date;
+  last_activity_at?: Date | null;
   last_mode: string | null;
   last_model: string | null;
   version: number;
@@ -94,6 +96,7 @@ export type DbSessionV2 = {
   parent_session_id: string | null;
   created_at: Date;
   updated_at: Date;
+  last_activity_at?: Date | null;
   version: number;
   status: string | null;
   status_updated_at: Date | null;
@@ -118,6 +121,7 @@ export function apiSessionToDbSession(apiSession: ApiSession): DbSession | DbSes
     last_model: apiSession.last_model ?? null,
     created_at: new Date(apiSession.created_at),
     updated_at: new Date(apiSession.updated_at),
+    last_activity_at: apiSession.last_activity_at ? new Date(apiSession.last_activity_at) : null,
     status_updated_at: apiSession.status_updated_at ? new Date(apiSession.status_updated_at) : null,
     associatedPr: apiSession.associatedPr ?? null,
   };

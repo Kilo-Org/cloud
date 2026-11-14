@@ -1,8 +1,9 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
 /**
- * The loop's state. Three tables, each answering one operator question: where
- * the stream is, what it is stuck on, and what it gave up on.
+ * The loop's state. Five tables, each answering one operator question: where
+ * the stream is, what it is stuck on, how long each directory may hold it, what
+ * it gave up on, and which directories it gave up on.
  */
 
 /**
@@ -30,6 +31,35 @@ export const eventFailures = sqliteTable('event_failures', {
   last_error: text('last_error').notNull(),
   first_failed_at: integer('first_failed_at').notNull(),
   last_attempt_at: integer('last_attempt_at').notNull(),
+});
+
+/**
+ * The one conflict window a directory has open, and the event whose conflict
+ * opened it.
+ *
+ * The loop holds a single environment-wide cursor, and `event_failures`
+ * measures a hold per event. This table measures the same hold per directory:
+ * once `first_conflict_at` is a budget old, that directory's events have used
+ * their stream time, and its later conflicts park at once.
+ *
+ * The window belongs to the one event that opened it and closes when that event
+ * applies. Nothing else clears it.
+ */
+export const directoryConflicts = sqliteTable('directory_conflicts', {
+  directory_id: text('directory_id').primaryKey(),
+  event_id: text('event_id').notNull(),
+  first_conflict_at: integer('first_conflict_at').notNull(),
+});
+
+/**
+ * Directories whose `dsync.activated` the loop parked. Such a directory has no
+ * bound organization, and this row lets the loop park its
+ * `directory_not_found` conflicts at once. Cleared by an activation that
+ * applies, or by an operator cursor reset.
+ */
+export const parkedActivations = sqliteTable('parked_activations', {
+  directory_id: text('directory_id').primaryKey(),
+  parked_at: integer('parked_at').notNull(),
 });
 
 /**

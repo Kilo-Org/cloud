@@ -1,0 +1,232 @@
+import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { signInMethodRefusalForCode } from '@kilocode/app-shared/auth';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type ReactNode, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+
+import { EmptyState } from '@/components/empty-state';
+import { providerLabel } from '@/components/account/provider-label';
+import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { useConfirmDialog } from '@/components/ui/dialog';
+import { KeyRound, Plus } from '@/components/ui/icons';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
+
+/** The web page that starts a link: the round trip needs the browser's session. */
+const CONNECTED_ACCOUNTS_URL = `${WEB_BASE_URL}/connected-accounts`;
+
+/** The unlink procedure's provider argument, so a row cannot name an unchecked id. */
+type AuthProviderId = inferRouterInputs<MobileRouter>['user']['unlinkAuthProvider']['provider'];
+
+const SKELETON_ROWS = [0, 1, 2];
+
+function ProviderRow({
+  provider,
+  email,
+  onUnlink,
+  disabled,
+}: Readonly<{
+  provider: string;
+  email: string;
+  onUnlink: () => void;
+  disabled: boolean;
+}>) {
+  const { t } = useTranslation();
+  const label = providerLabel(provider);
+
+  return (
+    <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+      <View className="min-w-0 flex-1 gap-1">
+        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+          {label}
+        </Text>
+        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+          {email}
+        </Text>
+      </View>
+      <Button
+        variant="outline"
+        size="sm"
+        className={STATE_ACTION_CLASS}
+        disabled={disabled}
+        accessibilityLabel={t('profile.signInMethods.unlinkProvider', { provider: label })}
+        onPress={onUnlink}
+      >
+        <Text>{t('profile.signInMethods.unlink')}</Text>
+      </Button>
+    </View>
+  );
+}
+
+/**
+ * The sign-in methods of the account, and the way to add another.
+ *
+ * Unlinking asks first and the server owns the rules that at least one method
+ * stays and that the row it names still exists: a refusal is rendered in place,
+ * beside the list, rather than as a toast, because it is the answer to the tap
+ * the reader just made and the list they can act on is still above it. A known
+ * refusal code becomes catalog copy, and only an unknown failure shows the
+ * server's sentence as written. That inline status is the screen's single
+ * announcement owner, so no toast repeats it.
+ *
+ * The screen refuses a last-method tap itself, without asking the server, and
+ * that sentence retires as soon as the loaded list shows a second method; a
+ * server refusal stands until the screen refuses a later tap itself or the
+ * server answers again, because the server's answer is about the account, not
+ * about the list this render drew.
+ *
+ * Adding a method is the web's round trip (the OAuth callback needs the browser
+ * session that starts it), so the row opens the connected-accounts page in the
+ * in-app browser; the list refreshes when the reader comes back.
+ */
+export function LoginMethodsScreen() {
+  const { t } = useTranslation();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const { confirm, dialog } = useConfirmDialog();
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
+  // The screen's own refusal, kept apart from a server refusal: it describes the
+  // one-method list the reader tapped on, so a list that later shows two methods
+  // retires it instead of leaving a sentence the reader can check.
+  const [lastMethodRefusal, setLastMethodRefusal] = useState(false);
+  useRouteForegroundRefresh([[['user']]]);
+
+  const providers = useQuery(trpc.user.getAuthProviders.queryOptions());
+  const methodCount = providers.data?.providers.length ?? 0;
+  // The screen's refusal only holds for the one-method list that produced it.
+  const statusMessage =
+    lastMethodRefusal && methodCount < 2 ? t('profile.signInMethods.lastMethod') : unlinkError;
+  const unlink = useMutation(
+    trpc.user.unlinkAuthProvider.mutationOptions({
+      onSuccess: (_result, input) => {
+        setUnlinkError(null);
+        setLastMethodRefusal(false);
+        void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
+        announcingToast.success(
+          t('profile.signInMethods.unlinked', { provider: providerLabel(input.provider) })
+        );
+      },
+      // A known refusal code becomes catalog copy. Only a failure the screen
+      // does not recognise shows the server's sentence as written.
+      onError: (error, input) => {
+        const refusal = signInMethodRefusalForCode(readTrpcErrorField(error, 'upstreamCode'));
+        if (refusal === 'lastMethod') {
+          setUnlinkError(t('profile.signInMethods.lastMethod'));
+          return;
+        }
+        if (refusal === 'notLinked') {
+          setUnlinkError(
+            t('profile.signInMethods.notLinked', { provider: providerLabel(input.provider) })
+          );
+          // The list still draws the row the server reports as gone.
+          void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
+          return;
+        }
+        setUnlinkError(error.message);
+      },
+    })
+  );
+
+  const confirmUnlink = (provider: AuthProviderId) => {
+    // The server refuses the last method, so a confirmation would promise an
+    // outcome this tap cannot deliver.
+    if (methodCount < 2) {
+      setLastMethodRefusal(true);
+      // This tap answers for the list it drew, so an answer to an earlier tap
+      // must not wait behind it: once the refusal retires, that sentence would
+      // sit beside rows it never described.
+      setUnlinkError(null);
+      return;
+    }
+    setLastMethodRefusal(false);
+    const label = providerLabel(provider);
+    confirm({
+      title: t('profile.signInMethods.unlinkTitle', { provider: label }),
+      message: t('profile.signInMethods.unlinkMessage', { provider: label }),
+      confirmLabel: t('profile.signInMethods.unlink'),
+      onConfirm: () => {
+        unlink.mutate({ provider });
+      },
+    });
+  };
+
+  let body: ReactNode = null;
+  if (providers.isPending) {
+    body = (
+      <View className="gap-3">
+        {SKELETON_ROWS.map(row => (
+          <Skeleton key={row} className="h-[62px] rounded-lg" />
+        ))}
+      </View>
+    );
+  } else if (providers.isError) {
+    body = (
+      <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
+    );
+  } else if (providers.data.providers.length === 0) {
+    body = (
+      <EmptyState
+        icon={KeyRound}
+        title={t('profile.signInMethods.emptyTitle')}
+        description={t('profile.signInMethods.emptyDescription')}
+      />
+    );
+  } else {
+    body = (
+      <View className="gap-3">
+        {providers.data.providers.map(provider => (
+          <ProviderRow
+            key={provider.provider}
+            provider={provider.provider}
+            email={provider.email}
+            disabled={unlink.isPending}
+            onUnlink={() => {
+              confirmUnlink(provider.provider);
+            }}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={t('profile.signInMethods.title')} />
+      <TabScreenScrollView
+        className="flex-1"
+        contentContainerClassName="gap-3 px-4 pt-4"
+        showsVerticalScrollIndicator={false}
+      >
+        {body}
+        <AccessibleStatus message={statusMessage} className="text-sm" />
+        <ConfigureRow
+          icon={Plus}
+          title={t('profile.signInMethods.linkAnother')}
+          subtitle={t('profile.signInMethods.linkAnotherSubtitle')}
+          className="mt-3 rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            void openExternalUrl(CONNECTED_ACCOUNTS_URL, {
+              label: t('profile.signInMethods.title'),
+              retryOnError: true,
+            });
+          }}
+        />
+      </TabScreenScrollView>
+      {dialog}
+    </View>
+  );
+}

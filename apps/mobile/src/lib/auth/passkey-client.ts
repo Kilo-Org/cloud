@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { postAuth } from '@/lib/auth/auth-fetch';
-import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { parseTokenPair, type PendingLinkResult } from '@/lib/auth/native-auth-contract';
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 
@@ -164,6 +164,7 @@ export type PasskeySignInResult =
       refreshToken?: string;
       expiresIn?: number;
       created?: boolean;
+      pendingLink?: PendingLinkResult;
     }
   | {
       status: 'error';
@@ -181,10 +182,11 @@ export type PasskeySignInResult =
  * platform credential API produce the assertion, hand the assertion back for
  * server-side verification, then redeem the one-time ticket through the same
  * native token route the other providers use. The screen signs the returned
- * token pair in.
+ * token pair in. `pendingLinkToken` ties the sign-in to the pending link it resolves.
  */
 export async function signInWithPasskey(
-  api: PasskeysApi | null = loadPasskeys()
+  api: PasskeysApi | null = loadPasskeys(),
+  pendingLinkToken?: string
 ): Promise<PasskeySignInResult> {
   if (!usable(api)) {
     return { status: 'error', failure: 'unsupported' };
@@ -256,6 +258,7 @@ export async function signInWithPasskey(
     ticket: ticket.data.ticket,
     supportsRefresh: true,
     ...admissionBody,
+    ...(pendingLinkToken ? { pendingLinkToken } : {}),
   });
   if (!tokenResult.ok) {
     if (!tokenResult.errorCode) {
@@ -279,12 +282,34 @@ export async function signInWithPasskey(
     refreshToken: 'refreshToken' in parsed ? parsed.refreshToken : undefined,
     expiresIn: 'expiresIn' in parsed ? parsed.expiresIn : undefined,
     created: parsed.created,
+    ...(parsed.pendingLink ? { pendingLink: parsed.pendingLink } : {}),
   };
 }
 
 export type PasskeyRegistrationResult =
   | { status: 'ok' }
-  | { status: 'error'; failure: 'cancelled' | 'unsupported' | 'failed' };
+  | { status: 'error'; failure: 'cancelled' | 'unsupported' | 'unavailable' | 'failed' };
+
+/**
+ * The registration route answers a browser session only: it refuses a request
+ * that carries a bearer token (`Unauthorized`), and it refuses a session that
+ * is not recent enough (`REAUTH_REQUIRED`). Neither answer changes by repeating
+ * the request, so both map to `unavailable` instead of the retryable `failed`.
+ */
+function registrationRefusal(
+  failure: { errorCode: string | undefined; httpStatus?: number },
+  step: 'options' | 'verify'
+): 'unavailable' | 'failed' {
+  if (failure.errorCode === 'Unauthorized' || failure.errorCode === 'REAUTH_REQUIRED') {
+    return 'unavailable';
+  }
+  // The options step answers 401 only for a session it will not accept, so the
+  // status alone is enough there even when the body is not one this client
+  // parses. Verify also answers 401 for credential refusals — an expired
+  // challenge, a signature that did not verify — which a fresh ceremony can
+  // fix, so the session refusals are named by code there instead.
+  return step === 'options' && failure.httpStatus === 401 ? 'unavailable' : 'failed';
+}
 
 /** Creation has no credential to be missing yet, so `no-passkey` is just a refusal. */
 function registrationFailure(error: unknown): 'cancelled' | 'unsupported' | 'failed' {
@@ -308,7 +333,7 @@ export async function registerPasskey(
   const authHeaders = buildAuthHeaders(await getAuthTokenForRequest());
   const optionsResult = await postAuth(REGISTER_ROUTE, { action: 'options' }, authHeaders);
   if (!optionsResult.ok) {
-    return { status: 'error', failure: 'failed' };
+    return { status: 'error', failure: registrationRefusal(optionsResult, 'options') };
   }
   const ceremony = ceremonyOptionsSchema.safeParse(optionsResult.data);
   if (!ceremony.success) {
@@ -335,7 +360,7 @@ export async function registerPasskey(
     authHeaders
   );
   if (!verifyResult.ok) {
-    return { status: 'error', failure: 'failed' };
+    return { status: 'error', failure: registrationRefusal(verifyResult, 'verify') };
   }
   return { status: 'ok' };
 }

@@ -287,15 +287,15 @@ describe('NotificationHistoryScreen', () => {
   });
 
   it('filters the list by the tapped chip', async () => {
-    state.rows = [row(), row({ id: 'row-2', category: 'chatMessages', pushType: 'chat.message' })];
+    state.rows = [row(), row({ id: 'row-2', category: 'sessionStatus' })];
     await mount();
     expect(byType('Cell')).toHaveLength(2);
 
-    const chatChip = withText(byType('Button'), 'Chat messages');
-    press(chatChip);
+    const sessionChip = withText(byType('Button'), 'Session status');
+    press(sessionChip);
 
     await waitFor(() => byType('Cell').length === 1);
-    expect(state.historyInputs.at(-1)).toMatchObject({ category: 'chatMessages' });
+    expect(state.historyInputs.at(-1)).toMatchObject({ category: 'sessionStatus' });
   });
 
   it('opens a row through the pending deep link slot, not the router', async () => {
@@ -448,10 +448,10 @@ describe('NotificationHistoryScreen', () => {
   });
 
   it('announces the chip row as a tab list with the selected chip marked', async () => {
-    state.rows = [row({ category: 'chatMessages', pushType: 'chat.message' })];
+    state.rows = [row({ category: 'sessionStatus' })];
     await mount();
 
-    const chip = withText(byType('Button'), 'Chat messages');
+    const chip = withText(byType('Button'), 'Session status');
     expect(chipProps(chip)).toMatchObject({
       // iOS is the mocked platform: a chip is typed as a button there so
       // VoiceOver gives it a control trait (see lib/a11y/tab-entry).
@@ -462,7 +462,7 @@ describe('NotificationHistoryScreen', () => {
     press(chip);
     await waitFor(
       () =>
-        chipProps(withText(byType('Button'), 'Chat messages'))?.accessibilityState?.selected ===
+        chipProps(withText(byType('Button'), 'Session status'))?.accessibilityState?.selected ===
         true
     );
   });
@@ -470,7 +470,7 @@ describe('NotificationHistoryScreen', () => {
   it('says a category has nothing rather than that the account has nothing', async () => {
     state.rows = [row({ category: 'balanceAlerts' })];
     await mount();
-    press(withText(byType('Button'), 'Chat messages'));
+    press(withText(byType('Button'), 'Session status'));
     await waitFor(() => byType('EmptyState').length === 1);
 
     const empty = byType('EmptyState')[0];
@@ -535,7 +535,7 @@ describe('NotificationHistoryScreen', () => {
     await mount();
 
     expect(withText(byType('Button'), 'All')).toBeDefined();
-    expect(withText(byType('Button'), 'Chat messages')).toBeDefined();
+    expect(withText(byType('Button'), 'Session status')).toBeDefined();
   });
 
   it('turns off the network gate so an offline first load can fail into its retry', async () => {

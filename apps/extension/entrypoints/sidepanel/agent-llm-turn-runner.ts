@@ -138,8 +138,6 @@ export const runDangerousLlmTurn = ({
 
       return executeSafeToolCall(toolCall);
     },
-    failureMessage: error =>
-      `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     maxToolRounds,
     noResponseMessage: 'The model did not return a response.',
     prepareTools: async () => {

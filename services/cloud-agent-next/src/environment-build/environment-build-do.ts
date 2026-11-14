@@ -1,3 +1,4 @@
+import { assertContainerAccountAvailable } from '../container-account-admission.js';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -8,11 +9,6 @@ import {
   type EnvironmentReference,
 } from '@kilocode/cloud-agent-profile';
 import { resolveSecret } from '../auth.js';
-import {
-  assertContainerCapacity,
-  getContainerCapacityFailureReason,
-} from '../container-concurrency.js';
-import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { getPgDb } from '../db/pg.js';
 import { logger } from '../logger.js';
 import { mergeEnvVarsWithSecrets, type EncryptedSecrets } from '../utils/encryption.js';
@@ -30,11 +26,8 @@ import type {
   EnvironmentBuildStatus,
 } from '../shared/environment-build-status.js';
 import { environmentActorAccess, resolveBuilderGitSource } from './access.js';
-import {
-  builderRuntimeUnsupportedReason,
-  builderSandboxId,
-  createBuilderProvider,
-} from './builder-provider.js';
+import { builderSandboxId, createBuilderProvider } from './builder-provider.js';
+import { resolveEnvironmentBuildTarget, snapshotsRuntimeUnsupportedReason } from './target.js';
 import {
   EnvironmentBuildCoordinator,
   type CoordinatorDeps,
@@ -43,6 +36,7 @@ import {
   type SnapshotResolution,
 } from './coordinator.js';
 import { mintRunnerCredential } from './runner-credential.js';
+import type { PublishedSnapshot } from './policy.js';
 import type { EnvironmentScope } from './reference.js';
 import type { BuildTrigger } from './sqlite-schema.js';
 import { BuildStore } from './store.js';
@@ -125,23 +119,25 @@ export class EnvironmentBuild extends DurableObject<Env> {
       environment: {
         reference: id => readEnvironmentReference(getPgDb(env), id),
         buildInput: id => loadEnvironmentBuildInput(getPgDb(env), id),
-        actorAccess: (owner, userId) => environmentActorAccess(getPgDb(env), owner, userId),
-        gitSource: input => resolveBuilderGitSource(env, input),
-        capacity: async (owner, instanceId, actorUserId) => {
-          try {
-            await assertContainerCapacity(env, {
+        actorAccess: async (owner, userId) => {
+          const access = await environmentActorAccess(getPgDb(env), owner, userId);
+          if (access !== 'none')
+            await assertContainerAccountAvailable(env, {
               subject: billingSubject(owner),
-              instanceId,
-              actor: { type: 'user', id: actorUserId },
-              checkpoint: 'sandbox-start',
+              actor: { type: 'user', id: userId },
             });
-            return 'ok';
-          } catch (error) {
-            if (getContainerCapacityFailureReason(error) === 'container_limit_reached')
-              return 'limit_reached';
-            throw error;
-          }
+          return access;
         },
+        gitSource: input => resolveBuilderGitSource(env, input),
+        buildTarget: input =>
+          resolveEnvironmentBuildTarget({
+            env,
+            db: getPgDb(env),
+            reference: input.reference,
+            repoFullName: input.repoFullName,
+            commands: input.commands,
+            sandboxAllocation: input.sandboxAllocation,
+          }),
       },
       provider: createBuilderProvider({
         containers: env.SANDBOX_CONTAINERS,
@@ -165,10 +161,6 @@ export class EnvironmentBuild extends DurableObject<Env> {
       decryptSecrets: encrypted =>
         mergeEnvVarsWithSecrets({}, encrypted as EncryptedSecrets, env.AGENT_ENV_VARS_PRIVATE_KEY),
       billingInput: ({ owner, actorUserId, sandboxId: billingSandboxId, buildId }) => {
-        const enforcementRequested = isCloudAgentContainerBillingEnabled(env, {
-          userId: actorUserId,
-          ...(owner.type === 'organization' ? { orgId: owner.id } : {}),
-        });
         return {
           sandboxId: billingSandboxId as never,
           sandboxKind: 'isolated',
@@ -176,14 +168,10 @@ export class EnvironmentBuild extends DurableObject<Env> {
           actor: { type: 'user', id: actorUserId },
           sessionId: `environment-build:${buildId}`,
           metadata: { origin: 'environment-build' },
-          ...(enforcementRequested ? { enforcementRequested: true } : {}),
         };
       },
       builderSandboxId: sandboxId,
-      unsupportedReason: () => {
-        if (!env.SANDBOX_CONTAINERS) return 'Native containers are not configured';
-        return builderRuntimeUnsupportedReason(env);
-      },
+      unsupportedReason: () => snapshotsRuntimeUnsupportedReason(env),
       log: (message, fields) => logger.withFields(fields).info(message),
     };
   }
@@ -241,6 +229,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
   async resolveSnapshot(input: {
     reference: EnvironmentScope;
     actorUserId: string;
+    provider: PublishedSnapshot['provider'];
   }): Promise<SnapshotResolution> {
     return (await this.coordinatorFor(input.reference.environmentId)).resolveSnapshot(input);
   }

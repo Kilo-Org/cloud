@@ -38,7 +38,6 @@ const ZOOM_SURFACE_STYLE = { flex: 1, alignSelf: 'stretch' } as const;
 type ImageViewerProps = {
   visible: boolean;
   uri: string | null;
-  /** Header a11y labels; kilo-chat passes the filename. */
   filename: string;
   /** Omit to hide the share action entirely. */
   onShare?: () => void;

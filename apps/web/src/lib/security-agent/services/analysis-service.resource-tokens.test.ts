@@ -137,8 +137,8 @@ it.each([
     expect(cloudClaims.tokenPurpose).toBe(cloud ? 'internal-service' : undefined);
     if (gateway) {
       expect(gatewayClaims.apiTokenPepper).toBe(persisted.api_token_pepper);
-      expect(gatewayClaims.exp! - gatewayClaims.iat!).toBe(3600);
     }
+    expect(gatewayClaims.exp! - gatewayClaims.iat!).toBe(3600);
   }
 );
 

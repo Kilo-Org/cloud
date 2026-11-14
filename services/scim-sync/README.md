@@ -91,8 +91,10 @@ neither can happen — and a rewind *onto* it would carry the old attempt count
 and first-failure time into the next attempt, so a conflict could be parked
 immediately instead of getting the retry budget the reset was meant to grant. A
 reset is a deliberate "start from here", and the held failure does not survive
-it. `parked_events` does: those rows are the record of what was skipped, and a
-reset is how an operator replays them.
+it. The directory records do not survive it either, for the same reason: a
+replayed conflict is measured from the new position rather than against a
+window that was already spent. `parked_events` does: those rows are the record
+of what was skipped, and a reset is how an operator replays them.
 
 ## Parking
 
@@ -109,6 +111,36 @@ count and the first failure time. The row is deleted the moment that event
 applies, when it is parked, or when `WORKOS_EVENT_CURSOR` resets the stream.
 `/status` reports it, which is the thing to look at when the cursor stops
 moving.
+
+### Per-directory budget
+
+A conflict is retried within two budgets, because the namespace holds one
+instance and its cursor is shared by every tenant:
+
+| Budget | Opens at | Spent after |
+|---|---|---|
+| The event's | its first failure | `CONFLICT_RETRY_BUDGET_MS` |
+| Its directory's | the directory's first conflicting event | `CONFLICT_RETRY_BUDGET_MS` |
+
+`directory_conflicts` holds one row per directory, naming the event whose
+conflict opened its window. Once the directory's window is spent, its later
+conflicts park at once with a reason saying so, so a directory's events hold the
+shared cursor for about one budget in aggregate however many of them conflict.
+
+The window closes only when **the event that opened it applies**, which is what
+says the directory's conflicts are over. Another event of the same directory
+applying leaves it open, because the window belongs to the one event that opened
+it. An applied `dsync.activated` clears both the window and the
+parked-activation record, because binding the organization makes them stale.
+`WORKOS_EVENT_CURSOR` clears both as well, so a replay is measured from the new
+position.
+
+`parked_activations` records a directory whose `dsync.activated` the loop
+parked. No organization is bound for such a directory and no later event binds
+one, so its `directory_not_found` conflicts park at once and record `terminal`,
+with a reason naming the abandoned activation. The activation park itself keeps
+its own class and reason in `parked_events`, which is the record an operator
+acts on.
 
 ## HTTP surface
 
@@ -266,7 +298,9 @@ The directory is deliberately **not** provisioned this way. Nothing in a
 an administrator disconnected, so backfilling it resurrects the organization and
 its groups after a `dsync.deleted`. An unknown directory stays a 409
 (`directory_not_found`), which holds the cursor for up to an hour and is then
-parked; recovering a lost cursor is an operator action, using `range_start`.
+parked; once that directory's window is spent its later conflicts park at once
+(see "Per-directory budget"). Recovering a lost cursor is an operator action,
+using `range_start`.
 
 `dsync.group.user_removed` takes no prerequisite calls. An unknown group or user
 means there is no membership to revoke, which is what the event asserts, so the
@@ -315,7 +349,7 @@ the cursor and whether the event survives:
 | Class | Cause | Effect |
 |---|---|---|
 | `applied` | 2xx | Continue to this event's next call, then commit the cursor |
-| `conflict` | 409 whose `code` is retryable, or an unrecognized code; an unexpected throw inside the dispatcher | Hold the cursor and retry, bounded by one hour from the first failure, then park |
+| `conflict` | 409 whose `code` is retryable, or an unrecognized code; an unexpected throw inside the dispatcher | Hold the cursor and retry, bounded by one hour from the event's first failure and by one hour per directory, then park |
 | `terminal` | a 409 with a terminal `code`; a body this Worker's own copy of the request schema rejects; a payload that cannot be mapped at all | Park immediately |
 | `unavailable` | 400, 401, 403, 408, 429, any 3xx, any 5xx, a 2xx whose body does not match the contract, a network error, a timeout | Hold the cursor and retry indefinitely with capped backoff; never park |
 
@@ -441,12 +475,36 @@ than a race: only the capture clears it. The app logs it as
 domain, and the 409 body names the domain too — neither carries the address. See
 `.specs/organization-sso.md`, Directory Sync rules 13 and 15.
 
+Two domains satisfy the gate. The organization's own `sso_domain`, checked
+first because it needs no network call, and any domain the WorkOS organization
+reports as verified **through DNS** — an enterprise routinely routes several
+mail domains through one directory, and only one of them can be the SSO
+authority under Policy Resolution rules 4 and 6.
+
+DNS is the bar rather than a verified *state*: WorkOS also reaches that state
+by a `manual` tick in the dashboard, and `POST /organizations` accepts
+`state: 'verified'` outright, so the weaker signal is an assertion by whoever
+held access rather than evidence of control — and this authorizes seizing an
+account someone else holds. The check lives in
+`apps/web/src/lib/scim/directory-verified-domains.ts`, which reads
+`GET /organizations/{id}` and keeps only
+`state === 'verified' && verificationStrategy === 'dns'`.
+
+It is read from that API rather than the event, because `dsync.activated`'s
+domain objects are `{object, id, domain}` only — no `state`, no
+`verificationStrategy` — so the payload cannot tell a DNS-verified domain from
+one still pending.
+
 Clearing the refusal is an administrative action on the organization, never a
-directory-side one: capture the domain in the organization's SSO settings, or
-replay `dsync.activated` carrying `domains` for an organization that has none
-(rule 14). Until one of those happens every address the directory provisions is
-refused, and each refusal is recorded and skipped rather than held, so later
-events keep applying while the organization has no captured domain.
+directory-side one: verify the domain through DNS in WorkOS, capture it in the
+organization's SSO settings, or replay `dsync.activated` carrying `domains` for
+an organization that has none (rule 14). Until one of those happens every
+address the directory provisions is refused, and each refusal is recorded and
+skipped rather than held, so later events keep applying.
+
+A lookup that *fails* is not a refusal. An unreachable WorkOS answers 500, not
+409, so the loop holds its cursor and retries rather than parking a bind that
+may well be valid.
 
 `domain_not_captured` is the code for that refusal, and it is terminal: the loop
 parks it rather than retrying something no event will satisfy.
@@ -461,10 +519,10 @@ provision the user.
 ## Logging
 
 Only envelope fields and failure reasons are logged: `eventId`, `eventType`,
-`eventCreatedAt`, the class, the status, the conflict code, and the attempt
-count. An event's `data` carries directory user attributes — emails, names, raw
-IdP attributes — and is never logged. A park is logged at error level, a held
-failure at warn.
+`directoryId`, `eventCreatedAt`, the class, the status, the conflict code, and
+the attempt count. An event's `data` carries directory user attributes —
+emails, names, raw IdP attributes — and is never logged. A park is logged at
+error level, a held failure at warn.
 
 ## WorkOS client
 
@@ -635,6 +693,8 @@ holds exactly one instance, because WorkOS prescribes a single serial consumer.
 |---|---|
 | `sync_state` | `cursor` and `seed_cursor` |
 | `event_failures` | The one event the loop is currently stuck on, with `attempts` and `first_failed_at` |
+| `directory_conflicts` | Each directory's open conflict window, with the event whose conflict opened it |
+| `parked_activations` | Directories whose activation the loop parked, so no organization is bound for them |
 | `parked_events` | Events it gave up on and stepped over |
 
 Each instance's database is isolated and migrations apply per instance on first
@@ -681,8 +741,9 @@ access after a deploy.
 
 ## Deployment
 
-Deployed by `deploy-workers.yml`, which auto-discovers any `services/*` folder
-containing a `wrangler.jsonc`. The automatic `deploy-production.yml` run starts
+Deployed by `deploy-workers.yml`, whose `detect-changes` job builds the Worker
+matrix by auto-discovering any `services/*` folder containing a
+`wrangler.jsonc`. The automatic `deploy-production.yml` run starts
 when a main `CI` run completes, and `deploy-staging.yml` does the same ahead of
 it; an hourly poll covers a missed completion. Both deploy the base config and
 `--env staging` from the newest CI-green merge commit.

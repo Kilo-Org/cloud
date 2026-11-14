@@ -299,8 +299,8 @@ export function normalizeProviderOverview(summary: ProviderPrSummary): PrOvervie
     mergedBy: null,
     commentCount: 0,
     repo: {
-      allowMergeCommit: capabilities.canMerge,
-      allowSquashMerge: capabilities.canMerge,
+      allowMergeCommit: capabilities.canMerge.supported,
+      allowSquashMerge: capabilities.canMerge.supported,
       allowRebaseMerge: false,
       allowAutoMerge: capabilities.autoMerge.supported,
       deleteBranchOnMerge: false,

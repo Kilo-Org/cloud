@@ -139,7 +139,6 @@ describe('applyCodeReviewConfigPatch', () => {
   it('ignores explicit `undefined` values in the patch (preserves stored)', () => {
     const merged = applyCodeReviewConfigPatch(stored, {
       reviewStyle: undefined,
-      // Cast to satisfy the partial type at the test call site.
       council: undefined,
     });
     expect(merged.reviewStyle).toBe(stored.reviewStyle);

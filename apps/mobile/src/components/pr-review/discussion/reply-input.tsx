@@ -16,7 +16,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearDraft, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
@@ -290,7 +290,7 @@ export function ReplyInput({
     // instead of starting a request that hangs on the UI deadline behind a
     // spinner (uxs3 spot check, e6-offline-hang). The draft stays intact,
     // nothing is pending, and the same tap retries once the banner clears.
-    if (getCommittedConnectivityStatus() === 'offline') {
+    if (connectionRefusesWrites()) {
       setInlineError(t('prReview.operation.couldNotReply'));
       setInlineErrorKind('retryable');
       return;

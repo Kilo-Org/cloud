@@ -1,5 +1,10 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests, organizations } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_worktrees,
+  github_branch_pull_requests,
+  organizations,
+} from '@kilocode/db/schema';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -21,7 +26,8 @@ type Action =
   | 'synchronize'
   | 'closed'
   | 'ready_for_review'
-  | 'converted_to_draft';
+  | 'converted_to_draft'
+  | 'stacked';
 
 function makePayload(overrides: {
   action: Action;
@@ -40,11 +46,20 @@ function makePayload(overrides: {
   repo?: string;
   /** Head repository full name — set to a fork to model a cross-repo PR. */
   headRepo?: string;
+  baseRef?: string;
+  stack?: { number?: number | null; position?: number | null; size?: number | null } | null;
+  /** The `stacked` action carries the stack at the payload top level. */
+  topLevelStack?: {
+    number?: number | null;
+    position?: number | null;
+    size?: number | null;
+  } | null;
 }): PullRequestPayload {
   const repo = overrides.repo ?? REPO;
   const headRepo = overrides.headRepo ?? repo;
   return {
     action: overrides.action,
+    ...(overrides.topLevelStack === undefined ? {} : { stack: overrides.topLevelStack }),
     pull_request: {
       number: overrides.prNumber,
       title: overrides.title ?? 'test PR',
@@ -63,7 +78,8 @@ function makePayload(overrides: {
           html_url: overrides.htmlUrl ?? `https://github.com/${headRepo}`,
         },
       },
-      base: { sha: 'base-sha', ref: 'main' },
+      base: { sha: 'base-sha', ref: overrides.baseRef ?? 'main' },
+      ...(overrides.stack === undefined ? {} : { stack: overrides.stack }),
     },
     repository: {
       id: 1,
@@ -160,6 +176,11 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
   });
 
   afterAll(async () => {
+    if (userIdsToCleanup.length > 0) {
+      await db
+        .delete(cloud_agent_worktrees)
+        .where(inArray(cloud_agent_worktrees.kilo_user_id, userIdsToCleanup));
+    }
     if (sessionIdsToCleanup.length > 0) {
       await db
         .delete(cli_sessions_v2)
@@ -266,6 +287,126 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       owned_by_organization_id: null,
     });
     expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+  });
+
+  it('stores the PR base and stack metadata from a stacked action', async () => {
+    const branch = 'feature/stacked-layer';
+    await seedSession({ branch, owner: testOwner, prNumber: 130 });
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'stacked',
+        prNumber: 130,
+        headRef: branch,
+        headSha: 'sha-stacked',
+        baseRef: 'feature/stacked-base',
+        topLevelStack: { number: 7, position: 2, size: 3 },
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(1);
+    const [row] = await readUserRow({ userId: testUserId, prNumber: 130 });
+    expect(row).toMatchObject({
+      pr_base_ref: 'feature/stacked-base',
+      stack_number: 7,
+      stack_position: 2,
+      stack_size: 3,
+    });
+  });
+
+  it('accepts nullable stack members in the pull_request stack object', async () => {
+    const branch = 'feature/nullable-stack';
+    await seedSession({ branch, owner: testOwner, prNumber: 131 });
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 131,
+        headRef: branch,
+        headSha: 'sha-nullable-stack',
+        stack: { number: null, position: null, size: null },
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(1);
+    const [row] = await readUserRow({ userId: testUserId, prNumber: 131 });
+    expect(row).toMatchObject({ stack_number: null, stack_position: null, stack_size: null });
+  });
+
+  it('updates the base ref on an edited event and clears omitted stack data', async () => {
+    const branch = 'feature/retargeted';
+    await seedSession({ branch, owner: testOwner, prNumber: 132 });
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 132,
+        headRef: branch,
+        headSha: 'sha-retarget',
+        baseRef: 'feature/grandparent',
+        stack: { number: 9, position: 3, size: 3 },
+      }),
+      testOwner
+    );
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'edited',
+        prNumber: 132,
+        headRef: branch,
+        headSha: 'sha-retarget',
+        baseRef: 'main',
+        // A delivery without a stack means the PR is no longer stacked.
+      }),
+      testOwner
+    );
+
+    const [row] = await readUserRow({ userId: testUserId, prNumber: 132 });
+    expect(row).toMatchObject({
+      pr_base_ref: 'main',
+      stack_number: null,
+      stack_position: null,
+      stack_size: null,
+    });
+  });
+
+  it('does not restamp an already verified link on a later delivery', async () => {
+    const branch = 'feature/verified-once';
+    const sessionId = await seedSession({ branch, owner: testOwner, prNumber: 133 });
+    const verifiedAt = '2026-10-01T00:00:00.000Z';
+    await db
+      .update(cli_sessions_v2)
+      .set({ pr_link_verified_at: verifiedAt })
+      .where(eq(cli_sessions_v2.session_id, sessionId));
+    const [before] = await db
+      .select({
+        verified: cli_sessions_v2.pr_link_verified_at,
+        updatedAt: cli_sessions_v2.updated_at,
+      })
+      .from(cli_sessions_v2)
+      .where(eq(cli_sessions_v2.session_id, sessionId));
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'synchronize',
+        prNumber: 133,
+        headRef: branch,
+        headSha: 'sha-verified-once',
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(1);
+    const [after] = await db
+      .select({
+        verified: cli_sessions_v2.pr_link_verified_at,
+        updatedAt: cli_sessions_v2.updated_at,
+      })
+      .from(cli_sessions_v2)
+      .where(eq(cli_sessions_v2.session_id, sessionId));
+    expect(after).toEqual(before);
   });
 
   it('matches on the stored head SHA when the session reported one', async () => {
@@ -1843,6 +1984,104 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
 
       const rows = await readUserRow({ userId: testUserId, prNumber: 808 });
       expect(rows[0].review_decision_pending).toBe(true);
+    });
+  });
+
+  describe('Cloud Agent workspace branch', () => {
+    async function seedWorkspace(args: {
+      branch: string;
+      owner?: WebhookInstallationOwner;
+      deleting?: boolean;
+    }) {
+      const owner = args.owner ?? testOwner;
+      await db.insert(cloud_agent_worktrees).values({
+        worktree_id: `worktree_${crypto.randomUUID()}`,
+        kilo_user_id: owner.kind === 'user' ? owner.userId : testUserId,
+        organization_id: owner.kind === 'organization' ? owner.organizationId : null,
+        git_url: NORMALIZED_GIT_URL,
+        git_branch: args.branch,
+        deletion_started_at: args.deleting ? new Date().toISOString() : null,
+      });
+    }
+
+    it('writes the PR when a workspace has its branch checked out, without any session link', async () => {
+      const branch = 'kilo/workspace-open';
+      await seedWorkspace({ branch });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 901, headRef: branch, headSha: 'sha-901' }),
+        testOwner
+      );
+
+      expect(written).toBe(1);
+      const [row] = await readUserRow({ userId: testUserId, prNumber: 901 });
+      expect(row).toMatchObject({ git_branch: branch, pr_state: 'open', pr_head_sha: 'sha-901' });
+    });
+
+    it('keeps the PR state current through merge', async () => {
+      const branch = 'kilo/workspace-merge';
+      await seedWorkspace({ branch });
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 902, headRef: branch, headSha: 'sha-902' }),
+        testOwner
+      );
+
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'closed',
+          prNumber: 902,
+          state: 'closed',
+          merged: true,
+          headRef: branch,
+          headSha: 'sha-902',
+        }),
+        testOwner
+      );
+
+      const [row] = await readUserRow({ userId: testUserId, prNumber: 902 });
+      expect(row.pr_state).toBe('merged');
+    });
+
+    it('ignores another branch, a deleting workspace, and another tenant', async () => {
+      const otherUser = await insertTestUser();
+      userIdsToCleanup.push(otherUser.id);
+      await seedWorkspace({ branch: 'kilo/workspace-elsewhere' });
+      await seedWorkspace({ branch: 'kilo/workspace-deleting', deleting: true });
+      await seedWorkspace({
+        branch: 'kilo/workspace-other-tenant',
+        owner: { kind: 'user', userId: otherUser.id },
+      });
+
+      for (const [prNumber, branch] of [
+        [903, 'kilo/workspace-unknown'],
+        [904, 'kilo/workspace-deleting'],
+        [905, 'kilo/workspace-other-tenant'],
+      ] as const) {
+        const written = await upsertCliSessionPullRequestsFromWebhook(
+          makePayload({ action: 'opened', prNumber, headRef: branch, headSha: `sha-${prNumber}` }),
+          testOwner
+        );
+        expect(written).toBe(0);
+        expect(await readUserRow({ userId: testUserId, prNumber })).toHaveLength(0);
+      }
+    });
+
+    it('ignores a fork PR on the workspace branch', async () => {
+      const branch = 'kilo/workspace-fork';
+      await seedWorkspace({ branch });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'opened',
+          prNumber: 906,
+          headRef: branch,
+          headSha: 'sha-906',
+          headRepo: 'someone/widgets',
+        }),
+        testOwner
+      );
+
+      expect(written).toBe(0);
     });
   });
 });

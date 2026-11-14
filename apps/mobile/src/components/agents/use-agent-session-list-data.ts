@@ -39,6 +39,7 @@ export function useAgentSessionListData(options: {
     storedSessions,
     activeSessionIds,
     dateGroups,
+    timeZone,
     activeIsError,
     storedIsError,
     storedIsPending,
@@ -130,11 +131,15 @@ export function useAgentSessionListData(options: {
   );
   const sections = useMemo<SessionSection[]>(() => {
     const storedGroups = effectiveSearchQuery ? search.dateGroups : dateGroups;
+    // The zone of the source that produced these groups: the rows under a
+    // heading are handed the same zone that heading was grouped in.
+    const groupedIn = effectiveSearchQuery ? search.timeZone : timeZone;
     return storedGroups.map(group => ({
       title: group.label,
       data: group.sessions,
+      timeZone: groupedIn,
     }));
-  }, [dateGroups, effectiveSearchQuery, search.dateGroups]);
+  }, [dateGroups, effectiveSearchQuery, search.dateGroups, search.timeZone, timeZone]);
   const projectOptions = useMemo(() => {
     const byGitUrl = new Map<string, { gitUrl: string; displayName: string }>();
     // The server already bounds `recentRepositories` (LIMIT 10); offer every row

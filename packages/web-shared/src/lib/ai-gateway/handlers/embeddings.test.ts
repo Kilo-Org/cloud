@@ -13,11 +13,17 @@ import {
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { captureException } from '@sentry/nextjs';
 
+import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureException: jest.fn(),
@@ -45,9 +51,16 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models', () => ({
+  getKiloEmbeddingModelCatalogFromDatabase: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'),
   countAndStoreEmbeddingUsage: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
+  emitApiMetricsForResponse: jest.fn(),
+  emitGatewayApiMetrics: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -55,6 +68,9 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedResolveModelDecision = jest.mocked(resolveOrganizationMemberModelDecision);
 const mockedGetEmbeddingProvider = jest.mocked(getEmbeddingProvider);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
+const mockedGetKiloEmbeddingModelCatalogFromDatabase = jest.mocked(
+  getKiloEmbeddingModelCatalogFromDatabase
+);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 const model = 'openai/text-embedding-3-small';
@@ -102,6 +118,27 @@ function getUpstreamBody(): Record<string, unknown> {
   return JSON.parse(init?.body as string);
 }
 
+const fixedDimensionModels = [
+  {
+    label: 'default Mistral model',
+    model: 'mistralai/mistral-embed-2312',
+    nativeDimensions: 1024,
+    customDimensions: 256,
+  },
+  {
+    label: 'Codestral alias',
+    model: 'codestral-embed-2505',
+    nativeDimensions: 1536,
+    customDimensions: 1024,
+  },
+  {
+    label: 'canonical Codestral model',
+    model: 'mistralai/codestral-embed-2505',
+    nativeDimensions: 1536,
+    customDimensions: 1024,
+  },
+] as const;
+
 describe('POST /api/gateway/embeddings provider privacy', () => {
   beforeEach(() => {
     jest.resetAllMocks();
@@ -114,6 +151,12 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       isFree: false,
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
+    mockedGetKiloEmbeddingModelCatalogFromDatabase.mockResolvedValue(null);
+    jest.mocked(countAndStoreEmbeddingUsage).mockReturnValue({
+      // Metrics are mocked, so the parsed stats never need to settle.
+      statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
+      usagePromise: Promise.resolve(null),
+    });
     mockedFetch.mockResolvedValue(
       new Response(JSON.stringify({ object: 'list', data: [] }), {
         status: 200,
@@ -124,6 +167,68 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it.each(fixedDimensionModels)(
+    'rejects a non-native dimensions value for the $label before proxying',
+    async ({ model: embeddingModel, customDimensions }) => {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ model: embeddingModel, dimensions: customDimensions })
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: {
+          param: 'dimensions',
+          message: expect.stringContaining('fixed'),
+        },
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(fixedDimensionModels)(
+    'strips native dimensions and legacy fields for the $label',
+    async ({ model: embeddingModel, nativeDimensions }) => {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({
+          model: embeddingModel,
+          dimensions: nativeDimensions,
+          output_dtype: 'int8',
+          output_dimension: 256,
+          user: 'legacy-user-hash',
+        })
+      );
+
+      expect(response.status).toBe(200);
+      const upstreamBody = getUpstreamBody();
+      expect(upstreamBody).toMatchObject({ model: embeddingModel, input: 'hello world' });
+      expect(upstreamBody).not.toHaveProperty('dimensions');
+      expect(upstreamBody).not.toHaveProperty('output_dtype');
+      expect(upstreamBody).not.toHaveProperty('output_dimension');
+      expect(upstreamBody).not.toHaveProperty('user');
+    }
+  );
+
+  it('passes dimensions for an unknown model without discovering catalog metadata', async () => {
+    const unknownModel = 'vendor/new-embedding-model';
+    const requestedDimensions = 768;
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({ model: unknownModel, dimensions: requestedDimensions })
+    );
+
+    expect(response.status).toBe(200);
+    expect(getUpstreamBody()).toMatchObject({
+      model: unknownModel,
+      input: 'hello world',
+      dimensions: requestedDimensions,
+    });
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${OPENROUTER.apiUrl}/embeddings`);
+    expect(mockedGetKiloEmbeddingModelCatalogFromDatabase).not.toHaveBeenCalled();
   });
 
   it('never forwards a custom LLM id to an embeddings upstream', async () => {
@@ -185,15 +290,49 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
 
   it('forwards personal request privacy with other provider fields', async () => {
     const provider = { data_collection: 'deny', zdr: true, only: ['openai'], sort: 'latency' };
+    const upstreamResponse = new Response(JSON.stringify({ object: 'list', data: [] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+    const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    mockedFetch.mockResolvedValue(upstreamResponse);
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(makeRequest({ provider }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
+    expect(cloneSpy).toHaveBeenCalledTimes(1);
+    expect(countAndStoreEmbeddingUsage).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[0]).toBe(
+      cloneSpy.mock.results[0]?.value
+    );
+    expect(emitApiMetricsForResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 200 }),
+      expect.any(Promise),
+      expect.any(Number)
+    );
+    expect(emitGatewayApiMetrics).not.toHaveBeenCalled();
     expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
       is_free: false,
       user_byok: false,
     });
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[3]).toBe(OPENROUTER);
+  });
+
+  it('emits gateway metrics before accounting a platform-funded upstream error', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json({ error: 'Upstream request failed' }, { status: 402 })
+    );
+
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest());
+
+    expect(response.status).toBe(503);
+    expect(countAndStoreEmbeddingUsage).not.toHaveBeenCalled();
+    expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 402, completeRequestMs: expect.any(Number) })
+    );
   });
 
   it.each([undefined, { only: ['openai'] }])(
@@ -293,16 +432,19 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
-    'rejects malformed provider privacy before proxying: %j',
-    async provider => {
-      const { handleEmbeddingsRequest } = await import('./embeddings');
-      const response = await handleEmbeddingsRequest(makeRequest({ provider }));
+  it.each([
+    { data_collection: 'invalid' },
+    { zdr: 'true' },
+    { only: [['openai']] },
+    { ignore: 'azure' },
+    { order: [1] },
+  ])('rejects malformed provider preferences before proxying: %j', async provider => {
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest({ provider }));
 
-      expect(response.status).toBe(400);
-      expect(mockedFetch).not.toHaveBeenCalled();
-    }
-  );
+    expect(response.status).toBe(400);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
 
   it.each([
     { privacy: undefined, settings: undefined, translated: {} },

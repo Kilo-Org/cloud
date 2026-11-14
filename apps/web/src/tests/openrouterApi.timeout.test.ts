@@ -1,5 +1,8 @@
 import { captureException } from '@sentry/nextjs';
-import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  upstreamRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -53,6 +56,7 @@ describe('upstreamRequest timeout', () => {
       global.fetch = mockFetch;
 
       const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
         chatApi,
         reasoningEffort: null,
         search: '?beta=true',
@@ -113,6 +117,7 @@ describe('upstreamRequest timeout', () => {
       global.fetch = mockFetch;
 
       const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
         chatApi,
         reasoningEffort: null,
         search,
@@ -137,6 +142,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'messages',
       reasoningEffort: null,
       search: '',
@@ -162,6 +168,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '',
@@ -184,6 +191,7 @@ describe('upstreamRequest timeout', () => {
       controller.abort();
 
       const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
         chatApi: 'chat_completions',
         search: '',
         method: 'POST',
@@ -221,6 +229,7 @@ describe('upstreamRequest timeout', () => {
       global.fetch = jest.fn().mockRejectedValue(timeoutError);
 
       const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
         chatApi: 'chat_completions',
         search: '',
         method: 'POST',
@@ -267,6 +276,7 @@ describe('upstreamRequest timeout', () => {
       global.fetch = jest.fn().mockRejectedValue(error);
 
       const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
         chatApi: 'chat_completions',
         search: '',
         method: 'POST',
@@ -300,6 +310,7 @@ describe('upstreamRequest timeout', () => {
       global.fetch = jest.fn().mockRejectedValue(error);
 
       const result = await upstreamRequest({
+        durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
         chatApi: 'chat_completions',
         search: '',
         method: 'POST',
@@ -327,6 +338,7 @@ describe('upstreamRequest timeout', () => {
       .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '',
@@ -356,6 +368,7 @@ describe('upstreamRequest timeout', () => {
       .mockRejectedValue(new TypeError('fetch failed', { cause: resetCause }));
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '',
@@ -392,6 +405,7 @@ describe('upstreamRequest timeout', () => {
     controller.abort();
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '',
@@ -424,6 +438,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '',
@@ -461,6 +476,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '',
@@ -493,6 +509,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '?trace=search-secret',
@@ -543,6 +560,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '',
@@ -581,6 +599,7 @@ describe('upstreamRequest timeout', () => {
     global.fetch = mockFetch;
 
     const result = await upstreamRequest({
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
       chatApi: 'chat_completions',
       reasoningEffort: null,
       search: '?trace=search-secret',

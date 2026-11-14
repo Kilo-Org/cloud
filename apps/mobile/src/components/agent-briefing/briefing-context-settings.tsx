@@ -166,7 +166,9 @@ export function BriefingContextSettings({
             });
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: nothing is enabled.
+      { cancelable: true }
     );
   };
   return (

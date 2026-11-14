@@ -2,6 +2,7 @@ import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 import { createHash } from 'node:crypto';
 import * as z from 'zod';
+import type { GitHubBrokerRejectionProvenance } from '@kilocode/worker-utils/github-authorization';
 
 type Token = z.infer<typeof Token>;
 const Token = z.object({
@@ -80,7 +81,8 @@ const GitHubTokenErrorSchema = z.object({
 export class GitHubTokenGenerationError extends Error {
   constructor(
     readonly status: number | undefined,
-    readonly reason?: 'no_installation_found' | 'repository_not_installed'
+    readonly reason?: 'no_installation_found' | 'repository_not_installed',
+    readonly rejectionProvenance?: GitHubBrokerRejectionProvenance
   ) {
     super('Failed to generate GitHub installation token');
     this.name = 'GitHubTokenGenerationError';
@@ -335,7 +337,11 @@ export class GitHubTokenService {
           reason,
         })
       );
-      throw new GitHubTokenGenerationError(status, reason);
+      throw new GitHubTokenGenerationError(
+        status,
+        reason,
+        status === 404 ? 'installation_token_http404' : undefined
+      );
     }
   }
 

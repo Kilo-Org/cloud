@@ -10,14 +10,17 @@ import {
   GitMerge,
   GitPullRequest,
   KeyRound,
+  LineChart,
   Lock,
-  LogOut,
   MessageSquare,
+  Plug,
+  Plus,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Trash2,
   Users,
+  Workflow,
 } from '@/components/ui/icons';
 import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -31,19 +34,22 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
-import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
-import { SESSION_SYNC_URL } from '@/lib/config';
+import { providerLabel } from '@/lib/auth/provider-label';
+import { SESSION_SYNC_URL, WEB_BASE_URL } from '@/lib/config';
+import { getCloudTriggersUrl } from '@/lib/cloud-triggers-url';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
+import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
@@ -54,32 +60,9 @@ import { getSecurityAgentPath } from '@/lib/security-agent';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
-const PROVIDER_LABEL_KEYS = {
-  anaconda: 'profile.providerAnaconda',
-  apple: 'profile.providerApple',
-  discord: 'profile.providerDiscord',
-  email: 'common.email',
-  'fake-login': 'profile.providerTestAccount',
-  github: 'common.github',
-  gitlab: 'common.gitlab',
-  google: 'profile.providerGoogle',
-  linkedin: 'profile.providerLinkedin',
-  workos: 'profile.providerEnterpriseSso',
-} as const;
-
 // The app changelog lives on `main` and is written per store build by the
 // kilo-app Release workflow; never pin it to a version or a per-build copy.
 const CHANGELOG_URL = 'https://github.com/Kilo-Org/cloud/blob/main/apps/mobile/CHANGELOG.md';
-
-/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
-function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
-  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
-}
-
-function providerLabel(provider: string) {
-  const key = lookup(PROVIDER_LABEL_KEYS, provider);
-  return key ? i18n.t(key) : provider;
-}
 
 export function ProfileScreen() {
   const { signOut, token } = useAuth();
@@ -123,16 +106,27 @@ export function ProfileScreen() {
   const agentScope = organizationContextLoaded
     ? getProfileAgentScope(organizationId, orgs)
     : undefined;
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
+  // A settled read that lists no memberships still keeps the section: its Create
+  // organization row is the app's only entry to that flow, so an account with no
+  // organization has to be able to start one. The account-picker row is dropped
+  // in that case alone — it would list Personal and nothing else.
+  const hasOrganizations = (orgs?.length ?? 0) > 0;
   // The Organization section stays on Profile in every credit-account context:
   // a Personal context still offers the account picker when the account has
   // memberships, so organization management is not gated behind the credits
   // account control. The restore decides the context first, so the chooser never
-  // paints for a frame before the active organization's row replaces it.
+  // paints for a frame before the active organization's row replaces it. A
+  // memberships read that failed keeps the section too: its error and Retry live
+  // inside this block, so hiding the section while the list is unavailable would
+  // drop the only retry. A read that is still loading, or paused offline before
+  // it ever fetched, keeps the section hidden: no empty state paints before the
+  // list settles.
   const showOrganizationSection =
-    organizationId != null || (organizationContextLoaded && (orgs?.length ?? 0) > 0);
+    organizationId != null ||
+    (organizationContextLoaded && (organizationsError || orgs !== undefined));
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
@@ -257,6 +251,22 @@ export function ProfileScreen() {
         {/* Credits */}
         <CreditsCard orgs={orgs} enabled={isAuthenticated} />
 
+        {/* Usage: one row on the balance's own section, because spend and
+            remaining credits are the two halves of the same question. */}
+        <View className="mt-3">
+          <ConfigureRow
+            icon={LineChart}
+            title={t('usage.title')}
+            subtitle={t('usage.entrySubtitle')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/usage' as Href);
+            }}
+          />
+        </View>
+
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
@@ -297,9 +307,26 @@ export function ProfileScreen() {
             // made one row of three read as disabled.
             hue="honey"
             className="rounded-lg bg-secondary px-3"
-            last
             onPress={() => {
               router.push(getProfilesPath());
+            }}
+          />
+          {/* Cloud Agent triggers stay on the web: the editor carries a body
+              schema, target, cron expression and signing secret. The row is the
+              hand-off, and it opens the page for the scope in view (personal or
+              the selected organization) so the browser lands where the app was. */}
+          <ConfigureRow
+            icon={Workflow}
+            title={t('cloudAgent.triggers.title')}
+            subtitle={t('cloudAgent.triggers.subtitle')}
+            hue="honey"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              void openExternalUrl(getCloudTriggersUrl(WEB_BASE_URL, organizationId), {
+                label: t('cloudAgent.triggers.title'),
+                retryOnError: true,
+              });
             }}
           />
         </View>
@@ -338,9 +365,20 @@ export function ProfileScreen() {
                 isRetrying={organizationsFetching}
               />
             ) : (
-              organizationRow
+              <>
+                {(organizationId != null || hasOrganizations) && organizationRow}
+                <ConfigureRow
+                  icon={Plus}
+                  title={t('organization.create.title')}
+                  hue="lime"
+                  className="rounded-lg bg-secondary px-3"
+                  last
+                  onPress={() => {
+                    router.push(CREATE_ORGANIZATION_HREF);
+                  }}
+                />
+              </>
             )}
-            {picker}
           </View>
         )}
 
@@ -394,13 +432,13 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={Sparkles}
-            title={t('kiloclaw.changelog.title')}
+            title={t('profile.changelog')}
             hue="sage"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
               void openExternalUrl(CHANGELOG_URL, {
-                label: t('kiloclaw.changelog.title'),
+                label: t('profile.changelog'),
               });
             }}
           />
@@ -472,6 +510,26 @@ export function ProfileScreen() {
           </View>
         )}
 
+        {/* Connected services — the integrations hub. Its own section rather
+            than a row in App: the hub manages external accounts, and its row
+            takes the next curated hue step in reading order. */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('integrations.sectionTitle')}
+          </Text>
+          <ConfigureRow
+            icon={Plug}
+            title={t('integrations.title')}
+            subtitle={t('integrations.entrySubtitle')}
+            hue="pine"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
+            }}
+          />
+        </View>
+
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
           <ActionTile
@@ -489,7 +547,7 @@ export function ProfileScreen() {
             onPress={showPrivacyChoices}
           />
           <ActionTile
-            icon={LogOut}
+            icon={DirectionalLogOut}
             label={t('common.signOut')}
             hue="fern"
             onPress={requestSignOut}

@@ -13,18 +13,66 @@ jest.mock('@/lib/device-auth/device-auth', () => {
   };
 });
 
+jest.mock('@/lib/auth/pending-link', () => ({
+  getPendingLinkBySecret: jest.fn(),
+}));
+
 import {
   createDeviceAuthRequest,
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
 } from '@/lib/device-auth/device-auth';
+import { headers } from 'next/headers';
 import { POST } from './route';
+import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
 
 const mockCreate = jest.mocked(createDeviceAuthRequest);
+const mockHeaders = jest.mocked(headers);
+const mockGetPendingLink = jest.mocked(getPendingLinkBySecret);
 
 describe('POST /api/device-auth/codes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  test('refuses a pending link token that names no live pending link', async () => {
+    mockGetPendingLink.mockResolvedValue(null);
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({ pendingLinkToken: 'dead-secret' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'PENDING_LINK_EXPIRED' });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test('stores a live pending link token with the device code', async () => {
+    mockGetPendingLink.mockResolvedValue({ id: 'pending-1' } as never);
+    mockCreate.mockResolvedValue({
+      code: 'poll-secret',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({ pendingLinkToken: 'live-secret' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ pendingLinkToken: 'live-secret' })
+    );
   });
 
   test('returns code as the poll secret plus user_code, device_code, verificationUrl, and expiresIn', async () => {
@@ -95,6 +143,45 @@ describe('POST /api/device-auth/codes', () => {
     expect(response.status).toBe(429);
     expect(data.error).toBe(DEVICE_AUTH_PENDING_LIMIT_MESSAGE);
     expect(data.error.length).toBeGreaterThan(0);
+  });
+
+  test('keys the pending limit on the platform-observed caller address', async () => {
+    mockHeaders.mockResolvedValueOnce(
+      new Headers({
+        'x-vercel-forwarded-for': '203.0.113.7, 70.41.3.18',
+        'x-forwarded-for': '192.0.2.11, 10.0.0.1',
+        'x-real-ip': '198.51.100.4',
+      })
+    );
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', { method: 'POST' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ ipAddress: '203.0.113.7' }));
+  });
+
+  test('passes no address when neither platform header carries a hop', async () => {
+    mockHeaders.mockResolvedValueOnce(new Headers({ 'x-forwarded-for': '192.0.2.11' }));
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    await POST(new NextRequest('http://localhost:3000/api/device-auth/codes', { method: 'POST' }));
+
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ ipAddress: undefined }));
   });
 
   test('re-throws unexpected errors to the global 500 handler', async () => {

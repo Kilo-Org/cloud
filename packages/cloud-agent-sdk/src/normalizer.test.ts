@@ -2358,30 +2358,50 @@ describe('normalize', () => {
 
   describe('cloud.message.queued', () => {
     it('normalizes with messageId, executionId, delivery', () => {
-      const result = normalize(
-        createRaw('cloud.message.queued', {
-          messageId: 'msg_1',
-          executionId: 'exe_1',
-          content: 'hi',
-          delivery: 'queued',
-        })
-      );
+      const raw = createRaw('cloud.message.queued', {
+        messageId: 'msg_1',
+        executionId: 'exe_1',
+        content: 'hi',
+        delivery: 'queued',
+      });
+      const result = normalize(raw);
       expect(result).toEqual({
         type: 'cloud.message.queued',
         messageId: 'msg_1',
         executionId: 'exe_1',
         content: 'hi',
+        createdAt: Date.parse(raw.timestamp),
       });
     });
 
     it('normalizes with only messageId', () => {
-      const result = normalize(createRaw('cloud.message.queued', { messageId: 'msg_2' }));
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_2' });
+      const result = normalize(raw);
       expect(result).toEqual({
         type: 'cloud.message.queued',
         messageId: 'msg_2',
         executionId: undefined,
         content: undefined,
+        createdAt: Date.parse(raw.timestamp),
       });
+    });
+
+    it('uses the persisted envelope time, not a timestamp supplied in content', () => {
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_1', createdAt: 999 });
+      expect(normalize({ ...raw, timestamp: '2026-09-01T00:00:00.000Z' })).toMatchObject({
+        createdAt: Date.parse('2026-09-01T00:00:00.000Z'),
+      });
+    });
+
+    it('keeps an unreadable timestamp unconfirmed without dropping the queued event', () => {
+      const raw = createRaw('cloud.message.queued', { messageId: 'msg_1', content: 'hi' });
+      const event = normalize({ ...raw, timestamp: 'unreadable' });
+      expect(event).toMatchObject({
+        type: 'cloud.message.queued',
+        messageId: 'msg_1',
+        content: 'hi',
+      });
+      expect(event).not.toHaveProperty('createdAt');
     });
 
     it('returns null when messageId is missing', () => {
@@ -2478,6 +2498,43 @@ describe('normalize', () => {
   });
 
   describe('cloud.message.failed', () => {
+    it('retains valid billing details only for a billing-blocked message', () => {
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS',
+        payer: { type: 'org', id: 'org-1' },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'billing_blocked',
+            billingFailure,
+          })
+        )
+      ).toMatchObject({ billingFailure });
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'connection_lost',
+            billingFailure,
+          })
+        )
+      ).not.toHaveProperty('billingFailure');
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'billing_blocked',
+            billingFailure: { ...billingFailure, payer: {} },
+          })
+        )
+      ).toMatchObject({ type: 'cloud.message.failed', messageId: 'msg' });
+    });
+
     it('retains explicit non-acceptance without requiring delivery', () => {
       expect(
         normalize(createRaw('cloud.message.failed', { messageId: 'msg', accepted: false }))

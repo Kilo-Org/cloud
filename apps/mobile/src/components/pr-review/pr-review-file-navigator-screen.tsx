@@ -10,6 +10,7 @@ import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-na
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
@@ -41,6 +42,9 @@ export function PrReviewFileNavigatorScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  // This header is inside a formSheet route: the sheet edge owns the top
+  // clearance unless the sheet is the stack's first screen.
+  const modalTopInset = useFormSheetHeaderTopInset();
   const params = useLocalSearchParams<Params>();
   const rawNumber = parseParam(params.number) ?? '';
   const queries = useProviderPrQueries({
@@ -64,6 +68,7 @@ export function PrReviewFileNavigatorScreen() {
       title={t('prReview.fileNavigator.title')}
       eyebrow={providerPrRefLabel(queries.ref)}
       modal
+      modalTopInset={modalTopInset}
       onBack={() => {
         router.back();
       }}

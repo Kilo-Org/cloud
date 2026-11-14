@@ -29,8 +29,8 @@ export function EnvironmentBuildRecovery({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="mt-2 mr-2">
-          <Hammer className="mr-2 size-4" />
+        <Button type="button" variant="outline" size="sm" className="bg-background">
+          <Hammer className="size-4" />
           View environment build
         </Button>
       </DialogTrigger>

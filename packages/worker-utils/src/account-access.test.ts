@@ -1,19 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  BLACKLISTED_DOMAINS_REDIS_KEY,
-  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
-  BlacklistDomainsConfigSchema,
-  MAX_BLACKLIST_DOMAINS,
-  blacklistedDomainsFromConfig,
-  blockedSignupTldsFromConfig,
+  EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS,
   canSpendPaidUsage,
+  createEmailDomainBlacklistCache,
+  emailDomainSuffixes,
+  findBlacklistedDomains,
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
   organizationMemberBalance,
-  parseBlacklistDomainsConfig,
-  refreshBlacklistDomainsConfig,
   requestOrganizationId,
-  type BlacklistDomainsConfig,
 } from './account-access';
 
 const organization = { total_microdollars_acquired: 5_000, microdollars_used: 1_000 };
@@ -114,193 +111,211 @@ describe('account access rules', () => {
   });
 });
 
-function blocklistConfig(fields: Partial<BlacklistDomainsConfig> = {}): BlacklistDomainsConfig {
-  return { domains: [], updated_at: null, updated_by: null, updated_by_email: null, ...fields };
+const dialect = new PgDialect();
+
+// Answers `select domain from blacklisted_domains where domain in (...)` from the given rows,
+// recording each lookup's rendered SQL and domains.
+function blacklistDb(blockedDomains: readonly string[], options: { fail?: () => boolean } = {}) {
+  const lookups: { sql: string; domains: string[] }[] = [];
+  const db = {
+    select: () => ({
+      from: () => ({
+        where: async (condition: SQL) => {
+          const query = dialect.sqlToQuery(condition);
+          const domains = query.params.map(String);
+          lookups.push({ sql: query.sql, domains });
+          if (options.fail?.()) throw new Error('database unavailable');
+          return domains
+            .filter(domain => blockedDomains.includes(domain))
+            .map(domain => ({ domain }));
+        },
+      }),
+    }),
+  };
+  return { db: db as never, lookups };
 }
 
-describe('blocklist config fields', () => {
-  it('reads blocked domains and falls back when the list is empty or missing', () => {
-    expect(
-      blacklistedDomainsFromConfig(blocklistConfig({ domains: ['spam.com'] }), ['env.com'])
-    ).toEqual(['spam.com']);
-    expect(blacklistedDomainsFromConfig(blocklistConfig(), ['env.com'])).toEqual(['env.com']);
-    expect(blacklistedDomainsFromConfig(null, ['env.com'])).toEqual(['env.com']);
+describe('emailDomainSuffixes', () => {
+  it('lists the host and its label-boundary suffixes, longest first and lowercased', () => {
+    expect(emailDomainSuffixes('user@a.b.com')).toEqual(['a.b.com', 'b.com', 'com']);
+    expect(emailDomainSuffixes('User@Mail.EXAMPLE.com')).toEqual([
+      'mail.example.com',
+      'example.com',
+      'com',
+    ]);
+    expect(emailDomainSuffixes('user@localhost')).toEqual(['localhost']);
   });
 
-  it('reads signup TLDs and distinguishes empty from absent', () => {
-    const fallback = ['shop', 'top'];
-    expect(
-      blockedSignupTldsFromConfig(blocklistConfig({ blocked_signup_tlds: ['asia'] }), fallback)
-    ).toEqual(['asia']);
-    expect(
-      blockedSignupTldsFromConfig(blocklistConfig({ blocked_signup_tlds: [] }), fallback)
-    ).toEqual([]);
-    expect(blockedSignupTldsFromConfig(blocklistConfig(), fallback)).toEqual(fallback);
-    expect(blockedSignupTldsFromConfig(null, fallback)).toEqual(fallback);
+  it('takes the host after the last @', () => {
+    expect(emailDomainSuffixes('spam.com@legit.org')).toEqual(['legit.org', 'org']);
+  });
+
+  it('yields only dotted suffixes for an address without @', () => {
+    expect(emailDomainSuffixes('something.evil.com')).toEqual(['evil.com', 'com']);
+    expect(emailDomainSuffixes('evil')).toEqual([]);
+  });
+
+  it('yields nothing for an empty host and skips the empty suffix after a trailing dot', () => {
+    expect(emailDomainSuffixes('')).toEqual([]);
+    expect(emailDomainSuffixes('user@')).toEqual([]);
+    expect(emailDomainSuffixes('user@evil.com.')).toEqual(['evil.com.', 'com.']);
+  });
+
+  it('skips suffixes longer than a DNS name', () => {
+    const longestName = `${'a'.repeat(249)}.com`;
+    expect(longestName).toHaveLength(253);
+    expect(emailDomainSuffixes(`user@${longestName}`)).toEqual([longestName, 'com']);
+    expect(emailDomainSuffixes(`user@x.${longestName}`)).toEqual([longestName, 'com']);
+    expect(emailDomainSuffixes(`user@a${longestName}`)).toEqual(['com']);
+  });
+
+  it('bounds the suffixes of a very long host and still finds its short suffixes', () => {
+    const host = `${'a.'.repeat(100_000)}evil.com`;
+    const started = performance.now();
+    const suffixes = emailDomainSuffixes(`user@${host}`);
+    expect(performance.now() - started).toBeLessThan(1_000);
+
+    expect(suffixes.every(suffix => suffix.length <= 253)).toBe(true);
+    // 'com', 'evil.com', and each 'a.'-prefixed suffix that fits in 253 characters.
+    expect(suffixes).toHaveLength(124);
+    expect(suffixes.slice(-3)).toEqual(['a.evil.com', 'evil.com', 'com']);
   });
 });
 
-describe('refreshBlacklistDomainsConfig', () => {
-  const FULL_READ_INTERVAL_MS = 10 * 60_000;
+describe('email domain blacklist lookups', () => {
+  it('blocks an address whose parent domain is listed, in one IN lookup', async () => {
+    const { db, lookups } = blacklistDb(['example.com']);
+    const cache = createEmailDomainBlacklistCache();
 
-  function fakeRedis() {
-    const store: Record<string, string> = {};
-    const reads: string[] = [];
-    return {
-      reads,
-      get: async (key: string) => {
-        reads.push(key);
-        return store[key] ?? null;
+    expect(await cache.isBlacklisted(db, 'dev@Mail.Example.com')).toBe(true);
+    expect(lookups).toEqual([
+      {
+        sql: '"blacklisted_domains"."domain" in ($1, $2, $3)',
+        domains: ['mail.example.com', 'example.com', 'com'],
       },
-      store(config: BlacklistDomainsConfig, { writeUpdatedAtKey = true } = {}) {
-        store[BLACKLISTED_DOMAINS_REDIS_KEY] = JSON.stringify(config);
-        if (writeUpdatedAtKey && config.updated_at) {
-          store[BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY] = config.updated_at;
-        }
-      },
-    };
-  }
-
-  it('reads the stored config, or null when none is stored', async () => {
-    const redis = fakeRedis();
-    expect(await refreshBlacklistDomainsConfig(redis.get, null, 0)).toEqual({
-      config: null,
-      fullReadAt: 0,
-      droppedDomains: 0,
-    });
-
-    const config = blocklistConfig({ domains: ['spam.com'], updated_at: 't1' });
-    redis.store(config);
-    expect(await refreshBlacklistDomainsConfig(redis.get, null, 0)).toEqual({
-      config,
-      fullReadAt: 0,
-      droppedDomains: 0,
-    });
+    ]);
   });
 
-  it('keeps the previous snapshot without downloading the config while updated_at is unchanged', async () => {
-    const redis = fakeRedis();
-    redis.store(blocklistConfig({ domains: ['spam.com'], updated_at: 't1' }));
-    const first = await refreshBlacklistDomainsConfig(redis.get, null, 0);
-    redis.reads.length = 0;
+  it('admits an address whose suffixes are not listed', async () => {
+    const { db } = blacklistDb(['example.com']);
+    const cache = createEmailDomainBlacklistCache();
 
-    const second = await refreshBlacklistDomainsConfig(redis.get, first, 60_000);
-
-    expect(second).toBe(first);
-    expect(redis.reads).toEqual([BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY]);
+    expect(await cache.isBlacklisted(db, 'dev@notexample.com')).toBe(false);
+    expect(await cache.isBlacklisted(db, 'example.com@legit.org')).toBe(false);
   });
 
-  it('downloads the config once updated_at changes', async () => {
-    const redis = fakeRedis();
-    redis.store(blocklistConfig({ domains: ['spam.com'], updated_at: 't1' }));
-    const first = await refreshBlacklistDomainsConfig(redis.get, null, 0);
-    const changed = blocklistConfig({
-      domains: ['spam.com', 'junk.org'],
-      blocked_signup_tlds: ['asia'],
-      updated_at: 't2',
-    });
-    redis.store(changed);
+  it('does not query for an address or domain list without suffixes', async () => {
+    const { db, lookups } = blacklistDb(['example.com']);
+    const cache = createEmailDomainBlacklistCache();
 
-    expect(await refreshBlacklistDomainsConfig(redis.get, first, 60_000)).toEqual({
-      config: changed,
-      fullReadAt: 60_000,
-      droppedDomains: 0,
-    });
+    expect(await cache.isBlacklisted(db, 'user@')).toBe(false);
+    expect(await findBlacklistedDomains(db, [])).toEqual(new Set());
+    expect(lookups).toHaveLength(0);
   });
 
-  it('downloads the config every time when the updated_at key was never written', async () => {
-    const redis = fakeRedis();
-    redis.store(blocklistConfig({ domains: ['spam.com'], updated_at: 't1' }), {
-      writeUpdatedAtKey: false,
-    });
-    const first = await refreshBlacklistDomainsConfig(redis.get, null, 0);
-    redis.store(blocklistConfig({ domains: ['junk.org'], updated_at: 't2' }), {
-      writeUpdatedAtKey: false,
-    });
+  it('finds which of several domains are listed in one lookup', async () => {
+    const { db, lookups } = blacklistDb(['spam.com', 'junk.org']);
 
-    expect((await refreshBlacklistDomainsConfig(redis.get, first, 60_000)).config?.domains).toEqual(
-      ['junk.org']
+    expect(await findBlacklistedDomains(db, ['spam.com', 'legit.org', 'junk.org'])).toEqual(
+      new Set(['spam.com', 'junk.org'])
     );
-  });
-
-  it('downloads the config after the full-read interval even when updated_at is unchanged', async () => {
-    const redis = fakeRedis();
-    redis.store(blocklistConfig({ domains: ['spam.com'], updated_at: 't1' }));
-    const first = await refreshBlacklistDomainsConfig(redis.get, null, 0);
-    redis.store(blocklistConfig({ domains: ['junk.org'], updated_at: 't1' }));
-
-    expect(await refreshBlacklistDomainsConfig(redis.get, first, FULL_READ_INTERVAL_MS - 1)).toBe(
-      first
-    );
-    expect(
-      (await refreshBlacklistDomainsConfig(redis.get, first, FULL_READ_INTERVAL_MS)).config?.domains
-    ).toEqual(['junk.org']);
+    expect(lookups).toHaveLength(1);
+    expect(lookups[0]?.sql).toBe('"blacklisted_domains"."domain" in ($1, $2, $3)');
   });
 });
 
-describe('BlacklistDomainsConfigSchema domain bound', () => {
-  const domains = (count: number) =>
-    Array.from({ length: count }, (_, index) => `bulk-${index}.example`);
-
-  it('enforces the 200,000th stored entry at the cap', () => {
-    expect(MAX_BLACKLIST_DOMAINS).toBe(200_000);
-    const parsed = BlacklistDomainsConfigSchema.parse(
-      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS) })
-    );
-
-    expect(parsed.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
-    expect(isEmailBlacklistedByDomain('user@MAIL.BULK-199999.EXAMPLE', parsed.domains)).toBe(true);
+describe('createEmailDomainBlacklistCache', () => {
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('rejects a stored list one entry over the cap', () => {
-    const parsed = BlacklistDomainsConfigSchema.safeParse(
-      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS + 1) })
-    );
+  it('answers the same host from the cache within the TTL', async () => {
+    const { db, lookups } = blacklistDb(['example.com']);
+    const cache = createEmailDomainBlacklistCache();
 
-    expect(parsed.success).toBe(false);
-  });
-});
+    expect(await cache.isBlacklisted(db, 'a@mail.example.com')).toBe(true);
+    expect(await cache.isBlacklisted(db, 'b@MAIL.example.com')).toBe(true);
+    expect(lookups).toHaveLength(1);
 
-describe('parseBlacklistDomainsConfig', () => {
-  const domains = (count: number) =>
-    Array.from({ length: count }, (_, index) => `bulk-${index}.example`);
-
-  it('keeps the first capped entries of a stored list over the cap', () => {
-    const metadata = {
-      blocked_signup_tlds: ['asia'],
-      updated_at: 't1',
-      updated_by: 'test-operator',
-      updated_by_email: 'operator@example.test',
-    };
-    const parsed = parseBlacklistDomainsConfig(
-      blocklistConfig({ ...metadata, domains: domains(MAX_BLACKLIST_DOMAINS + 50) })
-    );
-
-    expect(parsed.config.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
-    expect(parsed.config.domains[0]).toBe('bulk-0.example');
-    expect(parsed.config.domains.at(-1)).toBe(`bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`);
-    expect(parsed.config).toMatchObject(metadata);
-    expect(
-      isEmailBlacklistedByDomain(
-        `user@bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`,
-        parsed.config.domains
-      )
-    ).toBe(true);
-    expect(
-      isEmailBlacklistedByDomain(
-        `user@bulk-${MAX_BLACKLIST_DOMAINS}.example`,
-        parsed.config.domains
-      )
-    ).toBe(false);
-    expect(parsed.droppedDomains).toBe(50);
+    expect(await cache.isBlacklisted(db, 'a@example.com')).toBe(true);
+    expect(lookups).toHaveLength(2);
   });
 
-  it('keeps every entry of a stored list within the cap', () => {
-    const stored = blocklistConfig({ domains: ['spam.example', 'junk.example'] });
+  it('looks the host up again once the TTL has passed', async () => {
+    let time = 0;
+    const { db, lookups } = blacklistDb([]);
+    const cache = createEmailDomainBlacklistCache({ now: () => time });
 
-    expect(parseBlacklistDomainsConfig(stored)).toEqual({
-      config: stored,
-      droppedDomains: 0,
-    });
+    await cache.isBlacklisted(db, 'dev@example.com');
+    time = EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS - 1;
+    await cache.isBlacklisted(db, 'dev@example.com');
+    expect(lookups).toHaveLength(1);
+
+    time = EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS;
+    await cache.isBlacklisted(db, 'dev@example.com');
+    expect(lookups).toHaveLength(2);
+  });
+
+  it('caches the answer once the first lookup resolves', async () => {
+    const { db, lookups } = blacklistDb(['example.com']);
+    const cache = createEmailDomainBlacklistCache();
+
+    expect(await cache.isBlacklisted(db, 'a@example.com')).toBe(true);
+    expect(lookups).toHaveLength(1);
+
+    expect(await cache.isBlacklisted(db, 'b@example.com')).toBe(true);
+    expect(lookups).toHaveLength(1);
+  });
+
+  it('expires answers on the system clock', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const { db, lookups } = blacklistDb([]);
+    const cache = createEmailDomainBlacklistCache();
+
+    await cache.isBlacklisted(db, 'dev@example.com');
+    vi.setSystemTime(EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS - 1);
+    await cache.isBlacklisted(db, 'dev@example.com');
+    expect(lookups).toHaveLength(1);
+
+    vi.setSystemTime(EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS);
+    await cache.isBlacklisted(db, 'dev@example.com');
+    expect(lookups).toHaveLength(2);
+  });
+
+  it('does not cache a failed lookup', async () => {
+    let failing = true;
+    const { db, lookups } = blacklistDb(['example.com'], { fail: () => failing });
+    const cache = createEmailDomainBlacklistCache();
+
+    await expect(cache.isBlacklisted(db, 'dev@example.com')).rejects.toThrow(
+      'database unavailable'
+    );
+    failing = false;
+    expect(await cache.isBlacklisted(db, 'dev@example.com')).toBe(true);
+    expect(lookups).toHaveLength(2);
+  });
+
+  it('forgets every answer on clear', async () => {
+    const { db, lookups } = blacklistDb([]);
+    const cache = createEmailDomainBlacklistCache();
+
+    await cache.isBlacklisted(db, 'dev@example.com');
+    cache.clear();
+    await cache.isBlacklisted(db, 'dev@example.com');
+    expect(lookups).toHaveLength(2);
+  });
+
+  it('evicts the oldest host beyond 10,000 entries', async () => {
+    const { db, lookups } = blacklistDb([]);
+    const cache = createEmailDomainBlacklistCache();
+
+    for (let i = 0; i <= 10_000; i++) await cache.isBlacklisted(db, `dev@host${i}.test`);
+    expect(lookups).toHaveLength(10_001);
+
+    await cache.isBlacklisted(db, 'dev@host1.test');
+    expect(lookups).toHaveLength(10_001);
+    await cache.isBlacklisted(db, 'dev@host0.test');
+    expect(lookups).toHaveLength(10_002);
   });
 });

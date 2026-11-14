@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { MessageMetadata } from '@vercel/queue';
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
-import { recordUsage } from '@kilocode/worker-utils/usage-writer-client';
+import { recordLlmUsage } from '@kilocode/worker-utils/usage-writer-client';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 import { verifyUsageMessage, VERCEL_USAGE_TOPIC } from './message';
 const getEnvVariable = (key: string) => process.env[key] || '';
@@ -43,7 +43,7 @@ export async function consumeVercelUsage(
   const usageId = parsed.data.core.id;
   console.info('usage queue consumer started', { ...context, usageId });
   const startedAt = performance.now();
-  const outcome = await recordUsage(parsed.data, {
+  const outcome = await recordLlmUsage(parsed.data, {
     url: getEnvVariable('USAGE_WRITER_URL'),
     secret: getEnvVariable('USAGE_WRITER_SECRET'),
     protectionBypass: getEnvVariable('USAGE_WRITER_PROTECTION_BYPASS'),

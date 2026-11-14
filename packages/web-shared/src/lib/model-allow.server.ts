@@ -24,7 +24,11 @@ export type ModelRestrictions = {
   customLlmGrantee?: CustomLlmGrantee;
 };
 
-/** Receives the requested model id as-is (including variant suffixes such as `:free`). */
+/**
+ * Resolves the providers that can serve a model. Receives the requested model id
+ * as-is (including variant suffixes such as `:free`) so implementations can
+ * distinguish variants that are served by different providers.
+ */
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
 /**

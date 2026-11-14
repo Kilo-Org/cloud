@@ -55,10 +55,6 @@
       "schedule": "0 * * * *"
     },
     {
-      "path": "/api/cron/kilo-pass-store-subscription-reconcile",
-      "schedule": "*/15 * * * *"
-    },
-    {
       "path": "/api/cron/kilo-pass-expire-referral-rewards",
       "schedule": "0 * * * *"
     },
@@ -123,6 +119,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/process-kiloclaw-stripe-renewals",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/user-deletion-attention-summary",
       "schedule": "0 12 * * *"
     },
@@ -163,8 +163,8 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/backfill-byok-envelopes",
-      "schedule": "*/5 * * * *"
+      "path": "/api/cron/backfill-users",
+      "schedule": "20 2 * * *"
     },
     {
       "path": "/api/cron/recover-code-reviews",

@@ -15,6 +15,13 @@
       "when": 1793171117833,
       "tag": "0001_solid_whiplash",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794429901451,
+      "tag": "0002_builder_provider_state",
+      "breakpoints": true
     }
   ]
 }

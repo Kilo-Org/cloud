@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Boxes, GitBranch, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
@@ -21,12 +20,10 @@ import {
 import {
   environmentMembers,
   useCloudAgentEnvironmentsForOwner,
-  useEnvironmentBuildStatus,
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
 import { EnvironmentDetailPane, type EnvironmentEditorPage } from '../EnvironmentDialog';
-import { snapshotBadge } from '../environment-build-display';
 
 type EnvironmentsSectionProps = {
   organizationId?: string;
@@ -153,9 +150,7 @@ export function EnvironmentsSection({
                 <EnvironmentRow
                   key={environment.id}
                   environment={environment}
-                  organizationId={organizationId}
                   canManage={canManage}
-                  active={active}
                   selected={!createRepository && selectedId === environment.id}
                   disabled={saving}
                   onSelect={() => selectEnvironment(environment.id)}
@@ -285,28 +280,18 @@ export function EnvironmentsSection({
 
 function EnvironmentRow({
   environment,
-  organizationId,
   canManage,
-  active = true,
   selected,
   disabled,
   onSelect,
 }: {
   environment: EnvironmentSummary;
-  organizationId?: string;
   canManage: boolean;
-  active?: boolean;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
-  const { data: buildStatus } = useEnvironmentBuildStatus(environment.id, {
-    organizationId,
-    enabled: active,
-  });
-  const badge = snapshotBadge(buildStatus, Date.now());
   const members = environmentMembers(environment);
-  const primary = members[0];
   return (
     <button
       type="button"
@@ -321,23 +306,8 @@ function EnvironmentRow({
     >
       <Boxes className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-1.5">
-          <span className="truncate text-sm font-medium" title={environment.name}>
-            {environment.name}
-          </span>
-          <Badge variant="secondary" className="shrink-0 text-[10px]">
-            {platformLabel(primary?.platform ?? 'github')}
-          </Badge>
-          {members.length > 1 && (
-            <Badge variant="outline" className="shrink-0 text-[10px]">
-              {members.length} repos
-            </Badge>
-          )}
-          {badge && (
-            <Badge variant="outline" className="shrink-0 text-[10px]">
-              {badge}
-            </Badge>
-          )}
+        <span className="block truncate text-sm font-medium" title={environment.name}>
+          {environment.name}
         </span>
         {members.map(member => (
           <span
@@ -355,8 +325,4 @@ function EnvironmentRow({
 
 function repositoryLabel(repository: EnvironmentRepository): string {
   return repository.platform === 'gitlab' ? repository.projectPath : repository.fullName;
-}
-
-function platformLabel(platform: 'github' | 'gitlab' | 'bitbucket'): string {
-  return platform === 'gitlab' ? 'GL' : platform === 'bitbucket' ? 'BB' : 'GH';
 }

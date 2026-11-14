@@ -82,6 +82,36 @@ describe('Claude billing refusal transitions', () => {
     ]);
   });
 
+  it('keeps updated_at on refusal bookkeeping so an approval in flight stays valid', async () => {
+    const user = await insertTestUser();
+    const profileId = `uprof_${user.id}`;
+    const connectedAt = '2026-03-01T00:00:00Z';
+    const [inserted] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: user.id,
+        user_profile_id: profileId,
+        created_by: user.id,
+        status: 'connected',
+        connected_at: connectedAt,
+      })
+      .returning({ updated_at: claude_billing_connections.updated_at });
+
+    await recordClaudeBillingRefusal(profileId, 'billing_error', connectedAt);
+    await clearClaudeBillingRefusal(profileId, connectedAt);
+    await markClaudeBillingUnavailable(profileId, 'user_profile_not_billable', connectedAt);
+
+    const [row] = await db
+      .select()
+      .from(claude_billing_connections)
+      .where(eq(claude_billing_connections.user_profile_id, profileId));
+    expect(row).toMatchObject({
+      status: 'billing_unavailable',
+      last_refusal_code: 'user_profile_not_billable',
+    });
+    expect(row.updated_at).toBe(inserted.updated_at);
+  });
+
   it.each([
     [403, { error: { message: 'model access denied' } }, 'permission_error', false],
     [

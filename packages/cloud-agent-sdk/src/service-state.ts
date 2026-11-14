@@ -13,6 +13,7 @@
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
 import { upsertByRequestId } from './pending-requests';
+import { isPreparationCancellation } from './preparation-attempts';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import {
   PREPARATION_MAX_ATTEMPTS,
@@ -286,6 +287,28 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     }
   }
 
+  /**
+   * A user Stop retires a preparing route as `preparation_cancelled`. That is
+   * an interruption, not a preparation failure, so no cloud error survives to
+   * the reader. The same projection runs for a live event and for the status a
+   * durable refresh replays.
+   */
+  function isPreparationCancellationStatus(status: CloudStatus | null | undefined): boolean {
+    return status?.type === 'error' && isPreparationCancellation(status.message);
+  }
+
+  function settlePreparationCancellation(): void {
+    cloudStatus = null;
+    setupLog = [];
+    // A newer turn owns the activity and status; a late cancellation event for
+    // the retired route must not stop it.
+    if (activity.type === 'busy' || activity.type === 'retrying') return;
+    activity = { type: 'idle' };
+    status = { type: 'interrupted' };
+    terminated = true;
+    completed = false;
+  }
+
   function processSessionStatus(event: Extract<ServiceEvent, { type: 'session.status' }>): void {
     const { sessionId, status: sessionStatus } = event;
 
@@ -491,12 +514,21 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       // otherwise flip a ready session back to 'preparing' and permanently
       // disable the chat input.
       if (attempt) {
-        cloudStatus =
-          attempt.status === 'completed'
-            ? { type: 'ready' }
-            : attempt.status === 'failed'
-              ? { type: 'error', message: attempt.safeError ?? event.message }
-              : { type: 'preparing', step: event.step, message: event.message };
+        if (
+          attempt.status === 'failed' &&
+          isPreparationCancellation(attempt.safeError ?? event.message)
+        ) {
+          if (event.action === 'attempt_failed' && attempt === preparationAttempts.at(-1)) {
+            settlePreparationCancellation();
+          }
+        } else {
+          cloudStatus =
+            attempt.status === 'completed'
+              ? { type: 'ready' }
+              : attempt.status === 'failed'
+                ? { type: 'error', message: attempt.safeError ?? event.message }
+                : { type: 'preparing', step: event.step, message: event.message };
+        }
       }
       notify();
       return;
@@ -507,10 +539,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       if (event.branch) config.onBranchChanged?.(event.branch);
       config.onPreparationReady?.();
     } else if (event.step === 'failed') {
-      cloudStatus = { type: 'error', message: event.message };
-      setupLog = [];
-      config.onError?.(event.message);
-      config.onPreparationFailed?.(event.message);
+      if (isPreparationCancellation(event.message)) {
+        settlePreparationCancellation();
+      } else {
+        cloudStatus = { type: 'error', message: event.message };
+        setupLog = [];
+        config.onError?.(event.message);
+        config.onPreparationFailed?.(event.message);
+      }
     } else {
       cloudStatus = { type: 'preparing', step: event.step, message: event.message };
       if (
@@ -788,7 +824,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   function processCloudStatus(event: Extract<ServiceEvent, { type: 'cloud.status' }>): void {
-    cloudStatus = event.cloudStatus;
+    // A user Stop retires a preparing route as a failed route whose reason is
+    // the cancellation code. The live event and a durable refresh carry the
+    // same status, so both must read as a stop rather than an error.
+    if (isPreparationCancellationStatus(event.cloudStatus)) {
+      settlePreparationCancellation();
+    } else {
+      cloudStatus = event.cloudStatus;
+    }
     notify();
   }
 
@@ -850,10 +893,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     if (config.isDeliveryFailureResolved?.(event.messageId)) {
       return;
     }
+    // The route failure reason for a user Stop is the cancellation code; its
+    // safe projection says preparation was stopped. Either spelling means the
+    // user interrupted the turn, never a preparation failure.
+    const interrupted = event.reason === 'interrupted' || isPreparationCancellation(event.error);
     const deliveryState: Extract<MessageDeliveryState, { status: 'failed' }> = {
       status: 'failed',
       error: event.error,
-      reason: event.reason,
+      reason: interrupted ? 'interrupted' : event.reason,
       ...(event.attempts !== undefined ? { attempts: event.attempts } : {}),
     };
     pendingMessages.set(event.messageId, deliveryState);
@@ -872,9 +919,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     // cancelling, not a failure, so it clears the stale status instead of
     // raising an error banner.
     if (preparingWithoutActiveTurn) {
-      cloudStatus = event.reason === 'interrupted' ? null : { type: 'error', message: event.error };
+      cloudStatus = interrupted ? null : { type: 'error', message: event.error };
     }
-    if (isActiveMessage || (preparingWithoutActiveTurn && event.reason === 'interrupted')) {
+    if (isActiveMessage || (preparingWithoutActiveTurn && interrupted)) {
       activeMessageId = null;
       activity = { type: 'idle' };
       cloudStatus = null;
@@ -887,17 +934,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       // detection still matches. The mobile transcript maps the text to the
       // app's classified copy and the failed row's typed footer keeps the
       // original behind its copy action.
-      status =
-        event.reason === 'interrupted'
-          ? { type: 'interrupted' }
-          : { type: 'error', message: event.error };
+      status = interrupted ? { type: 'interrupted' } : { type: 'error', message: event.error };
       terminated = true;
-      terminalFailure =
-        event.reason === 'interrupted' ? null : { messageId: event.messageId, status };
+      terminalFailure = interrupted ? null : { messageId: event.messageId, status };
       disconnectedSource = null;
       completed = false;
       clearPendingInteractions();
-      if (event.reason !== 'interrupted') config.onError?.(event.error);
+      if (!interrupted) config.onError?.(event.error);
     }
     config.onMessageFailed?.(event.messageId, deliveryState);
     notify();
@@ -987,8 +1030,11 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       applySessionStatus(rootSessionId, knownSessionStatus(sessionStatus));
     }
 
-    // Set cloudStatus (undefined means not provided — leave as null)
-    cloudStatus = event.cloudStatus ?? null;
+    // Set cloudStatus (undefined means not provided — leave as null). A
+    // cancellation replayed from a durable route failure is a stop, not a
+    // cloud error, exactly like the live `cloud.status` event below.
+    const preparationCancelled = isPreparationCancellationStatus(event.cloudStatus);
+    cloudStatus = preparationCancelled ? null : (event.cloudStatus ?? null);
 
     // Clear question/permission — if still pending on the server the wrapper
     // replays them as separate question.asked / permission.asked events
@@ -1004,6 +1050,8 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       status = IDLE_STATUS;
       disconnectedSource = null;
     }
+
+    if (preparationCancelled) settlePreparationCancellation();
 
     // Clear pending-message delivery state — replayed cloud.message.queued
     // events following the snapshot will repopulate it with the current truth.

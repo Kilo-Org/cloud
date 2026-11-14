@@ -708,6 +708,7 @@ async function replayCompletedParent(args: {
     env: ctx.env,
     userId: ctx.userId,
     orgId: row.organization_id ?? undefined,
+    createdOnPlatform: 'cloud-agent-web',
     repository: repositoryInputToSessionRepository(input.repository),
   });
   return shapeOutput({

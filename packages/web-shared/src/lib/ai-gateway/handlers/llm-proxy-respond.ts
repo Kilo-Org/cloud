@@ -5,7 +5,7 @@ import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/up
 import { REPLACED_ANSWER_HEADER } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
 import { recordBriefingUsage } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
-import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import {
   accountForMicrodollarUsage,
   extractInferenceRegion,
@@ -17,7 +17,10 @@ import {
   type RequestLoggingParams,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { isAnonymousContext, type AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -36,7 +39,7 @@ type RespondInput = {
   model: string;
   /** The model id the caller asked for, lowercased. */
   requestedModel: string;
-  providerResult: GetProviderProviderResult;
+  providerResult: ProviderRoute;
   user: User | AnonymousUserContext;
   organizationId: string | undefined;
   usageContext: MicrodollarUsageContext;
@@ -66,25 +69,21 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     usageContext.session_id || '<none>'
   );
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: request.body.stream === true,
-      userByok: usageContext.user_byok,
-      mode: usageContext.mode || undefined,
-      provider: provider.type,
-      requestedModel: input.requestedModel,
-      resolvedModel: normalizeModelId(model),
-      toolsAvailable: upstream.toolsAvailable,
-      toolsUsed: upstream.toolsUsed,
-      ttfbMs: Math.max(0, Math.round(performance.now() - input.requestStartedAt)),
-      statusCode: response.status,
-    },
-    response.clone(),
-    input.requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: isAnonymousContext(user),
+    isStreaming: request.body.stream === true,
+    userByok: usageContext.user_byok,
+    mode: usageContext.mode || undefined,
+    provider: provider.type,
+    requestedModel: input.requestedModel,
+    resolvedModel: normalizeModelId(model),
+    toolsAvailable: upstream.toolsAvailable,
+    toolsUsed: upstream.toolsUsed,
+    ttfbMs: Math.max(0, Math.round(performance.now() - input.requestStartedAt)),
+    statusCode: response.status,
+  };
   usageContext.status_code = response.status;
   usageContext.inference_region = extractInferenceRegion(request.body);
   const userByokProviderIds = providerResult.userByok?.map(byok => byok.providerId) ?? null;
@@ -100,7 +99,10 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     gatewayModel: model,
     byokProviderIds: userByokProviderIds,
   });
-  if (upstreamErrorResponse) return upstreamErrorResponse;
+  if (upstreamErrorResponse) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: metricsParams.ttfbMs });
+    return upstreamErrorResponse;
+  }
 
   // Reading the body is side-effectful, so accounting reads a clone.
   const accounting = accountForMicrodollarUsage(
@@ -109,6 +111,7 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     input.upstreamSpan,
     provider
   );
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, input.requestStartedAt);
   // This answer is now accounted, so a decline that replaces it may already be
   // charged. `x-should-retry` describes the replacement's own condition, such as an
   // unavailable output guardrail, not the charge: the marker is what tells a client
@@ -130,7 +133,7 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     usageContext.clientRequestId === sessionId
   ) {
     after(
-      accounting
+      accounting.usagePromise
         .then(usage =>
           recordBriefingUsage({
             kiloUserId: user.id,

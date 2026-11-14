@@ -38,6 +38,9 @@ const WORKSPACE_SUBTYPE_REASONS = {
   git_pack_corrupt: 'repository_checkout_failed',
   git_checkout_conflict: 'repository_checkout_failed',
   git_branch_missing: 'repository_checkout_failed',
+  base_branch_changed: 'repository_checkout_failed',
+  base_branch_missing: 'repository_checkout_failed',
+  base_branch_stale: 'repository_checkout_failed',
   kilo_import_timeout: 'session_import_failed',
   kilo_import_failed: 'session_import_failed',
   setup_command_timeout: 'setup_command_failed',
@@ -102,6 +105,7 @@ const ASSISTANT_REASON_REASONS = {
   structured_output: 'assistant_structured_output',
   insufficient_credits: 'billing',
   model_unavailable: 'model_not_found',
+  model_catalog_unavailable: 'assistant_failed',
   unknown: 'assistant_failed',
 } as const satisfies Record<CloudAgentAssistantFailureReason, CodeReviewTerminalReason>;
 

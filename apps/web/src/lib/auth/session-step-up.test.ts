@@ -471,6 +471,35 @@ describe('session step-up ceremony', () => {
     );
   });
 
+  it('refuses to verify after the account state changes', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'platform_read',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: new Date().toISOString(), blocked_reason: null })
+      .where(eq(kilocode_users.id, user.id));
+
+    await expectRefusal(
+      verifyStepUp(
+        verifyParams(
+          user,
+          challengeId,
+          buildAuthenticationResponse(authenticator, {
+            challenge: options.challenge,
+            counter: 1,
+          })
+        )
+      ),
+      'SESSION_CHANGED'
+    );
+  });
+
   it('uses the same session proof for a sensitive write', async () => {
     const user = await createAdmin();
     const authenticator = createTestAuthenticator();

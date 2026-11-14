@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronDown, LoaderCircle } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -8,26 +8,37 @@ export function AgentWorkGroup({
   summary,
   working = false,
   activity,
+  scrollAnchorIds,
   children,
 }: {
   summary: string;
   working?: boolean;
   activity?: string;
+  scrollAnchorIds?: readonly string[];
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Collapsible className="border-muted bg-muted/30 rounded-md border">
-      <CollapsibleTrigger className="group hover:bg-muted/40 focus-visible:ring-ring flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="border-muted bg-muted/30 rounded-md border"
+    >
+      <CollapsibleTrigger
+        data-scroll-anchor-group
+        className="group hover:bg-muted/40 focus-visible:ring-ring flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      >
+        {!open && scrollAnchorIds?.map(id => <span key={id} hidden data-scroll-anchor={id} />)}
         {working && (
           <LoaderCircle
             className="text-muted-foreground size-4 shrink-0 animate-spin motion-reduce:animate-none"
             aria-hidden
           />
         )}
-        <span className="text-muted-foreground min-w-0 flex-1 text-sm">
-          <span className="block">{summary}</span>
+        <span className="text-muted-foreground flex min-w-0 flex-1 items-baseline gap-2 text-sm">
+          <span className="max-w-full shrink-0 truncate">{summary}</span>
           {activity && (
-            <span className="mt-1 block truncate font-mono text-xs" title={activity}>
+            <span className="min-w-0 truncate font-mono text-xs" title={activity}>
               {activity}
             </span>
           )}
@@ -37,9 +48,16 @@ export function AgentWorkGroup({
           aria-hidden
         />
       </CollapsibleTrigger>
-      <CollapsibleContent className="border-muted space-y-2 border-t px-3 py-2">
-        {children}
-      </CollapsibleContent>
+      {open && (
+        <CollapsibleContent
+          role="region"
+          aria-label={summary}
+          tabIndex={0}
+          className="border-muted focus-visible:ring-ring max-h-[min(24rem,50vh)] space-y-2 overflow-y-auto overscroll-y-contain border-t px-3 py-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
+        >
+          {children}
+        </CollapsibleContent>
+      )}
     </Collapsible>
   );
 }

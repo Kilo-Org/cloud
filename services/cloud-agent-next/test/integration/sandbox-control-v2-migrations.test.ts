@@ -57,6 +57,7 @@ const EXPECTED_ALLOCATION_COLUMNS: ColumnSignature[] = [
 const EXPECTED_ROUTES_COLUMNS: ColumnSignature[] = [
   { name: 'attempt_deadline_at', type: 'integer', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'attempt_id', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+  { name: 'billing_failure', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'credential_source', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'environment', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'grant', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
@@ -74,6 +75,7 @@ const REPO_KEY_MIGRATION_AT = 1790860790832;
 const ROUTE_ENVIRONMENT_MIGRATION_AT = 1792104724546;
 const WORKSPACE_DISK_MIGRATION_AT = 1793713237356;
 const CREATE_ATTEMPT_MIGRATION_AT = 1794145671968;
+const BILLING_FAILURE_MIGRATION_AT = 1794258032795;
 
 const OLD_FOUR_MIGRATIONS = {
   journal: {
@@ -212,6 +214,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: ROUTE_ENVIRONMENT_MIGRATION_AT },
         { hash: '', created_at: WORKSPACE_DISK_MIGRATION_AT },
         { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
+        { hash: '', created_at: BILLING_FAILURE_MIGRATION_AT },
       ]);
       const applied = appliedMigrations(db);
       await migrate(db, migrations);
@@ -253,6 +256,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: ROUTE_ENVIRONMENT_MIGRATION_AT },
         { hash: '', created_at: WORKSPACE_DISK_MIGRATION_AT },
         { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
+        { hash: '', created_at: BILLING_FAILURE_MIGRATION_AT },
       ]);
       expect(db.select().from(scopeGrants).all()).toEqual([]);
       expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);
@@ -270,7 +274,7 @@ describe('sandbox control V2 consolidated migrations', () => {
 
       expect(
         columnSignatures(db, 'routes').filter(
-          column => column.name !== 'repo_key' && column.name !== 'environment'
+          column => !['repo_key', 'environment', 'billing_failure'].includes(column.name)
         )
       ).toEqual(oldRoutesColumns);
       expect(db.select().from(allocationTable).get()).toMatchObject({
@@ -286,6 +290,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         credential_source: '{"fixture":"old-credential-source"}',
         repo_key: null,
         environment: null,
+        billing_failure: null,
       });
     });
   });

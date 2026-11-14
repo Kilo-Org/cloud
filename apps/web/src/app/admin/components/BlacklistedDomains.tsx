@@ -139,15 +139,6 @@ function EditTab() {
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {data && data.dropped_domains > 0 && (
-          <p className="text-destructive flex items-center gap-2 text-xs">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            All {domainCount.toLocaleString()} entries are shown and preserved on save. Redis access
-            checks still use only the first {(domainCount - data.dropped_domains).toLocaleString()}{' '}
-            entries; the remaining {data.dropped_domains.toLocaleString()} are not enforced by those
-            checks.
-          </p>
-        )}
         <Textarea
           placeholder={'example.com\nspam.org\nmalicious.net'}
           value={inputValue}
@@ -190,10 +181,10 @@ function EditTab() {
         <div className="flex items-center gap-3">
           <Button
             onClick={handleSave}
-            disabled={mutation.isPending || loadedVersion !== data.version}
+            disabled={mutation.isPending || !hasChanges || loadedVersion !== data.version}
             size="sm"
           >
-            {mutation.isPending ? 'Saving...' : hasChanges ? 'Save' : 'Sync'}
+            {mutation.isPending ? 'Saving...' : 'Save'}
           </Button>
           {data?.updated_by_email && (
             <span className="text-muted-foreground text-sm">
@@ -205,10 +196,9 @@ function EditTab() {
 
         <div className="text-muted-foreground text-xs">
           <p>
-            Domains and signup TLDs are stored in Redis, so changes apply without a deploy. Auth
-            checks cache the lists for up to a minute. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS
-            env vars are fallbacks when Redis has no data. Each save or sync also copies the
-            complete domain list to Postgres; access checks continue to use Redis.
+            Changes apply without a deploy. Domains are stored in Postgres and signup TLDs in Redis;
+            access checks can take up to a minute to see a change. BLOCKED_SIGNUP_TLDS is the
+            fallback until a TLD list is saved.
           </p>
         </div>
       </CardContent>

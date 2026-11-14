@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentSessionIdSchema,
+  cloudAgentWorktreeIdSchema,
+  MESSAGE_ID_PATTERN,
+} from '@kilocode/session-ingest-contracts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
 
 export const PARENT_WORKSPACE_CALLBACK_URL = 'workspace:new-chat';
@@ -92,7 +96,12 @@ export function validateCloudAgentAuthorityClaims(claims: unknown): CloudAgentAu
   return scopedTokenClaimsSchema.parse(claims).cloudAgentAuthority;
 }
 
-const requestedEnvironmentSchema = z
+/**
+ * The environment the user selected, and the branch of each additional
+ * repository of a multi-repository environment. The worker checks both against
+ * the owner and the launch repository, and validates each branch.
+ */
+export const requestedEnvironmentSchema = z
   .object({
     id: z.uuid(),
     repositories: z
@@ -121,17 +130,28 @@ const scopedPrepareSessionSchema = z
       .regex(/^[a-zA-Z]+$/)
       .optional(),
     upstreamBranch: z.string().min(1).max(500).optional(),
+    stackOnWorktreeId: cloudAgentWorktreeIdSchema
+      .describe(
+        "Stack on a direct child's pushed worktree in the same repository. Use the worktreeId from spawn_session or list_child_sessions. Omit upstreamBranch."
+      )
+      .optional(),
     autoCommit: z.boolean().optional(),
     autoInitiate: z.literal(true),
-    operationKey: z.uuid().optional(),
+    operationKey: z
+      .uuid()
+      .optional()
+      .describe('Use a fresh UUID for each child workspace. Reuse it only for the same launch.'),
     callbackTarget: ParentCallbackTargetSchema.optional(),
     requestedEnvironment: requestedEnvironmentSchema.optional(),
-    organizationId: z.string().min(1).optional(),
   })
-  .strict();
+  .strict()
+  // Callers add organizationId with extend(). Zod refuses to overwrite a key on a
+  // refined object, so the base shape must not declare it.
+  .refine(input => input.stackOnWorktreeId === undefined || input.upstreamBranch === undefined, {
+    message: 'A stacked workspace cannot use an upstream branch',
+    path: ['upstreamBranch'],
+  });
 
-const childSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
-const childMessageIdSchema = z.string().regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
 // Discovery is scope-neutral; auth context pins any signed organization, and the
 // shared input stays empty so it cannot carry one.
 const MODELS_LIST_PROCEDURE = 'models.list';
@@ -155,28 +175,28 @@ const scopedChildOperations = {
   },
   getSession: {
     kind: 'query',
-    schema: z.object({ cloudAgentSessionId: childSessionIdSchema }).strict(),
+    schema: z.object({ cloudAgentSessionId: cloudAgentSessionIdSchema }).strict(),
   },
   getMessageResult: {
     kind: 'query',
     schema: z
       .object({
-        cloudAgentSessionId: childSessionIdSchema,
-        messageId: childMessageIdSchema,
+        cloudAgentSessionId: cloudAgentSessionIdSchema,
+        messageId: z.string().regex(MESSAGE_ID_PATTERN),
         expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
       })
       .strict(),
   },
   interruptSession: {
     kind: 'mutation',
-    schema: z.object({ sessionId: childSessionIdSchema }).strict(),
+    schema: z.object({ sessionId: cloudAgentSessionIdSchema }).strict(),
   },
   sendMessage: {
     kind: 'mutation',
     schema: z
       .object({
-        cloudAgentSessionId: childSessionIdSchema,
-        messageId: childMessageIdSchema,
+        cloudAgentSessionId: cloudAgentSessionIdSchema,
+        messageId: z.string().regex(MESSAGE_ID_PATTERN),
         payload: z
           .object({
             type: z.literal('prompt'),
@@ -203,7 +223,7 @@ const scopedFolderOperations = {
     kind: 'mutation',
     schema: z
       .object({
-        cloudAgentSessionId: childSessionIdSchema,
+        cloudAgentSessionId: cloudAgentSessionIdSchema,
         worktreeId: cloudAgentWorktreeIdSchema,
         folderId: z.uuid().nullable(),
       })

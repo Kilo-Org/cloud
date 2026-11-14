@@ -14,7 +14,6 @@ export default {
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  transformRequest() {},
   models: cachedDirectByokModelList('orcarouter'),
   provider_listing: {
     dataPolicy: {

@@ -7,10 +7,11 @@ import {
   buildKiloCommandsConfiguration,
 } from '../../../src/shared/runtime-profile-config.js';
 import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
+import { writeRuntimeInstructions } from '../runtime-instructions.js';
 
 type RuntimeProfile = Pick<
   ControlPlaneRouteSpec,
-  'runtimeSkills' | 'runtimeAgents' | 'builtinAgents' | 'kiloCommands'
+  'runtimeSkills' | 'runtimeAgents' | 'builtinAgents' | 'kiloCommands' | 'runtimeInstructions'
 >;
 
 export type RuntimeProfileMaterializer = {
@@ -78,6 +79,7 @@ export function runtimeProfileConfigKey(profile: RuntimeProfile): string {
   return JSON.stringify(
     stableValue({
       runtimeSkills: profile.runtimeSkills ?? [],
+      runtimeInstructions: profile.runtimeInstructions ?? [],
       runtimeAgents: profile.runtimeAgents ?? [],
       builtinAgents: profile.builtinAgents ?? {},
       kiloCommands: profile.kiloCommands ?? [],
@@ -186,7 +188,10 @@ export async function materializeRuntimeProfile(
   const previous = profileWrites.get(home) ?? Promise.resolve();
   const write = previous
     .catch(() => undefined)
-    .then(() => stageRuntimeProfile(home, profile, options));
+    .then(async () => {
+      await stageRuntimeProfile(home, profile, options);
+      await writeRuntimeInstructions(home, profile.runtimeInstructions, { replaceExisting: true });
+    });
   profileWrites.set(home, write);
   try {
     await write;

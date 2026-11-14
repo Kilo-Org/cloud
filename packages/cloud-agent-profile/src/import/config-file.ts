@@ -2,6 +2,7 @@ import {
   createScanner,
   parse as parseJsonc,
   parseTree,
+  printParseErrorCode,
   type Node,
   type ParseError,
   type SyntaxKind,
@@ -21,6 +22,7 @@ export type ConfigSections = {
   instructionGlobs: string[];
 };
 
+/** Config file names that mark a real config root, so a bare config file is not treated as a wrapper. */
 export const CONFIG_FILE_NAMES = new Set(['kilo.json', 'kilo.jsonc']);
 
 const AGENT_SECTION_KEYS = ['agent', 'agents'] as const;
@@ -46,6 +48,32 @@ const TOKEN_CLOSE_BRACE = scanTokenKind('}');
 const TOKEN_OPEN_BRACKET = scanTokenKind('[');
 const TOKEN_CLOSE_BRACKET = scanTokenKind(']');
 const TOKEN_EOF = scanTokenKind('');
+
+/**
+ * A `line 3, column 16` formatter for one document, so an issue points at a
+ * place the user can open instead of a raw index into the file.
+ *
+ * The line starts are collected in one pass and searched per offset, because a
+ * config can hold many duplicate properties and re-scanning the prefix per
+ * issue would cost the square of the document length.
+ */
+function createPositionFormatter(text: string): (offset: number) => string {
+  const lineStarts = [0];
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === '\n') lineStarts.push(index + 1);
+  }
+  return offset => {
+    const end = Math.min(Math.max(offset, 0), text.length);
+    let low = 0;
+    let high = lineStarts.length - 1;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (lineStarts[middle] <= end) low = middle;
+      else high = middle - 1;
+    }
+    return `line ${low + 1}, column ${end - lineStarts[low] + 1}`;
+  };
+}
 
 /**
  * Whether the document nests objects or arrays deeper than `maxDepth`. The
@@ -140,6 +168,52 @@ function reportMalformedSection(
   );
 }
 
+/** One definition family read from a config file, with only its wording and target differing. */
+type EntrySectionFamily = {
+  keys: readonly string[];
+  category: 'agents' | 'commands';
+  noun: 'Agent' | 'Command';
+  expected: string;
+  target: ConfigSections['agentEntries'];
+};
+
+/**
+ * Read one definition family: skip an absent key, report a section that is not
+ * an object, and report each entry that is not an object. Every family reads the
+ * same way, so the two families take the same path here.
+ */
+function readEntrySection(
+  parsed: Record<string, unknown>,
+  state: ParseState,
+  configEntry: ArchiveEntry,
+  { keys, category, noun, expected, target }: EntrySectionFamily
+): void {
+  for (const key of keys) {
+    const value = parsed[key];
+    if (value === undefined) continue;
+    if (!isPlainObject(value)) {
+      reportMalformedSection(state, configEntry, key, category, expected);
+      continue;
+    }
+    for (const [name, entryValue] of Object.entries(value)) {
+      if (!isPlainObject(entryValue)) {
+        state.issues.push(
+          makeIssue(
+            'error',
+            'unmapped-entry',
+            category,
+            `${configEntry.path}#${key}.${name}`,
+            null,
+            `${noun} entry "${name}" is not an object`
+          )
+        );
+        continue;
+      }
+      target.push({ name, value: entryValue });
+    }
+  }
+}
+
 /** Longest glob echoed back in an issue message. */
 const GLOB_ECHO_LENGTH = 64;
 
@@ -213,6 +287,8 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
   const errors: ParseError[] = [];
   const parsed: unknown = parseJsonc(configEntry.content, errors, { allowTrailingComma: true });
   if (errors.length > 0) {
+    const [firstError] = errors;
+    const positionOf = createPositionFormatter(configEntry.content);
     state.issues.push(
       makeIssue(
         'error',
@@ -220,7 +296,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
         'config',
         configEntry.path,
         null,
-        `Could not parse ${configEntry.path}: ${errors[0].error} at offset ${errors[0].offset}`
+        `Could not parse ${configEntry.path}: ${printParseErrorCode(firstError.error)} at ${positionOf(firstError.offset)}`
       )
     );
     return sections;
@@ -243,6 +319,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
   const tree = parseTree(configEntry.content, undefined, { allowTrailingComma: true });
   if (tree) collectDuplicateProperties(tree, duplicates);
   if (duplicates.length > 0) {
+    const positionOf = createPositionFormatter(configEntry.content);
     for (const duplicate of duplicates) {
       state.issues.push(
         makeIssue(
@@ -251,68 +328,27 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
           'config',
           `${configEntry.path}#${duplicate.path}`,
           null,
-          `Duplicate property "${duplicate.path}" at offsets ${duplicate.firstOffset} and ${duplicate.secondOffset} in ${configEntry.path}; import is ambiguous`
+          `Duplicate property "${duplicate.path}" at ${positionOf(duplicate.firstOffset)} and ${positionOf(duplicate.secondOffset)} in ${configEntry.path}; import is ambiguous`
         )
       );
     }
     return sections;
   }
 
-  for (const key of AGENT_SECTION_KEYS) {
-    const value = parsed[key];
-    if (value === undefined) continue;
-    if (!isPlainObject(value)) {
-      reportMalformedSection(state, configEntry, key, 'agents', 'an object of agent definitions');
-      continue;
-    }
-    for (const [name, entryValue] of Object.entries(value)) {
-      if (!isPlainObject(entryValue)) {
-        state.issues.push(
-          makeIssue(
-            'error',
-            'unmapped-entry',
-            'agents',
-            `${configEntry.path}#${key}.${name}`,
-            null,
-            `Agent entry "${name}" is not an object`
-          )
-        );
-        continue;
-      }
-      sections.agentEntries.push({ name, value: entryValue });
-    }
-  }
-
-  for (const key of COMMAND_SECTION_KEYS) {
-    const value = parsed[key];
-    if (value === undefined) continue;
-    if (!isPlainObject(value)) {
-      reportMalformedSection(
-        state,
-        configEntry,
-        key,
-        'commands',
-        'an object of command definitions'
-      );
-      continue;
-    }
-    for (const [name, entryValue] of Object.entries(value)) {
-      if (!isPlainObject(entryValue)) {
-        state.issues.push(
-          makeIssue(
-            'error',
-            'unmapped-entry',
-            'commands',
-            `${configEntry.path}#${key}.${name}`,
-            null,
-            `Command entry "${name}" is not an object`
-          )
-        );
-        continue;
-      }
-      sections.commandEntries.push({ name, value: entryValue });
-    }
-  }
+  readEntrySection(parsed, state, configEntry, {
+    keys: AGENT_SECTION_KEYS,
+    category: 'agents',
+    noun: 'Agent',
+    expected: 'an object of agent definitions',
+    target: sections.agentEntries,
+  });
+  readEntrySection(parsed, state, configEntry, {
+    keys: COMMAND_SECTION_KEYS,
+    category: 'commands',
+    noun: 'Command',
+    expected: 'an object of command definitions',
+    target: sections.commandEntries,
+  });
 
   const instructions = parsed.instructions;
   if (typeof instructions === 'string') {

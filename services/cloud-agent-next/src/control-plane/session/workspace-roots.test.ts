@@ -53,6 +53,7 @@ function metadata(options: {
   repositories?: Array<Record<string, unknown>>;
   sandboxId?: string;
   launchBranch?: string;
+  base?: { baseBranch: string; baseSha: string };
 }) {
   const environment =
     options.repositories === undefined
@@ -72,7 +73,12 @@ function metadata(options: {
     },
     auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: KILO_TOKEN },
     agent: { mode: 'code', model: 'kilo/fake-deterministic' },
-    repository: { type: 'github', repo: 'acme/api', upstreamBranch: options.launchBranch },
+    repository: {
+      type: 'github',
+      repo: 'acme/api',
+      upstreamBranch: options.launchBranch,
+      ...options.base,
+    },
     workspace: {
       sandboxId: options.sandboxId ?? 'ses-0123456789abcdef',
       sandboxProvider: 'cloudflare',
@@ -164,6 +170,21 @@ describe('sessionWorkspace', () => {
       git: LAUNCH_GIT,
       branch: 'release/1',
     });
+  });
+
+  it('gives a stacked base to the launch root only', () => {
+    const baseSha = 'a'.repeat(40);
+    const workspace = sessionWorkspace(
+      metadata({ repositories: [API, WEB], base: { baseBranch: 'feature/parent', baseSha } }),
+      LAUNCH_GIT
+    );
+    expect(workspace.roots?.[0]).toMatchObject({
+      directory: '/workspace/api',
+      baseBranch: 'feature/parent',
+      baseSha,
+    });
+    expect(workspace.roots?.[1]).not.toHaveProperty('baseBranch');
+    expect(workspace.roots?.[1]).not.toHaveProperty('baseSha');
   });
 
   it('refuses a V2 session on a shared sandbox', () => {

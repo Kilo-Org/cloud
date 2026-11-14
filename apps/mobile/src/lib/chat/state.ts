@@ -48,6 +48,14 @@ export type Displaced = Question &
     readonly afterTurns: number;
     /** Why it has no answer: the answer failed, or the person stopped it. */
     readonly outcome: 'failed' | 'stopped';
+    /**
+     * The fixed copy key the slot's failure had when this question left it, so
+     * the bubble states the same cause where it was said: a send the account's
+     * balance refused keeps its statement and Add credits, and no Retry that
+     * would meet the same balance. A question kept before this was recorded, or
+     * one the person stopped, says nothing about a cause.
+     */
+    readonly failureKey?: string | null;
   };
 
 /** What a chat screen draws. */

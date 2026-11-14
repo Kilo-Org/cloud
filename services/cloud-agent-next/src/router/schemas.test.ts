@@ -4,6 +4,7 @@ import {
   sandboxAllocationSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  AdoptWorktreeBaseInput,
   ExecutionResponse,
   GetMessageResultInput,
   GetMessageResultOutput,
@@ -15,6 +16,7 @@ import {
   SendMessageV2Input,
   StartSessionOutput,
   StartSessionInput,
+  SyncWorktreeBranchInput,
   branchNameSchema,
 } from './schemas.js';
 import { parseCanonicalBitbucketCloneUrl } from '../types.js';
@@ -1214,5 +1216,120 @@ describe('legacy V2 output schema keeps executionId compatibility', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('stacked workspace inputs', () => {
+  const baseSha = 'a'.repeat(40);
+  const parentWorktreeId = 'worktree_12345678-1234-4123-8123-123456789012';
+
+  it('accepts stacked fields on the flat prepare input', () => {
+    const parsed = PrepareSessionInput.parse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+    expect(parsed).toMatchObject({
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+  });
+
+  it('accepts stacked fields on the grouped start input', () => {
+    const parsed = StartSessionInput.parse({
+      ...baseStartInput,
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+    expect(parsed).toMatchObject({ baseBranch: 'feat/parent', baseSha, parentWorktreeId });
+  });
+
+  it('rejects baseBranch combined with an upstream branch at either boundary', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        baseBranch: 'feat/parent',
+        upstreamBranch: 'feat/parent',
+      }).success
+    ).toBe(false);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: { type: 'github', repo: 'acme/repo', branch: 'feat/parent' },
+        baseBranch: 'feat/parent',
+      }).success
+    ).toBe(false);
+  });
+
+  it('requires baseBranch when baseSha or parentWorktreeId is present', () => {
+    for (const input of [
+      { ...basePromptInput, githubRepo: 'acme/repo', baseSha },
+      { ...basePromptInput, githubRepo: 'acme/repo', parentWorktreeId },
+    ]) {
+      expect(PrepareSessionInput.safeParse(input).success).toBe(false);
+    }
+    expect(StartSessionInput.safeParse({ ...baseStartInput, baseSha }).success).toBe(false);
+    expect(StartSessionInput.safeParse({ ...baseStartInput, parentWorktreeId }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects a malformed commit SHA', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        baseBranch: 'feat/parent',
+        baseSha: 'abc123',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('worktree branch operation additions', () => {
+  const baseSha = 'a'.repeat(40);
+
+  it('accepts the current fork point on sync as it already does on restack', () => {
+    expect(
+      SyncWorktreeBranchInput.parse({
+        cloudAgentSessionId: validSessionId,
+        baseBranch: 'main',
+        upstreamSha: baseSha,
+      })
+    ).toEqual({
+      cloudAgentSessionId: validSessionId,
+      baseBranch: 'main',
+      upstreamSha: baseSha,
+    });
+  });
+
+  it('accepts an adoptWorktreeBase request with an exact worktree and commit', () => {
+    expect(
+      AdoptWorktreeBaseInput.parse({
+        cloudAgentSessionId: validSessionId,
+        expectedWorktreeId: 'worktree_12345678-1234-4123-8123-123456789012',
+        baseBranch: 'main',
+        baseSha,
+      })
+    ).toMatchObject({ baseBranch: 'main', baseSha });
+  });
+
+  it('rejects a malformed worktree or commit on adoptWorktreeBase', () => {
+    const valid = {
+      cloudAgentSessionId: validSessionId,
+      expectedWorktreeId: 'worktree_12345678-1234-4123-8123-123456789012',
+      baseBranch: 'main',
+      baseSha,
+    };
+    expect(
+      AdoptWorktreeBaseInput.safeParse({ ...valid, expectedWorktreeId: 'worktree_nope' }).success
+    ).toBe(false);
+    expect(AdoptWorktreeBaseInput.safeParse({ ...valid, baseSha: 'abc' }).success).toBe(false);
+    expect(AdoptWorktreeBaseInput.safeParse({ ...valid, baseBranch: '' }).success).toBe(false);
   });
 });

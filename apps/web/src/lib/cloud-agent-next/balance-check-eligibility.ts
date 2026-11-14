@@ -22,6 +22,13 @@ import {
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { resolveClaudeBillingModel } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
+import { resolveClaudeBillingConnector } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/connector';
+import {
+  getGrantedClaudeBillingConnection,
+  type ClaudeBillingOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import {
   resolveOrganizationMemberModelDecision,
   type EffectiveOrganizationModelPolicy,
@@ -31,6 +38,14 @@ import type { User } from '@kilocode/db/schema';
 export type BalanceCheckModelEligibility = {
   isFree: boolean;
   hasUserByokAvailable: boolean;
+  /**
+   * Set when the model cannot bill until an organization owner reconnects the
+   * shared-services Claude connection, because the account that linked it is
+   * gone. Routing refuses every request for the model in that state, so no
+   * balance and no other credential runs it; a caller that refuses on the
+   * balance reports this requirement instead.
+   */
+  reconnectRequired?: 'claude_billing';
 };
 
 /**
@@ -41,8 +56,9 @@ export type BalanceCheckModelEligibility = {
  * - the model is Kilo-funded (free for the user), or
  * - the user has a BYOK credential that serves it: a Vercel-routed inference
  *   provider key, a gateway key, a direct BYOK key (bespoke or catalog mode),
- *   or a "Sign in with ChatGPT" connection, so the session is billed against
- *   the user's own key or plan rather than their balance.
+ *   a "Sign in with ChatGPT" connection, or a Claude billing link, so the
+ *   session is billed against the user's own key, plan, or Claude organization
+ *   rather than their balance.
  */
 export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   fromDb: typeof db;
@@ -61,7 +77,15 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
     ? await getOrganizationByokProviderIds(params.fromDb, params.organizationId)
     : await getUserByokProviderIds(params.fromDb, params.user.id);
   if (enabledProviderIds.length === 0) {
-    return { isFree: false, hasUserByokAvailable: await hasOpenAiChatGptByokForModel(params) };
+    const hasChatGptAvailable = await hasOpenAiChatGptByokForModel(params);
+    const claudeBilling = await resolveClaudeBillingForModel(params);
+    return withClaudeBilling(
+      {
+        isFree: false,
+        hasUserByokAvailable: hasChatGptAvailable || claudeBilling === 'byok',
+      },
+      claudeBilling
+    );
   }
 
   const enabled = new Set(enabledProviderIds);
@@ -100,10 +124,29 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
       modelId: params.modelId,
       policy: memberDecision?.policy,
     }));
-  return {
-    isFree: false,
-    hasUserByokAvailable: hasByokAvailable || (await hasOpenAiChatGptByokForModel(params)),
-  };
+  const hasChatGptAvailable = await hasOpenAiChatGptByokForModel(params);
+  const claudeBilling = await resolveClaudeBillingForModel(params);
+  return withClaudeBilling(
+    {
+      isFree: false,
+      hasUserByokAvailable: hasByokAvailable || hasChatGptAvailable || claudeBilling === 'byok',
+    },
+    claudeBilling
+  );
+}
+
+/**
+ * Add the reconnect requirement of an organization's shared-services Claude
+ * connection. A gone connector does not change `hasUserByokAvailable`: another
+ * credential may still exist, and routing decides the billing path.
+ */
+function withClaudeBilling(
+  eligibility: { isFree: boolean; hasUserByokAvailable: boolean },
+  claudeBilling: ClaudeBillingModelEligibility
+): BalanceCheckModelEligibility {
+  return claudeBilling === 'reconnect'
+    ? { ...eligibility, reconnectRequired: 'claude_billing' }
+    : eligibility;
 }
 
 /**
@@ -164,4 +207,57 @@ async function hasOpenAiChatGptByokForModel(params: {
     if (stored?.isEnabled && stored.connection.status === 'connected') return true;
   }
   return false;
+}
+
+type ClaudeBillingModelEligibility =
+  /** A connected Claude billing link serves the model. */
+  | 'byok'
+  /**
+   * The only relevant link is the organization's shared-services connection,
+   * and the account that linked it is gone, so routing refuses the model with a
+   * reconnect requirement.
+   */
+  | 'reconnect'
+  /** No Claude billing link serves the model. */
+  | 'none';
+
+/**
+ * How a Claude billing link serves the model, so the customer's Claude
+ * organization pays instead of the Kilo balance. The candidates and their order
+ * match `checkClaudeBilling`: the first link that is neither absent, pending,
+ * nor removed decides, and one that cannot bill fails the request. A
+ * shared-services link whose recorded connector is gone cannot bill either,
+ * because routing answers it with a reconnect requirement instead of another
+ * payer.
+ */
+async function resolveClaudeBillingForModel(params: {
+  fromDb: typeof db;
+  user: Pick<User, 'id'>;
+  modelId: string;
+  organizationId?: string;
+  includeSharedServicesConnection?: boolean;
+}): Promise<ClaudeBillingModelEligibility> {
+  if (!(await resolveClaudeBillingModel(params.modelId))) return 'none';
+
+  const owners: ClaudeBillingOwner[] = [];
+  if (params.includeSharedServicesConnection && params.organizationId) {
+    owners.push({ kind: 'shared_services', organizationId: params.organizationId });
+  }
+  owners.push(
+    params.organizationId
+      ? { kind: 'member', kiloUserId: params.user.id, organizationId: params.organizationId }
+      : { kind: 'personal', kiloUserId: params.user.id }
+  );
+
+  for (const owner of owners) {
+    const row = await getGrantedClaudeBillingConnection(owner, params.fromDb);
+    if (row?.status === ClaudeBillingConnectionStatus.BillingUnavailable) return 'none';
+    if (row?.status !== ClaudeBillingConnectionStatus.Connected) continue;
+    if (owner.kind === 'shared_services') {
+      const connector = await resolveClaudeBillingConnector(row.created_by, params.fromDb);
+      if (connector.kind === 'gone') return 'reconnect';
+    }
+    return 'byok';
+  }
+  return 'none';
 }

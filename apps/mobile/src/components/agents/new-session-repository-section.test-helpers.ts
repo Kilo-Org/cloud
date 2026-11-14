@@ -47,6 +47,7 @@ export function mountSection(
         value: '',
         organizationId: undefined,
         isCloneEntry: false,
+        settled: true,
         ...overrides,
       })
     );

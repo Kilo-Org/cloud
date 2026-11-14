@@ -23,7 +23,13 @@ import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
-import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
+import {
+  clearAccountBoundPendingDeepLink,
+  getPendingDeepLinkSnapshot,
+  setCurrentDeepLinkUserId,
+  setPendingDeepLink,
+} from '@/lib/deep-link-launch';
+import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
@@ -56,6 +62,7 @@ import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/prot
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
+import { clearEnvironmentChoices } from '@/lib/hooks/environment-choice';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
@@ -67,12 +74,8 @@ import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
-import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
-import { clearLastActiveInstance } from '@/lib/last-active-instance';
-import { clearLastRoute } from '@/lib/last-route';
-import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLoginDrafts } from '@/lib/login-draft';
-import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
+import { takeAccountIndependentLaunchUrl } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   isSignOutActive,
@@ -156,19 +159,6 @@ function readUserIdFromToken(token: string): string | null {
     return parsed.success && parsed.data.kiloUserId ? parsed.data.kiloUserId : null;
   } catch {
     return null;
-  }
-}
-
-/**
- * Run one synchronous best-effort teardown step. Sign-out's local cleanups are
- * independent: a throw in one must never abort the transition or reject
- * `signOut`, so each call site is guarded by this wrapper.
- */
-function runBestEffortTeardown(step: () => void): void {
-  try {
-    step();
-  } catch {
-    // Best effort: a failed clear never aborts sign-out.
   }
 }
 
@@ -465,8 +455,25 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
-        // A direct account switch must not keep the prior account's session
-        // state: trusted hosts, image confirms, media caches, temp copies.
+        // A Quick Action tapped while the app was signed out parks its launch
+        // URL natively, and the signed-in launcher mount is its only reader.
+        // Take the account-independent destination before the teardown below
+        // clears the launcher surfaces, and stage it for the account that just
+        // signed in, so the tap still lands where it points. The parked URL has
+        // no deadline while a captured link is live, so an occupied slot keeps
+        // the destination the person actually opened.
+        const parkedLaunchUrl = takeAccountIndependentLaunchUrl();
+        const parkedLaunchHref =
+          parkedLaunchUrl === null ? null : resolveIncomingUrl(parkedLaunchUrl);
+        if (parkedLaunchHref !== null && getPendingDeepLinkSnapshot() === null) {
+          setPendingDeepLink(parkedLaunchHref, 'universal-link');
+        }
+        // Every account boundary drops the session-scoped local state: trusted
+        // hosts, image confirms, media caches, temp copies, and the device-wide
+        // records that belong to an account (the OS launcher surfaces and the
+        // durable last-opened-session and last-route records). It runs in the
+        // same synchronous block as the token publish, ahead of every read a
+        // derived surface performs.
         clearSessionScopedState();
         // The sign-in form's drafts belong to the attempt that just succeeded,
         // whatever provider finished it; a later signed-out screen must not
@@ -521,10 +528,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // synchronous; the persisted delete chains behind any in-flight persist.
       clearAccountBoundPendingDeepLink();
       try {
-        // Close ownership persistence before any await so a late list
-        // response cannot write the previous account's answer during
-        // teardown.
-        gateKiloClawOwned();
         // Record the branch that fired immediately before the logout event,
         // so exactly one row lands per actual sign-out — a deduped sign-out
         // returned above and writes nothing — and it is attributed to the
@@ -613,8 +616,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // and an unknown one takes every chat rather than leaving one
             // account's conversations for the next person to sign in.
             clearChatsForSignOut(readCachedUserId(queryClient)),
-            clearLastActiveInstance(),
-            clearKiloClawOwned(),
             clearRecentPrs(),
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),
@@ -641,6 +642,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // the next signed-in account.
           clearAgentModelPreference();
           clearRunOnDestinationPreference();
+          clearEnvironmentChoices();
           clearReasoningPreference();
           clearHideThinkingPreference();
           clearKeepScreenOnPreference();
@@ -656,14 +658,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
           clearCollapsedConnectCtasPreference();
-          // The launcher surfaces belong to the signed-out account: drop the
-          // dynamic shortcuts/tile natively and the durable last-opened record,
-          // so the next account never sees the previous account's session.
-          // Both are synchronous best-effort clears, guarded so neither can
-          // throw into sign-out.
-          runBestEffortTeardown(clearLauncherSurfaces);
-          runBestEffortTeardown(clearLastOpenedSession);
-          runBestEffortTeardown(clearLastRoute);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

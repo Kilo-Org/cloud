@@ -12,6 +12,7 @@ import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolFileAttachments, getToolImageAttachments } from '../tool-card-attachments';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolFieldLabel } from '../tool-field-label';
 import { toolStatusLabel } from '../tool-status-label';
 
 /**
@@ -24,6 +25,9 @@ import { toolStatusLabel } from '../tool-status-label';
  * so a failed call never reads as a successful empty result. Renders only inside
  * the detail sheet — attachments and the pending/running status line live in
  * `ToolPartDetailBody`.
+ *
+ * A row is labelled in the reader's language for a known tool argument, and with
+ * the raw key for an MCP or plugin argument the app does not know.
  *
  * `inputMaxLength` caps each field value; it is set by the patch card's
  * fallback so a giant unparseable `patchText` cannot hang the sheet. Every
@@ -61,7 +65,7 @@ export function GenericToolCardBody({
     <View className="gap-2">
       {detail.fields.map((field, index) => (
         <View key={`${field.key}-${index}`} className="gap-1">
-          <Text className="text-xs text-muted-foreground">{field.key}</Text>
+          <Text className="text-xs text-muted-foreground">{toolFieldLabel(t, field.key)}</Text>
           <SelectableText className="font-mono text-xs text-foreground">
             {field.value}
           </SelectableText>

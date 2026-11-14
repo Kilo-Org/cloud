@@ -18,7 +18,7 @@ and `kilo_call`. Parent-scoped Cloud Agent connections instead expose the dedica
 child-session tools described below. Use the tool names published by your client;
 it may prefix them with the MCP server name.
 
-The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
+See `services/kilo-mcp/CHANGELOG.md`.
 
 ## General API connections
 

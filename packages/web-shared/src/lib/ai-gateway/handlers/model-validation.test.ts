@@ -7,6 +7,7 @@ import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import { handleModelValidationRequest } from './model-validation';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -20,6 +21,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   listUsableCustomRouters: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+
+const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
@@ -79,7 +83,10 @@ describe('POST /api/openrouter/models/validate', () => {
   test('validates against the catalog for the request country', async () => {
     await handleModelValidationRequest(request('available/model', { 'x-vercel-ip-country': 'CU' }));
 
-    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
+    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith(
+      expect.objectContaining({ countryCode: 'CU' })
+    );
+    expect(mockedGetEnhancedOpenRouterModels.mock.calls[0]?.[0].fromDb).toBe(readDb);
   });
 
   test('does not expose details for an unavailable model', async () => {

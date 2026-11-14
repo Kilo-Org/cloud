@@ -44,6 +44,7 @@ const launch = {
   mode: 'code',
   model: 'kilo/test-model',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
 const webForwardedLaunch = {
@@ -595,6 +596,43 @@ describe('Cloud Agent spawn authority', () => {
       })
     ).toThrow();
     expect(() => CloudAgentAuthoritySchema.parse({ ...scope, remainingDepth: 2 })).toThrow();
+  });
+  it('accepts the web-resolved stacked branch, commit, and connection at the internal boundary', () => {
+    const parentWorktreeId = 'worktree_12345678-1234-4234-8234-123456789abc';
+    expect(
+      validateScopedWorkerPreparation(scope, {
+        ...launch,
+        githubIntegrationId: '44444444-4444-4444-8444-444444444444',
+        platform: 'github',
+        baseBranch: 'feature/parent',
+        baseSha: 'a'.repeat(40),
+        parentWorktreeId,
+        operationKey: '33333333-3333-4333-8333-333333333333',
+      })
+    ).toEqual({
+      ...launch,
+      stackOnWorktreeId: parentWorktreeId,
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    });
+  });
+  it.each([
+    { stackOnWorktreeId: 'worktree_12345678-1234-4234-8234-123456789abc' },
+    { baseBranch: 'main', baseSha: 'a'.repeat(40) },
+    { parentWorktreeId: 'worktree_12345678-1234-4234-8234-123456789abc' },
+    {
+      parentWorktreeId: 'worktree_12345678-1234-4234-8234-123456789abc',
+      baseBranch: 'feature/parent',
+      baseSha: 'invalid-sha',
+    },
+    {
+      parentWorktreeId: 'worktree_12345678-1234-4234-8234-123456789abc',
+      baseBranch: 'feature/parent',
+      baseSha: 'a'.repeat(40),
+      upstreamBranch: 'main',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    },
+  ])('rejects incomplete or conflicting internal stack metadata %j', metadata => {
+    expect(() => validateScopedWorkerPreparation(scope, { ...launch, ...metadata })).toThrow();
   });
 
   it('never reissues an expired or revoked parent authorization', async () => {

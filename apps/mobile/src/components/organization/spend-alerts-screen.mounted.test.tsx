@@ -98,7 +98,7 @@ vi.mock('@/lib/format', () => {
     return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized) ? normalized : null;
   };
   return {
-    formatMoney: (amount: number) => `$${amount}`,
+    formatPrefixedMoney: (amount: number) => `$${amount}`,
     formatCurrency: (amount: number) => `$${amount}`,
     formatNumber: String,
     formatList: (values: readonly string[]) => values.join(' and '),

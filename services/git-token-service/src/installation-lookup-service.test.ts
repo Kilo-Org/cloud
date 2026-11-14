@@ -38,6 +38,7 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.sql).toContain('left join "github_app_installations"');
     expect(query.sql).toContain('COALESCE("github_app_installations"."installation_id"');
     expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
+    expect(query.sql).toContain('"kilocode_users"."blocked_at" is null');
     expect(query.sql).toContain('"organizations"."deleted_at" is null');
     expect(query.sql).toContain('"organization_memberships"."kilo_user_id" =');
     expect(query.sql).toContain('"organization_memberships"."id" is not null');
@@ -64,6 +65,7 @@ describe('buildInstallationLookupQuery', () => {
 
     expect(query.params).not.toContain('renamed-owner');
     expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
+    expect(query.sql).toContain('"kilocode_users"."blocked_at" is null');
     expect(query.sql).toContain('"organization_memberships"."id" is not null');
     expect(query.params).toContain(10);
   });

@@ -1,5 +1,7 @@
 import { Directory, File } from 'expo-file-system';
 
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
+
 import { artifactMirrorRoot } from './artifact-mirror-paths';
 import {
   type ArtifactMirrorManifest,
@@ -106,8 +108,12 @@ export function clearArtifactMirror(): void {
     if (root?.exists) {
       root.delete();
     }
-  } catch {
-    // Best-effort teardown; ignore delete failures.
+  } catch (error) {
+    captureTelemetry({
+      error,
+      level: 'warning',
+      tags: { 'error.subsystem': 'artifact-mirror', 'error.operation': 'clear' },
+    });
   }
 }
 

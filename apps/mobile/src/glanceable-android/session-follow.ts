@@ -211,12 +211,36 @@ export async function restoreFollowedSessionCardsFromStorage(): Promise<boolean>
   if (ctx === 'unavailable') {
     return false;
   }
-  // Reconcile first: another account's or scope's card is pruned even when the
-  // channel pass fails, and reconciliation posts nothing that needs a channel
-  // (the only native call is the existing card restore).
+  // Another account's or scope's card goes first and on its own: it must never be
+  // shown again, whatever happens to the channels.
+  dismissForeignSessionCards(ctx);
+  if (!(await ensureAndroidNotificationChannels())) {
+    // A restore posts the card through its channel, so a failed pass would leave it
+    // unposted and never reposted. The next launch reconciles and retries both.
+    return true;
+  }
   restoreFollowedSessionCards(ctx);
-  await ensureAndroidNotificationChannels();
   return true;
+}
+
+/**
+ * Cancel the stored cards that belong to another account or scope, and nothing
+ * else. Restoring a card posts it through its channel, so this is the half of the
+ * reconcile that may run before the channels exist.
+ */
+export function dismissForeignSessionCards(ctx: SessionFollowContext): void {
+  const stored = getStoredSessionCards();
+  const owned = stored.filter(
+    card => card.userId === ctx.userId && card.organizationId === ctx.organizationId
+  );
+  for (const card of stored) {
+    if (!owned.includes(card)) {
+      dismissSessionCard(card.sessionId);
+    }
+  }
+  if (owned.length !== stored.length) {
+    pruneSessionCards(owned.map(card => card.sessionId));
+  }
 }
 
 /** Follow one session from the row the session screen shows. */

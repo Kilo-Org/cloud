@@ -306,4 +306,29 @@ describe('restoreFollowedSessionCards', () => {
         Number.POSITIVE_INFINITY
     );
   });
+
+  it('restores a same-scope card only once the channel pass succeeded', async () => {
+    _setStoredContextReaderForTests(() => CTX);
+    const own = [
+      { sessionId: 'session-1', userId: 'user-1', organizationId: 'org-1', approvalKey: null },
+    ];
+    mocks.getStoredSessionCards.mockReturnValue(own);
+    mocks.ensureAndroidNotificationChannels.mockResolvedValue(false);
+
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(true);
+
+    // A card restored before its channel existed would be posted into nothing and
+    // never reposted once creation succeeded.
+    expect(mocks.restoreSessionCard).not.toHaveBeenCalled();
+    expect(mocks.dismissSessionCard).not.toHaveBeenCalledWith('session-1');
+
+    // The next launch reconciles again, and now the card is restored.
+    mocks.ensureAndroidNotificationChannels.mockResolvedValue(true);
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(true);
+
+    expect(mocks.restoreSessionCard).toHaveBeenCalledWith('session-1');
+    expect(mocks.ensureAndroidNotificationChannels.mock.invocationCallOrder[1]).toBeLessThan(
+      mocks.restoreSessionCard.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
+  });
 });

@@ -8,7 +8,7 @@ import {
   kilo2MessageSchema,
   customerBillingFailureSchema,
 } from '@kilocode/session-ingest-contracts';
-import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import { preparationStepSchema } from './preparation-step';
 import { readKilo2Messages } from './kilo2-source-messages';
 import type {
   CloudAgentSessionId,
@@ -241,32 +241,13 @@ export const cloudSessionMessagesPageInputSchema = z.object({
 });
 
 /**
- * A preparation step snapshot as the page carries it. `schemas.ts` validates
- * the same shape for a live `preparing` event; this copy keeps the page's
- * attempts complete, including their steps, through the page transform.
+ * The page's copy of one preparation attempt, steps included, so the page
+ * transform can carry them through. Each step is validated with the exact
+ * schema the live `preparing` event uses, so the two boundaries cannot drift:
+ * the rows the page carries are already inside the live bounds (the
+ * control-plane route caps each detail line, ingest guards the capture time to
+ * an integer, and the page strips output tails).
  */
-const preparationPageStepSchema = z.object({
-  id: z.string(),
-  key: z.string(),
-  kind: z.enum(['phase', 'setup_command']),
-  label: z.string(),
-  status: z.enum(['running', 'completed', 'failed']),
-  startedAt: z.number(),
-  startedRevision: z.number().optional(),
-  parentStepId: z.string().optional(),
-  completedAt: z.number().optional(),
-  revision: z.number(),
-  latestDetail: z.string().optional(),
-  snapshotCapturedAt: z.number().optional(),
-  safeError: z.string().optional(),
-  command: z.string().optional(),
-  commandIndex: z.number().optional(),
-  commandCount: z.number().optional(),
-  outputTail: z.string().max(PREPARATION_OUTPUT_TAIL_MAX_BYTES).optional(),
-  outputTruncated: z.boolean().optional(),
-  exitCode: z.number().optional(),
-});
-
 export const preparationAttemptPageSchema = z.object({
   id: z.string(),
   triggerMessageId: z.string(),
@@ -275,7 +256,7 @@ export const preparationAttemptPageSchema = z.object({
   completedAt: z.number().optional(),
   safeError: z.string().optional(),
   revision: z.number(),
-  steps: z.array(preparationPageStepSchema),
+  steps: z.array(preparationStepSchema),
 });
 
 /**

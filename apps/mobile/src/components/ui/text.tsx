@@ -1,7 +1,7 @@
 import * as Slot from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import { I18nManager, Text as RNText, type Role } from 'react-native';
+import { I18nManager, Text as RNText, type Role, type TextStyle } from 'react-native';
 
 import { useSystemFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
@@ -88,6 +88,16 @@ export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
  */
 export const EYEBROW_RTL_SCRIPT_DISPLAY = 'text-[13px]';
 
+/**
+ * The eyebrow's line box in dp, at font scale 1, for every script. Measured on
+ * the design-gate device: an RTL-script eyebrow at 13px took a 22.48 dp box
+ * there, while the 10px Latin eyebrow took 14.1 dp — a difference that moves the
+ * header when the two swap places. `screen-header.tsx`'s reserve holds this box
+ * before the label arrives and can never know that label's script, so the box
+ * must not depend on it: one explicit height, and both sizes sit inside it.
+ */
+export const EYEBROW_LINE_HEIGHT_DP = 22;
+
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
 function Text({
@@ -100,7 +110,8 @@ function Text({
     asChild?: boolean;
   }) {
   const textClass = React.useContext(TextClassContext);
-  const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), props.maxFontSizeMultiplier);
+  const fontScale = useSystemFontScale();
+  const fontScaleCap = resolveFontScaleCap(fontScale, props.maxFontSizeMultiplier);
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
   // The shared text primitive re-renders whenever its parent does (streamed chat
@@ -124,6 +135,24 @@ function Text({
   // take a spacing no Hebrew reader asked for — while Latin copy, in either
   // direction, keeps the tracking its class asks for (`NATURAL_LETTER_SPACING`).
   const resetsTracking = joinedScript || (isRTL && isRtlScript);
+  // One line box for the eyebrow in every script: the reserve in
+  // `screen-header.tsx` can never know the arriving label's script, so the box
+  // must not depend on it, and the 10px Latin size and the 13px RTL-script twin
+  // both sit inside `EYEBROW_LINE_HEIGHT_DP`. The box follows the system scale
+  // (a cap on the font size is a cap on the line it sits in), and a caller's own
+  // `lineHeight` still wins: the computed entry comes before `props.style`.
+  //
+  // `resolveFontScaleCap` reports 0 for a scale below 1 — React Native cannot
+  // express a fractional multiplier and treats 0 as no cap — so only a cap of 1
+  // or more bounds the box here.
+  const eyebrowScale = Math.min(
+    fontScale ?? 1,
+    fontScaleCap != null && fontScaleCap >= 1 ? fontScaleCap : Number.POSITIVE_INFINITY
+  );
+  const eyebrowLineHeight: TextStyle | undefined =
+    variant === 'eyebrow'
+      ? { lineHeight: Math.round(EYEBROW_LINE_HEIGHT_DP * eyebrowScale) }
+      : undefined;
   const headingA11y = HEADING_A11Y.get(variant ?? 'default');
   const classes = cn(
     textVariants({ variant }),
@@ -134,6 +163,26 @@ function Text({
     textClass,
     className
   );
+  // The direction and reset land in the same array the component has always
+  // built, so a non-eyebrow text node's style never grows an empty entry; the
+  // eyebrow's line box leads its own array, before `props.style`, so a caller's
+  // `lineHeight` still wins (`ownStyles` reads the last entry).
+  const directionStyle =
+    isRTL || resetsTracking
+      ? [
+          isRTL ? RTL_WRITING_DIRECTION : undefined,
+          resetsTracking ? NATURAL_LETTER_SPACING : undefined,
+          props.style,
+        ]
+      : props.style;
+  const resolvedStyle = eyebrowLineHeight
+    ? [
+        eyebrowLineHeight,
+        isRTL ? RTL_WRITING_DIRECTION : undefined,
+        resetsTracking ? NATURAL_LETTER_SPACING : undefined,
+        props.style,
+      ]
+    : directionStyle;
   return (
     <Component
       className={isRtlScript ? withoutMonoFamily(classes) : classes}
@@ -141,15 +190,7 @@ function Text({
       aria-level={headingA11y?.level}
       {...props}
       maxFontSizeMultiplier={fontScaleCap ?? props.maxFontSizeMultiplier}
-      style={
-        isRTL || resetsTracking
-          ? [
-              isRTL ? RTL_WRITING_DIRECTION : undefined,
-              resetsTracking ? NATURAL_LETTER_SPACING : undefined,
-              props.style,
-            ]
-          : props.style
-      }
+      style={resolvedStyle}
     />
   );
 }

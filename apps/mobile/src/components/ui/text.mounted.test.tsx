@@ -1,9 +1,11 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native style regression tests. */
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { type TextStyle } from 'react-native';
 import { type ReactTestInstance } from '@/test/renderer';
 import { compileClassName } from '@/test/native-dimensions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { SystemFontScaleContext } from '@/lib/font-scale/system-font-scale-context';
 
 import { Eyebrow } from './eyebrow';
 import { Text } from './text';
@@ -228,6 +230,63 @@ describe('Text eyebrow letterspacing', () => {
         expect.arrayContaining(['font-mono-medium', 'text-[10px]', 'uppercase', 'tracking-[1.5px]'])
       );
     }
+  });
+});
+
+// One box for every script: `screen-header.tsx`'s reserve holds the eyebrow line
+// before the label arrives and can never know that label's script, so the box
+// must not depend on it (`EYEBROW_LINE_HEIGHT_DP` in text.tsx).
+describe('Text eyebrow line box', () => {
+  /** The line height the host `Text` lays the label out in. */
+  function eyebrowLineHeight(element: ReactElement): TextStyle['lineHeight'] {
+    return ownStyles(hostText(mountTextTree(element))).findLast(style => 'lineHeight' in style)
+      ?.lineHeight;
+  }
+
+  it('holds the same box for Latin, Arabic and Hebrew copy in either direction', () => {
+    const cases: [boolean, string][] = [
+      [false, 'Live now'],
+      [false, 'الجلسات الجارية الآن'],
+      [true, 'الجلسات الجارية الآن'],
+      [true, 'פעילים עכשיו'],
+    ];
+    const boxes = cases.map(([isRTL, copy]) => {
+      i18nManager.isRTL = isRTL;
+      return eyebrowLineHeight(createElement(Text, { variant: 'eyebrow' }, copy));
+    });
+
+    // Every case lays out, and they all lay out in one height: the 10px Latin
+    // and the 13px RTL-script size sit inside the same box.
+    expect(boxes).not.toContain(undefined);
+    expect(new Set(boxes).size).toBe(1);
+  });
+
+  it('keeps a caller-supplied line height', () => {
+    expect(
+      eyebrowLineHeight(
+        createElement(Text, { variant: 'eyebrow', style: { lineHeight: 40 } }, 'Live now')
+      )
+    ).toBe(40);
+  });
+
+  it('scales the box with the system font scale', () => {
+    const unscaled = eyebrowLineHeight(createElement(Text, { variant: 'eyebrow' }, 'Live now'));
+    const scaled = eyebrowLineHeight(
+      createElement(
+        SystemFontScaleContext.Provider,
+        { value: 2 },
+        createElement(Text, { variant: 'eyebrow' }, 'Live now')
+      )
+    );
+
+    if (typeof unscaled !== 'number') {
+      throw new TypeError('the eyebrow variant laid out no line box');
+    }
+    expect(scaled).toBe(Math.round(unscaled * 2));
+  });
+
+  it('leaves a non-eyebrow variant without a line box of its own', () => {
+    expect(eyebrowLineHeight(createElement(Text, null, 'Live now'))).toBeUndefined();
   });
 });
 

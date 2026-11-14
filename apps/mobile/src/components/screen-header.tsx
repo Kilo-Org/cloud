@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -97,23 +97,14 @@ export function shouldStackHeaderActions(
 const MAX_TITLE_LINES = 3;
 
 /**
- * What a reserve lays out when it cannot know the label that will fill it.
- * The filler's own script chooses the family and size through the same path the
- * arriving label takes (`Text`'s eyebrow variant drops the mono family from
- * RTL-script copy and sizes it to `EYEBROW_RTL_SCRIPT_DISPLAY`): in a
- * right-to-left interface an ARABIC LETTER MARK (U+061C) is an RTL-script
- * character, so the reserve lays out in the system family at 13px — the 22.48dp
- * line box a localized label takes — while in a left-to-right interface the
- * mono no-break space holds the 14.1dp box a Latin label takes. Neither mark
- * paints ink, so the reserve holds height only. A raw space could not: it has no
- * script, so a forced size would leave it in the mono family and still shorter
- * than the label. A caller whose arriving label is Latin inside a
- * right-to-left interface should pass `reservedEyebrow` so the reserve holds
- * that label's exact box instead of the RTL-script one.
+ * What a reserve lays out when it cannot know the label that will fill it: a
+ * no-break space, which paints no ink. It holds the eyebrow variant's single
+ * line box (`EYEBROW_LINE_HEIGHT_DP` in `ui/text.tsx`), which no longer depends
+ * on the script, so any zero-ink filler reserves exactly the height the arriving
+ * label takes. A caller that knows the label passes `reservedEyebrow` and the
+ * reserve lays out that label itself.
  */
-function reservedEyebrowFiller(isRtl: boolean): string {
-  return isRtl ? '\u061C' : '\u00A0';
-}
+const blankEyebrow = '\u00A0';
 
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
@@ -170,14 +161,15 @@ type ScreenHeaderProps = {
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
   /**
-   * Render this label in the reserve instead of the filler, so the reserved
-   * eyebrow line holds the exact line box of the label that replaces it. The
-   * reserve holds one line box at a time and cannot see the arriving label, so
-   * its filler follows the interface (`reservedEyebrowFiller`): pass this when
-   * the two disagree — a Latin label inside a right-to-left interface — or when
-   * the label already exists at the first render. The reserve paints nothing
-   * either way (a zero-width, clipped, `aria-hidden` twin), so this is the
-   * label's metrics, not its text.
+   * Render this label in the reserve instead of the blank filler, so the
+   * reserved eyebrow line holds the exact box of the label that replaces it —
+   * pass it when the caller knows the label before it paints (the invoices
+   * boundary passes the screen's own name). The eyebrow variant holds one line
+   * box for every script (`EYEBROW_LINE_HEIGHT_DP`), so the blank filler already
+   * reserves the height a label takes; this is for the caller that owns the
+   * label and wants the reserve to lay it out rather than a stand-in. The
+   * reserve paints nothing either way (a zero-width, clipped, `aria-hidden`
+   * twin), so this is the label's metrics, not its text.
    */
   reservedEyebrow?: string;
   reserveEyebrow?: boolean;
@@ -490,13 +482,6 @@ export function ScreenHeader({
     );
   }
 
-  // The reserve cannot know the arriving label, so it lays out a filler whose
-  // own script matches the interface's: an RTL-script mark in a right-to-left
-  // interface (the family and size a localized label takes), the mono no-break
-  // space in a left-to-right one (a Latin label's box). See
-  // `reservedEyebrowFiller`.
-  const eyebrowFiller = reservedEyebrowFiller(I18nManager.isRTL);
-
   const heading = (
     <View className="min-w-0 flex-1">
       {eyebrow || reserveEyebrow ? (
@@ -515,12 +500,12 @@ export function ScreenHeader({
           {/*
             Before the caller's label exists the slot holds the label that will
             fill it (`reservedEyebrow`), and with no label to go on it holds the
-            reserve filler, whose script makes it take the same family and size
-            a localized label takes (`reservedEyebrowFiller`). The copy stays
-            transparent and hidden from assistive readers until `eyebrow` itself
-            is set.
+            blank filler: the eyebrow variant's line box no longer depends on the
+            script (`EYEBROW_LINE_HEIGHT_DP`), so a no-ink space reserves exactly
+            the height the arriving label takes. The copy stays transparent and
+            hidden from assistive readers until `eyebrow` itself is set.
           */}
-          {eyebrow ?? reservedEyebrow ?? eyebrowFiller}
+          {eyebrow ?? reservedEyebrow ?? blankEyebrow}
         </Eyebrow>
       ) : null}
       {titleNode}
@@ -571,11 +556,12 @@ export function ScreenHeader({
   // control up with the text rather than with the empty line the reserve keeps.
   // The twin lays out with the same eyebrow style and the same cap box as the
   // visible title, so the band follows the font scale, and it needs no measured
-  // height and no line-height constant.
+  // height and no line-height constant of its own (the eyebrow variant owns
+  // `EYEBROW_LINE_HEIGHT_DP`, the same box for every script).
   const reservedTitleBand = reserveTitleSpace ? (
     <View className="w-0 overflow-hidden" aria-hidden>
       {eyebrow || reserveEyebrow ? (
-        <Eyebrow className="mb-0.5">{reservedEyebrow ?? eyebrow ?? eyebrowFiller}</Eyebrow>
+        <Eyebrow className="mb-0.5">{reservedEyebrow ?? eyebrow ?? blankEyebrow}</Eyebrow>
       ) : null}
       <View className={reservedTitleHeightClass(size, titleLines)} />
     </View>

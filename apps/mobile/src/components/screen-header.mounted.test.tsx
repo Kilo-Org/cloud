@@ -841,54 +841,39 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
-  // ARABIC LETTER MARK carries no ink but it is RTL-script copy, so the reserve
-  // resolves to the same system family and 13px size a localized label takes
-  // and the header cannot grow when the label lands (the session-changes `asOf`
-  // timestamp, which arrives after the first render).
-  it('reserves an RTL-script filler when the arriving label is unknown in an RTL interface', () => {
-    i18nManager.isRTL = true;
+  // The reserve cannot know the arriving label, so it holds a no-ink no-break
+  // space: the eyebrow variant's line box is the same for every script
+  // (`EYEBROW_LINE_HEIGHT_DP`), so the space reserves exactly the height the
+  // label takes, in either interface direction.
+  it.each([false, true])(
+    'reserves a blank filler when the arriving label is unknown (RTL=%s)',
+    isRTL => {
+      i18nManager.isRTL = isRTL;
 
-    const banded = renderHeader({
-      title: '#6054',
-      reserveEyebrow: true,
-      reserveTitleSpace: true,
-    });
-    const twin = findReservedBand(banded.root).find(node => String(node.type) === 'Eyebrow');
-    expect(twin.children).toEqual(['\u061C']);
-    banded.unmount();
+      const banded = renderHeader({
+        title: '#6054',
+        reserveEyebrow: true,
+        reserveTitleSpace: true,
+      });
+      const twin = findReservedBand(banded.root).find(node => String(node.type) === 'Eyebrow');
+      expect(twin.children).toEqual(['\u00A0']);
+      // No eyebrow class is forced on the reserve: the size and family stay the
+      // `Text` variant's business.
+      expect(twin.props.className).toBe('mb-0.5');
+      banded.unmount();
 
-    // The hidden placeholder line, which is what holds the height when the
-    // caller does not reserve the title space (the invoices boundary).
-    const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
-    const placeholder = inline.root.findByType('Eyebrow');
-    expect(placeholder.children).toEqual(['\u061C']);
-    // It still paints nothing and reaches no reader.
-    expect(placeholder.props.className).toContain('opacity-0');
-    inline.unmount();
+      // The hidden placeholder line, which is what holds the height when the
+      // caller does not reserve the title space (the invoices boundary).
+      const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
+      const placeholder = inline.root.findByType('Eyebrow');
+      expect(placeholder.children).toEqual(['\u00A0']);
+      // It still paints nothing and reaches no reader.
+      expect(placeholder.props.className).toBe('mb-0.5 opacity-0');
+      inline.unmount();
 
-    i18nManager.isRTL = false;
-  });
-
-  // A left-to-right interface reserves with the mono no-break space, whose line
-  // box is the one a Latin label takes; no eyebrow class is forced on either
-  // reserve rendering, because the filler's script decides the family and size.
-  it('reserves a mono no-break space when the arriving label is unknown in an LTR interface', () => {
-    const banded = renderHeader({
-      title: '#6054',
-      reserveEyebrow: true,
-      reserveTitleSpace: true,
-    });
-    const twin = findReservedBand(banded.root).find(node => String(node.type) === 'Eyebrow');
-    expect(twin.children).toEqual(['\u00A0']);
-    expect(twin.props.className).toBe('mb-0.5');
-    banded.unmount();
-
-    const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
-    const placeholder = inline.root.findByType('Eyebrow');
-    expect(placeholder.children).toEqual(['\u00A0']);
-    expect(placeholder.props.className).toBe('mb-0.5 opacity-0');
-    inline.unmount();
-  });
+      i18nManager.isRTL = false;
+    }
+  );
 
   // A known Latin label keeps the reserve at the eyebrow token's own size.
   it('holds a known Latin label in the reserve exactly as given', () => {

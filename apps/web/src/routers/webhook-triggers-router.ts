@@ -60,7 +60,6 @@ import {
 
 const TRIGGER_WRITE_ROLES: OrganizationRole[] = ['owner', 'admin', 'member'];
 
-// Input schemas
 const variantSchema = z
   .string()
   .max(50)
@@ -72,9 +71,7 @@ export const WebhookTriggerCreateInput = z
     organizationId: z.string().uuid().optional(),
     runAsCreator: z.boolean().optional(),
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
-    // KiloClaw Chat target fields
     kiloclawInstanceId: z.string().uuid().optional(),
-    // Cloud Agent target fields (optional — required only when targetType = 'cloud_agent')
     githubRepo: z.string().min(1, 'GitHub repo is required').optional(),
     mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1, 'Model is required').optional(),
@@ -83,7 +80,6 @@ export const WebhookTriggerCreateInput = z
     environmentId: z.string().uuid().nullable().optional(),
     profileId: z.string().uuid().nullable().optional(),
     bodySchema: webhookBodySchema.nullable().optional(),
-    // Shared fields
     promptTemplate: z
       .string()
       .min(1, 'Prompt template is required')
@@ -96,7 +92,6 @@ export const WebhookTriggerCreateInput = z
         secret: z.string().trim().min(1, 'Webhook auth secret is required'),
       })
       .optional(),
-    // Activation mode: 'webhook' (default) or 'scheduled' (cron-based). Immutable after creation.
     activationMode: z.enum(['webhook', 'scheduled']).default('webhook'),
     cronExpression: z.string().max(100).optional(),
     cronTimezone: z.string().max(50).optional().default('UTC'),
@@ -546,12 +541,10 @@ export const webhookTriggersRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.user.id;
 
-      // Verify org membership if organizationId provided
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
 
-      // Query PostgreSQL with ownership + optional target type filter
       const ownerFilter = input.organizationId
         ? eq(cloud_agent_webhook_triggers.organization_id, input.organizationId)
         : and(
@@ -623,10 +616,8 @@ export const webhookTriggersRouter = createTRPCRouter({
         }
       }
 
-      // Verify ownership via PostgreSQL
       await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
-      // Fetch authoritative config from worker
       const workerResult = await getWorkerTrigger(
         input.organizationId ? undefined : userId,
         input.organizationId,
@@ -654,7 +645,6 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Build inbound URL
       const inboundUrl = buildInboundUrl(
         input.organizationId ? undefined : userId,
         input.organizationId,
@@ -695,7 +685,6 @@ export const webhookTriggersRouter = createTRPCRouter({
   create: baseProcedure.input(WebhookTriggerCreateInput).mutation(async ({ ctx, input }) => {
     const userId = ctx.user.id;
 
-    // Verify org membership if organizationId provided
     if (input.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
     }
@@ -735,7 +724,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Target-specific validation (superRefine guarantees required fields per target type)
     if (input.targetType === 'cloud_agent' && input.profileId) {
       await assertProfileOwnership(
         userId,
@@ -761,7 +749,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       if (!input.kiloclawInstanceId) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'KiloClaw instance is required' });
       }
-      // Verify user owns the KiloClaw instance and it's not destroyed
       const [instance] = await db
         .select({ id: kiloclaw_instances.id })
         .from(kiloclaw_instances)
@@ -802,7 +789,6 @@ export const webhookTriggersRouter = createTRPCRouter({
         .returning();
       dbRecord = inserted;
     } catch (error) {
-      // Unique constraint violation = trigger already exists
       if (isUniqueViolation(error)) {
         throw new TRPCError({
           code: 'CONFLICT',
@@ -812,8 +798,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       throw error;
     }
 
-    // Create in worker (only if DB insert succeeded)
-    // Wrap in try/catch to handle network errors
     let workerResult: Awaited<ReturnType<typeof createWorkerTrigger>>;
     try {
       workerResult = await createWorkerTrigger(
@@ -842,7 +826,6 @@ export const webhookTriggersRouter = createTRPCRouter({
         }
       );
     } catch (error) {
-      // Network error or JSON parse error - rollback DB
       console.error('Worker request failed with exception, rolling back DB', {
         triggerId: input.triggerId,
         error: error instanceof Error ? error.message : String(error),
@@ -857,7 +840,6 @@ export const webhookTriggersRouter = createTRPCRouter({
     }
 
     if (!workerResult.success) {
-      // Worker failed to create trigger - rollback DB
       console.error('Worker failed to create trigger, rolling back DB', {
         triggerId: input.triggerId,
         error: workerResult.error,
@@ -878,7 +860,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Build inbound URL
     const inboundUrl = buildInboundUrl(
       input.organizationId ? undefined : userId,
       input.organizationId,
@@ -910,7 +891,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       actorRole = await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
     }
 
-    // Verify ownership via PostgreSQL
     const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
     let executionUserId: string | null = null;
@@ -959,7 +939,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Validate profile ownership if profileId provided
     if (input.profileId) {
       await assertProfileOwnership(
         executionUserId ?? userId,
@@ -1007,7 +986,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Build update payload
     // Use null to explicitly clear fields, undefined to leave unchanged
     // Cron fields only apply to scheduled triggers — ignore for webhook triggers
     const isScheduledTrigger = dbTrigger.activation_mode === 'scheduled';
@@ -1028,7 +1006,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       cronTimezone: isScheduledTrigger ? input.cronTimezone : undefined,
     };
 
-    // Update in worker
     const workerResult = await updateWorkerTrigger(
       input.organizationId ? undefined : userId,
       input.organizationId,
@@ -1038,7 +1015,6 @@ export const webhookTriggersRouter = createTRPCRouter({
 
     if (!workerResult.success) {
       if (workerResult.isNotFound) {
-        // Worker doesn't have this trigger - clean up DB and return NOT_FOUND
         await cleanupOrphanDbRecord(dbTrigger.id, input.triggerId);
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -1051,7 +1027,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Update PostgreSQL (isActive/profileId/updatedAt)
     await db
       .update(cloud_agent_webhook_triggers)
       .set({
@@ -1078,7 +1053,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Build inbound URL
     const inboundUrl = buildInboundUrl(
       input.organizationId ? undefined : userId,
       input.organizationId,
@@ -1151,15 +1125,12 @@ export const webhookTriggersRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user.id;
 
-      // Verify org membership if organizationId provided
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
       }
 
-      // Verify ownership via PostgreSQL
       const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
-      // Delete from worker
       const workerResult = await deleteWorkerTrigger(
         input.organizationId ? undefined : userId,
         input.organizationId,
@@ -1173,7 +1144,6 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Delete from PostgreSQL
       await db
         .delete(cloud_agent_webhook_triggers)
         .where(eq(cloud_agent_webhook_triggers.id, dbTrigger.id));
@@ -1215,15 +1185,12 @@ export const webhookTriggersRouter = createTRPCRouter({
     .query(async ({ ctx, input }): Promise<EnrichedCapturedRequest[]> => {
       const userId = ctx.user.id;
 
-      // Verify org membership if organizationId provided
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
 
-      // Verify ownership via PostgreSQL
       await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
-      // Fetch from worker
       const result = await listWorkerRequests(
         input.organizationId ? undefined : userId,
         input.organizationId,
@@ -1244,7 +1211,6 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Enrich requests with kiloSessionId by looking up cloudAgentSessionId in cli_sessions
       const cloudAgentSessionIds = result.requests
         .map(r => r.cloudAgentSessionId)
         .filter((id): id is string => id !== null);

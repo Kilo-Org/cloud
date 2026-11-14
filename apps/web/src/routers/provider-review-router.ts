@@ -75,8 +75,6 @@ import {
 import type { GitLabReviewOwner } from '@/lib/provider-review/gitlab-authorization';
 import type { BitbucketReviewOwner } from '@/lib/provider-review/bitbucket-authorization';
 
-// ----- input schemas ----------------------------------------------------------
-
 // GitLab project paths are full nested paths (`group/sub/repo`) — never just
 // the last segment. The authorization layer matches them against the
 // integration's repository cache; the regex only bounds the shape.

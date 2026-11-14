@@ -21,7 +21,6 @@ import {
 import { client } from '@kilocode/web-shared/lib/stripe-client';
 import type Stripe from 'stripe';
 
-// Mock Stripe client to avoid API calls in tests
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     checkout: {
@@ -45,7 +44,6 @@ describe('organization auto-top-up router', () => {
   let testOrg: Organization;
 
   beforeAll(async () => {
-    // Create test users
     ownerUser = await insertTestUser({
       google_user_email: `org-atu-owner-${Date.now()}@example.com`,
       google_user_name: 'Org ATU Owner',
@@ -62,7 +60,6 @@ describe('organization auto-top-up router', () => {
       google_user_name: 'Org ATU Non-Member',
     });
 
-    // Create test organization
     testOrg = await createOrganization('Auto TopUp Router Test Org', ownerUser.id);
     await db
       .update(organizations)
@@ -72,7 +69,6 @@ describe('organization auto-top-up router', () => {
       })
       .where(eq(organizations.id, testOrg.id));
 
-    // Add member to org
     await addUserToOrganization(testOrg.id, memberUser.id, 'member');
   });
 
@@ -90,7 +86,6 @@ describe('organization auto-top-up router', () => {
   });
 
   beforeEach(async () => {
-    // Reset org state
     await db
       .update(organizations)
       .set({ auto_top_up_enabled: false })
@@ -127,7 +122,6 @@ describe('organization auto-top-up router', () => {
     });
 
     it('returns config with payment method when configured', async () => {
-      // Create config with payment method
       await db.insert(auto_top_up_configs).values({
         owned_by_organization_id: testOrg.id,
         owned_by_user_id: null,
@@ -179,7 +173,6 @@ describe('organization auto-top-up router', () => {
 
       expect(result).toEqual({ enabled: false });
 
-      // Verify DB was updated
       const org = await db.query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
@@ -187,7 +180,6 @@ describe('organization auto-top-up router', () => {
     });
 
     it('enables auto-top-up directly when payment method exists', async () => {
-      // Create config with payment method
       await db.insert(auto_top_up_configs).values({
         owned_by_organization_id: testOrg.id,
         owned_by_user_id: null,
@@ -204,7 +196,6 @@ describe('organization auto-top-up router', () => {
 
       expect(result).toEqual({ enabled: true });
 
-      // Verify DB was updated
       const org = await db.query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
@@ -340,7 +331,6 @@ describe('organization auto-top-up router', () => {
 
       expect(result.success).toBe(true);
 
-      // Verify DB was updated
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });

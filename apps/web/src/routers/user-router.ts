@@ -326,7 +326,6 @@ type RawDeduction = {
 function parseInstanceIdFromCategory(category: string): string | null {
   const match = category.match(/^kiloclaw-subscription(?:-commit)?:([^:]+):/);
   if (!match) return null;
-  // Validate it looks like a UUID to avoid false matches
   const candidate = match[1];
   if (!/^[0-9a-f-]{36}$/i.test(candidate)) return null;
   return candidate;
@@ -347,7 +346,6 @@ function formatKiloClawDeductionDescription(
 ): string {
   const match = storedDescription.match(/^KiloClaw\s+(standard|commit)\s+(.+)$/i);
   if (!match) {
-    // Unrecognized format — append instance name if available
     return instanceName ? `${storedDescription} (${instanceName})` : storedDescription;
   }
   const plan = match[1].toLowerCase() === 'commit' ? 'Commit' : 'Standard';
@@ -435,9 +433,7 @@ async function enrichDeductionsWithInstanceNames(
     purchase: RawDeduction['purchase'];
   }[]
 > {
-  // Collect unique instance IDs from pure-credit deduction categories.
   const instanceIds = new Set<string>();
-  // Collect Stripe subscription IDs from settlement categories for lookup.
   const stripeSubIds = new Set<string>();
 
   for (const d of deductions) {
@@ -446,13 +442,11 @@ async function enrichDeductionsWithInstanceNames(
     if (instanceId) {
       instanceIds.add(instanceId);
     } else {
-      // Settlement category: kiloclaw-settlement:{stripeSubId}:...
       const settlementMatch = d.credit_category.match(/^kiloclaw-settlement:([^:]+):/);
       if (settlementMatch) stripeSubIds.add(settlementMatch[1]);
     }
   }
 
-  // Batch-fetch instance names.
   const nameById = new Map<string, string | null>();
 
   if (instanceIds.size > 0) {
@@ -463,7 +457,6 @@ async function enrichDeductionsWithInstanceNames(
     for (const r of rows) nameById.set(r.id, r.name);
   }
 
-  // For settlement deductions, resolve Stripe subscription ID → instance ID → name.
   if (stripeSubIds.size > 0) {
     const subRows = await db
       .select({
@@ -495,9 +488,7 @@ async function enrichDeductionsWithInstanceNames(
       for (const r of rows) nameById.set(r.id, r.name);
     }
 
-    // Map stripe sub IDs → instance names
     for (const [stripeSub, instId] of stripeToInstance) {
-      // Store under the stripe sub key too for easy lookup
       nameById.set(`stripe:${stripeSub}`, nameById.get(instId) ?? null);
     }
   }
@@ -638,7 +629,6 @@ export const userRouter = createTRPCRouter({
   getPaidCreditPolicy: baseProcedure.query(() =>
     getPaidCreditPolicyPresentation(PAID_CREDIT_EXPIRATION_EFFECTIVE_AT)
   ),
-  // Account linking routes
   getMe: baseProcedure.query(async ({ ctx }) => {
     return successResult({
       id: ctx.user.id,
@@ -695,8 +685,6 @@ export const userRouter = createTRPCRouter({
       })),
     });
   }),
-
-  // ─── Passkeys ───────────────────────────────────────────────────────
 
   getPasskeys: baseProcedure.query(async ({ ctx }) => {
     const passkeys = await listPasskeysForUser(ctx.user.id);
@@ -796,7 +784,6 @@ export const userRouter = createTRPCRouter({
       }
 
       try {
-        // Create a secure linking session
         await createAccountLinkingSession(
           ctx.user.id,
           input.provider,
@@ -834,8 +821,6 @@ export const userRouter = createTRPCRouter({
 
     return successResult();
   }),
-
-  // ─── Device Sessions ────────────────────────────────────────────────
 
   listDeviceSessions: baseProcedure.query(async ({ ctx }) => {
     const rows = await db
@@ -889,7 +874,6 @@ export const userRouter = createTRPCRouter({
 
       const result = getCreditBlocks(transactions, now, ctx.user, ctx.user.id);
 
-      // Enrich KiloClaw deduction descriptions with instance names.
       const enrichedDeductions = await enrichDeductionsWithInstanceNames(
         ctx.user.id,
         result.deductions
@@ -1072,7 +1056,6 @@ export const userRouter = createTRPCRouter({
 
       const dateThreshold = getDateThreshold(period);
 
-      // Build where conditions based on view type, filtering for autocomplete model
       const conditions = [
         eq(microdollar_usage.kilo_user_id, userId),
         eq(microdollar_usage.model, AUTOCOMPLETE_MODEL),
@@ -1129,14 +1112,12 @@ export const userRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.currentEnabled) {
-        // Disabling auto-top-up
         await db
           .update(kilocode_users)
           .set({ auto_top_up_enabled: false })
           .where(eq(kilocode_users.id, ctx.user.id));
         return { enabled: false } as const;
       } else {
-        // Enabling auto-top-up
         const config = await db.query.auto_top_up_configs.findFirst({
           where: eq(auto_top_up_configs.owned_by_user_id, ctx.user.id),
         });

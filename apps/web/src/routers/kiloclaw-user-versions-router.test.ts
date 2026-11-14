@@ -79,7 +79,6 @@ beforeAll(async () => {
     .returning({ id: kiloclaw_instances.id });
   adminInstanceId = adminInstance.id;
 
-  // Give test users active subscriptions so clawAccessProcedure doesn't block them
   const trialEnd = new Date(Date.now() + 7 * 86_400_000).toISOString();
   await db.insert(kiloclaw_subscriptions).values(
     [
@@ -155,7 +154,6 @@ describe('kiloclaw.getMyPin', () => {
   });
 
   it('returns pin details when user has a pin', async () => {
-    // Create a pin for userB
     await db.insert(kiloclaw_version_pins).values({
       instance_id: userBInstanceId,
       image_tag: availableVersion.image_tag,
@@ -172,7 +170,6 @@ describe('kiloclaw.getMyPin', () => {
     expect(result?.openclaw_version).toBe(availableVersion.openclaw_version);
     expect(result?.variant).toBe(availableVersion.variant);
 
-    // Cleanup
     await db
       .delete(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, userBInstanceId));
@@ -181,7 +178,6 @@ describe('kiloclaw.getMyPin', () => {
 
 describe('kiloclaw.setMyPin', () => {
   afterEach(async () => {
-    // Cleanup pins after each test
     await db
       .delete(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
@@ -203,13 +199,11 @@ describe('kiloclaw.setMyPin', () => {
   it('updates existing pin when called again', async () => {
     const caller = await createCallerForUser(userA.id);
 
-    // Create initial pin
     await caller.kiloclaw.setMyPin({
       imageTag: availableVersion.image_tag,
       reason: 'Initial reason',
     });
 
-    // Update pin (this should be an upsert)
     const result = await caller.kiloclaw.setMyPin({
       imageTag: availableVersion.image_tag,
       reason: 'Updated reason',
@@ -217,7 +211,6 @@ describe('kiloclaw.setMyPin', () => {
 
     expect(result.reason).toBe('Updated reason');
 
-    // Verify only one pin exists
     const pins = await db
       .select()
       .from(kiloclaw_version_pins)
@@ -257,7 +250,6 @@ describe('kiloclaw.setMyPin', () => {
 
 describe('kiloclaw.removeMyPin', () => {
   it('removes the user pin', async () => {
-    // Create a pin first
     await db.insert(kiloclaw_version_pins).values({
       instance_id: userAInstanceId,
       image_tag: availableVersion.image_tag,
@@ -269,7 +261,6 @@ describe('kiloclaw.removeMyPin', () => {
 
     expect(result.success).toBe(true);
 
-    // Verify pin is deleted
     const pins = await db
       .select()
       .from(kiloclaw_version_pins)
@@ -291,7 +282,6 @@ describe('kiloclaw.removeMyPin', () => {
 
 describe('Authorization', () => {
   beforeEach(async () => {
-    // Create pins for both users
     await db.insert(kiloclaw_version_pins).values([
       {
         instance_id: userAInstanceId,

@@ -18,7 +18,6 @@ jest.mock('@/lib/organizations/organization-billing', () => ({
   getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_child_org'),
 }));
 
-// Test users and organization will be created dynamically
 let regularUser: User;
 let adminUser: User;
 let memberUser: User;
@@ -27,7 +26,6 @@ let testOrganization: Organization;
 
 describe('organizations trpc router', () => {
   beforeAll(async () => {
-    // Create test users using the helper function
     regularUser = await insertTestUser({
       google_user_email: 'regular-org@example.com',
       google_user_name: 'Regular Org User',
@@ -52,10 +50,8 @@ describe('organizations trpc router', () => {
       is_admin: false,
     });
 
-    // Create test organization using the CRUD method
     testOrganization = await createOrganization('Test Organization', regularUser.id);
 
-    // Set organization balance using direct DB update (since there's no CRUD method for this)
     await db
       .update(organizations)
       .set({
@@ -64,12 +60,10 @@ describe('organizations trpc router', () => {
       })
       .where(eq(organizations.id, testOrganization.id));
 
-    // Add member user to organization using CRUD method
     await addUserToOrganization(testOrganization.id, memberUser.id, 'member');
   });
 
   afterAll(async () => {
-    // Clean up test data - organizations cleanup will cascade to memberships
     await db.delete(organizations).where(eq(organizations.id, testOrganization.id));
   });
 
@@ -421,7 +415,6 @@ describe('organizations trpc router', () => {
     it('should validate organizationId input format', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test with invalid UUID format
       await expect(
         caller.organizations.withMembers({ organizationId: 'invalid-uuid' })
       ).rejects.toThrow();
@@ -433,7 +426,6 @@ describe('organizations trpc router', () => {
         organizationId: testOrganization.id,
       });
 
-      // Check that each member has the expected structure
       result.members.forEach(member => {
         if (member.status === 'active') {
           expect(member).toHaveProperty('id');
@@ -901,7 +893,6 @@ describe('organizations trpc router', () => {
         },
       });
 
-      // Verify the organization was actually updated in the database
       const updatedOrg = await db
         .select()
         .from(organizations)
@@ -909,7 +900,6 @@ describe('organizations trpc router', () => {
 
       expect(updatedOrg[0].name).toBe(newName);
 
-      // Reset the name for other tests
       await db
         .update(organizations)
         .set({ name: 'Test Organization' })
@@ -932,7 +922,6 @@ describe('organizations trpc router', () => {
         },
       });
 
-      // Verify the organization was actually updated in the database
       const updatedOrg = await db
         .select()
         .from(organizations)
@@ -940,7 +929,6 @@ describe('organizations trpc router', () => {
 
       expect(updatedOrg[0].name).toBe(newName);
 
-      // Reset the name for other tests
       await db
         .update(organizations)
         .set({ name: 'Test Organization' })
@@ -984,7 +972,6 @@ describe('organizations trpc router', () => {
     it('should validate organizationId input format', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test with invalid UUID format
       await expect(
         caller.organizations.update({
           organizationId: 'invalid-uuid',
@@ -996,7 +983,6 @@ describe('organizations trpc router', () => {
     it('should validate organization name input', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test with empty name
       await expect(
         caller.organizations.update({
           organizationId: testOrganization.id,
@@ -1004,7 +990,6 @@ describe('organizations trpc router', () => {
         })
       ).rejects.toThrow('Organization name is required');
 
-      // Test with whitespace-only name
       await expect(
         caller.organizations.update({
           organizationId: testOrganization.id,
@@ -1012,7 +997,6 @@ describe('organizations trpc router', () => {
         })
       ).rejects.toThrow('Organization name is required');
 
-      // Test with name that's too long (over 100 characters)
       const longName = 'a'.repeat(101);
       await expect(
         caller.organizations.update({
@@ -1039,7 +1023,6 @@ describe('organizations trpc router', () => {
         },
       });
 
-      // Verify the organization was updated with trimmed name in the database
       const updatedOrg = await db
         .select()
         .from(organizations)
@@ -1047,7 +1030,6 @@ describe('organizations trpc router', () => {
 
       expect(updatedOrg[0].name).toBe(expectedName);
 
-      // Reset the name for other tests
       await db
         .update(organizations)
         .set({ name: 'Test Organization' })
@@ -1057,7 +1039,6 @@ describe('organizations trpc router', () => {
     it('should handle valid edge case names', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test with minimum length name (1 character)
       const minName = 'A';
       let result = await caller.organizations.update({
         organizationId: testOrganization.id,
@@ -1065,7 +1046,6 @@ describe('organizations trpc router', () => {
       });
       expect(result.organization.name).toBe(minName);
 
-      // Test with maximum length name (100 characters)
       const maxName = 'a'.repeat(100);
       result = await caller.organizations.update({
         organizationId: testOrganization.id,
@@ -1073,7 +1053,6 @@ describe('organizations trpc router', () => {
       });
       expect(result.organization.name).toBe(maxName);
 
-      // Reset the name for other tests
       await db
         .update(organizations)
         .set({ name: 'Test Organization' })
@@ -1201,7 +1180,6 @@ describe('organizations trpc router', () => {
     });
 
     it('should clear company_domain with null', async () => {
-      // First set a domain
       await db
         .update(organizations)
         .set({ company_domain: 'to-be-cleared.com' })

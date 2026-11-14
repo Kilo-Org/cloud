@@ -110,7 +110,6 @@ const OrganizationListInputSchema = z.object({
   // paying = has ever had a seats purchase (active or churned customers)
   // trial  = has never had a seats purchase
   mode: z.enum(['paying', 'trial', 'all']).default('paying'),
-  // User-facing filters
   include_deleted: z.boolean().default(false),
   // Filter by latest subscription_status value. Values match the canonical
   // Stripe status registry; '' clears the filter.
@@ -401,7 +400,6 @@ export const organizationAdminRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, userId } = input;
 
-      // Validate that the organization exists
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
@@ -413,7 +411,6 @@ export const organizationAdminRouter = createTRPCRouter({
         });
       }
 
-      // If userId is provided, validate that the user exists
       if (userId !== null) {
         const user = await db.query.kilocode_users.findFirst({
           where: eq(kilocode_users.id, userId),
@@ -450,7 +447,6 @@ export const organizationAdminRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, free_trial_end_at } = input;
 
-      // Validate that the organization exists
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
@@ -481,7 +477,6 @@ export const organizationAdminRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, suppress_trial_messaging } = input;
 
-      // Validate that the organization exists
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
@@ -489,7 +484,6 @@ export const organizationAdminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
 
-      // Update the settings JSONB column
       const updatedSettings = {
         ...organization.settings,
         suppress_trial_messaging,
@@ -1498,7 +1492,6 @@ export const organizationAdminRouter = createTRPCRouter({
           )
         : baseQueryWithCommonJoins;
 
-      // Add mode-based and stripe_status conditions
       const statusConditions: (SQL | undefined)[] = whereCondition ? [whereCondition] : [];
 
       if (mode === 'paying') {
@@ -1526,9 +1519,7 @@ export const organizationAdminRouter = createTRPCRouter({
           sql`${organizations.settings}->>'is_sales_demo' IS DISTINCT FROM 'true'`
         );
       }
-      // mode === 'all': no subscription filter
 
-      // Filter by Stripe subscription status (latest subscription for this org)
       if (stripe_status) {
         // Old form required the latest subscription status to match; sales-demo
         // orgs have no seats purchase, so include them for admins.
@@ -1549,7 +1540,6 @@ export const organizationAdminRouter = createTRPCRouter({
       // "more than one user" threshold.
       const havingCondition = has_multiple_users ? gt(count(kilocode_users.id), 1) : undefined;
 
-      // Execute main query with pagination
       const filteredOrganizations = await baseQuery
         .where(finalWhereCondition)
         .groupBy(

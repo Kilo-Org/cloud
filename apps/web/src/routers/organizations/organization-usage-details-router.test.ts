@@ -17,14 +17,12 @@ import {
 import { eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 
-// Test users and organization will be created dynamically
 let regularUser: User;
 let memberUser: User;
 let testOrganization: Organization;
 
 describe('organizations usage details trpc router', () => {
   beforeAll(async () => {
-    // Create test users using the helper function
     regularUser = await insertTestUser({
       google_user_email: 'regular-usage@example.com',
       google_user_name: 'Regular Usage User',
@@ -37,15 +35,12 @@ describe('organizations usage details trpc router', () => {
       is_admin: false,
     });
 
-    // Create test organization using the CRUD method
     testOrganization = await createOrganization('Test Usage Organization', regularUser.id);
 
-    // Add member user to organization using CRUD method
     await addUserToOrganization(testOrganization.id, memberUser.id, 'member');
   });
 
   afterEach(async () => {
-    // Clean up usage and feature adoption data after each test
     await db
       .delete(cloud_agent_webhook_triggers)
       .where(eq(cloud_agent_webhook_triggers.organization_id, testOrganization.id));

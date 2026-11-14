@@ -209,6 +209,20 @@ describe('getDatabaseClientConfig', () => {
       });
     });
 
+    it('decodes escaped characters in the host', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://us%40er:p%40ss@db%2Eexample.com:5432/db%2Fname?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'us@er',
+        password: 'p@ss',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'db/name',
+      });
+    });
+
     it('rejects a malformed escape instead of passing it through', () => {
       expect(() =>
         getDatabaseClientConfig('postgres://us%40er:p%zz@db.example.com:5432/mydb')
@@ -241,6 +255,14 @@ describe('getDatabaseClientConfig', () => {
       );
 
       expect(config.ssl).toMatchObject({ rejectUnauthorized: true });
+    });
+
+    it('uses the decoded host as the TLS servername', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig('postgres://user:secret@db%2Eexample.com:5432/mydb');
+
+      expect(config.ssl).toMatchObject({ servername: 'db.example.com' });
     });
 
     it('expands escaped newlines in the CA', () => {

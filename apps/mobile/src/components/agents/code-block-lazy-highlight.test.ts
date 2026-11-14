@@ -129,7 +129,6 @@ describe('chunkCodeLines lazy highlighting', () => {
     ).join('\n');
     expect(overBudget.length).toBeGreaterThan(2_000_000);
     chunkCodeLines(overBudget, null, CODE_FIRST_PAINT_CHUNKS);
-    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 2, held: 1 });
 
     highlightCalls.lines = [];
     const mounted = CODE_FIRST_PAINT_CHUNKS + CODE_CHUNK_MOUNT_BATCH;
@@ -146,6 +145,7 @@ describe('chunkCodeLines lazy highlighting', () => {
         .split('\n')
         .slice(highlightedPrefix.length, highlightedPrefix.length + newlyHighlighted.length)
     );
+    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 2, held: 1 });
   });
 });
 

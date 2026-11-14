@@ -154,12 +154,24 @@ vi.mock('@/components/ui/text', () => ({
   Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),
 }));
 // Each row carries its action as a child, so a test can ask one row for its
-// button instead of inspecting the trailing element it was handed.
+// button instead of inspecting the trailing element it was handed. A row
+// without a button carries a press instead, so the mock keeps both.
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title?: string; subtitle?: string; trailing?: ReactNode }) =>
+  ConfigureRow: (props: {
+    title?: string;
+    subtitle?: string;
+    trailing?: ReactNode;
+    onPress?: () => void;
+    accessibilityLabel?: string;
+  }) =>
     createElement(
       'RowMock',
-      { title: props.title, subtitle: props.subtitle },
+      {
+        title: props.title,
+        subtitle: props.subtitle,
+        onPress: props.onPress,
+        accessibilityLabel: props.accessibilityLabel,
+      },
       props.trailing ?? null
     ),
 }));
@@ -327,7 +339,7 @@ describe('IntegrationsScreen', () => {
     expect(calls.disconnect).toHaveBeenCalledWith({ provider: 'slack', githubIntegrationId: null });
   });
 
-  it('shows one shared note to a member whose organization rows offer nothing', () => {
+  it('shows one shared note to a member and opens each blocked row on the web', () => {
     state.role = 'member';
     state.statuses.data = [
       { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
@@ -340,10 +352,19 @@ describe('IntegrationsScreen', () => {
     // control, and the hub names the roles that can change them once, above the
     // list, instead of under each row. GitLab belongs to that set: every
     // organization GitLab connect asks for a billing role, first connect too.
+    // The row keeps a press that opens the provider's page, so the hub is a
+    // list of destinations rather than a list of labels.
     for (const title of ['GitHub', 'Slack', 'GitLab', 'Bitbucket']) {
-      expect(actionOf(rowTitled(root, title))).toBeNull();
+      const row = rowTitled(root, title);
+      expect(actionOf(row)).toBeNull();
+      expect(row.props.accessibilityLabel).toBe(`Open in browser. ${title}`);
     }
     expect(texts(root).filter(text => text === SHARED_NOTE)).toHaveLength(1);
+
+    press(rowTitled(root, 'GitLab'));
+    expect(calls.openExternal).toHaveBeenCalledWith(
+      expect.stringContaining('/organizations/org-1/integrations/gitlab')
+    );
   });
 
   it('shows no shared note to an owner, who is offered every row', () => {
@@ -355,6 +376,9 @@ describe('IntegrationsScreen', () => {
     const root = mount('org-1').root;
 
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
+    // A row that offers its control does not also open the page on press: one
+    // row, one action.
+    expect(findOne(root, 'RowMock').every(row => row.props.onPress == null)).toBe(true);
     expect(texts(root)).not.toContain(SHARED_NOTE);
   });
 

@@ -188,7 +188,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
                   onDisconnect={() => {
                     requestDisconnect(row);
                   }}
-                  onManageOnWeb={() => {
+                  onOpenOnWeb={() => {
                     openProviderPage(row.provider);
                   }}
                   last={index === rows.length - 1}

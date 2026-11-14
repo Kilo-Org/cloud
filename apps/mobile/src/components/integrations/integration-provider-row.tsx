@@ -45,7 +45,8 @@ type IntegrationProviderRowProps = Readonly<{
   disconnecting: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
-  onManageOnWeb: () => void;
+  /** Opens the provider's organization page on the web: its controls, or its details. */
+  onOpenOnWeb: () => void;
   last?: boolean;
 }>;
 
@@ -63,7 +64,7 @@ export function IntegrationProviderRow({
   disconnecting,
   onConnect,
   onDisconnect,
-  onManageOnWeb,
+  onOpenOnWeb,
   last,
 }: IntegrationProviderRowProps) {
   const { t } = useTranslation();
@@ -91,7 +92,7 @@ export function IntegrationProviderRow({
   // The page behind "Manage on the web" is the same manager-only surface as
   // Disconnect, so it follows the disconnect roles; Connect follows the
   // connect flow's own rule, and every organization GitLab connect asks for a
-  // billing role, so a member's GitLab row offers no action.
+  // billing role, so a member's GitLab row offers no control.
   let action: ReactNode = null;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
@@ -102,7 +103,7 @@ export function IntegrationProviderRow({
       <Button
         size="sm"
         variant="outline"
-        onPress={onManageOnWeb}
+        onPress={onOpenOnWeb}
         accessibilityLabel={namedAction(t('common.manageOnWeb'))}
       >
         <Text>{t('common.manageOnWeb')}</Text>
@@ -133,6 +134,14 @@ export function IntegrationProviderRow({
     ) : null;
   }
 
+  // A row the viewer's role leaves without a control still carries a press: it
+  // opens the provider's page, which shows the connection details and names the
+  // roles that can change them. The press leaves the app for the browser, as
+  // Connect already does, so the hub reads as a list of destinations rather than
+  // a list of labels. A pending connections read keeps the row inert until the
+  // control it settles on is known.
+  const opensProviderPage = action === null && !row.actionPending;
+
   return (
     <ConfigureRow
       icon={PROVIDER_ICONS[row.provider]}
@@ -140,6 +149,8 @@ export function IntegrationProviderRow({
       subtitle={subtitle}
       subtitleNumberOfLines={1}
       trailing={action}
+      onPress={opensProviderPage ? onOpenOnWeb : undefined}
+      accessibilityLabel={opensProviderPage ? namedAction(t('common.openInBrowser')) : undefined}
       last={last}
     />
   );

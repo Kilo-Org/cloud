@@ -160,14 +160,18 @@ export function Sheet({
    * (BottomSheet.ios.tsx), so a report for a presentation that is gone would
    * close the one that replaced it.
    */
-  const owedReportsRef = useRef({ close: false, dismiss: false });
+  const owedReportsRef = useRef({ close: false, dismiss: false, presentation: 0 });
   /**
-   * Which presentation the owed reports belong to. `presented` has handed nothing
-   * over yet, so a native report there is a dismissal the app did not ask for (a
-   * swipe) and settles that presentation; `ended` has already settled its reports,
-   * so a report that arrives afterwards belongs to it and is dropped.
+   * The presentation generation the mounted native instance represents. Every
+   * report is matched against it: the adapter dispatches through its latest props,
+   * so without an identity a report belonging to a dismissal the app already ended
+   * would close the presentation that replaced it. A dismissal the deadline ends
+   * also replaces the instance (see the `key`), because the replaced adapter keeps
+   * its own teardown state and would not present again from an unchanged index.
    */
-  const reportPhaseRef = useRef<'presented' | 'dismissing' | 'ended'>('presented');
+  const [presentation, setPresentation] = useState(0);
+  const presentationRef = useRef(presentation);
+  presentationRef.current = presentation;
   // The latest committed `visible`/`dismissalPending`, read by the callback-typed
   // report handlers the adapter keeps a ref to.
   const stateRef = useRef({ visible, dismissalPending });
@@ -179,19 +183,17 @@ export function Sheet({
       // A caller turning the sheet back on re-presents it, so its earlier
       // dismissal was superseded: the next self-dismissal reports again.
       forwardedSelfDismissRef.current = false;
-      // A settled dismissal's late report belongs to the presentation that is gone.
-      // Only a superseding reopen keeps it owed, so that report can re-present this one.
-      if (reportPhaseRef.current === 'ended') {
-        reportPhaseRef.current = 'presented';
-      }
       return;
     }
     // The host is up, so this hands the library its dismissal. Android reports
     // that dismissal from the host's own effect, which runs before this one;
     // `onDismiss` clears `mountedRef` in time for this check to see it.
     if (mountedRef.current) {
-      owedReportsRef.current = { close: true, dismiss: true };
-      reportPhaseRef.current = 'dismissing';
+      owedReportsRef.current = {
+        close: true,
+        dismiss: true,
+        presentation: presentationRef.current,
+      };
       setDismissalPending(true);
     }
   }, [visible]);
@@ -205,8 +207,11 @@ export function Sheet({
     if (onRequestDismiss?.() === false) {
       return false;
     }
-    owedReportsRef.current = { close: true, dismiss: true };
-    reportPhaseRef.current = 'dismissing';
+    owedReportsRef.current = {
+      close: true,
+      dismiss: true,
+      presentation: presentationRef.current,
+    };
     setSelfDismissalStarted(true);
     return true;
   };
@@ -248,84 +253,88 @@ export function Sheet({
   }, [mounted, visible]);
 
   /** The caller's close edge, forwarded at most once per handed-over dismissal. */
-  const settleClose = useCallback(() => {
-    if (reportPhaseRef.current === 'ended') {
-      return;
-    }
-    if (!owedReportsRef.current.close) {
-      // A report while nothing was handed over is the sheet dismissing itself
-      // (a swipe): that is this presentation's real close, not a late one.
-      if (reportPhaseRef.current !== 'presented') {
+  const settleClose = useCallback(
+    (generation: number) => {
+      // A report from a presentation this one replaced describes a dismissal that
+      // is over; it must not end the presentation that took its place.
+      if (generation !== presentationRef.current) {
         return;
       }
-      owedReportsRef.current = { close: true, dismiss: true };
-      reportPhaseRef.current = 'dismissing';
-    }
-    owedReportsRef.current.close = false;
-    if (!owedReportsRef.current.dismiss) {
-      reportPhaseRef.current = 'ended';
-    }
-    const { visible: isVisible, dismissalPending: isPending } = stateRef.current;
-    // A dismissal the caller already reopened past must not close the sheet
-    // again through the caller's own handler.
-    if (isVisible && isPending) {
-      return;
-    }
-    // A reported self-dismissal that already handed the caller the close
-    // must not arrive a second time once the caller dropped `visible`.
-    if (forwardedSelfDismissRef.current) {
-      forwardedSelfDismissRef.current = false;
-      return;
-    }
-    onClose();
-  }, [onClose]);
+      const owed = owedReportsRef.current;
+      if (!owed.close) {
+        if (owed.dismiss) {
+          // This occurrence's close edge already landed.
+          return;
+        }
+        // Nothing was handed over: the native sheet dismissed itself (a swipe),
+        // and this close edge belongs to the live presentation.
+        owedReportsRef.current = { close: true, dismiss: true, presentation: generation };
+      }
+      owedReportsRef.current.close = false;
+      const { visible: isVisible, dismissalPending: isPending } = stateRef.current;
+      // A dismissal the caller already reopened past must not close the sheet
+      // again through the caller's own handler.
+      if (isVisible && isPending) {
+        return;
+      }
+      // A reported self-dismissal that already handed the caller the close
+      // must not arrive a second time once the caller dropped `visible`.
+      if (forwardedSelfDismissRef.current) {
+        forwardedSelfDismissRef.current = false;
+        return;
+      }
+      onClose();
+    },
+    [onClose]
+  );
 
   /** The finished-dismissal edge: unmounts the presentation and tells the caller once. */
-  const settleDismiss = useCallback(() => {
-    if (reportPhaseRef.current === 'ended') {
-      return;
-    }
-    if (!owedReportsRef.current.dismiss) {
-      if (reportPhaseRef.current !== 'presented') {
+  const settleDismiss = useCallback(
+    (generation: number) => {
+      if (generation !== presentationRef.current) {
         return;
       }
-      owedReportsRef.current = { close: true, dismiss: true };
-      reportPhaseRef.current = 'dismissing';
-    }
-    owedReportsRef.current.dismiss = false;
-    if (!owedReportsRef.current.close) {
-      reportPhaseRef.current = 'ended';
-    }
-    // Whatever started the dismissal, the finished report ends the close
-    // request lease. It also arms the settle hold directly here: the host
-    // tears the sheet's window down in the frames around this report,
-    // measured on the emulator (the window went before the report reached
-    // this tree, and a touch between the two opened the row behind it), so
-    // the lease ending together with the window's teardown leaves exactly
-    // the frames no window shields unprotected. Holding here instead of in
-    // the hook keeps the settle off the reopen path.
-    settleReleaseRef.current?.();
-    settleReleaseRef.current = holdSheetTouch(SHEET_TOUCH_SETTLE_MS);
-    setSelfDismissalStarted(false);
-    setDismissalPending(false);
-    const { visible: isVisible, dismissalPending: isPending } = stateRef.current;
-    if (isVisible && isPending) {
-      // Superseded: the caller reopened while this dismissal was in flight.
-      // The next render hands the library `index` 0, re-presenting the sheet
-      // the dismissal had taken down; the sheet stays mounted, so its content
-      // never unmounts.
-      return;
-    }
-    // Clear the host flag before queueing, not just with `setMounted`: on
-    // Android this report runs from the host's effect, ahead of this
-    // component's `[visible]` effect, which reads the flag to decide whether
-    // a dismissal is still outstanding. Otherwise it re-arms
-    // `dismissalPending` for a dismissal that already reported and the next
-    // reopen passes -1 and never presents.
-    mountedRef.current = false;
-    setMounted(false);
-    onDismiss?.();
-  }, [onDismiss]);
+      const owed = owedReportsRef.current;
+      if (!owed.dismiss) {
+        if (owed.close) {
+          // This occurrence's dismissal edge already landed.
+          return;
+        }
+        owedReportsRef.current = { close: true, dismiss: true, presentation: generation };
+      }
+      owedReportsRef.current.dismiss = false;
+      // Whatever started the dismissal, the finished report ends the close
+      // request lease. It also arms the settle hold directly here: the host
+      // tears the sheet's window down in the frames around this report,
+      // measured on the emulator (the window went before the report reached
+      // this tree, and a touch between the two opened the row behind it), so
+      // the lease ending together with the window's teardown leaves exactly
+      // the frames no window shields unprotected. Holding here instead of in
+      // the hook keeps the settle off the reopen path.
+      settleReleaseRef.current?.();
+      settleReleaseRef.current = holdSheetTouch(SHEET_TOUCH_SETTLE_MS);
+      setSelfDismissalStarted(false);
+      setDismissalPending(false);
+      const { visible: isVisible, dismissalPending: isPending } = stateRef.current;
+      if (isVisible && isPending) {
+        // Superseded: the caller reopened while this dismissal was in flight.
+        // The next render hands the library `index` 0, re-presenting the sheet
+        // the dismissal had taken down; the sheet stays mounted, so its content
+        // never unmounts.
+        return;
+      }
+      // Clear the host flag before queueing, not just with `setMounted`: on
+      // Android this report runs from the host's effect, ahead of this
+      // component's `[visible]` effect, which reads the flag to decide whether
+      // a dismissal is still outstanding. Otherwise it re-arms
+      // `dismissalPending` for a dismissal that already reported and the next
+      // reopen passes -1 and never presents.
+      mountedRef.current = false;
+      setMounted(false);
+      onDismiss?.();
+    },
+    [onDismiss]
+  );
 
   // A dismissal torn down out of band (the OS removed the presentation) or an
   // Android `hide()` that never resolves leaves the report owed forever: bound it,
@@ -337,8 +346,16 @@ export function Sheet({
     const timeout = setTimeout(() => {
       // End the presentation before forwarding the close: the dismissal clears
       // `mounted`, so the close it forwards cannot re-arm another owed occurrence.
-      settleDismiss();
-      settleClose();
+      settleDismiss(presentationRef.current);
+      settleClose(presentationRef.current);
+      // The instance that still holds this dismissal is replaced: its own teardown
+      // state would refuse to present from an unchanged index, and its late report
+      // belongs to a presentation that is over. The fresh instance presents from
+      // index 0, so a reopened sheet is really on screen again.
+      const next = presentationRef.current + 1;
+      owedReportsRef.current = { close: false, dismiss: false, presentation: next };
+      presentationRef.current = next;
+      setPresentation(next);
     }, DISMISS_REPORT_TIMEOUT_MS);
     return () => {
       clearTimeout(timeout);
@@ -351,6 +368,7 @@ export function Sheet({
 
   return (
     <BottomSheet
+      key={presentation}
       index={visible && !dismissalPending ? 0 : -1}
       snapPoints={snapPoints}
       // The native sheet paints the platform surface color: without this a
@@ -370,8 +388,12 @@ export function Sheet({
       }}
       onRequestDismiss={() => selfDismissRef.current()}
       locale={i18n.language}
-      onClose={settleClose}
-      onDismiss={settleDismiss}
+      onClose={() => {
+        settleClose(presentation);
+      }}
+      onDismiss={() => {
+        settleDismiss(presentation);
+      }}
     >
       {Platform.OS === 'android' && !snapPoints?.length ? (
         // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.

@@ -42,6 +42,9 @@ vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
 // `index` at -1 until the report and only then asks for 0.
 const nativeSheet = vi.hoisted(() => ({
   mounts: 0,
+  // One handle per mounted instance, kept after it unmounts: a report from an
+  // instance the wrapper replaced is exactly what the deadline has to fence.
+  handles: [] as { dismiss: () => void }[],
   // Android's BottomSheet fires its close callbacks synchronously from the
   // `index === -1` effect; iOS fires them from the native dismiss event later.
   synchronous: false,
@@ -91,9 +94,13 @@ vi.mock('@expo/ui/community/bottom-sheet', () => {
       nativeSheet.mounts += 1;
     }, []);
 
+    const handle = useRef({ dismiss: () => undefined });
+    useEffect(() => {
+      nativeSheet.handles.push(handle.current);
+    }, []);
     // Re-registered every commit so a test always drives the live handlers.
     useEffect(() => {
-      nativeSheet.dismiss = () => {
+      handle.current.dismiss = () => {
         if (closedRef.current) {
           return;
         }
@@ -102,6 +109,7 @@ vi.mock('@expo/ui/community/bottom-sheet', () => {
         closeRef.current?.();
         dismissRef.current?.();
       };
+      nativeSheet.dismiss = handle.current.dismiss;
       // The iOS sheet reports a dimmed-area tap only while the gesture is on
       // (repo-local `BottomSheet.ios` passes `dismissOnBackdropTap: dismissGestures`).
       nativeSheet.backdropTap = () => {
@@ -159,6 +167,7 @@ function sheet(renderer: ReactTestRenderer): ReactTestInstance | undefined {
 
 beforeEach(() => {
   nativeSheet.mounts = 0;
+  nativeSheet.handles.length = 0;
   nativeSheet.synchronous = false;
   nativeSheet.dismiss = () => undefined;
   nativeSheet.backdropTap = () => undefined;
@@ -527,7 +536,7 @@ describe('Sheet', () => {
 
   // iOS only: the native sheet there reports a dimmed-area tap instead of
   // dismissing. Its cases live in `sheet.backdrop-tap.mounted.test.tsx`.
-  it('ignores a native report that arrives after the deadline ended its dismissal', async () => {
+  it('presents the reopened sheet and ignores a report the replaced instance sends late', async () => {
     vi.useFakeTimers();
     const onClose = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();
@@ -538,26 +547,69 @@ describe('Sheet', () => {
     await updateSheet(renderer, queryClient, { visible: false, onClose, onDismiss });
     await updateSheet(renderer, queryClient, { visible: true, onClose, onDismiss });
     expect(sheet(renderer)?.props.index).toBe(-1);
+    const replaced = nativeSheet.handles.at(-1);
 
-    // The report never comes: the deadline ends the dismissal and the reopened
-    // sheet is presented again.
+    // The report never comes: the deadline ends the dismissal and replaces the
+    // instance that still holds it, because that adapter would not present again
+    // from an unchanged index.
     await settleTimers(DISMISS_REPORT_TIMEOUT_MS);
     expect(sheet(renderer)?.props.index).toBe(0);
+    expect(sheet(renderer)?.props.presented).toBe(true);
+    expect(nativeSheet.mounts).toBe(2);
+    expect(nativeSheet.handles).toHaveLength(2);
     expect(onClose).not.toHaveBeenCalled();
     expect(onDismiss).not.toHaveBeenCalled();
 
-    // The adapter re-armed its own guard when the index returned to 0, so its
-    // report walks the props one presentation later. It belongs to the dismissal
-    // that already ended and must not close the sheet that replaced it.
+    // The replaced instance reports after the fact. It belongs to a presentation
+    // that is over, so it must not end the one that took its place.
     await act(async () => {
-      nativeSheet.dismiss();
+      replaced?.dismiss();
       await Promise.resolve();
     });
 
     expect(onClose).not.toHaveBeenCalled();
     expect(onDismiss).not.toHaveBeenCalled();
     expect(sheet(renderer)?.props.index).toBe(0);
+    expect(sheet(renderer)?.props.presented).toBe(true);
     expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
+
+    // A genuine swipe on the live instance still closes it, and reports once.
+    await act(async () => {
+      nativeSheet.dismiss();
+      await Promise.resolve();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(sheet(renderer)).toBeUndefined();
+  });
+
+  it('closes on a swipe after a dismissal the caller reopened past', async () => {
+    const onClose = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const { renderer, queryClient } = await mount({ onClose, onDismiss });
+
+    // Close, reopen while the dismissal is in flight, then let it report. The
+    // reopened sheet is presented again, so it is a live presentation.
+    await updateSheet(renderer, queryClient, { visible: false, onClose, onDismiss });
+    await updateSheet(renderer, queryClient, { visible: true, onClose, onDismiss });
+    await act(async () => {
+      nativeSheet.dismiss();
+      await Promise.resolve();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(sheet(renderer)?.props.index).toBe(0);
+    expect(sheet(renderer)?.props.presented).toBe(true);
+
+    // An iOS swipe reports only the adapter's own close and dismissal: the closed
+    // dismissal above must not leave the sheet unable to take one.
+    await act(async () => {
+      nativeSheet.dismiss();
+      await Promise.resolve();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(sheet(renderer)).toBeUndefined();
   });
 
   it('ends a self-dismissal the native sheet never completed', async () => {

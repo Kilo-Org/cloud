@@ -172,30 +172,35 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
         headerRightWidth={144}
       />
 
-      {surface?.reconnecting ? (
+      {surface?.reconnecting && (phase.kind === 'connecting' || phase.kind === 'reconnecting') ? (
         <SshSessionNotice
           tone="warn"
           icon={WifiOff}
           title={t('ssh.session.reconnectingTitle', {
-            attempt:
-              phase.kind === 'connecting' || phase.kind === 'reconnecting' ? phase.attempt : 1,
+            attempt: phase.attempt,
           })}
-          message={closeReasonMessage(
-            t,
-            phase.kind === 'reconnecting' ? phase.reason : 'disconnected'
-          )}
+          message={
+            phase.kind === 'reconnecting'
+              ? closeReasonMessage(t, phase.reason)
+              : t('ssh.session.reconnectingStage', {
+                  target: session.target,
+                  attempt: phase.attempt,
+                })
+          }
           action={
-            <Button
-              variant="outline"
-              size="sm"
-              className="self-start"
-              onPress={() => {
-                retrySession(sessionId);
-              }}
-            >
-              <RefreshCw size={14} color={colors.foreground} />
-              <Text>{t('ssh.session.retryNow')}</Text>
-            </Button>
+            phase.kind === 'reconnecting' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onPress={() => {
+                  retrySession(sessionId);
+                }}
+              >
+                <RefreshCw size={14} color={colors.foreground} />
+                <Text>{t('ssh.session.retryNow')}</Text>
+              </Button>
+            ) : null
           }
         />
       ) : null}

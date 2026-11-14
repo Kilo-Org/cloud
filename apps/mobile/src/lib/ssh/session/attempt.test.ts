@@ -1,8 +1,9 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { type SshHost } from '../hosts';
 import { attempt, fail } from './attempt';
 import { live, type LiveSession } from './live';
+import { retrySession } from './manager';
 import { sessionById, writeSession } from './session-store';
 
 const state = vi.hoisted(() => ({
@@ -32,6 +33,9 @@ const state = vi.hoisted(() => ({
   } satisfies SshHost,
 }));
 vi.mock('@/i18n', () => ({ i18n: { t: () => 'Unlock' } }));
+vi.mock('./idle-notify', () => ({ forgetIdleNotify: vi.fn() }));
+vi.mock('../known-hosts', () => ({ findKnownHost: vi.fn(), trustHostKey: vi.fn() }));
+vi.mock('../id', () => ({ newId: vi.fn() }));
 vi.mock('../store', () => ({ sshDatabase: () => Promise.resolve({}) }));
 vi.mock('../hosts', () => ({ getHost: state.getHost, updateHost: vi.fn() }));
 vi.mock('../keys', () => ({ getKey: () => ({ privateKeyOpenssh: 'key', passphrase: null }) }));
@@ -95,6 +99,31 @@ beforeEach(() => {
   state.disconnect.mockResolvedValue(undefined);
   state.connect.mockResolvedValue('new-target');
   state.openShell.mockResolvedValue('new-shell');
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+it('starts a requested retry immediately and clears the pending backoff timer', async () => {
+  vi.useFakeTimers();
+  entry.nativeSessionId = null;
+  entry.jumpSessionIds = [];
+  entry.attempt = 2;
+  fail(entry, 'disconnected');
+  expect(vi.getTimerCount()).toBe(1);
+  expect(sessionById('app')?.phase.kind).toBe('reconnecting');
+
+  retrySession('app');
+
+  expect(entry.timer).toBeNull();
+  expect(vi.getTimerCount()).toBe(0);
+  expect(entry.connecting).toBe(true);
+  expect(sessionById('app')?.phase).toEqual({ kind: 'connecting', attempt: 1 });
+  await vi.waitFor(() => {
+    expect(state.connect).toHaveBeenCalledTimes(1);
+    expect(sessionById('app')?.phase.kind).toBe('connected');
+  });
 });
 
 it('disconnects target and hops and clears their ids on a channel ending', async () => {

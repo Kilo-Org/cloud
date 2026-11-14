@@ -344,8 +344,6 @@
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
       "manageOnWebReason": "Ci dostawcy wymagają danych uwierzytelniających w określonym formacie.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
-      "enabled": "W użyciu",
-      "disabled": "Wyłączony",
       "managedByPlan": "Zarządzany przez twój plan kodowania",
       "enableKey": "Włącz klucz {{provider}}",
       "test": "Testuj klucz",

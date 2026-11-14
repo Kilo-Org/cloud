@@ -344,8 +344,6 @@
       "rowSubtitle": "Utiliser votre propre facturation fournisseur",
       "manageOnWebReason": "Ces fournisseurs nécessitent des identifiants structurés.",
       "description": "Les requêtes effectuées avec ces clés sont facturées sur votre compte fournisseur au lieu de votre solde Kilo.",
-      "enabled": "Utilisée",
-      "disabled": "Désactivée",
       "managedByPlan": "Gérée par votre forfait de code",
       "enableKey": "Activer la clé {{provider}}",
       "test": "Tester la clé",

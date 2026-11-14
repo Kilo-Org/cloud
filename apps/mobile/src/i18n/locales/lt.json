@@ -344,8 +344,6 @@
       "rowSubtitle": "Naudoti savo teikėjo atsiskaitymą",
       "manageOnWebReason": "Šiems teikėjams reikalingi struktūrizuoti prisijungimo duomenys.",
       "description": "Užklausos, atliekamos su šiais raktais, apmokestinamos jūsų teikėjo paskyroje, o ne iš jūsų Kilo likučio.",
-      "enabled": "Naudojamas",
-      "disabled": "Išjungtas",
       "managedByPlan": "Valdoma pagal jūsų programavimo planą",
       "enableKey": "Įjungti {{provider}} raktą",
       "test": "Išbandyti raktą",

@@ -344,8 +344,6 @@
       "rowSubtitle": "Isticmaal biilasha bixiyahaaga",
       "manageOnWebReason": "Bixiyeyaashan waxay u baahan yihiin aqoonsiyo habaysan.",
       "description": "Codsiyada maraya furayaashan waxaa lagu dallacayaa akoonka bixiyahaaga halkii laga jari lahaa hadhaagaaga Kilo.",
-      "enabled": "La isticmaalayo",
-      "disabled": "Waa la damiyay",
       "managedByPlan": "Waxaa maamula qorshahaaga koodhka",
       "enableKey": "Daar furaha {{provider}}",
       "test": "Tijaabi furaha",

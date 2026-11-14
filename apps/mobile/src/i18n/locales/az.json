@@ -344,8 +344,6 @@
       "rowSubtitle": "Öz provayder ödənişindən istifadə et",
       "manageOnWebReason": "Bu provayderlər strukturlaşdırılmış etimadnamələr tələb edir.",
       "description": "Bu açarlarla göndərilən sorğuların haqqı Kilo balansından deyil, provayder hesabından tutulur.",
-      "enabled": "İstifadədədir",
-      "disabled": "Söndürülüb",
       "managedByPlan": "Kodlaşdırma planın tərəfindən idarə olunur",
       "enableKey": "{{provider}} açarını aktivləşdir",
       "test": "Açarı yoxla",

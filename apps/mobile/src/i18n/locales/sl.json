@@ -344,8 +344,6 @@
       "rowSubtitle": "Uporabi lastno obračunavanje pri ponudniku",
       "manageOnWebReason": "Ti ponudniki potrebujejo strukturirane poverilnice.",
       "description": "Zahteve prek teh ključev se zaračunajo tvojemu računu pri ponudniku namesto stanju v Kilo.",
-      "enabled": "V uporabi",
-      "disabled": "Izklopljeno",
       "managedByPlan": "Upravlja ga tvoj paket za kodiranje",
       "enableKey": "Omogoči ključ za {{provider}}",
       "test": "Preizkusi ključ",

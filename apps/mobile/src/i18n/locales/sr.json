@@ -344,8 +344,6 @@
       "rowSubtitle": "Koristi naplatu preko svog provajdera",
       "manageOnWebReason": "Ovim provajderima su potrebni strukturirani akreditivi.",
       "description": "Zahtevi poslati preko ovih ključeva naplaćuju se na tvom nalogu kod provajdera umesto sa tvog Kilo salda.",
-      "enabled": "U upotrebi",
-      "disabled": "Isključeno",
       "managedByPlan": "Upravlja se kroz tvoj plan za kodiranje",
       "enableKey": "Omogući ključ za {{provider}}",
       "test": "Testiraj ključ",

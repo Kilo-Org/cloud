@@ -344,8 +344,6 @@
       "rowSubtitle": "使用你自己的提供商计费",
       "manageOnWebReason": "这些提供商需要结构化凭据。",
       "description": "通过这些密钥发出的请求将计入你的提供商账户，而不是从 Kilo 余额中扣除。",
-      "enabled": "使用中",
-      "disabled": "已关闭",
       "managedByPlan": "由你的编程套餐管理",
       "enableKey": "启用 {{provider}} 密钥",
       "test": "测试密钥",

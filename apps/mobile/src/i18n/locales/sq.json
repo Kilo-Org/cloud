@@ -344,8 +344,6 @@
       "rowSubtitle": "Përdor faturimin e ofruesit tënd",
       "manageOnWebReason": "Këta ofrues kërkojnë kredenciale të strukturuara.",
       "description": "Kërkesat përmes këtyre çelësave faturohen në llogarinë tënde te ofruesi, në vend të gjendjes tënde në Kilo.",
-      "enabled": "Në përdorim",
-      "disabled": "I çaktivizuar",
       "managedByPlan": "Menaxhohet nga plani yt i kodimit",
       "enableKey": "Aktivizo çelësin e {{provider}}",
       "test": "Testo çelësin",

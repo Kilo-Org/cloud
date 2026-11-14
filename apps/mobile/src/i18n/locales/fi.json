@@ -344,8 +344,6 @@
       "rowSubtitle": "Käytä palveluntarjoajasi omaa laskutusta",
       "manageOnWebReason": "Nämä palveluntarjoajat tarvitsevat jäsennellyt tunnistetiedot.",
       "description": "Näiden avainten kautta tehdyt pyynnöt laskutetaan palveluntarjoajasi tililtä Kilo-saldon sijaan.",
-      "enabled": "Käytössä",
-      "disabled": "Pois käytöstä",
       "managedByPlan": "Hallitaan koodaustilauksesi kautta",
       "enableKey": "Ota palvelun {{provider}} avain käyttöön",
       "test": "Testaa avain",

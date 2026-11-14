@@ -344,8 +344,6 @@
       "rowSubtitle": "Gunakan pengebilan pembekal anda sendiri",
       "manageOnWebReason": "Pembekal ini memerlukan kelayakan berstruktur.",
       "description": "Permintaan melalui kunci ini dibilkan kepada akaun pembekal anda dan bukannya baki Kilo anda.",
-      "enabled": "Sedang digunakan",
-      "disabled": "Dimatikan",
       "managedByPlan": "Diurus oleh pelan pengekodan anda",
       "enableKey": "Dayakan kunci {{provider}}",
       "test": "Uji kunci",

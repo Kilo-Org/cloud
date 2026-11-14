@@ -344,8 +344,6 @@
       "rowSubtitle": "Sèvi ak pwòp faktirasyon founisè w",
       "manageOnWebReason": "Founisè sa yo bezwen idantifyan ki estriktire.",
       "description": "Demann ki pase nan kle sa yo ap faktire sou kont founisè w la olye de balans Kilo w la.",
-      "enabled": "Ap itilize",
-      "disabled": "Dezaktive",
       "managedByPlan": "Plan kodaj ou a jere l",
       "enableKey": "Aktive kle {{provider}} an",
       "test": "Teste kle",

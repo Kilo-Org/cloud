@@ -344,8 +344,6 @@
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
       "manageOnWebReason": "Kailangan ng mga provider na ito ng mga structured na credential.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
-      "enabled": "Ginagamit",
-      "disabled": "Naka-off",
       "managedByPlan": "Pinamamahalaan ng iyong coding plan",
       "enableKey": "I-enable ang key ng {{provider}}",
       "test": "Subukan ang key",

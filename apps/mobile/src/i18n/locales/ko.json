@@ -344,8 +344,6 @@
       "rowSubtitle": "내 제공업체 결제 사용",
       "manageOnWebReason": "이 제공업체에는 구조화된 자격 증명이 필요합니다.",
       "description": "이 키를 통한 요청은 Kilo 잔액 대신 제공업체 계정으로 청구됩니다.",
-      "enabled": "사용 중",
-      "disabled": "꺼짐",
       "managedByPlan": "코딩 플랜에서 관리됨",
       "enableKey": "{{provider}} 키 사용",
       "test": "키 테스트",

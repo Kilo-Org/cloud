@@ -344,8 +344,6 @@
       "rowSubtitle": "Gebruik jou eie verskaffer se fakturering",
       "manageOnWebReason": "Hierdie verskaffers benodig gestruktureerde geloofsbriewe.",
       "description": "Versoeke via hierdie sleutels word aan jou verskafferrekening gefaktureer in plaas van van jou Kilo-saldo afgetrek.",
-      "enabled": "In gebruik",
-      "disabled": "Afgeskakel",
       "managedByPlan": "Bestuur deur jou koderingsplan",
       "enableKey": "Aktiveer die {{provider}}-sleutel",
       "test": "Toets sleutel",

@@ -344,8 +344,6 @@
       "rowSubtitle": "Izmanto sava nodrošinātāja norēķinus",
       "manageOnWebReason": "Šiem nodrošinātājiem nepieciešami strukturēti akreditācijas dati.",
       "description": "Pieprasījumi, kas veikti ar šīm atslēgām, tiek iekasēti no tava nodrošinātāja konta, nevis no tava Kilo atlikuma.",
-      "enabled": "Tiek izmantota",
-      "disabled": "Izslēgta",
       "managedByPlan": "Pārvalda tavs kodēšanas plāns",
       "enableKey": "Iespējot {{provider}} atslēgu",
       "test": "Pārbaudīt atslēgu",

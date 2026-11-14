@@ -154,13 +154,16 @@ afterEach(() => {
 });
 
 describe('ProviderKeysScreen', () => {
-  it('shows each key with its provider name and whether it is in use', async () => {
+  it('shows a user key as its provider name with the switch carrying the state', async () => {
     const root = await mount();
 
     const texts = root
       .findAll(node => Object.is(node.type, 'Text'))
       .map(node => node.props.children);
-    expect(texts).toEqual(expect.arrayContaining(['Anthropic', 'In use']));
+    expect(texts).toContain('Anthropic');
+    expect(texts).not.toContain('In use');
+    expect(texts).not.toContain('Turned off');
+    expect(switchFor(root, 'Anthropic').props.value).toBe(true);
   });
 
   it('sends the new value when a key is switched off', async () => {

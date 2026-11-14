@@ -344,8 +344,6 @@
       "rowSubtitle": "Tumia malipo ya mtoa huduma wako",
       "manageOnWebReason": "Watoa huduma hawa wanahitaji vitambulisho vilivyopangwa.",
       "description": "Maombi yanayopitia funguo hizi yanatozwa kwenye akaunti yako ya mtoa huduma badala ya salio lako la Kilo.",
-      "enabled": "Inatumika",
-      "disabled": "Imezimwa",
       "managedByPlan": "Inasimamiwa na mpango wako wa uandishi wa msimbo",
       "enableKey": "Washa ufunguo wa {{provider}}",
       "test": "Jaribu ufunguo",

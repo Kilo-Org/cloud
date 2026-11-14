@@ -344,8 +344,6 @@
       "rowSubtitle": "Use o faturamento do seu próprio provedor",
       "manageOnWebReason": "Esses provedores precisam de credenciais estruturadas.",
       "description": "As solicitações feitas com essas chaves são cobradas na sua conta do provedor, e não no seu saldo Kilo.",
-      "enabled": "Em uso",
-      "disabled": "Desativada",
       "managedByPlan": "Gerenciada pelo seu plano de programação",
       "enableKey": "Ativar a chave do {{provider}}",
       "test": "Testar chave",

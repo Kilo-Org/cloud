@@ -344,8 +344,6 @@
       "rowSubtitle": "Whakamahia te pire o tō ake kaiwhakarato",
       "manageOnWebReason": "E hiahia ana ēnei kaiwhakarato ki ngā tohu tuakiri whai hanganga.",
       "description": "Ko ngā tono mā ēnei kī ka pirehia ki tō pūkete kaiwhakarato, kaua ki tō toenga Kilo.",
-      "enabled": "E whakamahia ana",
-      "disabled": "Kua whakawetohia",
       "managedByPlan": "Kei tō mahere waehere e whakahaere",
       "enableKey": "Whakahohea te kī {{provider}}",
       "test": "Whakamātauhia te kī",

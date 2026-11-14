@@ -344,8 +344,6 @@
       "rowSubtitle": "Folosește facturarea propriului furnizor",
       "manageOnWebReason": "Acești furnizori necesită date de autentificare structurate.",
       "description": "Solicitările făcute cu aceste chei sunt facturate în contul tău de furnizor, nu din soldul Kilo.",
-      "enabled": "În uz",
-      "disabled": "Dezactivată",
       "managedByPlan": "Gestionată de planul tău de coding",
       "enableKey": "Activează cheia {{provider}}",
       "test": "Testează cheia",

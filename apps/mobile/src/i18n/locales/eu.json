@@ -344,8 +344,6 @@
       "rowSubtitle": "Erabili zure hornitzailearen fakturazioa",
       "manageOnWebReason": "Hornitzaile hauek egiturazko kredentzialak behar dituzte.",
       "description": "Gako hauen bidezko eskaerak zure hornitzaile-kontuan fakturatzen dira, ez zure Kilo saldoan.",
-      "enabled": "Erabiltzen",
-      "disabled": "Desaktibatuta",
       "managedByPlan": "Zure kodetze-planak kudeatzen du",
       "enableKey": "Gaitu {{provider}} gakoa",
       "test": "Probatu gakoa",

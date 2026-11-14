@@ -7,6 +7,7 @@ import {
   LOGIN_EMAIL_DRAFT_KEY,
   LOGIN_SSO_RECOVERY_DRAFT_KEY,
 } from '@/lib/storage-keys';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 export type SsoRecoveryDraft = { email: string; ssoOrganizationId: string | undefined };
 
@@ -55,8 +56,11 @@ let legacyCleaned = false;
 let restored = false;
 let edited = false;
 
-/** How many times a retirement write is tried before the completion fails. */
+/** How many times a retirement write is tried before it is reported. */
 const RETIREMENT_ATTEMPTS = 2;
+
+/** A retirement this process still owes the keychain, retried at the next safe point. */
+let retirementPending = false;
 
 /** Write the record on the one chain, so a persist can never land after a retirement. */
 function writeRecord(record: StoredLoginDraft): Promise<void> {
@@ -181,6 +185,11 @@ export async function restoreLoginDrafts(): Promise<{
   await deleteLegacyDrafts();
   restored = true;
   if (phase.kind === 'retired') {
+    /* The screen about to draw is signed out, which is the last safe point for
+       a retirement this process still owes. Fire it after answering. */
+    if (retirementPending) {
+      void retireLoginAttempt();
+    }
     return { email: '', ssoRecovery: null };
   }
   const held = await readRecord();
@@ -213,18 +222,50 @@ async function writeRetirement(attemptsLeft: number): Promise<void> {
 }
 
 /**
- * Retire the attempt after a successful sign-in: memory first, then the
- * tombstone.
+ * Report a retirement that could not be written. The tags follow the app's
+ * subsystem pattern and name the operation only: neither the record key nor its
+ * contents — an address, a recovery banner — is attached.
+ */
+function reportRetirementFailure(error: unknown): void {
+  captureTelemetry({
+    error,
+    level: 'warning',
+    tags: { 'error.subsystem': 'login_draft', 'error.operation': 'retire' },
+    fingerprint: ['login-draft-retirement', 'write'],
+  });
+}
+
+/**
+ * Retire the attempt after a successful sign-in.
  *
  * Retirement is a required part of completing the sign-in, not a cleanup: a
  * record left `held` on disk is restored by the next cold start, which is the
- * bug this lives for. So the write is retried, and one that still fails
- * rejects, so the completion can be retried instead of quietly leaving the old
- * copy restorable. Memory stays retired meanwhile.
+ * bug this lives for. Memory retires first, so this process never shows the
+ * attempt again whatever the keychain does; the write is retried, and a failure
+ * is reported and kept as an obligation instead of failing the caller.
+ *
+ * A signed-in session is not undone by a keychain write, so this never rejects.
+ * The sign-out path runs it again, still inside its auth-transition queue and
+ * before the signed-out login screen can restore a draft, so the held record is
+ * usually gone before anyone could see it.
  */
-export async function endLoginAttempt(): Promise<void> {
+export async function retireLoginAttempt(): Promise<void> {
+  /* Memory retirement never waits on the keychain: whatever the write does, the
+     signed-out screen must not see the attempt this sign-in ended. */
   phase = { kind: 'retired' };
-  await writeRetirement(RETIREMENT_ATTEMPTS);
+  try {
+    /* Nothing to retire costs no write: a sign-out on a device that never held a
+       draft must not touch the keychain. A record that cannot be read answers
+       "nothing known", because a locked keychain would fail the write too. */
+    if (!retirementPending && (await readRecord()) === null) {
+      return;
+    }
+    await writeRetirement(RETIREMENT_ATTEMPTS);
+    retirementPending = false;
+  } catch (error) {
+    retirementPending = true;
+    reportRetirementFailure(error);
+  }
 }
 
 // ── Test-only helpers ───────────────────────────────────────────────────────
@@ -235,4 +276,5 @@ export function _resetLoginDraftForTests(): void {
   legacyCleaned = false;
   restored = false;
   edited = false;
+  retirementPending = false;
 }

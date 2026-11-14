@@ -873,6 +873,85 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('completes the sign-in when the draft retirement cannot be written, and retires it on sign-out', async () => {
+    const { ctx, getCtx, unmount } = await mountAndGetContext();
+    const drafts = await import('@/lib/login-draft');
+    const recordKey = 'login-draft-record';
+    const stored = new Map<string, string>();
+    let refusesRetirement = true;
+    hoisted.secureStore.getItemAsync.mockImplementation(
+      async (key: string) => stored.get(key) ?? null
+    );
+    hoisted.secureStore.setItemAsync.mockImplementation(async (key: string, value: string) => {
+      if (key === recordKey && refusesRetirement) {
+        throw new Error('keychain unavailable');
+      }
+      stored.set(key, value);
+    });
+
+    drafts.beginLoginEmail('typed@example.com');
+    refusesRetirement = false;
+    await drafts.persistLoginDrafts();
+    // (a) The keychain refuses the tombstone, and the person is signed in anyway.
+    refusesRetirement = true;
+    await act(async () => {
+      await ctx.signIn('signed-in-token');
+    });
+    expect(getCtx().token).toBe('signed-in-token');
+
+    // (b) Sign-out retries the obligation, still before the login screen draws,
+    // and its success retires the record the previous attempt wrote.
+    refusesRetirement = false;
+    await act(async () => {
+      await ctx.signOut();
+    });
+    expect(JSON.parse(stored.get(recordKey) ?? '{}')).toEqual({ version: 2, state: 'retired' });
+    await expect(drafts.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+
+    unmount();
+  });
+
+  it('still signs in when the retirement fails both at sign-in and at sign-out', async () => {
+    const { ctx, getCtx, unmount } = await mountAndGetContext();
+    const drafts = await import('@/lib/login-draft');
+    const recordKey = 'login-draft-record';
+    const stored = new Map<string, string>();
+    let refusesWrites = false;
+    hoisted.secureStore.getItemAsync.mockImplementation(
+      async (key: string) => stored.get(key) ?? null
+    );
+    hoisted.secureStore.setItemAsync.mockImplementation(async (key: string, value: string) => {
+      if (key === recordKey && refusesWrites) {
+        throw new Error('keychain unavailable');
+      }
+      stored.set(key, value);
+    });
+
+    drafts.beginLoginEmail('typed@example.com');
+    await drafts.persistLoginDrafts();
+    refusesWrites = true;
+
+    // (c) Both retirements fail. This process still shows the signed-out screen
+    // with nothing restored, because its own memory is retired; the held record
+    // survives on disk, which is the window the report states.
+    await act(async () => {
+      await ctx.signIn('signed-in-token');
+    });
+    expect(getCtx().token).toBe('signed-in-token');
+    await act(async () => {
+      await ctx.signOut();
+    });
+    // The keychain kept refusing, so the record is still the held copy.
+    expect(JSON.parse(stored.get(recordKey) ?? '{}')).toEqual({
+      version: 2,
+      state: 'held',
+      email: 'typed@example.com',
+    });
+    await expect(drafts.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+
+    unmount();
+  });
+
   it('unregisters the prior account activity tokens on sign-in (account switch)', async () => {
     const { ctx, unmount } = await mountAndGetContext();
 

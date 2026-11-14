@@ -1,17 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LOGIN_EMAIL_DRAFT_KEY, LOGIN_SSO_RECOVERY_DRAFT_KEY } from '@/lib/storage-keys';
+import {
+  LOGIN_DRAFT_RECORD_KEY,
+  LOGIN_EMAIL_DRAFT_KEY,
+  LOGIN_SSO_RECOVERY_DRAFT_KEY,
+} from '@/lib/storage-keys';
 
 import type * as LoginDraftModule from './login-draft';
+
+import { type TelemetryEvent, setTelemetrySink } from '@/lib/telemetry/error-sink';
 
 import {
   _resetLoginDraftForTests,
   beginLoginEmail,
-  endLoginAttempt,
   holdLoginEmail,
   holdSsoRecovery,
   persistLoginDrafts,
   restoreLoginDrafts,
+  retireLoginAttempt,
 } from './login-draft';
 
 /**
@@ -67,7 +73,7 @@ describe('a sign-in attempt', () => {
     stored.failingWrites = 1;
     await expect(persistLoginDrafts()).rejects.toThrow('keychain unavailable');
 
-    await endLoginAttempt();
+    await retireLoginAttempt();
 
     const reloaded = await reload();
     await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
@@ -80,22 +86,10 @@ describe('a sign-in attempt', () => {
     await persistLoginDrafts();
     stored.failingWrites = 1;
 
-    await endLoginAttempt();
+    await retireLoginAttempt();
 
     const reloaded = await reload();
     await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
-  });
-
-  it('rejects a completion whose retirement cannot be written at all', async () => {
-    beginLoginEmail('a@b.c');
-    await persistLoginDrafts();
-    stored.failingWrites = 99;
-
-    // The retirement is part of completing the sign-in, so its failure is not
-    // swallowed: the completion can be retried.
-    await expect(endLoginAttempt()).rejects.toThrow('keychain unavailable');
-    // This process still has no attempt to restore, whatever the keychain did.
-    await expect(restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
   });
 
   it('does not overwrite a saved draft from a mount that unmounts before restoration', async () => {
@@ -137,7 +131,7 @@ describe('a sign-in attempt', () => {
   it('does not reopen a retired attempt from a passive mount', async () => {
     beginLoginEmail('a@b.c');
     await persistLoginDrafts();
-    await endLoginAttempt();
+    await retireLoginAttempt();
 
     // The login screen seeds what it restored, and its banner effect clears a
     // banner on every mount: neither is a person typing an address.
@@ -188,7 +182,7 @@ describe('a sign-in attempt', () => {
   });
 
   it('holds a followed invite as the address of a new attempt', async () => {
-    await endLoginAttempt();
+    await retireLoginAttempt();
 
     holdSsoRecovery({ email: 'invited@b.c', ssoOrganizationId: 'org-1' });
 
@@ -196,5 +190,32 @@ describe('a sign-in attempt', () => {
       email: 'invited@b.c',
       ssoRecovery: { email: 'invited@b.c', ssoOrganizationId: 'org-1' },
     });
+  });
+
+  it('reports a retirement it cannot write, without rejecting or naming the address', async () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    beginLoginEmail('typed@b.c');
+    await persistLoginDrafts();
+    stored.failingWrites = 99;
+
+    // The caller has already signed the person in; a keychain write may not undo it.
+    await expect(retireLoginAttempt()).resolves.toBeUndefined();
+
+    expect(events.map(event => event.tags)).toContainEqual({
+      'error.subsystem': 'login_draft',
+      'error.operation': 'retire',
+    });
+    expect(events.map(event => event.fingerprint)).toContainEqual([
+      'login-draft-retirement',
+      'write',
+    ]);
+    expect(JSON.stringify(events)).not.toContain('typed@b.c');
+    // The held copy is still the one the next start would read, and memory is retired.
+    expect(stored.values.get(LOGIN_DRAFT_RECORD_KEY) ?? '').toContain('typed@b.c');
+    await expect(restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+    setTelemetrySink(null);
   });
 });

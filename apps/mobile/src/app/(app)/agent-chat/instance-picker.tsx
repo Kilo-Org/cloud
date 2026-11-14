@@ -21,6 +21,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
   type InstancePickerListItem,
@@ -215,7 +216,7 @@ export default function InstancePickerScreen() {
               </Text>
             ) : null}
           </View>
-          {selected ? <Check size={18} color={colors.primary} /> : null}
+          {selected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
         </Pressable>
       );
     },
@@ -329,7 +330,9 @@ export default function InstancePickerScreen() {
                 {t('agentChat.instancePicker.cloudAgentDescription')}
               </Text>
             </View>
-            {cloudAgentSelected ? <Check size={18} color={colors.primary} /> : null}
+            {cloudAgentSelected ? (
+              <Check size={18} color={selectionCheckColor(colors)} />
+            ) : null}
           </Pressable>
         }
         ListEmptyComponent={

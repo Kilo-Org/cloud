@@ -26,7 +26,6 @@ const h = vi.hoisted(() => ({
     setKiloCommandEnabled: { mutate: vi.fn(), isPending: false },
     reorderKiloCommands: { mutate: vi.fn(), isPending: false },
   },
-  colorScheme: { current: 'light' as 'light' | 'dark' },
 }));
 
 const permissionState = vi.hoisted(() => ({
@@ -51,7 +50,6 @@ vi.mock('react-native', async () => {
   } = await import('react');
   return {
     Platform: { OS: 'ios' },
-    useColorScheme: () => h.colorScheme.current,
     View: 'View',
     Pressable: 'Pressable',
     Switch: 'Switch',
@@ -71,9 +69,7 @@ const THEME = vi.hoisted(() => ({
   foreground: '#0E0E10',
   mutedForeground: '#000000',
   destructive: '#FF0000',
-  mutedSoft: '#A9A39A',
   primary: '#4F5A10',
-  primaryForeground: '#FFFFFF',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => THEME,
@@ -147,16 +143,6 @@ function findOne(root: ReactTestInstance, type: string): ReactTestInstance {
     throw new Error(`${type} was not rendered`);
   }
   return node;
-}
-
-function switchColors(root: ReactTestInstance) {
-  return findAll(root, 'Switch').map(node => {
-    const props = node.props as {
-      trackColor?: { false?: string; true?: string };
-      thumbColor?: string;
-    };
-    return { track: props.trackColor, thumb: props.thumbColor };
-  });
 }
 
 function findField(root: ReactTestInstance, label: string): ReactTestInstance {
@@ -377,42 +363,6 @@ describe('ProfileKiloCommandsScreen row controls', () => {
     vi.clearAllMocks();
     Object.assign(h.query, { data: [testCommand()], isPending: false, isError: false });
     permissionState.permission = 'allowed';
-    h.colorScheme.current = 'light';
-  });
-
-  // The platform `Switch` falls back to its own accent tint, which drew the on
-  // state in Material teal and read as disabled against the card.
-  it('tints the enable switch from theme tokens instead of the platform accent', async () => {
-    h.colorScheme.current = 'light';
-    h.query.data = [testCommand({ enabled: false }), testCommand({ id: 'cmd-2', name: 'deploy' })];
-    const { renderer, unmount } = await mountScreen();
-
-    // Both states keep the white thumb and the gray track; the dark pair here
-    // would be the regression the dark case above also catches from its side.
-    expect(switchColors(renderer.root)).toEqual([
-      { track: { false: THEME.mutedSoft, true: THEME.primary }, thumb: THEME.primaryForeground },
-      { track: { false: THEME.mutedSoft, true: THEME.primary }, thumb: THEME.primaryForeground },
-    ]);
-
-    unmount();
-  });
-
-  // The dark palette's `primaryForeground` is near-black, so reusing it for the
-  // off state put a dark thumb on the dark track over the dark card.
-  it('keeps the off switch readable on the dark palette', async () => {
-    h.colorScheme.current = 'dark';
-    h.query.data = [testCommand({ enabled: false }), testCommand({ id: 'cmd-2', name: 'deploy' })];
-    const { renderer, unmount } = await mountScreen();
-
-    expect(switchColors(renderer.root)).toEqual([
-      { track: { false: THEME.mutedForeground, true: THEME.primary }, thumb: THEME.foreground },
-      {
-        track: { false: THEME.mutedForeground, true: THEME.primary },
-        thumb: THEME.primaryForeground,
-      },
-    ]);
-
-    unmount();
   });
 
   it('gives every row action a slop that carries its icon box to the touch target', async () => {

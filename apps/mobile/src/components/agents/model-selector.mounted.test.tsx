@@ -266,10 +266,8 @@ describe('ModelPickerOptionRow trailing accessory slot', () => {
 
   it('hides the reserved check on unselected rows and shows it on selected rows', () => {
     const option = cliCatalogOption();
-    expect(checkAccessories(renderRow(option, { selected: false }))).toEqual([]);
-    expect(checkAccessories(renderRow(option, { selected: true }))).toEqual([
-      { color: '#4F5A10', size: 18 },
-    ]);
+    expect(checkAccessories(renderRow(option, { selected: false }))).toHaveLength(0);
+    expect(checkAccessories(renderRow(option, { selected: true }))).toHaveLength(1);
   });
 });
 

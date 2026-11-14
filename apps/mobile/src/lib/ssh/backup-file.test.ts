@@ -93,38 +93,50 @@ it('distinguishes retryable wrong passphrases from invalid exports without expos
   expect(sshBackupFailure(new Error('private details'))).toBe('unavailable');
 });
 
-it('rejects an oversized backup without reading its contents', async () => {
-  const text = vi.fn<() => Promise<string>>();
-  const open = vi.fn();
-  const file = { size: MAX_SSH_BACKUP_BYTES + 1, text, open } as unknown as File;
+function pickedFile(size: number, readBytes: (length: number) => Promise<Uint8Array>) {
+  const close = vi.fn();
+  const file = {
+    size,
+    text: vi.fn<() => Promise<string>>(),
+    open: () => ({ readBytes, close }),
+  } as unknown as File;
+  return { close, file };
+}
+
+it('rejects a backup the picker reports as oversized without reading it', async () => {
+  const readBytes = vi.fn<(length: number) => Promise<Uint8Array>>();
+  const { file } = pickedFile(MAX_SSH_BACKUP_BYTES + 1, readBytes);
   await expect(readSshBackupFile(file, MAX_SSH_BACKUP_BYTES + 1)).rejects.toThrow(
     `${MAX_SSH_BACKUP_BYTES}`
   );
-  await expect(readSshBackupFile(file)).rejects.toThrow(`${MAX_SSH_BACKUP_BYTES}`);
-  expect(text).not.toHaveBeenCalled();
-  expect(open).not.toHaveBeenCalled();
+  expect(readBytes).not.toHaveBeenCalled();
 });
 
-it('reads a backup at the size limit', async () => {
-  const text = vi.fn<() => Promise<string>>().mockResolvedValue('age-armored');
-  const file = { size: MAX_SSH_BACKUP_BYTES, text, open: vi.fn() } as unknown as File;
-  await expect(readSshBackupFile(file)).resolves.toBe('age-armored');
-  expect(text).toHaveBeenCalledOnce();
-});
-
-it('reads only the limit plus one byte when no size is known', async () => {
+it('rejects content over the limit when the picker reports a size of zero', async () => {
   const readBytes = vi
     .fn<(length: number) => Promise<Uint8Array>>()
-    .mockResolvedValue(new Uint8Array([65]));
-  const close = vi.fn();
-  const text = vi.fn<() => Promise<string>>();
-  const file = {
-    size: 0,
-    text,
-    open: () => ({ readBytes, close }),
-  } as unknown as File;
-  await expect(readSshBackupFile(file, undefined)).resolves.toBe('A');
+    .mockResolvedValue(new Uint8Array(MAX_SSH_BACKUP_BYTES + 1));
+  const { file } = pickedFile(0, readBytes);
+  await expect(readSshBackupFile(file, 0)).rejects.toThrow(`${MAX_SSH_BACKUP_BYTES}`);
+  expect(readBytes).toHaveBeenCalledWith(MAX_SSH_BACKUP_BYTES + 1);
+});
+
+it('rejects content over the limit when the reported size is understated', async () => {
+  const readBytes = vi
+    .fn<(length: number) => Promise<Uint8Array>>()
+    .mockResolvedValue(new Uint8Array(MAX_SSH_BACKUP_BYTES + 1));
+  const { file } = pickedFile(12, readBytes);
+  await expect(readSshBackupFile(file, 12)).rejects.toThrow(`${MAX_SSH_BACKUP_BYTES}`);
+  expect(readBytes).toHaveBeenCalledWith(MAX_SSH_BACKUP_BYTES + 1);
+});
+
+it('reads a backup within the limit through one bounded read', async () => {
+  const armored = 'age-armored';
+  const readBytes = vi
+    .fn<(length: number) => Promise<Uint8Array>>()
+    .mockResolvedValue(new TextEncoder().encode(armored));
+  const { close, file } = pickedFile(armored.length, readBytes);
+  await expect(readSshBackupFile(file, armored.length)).resolves.toBe(armored);
   expect(readBytes).toHaveBeenCalledWith(MAX_SSH_BACKUP_BYTES + 1);
   expect(close).toHaveBeenCalledOnce();
-  expect(text).not.toHaveBeenCalled();
 });

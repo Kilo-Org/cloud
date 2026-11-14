@@ -281,6 +281,38 @@ describe('the remote MCP server form', () => {
     expectSavedBearer('rotated');
   });
 
+  it('shows and saves the typed token after the sign-in method is switched away and back', async () => {
+    /* Choosing another method unmounts the token field; choosing Bearer again
+       mounts a new one. What it shows then is the value the save sends — a form
+       that shows the saved token and sends the typed one saves a credential the
+       person cannot see. */
+    await mount({ server: savedBearer, onSave });
+
+    await type(2, 'rotated');
+    await choose('oauth');
+    await choose('bearer');
+
+    expect(mountedTokenValues).toEqual(['secret', 'rotated']);
+    expect(fields()[2]?.defaultValue).toBe('rotated');
+    expect(saveButton().disabled).toBe(false);
+
+    await pressSave();
+    expectSavedBearer('rotated');
+  });
+
+  it('does not remount the token field while the person types', async () => {
+    await mount({ server: savedBearer, onSave });
+
+    await type(2, 'a');
+    await type(2, 'ab');
+    await type(2, 'abc');
+
+    // The field is uncontrolled and already shows what was typed; remounting it
+    // on a keystroke would drop the caret and the rest of the value.
+    expect(mountedTokenValues).toEqual(['secret']);
+    expect(fields()[2]?.defaultValue).toBe('secret');
+  });
+
   it('does not carry a typed value to another endpoint', async () => {
     await mount({ server: savedBearer, onSave });
 

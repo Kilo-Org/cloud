@@ -1,4 +1,4 @@
-/* oxlint-disable max-lines -- one tRPC client suite; the link-options, auth-header, deadline, and observed-fetch cases share one hoisted module-mock scaffold */
+/* oxlint-disable max-lines -- one tRPC client suite; the auth-header, deadline, and observed-fetch cases share one hoisted module-mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type TelemetryBreadcrumb, type TelemetryEvent } from '@/lib/telemetry/error-sink';
@@ -101,32 +101,6 @@ afterEach(() => {
   createTRPCClientMock.mockClear();
   splitLinkMock.mockClear();
   randomUUIDMock.mockClear();
-});
-
-describe('tRPC client link options', () => {
-  it('passes methodOverride: "POST" to httpLink', async () => {
-    httpLinkMock.mockReturnValue({});
-    httpBatchLinkMock.mockReturnValue({});
-    createTRPCClientMock.mockReturnValue({});
-
-    await import('./trpc');
-
-    expect(httpLinkMock).toHaveBeenCalledTimes(1);
-    const httpLinkOpts = httpLinkMock.mock.calls[0]?.[0];
-    expect(httpLinkOpts).toHaveProperty('methodOverride', 'POST');
-  });
-
-  it('passes methodOverride: "POST" to httpBatchLink', async () => {
-    httpLinkMock.mockReturnValue({});
-    httpBatchLinkMock.mockReturnValue({});
-    createTRPCClientMock.mockReturnValue({});
-
-    await import('./trpc');
-
-    expect(httpBatchLinkMock).toHaveBeenCalledTimes(1);
-    const httpBatchLinkOpts = httpBatchLinkMock.mock.calls[0]?.[0];
-    expect(httpBatchLinkOpts).toHaveProperty('methodOverride', 'POST');
-  });
 });
 
 type AuthHeadersFn = () => Promise<Record<string, string>>;

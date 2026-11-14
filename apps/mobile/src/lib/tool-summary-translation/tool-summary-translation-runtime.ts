@@ -112,7 +112,7 @@ const CACHE_CAP = 500;
  * One commit's rows mount together, so a short window collects them before the
  * first request goes out. Ten rows mounted in one commit become one batch.
  */
-const BATCH_WINDOW_MS = 40;
+export const BATCH_WINDOW_MS = 40;
 /** One request carries at most this many distinct texts. */
 const MAX_BATCH_TEXTS = 20;
 /** At most this many requests are in flight; the rest wait in the queue. */

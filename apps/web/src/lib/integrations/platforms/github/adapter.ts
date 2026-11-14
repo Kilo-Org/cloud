@@ -424,9 +424,7 @@ export async function hasPRCommentWithMarker(
 
   const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
 
-  const found = comments.some(
-    c => c.body?.includes(marker) && String(c.performed_via_github_app?.id ?? '') === appId
-  );
+  const found = comments.some(c => c.body?.includes(marker) && isAuthoredByApp(c, appId));
 
   logExceptInTest('[hasPRCommentWithMarker] Scanned comments', {
     owner,
@@ -603,6 +601,16 @@ type PRIssueComment = {
   performed_via_github_app?: { id?: number | string } | null;
 };
 
+type GitHubAppAuthorship = { performed_via_github_app?: { id?: number | string | null } | null };
+
+/**
+ * Reports whether the app that owns this credential created the comment.
+ * GitHub returns the app id as a number, so compare the string forms.
+ */
+function isAuthoredByApp(comment: GitHubAppAuthorship, appId: string): boolean {
+  return String(comment.performed_via_github_app?.id ?? '') === appId;
+}
+
 /**
  * Reads pull-request issue comments from both ends of the list within the
  * MAX_KILO_REVIEW_COMMENT_PAGES budget: the first pages and the last pages.
@@ -678,9 +686,7 @@ export async function findKiloReviewComment(
   });
 
   const markedComments = comments.filter(
-    c =>
-      c.body?.includes('<!-- kilo-review -->') &&
-      String(c.performed_via_github_app?.id ?? '') === appId
+    c => c.body?.includes('<!-- kilo-review -->') && isAuthoredByApp(c, appId)
   );
 
   if (markedComments.length > 0) {
@@ -749,8 +755,8 @@ type ReviewCommentExtras = {
 /**
  * Used to detect duplicates and track outdated inline comments.
  *
- * `authoredByKilo` reports whether this app identity created the comment, following the same
- * `performed_via_github_app.id` ownership test `findKiloReviewComment` applies to summaries.
+ * `authoredByKilo` reports whether this app identity created the comment, through the same
+ * `isAuthoredByApp` predicate the summary readers use.
  */
 export async function fetchPRInlineComments(
   installationId: string,
@@ -771,7 +777,7 @@ export async function fetchPRInlineComments(
 > {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
-  const kiloAppId = String(getGitHubAppCredentials(appType).appId);
+  const appId = String(getGitHubAppCredentials(appType).appId);
 
   const comments: Array<{
     id: number;
@@ -810,7 +816,7 @@ export async function fetchPRInlineComments(
         line: c.line ?? null,
         body,
         isOutdated: c.position == null,
-        authoredByKilo: String(c.performed_via_github_app?.id ?? '') === kiloAppId,
+        authoredByKilo: isAuthoredByApp(c, appId),
         user: { login: c.user?.login ?? 'unknown' },
       });
 
@@ -1590,9 +1596,8 @@ export async function fetchBatchedReviewDecisions(args: {
     }
     return result;
   } catch (error) {
-    if (isGitHubRateLimitError(error)) {
-      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
-    }
+    const rateLimitError = toGitHubRateLimitError(error);
+    if (rateLimitError) throw rateLimitError;
     throw error;
   }
 }

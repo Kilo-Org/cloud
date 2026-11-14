@@ -4,7 +4,7 @@ import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 export type ScopeOrganization = { organizationId: string; organizationName: string };
 
 /** The labels a missing scope name falls back to. */
-export type ScopeTitleLabels = { personal: string; organization: string };
+type ScopeTitleLabels = { personal: string; organization: string };
 
 /**
  * The name the membership list carries for a scope, or undefined when it names

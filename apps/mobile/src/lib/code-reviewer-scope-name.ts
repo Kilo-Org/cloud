@@ -22,7 +22,7 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
  * account boundary clears both the map and the mirror.
  */
 
-export type ScopeNameEntry = {
+type ScopeNameEntry = {
   organizationId: string;
   organizationName: string;
   /** When this name was last seen; older entries carry an older stamp. */

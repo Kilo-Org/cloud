@@ -3,6 +3,7 @@
 // a restart, and never hand one account's names to another.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 import { ACTIVE_USER_ID_KEY, REVIEWER_SCOPE_NAMES_KEY } from '@/lib/storage-keys';
 
@@ -43,6 +44,45 @@ function persistedRecord(entries: readonly { organizationId: string; organizatio
     userId: 'u1',
     entries: entries.map((entry, index) => ({ ...entry, seenAt: 1_700_000_000_000 - index })),
   });
+}
+
+/**
+ * The mirrored record read back through a schema rather than a cast: a test
+ * that inspects device data fails on a shape change with a message instead of
+ * reading an undefined entry.
+ */
+const mirroredRecordSchema = z.object({
+  version: z.literal(1),
+  userId: z.string().min(1),
+  entries: z.array(
+    z.object({
+      organizationId: z.string().min(1),
+      organizationName: z.string().min(1),
+      seenAt: z.number(),
+    })
+  ),
+});
+
+type MirroredRecord = z.infer<typeof mirroredRecordSchema>;
+
+function mirroredRecord(): MirroredRecord {
+  const raw = store.get(REVIEWER_SCOPE_NAMES_KEY);
+  if (raw === undefined) {
+    throw new Error('the record was not mirrored');
+  }
+  const parsed = mirroredRecordSchema.safeParse(JSON.parse(raw));
+  if (!parsed.success) {
+    throw new Error(`the mirrored record does not match: ${parsed.error.message}`);
+  }
+  return parsed.data;
+}
+
+function entryAt(record: MirroredRecord, index: number): MirroredRecord['entries'][number] {
+  const entry = record.entries[index];
+  if (entry === undefined) {
+    throw new Error(`the mirrored record has no entry at index ${index}`);
+  }
+  return entry;
 }
 
 beforeEach(() => {
@@ -107,12 +147,10 @@ describe('remembered scope names', () => {
     expect(readScopeName('org-20')).toBe('Organization 20');
 
     await _flushScopeNameWritesForTests();
-    const record = JSON.parse(store.get(REVIEWER_SCOPE_NAMES_KEY) ?? '{}') as {
-      entries: { organizationId: string }[];
-    };
+    const record = mirroredRecord();
     expect(record.entries).toHaveLength(20);
-    expect(record.entries[0].organizationId).toBe('org-20');
-    expect(record.entries[19].organizationId).toBe('org-1');
+    expect(entryAt(record, 0).organizationId).toBe('org-20');
+    expect(entryAt(record, 19).organizationId).toBe('org-1');
   });
 
   it('ignores a record written for another account', async () => {

@@ -64,6 +64,8 @@ export {
   SESSION_INGEST_AUDIENCE,
   AI_ATTRIBUTION_AUDIENCE,
   HTML_DEPLOY_AUDIENCE,
+  PAGES_AUDIENCE,
+  PAGES_DEV_AUDIENCE,
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
@@ -253,6 +255,7 @@ export type {
 export {
   activeOrganizationAccessSql,
   activeOrganizationJoinCondition,
+  hasInheritedOrganizationAccess,
   hasOrganizationAccess,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,

@@ -30,6 +30,7 @@ const groups: ServiceGroup[] = [
   },
   { id: 'notifications', label: 'Notifications', alwaysOn: false },
   { id: 'data-export', label: 'Data Export', alwaysOn: false },
+  { id: 'session-sync', label: 'Session Sync', alwaysOn: false },
   { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, groupDependsOn: ['notifications'] },
   {
     id: 'cloud-agent',
@@ -153,6 +154,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'nextjs',
       'cloudflare-session-ingest',
       'cloudflare-git-token-service',
+      'cloudflare-session-sync',
       'container-usage-meter',
       'notifications',
     ],
@@ -173,6 +175,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'cloud-agent',
     dependsOn: ['postgres'],
     dir: 'services/session-ingest',
+  },
+  'cloudflare-session-sync': {
+    group: 'session-sync',
+    dependsOn: ['postgres'],
+    dir: 'services/session-sync',
   },
   'fake-llm': {
     group: 'cloud-agent',

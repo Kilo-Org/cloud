@@ -32,6 +32,7 @@ import { modelPickerCostLabel } from '@/lib/model-cost';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelPickerSelection, type ModelPickerSelectionScope } from '@/lib/picker-bridge';
 import { modelPickerSlot } from '@/lib/route-registry';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { cn } from '@/lib/utils';
 
 import { modelSelectorBadges } from './model-selector-badges';
@@ -406,7 +407,7 @@ export function ModelPickerOptionRow({
         </Pressable>
         <View className="w-[18px] items-center justify-center">
           {selected ? (
-            <Check size={18} color={option.unavailable ? colors.mutedForeground : colors.primary} />
+            <Check size={18} color={selectionCheckColor(colors, option.unavailable)} />
           ) : null}
         </View>
         <Pressable

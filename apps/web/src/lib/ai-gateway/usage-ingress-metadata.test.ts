@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from '@jest/globals';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import { UsageRecordRequestSchema, type LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {}, readDb: {} }));
 jest.mock('@sentry/nextjs', () => ({
@@ -26,7 +26,7 @@ import { enqueueUsage } from '@kilocode/web-shared/lib/ai-gateway/usage-publishe
 // type) seen at ingress. The rejected production values were never captured.
 
 const send = jest
-  .fn<Promise<void>, [UsageRecordRequest, { contentType: 'json' }]>()
+  .fn<Promise<void>, [LlmUsageQueueMessage, { contentType: 'json' }]>()
   .mockResolvedValue(undefined);
 // Load the actual Worker handler without importing its runtime globals into the Next.js typecheck.
 const { handleFetch } = jest.requireActual<{

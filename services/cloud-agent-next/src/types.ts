@@ -3,6 +3,7 @@ import type { EnvironmentBuild } from './environment-build/environment-build-do.
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
+  GitHubBrokerRejectionProvenance,
   GitHubRepositoryAuthorizationFailureReason,
   GitHubRepositoryAuthorizationResult,
 } from '@kilocode/worker-utils/github-authorization';
@@ -20,7 +21,10 @@ import type { CallbackJob } from './callbacks/index.js';
 import { AGENT_SANDBOX_PROVIDERS, type AgentSandboxProvider } from './shared/sandbox-provider.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
-import type { ContainerUsageRpcMethods } from '@kilocode/container-usage';
+import type {
+  ContainerBillingStatusRpcMethods,
+  ContainerUsageRpcMethods,
+} from '@kilocode/container-usage';
 import type { SecretBinding } from './auth.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
@@ -258,6 +262,7 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
+      rejectionProvenance?: GitHubBrokerRejectionProvenance;
       reason:
         | GitHubRepositoryAuthorizationFailureReason
         | 'capability_configuration_error'
@@ -290,7 +295,7 @@ type RedeemGitHubSessionCapabilityResult =
         | 'integration_mismatch';
     };
 
-type GetGitLabTokenFailureReason =
+export type GetGitLabTokenFailureReason =
   | 'database_not_configured'
   | 'no_integration_found'
   | 'invalid_org_id'
@@ -484,17 +489,17 @@ export type Env = {
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
-  /** Record-only container lifecycle usage meter. */
-  CONTAINER_USAGE_METER: ContainerUsageRpcMethods;
+  SESSION_SYNC?: Fetcher;
+  CONTAINER_USAGE_METER: ContainerUsageRpcMethods & ContainerBillingStatusRpcMethods;
   /** Shared secret for internal service-to-service authentication */
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
-  /** Optional until a downloaded target provisions its private artifact bucket. */
+  /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;
   NATIVE_RUNTIME_IMAGE?: string;
-  /** Comma-separated org UUIDs whose interactive web routes use the scoped startup target. */
+  /** Retired rollout setting, retained only to reject stale deployment configuration. */
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
@@ -516,7 +521,7 @@ export type Env = {
   GITHUB_LITE_APP_BOT_USER_ID?: string;
   /** Shared secret for JWT token validation */
   NEXTAUTH_SECRET: SecretBinding;
-  /** Comma-separated list of allowed Origins for /stream WebSocket connections */
+  /** Comma-separated allowed Origins for the /stream and /terminal WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
   /** Backend base URL (used for balance checks before session spin-up) */
   KILOCODE_BACKEND_BASE_URL?: string;

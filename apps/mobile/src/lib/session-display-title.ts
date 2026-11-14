@@ -4,8 +4,8 @@ import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
  * The user-facing title for a session, or undefined when the row carries no
  * name a person wrote.
  *
- * `packages/session-ingest-contracts/src/index.ts` owns the placeholder
- * pattern (`DEFAULT_SESSION_TITLE_PATTERN` / `isDefaultSessionTitle`). The
+ * `packages/session-ingest-contracts/src/session-live-summary.ts` owns the
+ * placeholder pattern (`DEFAULT_SESSION_TITLE_PATTERN` / `isDefaultSessionTitle`). The
  * backend seeds every fresh session with `New session - ${ISO}` —
  * `services/cloud-agent-next/src/session/session-registration.ts` and
  * `services/cloud-agent-next/wrapper/src/session-bootstrap.ts` — and

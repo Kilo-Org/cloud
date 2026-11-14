@@ -160,6 +160,15 @@ const findingsDataSchema = z.object({
 
 const queryKeyMetaSchema = z.object({ input: z.unknown().optional() });
 const organizationScopeInputSchema = z.object({ organizationId: z.string() });
+// The membership answer itself: one row per organization the account joined,
+// and the organizations an owner or billing manager also reaches through each
+// one.
+const organizationsListDataSchema = z.array(
+  z.object({
+    organizationId: z.string().min(1),
+    inheritedChildren: z.array(z.object({ organizationId: z.string().min(1) })).nullish(),
+  })
+);
 
 /** A minimal decoder, so a row schema can be passed without its generics. */
 type RowDecoder<TRow> = {
@@ -181,6 +190,18 @@ type RowDecoder<TRow> = {
 export type SystemSearchCollection = {
   documents: SystemSearchDocument[];
   observedSources: Set<string>;
+  /**
+   * The organizations a settled `organizations.list` read still names, or null
+   * when no such read settled this run. This is the account's own answer about
+   * which scopes it can open, so it is the evidence a source scope that stopped
+   * answering cannot supply: the plan keeps only documents from an organization
+   * this set names, and removes the ones it does not.
+   *
+   * Null is "the list has not settled" — absent from the cache, still loading,
+   * or errored — and then nothing is removed on its strength, because a read
+   * that did not happen proves nothing about the account's memberships.
+   */
+  accessibleOrganizations: Set<string> | null;
   /**
    * The named sessions this run could see, most recently updated first, for the
    * App Intents entity catalog — or null when no sessions read has settled.
@@ -209,9 +230,13 @@ export type SessionCatalogEntry = { id: string; title: string };
 /**
  * A catalog entry with the row's own update time, so the merge across queries
  * can order by recency instead of by the order the cache happened to insert
- * the queries in. The time never leaves this module.
+ * the queries in, and the row's organization, so a scope the account lost can
+ * be left out of the publish. Neither leaves this module.
  */
-type SessionCatalogCandidate = SessionCatalogEntry & { updatedAt: number | null };
+type SessionCatalogCandidate = SessionCatalogEntry & {
+  updatedAt: number | null;
+  organizationId: string | null;
+};
 
 /**
  * How many sessions the catalog keeps. The list is ordered by recency first, so
@@ -250,7 +275,8 @@ export async function collectSystemSearchDocuments(
   const documents: SystemSearchDocument[] = [];
   const sessions: SessionCatalogCandidate[] = [];
   const observedSources = new Set<string>();
-  let sessionsSettled = false;
+  let accessibleOrganizations: Set<string> | null = null;
+  const settledSessionScopes: (string | null)[] = [];
   const collections = collectionsFor(queryClient);
   const seen = new Set<string>();
   for (const query of queryClient.getQueryCache().getAll()) {
@@ -259,7 +285,9 @@ export async function collectSystemSearchDocuments(
     const collected = collectOrReuse(collections, query, queryHash);
     documents.push(...collected.documents);
     sessions.push(...collected.sessions);
-    sessionsSettled = sessionsSettled || collected.sessionsSettled;
+    if (collected.sessionsSettled) {
+      settledSessionScopes.push(sessionListOrganizationId(query.queryKey));
+    }
     // Only a successful query that fully enumerated a source scope is
     // authoritative. A query can hold the family path without enumerating it —
     // the findings capacity probe fetches `limit: 1` under `listFindings`, a
@@ -269,6 +297,19 @@ export async function collectSystemSearchDocuments(
     // source's index entries.
     if (query.state.status === 'success' && collected.observedSource !== null) {
       observedSources.add(collected.observedSource);
+    }
+    // The account's membership list is the only read that speaks for the scopes
+    // themselves rather than for the rows inside them. A settled payload names
+    // every organization the account can open, so a scope it omits is gone
+    // even when that scope's own query never answers again.
+    if (query.state.status === 'success' && queryKeyPath(query.queryKey) === 'organizations.list') {
+      const organizationIds = organizationIdsOfList(query.state.data);
+      if (organizationIds !== null) {
+        accessibleOrganizations ??= new Set<string>();
+        for (const organizationId of organizationIds) {
+          accessibleOrganizations.add(organizationId);
+        }
+      }
     }
   }
   // Drop the queries the cache no longer holds, so a removed-then-re-added
@@ -286,16 +327,46 @@ export async function collectSystemSearchDocuments(
   return {
     documents: dedupeBy(documents, document => document.id),
     observedSources,
+    accessibleOrganizations,
     // A settled read is the only thing that may replace the device's catalog.
     // Building the entries only then keeps the caller from publishing a
-    // half-loaded cache under the account's titles.
-    sessions: sessionsSettled ? catalogEntries(sessions) : null,
+    // half-loaded cache under the account's titles. The read has to belong to a
+    // scope the account can still open as well: a read from any other scope
+    // carries only that scope's rows, so it must not replace titles the run has
+    // not re-read.
+    sessions: settledSessionScopes.some(
+      organizationId =>
+        organizationId === null ||
+        accessibleOrganizations === null ||
+        accessibleOrganizations.has(organizationId)
+    )
+      ? catalogEntries(sessions, accessibleOrganizations)
+      : null,
   };
 }
 
-/** The catalog's entries: one per session id, newest first, capped. */
-function catalogEntries(sessions: readonly SessionCatalogCandidate[]): SessionCatalogEntry[] {
-  return dedupeBy(sortedByRecency(sessions), session => session.id)
+/**
+ * The catalog's entries: one per session id, newest first, capped.
+ *
+ * A session from an organization a settled membership read no longer names
+ * stays out: the catalog replaces the device's stored titles, so publishing it
+ * would put that scope's names back into the picker on the same run that drops
+ * its search entries. A personal session, and every session while no list has
+ * settled, is unaffected.
+ */
+function catalogEntries(
+  sessions: readonly SessionCatalogCandidate[],
+  accessibleOrganizations: ReadonlySet<string> | null
+): SessionCatalogEntry[] {
+  return dedupeBy(
+    sortedByRecency(sessions).filter(
+      session =>
+        session.organizationId === null ||
+        accessibleOrganizations === null ||
+        accessibleOrganizations.has(session.organizationId)
+    ),
+    session => session.id
+  )
     .slice(0, SESSION_CATALOG_MAX_ENTRIES)
     .map(session => ({ id: session.id, title: session.title }));
 }
@@ -441,7 +512,12 @@ function documentsFromQuery(query: Query): QueryDocuments {
     return {
       documents: rows.flatMap(row => presentOrEmpty(storedSessionSearchDocument(row))),
       sessions: namedSessions(
-        rows.map(row => ({ id: row.session_id, title: row.title, updatedAt: row.updated_at }))
+        rows.map(row => ({
+          id: row.session_id,
+          title: row.title,
+          updatedAt: row.updated_at,
+          organizationId: row.organization_id ?? null,
+        }))
       ),
       // A page-less payload is an infinite query the app has built and not
       // fetched, which is the cold-launch state; a narrowed list is one
@@ -467,7 +543,17 @@ function documentsFromQuery(query: Query): QueryDocuments {
     return {
       documents: rows.flatMap(row => presentOrEmpty(activeSessionSearchDocument(row))),
       sessions: namedSessions(
-        rows.map(row => ({ id: row.id, title: row.title, updatedAt: row.updatedAt }))
+        // A live row without an organization attribution stays out of the
+        // picker as well as out of the index, so the picker offers the same
+        // rows the index does.
+        rows
+          .filter(row => row.organizationId !== undefined)
+          .map(row => ({
+            id: row.id,
+            title: row.title,
+            updatedAt: row.updatedAt,
+            organizationId: row.organizationId ?? null,
+          }))
       ),
       sessionsSettled: false,
       observedSource: null,
@@ -568,6 +654,17 @@ function findingsFromQuery(query: Query, scope: string): QueryDocuments {
 function findingsFilters(queryKey: readonly unknown[]): QueryInput | null {
   const filters = queryInputSchema.safeParse(queryKey[2]);
   return filters.success ? filters.data : queryInput(queryKey);
+}
+
+/**
+ * The organization a stored-history query enumerates, or null for the personal
+ * scope and for an input this module cannot read. The catalog's published set
+ * is decided per settled read, so each read has to name the scope it speaks
+ * for.
+ */
+function sessionListOrganizationId(queryKey: readonly unknown[]): string | null {
+  const scope = sessionScopeInputSchema.safeParse(queryInput(queryKey));
+  return scope.success ? (scope.data.organizationId ?? null) : null;
 }
 
 /**
@@ -696,6 +793,27 @@ function organizationScope(queryKey: readonly unknown[]): string | null {
   return input.success ? input.data.organizationId : null;
 }
 
+/**
+ * The organization ids one settled `organizations.list` payload names: the
+ * account's own memberships plus the organizations it reaches through a parent
+ * organization. Null for a payload this module does not recognise, which
+ * observes nothing and so authorises no removal.
+ */
+function organizationIdsOfList(data: unknown): string[] | null {
+  const parsed = organizationsListDataSchema.safeParse(data);
+  if (!parsed.success) {
+    return null;
+  }
+  const organizationIds: string[] = [];
+  for (const entry of parsed.data) {
+    organizationIds.push(entry.organizationId);
+    for (const child of entry.inheritedChildren ?? []) {
+      organizationIds.push(child.organizationId);
+    }
+  }
+  return organizationIds;
+}
+
 /** The query key's input payload as a plain object, or null when it has none. */
 function queryInput(queryKey: readonly unknown[]): QueryInput | null {
   const meta = queryKeyMetaSchema.safeParse(queryKey[1]);
@@ -740,11 +858,25 @@ async function recentPrDocuments(): Promise<{
  * search index offering the same names.
  */
 function namedSessions(
-  rows: readonly { id: string; title: string | null | undefined; updatedAt?: number | null }[]
+  rows: readonly {
+    id: string;
+    title: string | null | undefined;
+    updatedAt?: number | null;
+    organizationId?: string | null;
+  }[]
 ): SessionCatalogCandidate[] {
   return rows.flatMap(row => {
     const title = sessionDisplayTitle(row.title);
-    return title === undefined ? [] : [{ id: row.id, title, updatedAt: row.updatedAt ?? null }];
+    return title === undefined
+      ? []
+      : [
+          {
+            id: row.id,
+            title,
+            updatedAt: row.updatedAt ?? null,
+            organizationId: row.organizationId ?? null,
+          },
+        ];
   });
 }
 

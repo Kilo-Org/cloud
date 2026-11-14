@@ -466,6 +466,40 @@ describe('getUserFromAuth', () => {
     }
   );
 
+  test.each(['bearer', 'bEaReR'])(
+    'authenticates a %s scheme with a valid API token',
+    async scheme => {
+      const user = await insertTestUser({
+        google_user_email: `bearer-scheme-${crypto.randomUUID()}@example.com`,
+        api_token_pepper: 'bearer-scheme-pepper',
+      });
+      mockHeaders.mockResolvedValue(
+        new Headers({ authorization: `${scheme} ${generateApiToken(user)}` })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.user?.id).toBe(user.id);
+    }
+  );
+
+  test('refuses a valid API token with two spaces after the scheme', async () => {
+    const user = await insertTestUser({
+      google_user_email: `bearer-extra-space-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'bearer-extra-space-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ authorization: `Bearer  ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.credentialsRejected).toBe(true);
+  });
+
   test('returns 401 for a token with malformed JSON header', async () => {
     const header = Buffer.from('{').toString('base64url');
     const payload = Buffer.from(JSON.stringify({ kiloUserId: 'malformed-token-user' })).toString(
@@ -1010,6 +1044,20 @@ describe('credential issuance authentication guards', () => {
     expect(result.authorizationRefused).toBe(true);
   });
 
+  test('does not authorize credential issuance when the block timestamp is set', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+    });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+  });
+
   test('leaves generic bearer authentication available', async () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
@@ -1033,6 +1081,20 @@ describe('credential issuance authentication guards', () => {
 
   test('redirects blocked sessions to the blocked account page', async () => {
     const user = await insertTestUser({ blocked_reason: 'blocked for test' });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/account-blocked'
+    );
+    expect(mockRedirect).toHaveBeenCalledWith('/account-blocked');
+  });
+
+  test('redirects a session with a block timestamp to the blocked account page', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+    });
     mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
     mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
 

@@ -5,6 +5,7 @@ import {
   BenchmarkPairSchema,
   PoolEntrySchema,
   poolEntryKey,
+  benchmarkPairKey,
   RoutingTableSchema,
   ProductionTokenProfileSchema,
 } from './routing-table';
@@ -401,7 +402,7 @@ export const RefreshBenchmarkProfilesRequestSchema = z.object({
     .superRefine((entries, ctx) => {
       const seen = new Set<string>();
       entries.forEach((entry, index) => {
-        const key = JSON.stringify([entry.model, entry.variant]);
+        const key = benchmarkPairKey(entry);
         if (seen.has(key)) {
           ctx.addIssue({ code: 'custom', path: [index], message: 'Duplicate benchmark pair.' });
         }

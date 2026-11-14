@@ -31,6 +31,7 @@ import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
   requireAdmissionPayload,
   countAdmissionCondition,
@@ -149,7 +150,7 @@ async function checkExistingProviderAccount(
   if (!user) {
     throw new Error(`Auth provider references missing user ${userId}`);
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
   const eligibility = await checkDomainSignInEligibility(user.google_user_email);
@@ -320,7 +321,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
     }
 
-    if (user.blocked_reason) {
+    if (isBlockedAccount(user)) {
       return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
     }
 
@@ -522,7 +523,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         return settlementFailureResponse(result, args);
       }
 
-      if (result.user.blocked_reason) {
+      if (isBlockedAccount(result.user)) {
         phase = 'release';
         return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
       }
@@ -674,7 +675,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     return settlementFailureResponse(result, args);
   }
 
-  if (result.user.blocked_reason) {
+  if (isBlockedAccount(result.user)) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
 

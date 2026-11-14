@@ -8,10 +8,7 @@ import {
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
 import { cleanupExpiredDeviceRefreshTokens } from '@/lib/auth/device-sessions';
-import {
-  cleanupExpiredPasskeyChallenges,
-  cleanupExpiredPasskeySignInTickets,
-} from '@/lib/auth/passkey';
+import { cleanupExpiredPasskeyRows } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { cleanupExpiredSessionStepUpRows } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
@@ -55,17 +52,16 @@ export async function GET(request: Request) {
     const challengesDeleted = await cleanupExpiredAdmissionChallenges();
     sentryLogger('cron', 'info')(`Cleaned up ${challengesDeleted} expired admission challenges`);
 
-    const passkeyChallengesDeleted = await cleanupExpiredPasskeyChallenges();
+    const passkeyRowsDeleted = await cleanupExpiredPasskeyRows();
     sentryLogger(
       'cron',
       'info'
-    )(`Cleaned up ${passkeyChallengesDeleted} expired passkey challenges`);
+    )(`Cleaned up ${passkeyRowsDeleted.challenges} expired passkey challenges`);
 
-    const passkeySignInTicketsDeleted = await cleanupExpiredPasskeySignInTickets();
     sentryLogger(
       'cron',
       'info'
-    )(`Cleaned up ${passkeySignInTicketsDeleted} expired passkey sign-in tickets`);
+    )(`Cleaned up ${passkeyRowsDeleted.tickets} expired passkey sign-in tickets`);
 
     const accessCodesDeleted = await cleanupExpiredAccessCodes();
     sentryLogger('cron', 'info')(`Cleaned up ${accessCodesDeleted} expired access codes`);
@@ -86,8 +82,8 @@ export async function GET(request: Request) {
         deleted_device_auth_request_count: deletedCount,
         deleted_refresh_token_count: refreshTokensDeleted,
         deleted_admission_challenge_count: challengesDeleted,
-        deleted_passkey_challenge_count: passkeyChallengesDeleted,
-        deleted_passkey_sign_in_ticket_count: passkeySignInTicketsDeleted,
+        deleted_passkey_challenge_count: passkeyRowsDeleted.challenges,
+        deleted_passkey_sign_in_ticket_count: passkeyRowsDeleted.tickets,
         deleted_access_code_count: accessCodesDeleted,
         deleted_install_state_count: installStatesDeleted,
         deleted_step_up_challenge_count: stepUpDeleted.challenges,
@@ -100,8 +96,8 @@ export async function GET(request: Request) {
       deletedCount,
       refreshTokensDeleted,
       challengesDeleted,
-      passkeyChallengesDeleted,
-      passkeySignInTicketsDeleted,
+      passkeyChallengesDeleted: passkeyRowsDeleted.challenges,
+      passkeySignInTicketsDeleted: passkeyRowsDeleted.tickets,
       accessCodesDeleted,
       installStatesDeleted,
       stepUpChallengesDeleted: stepUpDeleted.challenges,

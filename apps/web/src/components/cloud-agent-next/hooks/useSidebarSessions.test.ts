@@ -259,6 +259,7 @@ describe('mergeSidebarFolderSessions', () => {
         kind: 'manual',
         smartPreset: null,
         sortMode: 'manual',
+        manualWorktreeOrder: [],
         worktreeIds: folder.flatMap(session => (session.worktreeId ? [session.worktreeId] : [])),
       },
     ]);
@@ -1805,6 +1806,25 @@ describe('useSidebarSessions live update helpers', () => {
       expect(failed.worktrees.worktree_shared.sessions[0].latest_run_failure_kind).toBe('failed');
     });
 
+    it('adds a created chat to only its owning cached worktree without a refetch', () => {
+      const update = {
+        worktreeId: 'worktree_shared',
+        sessionId: 'ses_created',
+        sessionStatus: 'idle',
+        sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
+        updatedAt: '2026-01-03T12:02:00.000Z',
+      };
+      const patched = patchSidebarWorktreeSessionStatus(initial, update);
+      expect(patched.worktrees.worktree_shared.sessions.map(row => row.sessionId)).toEqual([
+        'ses_hidden',
+        'ses_created',
+      ]);
+      expect(patchSidebarWorktreeSessionStatus(patched, update)).toBe(patched);
+      expect(
+        patchSidebarWorktreeSessionStatus(initial, { ...update, worktreeId: 'elsewhere' })
+      ).toBe(initial);
+    });
+
     it('does not poll unloaded, empty, or CLI-only worktree batches', () => {
       expect(getSidebarWorktreeRefetchInterval(undefined)).toBe(false);
       expect(getSidebarWorktreeRefetchInterval(undefined, true)).toBe(false);
@@ -2087,9 +2107,17 @@ describe('ChatSidebar worktree controls', () => {
     expect(html).not.toContain('Session actions for');
   });
 
-  it('creates from the latest chat but delegates deletion using only the worktree ID', () => {
+  it.each([
+    { details: undefined, label: 'kilo/repo · main' },
+    {
+      details: { name: 'Release cleanup', defaultTitle: 'Generated title' },
+      label: 'Release cleanup',
+    },
+    { details: { name: null, defaultTitle: 'Generated title' }, label: 'Generated title' },
+    { details: { name: null, defaultTitle: null }, label: 'New chat' },
+  ])('delegates deletion with the worktree ID and display name: $label', ({ details, label }) => {
     const createdFrom: string[] = [];
-    const deletedWorktrees: string[] = [];
+    const deletedWorktrees: { worktreeId: string; name: string }[] = [];
     const deletedSessions: string[] = [];
     const openedSessions: string[] = [];
     renderChatSidebar(
@@ -2102,10 +2130,13 @@ describe('ChatSidebar worktree controls', () => {
             worktreeId: 'worktree_shared',
           }),
         ],
+        worktreeDetails: details
+          ? { worktree_shared: { ...details, prSession: null, sessions: [] } }
+          : {},
         onCreateWorktreeChat: sessionId => {
           createdFrom.push(sessionId);
         },
-        onDeleteWorktree: worktreeId => deletedWorktrees.push(worktreeId),
+        onDeleteWorktree: (worktreeId, name) => deletedWorktrees.push({ worktreeId, name }),
         onDeleteSession: sessionId => deletedSessions.push(sessionId),
         onOpenSession: sessionId => openedSessions.push(sessionId),
       },
@@ -2116,7 +2147,7 @@ describe('ChatSidebar worktree controls', () => {
     getSidebarMenuItemProps('Delete worktree').onSelect?.(new Event('select'));
 
     expect(createdFrom).toEqual(['ses_latest']);
-    expect(deletedWorktrees).toEqual(['worktree_shared']);
+    expect(deletedWorktrees).toEqual([{ worktreeId: 'worktree_shared', name: label }]);
     expect(deletedSessions).toEqual([]);
     expect(openedSessions).toEqual([]);
   });

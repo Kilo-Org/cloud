@@ -1,10 +1,20 @@
 /* eslint-disable max-lines -- The hub composes every organization row (money, members, Kilo Pass, rename) on one screen. */
 import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Bell, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
+import {
+  Bell,
+  CreditCard,
+  FileText,
+  Pencil,
+  Plug,
+  Receipt,
+  Users,
+  Wallet,
+} from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +29,11 @@ import {
   type OrgKiloPassRowState,
 } from '@/components/organization/org-kilo-pass-row-state';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
+import {
+  visibleInAppSettingsRows,
+  visibleOrgSettingsRows,
+} from '@/components/organization/organization-settings-rows';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -31,15 +46,16 @@ import { i18n } from '@/i18n';
 import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
+import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
   useOrgBoundary,
   useOrgKiloPassSummary,
-  useOrgWithMembers,
+  useOrgParentLink,
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
@@ -73,28 +89,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     setOrganizationId(organizationIdOverride);
   }, [organizationIdOverride, org, setOrganizationId]);
 
-  const orgWithMembers = useOrgWithMembers(organizationId);
   // `organizations.list` carries the org's parent link, so the billing group
   // knows from its first frame whether this org has a Kilo Pass row instead of
-  // adding one a request later and pushing the rows under it down. A device
-  // that persisted the list before that field existed hydrates an entry
-  // without it, and an entry written before an admin moved the organization
-  // under a parent still says `null`, so the membership payload fills the gap
-  // in both directions: a parent id from either payload makes this a child,
-  // because only an admin change moves an organization under a parent after
-  // creation and that id is never the stale side. A `null` confirms a
-  // top-level organization only from the freshly fetched membership payload;
-  // the list's own `null` is a cached value and leaves the link unknown until
-  // membership answers.
-  const listParentLink = org?.parentOrganizationId;
-  const membershipParentLink = orgWithMembers.data?.parent_organization_id;
-  const reportedParentLink = listParentLink ?? membershipParentLink;
-  const topLevelConfirmed = membershipParentLink === null;
-  const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
-  // No membership payload and a failed or paused fetch: the payload that would
-  // settle anything waiting on it will not arrive on its own.
-  const membershipUnavailable =
-    orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
+  // adding one a request later and pushing the rows under it down. The hook
+  // reconciles that cached entry with the membership payload.
+  const {
+    membership: orgWithMembers,
+    parentLink,
+    membershipUnavailable,
+  } = useOrgParentLink(organizationId, org?.parentOrganizationId);
   // An unknown link keeps the row: it renders in its loading state instead of
   // appearing once a payload lands. Only a known child organization, which
   // carries its parent's id, has no Kilo Pass row.
@@ -148,7 +151,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   let lowBalanceSubtitle: string | undefined = undefined;
   if (minimumBalance != null) {
     lowBalanceSubtitle = t('organization.hub.lowBalanceBelow', {
-      amount: formatMoney(minimumBalance, i18n.language),
+      amount: isolateLtrBidiText(formatPrefixedMoney(minimumBalance, i18n.language)),
     });
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
@@ -169,6 +172,53 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const lowBalanceAccessibilityLabel = lowBalanceRetry
     ? `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}. ${lowBalanceRetry}`
     : `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}`;
+
+  // One string for the painted balance and its spoken label, in the shape the
+  // Profile credits card paints the same balance.
+  const balanceAmount = formatPrefixedMoney(fromMicrodollars(org.balance), i18n.language);
+  // The plan and the subscription gate's own verdict arrive on the same
+  // membership row that decides whether this screen renders at all, so both
+  // paint settled on the first frame: there is no plan loading or plan error
+  // state to reserve room for, and a refetch that fails keeps the last verdict
+  // exactly as it does for the new-session composer. Only the server's boolean
+  // is read; nothing re-derives the plan state from seats or balance.
+  const planEnded = org.isTrialExpiredForEnforcement;
+  const planName =
+    org.plan === 'enterprise'
+      ? t('organization.hub.planEnterprise')
+      : t('organization.hub.planTeams');
+  const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
+  // A role that gets the billing action below the block needs only the state,
+  // because the action is the next step. A role that cannot change the plan
+  // gets the sentence the rest of the app shows with the same explanation, so
+  // the member still learns who can end the state.
+  const planMessage = showMoney
+    ? t('organization.hub.planEnded')
+    : t('common.organizationTrialEnded');
+
+  // The in-app destinations the hub opens itself, and the only card rows that
+  // need no payload: their gate reads the role and the plan, which the
+  // organization row decides before this screen renders.
+  const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan });
+
+  // The organization dashboard's own settings on the web, one row per area.
+  // The group waits for the membership payload because the parent link decides
+  // whether the sub-organization rows exist: painting them on the cached list
+  // entry's `null` and removing them a request later would move every row
+  // under them. It is the last group on the screen, so its arrival pushes
+  // nothing above it.
+  const settingsRows =
+    orgWithMembers.data == null && !membershipUnavailable
+      ? null
+      : visibleOrgSettingsRows(
+          {
+            role,
+            plan: org.plan,
+            isTopLevel: parentLink === null,
+            guardrailsEnabled: orgWithMembers.data?.settings.kilo_encrypt === true,
+          },
+          organizationId
+        );
 
   return (
     <View className="flex-1 bg-background">
@@ -196,35 +246,53 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        {/* A lapsed plan blocks every new session for every member of this
+            organization, so it is stated before the numbers the screen opens
+            on. Only a billing role gets the action, because the web billing
+            page refuses the other roles; the sentence then stops at the state
+            so it does not restate the control below it, while a role without
+            the action keeps the next step in the sentence. The plan row inside
+            the card below states the tier and its status, so this block adds
+            neither. */}
+        {planEnded ? (
+          <OrganizationPlanRefusal
+            message={planMessage}
+            action={
+              showMoney
+                ? {
+                    label: t('organization.hub.manageBilling'),
+                    onPress: () => {
+                      void openExternalUrl(planBillingUrl, {
+                        label: t('organization.hub.manageBilling'),
+                      });
+                    },
+                  }
+                : undefined
+            }
+          />
+        ) : null}
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
           {showMoney && (
             <KvRow
               label={t('organization.hub.balance')}
-              value={
-                hideOrgBalance
-                  ? HIDDEN_BALANCE
-                  : formatMoney(fromMicrodollars(org.balance), i18n.language)
-              }
+              value={hideOrgBalance ? HIDDEN_BALANCE : balanceAmount}
               valueFace="numeric"
+              // The amount's symbol and sign are neutral to the paragraph's
+              // direction, so the run carries its own left-to-right order.
+              valueDirection="ltr"
               // An empty balance offers the top-up on the amount's own line: a
-              // row of its own would hold nothing but this control.
+              // row of its own would hold nothing but this control, and
+              // `lineAction` keeps that line one text line tall.
               trailing={
                 org.balance === 0 ? (
-                  <AddCreditsRow
-                    inline
-                    url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
-                  />
+                  <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
                 ) : undefined
               }
               // Always pass the label: a node React Native stops handing a
               // label keeps its previous native value on Android, so a
               // masked row that reveals its amount would still announce
               // "Balance hidden" (the credits card's own note).
-              valueAccessibilityLabel={
-                hideOrgBalance
-                  ? t('profile.balanceHidden')
-                  : formatMoney(fromMicrodollars(org.balance), i18n.language)
-              }
+              valueAccessibilityLabel={hideOrgBalance ? t('profile.balanceHidden') : balanceAmount}
             />
           )}
           <KvRow
@@ -242,21 +310,59 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 : formatNumber(org.seatCount.used, i18n.language)
             }
             valueFace="numeric"
+          />
+          {/* The plan is the tier the seats belong to, so it closes the card
+              the seats are counted in and paints in every state. A lapsed plan
+              states that in this row: the tier alone beside the block above
+              would read as an active plan, and the tier keeps the row's own ink
+              so only the state carries the warning. */}
+          <KvRow
+            label={t('organization.hub.plan')}
+            value={planName}
+            valueStatus={
+              planEnded
+                ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
+                : undefined
+            }
+            valueFace="text"
             last
           />
         </Animated.View>
 
-        <OrgUsageStats organizationId={organizationId} />
+        <OrgUsageStats
+          organizationId={organizationId}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/organization/usage' as Href);
+          }}
+        />
 
         <View className="rounded-lg bg-secondary px-3">
           <ConfigureRow
             icon={Users}
             title={t('organization.members.title')}
-            last={!showMoney}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/organization/members' as Href);
             }}
           />
+          {/* Every member may view the organization's connections; the hub
+              itself hides the actions their role cannot take. */}
+          <ConfigureRow
+            icon={Plug}
+            title={t('integrations.title')}
+            last={!showMoney && inAppSettingsRows.length === 0}
+            onPress={() => {
+              router.push(`/(app)/(tabs)/(3_profile)/integrations?org=${organizationId}` as Href);
+            }}
+          />
+          {showMoney && (
+            <ConfigureRow
+              icon={CreditCard}
+              title={t('organization.billing.title')}
+              onPress={() => {
+                router.push('/(app)/(tabs)/(3_profile)/organization/billing' as Href);
+              }}
+            />
+          )}
           {showMoney && (
             <>
               <ConfigureRow
@@ -323,7 +429,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               <ConfigureRow
                 icon={Wallet}
                 title={t('notifications.channel.spend')}
-                last
+                last={inAppSettingsRows.length === 0}
                 onPress={() => {
                   router.push(
                     `/(app)/(tabs)/(3_profile)/spend-alerts?org=${organizationId}` as Href
@@ -332,7 +438,45 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
             </>
           )}
+          {/* The one destination this app reads itself. It closes the card, and
+              it is painted before any web row because its gate needs no
+              payload — see `visibleInAppSettingsRows`. */}
+          {inAppSettingsRows.map((row, index) => (
+            <ConfigureRow
+              key={row.area}
+              icon={row.icon}
+              title={row.title}
+              last={index === inAppSettingsRows.length - 1}
+              onPress={() => {
+                router.push(row.href);
+              }}
+            />
+          ))}
         </View>
+
+        {/* The areas this app does not reimplement. Each row opens the page
+            that already owns the setting, and the row set follows the web
+            sidebar's role and plan gates — see `visibleOrgSettingsRows`. */}
+        {settingsRows == null ? null : (
+          <View className="gap-2">
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('organization.settingsOnWeb.title')}
+            </Text>
+            <View className="rounded-lg bg-secondary px-3">
+              {settingsRows.map((row, index) => (
+                <ConfigureRow
+                  key={row.area}
+                  icon={row.icon}
+                  title={row.title}
+                  last={index === settingsRows.length - 1}
+                  onPress={() => {
+                    void openExternalUrl(row.url, { label: row.title });
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        )}
       </TabScreenScrollView>
 
       {renameVisible && (
@@ -342,10 +486,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           initialValue={org.organizationName}
           // The server validates a rename with `OrganizationNameSchema`
           // (packages/web-shared), so the field must accept the name it would
-          // accept. RenameModal's own default is lower than a stored name can
+          // accept, and it refuses a name the server's visible-character rule
+          // refuses. RenameModal's own default is lower than a stored name can
           // be, and React Native applies `maxLength` to the seeded value: the
           // dialog would open on a cut name, and saving would store the cut.
           maxLength={ORGANIZATION_NAME_MAX_LENGTH}
+          isAcceptableValue={hasVisibleText}
           onSave={async name => {
             await mutations.rename.mutateAsync({ name });
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ülesanne lõpetatud"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ebaõnnestus: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Katkestatud: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

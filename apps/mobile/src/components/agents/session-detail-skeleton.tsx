@@ -1,4 +1,4 @@
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
@@ -96,9 +96,8 @@ const COMPOSER_FIELD_BORDER = 2;
  *
  * Geometry follows ChatComposer's input row: a BlurBar wrapping the row's
  * `p-2.5 px-3`, the field's own box at `rounded-[20px]` and the two trailing
- * controls at `CONTROL_HIT_TARGET`'s 48 pt on Android and 44 pt on iOS — `ms-3`
- * is the row's COMPOSER_CONTROL_GAP_CLASS, repeated here because the row module
- * owns it.
+ * controls on the 48 pt voice toggle's target box — `ms-3` is the row's
+ * COMPOSER_CONTROL_GAP_CLASS, repeated here because the row module owns it.
  *
  * Sizes are written in points, not scale steps: this app's rem is 14 pt, so
  * `h-11` paints 38.5 pt and would leave the slot 6 pt short of the composer that
@@ -110,7 +109,10 @@ const COMPOSER_FIELD_BORDER = 2;
  */
 export function SessionComposerSkeleton() {
   const fontScale = useLiveFontScale();
-  const control = Platform.OS === 'android' ? 'h-[48px] w-[48px]' : 'h-[44px] w-[44px]';
+  // The voice toggle renders the shared 48dp target box, so the row is 48 tall
+  // on either platform; a shorter slot would leave the row short of the
+  // composer that replaces it, and the transcript would move on resolve.
+  const control = 'h-[48px] w-[48px]';
   return (
     <BlurBar>
       <View className="p-2.5 px-3">

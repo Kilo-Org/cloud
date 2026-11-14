@@ -1962,6 +1962,37 @@
     ],
     "searchBlob": "agentProfiles.get Fetch a single agent profile's full details by ID, scoped to the current user or an organization. agentprofiles get profileid organizationid profileId organizationId"
   },
+  "agentProfiles.instructions": {
+    "path": "agentProfiles.instructions",
+    "kind": "query",
+    "summary": "Returns the profile's instruction (rules) files: name, content, and enabled flag, ordered by name, optionally scoped to an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "instructions",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.instructions Returns the profile's instruction (rules) files: name, content, and enabled flag, ordered by name, optionally scoped to an organization. agentprofiles instructions profileid organizationid profileId organizationId"
+  },
   "agentProfiles.kiloCommands": {
     "path": "agentProfiles.kiloCommands",
     "kind": "query",
@@ -3967,6 +3998,28 @@
     ],
     "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
   },
+  "byok.listProviders": {
+    "path": "byok.listProviders",
+    "kind": "query",
+    "summary": "List the AI model providers you can connect with your own API key (bring your own key), optionally scoped to an organization. Includes experimental providers only when experimental BYOK is enabled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "listproviders",
+      "organizationid"
+    ],
+    "searchBlob": "byok.listProviders List the AI model providers you can connect with your own API key (bring your own key), optionally scoped to an organization. Includes experimental providers only when experimental BYOK is enabled. byok listproviders organizationid organizationId"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -4198,7 +4251,7 @@
   "claudeBilling.remove": {
     "path": "claudeBilling.remove",
     "kind": "mutation",
-    "summary": "Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only.",
+    "summary": "Disconnect Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; shared-services scope requires an organization owner or admin.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4220,7 +4273,7 @@
       "organizationid",
       "scope"
     ],
-    "searchBlob": "claudeBilling.remove Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only. claudebilling remove organizationid scope organizationId scope"
+    "searchBlob": "claudeBilling.remove Disconnect Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; shared-services scope requires an organization owner or admin. claudebilling remove organizationid scope organizationId scope"
   },
   "claudeBilling.status": {
     "path": "claudeBilling.status",
@@ -5324,6 +5377,31 @@
       "cursor"
     ],
     "searchBlob": "cliSessionsV2.getSessionMessagesPage Fetch a paginated page of a session's message history for incremental loading, including an event watermark when starting a fresh read. clisessionsv2 getsessionmessagespage session_id limit cursor session_id limit cursor"
+  },
+  "cliSessionsV2.getSharedSession": {
+    "path": "cliSessionsV2.getSharedSession",
+    "kind": "query",
+    "summary": "Retrieve a shared CLI session using its share link token, returning the session details for viewing or resuming.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "share_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "share_token"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getsharedsession",
+      "share_token"
+    ],
+    "searchBlob": "cliSessionsV2.getSharedSession Retrieve a shared CLI session using its share link token, returning the session details for viewing or resuming. clisessionsv2 getsharedsession share_token share_token"
   },
   "cliSessionsV2.getWatchPr": {
     "path": "cliSessionsV2.getWatchPr",
@@ -6499,6 +6577,31 @@
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
   },
+  "cloudAgentNext.getBackgroundActivity": {
+    "path": "cloudAgentNext.getBackgroundActivity",
+    "kind": "query",
+    "summary": "Get the background activity inventory for a Cloud Agent session, such as running or pending background tasks and process work associated with that session. Use to see what a session is doing in the background or whether background work is still active.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[\\w-]+$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getbackgroundactivity",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.getBackgroundActivity Get the background activity inventory for a Cloud Agent session, such as running or pending background tasks and process work associated with that session. Use to see what a session is doing in the background or whether background work is still active. cloudagentnext getbackgroundactivity cloudagentsessionid cloudAgentSessionId"
+  },
   "cloudAgentNext.getEgressAudit": {
     "path": "cloudAgentNext.getEgressAudit",
     "kind": "query",
@@ -6772,6 +6875,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "toolDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "preview"
+          ]
         }
       },
       "required": [
@@ -6784,9 +6894,61 @@
       "sessionid",
       "kilosessionid",
       "cursor",
-      "limit"
+      "limit",
+      "tooldisplay"
     ],
-    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit sessionId kiloSessionId cursor limit"
+    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit tooldisplay sessionId kiloSessionId cursor limit toolDisplay"
+  },
+  "cloudAgentNext.getSessionToolPartDetail": {
+    "path": "cloudAgentNext.getSessionToolPartDetail",
+    "kind": "query",
+    "summary": "Get the full detail of a single tool call part within a Cloud Agent session, including its input, output, and status. Use to inspect exactly what a specific tool invocation did during an agent run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "partId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "sessionId",
+        "messageId",
+        "partId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsessiontoolpartdetail",
+      "sessionid",
+      "kilosessionid",
+      "messageid",
+      "partid",
+      "callid"
+    ],
+    "searchBlob": "cloudAgentNext.getSessionToolPartDetail Get the full detail of a single tool call part within a Cloud Agent session, including its input, output, and status. Use to inspect exactly what a specific tool invocation did during an agent run. cloudagentnext getsessiontoolpartdetail sessionid kilosessionid messageid partid callid sessionId kiloSessionId messageId partId callId"
   },
   "cloudAgentNext.getStackedWorkspaceSource": {
     "path": "cloudAgentNext.getStackedWorkspaceSource",
@@ -8745,7 +8907,7 @@
       "properties": {
         "cloudAgentSessionId": {
           "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         }
       },
       "required": [
@@ -8908,7 +9070,7 @@
       "properties": {
         "cloudAgentSessionId": {
           "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         }
       },
       "required": [
@@ -9142,6 +9304,17 @@
       "organizationid"
     ],
     "searchBlob": "cloudAgentSettings.get Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available. cloudagentsettings get organizationid organizationId"
+  },
+  "cloudAgentSettings.getBuiltinAgents": {
+    "path": "cloudAgentSettings.getBuiltinAgents",
+    "kind": "query",
+    "summary": "Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getbuiltinagents"
+    ],
+    "searchBlob": "cloudAgentSettings.getBuiltinAgents Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides. cloudagentsettings getbuiltinagents"
   },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
@@ -11115,6 +11288,55 @@
     ],
     "searchBlob": "computeBilling.charges List compute usage charges for your personal account or an organization, optionally filtered to your own usage or specific date ranges. computebilling charges organizationid view startdate enddate groupby page organizationId view startDate endDate groupBy page"
   },
+  "computeBilling.codeReviewRate": {
+    "path": "computeBilling.codeReviewRate",
+    "kind": "query",
+    "summary": "Check whether code review compute billing is enabled for a user or organization, and get the hourly USD rate charged for code review sandbox containers if it is.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "computebilling",
+      "codereviewrate",
+      "organizationid"
+    ],
+    "searchBlob": "computeBilling.codeReviewRate Check whether code review compute billing is enabled for a user or organization, and get the hourly USD rate charged for code review sandbox containers if it is. computebilling codereviewrate organizationid organizationId"
+  },
+  "computeBilling.personalBillingMode": {
+    "path": "computeBilling.personalBillingMode",
+    "kind": "query",
+    "summary": "Look up the signed-in user's billing mode for a Kilo-hosted container instance: shadow (usage is metered but not charged yet) or paid (usage is charged).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "instance": {
+          "type": "string",
+          "enum": [
+            "standard-3",
+            "standard-4"
+          ]
+        }
+      },
+      "required": [
+        "instance"
+      ]
+    },
+    "tags": [
+      "computebilling",
+      "personalbillingmode",
+      "instance"
+    ],
+    "searchBlob": "computeBilling.personalBillingMode Look up the signed-in user's billing mode for a Kilo-hosted container instance: shadow (usage is metered but not charged yet) or paid (usage is charged). computebilling personalbillingmode instance instance"
+  },
   "computeBilling.rates": {
     "path": "computeBilling.rates",
     "kind": "query",
@@ -11125,6 +11347,35 @@
       "rates"
     ],
     "searchBlob": "computeBilling.rates Get the current compute pricing rates used to bill usage. computebilling rates"
+  },
+  "computeBilling.sessionCharges": {
+    "path": "computeBilling.sessionCharges",
+    "kind": "query",
+    "summary": "Get recorded compute charges for an owned cloud agent session in its personal or organization billing context. When scope is 'workspace', the total covers the shared sandbox across all chats and restarts in that workspace; do not add sibling chat totals together. Only scope 'session' returns a single session's charges.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "computebilling",
+      "sessioncharges",
+      "cloudagentsessionid",
+      "organizationid"
+    ],
+    "searchBlob": "computeBilling.sessionCharges Get recorded compute charges for an owned cloud agent session in its personal or organization billing context. When scope is 'workspace', the total covers the shared sandbox across all chats and restarts in that workspace; do not add sibling chat totals together. Only scope 'session' returns a single session's charges. computebilling sessioncharges cloudagentsessionid organizationid cloudAgentSessionId organizationId"
   },
   "credits.completeAppStorePurchase": {
     "path": "credits.completeAppStorePurchase",
@@ -13479,134 +13730,6 @@
     ],
     "searchBlob": "kiloPass.cancelSubscription Cancel a user's Kilo Pass subscription at the end of the current billing period so it does not renew. kilopass cancelsubscription"
   },
-  "kiloPass.completeAppStorePurchase": {
-    "path": "kiloPass.completeAppStorePurchase",
-    "kind": "mutation",
-    "summary": "Finish an Apple App Store Kilo Pass purchase by validating the App Store receipt and activating the subscription on the user's account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "signedTransactionJws": {
-          "type": "string",
-          "minLength": 1
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "ios",
-            "android"
-          ]
-        },
-        "storefront": {
-          "type": "string",
-          "enum": [
-            "app_store",
-            "play",
-            "web"
-          ]
-        },
-        "product": {
-          "type": "string",
-          "enum": [
-            "kilo_pass",
-            "credits"
-          ]
-        },
-        "program": {
-          "anyOf": [
-            {
-              "type": "string",
-              "maxLength": 64
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "signedTransactionJws",
-        "platform",
-        "storefront",
-        "product"
-      ]
-    },
-    "tags": [
-      "kilopass",
-      "completeappstorepurchase",
-      "signedtransactionjws",
-      "platform",
-      "storefront",
-      "product",
-      "program"
-    ],
-    "searchBlob": "kiloPass.completeAppStorePurchase Finish an Apple App Store Kilo Pass purchase by validating the App Store receipt and activating the subscription on the user's account. kilopass completeappstorepurchase signedtransactionjws platform storefront product program signedTransactionJws platform storefront product program"
-  },
-  "kiloPass.completePlayPurchase": {
-    "path": "kiloPass.completePlayPurchase",
-    "kind": "mutation",
-    "summary": "Finish a Google Play Kilo Pass purchase by validating the Play purchase token and activating the subscription on the user's account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "purchaseToken": {
-          "type": "string",
-          "minLength": 1
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "ios",
-            "android"
-          ]
-        },
-        "storefront": {
-          "type": "string",
-          "enum": [
-            "app_store",
-            "play",
-            "web"
-          ]
-        },
-        "product": {
-          "type": "string",
-          "enum": [
-            "kilo_pass",
-            "credits"
-          ]
-        },
-        "program": {
-          "anyOf": [
-            {
-              "type": "string",
-              "maxLength": 64
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "purchaseToken",
-        "platform",
-        "storefront",
-        "product"
-      ]
-    },
-    "tags": [
-      "kilopass",
-      "completeplaypurchase",
-      "purchasetoken",
-      "platform",
-      "storefront",
-      "product",
-      "program"
-    ],
-    "searchBlob": "kiloPass.completePlayPurchase Finish a Google Play Kilo Pass purchase by validating the Play purchase token and activating the subscription on the user's account. kilopass completeplaypurchase purchasetoken platform storefront product program purchaseToken platform storefront product program"
-  },
   "kiloPass.createCheckoutSession": {
     "path": "kiloPass.createCheckoutSession",
     "kind": "mutation",
@@ -13826,17 +13949,6 @@
       "returnurl"
     ],
     "searchBlob": "kiloPass.getCustomerPortalUrl Get a Stripe billing portal link where a user can view and manage their Kilo Pass subscription and payment details. kilopass getcustomerportalurl returnurl returnUrl"
-  },
-  "kiloPass.getMobileStoreProducts": {
-    "path": "kiloPass.getMobileStoreProducts",
-    "kind": "query",
-    "summary": "Get the available Kilo Pass products and app store account token for in-app / mobile store purchases.",
-    "inputSchema": {},
-    "tags": [
-      "kilopass",
-      "getmobilestoreproducts"
-    ],
-    "searchBlob": "kiloPass.getMobileStoreProducts Get the available Kilo Pass products and app store account token for in-app / mobile store purchases. kilopass getmobilestoreproducts"
   },
   "kiloPass.getPurchasePresentation": {
     "path": "kiloPass.getPurchasePresentation",
@@ -18291,6 +18403,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
+  "organizations.cloudAgentNext.getBackgroundActivity": {
+    "path": "organizations.cloudAgentNext.getBackgroundActivity",
+    "kind": "query",
+    "summary": "Get the background activity inventory for a Cloud Agent session, including background tasks or processes running for that session. Use to check what work is happening in the background of an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_[\\w-]+$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getbackgroundactivity",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getBackgroundActivity Get the background activity inventory for a Cloud Agent session, including background tasks or processes running for that session. Use to check what work is happening in the background of an agent session. organizations cloudagentnext getbackgroundactivity organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
   "organizations.cloudAgentNext.getEgressAudit": {
     "path": "organizations.cloudAgentNext.getEgressAudit",
     "kind": "query",
@@ -18578,6 +18740,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "toolDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "preview"
+          ]
         }
       },
       "required": [
@@ -18593,9 +18762,69 @@
       "sessionid",
       "kilosessionid",
       "cursor",
-      "limit"
+      "limit",
+      "tooldisplay"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit organizationId sessionId kiloSessionId cursor limit"
+    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit tooldisplay organizationId sessionId kiloSessionId cursor limit toolDisplay"
+  },
+  "organizations.cloudAgentNext.getSessionToolPartDetail": {
+    "path": "organizations.cloudAgentNext.getSessionToolPartDetail",
+    "kind": "query",
+    "summary": "Fetch the full stored details of a single tool call inside an organization's Cloud Agent session chat, such as the tool's input, output, status, and error, identified by message, part, and call ID. Use it to expand a tool-call preview in session history or inspect what a specific tool actually did.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "partId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId",
+        "messageId",
+        "partId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsessiontoolpartdetail",
+      "organizationid",
+      "sessionid",
+      "kilosessionid",
+      "messageid",
+      "partid",
+      "callid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSessionToolPartDetail Fetch the full stored details of a single tool call inside an organization's Cloud Agent session chat, such as the tool's input, output, status, and error, identified by message, part, and call ID. Use it to expand a tool-call preview in session history or inspect what a specific tool actually did. organizations cloudagentnext getsessiontoolpartdetail organizationid sessionid kilosessionid messageid partid callid organizationId sessionId kiloSessionId messageId partId callId"
   },
   "organizations.cloudAgentNext.getStackedWorkspaceSource": {
     "path": "organizations.cloudAgentNext.getStackedWorkspaceSource",
@@ -20924,7 +21153,7 @@
           "properties": {
             "cloudAgentSessionId": {
               "type": "string",
-              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             "organizationId": {
               "type": "string",
@@ -21120,7 +21349,7 @@
           "properties": {
             "cloudAgentSessionId": {
               "type": "string",
-              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             "organizationId": {
               "type": "string",
@@ -21155,7 +21384,6 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         },
         "autoAddCreator": {
@@ -21194,7 +21422,6 @@
         },
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         }
       },
@@ -26998,6 +27225,9 @@
         "disableReviewMd": {
           "type": "boolean"
         },
+        "skipBotPullRequests": {
+          "type": "boolean"
+        },
         "gateThreshold": {
           "type": "string",
           "enum": [
@@ -27154,12 +27384,13 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "skipbotpullrequests",
       "gatethreshold",
       "council",
       "councilenabledrepositoryids",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
+    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
   },
   "organizations.reviewAgent.rotateGitLabWebhookSecret": {
     "path": "organizations.reviewAgent.rotateGitLabWebhookSecret",
@@ -30163,7 +30394,6 @@
         },
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         }
       },
@@ -30970,6 +31200,9 @@
         "disableReviewMd": {
           "type": "boolean"
         },
+        "skipBotPullRequests": {
+          "type": "boolean"
+        },
         "gateThreshold": {
           "type": "string",
           "enum": [
@@ -30999,10 +31232,11 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "skipbotpullrequests",
       "gatethreshold",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd gateThreshold autoConfigureWebhooks"
+    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold autoConfigureWebhooks"
   },
   "personalReviewAgent.saveReviewConfig": {
     "path": "personalReviewAgent.saveReviewConfig",
@@ -37053,6 +37287,17 @@
     ],
     "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time. user getpasskeys"
   },
+  "user.getProfileLinks": {
+    "path": "user.getProfileLinks",
+    "kind": "query",
+    "summary": "Get the signed-in user's saved LinkedIn and GitHub profile URLs from their account settings.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getprofilelinks"
+    ],
+    "searchBlob": "user.getProfileLinks Get the signed-in user's saved LinkedIn and GitHub profile URLs from their account settings. user getprofilelinks"
+  },
   "user.hasGatewayUsage": {
     "path": "user.hasGatewayUsage",
     "kind": "query",
@@ -37063,6 +37308,37 @@
       "hasgatewayusage"
     ],
     "searchBlob": "user.hasGatewayUsage Check whether the current user has any Kilo gateway usage, including organization-scoped requests and zero-cost free-model requests. user hasgatewayusage"
+  },
+  "user.invoicesPage": {
+    "path": "user.invoicesPage",
+    "kind": "query",
+    "summary": "List a user's personal billing invoices from Stripe, filtered to a time period and paginated with a cursor, for showing payment history or past receipts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "period": {
+          "default": "month",
+          "type": "string",
+          "enum": [
+            "week",
+            "month",
+            "year",
+            "all"
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        }
+      }
+    },
+    "tags": [
+      "user",
+      "invoicespage",
+      "period",
+      "cursor"
+    ],
+    "searchBlob": "user.invoicesPage List a user's personal billing invoices from Stripe, filtered to a time period and paginated with a cursor, for showing payment history or past receipts. user invoicespage period cursor period cursor"
   },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",
@@ -37116,13 +37392,13 @@
   "user.listDeviceSessions": {
     "path": "user.listDeviceSessions",
     "kind": "query",
-    "summary": "List the current user's active device sessions with user agent and activity timestamps, marking which one is the current device.",
+    "summary": "List the current user's active device sessions with the client kind and activity timestamps, marking which one is the current device.",
     "inputSchema": {},
     "tags": [
       "user",
       "listdevicesessions"
     ],
-    "searchBlob": "user.listDeviceSessions List the current user's active device sessions with user agent and activity timestamps, marking which one is the current device. user listdevicesessions"
+    "searchBlob": "user.listDeviceSessions List the current user's active device sessions with the client kind and activity timestamps, marking which one is the current device. user listdevicesessions"
   },
   "user.markWelcomeFormCompleted": {
     "path": "user.markWelcomeFormCompleted",
@@ -38005,6 +38281,18 @@
             "vercel-large"
           ]
         },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "profileId": {
           "anyOf": [
             {
@@ -38089,6 +38377,7 @@
       "model",
       "variant",
       "sandboxallocation",
+      "environmentid",
       "profileid",
       "bodyschema",
       "prompttemplate",
@@ -38099,7 +38388,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation environmentid profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation environmentId profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -38375,6 +38664,18 @@
             }
           ]
         },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "promptTemplate": {
           "type": "string",
           "minLength": 1,
@@ -38464,6 +38765,7 @@
       "model",
       "variant",
       "sandboxallocation",
+      "environmentid",
       "prompttemplate",
       "profileid",
       "bodyschema",
@@ -38474,7 +38776,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation environmentid prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation environmentId promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",
@@ -38790,6 +39092,55 @@
       "folderids"
     ],
     "searchBlob": "workspaceFolders.reorder Change the display order of workspace folders. workspacefolders reorder organizationid folderids organizationId folderIds"
+  },
+  "workspaceFolders.reorderWorktrees": {
+    "path": "workspaceFolders.reorderWorktrees",
+    "kind": "mutation",
+    "summary": "Set the custom worktree order inside a smart workspace folder in the cloud agent sidebar, so you can manually arrange worktrees within the folder. Use to save a drag-and-drop reordering of worktrees.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "folderId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "worktreeIds": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": [
+        "organizationId",
+        "folderId",
+        "worktreeIds"
+      ]
+    },
+    "tags": [
+      "workspacefolders",
+      "reorderworktrees",
+      "organizationid",
+      "folderid",
+      "worktreeids"
+    ],
+    "searchBlob": "workspaceFolders.reorderWorktrees Set the custom worktree order inside a smart workspace folder in the cloud agent sidebar, so you can manually arrange worktrees within the folder. Use to save a drag-and-drop reordering of worktrees. workspacefolders reorderworktrees organizationid folderid worktreeids organizationId folderId worktreeIds"
   },
   "workspaceFolders.update": {
     "path": "workspaceFolders.update",

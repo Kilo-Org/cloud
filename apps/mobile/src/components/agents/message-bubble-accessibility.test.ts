@@ -46,6 +46,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/ui/bubble', () => ({ Bubble: 'Bubble' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The Add credits element pulls `@/lib/external-link` → `expo-web-browser`, which
+// the pure project cannot load; this harness reads the bubble's own element tree.
+vi.mock('@/components/add-credits-row', () => ({ AddCreditsRow: 'AddCreditsRow' }));
 vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' }));
 vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
 vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
@@ -121,6 +124,11 @@ describe.each([
         expect(host).toBeNull();
         return;
       }
+      // Android composes an unnamed focus stop's name from its speaking
+      // non-focusable descendants in child order, so the host comes first.
+      const children = wrapper.props.children;
+      const [firstChild] = Array.isArray(children) ? children : [children];
+      expect(findElementByType(firstChild, 'View', isActionsOverlayProps)).not.toBeNull();
       expect(host?.props.accessibilityRole).toBe('text');
       expect(host?.props.accessibilityLabel).toBe(label);
       expect(host?.props.children).toBeUndefined();

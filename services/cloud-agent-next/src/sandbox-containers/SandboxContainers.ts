@@ -1,6 +1,7 @@
 import {
   classifySnapshotStartFailure,
   type SnapshotStartFailureReason,
+  type SnapshotLaunchDiagnosticContext,
 } from './snapshot-start-failures.js';
 import { billingFailureFromAdmission } from '../billing-failure.js';
 import { getBillingContext } from '@kilocode/container-usage';
@@ -27,6 +28,7 @@ import { fetchPreviewPort, previewNotRunningResponse } from '../preview/containe
 import { isReservedPreviewPort } from '../shared/reserved-ports.js';
 import {
   ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT,
+  ENVIRONMENT_BUILD_RUNNER_ENV,
   type EnvironmentBuildRunner,
 } from '../shared/environment-build-protocol.js';
 import {
@@ -74,7 +76,7 @@ import {
   nativeEgressPolicySchema,
   type NativeEgressPolicy,
 } from './egress-policy.js';
-import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
+import type { NativeRuntimeImage } from '../sandbox-control/startup-selection.js';
 
 export type { ContainerInstanceSize, ContainersStartSource } from './native-start.js';
 export type { NativeCaptureResult } from './native-capture.js';
@@ -92,7 +94,8 @@ export type ContainersLaunchInput = {
   /** Environment snapshot selected for this allocation; absent starts from the image. */
   snapshot?: NativeStartSnapshot;
   deadlineAt?: number;
-  nativeImage?: RuntimeStartupConfig['image'];
+  nativeImage?: NativeRuntimeImage;
+  snapshotDiagnostic?: SnapshotLaunchDiagnosticContext;
 };
 
 /**
@@ -100,7 +103,7 @@ export type ContainersLaunchInput = {
  * only builders, from the image, with internet egress and no interception: the
  * builder holds a build-scoped repository credential, not contained aliases.
  */
-const BUILDER_RUNNER_ENV = 'KILO_BUILDER_RUNNER';
+const BUILDER_RUNNER_ENV = ENVIRONMENT_BUILD_RUNNER_ENV;
 /** Atomic, owner-only write of the runner file; the value comes from exec env. */
 
 export type ContainersBuilderLaunchInput = {
@@ -527,7 +530,9 @@ export class SandboxContainers extends DurableObject<Env> {
     record: ContainersRecord,
     ref: string,
     start: ResolvedStart,
-    policy: Pick<ContainersLaunchInput, 'egressAllowlist' | 'egressAudit'> | undefined,
+    policy:
+      | Pick<ContainersLaunchInput, 'egressAllowlist' | 'egressAudit' | 'snapshotDiagnostic'>
+      | undefined,
     deadlineAt: number | undefined
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
@@ -555,12 +560,16 @@ export class SandboxContainers extends DurableObject<Env> {
     if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
-    const failure = await this.runStart(start, async () => {
-      const issuedAt = Date.now();
-      await this.startContainerAndActivateBilling(container, record, start.options);
-      await this.awaitMainProcess(container, start, issuedAt, deadlineAt);
-      await this.activateBillingIfRunning(container, record);
-    });
+    const failure = await this.runStart(
+      start,
+      async () => {
+        const issuedAt = Date.now();
+        await this.startContainerAndActivateBilling(container, record, start.options);
+        await this.awaitMainProcess(container, start, issuedAt, deadlineAt);
+        await this.activateBillingIfRunning(container, record);
+      },
+      policy?.snapshotDiagnostic
+    );
     if (failure !== null) return { started: false, startSource: start.source, ...failure };
     await this.writeRunning(ref, 'clear');
     return { started: true, startSource: start.source };
@@ -589,7 +598,7 @@ export class SandboxContainers extends DurableObject<Env> {
   ): Promise<ResolvedStart> {
     const plan = planNativeStart(
       {
-        image: this.containerImage(input.nativeImage ?? 'all-in-one'),
+        image: this.containerImage(input.nativeImage ?? 'runtime-free'),
         instance: input.instance,
         mainProcess,
         env: input.env,
@@ -630,8 +639,10 @@ export class SandboxContainers extends DurableObject<Env> {
    */
   private async runStart(
     start: ResolvedStart,
-    attempt: () => Promise<void>
+    attempt: () => Promise<void>,
+    diagnostic?: SnapshotLaunchDiagnosticContext
   ): Promise<StartFailure | null> {
+    const startedAt = diagnostic?.startedAt ?? Date.now();
     try {
       await attempt();
       return null;
@@ -640,9 +651,14 @@ export class SandboxContainers extends DurableObject<Env> {
         const snapshotFailureReason = classifySnapshotStartFailure(error);
         logControlDiagnostic('snapshot_start_failed', {
           sandboxId: this.sandboxNameForLog(),
+          allocationId: diagnostic?.allocationId,
+          source: diagnostic?.source ?? 'image',
+          failureStage: 'provider_snapshot',
           reason: snapshotFailureReason,
           errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
           cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+          attempt: diagnostic?.attempt ?? 1,
+          elapsedMs: Math.max(0, Date.now() - startedAt),
         });
         return { snapshotFailed: true, snapshotFailureReason };
       }
@@ -1325,7 +1341,7 @@ export class SandboxContainers extends DurableObject<Env> {
     );
   }
 
-  private containerImage(nativeImage: RuntimeStartupConfig['image']): string {
+  private containerImage(nativeImage: NativeRuntimeImage): string {
     const imageName =
       nativeImage === 'runtime-free' ? RUNTIME_FREE_CONTAINER_IMAGE : CONTAINER_IMAGE;
     const image = this.requiredContainer().images[imageName];
@@ -1407,7 +1423,7 @@ export class SandboxContainers extends DurableObject<Env> {
 
   /** The stored outcome of one capture, or null when this DO never recorded it. */
   /** The image a launch uses now; environment snapshots must match it. */
-  async currentImage(nativeImage: RuntimeStartupConfig['image']): Promise<string> {
+  async currentImage(nativeImage: NativeRuntimeImage): Promise<string> {
     return this.containerImage(nativeImage);
   }
 

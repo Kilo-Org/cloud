@@ -117,7 +117,9 @@ function isIdentifierRun(run: string): boolean {
  * rather than payload data: the `error.subsystem`, `error.operation`,
  * `trpc.procedure`, `trpc.code`, `auth.cause`, `auth.branch` and `auth.keys`
  * tags the app writes (code names such as `refresh_token_unreadable` or
- * `cliSessionsV2.getSessionMessagesPage`), the `turbo_module.method` tag the
+ * `cliSessionsV2.getSessionMessagesPage`), the two `credits.store-error-*` tags
+ * that carry a store SDK failure's slugged name and code
+ * (`purchase-verification-finish-failed`), the `turbo_module.method` tag the
  * Sentry SDK writes, and the React `componentStack` the render boundary
  * attaches as a direct `extra` field. Each entry is `<section>.<field>` for one
  * of the maps {@link scrubEvent} walks.
@@ -137,6 +139,8 @@ const IDENTIFIER_PATHS = new Set([
   'tags.auth.cause',
   'tags.auth.branch',
   'tags.auth.keys',
+  'tags.credits.store-error-name',
+  'tags.credits.store-error-code',
   'tags.turbo_module.method',
 ]);
 

@@ -1,12 +1,13 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgUsageStats } from '@/lib/hooks/use-organization-queries';
 
 /**
@@ -33,16 +34,30 @@ function StatTile({ label, value }: Readonly<{ label: string; value: string | nu
 
 type OrgUsageStatsProps = {
   organizationId: string;
+  /**
+   * Turns the section into the entry point for the full usage screen. Absent
+   * leaves the numbers informational.
+   */
+  onPress?: () => void;
 };
 
 /**
- * "Last 30 days" eyebrow + 2x2 usage stat tile grid. Visible to all org roles.
+ * "All members · last 30 days" eyebrow + 2x2 usage stat tile grid.
+ * Visible to all org roles.
+ *
+ * The eyebrow names every member because the tiles are organization-wide
+ * totals, while the usage screen the grid opens is self-scoped for a member
+ * without a money role (`usage.orgSelfNotice`).
  *
  * The grid carries no entrance animation: it is the section's entire body, so a
  * fade that does not run leaves four cards unpainted while their frames and
  * accessibility nodes are already in place.
+ *
+ * With `onPress` the whole grid opens the usage screen. The section cannot load
+ * keeps its own retry row instead of the wrapper: a pressable around a retry
+ * button leaves the reader guessing which control a tap reaches.
  */
-export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) {
+export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
   const { data, isError, isPaused, isFetching, refetch } = useOrgUsageStats(organizationId);
   const unavailable = data == null && (isError || isPaused);
@@ -51,17 +66,23 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
   // totals through a refetch error.
   const missingValue = unavailable ? '—' : null;
 
-  return (
+  const body = (
     <View className="gap-3">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('organization.usageStats.last30Days')}
+        {t('organization.usageStats.orgLast30Days')}
       </Text>
       <View className="gap-3">
         <View className="flex-row gap-3">
           <StatTile
             label={t('common.cost')}
+            // A money amount's symbol is neutral to the paragraph's direction, so
+            // the run keeps its own left-to-right order inside the tile.
             value={
-              data ? formatMoney(fromMicrodollars(data.totalCost), i18n.language) : missingValue
+              data
+                ? isolateLtrBidiText(
+                    formatPrefixedMoney(fromMicrodollars(data.totalCost), i18n.language)
+                  )
+                : missingValue
             }
           />
           <StatTile
@@ -91,5 +112,20 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
         </View>
       )}
     </View>
+  );
+
+  if (onPress === undefined || unavailable) {
+    return body;
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityHint={t('usage.viewDetails')}
+      className="active:opacity-70"
+    >
+      {body}
+    </Pressable>
   );
 }

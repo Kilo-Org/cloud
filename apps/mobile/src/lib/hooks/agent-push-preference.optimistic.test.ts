@@ -28,11 +28,9 @@ function readRow(qc: QueryClient): NotificationPreferences {
 
 function fullRow(overrides: Partial<NotificationPreferences> = {}): NotificationPreferences {
   return {
-    chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
     agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
     agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-    kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
     balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     spendAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
@@ -64,11 +62,9 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
   it('flips a non-agentUpdates category in a real full snapshot without corrupting the other keys', async () => {
     const qc = makeQueryClient();
     const original = {
-      chatMessages: true,
       agentAttention: true,
       agentUpdates: true,
       sessionStatus: false,
-      kiloclawActivity: true,
       balanceAlerts: true,
       spendAlerts: true,
       securityFindings: true,
@@ -85,10 +81,8 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
 
     const after = readRow(qc);
     expect(after.sessionStatus).toBe(true);
-    expect(after.chatMessages).toBe(true);
     expect(after.agentAttention).toBe(true);
     expect(after.agentUpdates).toBe(true);
-    expect(after.kiloclawActivity).toBe(true);
     expect(after.balanceAlerts).toBe(true);
     expect(after.spendAlerts).toBe(true);
     expect(after.securityFindings).toBe(true);
@@ -197,11 +191,9 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
 
 describe('per-category flip flow (each category in turn)', () => {
   const scenarios: { category: NotificationCategoryKey; next: boolean }[] = [
-    { category: 'chatMessages', next: false },
     { category: 'agentAttention', next: true },
     { category: 'agentUpdates', next: false },
     { category: 'sessionStatus', next: true },
-    { category: 'kiloclawActivity', next: false },
     { category: 'balanceAlerts', next: false },
     { category: 'spendAlerts', next: false },
     { category: 'securityFindings', next: true },

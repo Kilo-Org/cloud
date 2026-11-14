@@ -9,7 +9,11 @@ import { eq, sql } from 'drizzle-orm';
 import { enqueueCreditEvent } from '@kilocode/web-shared/lib/bouncer/credit-events';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { bouncer_credit_event_outbox, type BouncerCreditEventOutboxRow } from '@kilocode/db/schema';
+import {
+  bouncer_credit_event_outbox,
+  organizations,
+  type BouncerCreditEventOutboxRow,
+} from '@kilocode/db/schema';
 import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete-reasons';
 import {
   BOUNCER_CREDIT_EVENT_OUTBOX_INITIAL_RETRY_BACKOFF_MS,
@@ -83,11 +87,13 @@ describe('bouncer credit-event outbox (integration)', () => {
   it('keeps a normal-length source id unchanged as the wire identity and dedupe key', async () => {
     const user = await insertTestUser();
 
-    await enqueueCreditEvent(db, {
-      type: 'charge.failed',
-      eventId: 'evt-short-identity',
-      userId: user.id,
-    });
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.failed',
+        eventId: 'evt-short-identity',
+        userId: user.id,
+      })
+    );
 
     const [row] = await db
       .select()
@@ -101,7 +107,9 @@ describe('bouncer credit-event outbox (integration)', () => {
     const user = await insertTestUser();
     const longId = 'e'.repeat(200);
 
-    await enqueueCreditEvent(db, { type: 'charge.failed', eventId: longId, userId: user.id });
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, { type: 'charge.failed', eventId: longId, userId: user.id })
+    );
 
     const [row] = await db
       .select()
@@ -115,16 +123,20 @@ describe('bouncer credit-event outbox (integration)', () => {
     const user = await insertTestUser();
     const prefix = 'p'.repeat(128);
 
-    await enqueueCreditEvent(db, {
-      type: 'charge.failed',
-      eventId: `${prefix}A`,
-      userId: user.id,
-    });
-    await enqueueCreditEvent(db, {
-      type: 'charge.failed',
-      eventId: `${prefix}B`,
-      userId: user.id,
-    });
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.failed',
+        eventId: `${prefix}A`,
+        userId: user.id,
+      })
+    );
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.failed',
+        eventId: `${prefix}B`,
+        userId: user.id,
+      })
+    );
 
     const rows = await db
       .select()
@@ -141,11 +153,13 @@ describe('bouncer credit-event outbox (integration)', () => {
       blocked_reason: createSoftDeletedBlockedReason(),
     });
 
-    const result = await enqueueCreditEvent(db, {
-      type: 'charge.failed',
-      eventId: 'evt-for-deleted-user',
-      userId,
-    });
+    const result = await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.failed',
+        eventId: 'evt-for-deleted-user',
+        userId,
+      })
+    );
 
     expect(result.enqueued).toBe(false);
     const rows = await db
@@ -153,6 +167,54 @@ describe('bouncer credit-event outbox (integration)', () => {
       .from(bouncer_credit_event_outbox)
       .where(eq(bouncer_credit_event_outbox.event_id, 'evt-for-deleted-user'));
     expect(rows).toHaveLength(0);
+  });
+
+  it('reports an organization event against its family root with the family totals', async () => {
+    const user = await insertTestUser();
+    const parentCreatedAt = '2025-05-01T00:00:00.000Z';
+    const [parent] = await db
+      .insert(organizations)
+      .values({
+        name: 'Parent organization',
+        created_at: parentCreatedAt,
+        microdollars_used: 7_000,
+        total_microdollars_acquired: 100_000,
+      })
+      .returning();
+    const [child] = await db
+      .insert(organizations)
+      .values({
+        name: 'Child organization',
+        parent_organization_id: parent.id,
+        microdollars_used: 2_000,
+        total_microdollars_acquired: 5_000,
+      })
+      .returning();
+
+    await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.attempted',
+        eventId: 'evt-child-org-charge',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        userId: user.id,
+        orgId: child.id,
+        flow: 'topup',
+        amountCents: 2_000,
+        accountCreatedAt: child.created_at,
+        accountUsedMicrodollars: child.microdollars_used,
+      })
+    );
+
+    const [row] = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, 'evt-child-org-charge'));
+    expect(row?.payload.orgId).toBe(parent.id);
+    expect(row?.payload.accountUsedMicrodollars).toBe(9_000);
+    expect(new Date(String(row?.payload.accountCreatedAt)).toISOString()).toBe(parentCreatedAt);
+
+    await db.delete(organizations).where(eq(organizations.id, child.id));
+    await db.delete(organizations).where(eq(organizations.id, parent.id));
   });
 
   it('treats the same event_id with a different type as a distinct row', async () => {

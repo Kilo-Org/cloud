@@ -4,11 +4,13 @@ import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { MessageInfo } from './types';
 import {
   hasUnresolvedKilo2Assets,
+  isCompactionSummaryPart,
   kilo2AssetKey,
   kilo2ToolFileId,
   readKilo2Messages,
 } from './kilo2-source-messages';
 import { kilo2MessageSchema, kilo2PartId } from '@kilocode/session-ingest-contracts';
+import { findLatestContextUsage } from './context-usage';
 
 const session = {
   id: 'ses_source',
@@ -133,8 +135,208 @@ describe('versioned native conversation sources', () => {
         },
       ],
     });
-    expect(display?.messages.map(message => message.info.id)).toEqual([user.id, assistant.id]);
+    expect(display?.messages.map(message => message.info.id)).toEqual([
+      user.id,
+      assistant.id,
+      'msg_compacting',
+    ]);
     expect(display?.omittedItemCount).toBe(1);
+  });
+
+  it.each(['pending', 'running', 'completed', 'failed'])(
+    'projects a stable %s compaction marker in history and live updates',
+    status => {
+      const message = {
+        id: 'msg_compaction',
+        type: 'compaction',
+        status,
+        reason: 'manual',
+        time: { created: 4 },
+        summary: 'Internal context summary',
+        ...(status === 'failed' ? { error: { type: 'model', message: 'Model unavailable' } } : {}),
+      };
+      const history = cloudSessionMessagesPageSchema.parse({
+        ...page,
+        messages: [{ message }],
+      })?.messages[0];
+      expect(history?.info).toMatchObject({
+        id: message.id,
+        role: 'assistant',
+        summary: true,
+        time: { created: 4 },
+      });
+      expect(history?.parts).toEqual([
+        {
+          id: kilo2PartId(message.id, 0),
+          sessionID: session.id,
+          messageID: message.id,
+          type: 'compaction',
+          auto: false,
+        },
+        ...(status === 'completed'
+          ? [
+              {
+                id: `${kilo2PartId(message.id, 0)}_summary`,
+                sessionID: session.id,
+                messageID: message.id,
+                type: 'text',
+                text: 'Internal context summary',
+                metadata: { compactionSummary: true },
+              },
+            ]
+          : []),
+      ]);
+      const terminal = status === 'completed' || status === 'failed';
+      expect(history?.info.role === 'assistant' ? history.info.time.completed : undefined).toBe(
+        terminal ? 4 : undefined
+      );
+      if (status === 'failed')
+        expect(history?.info).toMatchObject({ error: { data: { message: 'Model unavailable' } } });
+      const live = createConversationSourceReader().read(
+        wire('conversation.message.updated', { sessionID: session.id, source, message })
+      ).events;
+      expect(live).toEqual([
+        { type: 'message.updated', info: history?.info },
+        ...(history?.parts ?? []).map(part => ({ type: 'message.part.updated', part })),
+      ]);
+      expect(message.summary).toBe('Internal context summary');
+    }
+  );
+
+  it('keeps the prior context reading when a native compaction fails', () => {
+    const messages = readKilo2Messages(session, [
+      {
+        ...kilo2MessageSchema.parse(assistant),
+        model: session.model,
+        tokens: { input: 100, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+      },
+      {
+        id: 'msg_failed_compaction',
+        type: 'compaction',
+        status: 'failed',
+        time: { created: 4 },
+      },
+    ]);
+    expect(findLatestContextUsage(messages)).toMatchObject({ contextTokens: 110 });
+    expect(messages[1]?.info).toMatchObject({
+      error: { data: { message: 'Context compaction failed' } },
+    });
+  });
+
+  it('keeps compaction content positions and identities stable through completion and reload', () => {
+    const reader = createConversationSourceReader();
+    const message = {
+      id: 'msg_compaction',
+      type: 'compaction',
+      status: 'running',
+      reason: 'auto',
+      time: { created: 4 },
+      content: [{ type: 'reasoning', text: 'Summarizing', time: { created: 4 } }],
+    };
+    const running = reader.read(
+      wire('conversation.message.updated', { sessionID: session.id, source, message })
+    ).events;
+    const completedMessage = { ...message, status: 'completed', summary: 'Internal summary' };
+    const completed = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: completedMessage,
+      })
+    ).events;
+    expect(running[1]).toMatchObject({
+      part: { id: kilo2PartId(message.id, 0), type: 'compaction', auto: true },
+    });
+    expect(completed[1]).toEqual(running[1]);
+    const restored = readKilo2Messages(session, [completedMessage])[0];
+    expect(completed.slice(1)).toEqual(
+      restored.parts.map(part => ({ type: 'message.part.updated', part }))
+    );
+    expect(restored.parts[2]).toMatchObject({
+      id: kilo2PartId(message.id, 1),
+      type: 'reasoning',
+    });
+    reader.observeProjected([restored]);
+    expect(
+      reader.read(
+        wire('conversation.event', {
+          sessionID: session.id,
+          source: { version: 'v2' },
+          event: {
+            id: 'evt_reasoning',
+            type: 'session.reasoning.ended',
+            data: { sessionID: session.id, assistantMessageID: message.id, ordinal: 0 },
+          },
+        })
+      ).events[0]
+    ).toMatchObject({ part: { id: kilo2PartId(message.id, 1) } });
+  });
+
+  it.each([undefined, '', '   '])('does not invent an absent compaction summary: %j', summary => {
+    const [message] = readKilo2Messages(session, [
+      {
+        id: 'msg_compaction',
+        type: 'compaction',
+        status: 'completed',
+        time: { created: 4 },
+        summary,
+      },
+    ]);
+    expect(message.parts).toHaveLength(1);
+    expect(message.parts[0].type).toBe('compaction');
+  });
+
+  it.each([
+    ['a completed time without status', { time: { created: 4, completed: 5 } }, true],
+    ['a failed status', { status: 'failed', time: { created: 4, completed: 5 } }, false],
+    [
+      'an error',
+      { time: { created: 4, completed: 5 }, error: { type: 'unknown', message: 'x' } },
+      false,
+    ],
+  ])(
+    'projects the summary for a compaction with %s only when it is displayed as completed',
+    (_, fields, shown) => {
+      const [message] = readKilo2Messages(session, [
+        { id: 'msg_compaction', type: 'compaction', summary: 'Saved summary', ...fields },
+      ]);
+      expect(message.info.role === 'assistant' && message.info.time.completed).toBe(5);
+      expect(message.parts.some(isCompactionSummaryPart)).toBe(shown);
+    }
+  );
+
+  it('does not count the displayed summary as native text when restoring a live layout', () => {
+    const reader = createConversationSourceReader();
+    const [message] = readKilo2Messages(session, [
+      {
+        id: 'msg_compaction',
+        type: 'compaction',
+        status: 'completed',
+        time: { created: 4 },
+        summary: 'Saved summary',
+        content: [{ type: 'text', text: 'Native text' }],
+      },
+    ]);
+    reader.observeProjected([message]);
+    const update = reader.read(
+      wire('conversation.event', {
+        sessionID: session.id,
+        source: { version: 'v2' },
+        event: {
+          id: 'evt_text',
+          type: 'session.text.ended',
+          data: {
+            sessionID: session.id,
+            assistantMessageID: message.info.id,
+            ordinal: 0,
+            text: 'Native text',
+          },
+        },
+      })
+    ).events;
+    expect(update[0]).toMatchObject({
+      part: { id: kilo2PartId(message.info.id, 1), text: 'Native text' },
+    });
   });
 
   it('supports v1 data and rejects unknown source versions', () => {

@@ -38,7 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatList, formatMoney, formatNumber } from '@/lib/format';
+import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -285,7 +285,7 @@ function SpendAlertsForm({
   const spend7d = spend?.spend7dMicrodollars ?? 0;
   const hasSpend = spend24h > 0 || spend7d > 0;
   const spendValue = hasSpend
-    ? formatMoney(fromMicrodollars(spend24h), i18n.language)
+    ? formatPrefixedMoney(fromMicrodollars(spend24h), i18n.language)
     : t('spendAlerts.noSpend');
 
   const windowOptions: readonly { value: WindowOption; label: string }[] = [
@@ -438,6 +438,10 @@ function SpendAlertsForm({
           label={t('spendAlerts.spend24h')}
           value={spendValue}
           valueFace={hasSpend ? 'mono' : 'text'}
+          // An amount's symbol is neutral to the paragraph's direction, so the
+          // run carries its own left-to-right order; the empty placeholder is a
+          // sentence and keeps the paragraph's.
+          valueDirection={hasSpend ? 'ltr' : undefined}
           selectable={hasSpend}
           last
         />

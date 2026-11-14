@@ -15,6 +15,7 @@ import { sendOrgSSOUserJoinedEmail } from '@kilocode/web-shared/lib/email';
 import { SSO_SIGNIN_PATH } from '@kilocode/web-shared/lib/auth/constants';
 import { authFailureRedirectUrl } from '@/lib/auth/redirect-urls';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -85,8 +86,10 @@ async function processSSOInternal(
     }
     throw new Error(res.error);
   }
-  if (res.user.blocked_reason) {
-    throw new Error('User is blocked: ' + res.user.blocked_reason);
+  if (isBlockedAccount(res.user)) {
+    throw new Error(
+      `User is blocked${res.user.blocked_reason ? `: ${res.user.blocked_reason}` : ''}`
+    );
   }
 
   const savedUser = res.user;

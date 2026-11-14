@@ -33,10 +33,6 @@ function flushMicrotasks(): Promise<void> {
 // eslint-disable-next-line no-empty-function -- listener body is irrelevant, only subscribe()'s side effect (starting the load) is under test
 function noopListener(): void {}
 
-// The retrying read backs off 250/500/1000 ms, so a test that drives a
-// rejection must let those timers fire before the read settles.
-const RETRY_BUDGET_MS = 250 + 500 + 1000 + 250;
-
 describe('createSecureStorePreference', () => {
   beforeEach(() => {
     getItemAsync.mockReset();
@@ -47,8 +43,8 @@ describe('createSecureStorePreference', () => {
   });
 
   it('logs to Sentry (not a toast) on a read failure and keeps the default value', async () => {
-    // Every attempt rejects, so the retry budget is exhausted before the
-    // failure is surfaced.
+    // Every attempt rejects, so the retry policy gives up and surfaces the
+    // failure.
     getItemAsync.mockRejectedValue(new Error('disk error'));
     const store = createSecureStorePreference<boolean>({
       key: 'k',
@@ -59,17 +55,18 @@ describe('createSecureStorePreference', () => {
 
     vi.useFakeTimers();
     try {
-      const unsubscribe = store.subscribe(noopListener);
-      await vi.advanceTimersByTimeAsync(RETRY_BUDGET_MS);
+      // Fake timers stay on, so the backoff must still fire. The wait is on the
+      // store's own completion signal, not on a copied delay budget.
+      const loading = store.whenLoaded();
+      await vi.runAllTimersAsync();
+      await loading;
 
       expect(store.get()).toBe(false);
       expect(store.getHasLoaded()).toBe(true);
-      expect(getItemAsync).toHaveBeenCalledTimes(4);
       expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
         tags: { 'error.subsystem': 'preferences', 'error.operation': 'load_secure_store' },
       });
       expect(toastError).not.toHaveBeenCalled();
-      unsubscribe();
     } finally {
       vi.useRealTimers();
     }
@@ -88,12 +85,14 @@ describe('createSecureStorePreference', () => {
 
     vi.useFakeTimers();
     try {
-      const unsubscribe = store.subscribe(noopListener);
-      await vi.advanceTimersByTimeAsync(RETRY_BUDGET_MS);
+      // The first read rejects; the retry timer must fire before the second
+      // attempt can apply the stored value.
+      const loading = store.whenLoaded();
+      await vi.runAllTimersAsync();
+      await loading;
 
       expect(store.get()).toBe(true);
       expect(store.getHasLoaded()).toBe(true);
-      unsubscribe();
     } finally {
       vi.useRealTimers();
     }

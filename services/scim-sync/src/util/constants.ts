@@ -59,12 +59,23 @@ export const PAGE_LIMIT = 100;
 export const DRAIN_BUDGET_MS = 20_000;
 
 /**
- * How long a retryable conflict may hold the cursor before the event is
- * parked, measured from its first failure. A conflict names a missing
- * dependency, which an event behind the cursor can supply — but not one that
- * is ahead of it, and nothing else ever will. An hour is long enough to cover
- * an app deploy or a database failover and short enough that a permanently
- * unsatisfiable event does not stall the directory indefinitely.
+ * How long a retryable conflict may hold the cursor before the event is parked.
+ *
+ * Two budgets, both measured from a first failure, because the namespace holds
+ * one instance and every tenant queues behind its cursor:
+ *
+ * - the event's own, from its first failure, which is what a single conflicting
+ *   event may hold;
+ * - its directory's, from that directory's first conflict, which is what one
+ *   directory may hold in aggregate. Once it is spent, the directory's later
+ *   conflicts park at once, so a directory's events hold the cursor for about
+ *   one budget however many of them conflict.
+ *
+ * A conflict names a missing dependency, which an event *behind* the cursor can
+ * supply — but not one that is ahead of it, and nothing else ever will. An hour
+ * is long enough to cover an app deploy or a database failover and short enough
+ * that a permanently unsatisfiable event does not stall the directory
+ * indefinitely.
  */
 export const CONFLICT_RETRY_BUDGET_MS = 60 * 60 * 1000;
 

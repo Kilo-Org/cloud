@@ -8,7 +8,12 @@ import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachme
 import { AttachmentPreviewStrip } from './attachment-preview-strip';
 
 const FIXTURE_DIR_NAME = 'agent-attachment-fixture';
-const FIXTURE_FILENAME = 'quarterly-report.pdf';
+/**
+ * Long on purpose: the chip is 168 dp wide, so this name cannot fit and the
+ * filename line must ellipsize before the Remove badge and the Retry badge.
+ * A short default name would leave that clearance unmeasured.
+ */
+const FIXTURE_FILENAME = 'quarterly-revenue-forecast-northern-region-2026-q4-final.pdf';
 const FIXTURE_BYTES = 564;
 
 /**

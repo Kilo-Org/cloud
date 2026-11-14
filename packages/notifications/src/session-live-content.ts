@@ -25,6 +25,15 @@ import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-
 export const SESSION_CARD_STATUS_KINDS = [...GLANCEABLE_STATUS_KINDS, 'failed'] as const;
 export type SessionCardStatusKind = (typeof SESSION_CARD_STATUS_KINDS)[number];
 
+/**
+ * The card kinds that mean the turn finished: a quiet idle card or a failed
+ * turn. The content builder and the relevance ranking share this one test, so a
+ * new terminal kind changes both together.
+ */
+export function isFinishedSessionCardStatus(kind: SessionCardStatusKind): boolean {
+  return kind === 'idle' || kind === 'failed';
+}
+
 /** How a finished session ended, for the outcome line. */
 export const sessionLiveOutcomeKindSchema = z.enum(['pr_opened', 'changes', 'none']);
 export type SessionLiveOutcomeKind = z.infer<typeof sessionLiveOutcomeKindSchema>;

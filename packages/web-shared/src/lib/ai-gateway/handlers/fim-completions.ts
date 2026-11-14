@@ -33,7 +33,10 @@ import {
   findSupportedFimModel,
   type FimProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -178,17 +181,23 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     user_byok: !!userByokEntry,
     has_tools: false,
     feature,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: false,
-      samples: null,
-      // FIM feeds volume rules only, which do not read a prompt hash.
-      promptSimHash: null,
-    }),
+  };
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: false,
+    samples: null,
+    // FIM feeds volume rules only, which do not read a prompt hash.
+    promptSimHash: null,
   };
 
   setTag('ui.ai_model', requestBody.model);
+  // This one call is the route's whole access decision. It answers the paid-usage gate, then
+  // the caller's organization model-access policy: the member grant, the enterprise
+  // organization's model deny list, and its provider allow-list, matched against the provider
+  // this route selected for the model. A denial returns `modelNotAllowedResponse` before any
+  // upstream request. Do not resolve that policy again here; `direct-provider-access.ts` is the
+  // single source, so a second resolution can only disagree with it.
   const accessResult = await checkDirectProviderAccess({
     user,
     organizationId,
@@ -199,6 +208,10 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   });
   if (accessResult.rejection) return accessResult.rejection;
   const { balance, plan, payer } = accessResult.access;
+
+  // The usage row reports the payer the balance check resolved: the root organization for an
+  // organization member.
+  usageContext.bouncer = await bouncer.usage(bouncerUsageFields, payer);
 
   // Data-use contract for this route: FIM goes straight to the provider, and the supported
   // providers are classified by the gateway's provider data policy as not training on prompts
@@ -258,26 +271,23 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = proxyRes.status;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: requestBody.stream === true,
-      userByok: !!userByokEntry,
-      provider: fimProvider,
-      requestedModel: requestBody.model,
-      resolvedModel: requestBody.model,
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: proxyRes.status,
-    },
-    proxyRes.clone(),
-    requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: false,
+    isStreaming: requestBody.stream === true,
+    userByok: !!userByokEntry,
+    provider: fimProvider,
+    requestedModel: requestBody.model,
+    resolvedModel: requestBody.model,
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs,
+    statusCode: proxyRes.status,
+  };
 
   if (!proxyRes.body) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
     return NextResponse.json(
       {
         error: 'No body returned from upstream',
@@ -299,8 +309,8 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
 
   const clonedResponse = proxyRes.clone(); // reading from body is side-effectful
 
-  // Account for usage using FIM-specific parser
-  countAndStoreFimUsage(clonedResponse, usageContext, fimRequestSpan);
+  const accounting = countAndStoreFimUsage(clonedResponse, usageContext, fimRequestSpan);
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
 
   return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

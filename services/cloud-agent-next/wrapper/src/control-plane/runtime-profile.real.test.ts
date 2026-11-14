@@ -140,6 +140,7 @@ suite('pinned Kilo profile discovery', () => {
         createdOnPlatform: 'webhook',
       };
       const runtime: TurnKiloRuntime = {
+        nativeRuntimeId: 'agent-probe',
         directory: fixture.directory,
         env: {},
         client: fixture.harness,
@@ -149,6 +150,7 @@ suite('pinned Kilo profile discovery', () => {
         isUnavailable: () => false,
         isRetiredClient: () => false,
         sessionState: () => undefined,
+        liveTreeExecutions: () => undefined,
         refreshActivity: async () => {},
       };
       manager = createTurnManager({

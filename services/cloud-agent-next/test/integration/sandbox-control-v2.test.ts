@@ -1,4 +1,4 @@
-import { preinstalledStartup } from '../../src/sandbox-control/preinstalled-startup.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 import {
   env,
   evictAllDurableObjects,
@@ -45,13 +45,11 @@ import {
   type BillingScheduleEntries,
 } from '../../src/sandbox-control/billing-schedule.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
 import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
-import {
-  createFakeCredentialBroker,
-  installFakeCredentialEnv,
-} from './helpers/fake-credentials.js';
+import { createFakeCredentialBroker, installFakeSandboxEnv } from './helpers/fake-credentials.js';
 import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
@@ -62,6 +60,33 @@ const CUSTOM_ALLOCATION_NAME = 'usr-shared-allocation-name';
 const LEGACY_ALLOCATION_NAME = 'usr-legacy-shared-allocation';
 const MINUTE = 60 * 1000;
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
+const VERCEL_RUNTIME_DESCRIPTOR = JSON.stringify({
+  format: 1,
+  bootstrap: 1,
+  platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+  abi: RUNTIME_BASE_ABI,
+  cliVersion: '7.8.1',
+  cliExecutable: 'package/bin/kilo',
+  wrapperSdkVersion: '7.8.1',
+  protocol: '1',
+  artifacts: [
+    { role: 'cli', sha256: 'a'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+    { role: 'control', sha256: 'b'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+  ],
+  caps: { maxTransferBytes: 100, maxExpandedBytes: 100, maxFileCount: 10 },
+  inventory: [
+    ['cli', 'package/bin/kilo', 0o755, 1, 'a'.repeat(64)],
+    ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
+  ],
+});
+const VERCEL_RUNTIME_ENV = {
+  RUNTIME_RELEASE_DESCRIPTOR: VERCEL_RUNTIME_DESCRIPTOR,
+  RUNTIME_RELEASE_BUCKET: {
+    async head() {
+      return { size: 1 };
+    },
+  },
+};
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
@@ -188,6 +213,7 @@ async function startAllocation(
   const stub = sandboxNamespace.getByName(sandboxId);
   await runInDurableObject(stub, async (instance, state) => {
     await instance.getAllocationState();
+    if (options.provider === 'vercel') Object.assign(instance.env, VERCEL_RUNTIME_ENV);
     if (options.meter !== undefined) await state.storage.put('control_plane_owner', 'owner-1');
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
@@ -490,7 +516,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     );
   });
   it.each([
-    { provider: 'cloudflare' },
+    { provider: 'vercel' },
     { provider: 'cloudflare-containers' },
     { provider: 'cloudflare-containers', instance: 'standard-3' },
     { provider: 'cloudflare-containers', instance: 'standard-4' },
@@ -2471,7 +2497,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     });
     const stub = await startAllocation(provider, {
       preparingRoute: 'workspace_cold_retry',
-      timers: { providerCreateRetryMs: 1 },
+      timers: { providerCreateRetryMs: MINUTE },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const firstAttempt = launchIdentity(provider);
@@ -2482,6 +2508,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       expect(state.allocationId).not.toBe(firstAttempt.allocationId);
       expect(state.providerRef).toBeNull();
     });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
     await runAlarm(stub);
     // A transient launch failure must retain the retry: a second attempt starts.
     await waitFor(() => expect(provider.createCalls).toBe(2));
@@ -2507,6 +2534,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'media.githubusercontent.com',
     'objects.githubusercontent.com',
     'raw.githubusercontent.com',
+    'session-sync.kiloapps.io',
     'uploads.github.com',
     'worker.example.com',
   ];
@@ -2527,7 +2555,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
         WORKER_URL: 'https://worker.example.com',
         KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
@@ -2654,7 +2682,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     await configureEgressSandbox(provider);
     const stub = await startAllocation(provider, {
       sandboxId,
-      provider: 'cloudflare',
+      provider: 'vercel',
       egressMode: 'unrestricted',
     });
     await awaitStarting(provider, stub);
@@ -2722,7 +2750,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
           instanceId: 'reconstructed-allocation',
         });
         await reconstructed.provider.launch(ref, {
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           env: {},
         });
       });
@@ -3107,7 +3135,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
     }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
         AGENT_ENV_VARS_PRIVATE_KEY: privateKey,
       });
       Object.assign(instance, {
@@ -3472,6 +3500,7 @@ describe('SandboxControlV2 previewTarget', () => {
   it('resolves a connected container preview by workspace scope across absent, failed and preparing routes', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
     await connectAndHello(provider, stub);
 
     // A sibling route proves the workspace scope; the viewed chat has no route.
@@ -3505,6 +3534,7 @@ describe('SandboxControlV2 previewTarget', () => {
   it('denies a foreign owner, organization or workspace and reports stopped or missing refs', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
     await connectAndHello(provider, stub);
     await seedPreviewRoutes(stub, [
       {

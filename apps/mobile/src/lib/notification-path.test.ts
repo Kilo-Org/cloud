@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { SECURITY_LIFECYCLE_EVENTS } from '@kilocode/notifications/schemas';
 
-import { notificationPathForData, prPathForData } from './notification-path';
+import {
+  notificationDestinationForData,
+  notificationPathForData,
+  prPathForData,
+} from './notification-path';
 
 describe('prPathForData', () => {
   it('routes a GitHub PR payload to the PR review route with via=push', () => {
@@ -62,46 +66,55 @@ describe('notificationPathForData', () => {
     ).toBe('/(app)/agent-briefing?via=push');
   });
 
-  it('routes chat message notifications to the conversation screen', () => {
-    expect(
-      notificationPathForData({
-        type: 'chat.message',
-        sandboxId: 'sandbox-1',
-        conversationId: 'conversation-1',
-        messageId: 'message-1',
-      })
-    ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/conversation-1?via=push');
+  it.each([
+    {
+      type: 'chat.message',
+      sandboxId: 'sandbox-1',
+      conversationId: 'conversation-1',
+      messageId: 'm1',
+    },
+    { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sandbox-1' },
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sandbox-1' },
+  ] as const)('keeps KiloClaw $type off the app router', data => {
+    // KiloClaw has no mobile screen, so it has no app href; its tap opens the
+    // matching web page instead.
+    expect(notificationPathForData(data)).toBeNull();
+    expect(notificationDestinationForData(data, 'https://app.example.com')).toMatchObject({
+      kind: 'external',
+    });
   });
 
-  it('keeps notifications on the tab-owned KiloClaw chat route', () => {
+  it('opens a KiloClaw conversation on its web chat', () => {
     expect(
-      notificationPathForData({
-        type: 'chat.message',
-        sandboxId: 'sandbox-1',
-        conversationId: 'conversation-1',
-        messageId: 'message-1',
-      })
-    ).toContain('/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/');
+      notificationDestinationForData(
+        {
+          type: 'chat.message',
+          sandboxId: 'sandbox-1',
+          conversationId: 'conv_1',
+          messageId: 'm1',
+        },
+        'https://app.kilo.ai'
+      )
+    ).toEqual({ kind: 'external', url: 'https://app.kilo.ai/claw/chat/conv_1' });
   });
 
-  it('routes ready lifecycle notifications with legacy sandbox IDs to the sandbox chat screen', () => {
-    expect(
-      notificationPathForData({
-        type: 'instance-lifecycle',
-        event: 'ready',
-        sandboxId: 'abcDEF123_-',
-      })
-    ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/abcDEF123_-');
+  it.each([
+    { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sandbox-1' },
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sandbox-1' },
+  ] as const)('opens a KiloClaw $type push on the instance page', data => {
+    expect(notificationDestinationForData(data, 'https://app.kilo.ai')).toEqual({
+      kind: 'external',
+      url: 'https://app.kilo.ai/claw',
+    });
   });
 
-  it('routes start_failed lifecycle notifications with ki sandbox IDs to the sandbox chat screen', () => {
+  it('leaves an app destination alone and ignores the web origin', () => {
     expect(
-      notificationPathForData({
-        type: 'instance-lifecycle',
-        event: 'start_failed',
-        sandboxId: 'ki_deadbeef',
-      })
-    ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/ki_deadbeef');
+      notificationDestinationForData(
+        { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+        'https://app.kilo.ai'
+      )
+    ).toEqual({ kind: 'app', href: '/(app)/agent-chat/ses_1?via=push' });
   });
 
   it('routes cloud agent notifications to the matching agent session', () => {

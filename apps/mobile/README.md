@@ -6,10 +6,11 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 
 ## Feature availability
 
-- Chat and PR Review always appear in signed-in navigation.
+- The four signed-in tabs are Home, Agents, Chat, and Profile. Home and Profile include PR Review.
+- Quick Chat runs conversations on Kilo, custom backends, or supported on-device models.
+- Profile retains account, device sessions, notification preferences, and billing settings.
 - The `mobile-chat` and `mobile-pr-review` flags no longer control these features.
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
-- KiloClaw tab visibility still depends on instance ownership.
 
 ## Profile credits
 
@@ -256,8 +257,6 @@ Native compatibility requirements:
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.
-Background location descriptions remain disabled because the app does not request background location.
-Apple requires a localized motion description for the location library's linked APIs, even though Kilo does not use or collect motion activity.
 Every build localizes the local-network prompt, because Chat can connect to a local model server.
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
@@ -473,12 +472,19 @@ The Expo plugin disables Horizon and Fire OS through `modules.horizon` and
 builds. Rebuild the native development client after changing `expo-iap`; a Metro
 reload alone does not update its native billing implementation.
 
-Kilo Pass has no native purchase, restore, or store-management flow in the app.
-The Profile card and `/kilo-pass` route render the backend
-`kiloPass.getPurchasePresentation` result:
+Kilo Pass has no native purchase, restore, store-management, or external-link
+flow in the app. The Profile card and the `/kilo-pass` route both read
+`kiloPass.getState`:
 
-- `unavailable` shows the unavailable presentation without purchase controls.
-- `web_management` shows Manage, which opens the returned `webUrl`.
+- No pass shows that Kilo Pass is not available in the app.
+- An active pass shows its tier and billing cadence, its status, the renewal or
+  paid-through date, the current period's usage against the available credits,
+  and the bonus credits for the period. A scheduled cancellation shows the
+  paid-through date; a paused pass shows its resume date.
+- A pass whose provider status ended shows the ended message.
+- A failed read offers one retry.
+
+No control on either surface buys, cancels, resumes, or manages a pass.
 
 Kilo Pass store verification, provider notifications, and expiry reconciliation
 remain on the backend for existing store subscriptions.

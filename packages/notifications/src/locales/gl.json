@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Os axentes activos teñen unha actualización"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tarefa completada"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Fallou: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Interrompido: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

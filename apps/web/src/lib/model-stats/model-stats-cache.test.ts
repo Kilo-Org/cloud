@@ -5,6 +5,7 @@ import type { SQL } from 'drizzle-orm';
 import type { ModelStats } from '@kilocode/db/schema';
 import type * as Cache from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import type * as ListRoute from '@/app/api/models/stats/route';
 import type * as DetailRoute from '@/app/api/models/stats/[slug]/route';
 import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
@@ -16,7 +17,13 @@ const mockFrom = jest.fn((_table: unknown) => ({ leftJoin: mockLeftJoin, orderBy
 const mockSelect = jest.fn((_selection: { stat: unknown; verification?: SQL }) => ({
   from: mockFrom,
 }));
-const mockReplicaSelect = jest.fn();
+const mockReplicaOrderBy = jest.fn<Promise<Cache.ModelStatsCacheEntry[]>, [unknown]>();
+const mockReplicaSelect = jest.fn((_selection: unknown) => ({
+  from: (_table: unknown) => ({
+    leftJoin: (_table: unknown, _condition: SQL) => ({ orderBy: mockReplicaOrderBy }),
+    orderBy: mockReplicaOrderBy,
+  }),
+}));
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { select: mockSelect },
@@ -75,6 +82,7 @@ beforeEach(async () => {
   jest.resetModules();
   jest.clearAllMocks();
   mockOrderBy.mockReset().mockResolvedValue([entry()]);
+  mockReplicaOrderBy.mockReset().mockResolvedValue([entry()]);
   mockPublicationEnabled = true;
   jest.useFakeTimers();
   jest.setSystemTime(Date.parse(checkedAt));
@@ -129,6 +137,37 @@ describe('model stats snapshot cache', () => {
     const snapshot = await cache.getModelStatsSnapshot();
     expect(await enkrypt.getEnkryptBenchmarks()).toBe(snapshot);
     expect(snapshot.customLlmIds).toEqual(new Set(['acme/custom']));
+  });
+
+  it('keeps one snapshot per read client and expires both on invalidation', async () => {
+    const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
+    mockReplicaOrderBy.mockResolvedValue([entry({ isStealth: true })]);
+
+    const replica = await cache.getModelStatsSnapshot({ fromDb: readDb });
+    const primary = await cache.getModelStatsSnapshot();
+
+    expect(replica).not.toBe(primary);
+    expect(replica.entries[0].stat.isStealth).toBe(true);
+    expect(primary.entries[0].stat.isStealth).toBe(false);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+    expect(mockReplicaSelect).toHaveBeenCalledTimes(1);
+    const { modelStats } = await import('@kilocode/db/schema');
+    expect(mockReplicaSelect).toHaveBeenCalledWith({
+      stat: modelStats,
+      verification: expect.anything(),
+    });
+
+    expect(await cache.getModelStatsSnapshot({ fromDb: readDb })).toBe(replica);
+    expect(await cache.getModelStatsSnapshot()).toBe(primary);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+    expect(mockReplicaSelect).toHaveBeenCalledTimes(1);
+
+    cache.invalidateModelStatsCache();
+    expect(cache.isModelStatsSnapshotFresh(replica)).toBe(false);
+    expect(cache.isModelStatsSnapshotFresh(primary)).toBe(false);
+    expect(await cache.getModelStatsSnapshot({ fromDb: readDb })).not.toBe(replica);
+    expect(mockReplicaSelect).toHaveBeenCalledTimes(2);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
   });
 
   it('selects only each row verification alongside nested stats in one ordered left join', async () => {

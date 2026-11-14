@@ -1,8 +1,5 @@
-import { isPreviewLoopbackHostname } from '../../../../../services/cloud-agent-next/src/shared/preview-loopback';
-import {
-  PREVIEW_PORT_MAX,
-  PREVIEW_PORT_MIN,
-} from '../../../../../services/cloud-agent-next/src/shared/preview-port';
+import { isPreviewLoopbackHostname } from '@cloud-agent-shared/preview-loopback';
+import { PREVIEW_PORT_MAX, PREVIEW_PORT_MIN } from '@cloud-agent-shared/preview-port';
 
 /** The placeholder in the preview URL template from `getPreviewOptions`. */
 const PREVIEW_URL_TEMPLATE_PORT = '{port}';

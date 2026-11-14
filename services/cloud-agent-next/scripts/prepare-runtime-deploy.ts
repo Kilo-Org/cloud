@@ -38,8 +38,6 @@ export async function prepareRuntimeDeployment(input: {
   verifyBase: (base: RuntimeBase) => void | Promise<void>;
 }) {
   const startup = runtimeStartupConfigSchema.parse(input.startup);
-  if (startup.mode === 'preinstalled')
-    return renderRuntimeTarget({ config: input.config, environment: input.environment, startup });
   const { target } = validateRuntimeTarget(input.config, input.environment);
   runtimeBucketBindings(target.r2_buckets, input.bucket);
   const { handoff } = await loadRuntimeHandoff(input.store, input.sourceSha, input.baseInputId);
@@ -137,14 +135,6 @@ export async function main(
     environment
   );
   const { target } = validateRuntimeTarget(raw, environment);
-  if (startup.mode === 'preinstalled') {
-    await writeDeploymentConfig(
-      packageRoot,
-      environment,
-      renderRuntimeTarget({ config: raw, environment, startup })
-    );
-    return; // No publication storage request, registry access or publisher credentials.
-  }
   const accountId = z.string().parse(process.env.RUNTIME_R2_ACCOUNT_ID);
   const bucket = z.string().parse(process.env.RUNTIME_R2_BUCKET);
   runtimeBucketBindings(target.r2_buckets, bucket);

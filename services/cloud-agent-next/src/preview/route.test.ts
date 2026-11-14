@@ -1039,6 +1039,22 @@ describe('preview upstream forwarding', () => {
     expect(response.headers.get('set-cookie')).toBe('a=1; Path=/');
   });
 
+  it.each(['127.0.0.2', '127.255.255.254', '[::ffff:7f00:1]', 'localhost.', 'app.localhost'])(
+    'rewrites a same-port %s redirect to the preview origin through the preview route',
+    async host => {
+      const { deps, fetchUpstream } = fixture();
+      fetchUpstream.mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { Location: `http://${host}:${PORT}/login` },
+        })
+      );
+      const response = await handlePreviewRequest(proxyRequest(sessionToken()), env, deps);
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe(`${ORIGIN}/login`);
+    }
+  );
+
   it('drops the preview cookie the app tries to set', async () => {
     const { deps, fetchUpstream } = fixture();
     fetchUpstream.mockResolvedValueOnce(

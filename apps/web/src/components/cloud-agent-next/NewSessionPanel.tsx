@@ -48,7 +48,8 @@ import {
 } from '@/components/shared/RepositoryCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
-import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
+import { CloudAgentModeCombobox } from './CloudAgentModeCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
@@ -58,6 +59,7 @@ import { environmentBlocksStart } from '@/components/cloud-agent-next/environmen
 import { useSessionEnvironment } from '@/hooks/useSessionEnvironment';
 import type { EnvironmentRepository } from '@/hooks/useCloudAgentEnvironments';
 import { StackedOnSegment } from '@/components/cloud-agent-next/StackedOnSegment';
+import { NewSessionComputePrice } from '@/components/cloud-agent-next/NewSessionComputePrice';
 import {
   contextGroupClassName,
   contextSegmentClassName,
@@ -1576,10 +1578,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             />
             {/* Desktop: individual pickers */}
             <div className="hidden md:contents">
-              <ModeCombobox<AgentMode>
+              <CloudAgentModeCombobox
                 value={mode}
                 onValueChange={setMode}
-                options={NEXT_MODE_OPTIONS}
                 customOptions={customModeOptions}
                 variant="compact"
                 className="min-w-0"
@@ -1692,8 +1693,8 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         </div>
 
         {/* Session context (outside prompt box): code source left, sandbox setup right */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="@container/context flex flex-col gap-1.5">
+          <div className="flex flex-col items-start gap-2 @xl/context:flex-row @xl/context:items-center">
             <div className={contextGroupClassName}>
               {stackedTarget ? (
                 <span
@@ -1944,7 +1945,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               )}
             </div>
 
-            <div className={cn(contextGroupClassName, 'ml-auto')}>
+            <div className={cn(contextGroupClassName, '@xl/context:ml-auto')}>
               <RepositoryEnvironmentChip
                 organizationId={organizationId}
                 repository={environmentRepository}
@@ -1972,6 +1973,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               This workspace is being deleted or no longer exists. Remove the stack target and start
               a normal session.
             </p>
+          )}
+          {!organizationId && (
+            <NewSessionComputePrice
+              repository={environmentRepository}
+              environment={repositoryEnvironment}
+            />
           )}
         </div>
 

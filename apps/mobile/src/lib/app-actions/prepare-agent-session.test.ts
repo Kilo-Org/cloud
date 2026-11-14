@@ -132,3 +132,57 @@ describe('prepareAgentSession post-create cleanup', () => {
     expect(deps.rotateKey).toHaveBeenCalledOnce();
   });
 });
+
+describe('prepareAgentSession environment', () => {
+  it('carries the chosen environment and the picker flag in the create body', async () => {
+    const deps = createDeps();
+
+    await prepareAgentSession(
+      {
+        ...INTENT,
+        requestedEnvironment: { id: '11111111-1111-4111-8111-111111111111' },
+        requireEnvironmentChoice: true,
+      },
+      deps
+    );
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedEnvironment: { id: '11111111-1111-4111-8111-111111111111' },
+        requireEnvironmentChoice: true,
+      })
+    );
+  });
+
+  it('sends neither field when the form has no environment pick', async () => {
+    const deps = createDeps();
+
+    await prepareAgentSession(INTENT, deps);
+
+    const body = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(body).not.toHaveProperty('requestedEnvironment');
+    expect(body).not.toHaveProperty('requireEnvironmentChoice');
+  });
+
+  it('treats a different environment as a different retry intent', async () => {
+    const first = createDeps();
+    await prepareAgentSession(
+      { ...INTENT, requestedEnvironment: { id: '11111111-1111-4111-8111-111111111111' } },
+      first
+    );
+    const second = createDeps();
+    await prepareAgentSession(
+      { ...INTENT, requestedEnvironment: { id: '22222222-2222-4222-8222-222222222222' } },
+      second
+    );
+    const withoutEnvironment = createDeps();
+    await prepareAgentSession(INTENT, withoutEnvironment);
+
+    const fingerprints = [
+      first.getKey.mock.calls[0]?.[0],
+      second.getKey.mock.calls[0]?.[0],
+      withoutEnvironment.getKey.mock.calls[0]?.[0],
+    ];
+    expect(new Set(fingerprints).size).toBe(3);
+  });
+});

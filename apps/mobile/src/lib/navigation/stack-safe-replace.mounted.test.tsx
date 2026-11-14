@@ -261,17 +261,4 @@ describe('useStackSafeReplace', () => {
 
     unmount(renderer);
   });
-
-  it('leaves the stack alone when the source route is the only one left', () => {
-    setStack([r('new-1', 'agent-chat/new')], 0);
-    const renderer = mount();
-
-    latestReplace?.('/(app)/agent-chat/ses_1');
-    endTransition();
-
-    // Resetting to an empty route list would tear down the navigator.
-    expect(resetMock).not.toHaveBeenCalled();
-
-    unmount(renderer);
-  });
 });

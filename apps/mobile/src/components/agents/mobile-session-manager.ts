@@ -36,6 +36,11 @@ import { answerSessionPermission } from '@/lib/glanceable/approve-ask';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
 import {
+  clearPendingSendConfirmation,
+  persistPendingSendConfirmation,
+  readPendingSendConfirmations,
+} from '@/lib/persist/pending-send-confirmations';
+import {
   persistResolvedDeliveryFailure,
   readResolvedDeliveryFailures,
 } from '@/lib/persist/resolved-delivery-failures';
@@ -318,6 +323,27 @@ export function createMobileAgentSessionManager({
       readResolvedDeliveryFailures(resolvedDeliveryOwner.userId, id),
     persistResolvedDeliveryFailure: (id: KiloSessionId, messageId: string) => {
       void persistResolvedDeliveryFailure(resolvedDeliveryOwner, id, messageId);
+    },
+    // Durable memory of sends whose outcome the transport could not confirm:
+    // the route that sent one may be gone before the server's record arrives,
+    // and the draft the composer restored survives that teardown.
+    // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
+    readPendingSendConfirmations: (id: KiloSessionId) =>
+      readPendingSendConfirmations(resolvedDeliveryOwner.userId, id),
+    persistPendingSendConfirmation: (id: KiloSessionId, messageId: string, text: string) => {
+      void persistPendingSendConfirmation({
+        owner: resolvedDeliveryOwner,
+        sessionId: id,
+        messageId,
+        text,
+      });
+    },
+    clearPendingSendConfirmation: (id: KiloSessionId, messageId: string) => {
+      void clearPendingSendConfirmation({
+        owner: resolvedDeliveryOwner,
+        sessionId: id,
+        messageId,
+      });
     },
     // A tRPC call whose client control-plane deadline expired never got an
     // answer: the open is stalled, not failed. The manager keeps the skeleton

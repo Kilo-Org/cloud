@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TRPCClientErrorLike } from '@trpc/client';
 import type { GetWorktreeChangesOutput } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
@@ -14,18 +14,29 @@ export function useSavedWorktreeChanges({
   organizationId,
   worktreeId,
   enabled,
+  refreshToken = 0,
 }: {
   userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
   enabled: boolean;
+  refreshToken?: number;
 }) {
   const trpcClient = useRawTRPCClient();
+  const queryClient = useQueryClient();
   const queryKey = useMemo(
     () => getWorktreeChangesQueryKey({ userId, organizationId, worktreeId, cloudAgentSessionId }),
     [userId, organizationId, worktreeId, cloudAgentSessionId]
   );
+  const previousRefresh = useRef({ queryKey, refreshToken });
+  useEffect(() => {
+    const previous = previousRefresh.current;
+    previousRefresh.current = { queryKey, refreshToken };
+    if (previous.queryKey === queryKey && previous.refreshToken !== refreshToken) {
+      void queryClient.invalidateQueries({ queryKey, exact: true }, { cancelRefetch: false });
+    }
+  }, [queryClient, queryKey, refreshToken]);
   const saved = useQuery<GetWorktreeChangesOutput, TRPCClientErrorLike<RootRouter>>({
     queryKey,
     queryFn: ({ signal }) =>
@@ -39,8 +50,8 @@ export function useSavedWorktreeChanges({
             { signal, context: { skipBatch: true } }
           ),
     enabled,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 5000,
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: (failureCount, error) => {

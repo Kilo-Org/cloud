@@ -1,0 +1,77 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // This file is what deploys. `pnpm run build` also asks the pinned Pages
+  // source (source.json) for the configuration it expects, and fails if the
+  // two differ: a new Durable Object class, migration or cron trigger in Pages
+  // changes this file in the pull request that moves the pin.
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "name": "pages-dev",
+  // Built by `pnpm run build` from the pinned source, already bundled.
+  "main": "dist/worker/index.js",
+  "no_bundle": true,
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "dist/public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true,
+  },
+  // The custom domain is the Worker's only address: it checks every request
+  // against NOTEBOOK_CLOUD_PUBLIC_ORIGIN, so a workers.dev URL would serve
+  // pages a browser cannot use.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "pages-dev.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "PAGES", "class_name": "Page" },
+      { "name": "CATALOGS", "class_name": "Catalog" },
+      { "name": "PAGE_RECORDS", "class_name": "PageRecords" },
+      // Projects keep the class name Space: it is their storage identity.
+      { "name": "PROJECTS", "class_name": "Space" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Page", "Catalog"] },
+    { "tag": "v2", "new_sqlite_classes": ["PageRecords"] },
+    { "tag": "v3", "new_sqlite_classes": ["Space"] },
+  ],
+  "triggers": {
+    "crons": ["5 0 * * *", "35 * * * *"],
+  },
+  "d1_databases": [
+    // Sign-in and the Page catalog.
+    {
+      "binding": "DB",
+      "database_name": "pages-dev-auth",
+      "database_id": "13db1af4-e01e-447d-ae51-cc37625d5f77",
+    },
+    // Usage history.
+    {
+      "binding": "PAGES_USAGE",
+      "database_name": "pages-dev-usage",
+      "database_id": "8691d489-5105-49f4-bbec-63ecbca319e9",
+    },
+  ],
+  // Images and other files people add to a Page.
+  "r2_buckets": [{ "binding": "PAGES_ASSETS", "bucket_name": "pages-dev-assets" }],
+  "vars": {
+    "NOTEBOOK_CLOUD_PUBLIC_ORIGIN": "https://pages-dev.kiloapps.io",
+    "NOTEBOOK_CLOUD_ANACONDA_API_KEY_USERINFO_URL": "https://anaconda.com/api/auth/sessions/whoami",
+    "NOTEBOOK_CLOUD_ANACONDA_API_KEY_PRINCIPAL_NAMESPACE": "kilo-pages-dev-anaconda",
+    "PAGES_CATALOG_INDEX": "1",
+    "PAGES_DEFAULT_PAGE_QUOTA": "250",
+    "PAGES_KILO_APP_URL": "https://app.kilo.ai",
+    "PAGES_KILO_AUDIENCE": "pages-dev",
+    "NOTEBOOK_CLOUD_OIDC_FLOW": "server",
+  },
+}

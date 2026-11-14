@@ -17,10 +17,10 @@ import {
   UnknownPartRenderer,
 } from '../part-content';
 import { MessageErrorBoundary } from '../MessageErrorBoundary';
-import { isPartStreaming } from '../types';
+import { isPartStreaming, type Part } from '../types';
 import { getToolActivity } from '../toolCardUtils';
 import { getVisibleAssistantParts } from '../message-presentation';
-import { groupAssistantParts, summarizeAgentWork } from '../shared-transcript-presentation';
+import { summarizeAgentWork } from '../shared-transcript-presentation';
 import { AgentWorkGroup } from './AgentWorkGroup';
 import { CloudToolRenderer } from './CloudToolRenderer';
 import {
@@ -30,11 +30,9 @@ import {
 
 type CloudPartProps = TextMessagePartProps | ReasoningMessagePartProps | DataMessagePartProps;
 
-function CloudPartContent({ nativePart }: { nativePart: CloudPartProps }) {
-  const presentation = useCloudMessagePresentation();
-  const part = findCloudPartPresentation(presentation, nativePart)?.source;
+function CloudPartContent({ part, isStreaming }: { part: Part | undefined; isStreaming: boolean }) {
   if (!part) return <p className="text-muted-foreground px-2 text-xs">Content is unavailable.</p>;
-  const streaming = presentation.isStreaming && isPartStreaming(part);
+  const streaming = isStreaming && isPartStreaming(part);
   switch (part.type) {
     case 'text':
       return <TextPartRenderer text={part.text} isStreaming={streaming} />;
@@ -54,11 +52,14 @@ function CloudPartContent({ nativePart }: { nativePart: CloudPartProps }) {
 }
 
 function CloudPart(nativePart: CloudPartProps) {
+  const presentation = useCloudMessagePresentation();
+  const part = findCloudPartPresentation(presentation, nativePart)?.source;
   return (
     <MessageErrorBoundary
       fallback={<p className="text-destructive text-xs">Failed to render content</p>}
     >
-      <CloudPartContent nativePart={nativePart} />
+      {part && <span hidden data-scroll-anchor={part.id} />}
+      <CloudPartContent part={part} isStreaming={presentation.isStreaming} />
     </MessageErrorBoundary>
   );
 }
@@ -70,6 +71,7 @@ function CloudTool(nativePart: ToolCallMessagePartProps) {
     <MessageErrorBoundary
       fallback={<p className="text-destructive text-xs">Failed to render tool</p>}
     >
+      <span hidden data-scroll-anchor={part.id} />
       <CloudToolRenderer part={part} />
     </MessageErrorBoundary>
   );
@@ -105,21 +107,20 @@ export function CloudMessageParts({ collapseTools = false }: { collapseTools?: b
 
   const parts = getVisibleAssistantParts(presentation.parts.map(part => part.source));
   const indices = new Map(parts.map((part, index) => [part, index]));
-  return groupAssistantParts(parts, 'live').map((segment, segmentIndex, segments) => {
+  return presentation.segments.map(segment => {
     const content = segment.parts.map(part => {
       const index = indices.get(part);
       return index === undefined ? null : <CloudMessagePartByIndex key={part.id} index={index} />;
     });
-    if (segment.type === 'chat')
-      return <React.Fragment key={segment.parts[0]?.id}>{content}</React.Fragment>;
-    const key = `agent-work:${segments[segmentIndex - 1]?.parts[0]?.id ?? 'start'}`;
+    if (segment.type === 'chat') return <React.Fragment key={segment.id}>{content}</React.Fragment>;
     const activePart = presentation.isStreaming
       ? segment.parts.findLast(isPartStreaming)
       : undefined;
     const working = activePart !== undefined;
     return (
-      <div key={key} className="py-1">
+      <div key={segment.id} className="py-1">
         <AgentWorkGroup
+          scrollAnchorIds={segment.parts.map(part => part.id)}
           summary={summarizeAgentWork(segment.parts, working)}
           working={working}
           activity={

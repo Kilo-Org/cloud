@@ -13,11 +13,15 @@ vi.mock('@sentry/react-native', () => sentryMock);
 // module registry.
 const configMock = vi.hoisted(() => ({
   latencyIngestUrl: 'https://latency.kiloapps.io' as string | undefined,
+  kiloMcpUrl: 'https://mcp.kiloapps.io' as string | undefined,
 }));
 
 vi.mock('@/lib/config', () => ({
   get LATENCY_INGEST_URL() {
     return configMock.latencyIngestUrl;
+  },
+  get KILO_MCP_URL() {
+    return configMock.kiloMcpUrl;
   },
 }));
 
@@ -42,6 +46,7 @@ beforeEach(() => {
   sentryMock.captureException.mockClear();
   sentryMock.captureMessage.mockClear();
   configMock.latencyIngestUrl = 'https://latency.kiloapps.io';
+  configMock.kiloMcpUrl = 'https://mcp.kiloapps.io';
   baseFetch.mockReset();
   vi.stubGlobal('fetch', baseFetch);
   vi.stubGlobal(INSTALLED_FLAG, undefined);
@@ -224,6 +229,52 @@ describe('installErrorReporting', () => {
     await globalThis.fetch('https://latency-staging.example.com/v1/latency', { method: 'POST' });
 
     expect(sentryMock.captureException).not.toHaveBeenCalled();
+  });
+
+  // KILO-APP-3VA: the MCP Streamable HTTP client opens an optional SSE stream
+  // with a GET, and the server answers 405 to say it offers none. The SDK
+  // returns on that status and carries on over POST, so the answer names no
+  // defect; reporting it filed an issue per discovery.
+  it('leaves the MCP SSE probe as a breadcrumb and files no issue', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+
+    baseFetch.mockResolvedValue(new Response('', { status: 405 }));
+
+    const response = await globalThis.fetch('https://mcp.kiloapps.io/mcp', { method: 'GET' });
+
+    expect(response.status).toBe(405);
+    expect(sentryMock.captureException).not.toHaveBeenCalled();
+    expect(sentryMock.captureMessage).not.toHaveBeenCalled();
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'network' })
+    );
+  });
+
+  it('still reports a failing POST to the MCP endpoint', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+
+    baseFetch.mockResolvedValue(new Response('', { status: 500 }));
+
+    const response = await globalThis.fetch('https://mcp.kiloapps.io/mcp', { method: 'POST' });
+
+    expect(response.status).toBe(500);
+    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  // The rule is the SSE probe, not "a GET answered 405": another endpoint
+  // answering 405 means the app used a method it does not accept.
+  it('still reports a 405 from another endpoint', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+
+    baseFetch.mockResolvedValue(new Response('', { status: 405 }));
+
+    await globalThis.fetch('https://api.example.com/health');
+
+    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
   });
 
   // The exclusion is scoped to the app's own sink: the control plane still

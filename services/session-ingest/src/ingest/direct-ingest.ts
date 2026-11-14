@@ -117,6 +117,27 @@ export async function handleDirectIngestRequest(
     return { status: 413, body: { success: false, error: 'payload_too_large' } };
   };
 
+  const emptyBody = (reason: LegacyReason): DirectIngestResponse => {
+    logEvent('info', {
+      event: 'direct_ingest_noop',
+      ...eventBase(request, startedAt, { declaredBytes: 0, actualBytes: 0, items: 0 }),
+      reason,
+    });
+    return { status: 200, body: { success: true } };
+  };
+
+  const malformedBody = (
+    metrics: DirectIngestMetrics,
+    reason?: LegacyReason
+  ): DirectIngestResponse => {
+    logEvent('warn', {
+      event: 'direct_ingest_parse_reject',
+      ...eventBase(request, startedAt, metrics),
+      ...(reason === undefined ? {} : { reason }),
+    });
+    return { status: 400, body: { success: false, error: 'malformed_json' } };
+  };
+
   const legacyWithBoundedBody = async (
     reason: LegacyReason,
     metrics: DirectIngestMetrics
@@ -125,9 +146,19 @@ export async function handleDirectIngestRequest(
     if (typeof declared === 'number' && declared > stagingCeiling) {
       return tooLarge(declared);
     }
-    if (typeof declared === 'number' && declared !== 0 && declared <= INGEST_CHUNK_MAX_BYTES) {
+    if (declared === 'empty') {
+      return emptyBody('empty_body');
+    }
+    if (typeof declared === 'number' && declared <= INGEST_CHUNK_MAX_BYTES) {
       const buffered = await readBoundedStream(request.body, declared);
       if (!buffered.ok) return tooLarge(declared);
+      const validation = validateAndParseIngestPayload(buffered.bytes);
+      if (!validation.ok) {
+        return malformedBody(
+          { declaredBytes: declared, actualBytes: buffered.bytes.byteLength, items: null },
+          reason
+        );
+      }
       return legacy(request, r2Key, buffered.bytes, {
         reason,
         metrics,
@@ -178,12 +209,7 @@ export async function handleDirectIngestRequest(
     return legacyWithBoundedBody('invalid_content_length', unknownMetrics());
   }
   if (contentLength === 'empty') {
-    return legacy(request, r2Key, request.body, {
-      reason: 'empty_body',
-      metrics: { declaredBytes: 0, actualBytes: null, items: null },
-      startedAt,
-      stagingMaxBytes: stagingCeiling,
-    });
+    return emptyBody('empty_body');
   }
   if (contentLength > stagingCeiling) {
     logEvent('warn', {
@@ -237,11 +263,7 @@ export async function handleDirectIngestRequest(
   const actualBytes = buffered.bytes.byteLength;
   const validation = validateAndParseIngestPayload(buffered.bytes);
   if (!validation.ok) {
-    logEvent('warn', {
-      event: 'direct_ingest_parse_reject',
-      ...eventBase(request, startedAt, { declaredBytes: contentLength, actualBytes, items: null }),
-    });
-    return { status: 400, body: { success: false, error: 'malformed_json' } };
+    return malformedBody({ declaredBytes: contentLength, actualBytes, items: null });
   }
 
   if (validation.skippedItemCount > 0) {

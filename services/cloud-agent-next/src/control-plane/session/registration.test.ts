@@ -387,7 +387,7 @@ describe('migrated origin permissions', () => {
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
-        bash: { git: 'allow' },
+        bash: { git: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny' },
       });
       expect(spec.permission?.bash).toMatchObject(
         createdOnPlatform === 'security-remediation'
@@ -398,7 +398,8 @@ describe('migrated origin permissions', () => {
               curl: 'deny',
             }
           : {
-              'git push': 'deny',
+              'git *': 'deny',
+              'git diff': 'allow',
               'gh pr create': 'deny',
               'gh api repos/*/issues/*/comments --input*': 'allow',
               'gh api repos/*/issues/comments/* -X PATCH*': 'allow',

@@ -30,6 +30,10 @@ type MarkdownCodeFenceProps = {
  *
  * Without a host handler the copy button still copies the fence's source,
  * matching the renderer's own button.
+ *
+ * The language chip is a stop of its own, named by the language it shows, so
+ * Android does not fold it into the message group's name ahead of the role;
+ * an unnamed fence keeps a bare chip rather than an empty focus stop.
  */
 export function MarkdownCodeFence({
   code,
@@ -52,6 +56,7 @@ export function MarkdownCodeFence({
           // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the label tracks the markdown variant's palette
           style={{ color: palette.mutedTextColor }}
           numberOfLines={1}
+          {...(language ? { accessible: true, accessibilityLabel: language } : {})}
         >
           {language ?? ''}
         </Text>

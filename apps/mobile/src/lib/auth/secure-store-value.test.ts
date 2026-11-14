@@ -10,7 +10,12 @@ import {
   writeStoredValueSafe,
 } from '@/lib/auth/secure-store-value';
 import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
-import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+import {
+  setBreadcrumbSink,
+  setTelemetrySink,
+  type TelemetryBreadcrumb,
+  type TelemetryEvent,
+} from '@/lib/telemetry/error-sink';
 
 const getItemAsync = vi.hoisted(() =>
   vi.fn<(key: string, options?: unknown) => Promise<string | null>>()
@@ -29,17 +34,23 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 let events: TelemetryEvent[] = [];
+let breadcrumbs: TelemetryBreadcrumb[] = [];
 
 beforeEach(() => {
   events = [];
+  breadcrumbs = [];
   vi.clearAllMocks();
   setTelemetrySink(event => {
     events.push(event);
+  });
+  setBreadcrumbSink(breadcrumb => {
+    breadcrumbs.push(breadcrumb);
   });
 });
 
 afterEach(() => {
   setTelemetrySink(null);
+  setBreadcrumbSink(null);
   setProtectedDataAvailable(true);
 });
 
@@ -232,5 +243,53 @@ describe('while the device is locked', () => {
     await expect(readStoredValueSafe('scope-hint')).resolves.toBeNull();
 
     expect(events).toEqual([]);
+  });
+});
+
+describe('a keychain that refuses because the device is locked', () => {
+  /** The rejection expo-secure-store builds for `errSecInteractionNotAllowed`. */
+  const refusal =
+    "Calling the 'getValueWithKeyAsync' function has failed " +
+    '(at ExpoModulesCore/SecureStoreModule.swift:26)\n' +
+    '→ Caused by: KeyChainException: User interaction is not allowed.';
+
+  it('files no event while the cached protected-data state still says available', async () => {
+    // A background start after the screen locked reads the state installed at
+    // launch, which is not re-read on the way to a keychain call.
+    setProtectedDataAvailable(true);
+    getItemAsync.mockImplementation(() => rejectedCall(refusal));
+
+    await expect(readStoredValueSafe('scope-hint')).resolves.toBeNull();
+    await expect(readStoredValueForUpdate('scope-hint')).resolves.toEqual({
+      status: 'unreadable',
+    });
+
+    expect(events).toEqual([]);
+    // One breadcrumb per refused call: it explains a later event instead of
+    // filing one of its own.
+    const refused = {
+      category: 'secure_store',
+      level: 'warning',
+      message: 'keychain refused a call while the device was locked',
+      data: { operation: 'read' },
+    } satisfies TelemetryBreadcrumb;
+    expect(breadcrumbs).toEqual([refused, refused]);
+  });
+
+  it('still reports a keychain failure that is not the locked refusal', async () => {
+    setProtectedDataAvailable(true);
+    getItemAsync.mockImplementation(() =>
+      rejectedCall(
+        "Calling the 'getValueWithKeyAsync' function has failed\n" +
+          '→ Caused by: KeyChainException: The specified item could not be found in the keychain.'
+      )
+    );
+
+    await expect(readStoredValueSafe('scope-hint')).resolves.toBeNull();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(breadcrumbs).toEqual([]);
   });
 });

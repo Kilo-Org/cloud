@@ -3,13 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -31,6 +24,7 @@ import {
 } from './enkrypt-usage-labels';
 import { ABSENT, formatDurationMs, formatMicrodollarsAsUsd, formatRequestTime } from './format';
 import { RoutingSections, copyableItem, userLabel } from './RequestLogDetailsSheet';
+import { RequestSheetFrame } from './RequestSheetFrame';
 
 function requestedModel(call: EnkryptUsageRow, details: EnkryptRequestDetails | undefined) {
   const routing = details?.metadata.status === 'available' ? details.metadata.routing : null;
@@ -167,19 +161,18 @@ export function EnkryptRequestSheet({
   const details = detailsQuery.data;
 
   return (
-    <Sheet open={call !== null} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl">
-        {call && (
-          <>
-            <SheetHeader className="border-b p-6 pr-12">
-              <SheetTitle className="font-mono text-base break-all">
-                {requestedModel(call, details) ?? 'Request'}
-              </SheetTitle>
-              <SheetDescription>
-                {formatRequestTime(call.created_at)} · {userLabel(call.user)}
-              </SheetDescription>
-            </SheetHeader>
-            <div className="flex flex-col gap-8 p-6">
+    <RequestSheetFrame
+      onOpenChange={onOpenChange}
+      content={
+        call && {
+          title: requestedModel(call, details) ?? 'Request',
+          description: (
+            <>
+              {formatRequestTime(call.created_at)} · {userLabel(call.user)}
+            </>
+          ),
+          body: (
+            <>
               <RequestSection call={call} details={details} />
               {detailsQuery.isPending && <DetailsSkeleton />}
               {detailsQuery.error && (
@@ -196,10 +189,10 @@ export function EnkryptRequestSheet({
                   <RoutingSections metadata={details.metadata} />
                 </>
               )}
-            </div>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
+            </>
+          ),
+        }
+      }
+    />
   );
 }

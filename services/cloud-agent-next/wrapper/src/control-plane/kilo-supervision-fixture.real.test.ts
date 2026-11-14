@@ -8,11 +8,92 @@ const suite = binary ? describe : describe.skip;
 // outside the wrapper's rootDir while exercising the actual local HTTP adapter.
 type FakeServer = {
   url: string;
-  adminFetch(path: string): Promise<Response>;
+  adminFetch(path: string, init?: RequestInit): Promise<Response>;
   close(): Promise<void>;
 };
 
 suite('shared supervision fake with pinned Kilo', () => {
+  it('pairs HTTP drain with its real marker only after a held background child completes', async () => {
+    if (!binary) throw new Error('KILO_781_BINARY is required');
+    const moduleUrl = new URL('../../../test/e2e/fake-llm-server.ts', import.meta.url).href;
+    const { startFakeLlmServer } = (await import(moduleUrl)) as {
+      startFakeLlmServer: (options: { host: string }) => Promise<FakeServer>;
+    };
+    const server = await startFakeLlmServer({ host: '127.0.0.1' });
+    let fixture: Awaited<ReturnType<typeof activityFixture>> | undefined;
+    try {
+      const f = await activityFixture(binary, { modelBaseUrl: `${server.url}/api/openrouter` });
+      fixture = f;
+      const sessionID = await f.session();
+      const tag = `drain-${crypto.randomUUID()}`;
+      await f.prompt(sessionID, `__fake__:background-task:parent:${tag}`);
+      await f.until(
+        () => server.adminFetch(`/test/gate-status?tag=${tag}`).then(response => response.json()),
+        value => value.engaged === true,
+        'background child gate is held'
+      );
+      await f.until(
+        () => f.sessionEvents(sessionID),
+        events =>
+          events.some(
+            event => event.type === 'session.turn.close' && event.properties.reason === 'completed'
+          ),
+        'parent closes while child is held'
+      );
+      const token = crypto.randomUUID();
+      let http = false;
+      const drain = f.wrapper
+        .drainSession({ sessionId: sessionID, directory: f.directory, token, signal: f.signal })
+        .then(result => {
+          http = result;
+          return result;
+        });
+      void drain.catch(() => undefined);
+      const marker = () =>
+        f
+          .sessionEvents(sessionID)
+          .find(event => event.type === 'session.drained' && event.properties.token === token);
+      // Observe a bounded held interval against the actual native coordinator.
+      expect(
+        await Promise.race([drain.then(() => 'early'), Bun.sleep(250).then(() => 'held')])
+      ).toBe('held');
+      expect(http).toBe(false);
+      expect(marker()).toBeUndefined();
+      expect(
+        (await server.adminFetch(`/test/gate-status?tag=${tag}`).then(response => response.json()))
+          .engaged
+      ).toBe(true);
+      expect(
+        f.events.some(
+          event =>
+            event.type === 'session.created' &&
+            typeof event.properties.info === 'object' &&
+            event.properties.info !== null &&
+            'parentID' in event.properties.info &&
+            event.properties.info.parentID === sessionID
+        )
+      ).toBe(true);
+      expect((await server.adminFetch(`/test/release?tag=${tag}`, { method: 'POST' })).status).toBe(
+        204
+      );
+      expect(await drain).toBe(true);
+      await f.until(marker, event => event !== undefined, 'matching processed native drain marker');
+      console.info(
+        JSON.stringify({
+          contract: 'paired-background-drain',
+          verifiedVersion: '7.8.1',
+          sessionID,
+          token,
+          http,
+          marker: marker()?.properties,
+        })
+      );
+    } finally {
+      await fixture?.dispose();
+      await server.close();
+    }
+  }, 90_000);
+
   for (const mode of ['progress', 'silent', 'stuck'] as const) {
     it(`${mode} runs after the first native execution closes`, async () => {
       if (!binary) throw new Error('KILO_781_BINARY is required');

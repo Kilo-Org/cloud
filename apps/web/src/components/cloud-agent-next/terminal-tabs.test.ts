@@ -565,6 +565,8 @@ describe('CloudChatPage terminal ownership across navigation', () => {
 
   beforeAll(async () => {
     ({ CloudChatPage } = await import('./CloudChatPage'));
+    const { default: loadable } = await import('next/dist/shared/lib/loadable.shared-runtime');
+    await loadable.preloadAll();
   });
 
   beforeEach(() => {
@@ -587,6 +589,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
         worktreeId: 'worktree_shared',
       },
       activity: { type: 'idle' },
+      backgroundActivity: { status: 'inactive' },
       activeSessionType: 'cloud-agent',
       staticMessages: [],
       dynamicMessages: [],

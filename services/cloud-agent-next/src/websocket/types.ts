@@ -112,6 +112,8 @@ export type StreamFilters = {
   startTime?: number;
   /** Only return events at or before this timestamp (Unix ms, inclusive) */
   endTime?: number;
+  /** `preview` bounds completed tool bodies in historical replay; live events stay complete. */
+  toolDisplay?: 'preview';
 };
 
 /**

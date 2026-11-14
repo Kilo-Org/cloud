@@ -102,6 +102,7 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   github: platform,
   impactReferrals: { read: 'platform_read', write: 'sensitive_write', target: 'user' },
   internalBotUsers: { read: 'platform_read', write: 'sensitive_write', target: 'user' },
+  kiloclawCreditRenewals: { read: 'platform_read', write: 'sensitive_write', target: 'none' },
   kiloclawInstances: platform,
   kiloclawProviders: platform,
   kiloclawRegions: platform,
@@ -647,7 +648,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/app/api/auth/passkey/register/route.ts',
     actionClass: 'sensitive_write',
     surface: 'rest',
-    occurrences: 2,
+    occurrences: 1,
   },
   {
     id: 'internal.lib.admin.requirePrivilegedActor',

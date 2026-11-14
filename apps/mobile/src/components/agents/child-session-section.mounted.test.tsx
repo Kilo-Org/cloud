@@ -21,7 +21,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
-import { ChildSessionSection } from './child-session-section';
+import { ChildSessionMessage, ChildSessionSection } from './child-session-section';
+import { assistantMessage } from './message-bubble-test-utils';
 
 const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
   requestMock: vi.fn(),
@@ -132,6 +133,38 @@ describe('ChildSessionSection tool-summary translation gate', () => {
     readMock.mockResolvedValue([]);
     writeMock.mockResolvedValue(undefined);
     setConfig({ enabled: false, model: MODEL });
+  });
+
+  it.each([true, false])('passes child live state %s to its compaction renderer', isStreaming => {
+    const message = assistantMessage('compaction');
+    const part = {
+      id: 'compaction-part',
+      sessionID: 'ses_1',
+      messageID: 'compaction',
+      type: 'compaction',
+      auto: false,
+    } as const;
+    message.parts = [part];
+    const renderPart = vi.fn(() => null);
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(ChildSessionMessage, {
+          message,
+          isStreaming,
+          depth: 0,
+          getChildMessages: () => [],
+          renderPart,
+          onOpenChildSession: vi.fn<() => void>(),
+        })
+      );
+    });
+    expect(renderPart).toHaveBeenCalledWith(
+      expect.objectContaining({ part, messageInfo: message.info, isStreaming })
+    );
+    act(() => {
+      renderer?.unmount();
+    });
   });
 
   it('never requests a translation for the already-localized fallback task label', async () => {

@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { boundSlashCommandCatalog } from '../../../src/shared/slash-commands.js';
 import { createMessageId } from '../../../src/shared/message-id.js';
-import { kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
-import { isKiloServerUnreachableError } from '../kilo-api.js';
-import { git, logToFile } from '../utils.js';
+import { fetchKiloServer, kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
+import { DrainSessionError, isKiloServerUnreachableError } from '../kilo-api.js';
+import { logToFile } from '../utils.js';
 import type { Harness, HarnessSession } from './harness.js';
 import { readSessionSnapshot } from './session-snapshot.js';
 import {
@@ -16,6 +16,7 @@ import {
 import { createKilo2Reads, kilo2LocationQuery as locationQuery } from './kilo2-reads.js';
 import { restoreKilo2History } from './kilo2-history.js';
 import type { Kilo2Lifecycle } from './kilo2-lifecycle.js';
+import { readKilo2BackgroundActivity } from './kilo2-background.js';
 
 const ptySchema = z.object({
   id: z.string(),
@@ -84,12 +85,21 @@ export function createKilo2Harness(options: {
       return !(input.sessionId in active);
     });
   }
-  async function compact(input: HarnessSession & { model: string }) {
+  async function compact(input: Parameters<Harness['compact']>[0]) {
     await select(input);
     await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
     await replaceCloudAgentContext(input);
-    const id = createMessageId();
-    await post(`${kilo2SessionPath(input.sessionId)}/compact`, { id }, input.signal);
+    let outcome: Awaited<ReturnType<Harness['compact']>> = 'executed';
+    try {
+      await post(
+        `${kilo2SessionPath(input.sessionId)}/compact`,
+        { id: input.messageId },
+        input.signal
+      );
+    } catch (error) {
+      if (!(error instanceof Kilo2HttpError && error.status === 409)) throw error;
+      outcome = 'replayed';
+    }
     await post(
       `/api/experimental/session/${encodeURIComponent(input.sessionId)}/wait`,
       undefined,
@@ -97,20 +107,29 @@ export function createKilo2Harness(options: {
     );
     const result = z
       .object({
+        id: z.literal(input.messageId),
         type: z.literal('compaction'),
         status: z.enum(['completed', 'failed']),
-        error: z.object({ message: z.string() }).optional(),
+        error: z.object({ type: z.string().optional(), message: z.string() }).optional(),
       })
       .parse(
-        await api.data(`${kilo2SessionPath(input.sessionId)}/message/${encodeURIComponent(id)}`, {
-          signal: input.signal,
-        })
+        await api.data(
+          `${kilo2SessionPath(input.sessionId)}/message/${encodeURIComponent(input.messageId)}`,
+          { signal: input.signal }
+        )
       );
-    if (result.status === 'failed')
+    // Kilo v2 0.0.0-v2-77 reports an empty compaction with this exact type and message.
+    if (
+      result.status === 'failed' &&
+      !(
+        result.error?.type === 'compaction.unavailable' &&
+        result.error.message === 'Nothing to compact yet'
+      )
+    )
       throw new Error(
         `Kilo v2 compaction failed: ${result.error?.message ?? 'Unknown native failure'}`
       );
-    return true;
+    return outcome;
   }
   async function remove(path: string, signal?: AbortSignal) {
     try {
@@ -200,6 +219,7 @@ export function createKilo2Harness(options: {
     },
   };
   return {
+    supportsHistoryPreload: true,
     async open(input) {
       try {
         const existing = await session(input.sessionId, input.signal);
@@ -250,19 +270,15 @@ export function createKilo2Harness(options: {
       // The native command API has no message id; the command creates its own user message.
       await post(
         `${kilo2SessionPath(input.sessionId)}/command`,
-        { command: input.command, text: input.args ?? '' },
+        { name: input.command, text: input.args ?? '' },
         input.signal
       );
     },
     compact,
     async condense(input) {
       try {
-        const success = await compact(input);
-        return {
-          success,
-          wasAborted: false,
-          ...(success ? {} : { error: 'Kilo v2 compaction failed' }),
-        };
+        await compact({ ...input, messageId: createMessageId() });
+        return { success: true, wasAborted: false };
       } catch (error) {
         return {
           success: false,
@@ -311,6 +327,51 @@ export function createKilo2Harness(options: {
       return true;
     },
     interrupt,
+    async drainSession(input) {
+      const request: BunFetchRequestInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: { sessionID: input.sessionId, token: input.token } }),
+        // Bun's socket idle timeout can expire while native background work runs.
+        // The completion owner and native supervisor bound this wait instead.
+        timeout: false,
+        signal: input.signal,
+      };
+      let response: Response;
+      try {
+        response = await fetchKiloServer(
+          options.server,
+          `/api/rpc/kilocode.session-drain/drain?${locationQuery(input.directory)}`,
+          request
+        );
+      } catch (error) {
+        if (input.signal?.aborted) throw error;
+        throw new DrainSessionError('transient', 'Kilo v2 drain request failed', { cause: error });
+      }
+      if (!response.ok) {
+        const status = response.status;
+        const transient = status === 408 || status === 429 || status >= 500;
+        await response.body?.cancel();
+        throw new DrainSessionError(transient ? 'transient' : 'definitive', `HTTP ${status}`, {
+          status,
+        });
+      }
+      try {
+        const result = z.object({ output: z.boolean() }).parse(await response.json());
+        if (!result.output)
+          throw new DrainSessionError('anomalous', 'Session drain returned false');
+        return true;
+      } catch (error) {
+        if (input.signal?.aborted || error instanceof DrainSessionError) throw error;
+        throw new DrainSessionError(
+          error instanceof TypeError ? 'transient' : 'anomalous',
+          'Kilo v2 drain returned no boolean result',
+          {
+            cause: error,
+          }
+        );
+      }
+    },
     observe: input => readSessionSnapshot({ ...input, client: reads }),
     async release(input) {
       const start = Date.now();
@@ -354,34 +415,24 @@ export function createKilo2Harness(options: {
       );
     },
     async generateCommitMessage(input) {
-      const diff = await git(['diff', 'HEAD', '--no-ext-diff', '--no-textconv'], {
-        cwd: input.path,
-        signal: input.signal,
-        timeoutMs: 10_000,
-        maxOutputBytes: 128 * 1024,
-      });
-      const status = await git(['status', '--short'], {
-        cwd: input.path,
-        signal: input.signal,
-        timeoutMs: 10_000,
-        maxOutputBytes: 32 * 1024,
-      });
-      if (diff.exitCode !== 0 || status.exitCode !== 0)
-        throw new Error('Cannot read changes for commit message generation');
-      const result = z.object({ text: z.string() }).parse(
-        await api.data('/api/experimental/generate', {
-          method: 'POST',
-          body: {
-            prompt: `Write a short git commit message for these changes. Return only the commit message.\n\nStatus:\n${status.stdout}\n\nDiff:\n${diff.stdout}`,
-          },
-          signal: input.signal,
-        })
-      );
-      return { message: result.text };
+      const result = z
+        .object({ output: z.object({ message: z.string() }) })
+        .parse(
+          await post(
+            `/api/rpc/kilocode.commit-message/generate?${locationQuery(input.path)}`,
+            { input: { path: input.path } },
+            input.signal
+          )
+        );
+      return result.output;
     },
     isUnavailableError: isKiloServerUnreachableError,
     updateCloudAgentMcp,
-    reads,
+    reads: {
+      ...reads,
+      getBackgroundActivity: (id, directory, signal) =>
+        readKilo2BackgroundActivity(api, id, directory, signal),
+    },
     terminals,
     worktree: {
       async listSessionIds(directory) {

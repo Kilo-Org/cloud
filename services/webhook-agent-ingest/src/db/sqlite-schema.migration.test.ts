@@ -117,4 +117,39 @@ describe('trigger config migrations', () => {
       db.close();
     }
   });
+
+  it('adds a nullable environment selection while preserving existing configurations', async () => {
+    const db = new DatabaseSync(':memory:');
+    try {
+      for (const filename of [
+        '0000_lumpy_loners.sql',
+        '0001_dear_tombstone.sql',
+        '0002_first_mephisto.sql',
+        '0003_sparkling_kate_bishop.sql',
+        '0004_bumpy_firebird.sql',
+        '0005_open_morph.sql',
+        '0006_noisy_daredevil.sql',
+      ]) {
+        await executeMigration(db, filename);
+      }
+      insertLegacyRows(db, true);
+      const before = db.prepare('SELECT * FROM trigger_config ORDER BY trigger_id').all() as Row[];
+
+      await executeMigration(db, '0007_fresh_manta.sql');
+      const after = db.prepare('SELECT * FROM trigger_config ORDER BY trigger_id').all() as Row[];
+
+      expect(after).toEqual(before.map(row => ({ ...row, environment_id: null })));
+      db.prepare('UPDATE trigger_config SET environment_id = ? WHERE trigger_id = ?').run(
+        '11111111-1111-4111-8111-111111111111',
+        'legacy-webhook'
+      );
+      expect(
+        db
+          .prepare('SELECT environment_id FROM trigger_config WHERE trigger_id = ?')
+          .get('legacy-webhook')
+      ).toMatchObject({ environment_id: '11111111-1111-4111-8111-111111111111' });
+    } finally {
+      db.close();
+    }
+  });
 });

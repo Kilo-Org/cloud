@@ -274,6 +274,66 @@ describe('removeWhitespaceOnlyMessages', () => {
     ]);
   });
 
+  it.each<Anthropic.MessageParam['content']>([
+    'Hello',
+    [{ type: 'text', text: 'Hello' }],
+    [toolResult],
+    [toolUse, thinking, { type: 'redacted_thinking', data: 'opaque' }],
+  ])('does not mutate original history when moving a cache breakpoint onto %j', content => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const messages: Anthropic.MessageParam[] = [
+      { role: 'user', content },
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: '\n', cache_control: { type: 'ephemeral' } }],
+      },
+      { role: 'user', content: 'Continue.' },
+    ];
+    const before = structuredClone(messages);
+    const body = makeBody(messages);
+
+    removeWhitespaceOnlyMessages(body);
+
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0]).not.toBe(messages[0]);
+    expect(body.messages[1]).toBe(messages[2]);
+    expect(messages).toEqual(before);
+    if (Array.isArray(content)) {
+      const targetIndex = content.findLastIndex(
+        block => block.type !== 'thinking' && block.type !== 'redacted_thinking'
+      );
+      expect(body.messages[0].content).toEqual(
+        content.map((block, index) =>
+          index === targetIndex ? { ...block, cache_control: { type: 'ephemeral' } } : block
+        )
+      );
+    } else {
+      expect(body.messages[0].content).toEqual([
+        { type: 'text', text: content, cache_control: { type: 'ephemeral' } },
+      ]);
+    }
+  });
+
+  it('does not attach a moved cache breakpoint to a thinking-only message', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const messages: Anthropic.MessageParam[] = [
+      { role: 'assistant', content: [thinking, { type: 'redacted_thinking', data: 'opaque' }] },
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: '\n', cache_control: { type: 'ephemeral' } }],
+      },
+      { role: 'user', content: 'Continue.' },
+    ];
+    const before = structuredClone(messages);
+    const body = makeBody(messages);
+
+    removeWhitespaceOnlyMessages(body);
+
+    expect(body.messages).toEqual([before[0], before[2]]);
+    expect(body.messages[0]).toBe(messages[0]);
+    expect(messages).toEqual(before);
+  });
+
   it('leaves a request without whitespace-only messages unchanged', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const body = makeBody([

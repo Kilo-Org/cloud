@@ -13,13 +13,16 @@ export async function canCreateCliSessionForUser(
   kiloUserId: string
 ): Promise<boolean> {
   const [user] = await db
-    .select({ blocked_reason: kilocode_users.blocked_reason })
+    .select({
+      blocked_at: kilocode_users.blocked_at,
+      blocked_reason: kilocode_users.blocked_reason,
+    })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, kiloUserId))
     .limit(1)
     .for('update');
 
-  return user?.blocked_reason === null;
+  return user !== undefined && user.blocked_at === null && user.blocked_reason === null;
 }
 
 export const USER_SESSION_ADMISSION_ERROR = 'User session creation is not allowed';

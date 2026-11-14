@@ -517,6 +517,7 @@ export async function preflightSessionCreation(
     env: ctx.env,
     userId: ctx.userId,
     orgId: organizationId,
+    createdOnPlatform: request.options?.createdOnPlatform,
     repository: request.repository,
   });
 

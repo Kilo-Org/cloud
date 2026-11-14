@@ -1,6 +1,6 @@
 import {
   isPagesAuthClient,
-  isPagesAuthOrigin,
+  isPagesAuthAudience,
   PAGES_AUTH_CALLBACK_PATH,
   pagesAuthCallbackUrl,
 } from './pages-auth-clients';
@@ -11,34 +11,30 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   PAGES_DEV_AUTH_SECRET: '',
 }));
 
-const PAGES = 'https://pages.kiloapps.io';
-const PAGES_DEV = 'https://pages-dev.kiloapps.io';
+const PAGES = 'pages';
+const PAGES_DEV = 'pages-dev';
 const SECRET = 'p'.repeat(40);
 
 describe('pages-auth-clients', () => {
   test('a configured deployment may sign people in', () => {
-    expect(isPagesAuthOrigin(PAGES)).toBe(true);
+    expect(isPagesAuthAudience(PAGES)).toBe(true);
   });
 
   test('a deployment without a secret may not', () => {
-    expect(isPagesAuthOrigin(PAGES_DEV)).toBe(false);
+    expect(isPagesAuthAudience(PAGES_DEV)).toBe(false);
     expect(isPagesAuthClient(PAGES_DEV, '')).toBe(false);
     expect(isPagesAuthClient(PAGES_DEV, SECRET)).toBe(false);
+    expect(pagesAuthCallbackUrl(PAGES_DEV, { code: 'a.b', state: 'S'.repeat(43) })).toBeNull();
   });
 
-  test.each([
-    'https://pages.kiloapps.io/',
-    'https://pages.kiloapps.io/p/abc',
-    'http://pages.kiloapps.io',
-    'https://pages.kiloapps.io.evil.example',
-    'https://evil.pages.kiloapps.io',
-    'https://PAGES.kiloapps.io',
-    'https://app.kilo.ai',
-    '',
-  ])('an origin that is not exactly a deployment is refused: %s', origin => {
-    expect(isPagesAuthOrigin(origin)).toBe(false);
-    expect(isPagesAuthClient(origin, SECRET)).toBe(false);
-  });
+  test.each(['https://pages.kiloapps.io', 'Pages', 'pages ', 'kilo-api', 'kilo-gateway', ''])(
+    'an audience that is not exactly a deployment is refused: %s',
+    audience => {
+      expect(isPagesAuthAudience(audience)).toBe(false);
+      expect(isPagesAuthClient(audience, SECRET)).toBe(false);
+      expect(pagesAuthCallbackUrl(audience, { code: 'a.b', state: 'S'.repeat(43) })).toBeNull();
+    }
+  );
 
   test('only the configured secret proves a deployment', () => {
     expect(isPagesAuthClient(PAGES, SECRET)).toBe(true);
@@ -50,10 +46,15 @@ describe('pages-auth-clients', () => {
   });
 
   test('the callback is the fixed path on the deployment, with the code and state', () => {
-    const url = new URL(pagesAuthCallbackUrl(PAGES, { code: 'a.b', state: 'S'.repeat(43) }));
+    const url = new URL(
+      pagesAuthCallbackUrl(PAGES, { code: 'a.b', state: 'S'.repeat(43) }) ?? 'invalid:'
+    );
 
-    expect(url.origin).toBe(PAGES);
+    expect(url.origin).toBe('https://pages.kiloapps.io');
     expect(url.pathname).toBe(PAGES_AUTH_CALLBACK_PATH);
-    expect(Object.fromEntries(url.searchParams)).toEqual({ code: 'a.b', state: 'S'.repeat(43) });
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      code: 'a.b',
+      state: 'S'.repeat(43),
+    });
   });
 });

@@ -166,7 +166,13 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           { ended: false, timestamp: 0, contentState: toGlanceableContentState(snapshot) },
         ])
     );
-    const sessions = [
+    const sessions: Array<{
+      id: string;
+      userId: string;
+      organizationId: string | null;
+      title?: string | null;
+      status?: string | null;
+    }> = [
       { id: 'personal', userId: 'usr_1', organizationId: null },
       { id: 'org-a', userId: 'usr_1', organizationId: 'org-1' },
       { id: 'org-b', userId: 'usr_1', organizationId: 'org-1' },
@@ -177,10 +183,22 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const db = drizzle(async (sql, params) => {
       queries.push({ sql, params });
       if (sql.includes('from "cli_sessions_v2"')) {
+        const matched = sessions.filter(session => params.includes(session.id));
+        // The push builder reads the push-relevant columns; the scope refresh
+        // reads ownership. Both are answered from the same seeded rows.
+        if (sql.includes('"pr_url"')) {
+          return {
+            rows: matched.map(session => [
+              session.title ?? null,
+              session.organizationId,
+              null,
+              session.status ?? null,
+              '2026-08-27 10:00:00+00',
+            ]),
+          };
+        }
         return {
-          rows: sessions
-            .filter(session => params.includes(session.id))
-            .map(session => [session.id, session.userId, session.organizationId]),
+          rows: matched.map(session => [session.id, session.userId, session.organizationId]),
         };
       }
       if (sql.includes('from "user_push_tokens"')) {
@@ -1980,7 +1998,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         drizzle(async sql => ({
           rows: sql.includes('from "user_notification_preferences"')
             ? [[enabled, enabled, enabled, enabled, enabled, enabled, enabled]]
-            : [['Attention session', null]],
+            : [['Attention session', null, null, null, '2026-08-27 10:00:00+00']],
         })) as never
       );
       const ctx = createExecutionContext();

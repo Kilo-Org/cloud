@@ -1,6 +1,7 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import type { User } from '@kilocode/db/schema';
 import {
   code_review_feedback_events,
   code_review_memory_proposals,
@@ -8,7 +9,13 @@ import {
 } from '@kilocode/db/schema';
 
 import { recordReplyFeedbackEvent, type ReviewMemoryOwner } from './db';
-import { runReviewMemoryAnalysis } from './aggregation';
+import {
+  REVIEW_MEMORY_PROPOSAL_LIMITS,
+  ReviewMemoryProposalOutputSchema,
+  runReviewMemoryAnalysis,
+  validateReviewMemoryProposalDraft,
+} from './aggregation';
+import { createReviewMemoryGatewayProvider, generateReviewMemoryStructuredOutput } from './llm';
 
 describe('review memory aggregation', () => {
   afterEach(async () => {
@@ -77,6 +84,66 @@ describe('review memory aggregation', () => {
       runReviewMemoryAnalysis({ owner, platform: 'github', repoFullName: 'acme/empty' })
     ).resolves.toEqual({ status: 'no_feedback' });
     await expect(db.select().from(code_review_memory_proposals)).resolves.toHaveLength(0);
+  });
+});
+
+describe('Review Memory proposal structured output', () => {
+  // The wire schema strips maxLength, so the schema accepts an over-length title and the
+  // validate callback must refuse it.
+  it('refuses an over-length title in validate, not in the schema', async () => {
+    const gatewayFetch: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          id: 'gateway-response-id',
+          object: 'chat.completion',
+          created: 1_750_204_800,
+          model: 'test/model',
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: 'assistant',
+                content: JSON.stringify({
+                  proposal: {
+                    status: 'propose',
+                    title: 't'.repeat(REVIEW_MEMORY_PROPOSAL_LIMITS.titleChars + 1),
+                    rationale: 'repeated feedback about lint fixes',
+                    proposedMarkdown: '- run the linter before review',
+                    positiveCount: 1,
+                    negativeCount: 0,
+                    neutralCount: 0,
+                    evidenceEventIds: [],
+                  },
+                }),
+              },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+
+    const actor = { id: 'test-user-id', api_token_pepper: null } as User;
+    const provider = createReviewMemoryGatewayProvider({
+      owner: { type: 'user', id: actor.id },
+      actor,
+      userAgent: 'Review Memory proposal test',
+      fetch: gatewayFetch,
+    });
+
+    await expect(
+      generateReviewMemoryStructuredOutput({
+        model: provider.chatModel('test/model'),
+        prompt: 'Analyze the feedback.',
+        maxOutputTokens: 4_000,
+        schemaName: 'review_memory_proposal',
+        schema: ReviewMemoryProposalOutputSchema,
+        validate: output => ({
+          proposal: validateReviewMemoryProposalDraft(output.proposal),
+        }),
+      })
+    ).rejects.toThrow(/title exceeds 140 characters/);
   });
 });
 

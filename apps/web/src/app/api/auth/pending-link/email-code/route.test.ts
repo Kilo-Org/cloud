@@ -84,6 +84,22 @@ describe('POST /api/auth/pending-link/email-code', () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
+  it('refuses an account whose block timestamp is set', async () => {
+    mockFindUser.mockResolvedValue({
+      id: 'user-1',
+      google_user_email: 'user@example.com',
+      blocked_at: '2026-01-15T12:00:00.000Z',
+      blocked_reason: null,
+    } as never);
+
+    const response = await POST(codeRequest());
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'BLOCKED' });
+    expect(mockCreateCode).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
   it('claims a send, stores the challenge, and sends the code', async () => {
     mockClaim.mockResolvedValue(true);
     mockCreateCode.mockResolvedValue({ code: '123456', challengeId: 'challenge-1' });

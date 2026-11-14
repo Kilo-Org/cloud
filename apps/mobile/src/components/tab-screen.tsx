@@ -13,6 +13,7 @@ import {
 import { useKeyboardState } from 'react-native-keyboard-controller';
 
 import { scrollFocusedInputAboveKeyboard } from '@/lib/keyboard-reveal';
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { useScreenInsets } from '@/lib/screen-insets';
 
@@ -20,19 +21,6 @@ type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
 /** The breathing room a tab screen keeps below its last row, above the band. */
 export const TAB_SCREEN_TRAILING_GAP = 16;
-
-/**
- * The smallest scroll viewport the tab screens keep on screen. The reserved
- * band (the tab bar's height, or the IME occlusion while the keyboard is up) is
- * a margin on a `flex-1` frame, so a window shorter than the band leaves the
- * frame zero points tall: nothing below the header renders and nothing can be
- * scrolled. The floor gives up part of the reserved band in such a window
- * instead: the lowest 88 points of the viewport (about two list rows, or a
- * section header and one row) can then sit under the translucent bar, which is
- * the lesser cost. Any window that can afford the whole band keeps it
- * unchanged.
- */
-const TAB_SCREEN_MIN_VIEWPORT = 88;
 
 /**
  * The bottom chrome this screen clears: the tab bar's rendered height under the
@@ -57,11 +45,12 @@ export function useTabBarBottomPadding() {
  * landscape corner needs.
  *
  * The band is a margin on a `flex-1` frame, so it must be clamped against the
- * room a short window actually has: see `TAB_SCREEN_MIN_VIEWPORT`, which the
- * `measureFrame` callback below enforces from the frame's own layout. The
- * measured room, not the band it was measured under, is what is kept: the band
- * itself changes with the keyboard, and a limit derived from the tab-bar band
- * would otherwise outlive it and truncate the IME reservation.
+ * room a short window actually has: see `MIN_BODY_VIEWPORT` in
+ * `@/lib/body-viewport`, which the `measureFrame` callback below enforces from
+ * the frame's own layout. The measured room, not the band it was measured
+ * under, is what is kept: the band itself changes with the keyboard, and a limit
+ * derived from the tab-bar band would otherwise outlive it and truncate the IME
+ * reservation.
  *
  * `TabScreenScrollView` and the list bodies that cannot nest a virtualized list
  * inside a scroll view read this, so both reserve the same clearance.
@@ -76,7 +65,7 @@ export function useTabScreenFrame() {
   const frameMargin =
     availableHeight === null
       ? reservedBand
-      : Math.min(reservedBand, Math.max(0, availableHeight - TAB_SCREEN_MIN_VIEWPORT));
+      : Math.min(reservedBand, Math.max(0, availableHeight - MIN_BODY_VIEWPORT));
   // A collapsed frame reports 0, so the first pass over-estimates the room and
   // can only release band; the pass after it measures the real room and settles
   // on the floor.

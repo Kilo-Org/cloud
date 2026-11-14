@@ -20,6 +20,36 @@ import {
 } from '@kilocode/scim-contracts';
 
 /**
+ * The directory an event belongs to, which is what the loop's per-directory
+ * conflict window is keyed on.
+ *
+ * An activation and a disconnect carry the directory itself, so their `id` is
+ * the directory; every other event carries the directory it belongs to. Null for
+ * an event type outside `DSYNC_EVENTS`, which the Events API never returns
+ * because it filters on that allowlist: the loop then keeps its per-event budget
+ * rather than throwing into the poll's catch.
+ */
+export function directoryIdOf(event: Event): string | null {
+  switch (event.event) {
+    case 'dsync.activated':
+    case 'dsync.deleted':
+      return event.data.id;
+    case 'dsync.group.created':
+    case 'dsync.group.updated':
+    case 'dsync.group.deleted':
+    case 'dsync.user.created':
+    case 'dsync.user.updated':
+    case 'dsync.user.deleted':
+      return event.data.directoryId;
+    case 'dsync.group.user_added':
+    case 'dsync.group.user_removed':
+      return event.data.directoryId;
+    default:
+      return null;
+  }
+}
+
+/**
  * Maps one WorkOS directory event onto the app's internal endpoints and
  * applies it.
  *

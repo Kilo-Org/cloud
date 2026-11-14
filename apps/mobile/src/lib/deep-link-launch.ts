@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- the launch capture, the pending slot and its durable mirror share one module so their precedence rules cannot drift */
 import * as Sentry from '@sentry/react-native';
-import * as z from 'zod';
 
 import {
   type IncomingResume,
@@ -8,12 +7,14 @@ import {
   SESSION_RESUME_ANCHOR_PARAM,
 } from '@kilocode/app-shared/universal-links';
 
+import { browserHandoffUrl, isRemovedMobileDeepLink, openBrowserHandoff } from './deep-link-policy';
+import { parsePendingDeepLinkRecord, type PendingDeepLinkRecord } from './deep-link-record';
 import { currentRouteHref } from './current-route-href';
 import { opensDestination, shellRouteHref } from './deep-link-destination';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
 
-type DeepLinkSource = 'universal-link' | 'notification' | 'system-search';
+type DeepLinkSource = PendingDeepLinkRecord['source'];
 
 type GetLinkingURL = () => string | null;
 
@@ -43,13 +44,6 @@ type SecureStoreLike = {
   getItemAsync: (key: string) => Promise<string | null>;
 };
 
-/**
- * Persisted shape of the pending slot, mirroring the in-memory slot. Derived
- * from `pendingDeepLinkRecordSchema` (declared with the parser below) so the
- * durable record and the shape read back can never drift.
- */
-type PendingDeepLinkRecord = z.infer<typeof pendingDeepLinkRecordSchema>;
-
 /** A persisted record older than this is discarded on restore. */
 const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -62,6 +56,13 @@ let launchCapturedHref: string | null = null;
 // The launch opened one of the app's own routes (`kiloapp:///(app)/…`): the
 // request this process started for, which the relaunch repair leaves alone.
 let launchCapturedAppRoute = false;
+
+// The normalized browser page the cold-launch capture already handed this
+// launch URL to, or null. Kept apart from `launchCapturedHref` because that one
+// means "a link was stashed" to the app-action and resume paths, and a handoff
+// stashes nothing. expo-router's cold path redirects the same launch URL, so
+// this lets that redirect skip a second browser tab for one tap.
+let launchHandoffUrl: string | null = null;
 
 // True while the pending slot holds a universal link the cold-launch capture
 // derived from an app-scheme (`kiloapp://`) launch URL. On Android a tap on one
@@ -231,6 +232,9 @@ export function setPendingDeepLink(
   source: DeepLinkSource,
   options?: PendingDeepLinkOptions
 ): void {
+  if (isRemovedMobileDeepLink(href)) {
+    return;
+  }
   const sessionBound = source === 'system-search' || options?.sessionBound === true;
   if (sessionBound) {
     // A destination captured before the account is known. The native
@@ -307,6 +311,9 @@ export function getPendingDeepLink(): string | null {
   return consumePendingDeepLink()?.href ?? null;
 }
 
+/** A consumed pending destination together with the organization it belongs to. */
+export type ConsumedPendingDeepLink = { href: string; organizationId: string | null };
+
 /**
  * Get-and-clear of the pending destination together with the organization it
  * belongs to. The single gated consumer in `_layout.tsx` reads both: the
@@ -314,13 +321,33 @@ export function getPendingDeepLink(): string | null {
  * first fetch runs in the session's context. `organizationId` is null when the
  * destination carries none (Personal, or a source that never had one).
  */
-export function consumePendingDeepLink(): { href: string; organizationId: string | null } | null {
+export function consumePendingDeepLink(): ConsumedPendingDeepLink | null {
   const result =
     pendingDeepLink === null
       ? null
       : { href: pendingDeepLink, organizationId: pendingDeepLinkOrganizationId };
   clearPendingDeepLink();
   return result;
+}
+
+/**
+ * The single gated consumer step `_layout.tsx` runs: the organization switches
+ * the app before the href navigates, so the route's first fetch runs in the
+ * session's context. A destination with no organization leaves the selection
+ * untouched; a null destination does nothing.
+ */
+export function applyConsumedPendingDeepLink(
+  pending: ConsumedPendingDeepLink | null,
+  setOrganizationId: (organizationId: string) => void,
+  navigate: (href: string) => void
+): void {
+  if (pending === null) {
+    return;
+  }
+  if (pending.organizationId !== null) {
+    setOrganizationId(pending.organizationId);
+  }
+  navigate(pending.href);
 }
 
 /**
@@ -407,7 +434,11 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
     return;
   }
 
-  if (record === null || Date.now() - record.storedAt > PENDING_DEEP_LINK_TTL_MS) {
+  if (
+    record === null ||
+    Date.now() - record.storedAt > PENDING_DEEP_LINK_TTL_MS ||
+    isRemovedMobileDeepLink(record.href)
+  ) {
     deletePersistedPendingDeepLink();
     return;
   }
@@ -427,7 +458,7 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
   }
 
   const { href, source, sessionBound, organizationId } = record;
-  setPendingDeepLink(href, source, { sessionBound, organizationId });
+  setPendingDeepLink(currentRouteHref(href), source, { sessionBound, organizationId });
 }
 
 async function readPersistedPendingDeepLink(): Promise<string | null> {
@@ -437,32 +468,6 @@ async function readPersistedPendingDeepLink(): Promise<string | null> {
     Sentry.captureException(error, {
       tags: { 'error.subsystem': 'deep_link', 'error.operation': 'read_pending_link' },
     });
-    return null;
-  }
-}
-
-const pendingDeepLinkRecordSchema = z.object({
-  href: z.string(),
-  source: z.enum(['universal-link', 'notification', 'system-search']),
-  storedAt: z.number(),
-  // Signed-in user id at persist time, or null when captured while signed out.
-  userId: z.string().nullable(),
-  // Absent in a record written before the session binding existed: such a
-  // record can only be an account-independent destination (a link or a
-  // notification), which is what the default restores as.
-  sessionBound: z.boolean().default(false),
-  // Absent in a record written before the organization rode with the pending
-  // slot: such a record restores as no organization, which leaves the
-  // selection unchanged on the tap.
-  organizationId: z.string().nullable().default(null),
-});
-
-function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    const result = pendingDeepLinkRecordSchema.safeParse(parsed);
-    return result.success ? { ...result.data, href: currentRouteHref(result.data.href) } : null;
-  } catch {
     return null;
   }
 }
@@ -510,11 +515,22 @@ export function resumeDeepLinkHref({ href, anchorMessageId }: IncomingResume): s
  * the bare href here would open a resumed session at the bottom.
  */
 export function captureLaunchDeepLink(): void {
-  if (launchCapturedHref !== null) {
+  if (launchCapturedHref !== null || launchHandoffUrl !== null) {
     return;
   }
   const url = readLaunchUrl();
-  if (!url) {
+  if (!url || isRemovedMobileDeepLink(url)) {
+    return;
+  }
+  // The organization create pages reach the app through the org-root Android
+  // intent filter, which cannot exclude them. Nothing is stashed: the page opens
+  // in the browser the link was meant for, exactly as a warm arrival does. The
+  // handoff target is latched so expo-router's cold redirect of the same launch
+  // URL does not open a second tab for the one tap.
+  const handoffUrl = browserHandoffUrl(url);
+  if (handoffUrl !== null) {
+    launchHandoffUrl = handoffUrl;
+    void openBrowserHandoff(handoffUrl);
     return;
   }
   const resume = resolveIncomingResume(url);
@@ -557,6 +573,23 @@ export function wasLaunchLinkHandled(): string | null {
   return launchCapturedHref === 'none' ? null : launchCapturedHref;
 }
 
+/**
+ * Whether the `initial` redirect of THIS normalized handoff URL should be
+ * skipped because the synchronous launch capture already opened it. The two
+ * sources format the same link differently (`getLinkingURL()` versus the
+ * router's `path`), so both sides compare `browserHandoffUrl()` output. The
+ * latch is consumed: only the cold redirect of the same launch is skipped, and
+ * a different page still opens.
+ */
+export function consumeLaunchHandoffUrl(handoffUrl: string): boolean {
+  const pending = launchHandoffUrl;
+  if (pending === null) {
+    return false;
+  }
+  launchHandoffUrl = null;
+  return pending === handoffUrl;
+}
+
 /** Whether the launch opened one of the app's own routes, which the relaunch
  *  repair must leave to the pending consumer. */
 export function wasLaunchAppRouteCaptured(): boolean {
@@ -573,6 +606,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLinkOrganizationId = null;
   launchCapturedHref = null;
   launchCapturedAppRoute = false;
+  launchHandoffUrl = null;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();
   currentDeepLinkUserId = null;

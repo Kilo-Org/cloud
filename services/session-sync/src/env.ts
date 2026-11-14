@@ -3,12 +3,14 @@ import type { SessionSyncDO } from './dos/SessionSyncDO';
 import type { SessionSyncTenantDO } from './dos/SessionSyncTenantDO';
 import type { SessionRelayDO } from './dos/SessionRelayDO';
 import type { SessionPresenceDO } from './dos/SessionPresenceDO';
+import type { SessionNotificationsDO } from './dos/SessionNotificationsDO';
 
 export type Env = AuthEnv & {
   SESSION_SYNC_DO: DurableObjectNamespace<SessionSyncDO>;
   SESSION_SYNC_TENANT_DO: DurableObjectNamespace<SessionSyncTenantDO>;
   SESSION_RELAY_DO: DurableObjectNamespace<SessionRelayDO>;
   SESSION_PRESENCE_DO: DurableObjectNamespace<SessionPresenceDO>;
+  SESSION_NOTIFICATIONS_DO: DurableObjectNamespace<SessionNotificationsDO>;
   INTERNAL_API_SECRET_PROD: SecretBinding;
   USER_REQUEST_LIMITER: RateLimit;
   USER_DATA_BLOCK_LIMITER: RateLimit;

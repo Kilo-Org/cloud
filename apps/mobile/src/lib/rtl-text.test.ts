@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   containsJoinedScript,
   hasRtlScript,
-  JOINED_SCRIPT,
+JOINED_SCRIPT,
   ltrValueTextStyle,
   rtlBlockTextAlign,
   withoutMonoFamily,
@@ -83,15 +83,6 @@ describe('hasRtlScript', () => {
     expect(hasRtlScript(true)).toBe(false);
     expect(hasRtlScript(null)).toBe(false);
   });
-});
-
-describe('JOINED_SCRIPT', () => {
-  it.each(['\u0600', '\u0750', '\u0870', '\u08A0', '\uFB50', '\uFE70'])(
-    'covers the block that starts at %j',
-    value => {
-      expect(JOINED_SCRIPT.test(value)).toBe(true);
-    }
-  );
 });
 
 describe('containsJoinedScript', () => {

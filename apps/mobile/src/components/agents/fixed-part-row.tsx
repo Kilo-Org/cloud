@@ -130,7 +130,11 @@ export function FixedPartRow({
   return (
     <View
       className={cn(
-        'overflow-hidden rounded-lg border border-border',
+        // The default hairline is 7% white in dark, which all but vanishes on the
+        // near-black page: a dashed outline then reads as no outline at all. The
+        // dark page takes the neutral step the outlined control uses, so a row
+        // keeps the separation it has in the light scheme.
+        'overflow-hidden rounded-lg border border-border dark:border-neutral-700',
         variant === 'dashed' && 'border-dashed'
       )}
     >

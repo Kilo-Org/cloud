@@ -32,9 +32,8 @@ export const ERROR_FINISH_REASONS = [
 
 const errorFinishReasonSet: ReadonlySet<string> = new Set(ERROR_FINISH_REASONS);
 
-// `null` / `undefined` return false: an absent finish_reason is handled by
+// Non-string values return false: an absent finish_reason is handled by
 // the `wasAborted` / `reportedError` signals in the parsers, not here.
-export function isErrorFinishReason(finish_reason: string | null | undefined): boolean {
-  if (finish_reason == null) return false;
-  return errorFinishReasonSet.has(finish_reason);
+export function isErrorFinishReason(finish_reason: unknown): boolean {
+  return typeof finish_reason === 'string' && errorFinishReasonSet.has(finish_reason);
 }

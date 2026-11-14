@@ -189,6 +189,7 @@ export function createControlPlaneSessionHost(options: {
     | 'onDeadline'
     | 'onActivityChange'
     | 'onMemoryHold'
+    | 'onFeedInterrupted'
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
@@ -199,6 +200,7 @@ export function createControlPlaneSessionHost(options: {
     onEvent: event => turns?.observeKiloEvent(event),
     onHarnessActivity: event => turns?.observeActivity(event),
     onActivityChange: key => turns?.refreshActivity(key),
+    onFeedInterrupted: (id, key) => turns?.onFeedInterrupted(id, key),
     onDeadline: (identity, reason, retry, key, stopped) =>
       turns?.onNativeDeadline(identity, reason, retry, key, stopped),
     onRestart: info => turns?.onRuntimeRestart(info),
@@ -356,6 +358,7 @@ export async function runControlPlaneWrapper(
     uploadUrl,
     uploadGrant,
     wrapperLogPath: env.WRAPPER_LOG_PATH,
+    environment: env,
     onDiagnostic: diagnostics.onDiagnostic,
     projector,
   });
@@ -504,6 +507,7 @@ export async function runControlPlaneWrapper(
     // Route preparation output (progress/ready/failed) out over the connection.
     emit: frame => connection.send(frame),
     readHistoryPage: request => historyRequests.readPage(request),
+    readRecentHistory: request => historyRequests.readRecent(request),
     log: logToFile,
     inheritedEnv: env,
     spawnSetup: createSetupSpawn(workload),

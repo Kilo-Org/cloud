@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
-import { EndpointsSchema, ModelSchema } from '@kilocode/db/schema-types';
+import { EndpointsSchema, ModelSchema, VercelModelSchema } from '@kilocode/db/schema-types';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
@@ -322,6 +322,47 @@ describe('readStoredGatewayModels', () => {
     );
   });
 
+  it('keeps the model description fields only for a source whose schema has them', async () => {
+    const described = {
+      id: 'vendor/described',
+      name: 'Described',
+      type: 'language',
+      owned_by: 'vendor',
+      description: 'A described model',
+      created: 1_755_815_280,
+      released: 1_790_000_000,
+      context_window: 256_000,
+      max_tokens: 32_000,
+      modalities: { input: ['text'], output: ['text'] },
+      supported_parameters: ['tools'],
+      pricing: { input: '0.000001', output: '0.000002', input_cache_read: null },
+      deprecated_at: Date.UTC(2027, 0, 15),
+      reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+    };
+    await storeList([described]);
+    const vercelSource = gatewayModelsSource(gateway, '/models', VercelModelSchema);
+
+    const [vercelModel] = modelsOf(await readStoredGatewayModels(gateway, vercelSource, db)) ?? [];
+    const [plainModel] = modelsOf(await read()) ?? [];
+
+    expect(vercelModel).toEqual({
+      id: 'vendor/described',
+      name: 'Described',
+      type: 'language',
+      description: 'A described model',
+      created: 1_755_815_280,
+      released: 1_790_000_000,
+      context_window: 256_000,
+      max_tokens: 32_000,
+      modalities: { input: ['text'], output: ['text'] },
+      supported_parameters: ['tools'],
+      pricing: { input: '0.000001', output: '0.000002' },
+      deprecated_at: Date.UTC(2027, 0, 15),
+      reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+    });
+    expect(plainModel).toEqual({ id: 'vendor/described', name: 'Described', type: 'language' });
+  });
+
   it('joins only endpoints rows of the given gateway', async () => {
     await storeList([
       { id: 'vendor/a', name: 'A' },
@@ -446,6 +487,116 @@ describe('retainPreviousEntries', () => {
     expect(retainPreviousEntries(joined, previous)).toEqual({
       'vendor/kept': joined.models['vendor/kept'],
     });
+  });
+
+  it('leaves out an alias to a model listed without an endpoints resource', () => {
+    const previous = {
+      '~vendor/batch-latest': model('~vendor/batch-latest', 'before', 'vendor/batch'),
+      'vendor/batch': model('vendor/batch', 'before'),
+    };
+    const joined = {
+      models: {
+        '~vendor/batch-latest': model('~vendor/batch-latest', 'now', 'vendor/batch'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: ['vendor/batch'],
+      withoutStoredEndpoints: [],
+    };
+
+    expect(retainPreviousEntries(joined, previous)).toEqual({
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('restores the previous target of a retargeted alias while that target is listed', () => {
+    const previous = {
+      '~vendor/batch-latest': model('~vendor/batch-latest', 'before', 'vendor/kept'),
+      'vendor/batch': model('vendor/batch', 'before'),
+    };
+    const joined = {
+      models: {
+        '~vendor/batch-latest': model('~vendor/batch-latest', 'now', 'vendor/batch'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: ['vendor/batch'],
+      withoutStoredEndpoints: [],
+    };
+
+    expect(retainPreviousEntries(joined, previous)).toEqual({
+      '~vendor/batch-latest': previous['~vendor/batch-latest'],
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('leaves out a chained alias whose target alias is left out', () => {
+    const joined = {
+      models: {
+        '~vendor/a-latest': model('~vendor/a-latest', 'now', '~vendor/b-latest'),
+        '~vendor/b-latest': model('~vendor/b-latest', 'now', 'vendor/gone'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: [],
+      withoutStoredEndpoints: ['vendor/gone'],
+    };
+
+    expect(retainPreviousEntries(joined, {})).toEqual({
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('leaves out an alias whose target is not listed at all', () => {
+    const joined = {
+      models: {
+        '~vendor/unlisted-latest': model('~vendor/unlisted-latest', 'now', 'vendor/unlisted'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: [],
+      withoutStoredEndpoints: [],
+    };
+
+    expect(retainPreviousEntries(joined, {})).toEqual({
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('leaves out a restored alias whose previous target is unavailable too', () => {
+    const previous = {
+      '~vendor/a-latest': model('~vendor/a-latest', 'before', 'vendor/gone'),
+    };
+    const joined = {
+      models: {
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: [],
+      withoutStoredEndpoints: ['~vendor/a-latest'],
+    };
+
+    expect(retainPreviousEntries(joined, previous)).toEqual({
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('restores a chained alias to a previous target that is still listed', () => {
+    const previous = {
+      '~vendor/a-latest': model('~vendor/a-latest', 'before', 'vendor/kept'),
+    };
+    const joined = {
+      models: {
+        '~vendor/a-latest': model('~vendor/a-latest', 'now', '~vendor/b-latest'),
+        '~vendor/b-latest': model('~vendor/b-latest', 'now', 'vendor/gone'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: [],
+      withoutStoredEndpoints: ['vendor/gone'],
+    };
+
+    const result = retainPreviousEntries(joined, previous);
+
+    expect(result).toEqual({
+      '~vendor/a-latest': previous['~vendor/a-latest'],
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+    expect(Object.hasOwn(result, '~vendor/b-latest')).toBe(false);
   });
 });
 

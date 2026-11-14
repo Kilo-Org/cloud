@@ -1,6 +1,9 @@
-import type {
-  ControlPlaneHistoryResultFrame,
-  ControlPlaneWrapperFrame,
+import {
+  workspaceHistorySessionsSchema,
+  type WorkspaceHistorySession,
+  type ControlPlaneHistoryPageFrame,
+  type ControlPlaneHistoryResultFrame,
+  type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 
 const HISTORY_PAGE_TIMEOUT_MS = 30_000;
@@ -10,6 +13,7 @@ export type HistoryPageRequest = {
   sessionId: string;
   kiloSessionId: string;
   cursor?: string;
+  workspaceSessionId?: string;
   signal?: AbortSignal;
 };
 
@@ -24,8 +28,13 @@ export function createHistoryRequests(deps: { send(frame: ControlPlaneWrapperFra
     { resolve(page: unknown): void; reject(error: Error): void; settle(): void }
   >();
 
-  function readPage(request: HistoryPageRequest): Promise<unknown> {
-    if (request.signal?.aborted) return Promise.reject(new Error('History read was aborted'));
+  function read(
+    frame:
+      | Omit<ControlPlaneHistoryPageFrame, 'requestId'>
+      | { type: 'history.recent'; sessionId: string },
+    signal?: AbortSignal
+  ): Promise<unknown> {
+    if (signal?.aborted) return Promise.reject(new Error('History read was aborted'));
     if (pending.size >= MAX_PENDING_HISTORY_PAGES)
       return Promise.reject(new Error('Too many history reads are waiting'));
     const requestId = crypto.randomUUID();
@@ -38,7 +47,7 @@ export function createHistoryRequests(deps: { send(frame: ControlPlaneWrapperFra
       const entry = {
         settle() {
           clearTimeout(timer);
-          request.signal?.removeEventListener('abort', onAbort);
+          signal?.removeEventListener('abort', onAbort);
           pending.delete(requestId);
         },
         resolve(page: unknown) {
@@ -51,19 +60,26 @@ export function createHistoryRequests(deps: { send(frame: ControlPlaneWrapperFra
         },
       };
       pending.set(requestId, entry);
-      request.signal?.addEventListener('abort', onAbort, { once: true });
+      signal?.addEventListener('abort', onAbort, { once: true });
       deps.send({
-        type: 'history.page',
+        ...frame,
         requestId,
-        sessionId: request.sessionId,
-        kiloSessionId: request.kiloSessionId,
-        ...(request.cursor === undefined ? {} : { cursor: request.cursor }),
       });
     });
   }
 
   return {
-    readPage,
+    readPage({ signal, ...request }: HistoryPageRequest): Promise<unknown> {
+      return read({ type: 'history.page', ...request }, signal);
+    },
+    async readRecent(request: {
+      sessionId: string;
+      signal?: AbortSignal;
+    }): Promise<WorkspaceHistorySession[]> {
+      return workspaceHistorySessionsSchema.parse(
+        await read({ type: 'history.recent', sessionId: request.sessionId }, request.signal)
+      );
+    },
     handle(frame: ControlPlaneHistoryResultFrame): void {
       const entry = pending.get(frame.requestId);
       if (entry === undefined) return;

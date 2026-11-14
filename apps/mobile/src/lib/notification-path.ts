@@ -1,6 +1,6 @@
 import { type PushData } from '@kilocode/notifications/schemas';
 
-import { chatConversationRoute, chatSandboxRoute } from './kilo-chat-routes';
+import { clawNotificationWebUrl } from './claw-notification';
 import { providerPrRoutePath } from './pr-review/provider-pr-ref';
 import { parseProviderPrUrl } from './pr-review/provider-pr-url';
 import { getSecurityAgentPath } from './security-agent';
@@ -25,7 +25,11 @@ export function prPathForData(data: PushData): string | null {
   return `${base}${base.includes('?') ? '&' : '?'}via=push`;
 }
 
-export function notificationPathForData(data: PushData): string {
+export function notificationPathForData(
+  data: Extract<PushData, { type: 'cloud_agent_session' }>
+): string;
+export function notificationPathForData(data: PushData): string | null;
+export function notificationPathForData(data: PushData): string | null {
   // `via=push` marks the resulting session_viewed analytics event as
   // push-originated.
   switch (data.type) {
@@ -36,7 +40,9 @@ export function notificationPathForData(data: PushData): string {
       return `/(app)/agent-chat/${data.cliSessionId}?via=push`;
     }
     case 'chat.message': {
-      return `${chatConversationRoute(data.sandboxId, data.conversationId)}?via=push`;
+      // No app route (see the lifecycle case below): the conversation opens on
+      // the web.
+      return null;
     }
     case 'low_balance': {
       return `/(app)/(tabs)/(3_profile)/organization/credit-activity?org=${data.organizationId}&via=push`;
@@ -59,7 +65,9 @@ export function notificationPathForData(data: PushData): string {
     }
     case 'instance-lifecycle':
     case 'scheduled-action': {
-      return chatSandboxRoute(data.sandboxId);
+      // No app route: KiloClaw has no mobile screen, so a tap on one of these
+      // opens its web page. `notificationDestinationForData` resolves it.
+      return null;
     }
     case 'active_agents_glanceable':
     case 'session_live_update': {
@@ -74,4 +82,32 @@ export function notificationPathForData(data: PushData): string {
       return _exhaustive;
     }
   }
+}
+
+/**
+ * Where a push's tap lands: an app route, or a web page this app opens in the
+ * in-app browser because it has no native screen for it.
+ */
+export type NotificationDestination =
+  | Readonly<{ kind: 'app'; href: string }>
+  | Readonly<{ kind: 'external'; url: string }>;
+
+/**
+ * The one destination a push has, in-app or on the web, or null when it has
+ * none.
+ *
+ * `webBaseUrl` is the Kilo web origin an external destination opens on — the
+ * app's own `WEB_BASE_URL`, passed in so this module stays free of the runtime
+ * config.
+ */
+export function notificationDestinationForData(
+  data: PushData,
+  webBaseUrl: string
+): NotificationDestination | null {
+  const href = notificationPathForData(data);
+  if (href !== null) {
+    return { kind: 'app', href };
+  }
+  const url = clawNotificationWebUrl(data, webBaseUrl);
+  return url === null ? null : { kind: 'external', url };
 }

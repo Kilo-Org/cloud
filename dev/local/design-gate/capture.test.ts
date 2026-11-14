@@ -5,11 +5,14 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  InfraError,
   linkPath,
+  loadingPlaceholder,
   runMatrix,
   sampleUntilSettled,
   screenFindings,
   screenIdentity,
+  waitForLoadingPlaceholder,
   waitForStableLayout,
   type CaptureContext,
   type Clock,
@@ -190,6 +193,150 @@ test('sampleUntilSettled gives up after 8 s', async () => {
   const sampled = await sampleUntilSettled({ dump: async () => dumpWith({ y: y++ }) }, clock);
   assert.equal(sampled.settled, false);
   assert.ok(sampled.elapsedMs >= 8_000 && sampled.elapsedMs < 8_200);
+});
+
+test('loadingPlaceholder recognizes a skeleton test ID and a skeleton owner', () => {
+  assert.equal(loadingPlaceholder(normalize(dumpWith())), false);
+  const byTestID = dumpWith();
+  byTestID.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    testID: 'session-row-skeleton',
+  });
+  assert.equal(loadingPlaceholder(normalize(byTestID)), true);
+  const byOwner = dumpWith();
+  byOwner.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'SessionSkeletonMessages'],
+  });
+  assert.equal(loadingPlaceholder(normalize(byOwner)), true);
+  // A test ID that only ends in letters does not name a placeholder.
+  const unrelated = dumpWith();
+  unrelated.nodes.push({ parent: 0, tag: 'View', rect: [0, 0, 10, 10], testID: 'skeletons' });
+  assert.equal(loadingPlaceholder(normalize(unrelated)), false);
+});
+
+test('waitForLoadingPlaceholder waits for the screen the link opened and its placeholder to clear', async () => {
+  const clock = fakeClock();
+  const skeleton = dumpWith({ text: 'Loading', route: '/session' });
+  skeleton.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'SessionSkeletonMessages'],
+  });
+  const states = [
+    dumpWith({ route: '/' }),
+    skeleton,
+    skeleton,
+    dumpWith({ text: 'Card', route: '/session' }),
+  ];
+  let index = 0;
+  const waited = await waitForLoadingPlaceholder(
+    { dump: async () => states[Math.min(index++, states.length - 1)] },
+    clock,
+    dump => dump.env.route !== '/'
+  );
+  assert.equal(waited.cleared, true);
+  assert.equal(waited.observed, true);
+  assert.equal(index, 4);
+});
+
+test('waitForLoadingPlaceholder reports a placeholder that outlives its budget', async () => {
+  const clock = fakeClock();
+  const skeleton = dumpWith();
+  skeleton.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'Skeleton'],
+  });
+  const waited = await waitForLoadingPlaceholder(
+    { dump: async () => skeleton },
+    clock,
+    () => true,
+    1_000
+  );
+  assert.equal(waited.cleared, false);
+  assert.equal(waited.observed, true);
+  assert.ok(waited.elapsedMs >= 1_000);
+});
+
+test('waitForLoadingPlaceholder releases a link that never lands without claiming a placeholder', async () => {
+  const clock = fakeClock();
+  const skeleton = dumpWith({ route: '/elsewhere' });
+  skeleton.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'Skeleton'],
+  });
+  const waited = await waitForLoadingPlaceholder(
+    { dump: async () => skeleton },
+    clock,
+    () => false,
+    30_000,
+    1_000
+  );
+  // A placeholder on another screen is not this target's state.
+  assert.equal(waited.cleared, false);
+  assert.equal(waited.observed, false);
+  assert.ok(waited.elapsedMs >= 1_000 && waited.elapsedMs < 5_000);
+});
+
+test('an unsettled capture from a loading placeholder names that cause', () => {
+  const dump = dumpWith();
+  const blocked = screenFindings({
+    cell: 'base',
+    target: 'loading',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dump, dump, dump],
+      settled: false,
+      elapsedMs: 12_000,
+      blockedBy: 'loading-placeholder',
+    },
+  });
+  assert.deepEqual(
+    blocked.map(finding => finding.rule),
+    ['unsettled']
+  );
+  assert.match(blocked[0]?.message ?? '', /still paints its loading placeholder/u);
+  // The finding measures the wait that ran, not the settle loop's own elapsed time.
+  const waited = screenFindings({
+    cell: 'base',
+    target: 'loading',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dump, dump, dump],
+      settled: false,
+      elapsedMs: 12_000,
+      blockedBy: 'loading-placeholder',
+      loadingWaitMs: 30_101,
+    },
+  });
+  assert.equal(waited[0]?.measured, 30_101);
+  assert.match(waited[0]?.message ?? '', /after 30101 ms/u);
+  const changing = screenFindings({
+    cell: 'base',
+    target: 'moving',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dumpWith({ y: 50 }), dump],
+      settled: false,
+      elapsedMs: 12_000,
+    },
+  });
+  assert.match(changing[0]?.message ?? '', /kept changing/u);
 });
 
 type ProbeState = {
@@ -465,6 +612,162 @@ test('runMatrix skips a target that switches the language and resets it for the 
     [['warning', 'hindi', 'hindi switched the app language to hi; its rules were skipped']]
   );
   assert.deepEqual(state.languageCalls, ['system/en']);
+});
+
+test('a language reload the inspector never returns from relaunches the app', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const base = fakeProbe(state);
+  const probe: ProbeClient = {
+    ...base,
+    // The runtime reloads into an instance the inspector never lists again: the
+    // Arabic cell only sees its language after the app process restarts.
+    setLanguage: async (preference, resolved) => {
+      state.languageCalls.push(`${preference}/${resolved}`);
+      if (resolved === 'ar') return;
+      state.language = resolved;
+    },
+  };
+  const device: Device = {
+    ...fakeDevice(calls, state),
+    relaunch: () => {
+      calls.push('relaunch');
+      state.language = 'ar';
+    },
+  };
+  const ctx = context(device, probe);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'standard'), HOME);
+  assert.deepEqual(
+    calls.filter(call => call === 'relaunch'),
+    ['relaunch']
+  );
+  // The rtl cell is measured after the restart instead of aborting the run, and
+  // the restore brings the app back to English.
+  assert.equal(fs.existsSync(path.join(ctx.out, 'cells/rtl/home.timeline.json')), true);
+  assert.deepEqual(outcome.skipped, []);
+  assert.equal(state.language, 'en');
+});
+
+test('a reload that leaves no debugger at all still relaunches and measures the cell', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const base = fakeProbe(state);
+  // The reload takes the inspector with it: nothing is listed, so the readiness
+  // wait ends by throwing instead of returning a stale dump. That is the outage
+  // the relaunch exists for, and it must not end the run.
+  let detached = false;
+  const dead = () => new InfraError('No Metro debugger page for Pixel (0 pages listed)');
+  const probe: ProbeClient = {
+    ...base,
+    setLanguage: async (preference, resolved) => {
+      state.languageCalls.push(`${preference}/${resolved}`);
+      if (resolved === 'ar') {
+        detached = true;
+        return;
+      }
+      state.language = resolved;
+    },
+    ready: async () => {
+      if (detached) throw dead();
+      return true;
+    },
+    dump: async () => {
+      if (detached) throw dead();
+      return base.dump();
+    },
+  };
+  const device: Device = {
+    ...fakeDevice(calls, state),
+    relaunch: () => {
+      calls.push('relaunch');
+      detached = false;
+      state.language = 'ar';
+    },
+  };
+  const ctx = context(device, probe);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'standard'), HOME);
+  assert.equal(calls.filter(call => call === 'relaunch').length, 1);
+  assert.deepEqual(
+    outcome.cells.map(cell => [cell.id, cell.screens.map(screen => screen.target)]),
+    [
+      ['base', ['home']],
+      ['dark', ['home']],
+      ['compact', ['home']],
+      ['rtl', ['home']],
+    ]
+  );
+  assert.deepEqual(outcome.skipped, []);
+  assert.equal(state.language, 'en');
+});
+
+test('a relaunch the device cannot perform skips the cell instead of aborting the run', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const base = fakeProbe(state);
+  const probe: ProbeClient = {
+    ...base,
+    setLanguage: async (preference, resolved) => {
+      state.languageCalls.push(`${preference}/${resolved}`);
+      if (resolved === 'ar') return;
+      state.language = resolved;
+    },
+  };
+  const device: Device = {
+    ...fakeDevice(calls, state),
+    relaunch: () => {
+      calls.push('relaunch');
+      throw new Error('adb: device offline');
+    },
+  };
+  const outcome = await runMatrix(context(device, probe), matrixCells('android', 'standard'), HOME);
+  // The cell that needed the restart is named as unmeasured; the three cells
+  // that did not are still graded, and the run reports the gap instead of
+  // dying on one adb error.
+  assert.deepEqual(outcome.skipped, [
+    {
+      cell: 'rtl',
+      target: 'home',
+      reason: 'InfraError: Relaunch failed: Error: adb: device offline',
+    },
+  ]);
+  assert.deepEqual(
+    outcome.cells.map(cell => [cell.id, cell.screens.length]),
+    [
+      ['base', 1],
+      ['dark', 1],
+      ['compact', 1],
+      ['rtl', 0],
+    ]
+  );
+  assert.equal(calls.filter(call => call === 'relaunch').length, 1);
+});
+
+test('runMatrix records a target the probe cannot read instead of reporting a pass', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const base = fakeProbe(state);
+  const probe: ProbeClient = {
+    ...base,
+    openLink: async url => {
+      if (url === 'kiloapp://gone') throw new InfraError('No Metro debugger page for Pixel');
+      await base.openLink(url);
+    },
+  };
+  const outcome = await runMatrix(
+    context(fakeDevice(calls, state), probe),
+    matrixCells('android', 'base'),
+    [{ id: 'gone', link: 'kiloapp://gone' }, ...HOME]
+  );
+  // A target nothing measured is named, so the caller can report the run as
+  // inconclusive instead of a pass over the screens it did read.
+  assert.deepEqual(outcome.skipped, [
+    { cell: 'base', target: 'gone', reason: 'InfraError: No Metro debugger page for Pixel' },
+  ]);
+  assert.deepEqual(
+    outcome.cells[0]?.screens.map(screen => screen.target),
+    ['home']
+  );
+  assert.equal(calls.at(-1), 'restore');
 });
 
 test('runMatrix warms the target that has to reload the language back', async () => {

@@ -3,7 +3,7 @@ import {
   type SessionEnvironmentReference,
 } from '../../environment-build/reference.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import type { drizzle } from 'drizzle-orm/durable-sqlite';
 import {
@@ -38,6 +38,10 @@ import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
 import { lastSentHandleKey } from './scope-handle-delivery.js';
 import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
 import { admissionFailureStage } from './scope-handle-adoption.js';
+import {
+  OrganizationAccessRevokedError,
+  OrganizationMembershipUnavailableError,
+} from './organization-membership.js';
 import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
@@ -380,13 +384,24 @@ const ATTEMPT_POLICY_ATTEMPTS = 2;
 /**
  * The failure reason and diagnostic stage for an error that grant issuance
  * threw. A repository of the environment that cannot be accessed has its own
- * reason, and its stage names the repository; the other errors keep the generic
- * workspace failure with the caller's stage.
+ * reason, and its stage names the repository; an organization membership that
+ * refused or could not answer the read has its own stage; the other errors keep
+ * the generic workspace failure with the caller's stage.
  */
 export function grantIssueFailure(
   error: unknown,
   fallbackStage: string
 ): { reason: ControlPlaneFailureReason; stage: string } {
+  if (error instanceof OrganizationAccessRevokedError) {
+    // The owner left the organization the session belongs to: the route cannot
+    // run on organization authority, and no retry of the same attempt mints it.
+    return { reason: 'workspace_setup_failed', stage: 'organization_access_revoked' };
+  }
+  if (error instanceof OrganizationMembershipUnavailableError) {
+    // The read that would prove membership did not answer. The grant is denied,
+    // and its own stage keeps that deny distinguishable from a grant-mint fault.
+    return { reason: 'workspace_setup_failed', stage: 'organization_membership_unavailable' };
+  }
   if (error instanceof SessionCredentialUpgradeRequiredError) {
     return { reason: 'credential_upgrade_required', stage: 'credential_upgrade_required' };
   }
@@ -469,6 +484,55 @@ export async function startAttempt(
   );
 }
 
+function sameWorktreeRecovery(
+  current: ControlPlaneRouteSpec['worktreeRecovery'],
+  incoming: ControlPlaneRouteSpec['worktreeRecovery']
+): boolean {
+  return JSON.stringify(current) === JSON.stringify(incoming);
+}
+
+/**
+ * Adopts the newest saved worktree recovery on an existing route, so a later
+ * attempt (a wrapper restart) prepares from it. A frame that has not been sent
+ * yet reads the refreshed row in `sendPreparedRouteFrame`; an attempt that
+ * already received its frame is unaffected by the newer value.
+ *
+ * The update is a fenced column write, not a row upsert: a concurrent route
+ * transition (a new attempt, a failure, a deletion) must win over a stale read.
+ * Returns the updated record, or null when the route moved on first.
+ */
+function refreshRouteRecovery(
+  db: RouteDatabase,
+  existing: RouteRecord,
+  worktreeRecovery: ControlPlaneRouteSpec['worktreeRecovery']
+): RouteRecord | null {
+  if (sameWorktreeRecovery(existing.spec.worktreeRecovery, worktreeRecovery)) return existing;
+  const spec: ControlPlaneRouteSpec = { ...existing.spec, worktreeRecovery };
+  let applied = false;
+  db.transaction(tx => {
+    const row = tx
+      .select()
+      .from(routesTable)
+      .where(eq(routesTable.session_id, existing.sessionId))
+      .get();
+    if (row === undefined || row.state === 'failed' || row.attempt_id !== existing.attemptId) {
+      return;
+    }
+    tx.update(routesTable)
+      .set({ spec: JSON.stringify(spec), updated_at: Date.now() })
+      .where(
+        and(
+          eq(routesTable.session_id, existing.sessionId),
+          eq(routesTable.attempt_id, existing.attemptId),
+          eq(routesTable.state, row.state)
+        )
+      )
+      .run();
+    applied = true;
+  });
+  return applied ? { ...existing, spec } : null;
+}
+
 /**
  * The `prepare` route effect. Starts an attempt when the route is absent or
  * `failed`; any other route keeps its attempt deadline. `started` tells the
@@ -482,7 +546,13 @@ export async function ensureRoute(
 ): Promise<{ route: RouteRecord; started: boolean }> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   if (existing !== null && existing.state !== 'failed') {
-    return { route: existing, started: false };
+    const route = refreshRouteRecovery(ctx.db, existing, spec.worktreeRecovery);
+    if (route !== null) return { route, started: false };
+    const current = await readRoute(ctx.db, spec.sessionId);
+    if (current !== null && current.state !== 'failed') {
+      return { route: current, started: false };
+    }
+    return { route: await startAttempt(ctx, spec, source, environment), started: true };
   }
   return { route: await startAttempt(ctx, spec, source, environment), started: true };
 }

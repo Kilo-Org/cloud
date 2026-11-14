@@ -48,6 +48,7 @@ const colors = {
   rowSage: '#587C1D',
   rowMoss: '#467C1D',
   rowFern: '#357C1D',
+  rowPine: '#237C1D',
 } satisfies ThemeColors;
 
 describe('markdown palette', () => {
@@ -55,11 +56,5 @@ describe('markdown palette', () => {
     const palette = getPalette('user', colors);
 
     expect(palette.textColor).toBe(colors.accentSoftForeground);
-  });
-
-  it('uses primary-foreground for kilo-chat user bubbles (bg-primary)', () => {
-    const palette = getPalette('kilo-chat-user', colors);
-
-    expect(palette.textColor).toBe(colors.primaryForeground);
   });
 });

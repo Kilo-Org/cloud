@@ -17,6 +17,7 @@ import {
   type ProfileSummaryWithOwner,
 } from '@/hooks/useCloudAgentProfiles';
 import { ProfileDetailPane } from './ProfileDetailPane';
+import { TRPCClientError } from '@trpc/client';
 
 type ProfilesManagerProps = {
   organizationId?: string;
@@ -134,8 +135,14 @@ export function ProfilesManager({
       setNewProfileName('');
       setNewProfileDescription('');
       if (created?.id) setSelectedId(created.id);
-    } catch {
-      toast.error('Failed to create profile');
+    } catch (error) {
+      // A refusal the server words, such as the profile limit, explains itself.
+      // Anything else keeps the generic sentence instead of raw error text.
+      toast.error(
+        error instanceof TRPCClientError && error.data?.code === 'PRECONDITION_FAILED'
+          ? error.message
+          : 'Failed to create profile'
+      );
     } finally {
       setSavingNew(false);
     }

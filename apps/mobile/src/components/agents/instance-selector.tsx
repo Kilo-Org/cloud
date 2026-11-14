@@ -1,11 +1,16 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
-import { Keyboard, Pressable } from 'react-native';
+import { Keyboard, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { i18n } from '@/i18n';
-import { cloudAgentTargetLabel, formatInstanceTarget } from '@/lib/instance-target-label';
+import {
+  cloudAgentTargetLabel,
+  formatInstanceTarget,
+  formatInstanceValue,
+} from '@/lib/instance-target-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -36,7 +41,7 @@ type InstanceSelectorProps = {
   disabled?: boolean;
 };
 
-function selectorLabel({
+function selectorValue({
   value,
   isLoading,
   pendingComputer = false,
@@ -46,7 +51,7 @@ function selectorLabel({
   pendingComputer?: boolean;
 }): string {
   if (value) {
-    return formatInstanceTarget(value);
+    return formatInstanceValue(value);
   }
   if (isLoading) {
     return i18n.t('common.loading');
@@ -72,7 +77,10 @@ export function InstanceSelector({
   // The Cloud Agent default is always selectable, even when the list is
   // loading or empty — only the "open the picker" path is gated.
   const canOpenPicker = !disabled;
-  const label = selectorLabel({ value, isLoading, pendingComputer });
+  const label = selectorValue({ value, isLoading, pendingComputer });
+  // The value line names the computer alone, but a screen reader hears the
+  // whole target: the project is where the session will run.
+  const accessibleTarget = value === null ? label : formatInstanceTarget(value);
   // A target is selected in every state but the loading copy and the unbound
   // computer: the Cloud Agent default is a real value, not a placeholder, so it
   // takes the same foreground ink as a bound instance. Placeholder ink would
@@ -100,23 +108,29 @@ export function InstanceSelector({
       onPress={handlePress}
       disabled={!canOpenPicker}
       accessibilityRole="button"
-      accessibilityLabel={t('agentChat.instancePicker.runOnAccessibility', { label })}
+      accessibilityLabel={t('agentChat.instancePicker.runOnAccessibility', {
+        label: accessibleTarget,
+      })}
       accessibilityState={{ disabled: !canOpenPicker }}
-      className={cn(
-        'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',
-        !canOpenPicker && 'opacity-50'
-      )}
+      className={cn(FIELD_TRIGGER_FRAME_CLASS, !canOpenPicker && 'opacity-50')}
     >
-      <Text
-        className={cn(
-          'flex-1 text-base',
-          isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
-        )}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-      <ChevronDown size={14} color={colors.mutedForeground} />
+      <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+        <Text
+          className={cn(
+            'min-w-0 flex-1 text-base',
+            isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
+          )}
+          numberOfLines={1}
+          // The value is a computer name, read from the start, so it takes the
+          // ordinary tail cut. The project it runs in is the Folder field's job
+          // below the row, and repeating it cut the name itself on a compact
+          // screen.
+          ellipsizeMode="tail"
+        >
+          {label}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
     </Pressable>
   );
 }

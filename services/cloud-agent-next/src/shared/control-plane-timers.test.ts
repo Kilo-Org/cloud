@@ -46,6 +46,10 @@ describe('control-plane preparation attempt budget', () => {
       createMs +
       sandbox.providerCreateRetryMs +
       createMs +
+      // A failed snapshot launch stops the container and retries once with its
+      // own repository startup bound.
+      sandbox.providerStopAttemptMs +
+      DEADLINE_MS.repositoryStartup +
       sandbox.wrapperFirstConnectMs +
       sandbox.wrapperHelloMs +
       wrapper.restoreMs +
@@ -65,6 +69,31 @@ describe('control-plane preparation attempt budget', () => {
     expect(scaled.sandbox.routePreparationMs).toBeGreaterThanOrEqual(
       scaled.wrapper.cloneMs + scaled.wrapper.restoreMs
     );
+  });
+});
+
+describe('control-plane external-work bounds', () => {
+  it('bounds the membership read inside one grant issuance and keeps it real', () => {
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
+    const readMs = CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadMs;
+
+    // The read happens inside the bounded grant issuance, so a slow database
+    // must not consume more of that bound than one round trip.
+    expect(readMs).toBeLessThan(CONTROL_PLANE_TIMERS.sandbox.providerStopAttemptMs);
+    // Scaling it down would turn a slow read into a deny in a local run.
+    expect(scaled.sandbox.organizationMembershipReadMs).toBe(readMs);
+    expect(scaled.sandbox.organizationMembershipReadAttempts).toBe(
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts
+    );
+    expect(scaled.sandbox.organizationMembershipReadRetryMs).toBe(
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadRetryMs
+    );
+    // Every attempt of one issuance, timeouts and waits, still fits its bound.
+    const issuanceMs =
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts * readMs +
+      (CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts - 1) *
+        CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadRetryMs;
+    expect(issuanceMs).toBeLessThan(CONTROL_PLANE_TIMERS.sandbox.providerStopAttemptMs);
   });
 });
 

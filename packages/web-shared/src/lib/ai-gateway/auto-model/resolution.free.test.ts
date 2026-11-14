@@ -3,8 +3,10 @@ import { getAutoFreeCandidates } from './resolution';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as VercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
@@ -26,6 +28,17 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  ...jest.requireActual<typeof VercelModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/vercel'
+  ),
+  isVercelModel: jest.fn(async (model: string) => model === 'reflection/beam-free'),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
+  getRuntimeGatewayRoutingConfig: jest.fn(),
+}));
+
 function configure(models: string[]) {
   jest
     .mocked(getConfiguredAutoFreeModels)
@@ -34,6 +47,9 @@ function configure(models: string[]) {
 
 describe('getAutoFreeCandidates', () => {
   beforeEach(() => {
+    jest
+      .mocked(getRuntimeGatewayRoutingConfig)
+      .mockResolvedValue({ vercelEnabled: true, vercelOptOutModels: new Set() });
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
     configure([AUTO_SMALL_TARGET_MODELS.free, 'test/present:free', 'test/absent:free']);
   });
@@ -44,6 +60,25 @@ describe('getAutoFreeCandidates', () => {
       expect(await getAutoFreeCandidates(apiKind)).toEqual(['test/present:free']);
     }
   );
+
+  it('includes free models Vercel serves while Kilo routes them to Vercel', async () => {
+    configure(['test/present:free', 'reflection/beam-free']);
+    expect(await getAutoFreeCandidates('chat_completions')).toEqual([
+      'reflection/beam-free',
+      'test/present:free',
+    ]);
+
+    jest
+      .mocked(getRuntimeGatewayRoutingConfig)
+      .mockResolvedValue({ vercelEnabled: false, vercelOptOutModels: new Set() });
+    expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
+
+    jest.mocked(getRuntimeGatewayRoutingConfig).mockResolvedValue({
+      vercelEnabled: true,
+      vercelOptOutModels: new Set(['reflection/beam-free']),
+    });
+    expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
+  });
 
   it('includes the kilo-auto/small free model when the OpenRouter catalog lists it', async () => {
     jest

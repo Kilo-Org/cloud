@@ -58,6 +58,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   agent_configs,
+  claude_billing_connections,
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
@@ -2120,6 +2121,189 @@ describe('tryDispatchPendingReviews', () => {
       expect.stringContaining('out of credits'),
       'standard'
     );
+  });
+
+  it('refuses a funded organization review whose Claude billing link needs a reconnect', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+    // A funded organization proves the reconnect requirement decides the review,
+    // not the balance.
+    await setTestOrganizationBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockGetIntegrationById.mockResolvedValue({
+      id: organizationIntegrationId,
+      platform: 'github',
+      platform_installation_id: 'inst-org-1',
+      github_app_type: 'standard',
+    });
+
+    const connector = await insertTestUser();
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: null,
+      organization_id: testOrganizationId,
+      user_profile_id: `uprof_${crypto.randomUUID()}`,
+      status: 'connected',
+      connection_id: `ocon_${crypto.randomUUID()}`,
+      connected_at: new Date().toISOString(),
+      created_by: connector.id,
+    });
+    await db
+      .update(kilocode_users)
+      .set({
+        google_user_email: `deleted+${connector.id}@deleted.invalid`,
+        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+      })
+      .where(eq(kilocode_users.id, connector.id));
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          checkRunId: 43,
+        })
+      )
+      .returning({
+        id: cloud_agent_code_reviews.id,
+        prNumber: cloud_agent_code_reviews.pr_number,
+      });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
+      userId: testUser.id,
+    });
+
+    expect(result).toEqual({ dispatched: 0, notDispatched: 1, activeCount: 0 });
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalled();
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(await getStoredReview(review.id)).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        terminalReason: 'billing',
+        errorMessage: expect.stringContaining('no longer available'),
+        dispatchReservationId: null,
+      })
+    );
+
+    const [attempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    expect(attempt?.error_message).toContain('no longer available');
+
+    const [repoOwner, repoName] = REPO.split('/');
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      'inst-org-1',
+      repoOwner,
+      repoName,
+      43,
+      expect.objectContaining({
+        conclusion: 'action_required',
+        output: expect.objectContaining({ title: 'Reconnect Claude billing to run this review' }),
+      }),
+      'standard'
+    );
+    // The credits notice names credits, which do not fix a reconnect.
+    expect(mockCreatePRComment).not.toHaveBeenCalled();
+
+    await db
+      .delete(claude_billing_connections)
+      .where(eq(claude_billing_connections.organization_id, testOrganizationId));
+  });
+
+  it('finds the reconnect requirement behind a paid review model in a council', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+    await setTestOrganizationBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    // The review model comes first and cannot bill without credits; the Claude
+    // specialist carries the reconnect requirement that decides the review.
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-council-reconnect-config',
+      config: {
+        model_slug: 'openai/gpt-5',
+        council: {
+          enabled: true,
+          aggregation_strategy: 'advisory',
+          specialists: [
+            {
+              id: 'security-review',
+              role: 'security',
+              name: 'Security',
+              enabled: true,
+              required: false,
+              lens: 'Security issues',
+              model_slug: 'openai/gpt-5',
+            },
+            {
+              id: 'performance-review',
+              role: 'performance',
+              name: 'Performance',
+              enabled: true,
+              required: false,
+              lens: 'Performance issues',
+              model_slug: 'anthropic/claude-sonnet-4.6',
+            },
+          ],
+        },
+      },
+      is_enabled: true,
+      runtime_state: {},
+    });
+
+    const connector = await insertTestUser();
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: null,
+      organization_id: testOrganizationId,
+      user_profile_id: `uprof_${crypto.randomUUID()}`,
+      status: 'connected',
+      connection_id: `ocon_${crypto.randomUUID()}`,
+      connected_at: new Date().toISOString(),
+      created_by: connector.id,
+    });
+    await db
+      .update(kilocode_users)
+      .set({
+        google_user_email: `deleted+${connector.id}@deleted.invalid`,
+        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+      })
+      .where(eq(kilocode_users.id, connector.id));
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          reviewType: 'council',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
+      userId: testUser.id,
+    });
+
+    expect(result).toEqual({ dispatched: 0, notDispatched: 1, activeCount: 0 });
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalled();
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(await getStoredReview(review.id)).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        terminalReason: 'billing',
+        errorMessage: expect.stringContaining('no longer available'),
+      })
+    );
+
+    await db
+      .delete(claude_billing_connections)
+      .where(eq(claude_billing_connections.organization_id, testOrganizationId));
   });
 
   it('dispatches a review without credits when the model is free', async () => {

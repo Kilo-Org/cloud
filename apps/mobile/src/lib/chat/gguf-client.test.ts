@@ -1,6 +1,6 @@
 /* eslint-disable typescript-eslint/consistent-type-assertions, typescript-eslint/no-unsafe-argument, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access, typescript-eslint/no-unsafe-return, typescript-eslint/require-await, require-await, promise/prefer-await-to-then -- a llama.rn context is a JSI object and a download is a pending promise: a test double can only be built by asserting its shape */
 import { type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
-import { Effect, Result, Stream } from 'effect';
+import { Effect, Fiber, Result, Stream } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import { backendFailureKey } from './backend-target';
@@ -300,27 +300,32 @@ describe('the busy rule', () => {
 
 describe('interrupting and releasing', () => {
   it('stops the native call when the answer is interrupted', async () => {
-    const stopCompletion = vi.fn(async () => undefined);
-    const context = {
-      model: { chatTemplates: TOOL_TEMPLATE },
-      completion: (async (_params: unknown, onToken?: (data: unknown) => void) => {
-        onToken?.({ token: 'Hel', content: 'Hel', accumulated_text: 'Hel' });
-        const never = new Promise<never>(() => undefined);
-        return never;
-      }) as unknown as GgufContext['completion'],
-      stopCompletion,
-      release: vi.fn(async () => undefined),
-    } as unknown as GgufContext;
+    const never: Completion = async (_params, onToken) => {
+      onToken?.({ token: 'Hel', content: 'Hel', accumulated_text: 'Hel' });
+      return new Promise<never>(() => undefined);
+    };
+    const { context, stopCompletion } = contextOf(TOOL_TEMPLATE, never);
     const heard: string[] = [];
-    await Effect.runPromise(
-      Stream.runForEach(clientWith([context]).client.stream(request), event =>
-        Effect.sync(() => {
-          if (event.kind === 'delta') {
-            heard.push(event.text);
-          }
-        })
-      ).pipe(Effect.timeout('50 millis'), Effect.ignore)
+    const arrived = Promise.withResolvers<undefined>();
+    const fiber = Effect.runFork(
+      Stream.runForEach(clientWith([context]).client.stream(request), event => {
+        if (event.kind === 'delta') {
+          heard.push(event.text);
+          arrived.resolve(undefined);
+        }
+        return Effect.void;
+      })
     );
+    // A delta that never comes fails here; the arrival itself decides the interrupt.
+    await Effect.runPromise(
+      Effect.timeout(
+        Effect.promise(async () => {
+          await arrived.promise;
+        }),
+        '10 seconds'
+      )
+    );
+    await Effect.runPromise(Fiber.interrupt(fiber));
     expect(heard).toEqual(['Hel']);
     expect(stopCompletion).toHaveBeenCalled();
   });

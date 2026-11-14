@@ -17,12 +17,18 @@ modified, so the production/default deploy is unaffected.
 - `pnpm install` at the repo root.
 - Bun 1.4.4. The Cloud Agent deploy script builds the wrapper before bundling, including for `dry-run`.
 - Cloudflare auth for account `e115e769bcdd4c3d66af59d3332cb394`.
+- A verified exact-SHA `wrangler.runtime-generated.json`, prepared with
+  `pnpm exec tsx scripts/prepare-runtime-deploy.ts production <source-sha>` and the approved runtime
+  publication read credentials. The E2E renderer inherits its descriptor, runtime bucket and immutable
+  runtime-free image. It refuses an absent or non-downloaded configuration. The
+  `Cloud Agent E2E deploy` workflow runs this preparation for its own SHA, so it only deploys a SHA
+  whose exact-SHA runtime publication has completed.
 - A fake-llm admin token, exported as `FAKE_LLM_ADMIN_TOKEN` or provided by
   `E2E_AUTH_FILE`, and a user token supplied by `E2E_USER_TOKEN` or
   `E2E_AUTH_FILE` (see [Environment variables](#environment-variables)).
 - Docker scope: deploying the fake Worker needs no Docker, because it is a Worker
   and a Durable Object, not a container image. Deploying the Cloud Agent e2e
-  Worker still needs Docker for its sandbox container images. Running the
+  Worker uses the prepared immutable runtime-free image. Runtime preparation needs Docker to verify it. Running the
   deployed driver needs no local Docker daemon.
 - The account subdomain is assumed to be `engineering-e11` (plan section 11.1).
 

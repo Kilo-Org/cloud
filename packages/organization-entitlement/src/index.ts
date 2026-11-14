@@ -1,6 +1,7 @@
 export { classifyOrganizationEntitlement } from './classification';
 export {
   getDaysRemainingInTrial,
+  getOrganizationTrialEndDate,
   getOrgTrialStatusFromDays,
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,

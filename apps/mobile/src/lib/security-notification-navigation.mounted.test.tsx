@@ -99,11 +99,12 @@ describe.each(['personal', ORG_SCOPE])('security notification routes (%s)', scop
     const data = { ...payload, scope, findingId: 'finding-123' } satisfies PushData;
     const path = notificationPathForData(data);
     expect(path).toBe(`/(app)/security-agent/${scope}/findings/finding-123?via=push`);
-
+    if (path === null) {
+      throw new Error('Security notifications must keep their navigation destination');
+    }
     mountScope(scope);
     expect(unstable_settings.anchor).toBe('index');
     expect(declaredScopeRoutes()).toEqual(['index', 'dismiss/[id]', 'filter']);
-
     const url = new URL(path, 'https://example.test');
     expect(url.pathname.split('/').filter(Boolean)).toEqual([
       '(app)',

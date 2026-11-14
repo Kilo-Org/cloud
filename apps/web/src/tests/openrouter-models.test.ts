@@ -33,6 +33,7 @@ import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organiz
 import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 import type { ModelStats } from '@kilocode/db/schema';
+import { modelStats } from '@kilocode/db/schema';
 import { GET as statsGET } from '@/app/api/models/stats/route';
 import { GET as statGET } from '@/app/api/models/stats/[slug]/route';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -59,27 +60,42 @@ jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   requireEnv: () => 'http://localhost',
 }));
 
+function snapshotRows(client: 'primary' | 'replica') {
+  const countLoad = client === 'primary' ? mockPrimaryLoads : mockReplicaLoads;
+  const orderBy = async () => {
+    countLoad();
+    return [...(await mockRows())].map(([id, benchmark]) => ({
+      stat: {
+        id,
+        openrouterId: id,
+        slug: id,
+        name: id,
+        isActive: true,
+        isStealth: benchmark.isStealth ?? false,
+        benchmarks: { enkrypt: benchmark },
+        openrouterData: {},
+      } as ModelStats,
+      verification: benchmark.verification,
+    }));
+  };
+  return { orderBy, leftJoin: () => ({ orderBy }) };
+}
+
+const mockPrimaryLoads = jest.fn();
+const mockReplicaLoads = jest.fn();
+
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: {
-    select: jest.fn(() => {
-      const orderBy = async () =>
-        [...(await mockRows())].map(([id, benchmark]) => ({
-          stat: {
-            id,
-            openrouterId: id,
-            slug: id,
-            name: id,
-            isActive: true,
-            isStealth: benchmark.isStealth ?? false,
-            benchmarks: { enkrypt: benchmark },
-            openrouterData: {},
-          } as ModelStats,
-          verification: benchmark.verification,
-        }));
-      return { from: () => ({ orderBy, leftJoin: () => ({ orderBy }) }) };
-    }),
+  db: { select: jest.fn(() => ({ from: () => snapshotRows('primary') })) },
+  readDb: {
+    select: jest.fn(() => ({
+      from: (table: unknown) => {
+        // Other gateway readers also use the replica; only the model-stats
+        // snapshot supplies fixture rows here.
+        if (table !== modelStats) throw new Error('Unexpected replica query');
+        return snapshotRows('replica');
+      },
+    })),
   },
-  readDb: {},
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
@@ -722,6 +738,8 @@ describe('Enkrypt catalog publication boundaries', () => {
       expect(model?.enkrypt).not.toHaveProperty('verification');
       expect(model?.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
       expect(mockRows).toHaveBeenCalledTimes(1);
+      expect(mockReplicaLoads).toHaveBeenCalledTimes(1);
+      expect(mockPrimaryLoads).not.toHaveBeenCalled();
 
       jest.mocked(Date.now).mockReturnValue(Date.parse(checked.staleAfter));
       const stale = OpenRouterModelsResponseSchema.parse(
@@ -784,7 +802,7 @@ describe('shared stats and catalog snapshot', () => {
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
   });
 
-  test('uses one real cache load for concurrent and sequential list, detail, and catalog responses', async () => {
+  test('loads one snapshot per read client for concurrent and sequential list, detail, and catalog responses', async () => {
     const responses = await Promise.all(
       Array.from({ length: 20 }, () => Promise.all([listStats(), detailStats(), catalog()]))
     );
@@ -801,10 +819,13 @@ describe('shared stats and catalog snapshot', () => {
       Array.from({ length: 100 }, (_, i) => detailStats(`missing-${i}`))
     );
     expect(missing.every(response => response.status === 404)).toBe(true);
-    expect(mockRows).toHaveBeenCalledTimes(1);
+    expect(mockPrimaryLoads).toHaveBeenCalledTimes(1);
+    expect(mockReplicaLoads).toHaveBeenCalledTimes(1);
+    expect(mockRows).toHaveBeenCalledTimes(2);
   });
 
   test('withholds expired eligibility in both stats and catalogs on repeated refresh failures', async () => {
+    await listStats();
     await catalog();
     jest.mocked(Date.now).mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt) + 300_000);
     mockRows.mockRejectedValue(new Error('unavailable'));
@@ -821,7 +842,9 @@ describe('shared stats and catalog snapshot', () => {
         'enkrypt'
       );
     }
-    expect(mockRows).toHaveBeenCalledTimes(2);
+    expect(mockPrimaryLoads).toHaveBeenCalledTimes(2);
+    expect(mockReplicaLoads).toHaveBeenCalledTimes(2);
+    expect(mockRows).toHaveBeenCalledTimes(4);
   });
 
   test.each(['deadline', 'invalidation', 'disabled'] as const)(
@@ -937,6 +960,10 @@ describe('final Enkrypt serialization boundaries', () => {
     return OpenRouterModelsResponseSchema.parse(await response.json());
   }
 
+  function primeSnapshot(branch: Branch) {
+    return branch === 'direct' ? getEnkryptBenchmarks() : getEnkryptBenchmarks({ fromDb: readDb });
+  }
+
   beforeEach(() => {
     mockRows.mockResolvedValue(new Map([['some-other-model', enkryptBenchmark]]));
     global.fetch = jest
@@ -948,11 +975,11 @@ describe('final Enkrypt serialization boundaries', () => {
     describe.each(['failure', 'hidden', 'verified'] as const)('refresh returns %s', refresh => {
       test.each(stages)('%s response rechecks after %s', async (branch, stage) => {
         configureBranch(branch);
-        await getEnkryptBenchmarks();
+        await primeSnapshot(branch);
         const pending = pauseAt(stage);
         const response = responseFor(branch);
         await pending.entered;
-        expect(mockRows).toHaveBeenCalledTimes(1);
+        expect(mockRows).toHaveBeenCalledTimes(branch === 'organization' ? 2 : 1);
         if (boundary === 'deadline') jest.mocked(Date.now).mockReturnValue(Date.now() + 300_000);
         else invalidateModelStatsCache();
         const updated = { ...enkryptBenchmark, risk_score: 9 };
@@ -986,7 +1013,7 @@ describe('final Enkrypt serialization boundaries', () => {
           });
         } else expect(model).not.toHaveProperty('enkrypt');
         expect(model?.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
-        expect(mockRows).toHaveBeenCalledTimes(2);
+        expect(mockRows).toHaveBeenCalledTimes(branch === 'organization' ? 3 : 2);
         for (const field of ['verification', 'scoreHash', 'observedAt', 'generation', 'entries']) {
           expect(JSON.stringify(result)).not.toContain(field);
         }
@@ -1008,7 +1035,7 @@ describe('final Enkrypt serialization boundaries', () => {
     '%s response applies a kill switch during %s without another query',
     async (branch, stage) => {
       configureBranch(branch);
-      await getEnkryptBenchmarks();
+      await primeSnapshot(branch);
       const pending = pauseAt(stage);
       const response = responseFor(branch);
       await pending.entered;
@@ -1016,7 +1043,7 @@ describe('final Enkrypt serialization boundaries', () => {
       pending.release();
       const result = await response;
       for (const model of result.data) expect(model).not.toHaveProperty('enkrypt');
-      expect(mockRows).toHaveBeenCalledTimes(1);
+      expect(mockRows).toHaveBeenCalledTimes(branch === 'organization' ? 2 : 1);
     }
   );
 
@@ -1042,6 +1069,7 @@ describe('final Enkrypt serialization boundaries', () => {
         default_parameters: {},
         preferredIndex: undefined,
         hasUserByokAvailable: true,
+        isFree: false,
         opencode: { ai_sdk_provider: undefined, variants: undefined },
         enkrypt: publishedEnkryptBenchmark,
       };

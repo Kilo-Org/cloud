@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { selectOlderMessagesHeaderState } from './older-messages-scroll';
 
 type OlderMessagesHeaderProps = {
+  hasOlderMessages?: boolean;
   isLoadingOlderMessages: boolean;
   olderMessagesError: OlderMessagesError | null;
   olderMessagesOmittedItemCount: number;
@@ -19,6 +20,7 @@ function omittedMessage(count: number): string {
 }
 
 export function OlderMessagesHeader({
+  hasOlderMessages = false,
   isLoadingOlderMessages,
   olderMessagesError,
   olderMessagesOmittedItemCount,
@@ -31,6 +33,21 @@ export function OlderMessagesHeader({
   });
 
   if (state.kind === 'hidden') {
+    if (hasOlderMessages)
+      return (
+        <div className="mb-3 flex justify-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-11"
+            disabled={isLoadingOlderMessages}
+            onClick={onRetry}
+          >
+            {isLoadingOlderMessages ? 'Loading earlier messages…' : 'Load earlier messages'}
+          </Button>
+        </div>
+      );
     return null;
   }
 

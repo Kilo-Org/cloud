@@ -20,12 +20,12 @@ import {
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptGuardrailRequest } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
 
-export type EnkryptInputGuardrailScope = Pick<
+type EnkryptInputGuardrailScope = Pick<
   EnkryptGuardrailRequest,
   'organizationId' | 'kiloUserId' | 'config'
 >;
 
-export type EnkryptGuardrailAdmission =
+type EnkryptGuardrailAdmission =
   | { kind: 'admitted'; inputGuardrail: EnkryptInputGuardrailScope | null }
   | { kind: 'rejected'; response: NextResponse };
 

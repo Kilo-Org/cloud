@@ -16,19 +16,17 @@ it('publication builds once across wrapper, CLI and Worker changes, then rebuild
   try {
     const bin = path.join(root, 'bin');
     await fs.mkdir(bin);
-    const trace = path.join(root, 'trace.jsonl');
+    const trace = path.join(root, 'trace');
     const account = 'c'.repeat(32);
-    const tool =
-      '#!' +
-      process.execPath +
-      '\n' +
-      "const fs=require('node:fs');const args=process.argv.slice(2);" +
-      "fs.appendFileSync(process.env.RUNTIME_TEST_TOOL_TRACE,JSON.stringify({tool:require('node:path').basename(process.argv[1]),args})+'\\n');" +
-      "if(args[0]==='image'&&args[1]==='inspect'){" +
-      "if(args.includes('{{json .RepoDigests}}'))console.log(JSON.stringify(['registry.cloudflare.com/" +
-      account +
-      "/kilo-runtime-base@sha256:'+process.env.RUNTIME_TEST_BASE_INPUT]));" +
-      "else console.log(JSON.stringify({Os:'linux',Architecture:'amd64',Config:{Labels:{'io.kilo.runtime-base-input':process.env.RUNTIME_TEST_BASE_INPUT}}}));}";
+    const tool = `#!/bin/sh
+printf '%s\\n' "\${0##*/} $*" >> "$RUNTIME_TEST_TOOL_TRACE"
+if [ "$1 $2" = 'image inspect' ]; then
+  case "$*" in
+    *RepoDigests*) printf '["registry.cloudflare.com/${account}/kilo-runtime-base@sha256:%s"]\\n' "$RUNTIME_TEST_BASE_INPUT" ;;
+    *) printf '{"Os":"linux","Architecture":"amd64","Config":{"Labels":{"io.kilo.runtime-base-input":"%s"}}}\\n' "$RUNTIME_TEST_BASE_INPUT" ;;
+  esac
+fi
+`;
     for (const command of ['docker', 'pnpm'])
       await fs.writeFile(path.join(bin, command), tool, { mode: 0o755 });
     process.env.PATH = bin + path.delimiter + saved.PATH;
@@ -49,17 +47,12 @@ it('publication builds once across wrapper, CLI and Worker changes, then rebuild
     const changed = await publish();
     expect(changed.inputId).not.toBe(initial.inputId);
     expect(changed.image).not.toBe(initial.image);
-    const calls = (await fs.readFile(trace, 'utf8'))
-      .trim()
-      .split('\n')
-      .map(line => JSON.parse(line));
-    expect(calls.filter(call => call.tool === 'docker' && call.args[0] === 'build')).toHaveLength(
-      2
-    );
-    expect(calls.filter(call => call.tool === 'pnpm' && call.args.includes('push'))).toHaveLength(
-      2
-    );
-    expect(calls.filter(call => call.tool === 'docker' && call.args[0] === 'pull')).toHaveLength(5);
+    const calls = (await fs.readFile(trace, 'utf8')).trim().split('\n');
+    expect(calls.filter(call => call.startsWith('docker build '))).toHaveLength(2);
+    expect(
+      calls.filter(call => call.startsWith('pnpm exec wrangler containers push '))
+    ).toHaveLength(2);
+    expect(calls.filter(call => call.startsWith('docker pull '))).toHaveLength(5);
   } finally {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key];
@@ -169,17 +162,15 @@ it('concurrent publishers retain and verify the first base digest for identical 
     await fs.mkdir(bin);
     const account = 'c'.repeat(32);
     const prefix = 'registry.cloudflare.com/' + account + '/kilo-runtime-base@sha256:';
-    const tool =
-      '#!' +
-      process.execPath +
-      '\n' +
-      "const fs=require('node:fs');const args=process.argv.slice(2);" +
-      "fs.appendFileSync('../trace.jsonl',JSON.stringify({cwd:process.cwd(),args})+'\\n');" +
-      "if(args[0]==='image'&&args[1]==='inspect'){" +
-      "if(args.includes('{{json .RepoDigests}}'))console.log(JSON.stringify(['" +
-      prefix +
-      "'+fs.readFileSync('candidate','utf8')]));" +
-      "else console.log(JSON.stringify({Os:'linux',Architecture:'amd64',Config:{Labels:{'io.kilo.runtime-base-input':fs.readFileSync('input','utf8')}}}));}";
+    const tool = `#!/bin/sh
+printf '%s\\n' "$PWD $*" >> ../trace
+if [ "$1 $2" = 'image inspect' ]; then
+  case "$*" in
+    *RepoDigests*) read -r candidate < candidate || [ -n "$candidate" ]; printf '["${prefix}%s"]\\n' "$candidate" ;;
+    *) read -r input < input || [ -n "$input" ]; printf '{"Os":"linux","Architecture":"amd64","Config":{"Labels":{"io.kilo.runtime-base-input":"%s"}}}\\n' "$input" ;;
+  esac
+fi
+`;
     for (const command of ['docker', 'pnpm'])
       await fs.writeFile(path.join(bin, command), tool, { mode: 0o755 });
     process.env.PATH = bin + path.delimiter + previousPath;
@@ -219,18 +210,10 @@ it('concurrent publishers retain and verify the first base digest for identical 
     );
     expect(second).toEqual(first);
     expect(JSON.parse(new TextDecoder().decode(objects.values().next().value))).toEqual(first);
-    const calls = (await fs.readFile(path.join(root, 'trace.jsonl'), 'utf8'))
-      .trim()
-      .split('\n')
-      .map(line => JSON.parse(line));
-    expect(calls.filter(call => call.args[0] === 'build')).toHaveLength(2);
+    const calls = (await fs.readFile(path.join(root, 'trace'), 'utf8')).trim().split('\n');
+    expect(calls.filter(call => call.includes(' build '))).toHaveLength(2);
     for (const directory of roots)
-      expect(
-        calls.some(
-          call =>
-            call.cwd === directory && call.args[0] === 'pull' && call.args.includes(first.image)
-        )
-      ).toBe(true);
+      expect(calls.includes(`${directory} pull --platform linux/amd64 ${first.image}`)).toBe(true);
   } finally {
     if (previousPath === undefined) delete process.env.PATH;
     else process.env.PATH = previousPath;

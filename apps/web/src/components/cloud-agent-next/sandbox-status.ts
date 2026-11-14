@@ -16,6 +16,26 @@ export const SANDBOX_STATUS_FRESHNESS_MS = 15_000;
 export const SANDBOX_SLEEP_ESTIMATE_DELAY_MS = 120_000;
 export const SANDBOX_SLEEP_SOON_MS = 60_000;
 
+export type SandboxObservation = { snapshot: unknown; requestedAt: number; receivedAt: number };
+
+export function sandboxObservationKey(scopeId: string, organizationId?: string) {
+  return ['cloud-agent-sandbox-observation', organizationId ?? null, scopeId];
+}
+
+/** Use the observed allocation, which can differ from the requested sandbox after a fallback. */
+export function sandboxComputeInstance(data: unknown): 'standard-3' | 'standard-4' | null {
+  const parsed = baseGetSandboxStatusNextOutputSchema.safeParse(data);
+  if (!parsed.success || parsed.data.provider !== 'Cloudflare Containers') return null;
+  switch (parsed.data.runtime?.sandboxType) {
+    case 'containers-standard-3':
+      return 'standard-3';
+    case 'containers-standard-4':
+      return 'standard-4';
+    default:
+      return null;
+  }
+}
+
 export async function observeSandboxStatus(read: () => Promise<unknown>) {
   const requestedAt = Date.now();
   const snapshot = await read();

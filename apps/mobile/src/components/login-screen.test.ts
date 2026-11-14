@@ -22,7 +22,11 @@ import {
 } from '@/lib/login-draft';
 import LoginRoute from '@/app/(auth)/login';
 import { LoginScreen } from './login-screen';
-import { errorMessage, resolveKeyboardBottomPadding } from './login-screen-state';
+import {
+  errorMessage,
+  resolveBottomChromePadding,
+  resolveFieldActionReserve,
+} from './login-screen-state';
 
 // ── Hoisted mocks for the mounted globe tests ──────────────────────────────
 
@@ -63,8 +67,8 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
   View: 'View',
+  useWindowDimensions: () => ({ width: 400, height: 800, fontScale: 1 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeInsets,
@@ -280,32 +284,38 @@ describe('login-screen error mapping', () => {
   });
 });
 
-describe('login-screen keyboard bottom padding', () => {
-  it('floors the keyboard-down inset at the platform bottom chrome', () => {
+describe('login-screen bottom chrome padding', () => {
+  it('floors the reported inset at the platform bottom chrome', () => {
     // The reported inset is not a reliable floor for the chrome the platform
     // draws over the app: Android reports navigationBars() only and reports 0
     // when the window does not inset for the bar, so a bare inset let the
     // form's last control sit under the home indicator (landscape gesture bar).
     // 48 is the tallest bottom chrome either platform draws.
-    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 28 })).toBe(48);
-    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 0 })).toBe(48);
+    expect(resolveBottomChromePadding({ bottomInset: 28 })).toBe(48);
+    expect(resolveBottomChromePadding({ bottomInset: 0 })).toBe(48);
   });
 
   it('keeps a reported inset larger than the floor', () => {
-    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 63 })).toBe(63);
+    expect(resolveBottomChromePadding({ bottomInset: 63 })).toBe(63);
+  });
+});
+
+describe('login-screen keyboard field action reserve', () => {
+  it('floors the reserve at the action and the form gaps when nothing reported a height', () => {
+    // One action box and a form gap on each side.
+    expect(resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 0 })).toBe(68);
   });
 
-  it('reserves exactly the reported height, which already reaches the screen bottom', () => {
-    // The height comes from `react-native-keyboard-controller`, whose metric
-    // spans the whole strip the IME hides on both platforms: Android edge-to-edge
-    // keeps the navigation bar translucent, so nothing is subtracted, and iOS
-    // reports the keyboard frame, which includes the home indicator. Adding the
-    // bottom inset as well would float the form above the keyboard.
-    expect(resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28 })).toBe(300);
+  it('covers a measured block under the field, such as a wrapped refusal', () => {
+    // A two-line refusal above the action is taller than the action alone, and
+    // the reserve follows it instead of a fixed count of lines.
+    expect(resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 92 })).toBe(116);
   });
 
-  it('ignores a negative reported height', () => {
-    expect(resolveKeyboardBottomPadding({ keyboardHeight: -1, bottomInset: 28 })).toBe(48);
+  it('grows with the system text scale', () => {
+    // The action's label is text; the gaps are fixed lengths.
+    expect(resolveFieldActionReserve({ fontScale: 1.5, belowFieldHeight: 0 })).toBe(90);
+    expect(resolveFieldActionReserve({ fontScale: 2, belowFieldHeight: 0 })).toBe(112);
   });
 });
 
@@ -392,7 +402,7 @@ describe('login-screen language globe', () => {
       throw new Error('language globe header row parent not found');
     }
     const scrollViewIndex = screen.children.findIndex(
-      child => typeof child !== 'string' && (child.type as string) === 'ScrollView'
+      child => typeof child !== 'string' && (child.type as string) === 'KeyboardAwareScrollView'
     );
     // The row comes first and the scroller after it, so the scroll content
     // starts below the control instead of running under an absolute overlay.
@@ -400,6 +410,14 @@ describe('login-screen language globe', () => {
     // The row clears the status bar before the globe's own 48dp box.
     expect(headerRow.props.style).toMatchObject({ paddingTop: 24 + 8, paddingEnd: 16 });
     expect(globe.props.className).not.toMatch(/\bz-/);
+    // The scroller keeps room under the focused field for whatever the form
+    // renders below it, and can scroll that far because the keyboard spacer
+    // participates in layout.
+    const scroller = findByType(renderer.root, 'KeyboardAwareScrollView')[0];
+    expect(scroller?.props.bottomOffset).toBe(
+      resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 0 })
+    );
+    expect(scroller?.props.mode).toBe('layout');
 
     renderer.unmount();
     safeInsets.top = 0;
@@ -631,7 +649,7 @@ describe('login-screen timeout error dismissal', () => {
   });
 });
 
-describe('login-screen idle skeleton', () => {
+describe('login-screen idle form', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     deviceAuth.status = 'idle';
@@ -648,7 +666,7 @@ describe('login-screen idle skeleton', () => {
     vi.mocked(persistLoginDrafts).mockClear();
   });
 
-  it('shows a form skeleton until the draft restore finishes', async () => {
+  it('paints the form before the draft restore and re-seeds it when an address arrives', async () => {
     const state: {
       resolve: ((value: { email: string; ssoRecovery: null }) => void) | undefined;
     } = { resolve: undefined };
@@ -660,16 +678,22 @@ describe('login-screen idle skeleton', () => {
 
     const renderer = await mountLoginScreen();
 
-    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(2);
-    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(0);
+    // The form owns its space on the first frame, so the centered column never
+    // grows into a placeholder's place.
+    const before = findByType(renderer.root, 'IdleAuth');
+    expect(before).toHaveLength(1);
+    expect(before[0]?.props.initialEmail).toBe('');
 
     await act(async () => {
-      state.resolve?.({ email: '', ssoRecovery: null });
+      state.resolve?.({ email: 'stored@example.com', ssoRecovery: null });
       await Promise.resolve();
     });
 
-    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(1);
-    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
+    // The field reads its seed once: the restored address needs a fresh mount.
+    const after = findByType(renderer.root, 'IdleAuth');
+    expect(after).toHaveLength(1);
+    expect(after[0]).not.toBe(before[0]);
+    expect(after[0]?.props.initialEmail).toBe('stored@example.com');
 
     renderer.unmount();
   });

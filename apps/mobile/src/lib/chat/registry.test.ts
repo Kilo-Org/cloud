@@ -1053,6 +1053,7 @@ describe('a question a later send took the slot from', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
       },
     ]);
     const [kept] = held.displaced;
@@ -1086,6 +1087,9 @@ describe('a question a later send took the slot from', () => {
     expect(held).toMatchObject({ asked: 'second', failureKey: CREDITS_FAILURE_KEY });
     expect(held.displaced.map(one => one.text)).toEqual(['first']);
     const kept = held.displaced[0];
+    // The cause the question failed with is written down too, so its bubble
+    // states it where the question was said.
+    expect(kept?.failureKey).toBe(CREDITS_FAILURE_KEY);
     expect(asMessages(held).map(one => one.info.id)).toEqual([
       `${held.sessionId}:displaced:${kept?.id}`,
       `${held.sessionId}:asked`,

@@ -146,14 +146,15 @@ describe('historical GDPR user-ID backfill', () => {
     expect(await findUserById(user.id)).toEqual(before);
   });
 
-  it.each([{ is_admin: false }, { blocked_reason: 'blocked' }])(
-    'requires an active administrator: %j',
-    async overrides => {
-      await db.update(kilocode_users).set(overrides).where(eq(kilocode_users.id, admin.id));
-      expect(await enqueue()).toEqual({ status: 'refused', code: 'active_admin_required' });
-      expect(await queueState()).toEqual({ requests: [], steps: [], audits: [] });
-    }
-  );
+  it.each([
+    { is_admin: false },
+    { blocked_reason: 'blocked' },
+    { blocked_at: '2026-01-15T12:00:00.000Z' },
+  ])('requires an active administrator: %j', async overrides => {
+    await db.update(kilocode_users).set(overrides).where(eq(kilocode_users.id, admin.id));
+    expect(await enqueue()).toEqual({ status: 'refused', code: 'active_admin_required' });
+    expect(await queueState()).toEqual({ requests: [], steps: [], audits: [] });
+  });
 
   it('refuses missing users and missing administrators', async () => {
     expect(await enqueue({ userId: 'missing' })).toEqual({

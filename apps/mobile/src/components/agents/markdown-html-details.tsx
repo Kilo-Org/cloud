@@ -7,7 +7,8 @@ import {
 } from '@native-html/render';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronDown, ChevronRight } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { ChevronDown } from '@/components/ui/icons';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { withRtlWritingDirection } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
@@ -23,7 +24,7 @@ export const HtmlDetails: CustomBlockRenderer = function HtmlDetails({ tnode, st
   const summary = tnode.children.find(child => child.tagName === 'summary');
   const body = tnode.children.filter(child => child !== summary);
   const iconColor = tnode.styles.nativeTextFlow.color?.toString();
-  const Chevron = expanded ? ChevronDown : ChevronRight;
+  const Chevron = expanded ? ChevronDown : DirectionalChevronRight;
   return (
     <View style={style}>
       <Pressable

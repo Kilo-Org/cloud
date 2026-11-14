@@ -1,8 +1,11 @@
+/* eslint-disable max-lines -- the spend display and the action/role menus share the row's mounted harness. */
 import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatMoney } from '@/lib/format';
 import { MemberRow } from './member-row';
 
 type Mounted = RenderWithProvidersResult;
@@ -60,7 +63,16 @@ const mounted: Mounted[] = [];
 async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {}) {
   mocks.menuProps.length = 0;
   const view = await renderWithProviders(
-    <MemberRow member={member} canManage enableUsageLimits organizationId="org-1" {...overrides} />
+    <MemberRow
+      member={member}
+      canManage
+      canManageLimit
+      callerRole="owner"
+      enableUsageLimits
+      isSalesDemo={false}
+      organizationId="org-1"
+      {...overrides}
+    />
   );
   mounted.push(view);
   return view.renderer;
@@ -143,6 +155,43 @@ describe('MemberRow menu', () => {
     ]);
     expect(menu.options[2]?.destructive).toBe(true);
     expect(menu.options[0]?.destructive).toBeUndefined();
+  });
+
+  it('offers an admin the daily limit alone on an owner row', async () => {
+    const owner = { ...member, role: 'owner' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: owner, canManage: false, canManageLimit: true });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+
+    expect(actionsMenu().visible).toBe(true);
+    expect(actionsMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.setDailyUsageLimit'),
+    ]);
+  });
+
+  it('offers a member-row manager every action in order', async () => {
+    const renderer = await renderRow({ canManage: true, canManageLimit: true });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+
+    expect(actionsMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.changeRole'),
+      i18n.t('organization.members.setDailyUsageLimit'),
+      i18n.t('organization.members.removeMember'),
+    ]);
+  });
+
+  it('renders no menu when the caller may run no action', async () => {
+    const renderer = await renderRow({ canManage: false, canManageLimit: false });
+
+    expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(
+      renderer.root.findAllByType('Text').map(node => node.props.children as unknown)
+    ).toContain('Member E2E');
   });
 
   it('hides the daily-limit option when usage limits are off', async () => {
@@ -261,6 +310,25 @@ describe('MemberRow menu', () => {
     );
   });
 
+  it('offers an admin every role but owner, which the server reserves for owners', async () => {
+    const renderer = await renderRow({ callerRole: 'admin' });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+    await act(() => {
+      actionsMenu().onSelect(0);
+    });
+    await act(() => {
+      actionsMenu().onDismiss();
+    });
+
+    expect(roleMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.roles.admin'),
+      i18n.t('organization.members.roles.member'),
+      i18n.t('organization.members.roles.billingManager'),
+    ]);
+  });
+
   it('closes the menu without navigating when it is dismissed', async () => {
     const renderer = await renderRow({ enableUsageLimits: false });
     await act(() => {
@@ -273,5 +341,59 @@ describe('MemberRow menu', () => {
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.updateMember.mutate).not.toHaveBeenCalled();
     expect(mocks.removeMember.mutate).not.toHaveBeenCalled();
+  });
+});
+
+describe('MemberRow daily spend', () => {
+  // The same fields web's `DailyUsageLimitDisplay` pairs, and only in the
+  // states it pairs them in.
+  const spendMember = {
+    ...member,
+    dailyUsageLimitUsd: 10,
+    currentDailyUsageUsd: 2.4,
+  } as unknown as Parameters<typeof MemberRow>[0]['member'];
+
+  const texts = (renderer: Awaited<ReturnType<typeof renderRow>>) =>
+    renderer.root.findAllByType('Text').map(node => node.props.children as unknown);
+
+  const pair = `${isolateLtrBidiText(formatMoney(2.4, i18n.language))} / ${isolateLtrBidiText(
+    formatMoney(10, i18n.language)
+  )}`;
+  const limitOnly = i18n.t('organization.members.limitPerDay', {
+    amount: isolateLtrBidiText(formatMoney(10, i18n.language)),
+  });
+
+  it('pairs spend with the limit for a sales-demo organization', async () => {
+    const renderer = await renderRow({ member: spendMember, isSalesDemo: true });
+    expect(texts(renderer)).toContain(pair);
+    expect(texts(renderer)).not.toContain(limitOnly);
+  });
+
+  it('keeps the limit alone for an organization web does not pair', async () => {
+    const renderer = await renderRow({ member: spendMember, isSalesDemo: false });
+    expect(texts(renderer)).toContain(limitOnly);
+    expect(texts(renderer)).not.toContain(pair);
+  });
+
+  it('keeps the limit alone when the server withholds the spend', async () => {
+    const stripped = { ...member, dailyUsageLimitUsd: 10 } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: stripped, isSalesDemo: true });
+    expect(texts(renderer)).toContain(limitOnly);
+    expect(texts(renderer)).not.toContain(pair);
+  });
+
+  it('shows no spend line for a member without a daily limit', async () => {
+    const unlimited = { ...member, currentDailyUsageUsd: 2.4 } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: unlimited, isSalesDemo: true });
+    expect(texts(renderer)).not.toContain(pair);
+    expect(
+      texts(renderer).some(
+        value => typeof value === 'string' && value.includes(formatMoney(10, i18n.language))
+      )
+    ).toBe(false);
   });
 });

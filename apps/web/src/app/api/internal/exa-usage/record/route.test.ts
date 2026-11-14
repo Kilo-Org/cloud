@@ -18,10 +18,41 @@ import { POST } from './route';
 
 const authorized = { 'x-internal-api-key': INTERNAL_API_SECRET };
 const fromQueue = { ...authorized, 'x-usage-write-source': 'queue' };
+const SHARED_LIMIT = 8;
+const NON_LLM_CEILING = 2;
+
+type HeldSlot = { release: () => void };
+const heldSlots: HeldSlot[] = [];
 
 afterEach(() => {
+  for (const slot of heldSlots.splice(0)) slot.release();
   jest.restoreAllMocks();
 });
+
+async function holdNonLlmSlots(): Promise<HeldSlot[]> {
+  const held: HeldSlot[] = [];
+  for (let attempt = 0; attempt <= SHARED_LIMIT; attempt++) {
+    const slot = await queueWriterAdmission.acquire('queue', randomUUID(), {
+      maxWaitMs: 0,
+      writerClass: 'non_llm',
+    });
+    if (!slot.admitted) break;
+    held.push(slot);
+    heldSlots.push(slot);
+  }
+  return held;
+}
+
+function holdLlmSlots(): HeldSlot[] {
+  const held: HeldSlot[] = [];
+  for (let attempt = 0; attempt <= SHARED_LIMIT; attempt++) {
+    const slot = queueWriterAdmission.tryAcquire('queue', randomUUID());
+    if (!slot.admitted) break;
+    held.push(slot);
+    heldSlots.push(slot);
+  }
+  return held;
+}
 
 function request(body: unknown, headers: Record<string, string> = authorized) {
   return new NextRequest(`http://localhost${EXA_USAGE_WRITE_PATH}`, {
@@ -230,10 +261,68 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
     expect(acquire).toHaveBeenCalledWith('queue', record.id, {
       maxWaitMs: 250,
       signal: expect.any(AbortSignal),
+      writerClass: 'non_llm',
     });
     expect(transaction).not.toHaveBeenCalled();
     expect(await logRows(record.userId)).toEqual([]);
   });
+
+  test('rejects a queue write over the non-LLM ceiling with 429 and no write, leaving LLM slots free', async () => {
+    const record = await personalRecord();
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const transaction = jest.spyOn(db, 'transaction');
+    const nonLlm = await holdNonLlmSlots();
+
+    const response = await post(record, fromQueue);
+
+    expect(nonLlm).toHaveLength(NON_LLM_CEILING);
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Usage writer overloaded',
+      reason: 'queue_limit',
+    });
+    expect(transaction).not.toHaveBeenCalled();
+    expect(await logRows(record.userId)).toEqual([]);
+    expect(await debitedMicrodollars(record)).toBe(0);
+    expect(holdLlmSlots()).toHaveLength(SHARED_LIMIT - NON_LLM_CEILING);
+  });
+
+  test('returns the non-LLM slot after a queue write succeeds and after it throws', async () => {
+    const recorded = await personalRecord();
+    const failed = await personalRecord();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(db, 'transaction').mockRejectedValueOnce(new Error('synthetic write failure'));
+
+    expect((await post(failed, fromQueue)).status).toBe(500);
+    expect((await post(recorded, fromQueue)).status).toBe(200);
+
+    expect(await holdNonLlmSlots()).toHaveLength(NON_LLM_CEILING);
+    expect(await logRows(recorded.userId)).toHaveLength(1);
+    expect(await logRows(failed.userId)).toEqual([]);
+  });
+
+  test.each([
+    ['personal', personalRecord, 7000],
+    ['organization', organizationRecord, 9000],
+  ])(
+    'reports a queued replay of a directly written %s charge as a duplicate with one debit',
+    async (_payer, makeRecord, cost) => {
+      const record = await makeRecord();
+
+      const direct = await post(record);
+      const queued = await post(record, fromQueue);
+
+      await expect(direct.json()).resolves.toEqual({ status: 'recorded', usageId: record.id });
+      expect(queued.status).toBe(200);
+      await expect(queued.json()).resolves.toEqual({ status: 'duplicate', usageId: record.id });
+      expect(await logRows(record.userId)).toEqual([expect.objectContaining({ id: record.id })]);
+      expect(await monthlyRows(record.userId)).toEqual([
+        expect.objectContaining({ total_charged_microdollars: cost, request_count: 1 }),
+      ]);
+      expect(await debitedMicrodollars(record)).toBe(cost);
+      expect(await holdNonLlmSlots()).toHaveLength(NON_LLM_CEILING);
+    }
+  );
 
   test('keeps the admission slot until a queue write commits', async () => {
     const record = await personalRecord();

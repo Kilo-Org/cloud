@@ -532,4 +532,18 @@ describe('useSaveReviewConfigDelta mutationFn payload shape', () => {
       true
     );
   });
+
+  it('leaves the GitLab webhook warning flag alone when a delta save reports no sync', async () => {
+    orgPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
+    const { deltaOptions } = getToggleRepo('org_42', 'gitlab');
+
+    await deltaOptions.mutationFn?.({
+      add: [3],
+      remove: [],
+      optimisticSelection: [3],
+      authEpoch: currentAuthEpoch(),
+    });
+
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
 });

@@ -1,7 +1,8 @@
 /* eslint-disable max-lines -- One suite pins the whole store purchase lifecycle: request shapes, completion order, error mapping and recovery. */
 
 import { type Purchase } from 'expo-iap';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner-native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type StoreCreditProduct } from './store-products';
 import {
@@ -14,6 +15,7 @@ import {
   resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
   resetTerminalPurchaseRejections,
+  showDedupedPurchaseError,
   STORE_PURCHASE_PENDING_MESSAGE,
 } from './use-store-credit-purchase';
 
@@ -97,6 +99,67 @@ beforeEach(() => {
   resetPurchaseErrorToastDedup();
   resetInlinePurchaseErrorOwnership();
   resetTerminalPurchaseRejections();
+});
+
+afterEach(() => {
+  // The toast dedupe suite pins the clock with `vi.setSystemTime`; restore the
+  // real one so no later case reads a frozen `Date.now()`.
+  vi.useRealTimers();
+});
+
+/**
+ * `showDedupedPurchaseError` is the one place a purchase failure becomes a
+ * toast. Two rules are user-visible: a failure that repeats inside the dedupe
+ * window must stay one toast (a retry storm must not stack them), and the same
+ * failure after the window must toast again (a second, deliberate attempt is
+ * not silence).
+ */
+describe('showDedupedPurchaseError', () => {
+  // Mirrors `PURCHASE_ERROR_TOAST_DEDUPE_MS` in the module under test.
+  const DEDUPE_WINDOW_MS = 1500;
+  const FIRST_TOAST_AT = new Date('2026-01-01T00:00:00.000Z');
+
+  function setClockAt(offsetMs: number) {
+    vi.setSystemTime(new Date(FIRST_TOAST_AT.getTime() + offsetMs));
+  }
+
+  beforeEach(() => {
+    vi.setSystemTime(FIRST_TOAST_AT);
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('toasts the first purchase failure', () => {
+    showDedupedPurchaseError(CREDIT_PURCHASE_FAILED_KEY);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith(CREDIT_PURCHASE_FAILED_KEY);
+  });
+
+  it('swallows the same failure aimed at the user again inside the window', () => {
+    showDedupedPurchaseError(CREDIT_PURCHASE_FAILED_KEY);
+    setClockAt(500);
+    showDedupedPurchaseError(CREDIT_PURCHASE_FAILED_KEY);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('toasts the same failure again once the window has passed', () => {
+    showDedupedPurchaseError(CREDIT_PURCHASE_FAILED_KEY);
+    setClockAt(DEDUPE_WINDOW_MS + 100);
+    showDedupedPurchaseError(CREDIT_PURCHASE_FAILED_KEY);
+
+    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenLastCalledWith(CREDIT_PURCHASE_FAILED_KEY);
+  });
+
+  it('toasts a different failure inside the window', () => {
+    showDedupedPurchaseError(CREDIT_PURCHASE_FAILED_KEY);
+    setClockAt(500);
+    showDedupedPurchaseError(CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_KEY);
+
+    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenLastCalledWith(CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_KEY);
+  });
 });
 
 describe('createStoreCreditPurchaseActions.purchase', () => {

@@ -119,10 +119,20 @@ export function sheetHeaderTopClearance(input: {
   return surfaceOwnsWindowTop ? resolvedTopInset : 0;
 }
 
-/** The clearance `sheetHeaderTopClearance` resolves for the current window. */
-export function useSheetHeaderTopClearance(topInset: SheetHeaderTopInset): number {
+/**
+ * The clearance `sheetHeaderTopClearance` resolves for the current window.
+ *
+ * `topInset` is undefined for a header whose surface always owns the window (a
+ * pinned screen header): the clearance is then zero, and neither the status-bar
+ * height nor a platform check is read, so a plain header keeps working where the
+ * runtime does not expose them.
+ */
+export function useSheetHeaderTopClearance(topInset: SheetHeaderTopInset | undefined): number {
   const screenInsets = useScreenInsets();
   const windowTopInset = useSafeAreaInsets().top;
+  if (topInset === undefined) {
+    return 0;
+  }
   return sheetHeaderTopClearance({
     topInset,
     platform: Platform.OS,

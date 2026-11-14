@@ -45,7 +45,10 @@ import type {
   GatewayRequest,
   GatewayResponsesRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  upstreamRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
   buildOpenAiChatGptProvider,
@@ -337,10 +340,27 @@ describe('tagOpenAiChatGptByokModels', () => {
         { id: 'openai/gpt-5-nano', hasUserByokAvailable: false },
       ])
     ).resolves.toEqual([
-      { id: 'openai/gpt-5-nano', hasUserByokAvailable: true },
+      { id: 'openai/gpt-5-nano', hasUserByokAvailable: true, isFree: false },
       { id: 'anthropic/claude-sonnet-5' },
-      { id: 'openai/gpt-5-nano', hasUserByokAvailable: true },
+      { id: 'openai/gpt-5-nano', hasUserByokAvailable: true, isFree: false },
     ]);
+  });
+
+  it('clears the free flag for new and existing BYOK models without changing other models', async () => {
+    jest.mocked(isOpenAiModelServed).mockResolvedValue(true);
+    const models = [
+      { id: 'openai/gpt-5-nano', isFree: true },
+      { id: 'anthropic/byok-model', hasUserByokAvailable: true, isFree: true },
+      { id: 'anthropic/free-model', hasUserByokAvailable: false, isFree: true },
+    ];
+
+    await expect(tagOpenAiChatGptByokModels(USER_OWNER, models)).resolves.toEqual([
+      { ...models[0], hasUserByokAvailable: true, isFree: false },
+      { ...models[1], isFree: false },
+      models[2],
+    ]);
+    expect(models[0].isFree).toBe(true);
+    expect(models[1].isFree).toBe(true);
   });
 
   it('returns the same list when there is no usable connection', async () => {
@@ -702,6 +722,7 @@ describe('checkOpenAiChatGptByok', () => {
       extraHeaders,
       provider,
       reasoningEffort: null,
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
     });
 
     expect(outcome.type).toBe('success');

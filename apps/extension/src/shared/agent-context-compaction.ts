@@ -109,6 +109,9 @@ const renderEvent = (event: AgentConversationEvent): string | undefined => {
     case 'thinking': {
       return undefined;
     }
+    case 'error': {
+      return undefined;
+    }
     case 'tool-call': {
       // The tool input carries the facts the next turn needs (the call arguments).
       const detail = getToolCallDetail(event);

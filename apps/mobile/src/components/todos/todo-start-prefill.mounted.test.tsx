@@ -38,6 +38,9 @@ function NewSessionConsumer() {
   const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
     repositories: handoff.repositories,
     reposSettled: handoff.reposSettled,
+    // The handoff has no separate per-query state, so its settled flag is the
+    // equivalent provider-query signal here.
+    providerQueriesResolved: handoff.reposSettled,
     models,
     modelsSettled: models.length > 0,
   });

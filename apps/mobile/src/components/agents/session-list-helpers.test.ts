@@ -790,7 +790,7 @@ describe('composeActiveSessionSpokenMeta', () => {
 });
 
 describe('selectRemoteRowSpokenMeta', () => {
-  it('keeps metadata clauses separate from the outer Arabic conjunction', async () => {
+  it('separates metadata clauses with the catalog’s own comma, never a conjunction', async () => {
     await i18n.changeLanguage('ar');
     expect(
       selectRemoteRowSpokenMeta({
@@ -801,7 +801,7 @@ describe('selectRemoteRowSpokenMeta', () => {
         costSpoken: null,
         timeSpoken: 'activity',
       })
-    ).toBe('wake, activity');
+    ).toBe('wake\u060C activity');
   });
 
   it('keeps cost and activity alongside a scheduled wake', () => {

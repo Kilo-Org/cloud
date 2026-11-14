@@ -20,9 +20,6 @@ export function computeNextCronTime(
   }
 }
 
-/**
- * Validate a cron expression. Returns { valid: true } or { valid: false, error: string }.
- */
 export function validateCronExpression(
   expression: string
 ): { valid: true } | { valid: false; error: string } {
@@ -34,10 +31,6 @@ export function validateCronExpression(
   }
 }
 
-/**
- * Check that the minimum interval between consecutive runs is at least `minMs` milliseconds.
- * Default minimum is 60000ms (1 minute).
- */
 export function enforcesMinimumInterval(
   expression: string,
   timezone: string,
@@ -55,9 +48,6 @@ export function enforcesMinimumInterval(
   }
 }
 
-/**
- * Check if a string is a valid IANA timezone identifier.
- */
 export function isValidTimezone(tz: string): boolean {
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz });

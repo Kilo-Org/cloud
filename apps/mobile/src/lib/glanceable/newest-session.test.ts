@@ -101,21 +101,22 @@ describe('newestSessionTitle', () => {
     expect(newestSessionTitle([{ status: 'question' }])).toBeNull();
   });
 
-  it('hides the backend default title so the newest line is not a timestamp', () => {
-    // Explorer session-question/typed-kb-up: the widget line showed the raw
-    // `New session - <ISO>` stamp as machine output rather than human copy.
+  it('keeps the newest session name when an older row carries the backend placeholder', () => {
+    // The placeholder is hidden only where it would be the newest line: a row
+    // still stamped `New session - <ISO>` must not erase the name of a newer
+    // session the tray can name.
     const rows = [
       {
         title: 'New session - 2026-09-20T08:10:35.172Z',
         status: 'question',
-        updatedAt: '2026-01-05T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
       },
       {
         title: 'Refactor the billing webhook',
         status: 'busy',
-        updatedAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-05T00:00:00.000Z',
       },
     ];
-    expect(newestSessionTitle(rows)).toBeNull();
+    expect(newestSessionTitle(rows)).toBe('Refactor the billing webhook');
   });
 });

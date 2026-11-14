@@ -469,12 +469,6 @@ export type GitLabProject = {
   archived: boolean;
   marked_for_deletion_on?: string | null;
   marked_for_deletion_at?: string | null;
-  /**
-   * Access the requesting credential holds on the project, as reported by the
-   * instance. The value is provider input with no shape guarantee, so a caller
-   * that reads it validates it before use.
-   */
-  permissions?: unknown;
 };
 
 function isActiveGitLabProject(project: GitLabProject): boolean {
@@ -942,43 +936,70 @@ export async function listProjectWebhooks(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/hooks`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
+  const budget = new GitLabListingBudget('project webhook listing');
+  try {
+    const webhooks: GitLabWebhook[] = [];
+    let page = 1;
+    const perPage = 100;
 
-  if (!response.ok) {
-    const bodyExcerpt = providerErrorExcerpt(await response.text());
-    logExceptInTest('GitLab list webhooks failed:', {
-      status: response.status,
-      bodyExcerpt,
-      projectId,
-    });
-
-    if (response.status === 401) {
-      throw new GitLabAuthenticationError(
-        projectId,
-        401,
-        `GitLab rejected the credential while listing webhooks for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/hooks`, {
+          per_page: perPage,
+          page,
+        }),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+        budget
       );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab list webhooks failed:', {
+          status: response.status,
+          bodyExcerpt,
+          projectId,
+        });
+
+        if (response.status === 401) {
+          throw new GitLabAuthenticationError(
+            projectId,
+            401,
+            `GitLab rejected the credential while listing webhooks for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+          );
+        }
+
+        if (response.status === 403) {
+          throw new GitLabWebhookPermissionError(
+            projectId,
+            response.status,
+            `Insufficient permissions to manage webhooks for project ${projectId}. Requires Maintainer role or higher.`
+          );
+        }
+
+        throw new Error(`GitLab list webhooks failed: ${response.status}`);
+      }
+
+      webhooks.push(...((await response.json()) as GitLabWebhook[]));
+
+      const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
+      if (Number.isInteger(nextPage) && nextPage > page) {
+        checkGitLabPaginationBounds(nextPage, webhooks.length, 'project webhook listing');
+        page = nextPage;
+        continue;
+      }
+
+      checkGitLabPaginationBounds(page, webhooks.length, 'project webhook listing');
+      break;
     }
 
-    if (response.status === 403) {
-      throw new GitLabWebhookPermissionError(
-        projectId,
-        response.status,
-        `Insufficient permissions to manage webhooks for project ${projectId}. Requires Maintainer role or higher.`
-      );
-    }
-
-    throw new Error(`GitLab list webhooks failed: ${response.status}`);
+    return webhooks;
+  } finally {
+    budget.dispose();
   }
-
-  return (await response.json()) as GitLabWebhook[];
 }
 
 /**
@@ -1906,44 +1927,6 @@ export async function addReactionToMR(
   });
 }
 
-/**
- * A non-ok HTTP response from the GitLab single-project read. The status is the
- * only provider detail a caller can act on; the response body is never
- * included, so a message built from this error cannot leak a token or a
- * project path.
- */
-export class GitLabProjectFetchError extends Error {
-  constructor(readonly status: number) {
-    super(`GitLab project fetch failed: ${status}`);
-    this.name = 'GitLabProjectFetchError';
-  }
-}
-
-export async function getGitLabProject(
-  accessToken: string,
-  projectPath: string,
-  instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<GitLabProject> {
-  const encodedPath = encodeURIComponent(projectPath);
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedPath}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const bodyExcerpt = providerErrorExcerpt(await response.text());
-    logExceptInTest('GitLab project fetch failed:', { status: response.status, bodyExcerpt });
-    throw new GitLabProjectFetchError(response.status);
-  }
-
-  return (await response.json()) as GitLabProject;
-}
-
 export async function fetchGitLabRepositorySize(
   accessToken: string,
   projectPath: string,
@@ -2300,50 +2283,75 @@ export async function listProjectAccessTokens(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/access_tokens`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
+  const budget = new GitLabListingBudget('project access token listing');
+  try {
+    const tokens: GitLabProjectAccessToken[] = [];
+    let page = 1;
+    const perPage = 100;
 
-  if (!response.ok) {
-    const bodyExcerpt = providerErrorExcerpt(await response.text());
-    logExceptInTest('[listProjectAccessTokens] Failed:', {
-      status: response.status,
-      bodyExcerpt,
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/access_tokens`, {
+          per_page: perPage,
+          page,
+        }),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+        budget
+      );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('[listProjectAccessTokens] Failed:', {
+          status: response.status,
+          bodyExcerpt,
+          projectId,
+        });
+
+        if (response.status === 401) {
+          throw new GitLabAuthenticationError(
+            projectId,
+            401,
+            `GitLab rejected the credential while listing Project Access Tokens for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+          );
+        }
+
+        if (response.status === 403) {
+          throw new GitLabProjectAccessTokenPermissionError(
+            projectId,
+            response.status,
+            `Insufficient permissions to list Project Access Tokens for project ${projectId}. Requires Maintainer role or higher.`
+          );
+        }
+
+        throw new Error(`GitLab list Project Access Tokens failed: ${response.status}`);
+      }
+
+      tokens.push(...((await response.json()) as GitLabProjectAccessToken[]));
+
+      const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
+      if (Number.isInteger(nextPage) && nextPage > page) {
+        checkGitLabPaginationBounds(nextPage, tokens.length, 'project access token listing');
+        page = nextPage;
+        continue;
+      }
+
+      checkGitLabPaginationBounds(page, tokens.length, 'project access token listing');
+      break;
+    }
+
+    logExceptInTest('[listProjectAccessTokens] Listed tokens', {
       projectId,
+      count: tokens.length,
     });
 
-    if (response.status === 401) {
-      throw new GitLabAuthenticationError(
-        projectId,
-        401,
-        `GitLab rejected the credential while listing Project Access Tokens for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
-      );
-    }
-
-    if (response.status === 403) {
-      throw new GitLabProjectAccessTokenPermissionError(
-        projectId,
-        response.status,
-        `Insufficient permissions to list Project Access Tokens for project ${projectId}. Requires Maintainer role or higher.`
-      );
-    }
-
-    throw new Error(`GitLab list Project Access Tokens failed: ${response.status}`);
+    return tokens;
+  } finally {
+    budget.dispose();
   }
-
-  const tokens = (await response.json()) as GitLabProjectAccessToken[];
-
-  logExceptInTest('[listProjectAccessTokens] Listed tokens', {
-    projectId,
-    count: tokens.length,
-  });
-
-  return tokens;
 }
 
 /**

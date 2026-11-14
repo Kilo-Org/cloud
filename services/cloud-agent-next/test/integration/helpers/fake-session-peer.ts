@@ -11,6 +11,7 @@ import type {
   ControlPlaneEventsNotification,
   ControlPlaneOutcome,
   ControlPlaneRouteUpdate,
+  ControlPlaneWorkspaceStoppedPayload,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { Env } from '../../../src/types.js';
 import type { WorktreeChangesReady } from '../../../src/control-plane/worktree-changes-ready.js';
@@ -19,6 +20,10 @@ import { sessionDoName } from '../../../src/session-identity.js';
 
 export type RecordedRouteUpdate = { sessionId: string; update: ControlPlaneRouteUpdate };
 export type RecordedEvents = { sessionId: string; notification: ControlPlaneEventsNotification };
+export type RecordedWorkspaceStop = {
+  sessionId: string;
+  payload: ControlPlaneWorkspaceStoppedPayload;
+};
 
 /**
  * A synthetic Session DO peer. The real V2 Session DO is B4, so the Sandbox DO
@@ -28,10 +33,13 @@ export class FakeSessionPeer {
   readonly routeUpdates: RecordedRouteUpdate[] = [];
   readonly events: RecordedEvents[] = [];
   readonly outcomes: ControlPlaneOutcome[] = [];
+  readonly workspaceStops: RecordedWorkspaceStop[] = [];
+  /** When false, `onWorkspaceStopped` fails so the Sandbox must replay it. */
+  workspaceStopOnline = true;
   readonly worktreeChanges: Array<{ sessionId: string; notification: WorktreeChangesReady }> = [];
   /** Every notification in arrival order, across kinds. */
   readonly received: Array<{
-    kind: 'route' | 'events' | 'outcome' | 'worktree_changes';
+    kind: 'route' | 'events' | 'outcome' | 'workspace_stopped' | 'worktree_changes';
     sessionId: string;
   }> = [];
   /** Delegation expiry this peer reports, so handoff selection is controllable. */
@@ -51,6 +59,11 @@ export class FakeSessionPeer {
       onOutcome: async outcome => {
         this.received.push({ kind: 'outcome', sessionId });
         this.outcomes.push(outcome);
+      },
+      onWorkspaceStopped: async payload => {
+        if (!this.workspaceStopOnline) throw new Error('workspace stop dropped');
+        this.received.push({ kind: 'workspace_stopped', sessionId });
+        this.workspaceStops.push({ sessionId, payload });
       },
       getRuntimeProxyDelegationExpiresAt: async () => this.delegationExpiresAt,
       onWorktreeChangesReady: async notification => {
@@ -82,6 +95,7 @@ export function createRuntimeProxyMintingPeer(
 ): (sessionId: string) => ControlPlaneSessionPeer {
   return sessionId => ({
     onRoute: async () => undefined,
+    onWorkspaceStopped: async () => undefined,
     onEvents: async () => undefined,
     onOutcome: async () => undefined,
     // A deliberately long, live delegation so handoff selection can pick this
@@ -130,6 +144,7 @@ export function installFakeRuntimeProxyPeer(
     if (peer === null) return null;
     return {
       onRoute: update => peer.onRoute(update),
+      onWorkspaceStopped: payload => peer.onWorkspaceStopped(payload),
       onEvents: notification => peer.onEvents(notification),
       onOutcome: outcome => peer.onOutcome(outcome),
       onWorktreeChangesReady: notification => peer.onWorktreeChangesReady(notification),

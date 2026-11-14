@@ -68,6 +68,15 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
         path.join(env.HOME, '.kilocode', 'rules', '*.md'),
       ]),
     ];
+    const skills = z
+      .union([
+        z.array(z.string()),
+        z
+          .object({ paths: z.array(z.string()).optional(), urls: z.array(z.string()).optional() })
+          .transform(value => [...(value.paths ?? []), ...(value.urls ?? [])]),
+      ])
+      .parse(config.skills ?? []);
+    config.skills = [...new Set([...skills, path.join(env.HOME, '.kilocode', 'skills')])];
   }
   const provider = z
     .object({
@@ -93,12 +102,17 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
       },
     };
   }
-  return {
+  const runtimeEnv: Record<string, string> = {
     ...env,
+    KILO_USE_RELEASE_CONFIG: '1',
+    ...(env.KILO_CONFIG ? { KILO2_CONFIG: env.KILO_CONFIG } : {}),
     KILO_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     ...(nativeGateway ? { KILO_AI_GATEWAY_URL: nativeGateway } : {}),
   };
+  // V1 disables background subagents; V2 uses its native default.
+  delete runtimeEnv.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS;
+  return runtimeEnv;
 }
 
 export async function probeKilo2Health(server: KiloServer, signal: AbortSignal): Promise<boolean> {

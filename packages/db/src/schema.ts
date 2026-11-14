@@ -6605,6 +6605,10 @@ export const cloud_agent_workspace_folders = pgTable(
     kind: text().$type<'manual' | 'smart'>().notNull().default('manual'),
     smart_preset: text().$type<'needs_you' | 'in_review' | 'done'>(),
     sort_mode: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
+    manual_worktree_order: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6708,6 +6712,8 @@ export const cli_sessions_v2 = pgTable(
     kilo_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    // See CLI_SESSION_VERSION_BY_RUNTIME_HARNESS: Cloud Agent sets 1 (Kilo v1) or
+    // 2 (Kilo v2) after it delivers a message to a ready sandbox; 0 means unknown.
     version: integer().notNull().default(0),
     title: text(),
     public_id: uuid(),
@@ -7527,7 +7533,6 @@ export const byok_api_keys = pgTable(
       onDelete: 'cascade',
     }),
     provider_id: text().notNull(),
-    encrypted_api_key: jsonb().$type<EncryptedData>(),
     encrypted_api_key_envelope: jsonb().$type<BYOKApiKeyEnvelope>(),
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
@@ -11120,6 +11125,14 @@ export const enkrypt_usage = pgTable(
     // is an `allowed` row with detectors here. PostgreSQL cannot enforce foreign keys on array
     // elements, so the writer resolves every id through the lookup table.
     fired_detector_ids: integer().array(),
+    // Sizes in UTF-16 code units. `total_characters` is the text the scan covers: one of the
+    // request's tool definitions, its system prompt, or its conversation, each scanned by its own
+    // call, or the response. `scanned_characters` is what this call sent to Enkrypt: segments no
+    // cached verdict covers, packed into one call, with their separators and the headers of split
+    // segments. Parts that the verdict cache covers entirely make no call and have no row. Null on
+    // rows that predate them.
+    scanned_characters: integer(),
+    total_characters: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -11360,6 +11373,10 @@ export const container_usage_interval = pgTable(
   },
   table => [
     index('IDX_container_usage_interval_sweep').on(table.status, table.last_seen_at),
+    index('IDX_container_usage_interval_session')
+      .on(table.session_id)
+      .concurrently()
+      .where(sql`${table.session_id} IS NOT NULL`),
     index('IDX_container_usage_interval_subject_started').on(
       table.subject_type,
       table.subject_id,

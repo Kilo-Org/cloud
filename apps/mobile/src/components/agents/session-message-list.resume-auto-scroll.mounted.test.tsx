@@ -162,6 +162,11 @@ function emitContentSizeChange(height: number): void {
     1000,
     height
   );
+  // The tail correction is coalesced to the next frame; run it so the call
+  // list is complete when a case asserts.
+  act(() => {
+    vi.advanceTimersByTime(1);
+  });
 }
 
 describe('SessionMessageList resume anchor vs tail auto-follow', () => {

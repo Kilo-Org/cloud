@@ -1,8 +1,8 @@
 import { getWorkerDb } from '@kilocode/db/client';
 import { describe, expect, it } from 'vitest';
+import { isValidGitLabRepositoryUrl } from '@kilocode/worker-utils/gitlab-url';
 import {
   buildAuthorizedGitLabIntegrationQuery,
-  isValidGitLabRepositoryUrl,
   matchGitLabRepositoryToIntegration,
   type AuthorizedGitLabIntegration,
 } from './gitlab-lookup-service.js';
@@ -29,6 +29,8 @@ describe('buildAuthorizedGitLabIntegrationQuery', () => {
     const query = buildAuthorizedGitLabIntegrationQuery(db, params).toSQL();
 
     expect(query.sql).toMatch(/"platform_integrations"."owned_by_user_id" = \$\d+/);
+    expect(query.sql).toContain('"kilocode_users"."blocked_at" is null');
+    expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
     expect(query.sql).not.toMatch(/"platform_integrations"."id" = \$\d+/);
     expect(query.sql.toLowerCase()).not.toContain('limit');
     expect(query.params).toContain(params.userId);

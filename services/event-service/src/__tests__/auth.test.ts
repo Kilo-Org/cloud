@@ -72,7 +72,7 @@ describe('authenticateToken', () => {
   beforeEach(() => {
     clearSecretCacheForTest();
     currentPepperByUserId.clear();
-    currentPepperByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+    currentPepperByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
   });
 
   it('authenticates a legacy one-hour kilo-chat token without an audience', async () => {
@@ -185,7 +185,7 @@ describe('authenticateToken', () => {
   it('rejects a token for a blocked user even when pepper matches', async () => {
     currentPepperByUserId.set('user-xyz-789', {
       pepper: 'pepper-current',
-      blockedReason: 'manual block',
+      blocked: true,
     });
     const { token } = await signKiloToken({
       userId: 'user-xyz-789',

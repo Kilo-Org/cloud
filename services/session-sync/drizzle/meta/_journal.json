@@ -36,6 +36,13 @@
       "when": 1793900000000,
       "tag": "0004_session_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794573435621,
+      "tag": "0005_session_status",
+      "breakpoints": true
     }
   ]
 }

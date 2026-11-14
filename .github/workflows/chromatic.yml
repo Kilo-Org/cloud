@@ -53,11 +53,16 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      # The shared store keeps this install warm when a pull request moves the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -67,8 +72,25 @@ jobs:
         env:
           DOTENV_PRIVATE_KEY_DEVELOPMENT: ${{ secrets.DOTENV_PRIVATE_KEY_DEVELOPMENT }}
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      # The version comes from the dependency graph this install just built, so
+      # a bump to @playwright/test changes the key and downloads the matching
+      # build. No restore-keys: an older browser tree never satisfies the
+      # install and would only grow the cached entry.
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
+
+      # No --with-deps: the runner image already ships the Chromium system
+      # libraries, and the apt-get behind --with-deps can hang until the job
+      # timeout when the fleet's apt egress degrades.
+      - name: Install Playwright Chromium
+        run: pnpm --filter web exec playwright install chromium
 
       - name: Run Playwright tests
         run: pnpm test:e2e
@@ -97,11 +119,16 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      # The shared store keeps this install warm when a pull request moves the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

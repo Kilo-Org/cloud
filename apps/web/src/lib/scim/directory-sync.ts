@@ -25,6 +25,8 @@ import {
   invalidateMemberSessionAccess,
   removeUserFromOrganization,
 } from '@/lib/organizations/organization-member-removal';
+import { runAfterResponse } from '@/lib/after-response';
+import { cleanupRemovedClaudeProfilesForUser } from '@/lib/claude-billing/delete';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { createOrUpdateUser, findUserByNormalizedEmail } from '@/lib/user';
 import {
@@ -1049,6 +1051,11 @@ export async function revokeAllDirectoryMemberships(
   // above because a `txn` was passed.
   for (const organizationId of revokedOrganizationIds) {
     await invalidateMemberSessionAccess(organizationId, user.id);
+  }
+  if (revokedOrganizationIds.length > 0) {
+    await runAfterResponse(async () => {
+      await cleanupRemovedClaudeProfilesForUser(user.id).catch(() => undefined);
+    });
   }
 
   return { kiloUserId: user.id, revokedOrganizationIds };

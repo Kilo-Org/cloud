@@ -756,6 +756,8 @@ describe('AgentSessionListContent liveness', () => {
 
   it('keeps the loading skeletons instead of flashing empty history', () => {
     const renderer = mount(contentProps({ isLoading: true, hasAnySessions: false }));
+    // The date-header placeholder carries no row testID, so only the eight
+    // reserved session placeholders match here.
     expect(skeletonRows(renderer)).toHaveLength(8);
     expect(hosts(renderer, 'Button')).toHaveLength(0);
     expect(rows(renderer)).toEqual([]);
@@ -769,9 +771,12 @@ describe('AgentSessionListContent liveness', () => {
     if (!composite) {
       throw new Error('FlashList composite was not rendered');
     }
-    expect((composite.props as ListProps).data.map(row => row.kind)).toEqual(
-      Array.from({ length: 8 }, () => 'skeleton')
-    );
+    // Nine items: one date-header placeholder, then eight session placeholders
+    // — the same item-for-item shape the loaded list has.
+    expect((composite.props as ListProps).data.map(row => row.kind)).toEqual([
+      'section-header-skeleton',
+      ...Array.from({ length: 8 }, () => 'skeleton'),
+    ]);
   });
 
   it('swaps the reserved skeleton rows for real rows inside the same mounted list', () => {

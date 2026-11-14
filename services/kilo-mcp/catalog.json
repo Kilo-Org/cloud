@@ -21384,7 +21384,6 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         },
         "autoAddCreator": {
@@ -21423,7 +21422,6 @@
         },
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         }
       },
@@ -30396,7 +30394,6 @@
         },
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         }
       },

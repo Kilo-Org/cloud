@@ -12,6 +12,7 @@ vi.mock('../native', () => ({
   nativeErrorCode: () => 'Protocol',
 }));
 
+vi.mock('@/lib/analytics/posthog', () => ({ captureEvent: vi.fn() }));
 vi.mock('expo-file-system', async () => {
   const { fakeFs: fake } = await import('./fake-file-system.test-helpers');
   return { Directory: fake.Directory, File: fake.File, Paths: fake.Paths };

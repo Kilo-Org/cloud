@@ -2,11 +2,14 @@ import { SSH_ERROR_CODES } from '../../../../modules/kilo-ssh/src/ReactNativeSsh
 import type * as SshPackage from '../../../../modules/kilo-ssh/src';
 import { type ConnectOptions, type SshAuth } from '../../../../modules/kilo-ssh/src';
 
+import { type SshReconnectOutcome } from '@kilocode/app-shared/analytics';
+
 import { i18n } from '@/i18n';
 
+import { trackSshConnectFailed, trackSshConnectSucceeded, trackSshReconnect } from '../analytics';
 import { type SshDatabase } from '../database';
 import { listForwardsForHost } from '../forwards';
-import { autoStartForwards, resetSessionForwards } from '../forwards-runtime';
+import { autoStartForwards } from '../forwards-runtime';
 import { getHost, type SshHost, updateHost } from '../hosts';
 import { getKey } from '../keys';
 import { nativeErrorCode, sshPackage } from '../native';
@@ -15,6 +18,7 @@ import { quoteShellArg } from '../shell-quote';
 import { sshDatabase } from '../store';
 import { MAX_RECONNECT_ATTEMPTS, reconnectDelayMs } from './backoff';
 import { requireKeyAccess, waitForForeground } from './biometric';
+import { disconnectAll, releaseShell } from './connection';
 import { clearTimer, type LiveSession, setPhase, stillOpen } from './live';
 import { passwordFor } from './password';
 import { patchSession, sessionById } from './session-store';
@@ -29,6 +33,13 @@ type ChainOpening = Readonly<{
   ssh: typeof SshPackage;
   /** The hop sessions this attempt already opened, outermost first. */
   opened: string[];
+}>;
+
+type FailOptions = Readonly<{
+  /** The host the failure came from, when it is not the target. */
+  hop?: SshHost;
+  /** Whether the ending is a connection attempt's outcome or an established session's. */
+  origin?: 'connect' | 'session';
 }>;
 
 /**
@@ -73,7 +84,7 @@ async function openChain(
     return await openChain(opening, hops.slice(1), nativeSessionId);
   } catch (error) {
     await disconnectAll(opened);
-    fail(entry, reasonOf(error), hop);
+    fail(entry, reasonOf(error), { hop });
     return false;
   }
 }
@@ -144,6 +155,12 @@ export async function attempt(entry: LiveSession): Promise<void> {
       pendingCommand: host.tmuxAttach ? tmuxAttachCommand(host) : null,
       phase: { kind: 'connected' },
     });
+    if (entry.reconnecting) {
+      entry.reconnecting = false;
+      trackSshReconnect('succeeded');
+    } else {
+      trackSshConnectSucceeded(host.authMethod);
+    }
     // A listening port belongs to the connection that opened it, so the
     // forwards start here rather than on the screen that shows them.
     await autoStartForwards(entry.id, targetSessionId, listForwardsForHost(db, host.id));
@@ -159,9 +176,9 @@ export async function attempt(entry: LiveSession): Promise<void> {
 /**
  * Applies the ending of an attempt: the sheets a reason can be answered with,
  * an automatic retry for a transport failure, and the closed state otherwise.
- * `hop` is the host the failure came from when it is not the target.
  */
-export function fail(entry: LiveSession, reason: SshCloseReason, hop?: SshHost): void {
+export function fail(entry: LiveSession, reason: SshCloseReason, options: FailOptions = {}): void {
+  const origin = options.origin ?? 'connect';
   if (!stillOpen(entry)) {
     return;
   }
@@ -169,7 +186,7 @@ export function fail(entry: LiveSession, reason: SshCloseReason, hop?: SshHost):
   releaseShell(entry);
   entry.prompts = null;
   entry.hostKey = null;
-  const failedHost = hop ?? entry.host;
+  const failedHost = options.hop ?? entry.host;
   entry.connectAttemptId = null;
   if (reason === 'AuthFailed' && failedHost.authMethod === 'password') {
     entry.passwords.delete(failedHost.id);
@@ -179,17 +196,37 @@ export function fail(entry: LiveSession, reason: SshCloseReason, hop?: SshHost):
       failed: true,
       label: failedHost.id === entry.host.id ? null : failedHost.label,
     });
+    finishReconnect(entry, 'requires_input');
     return;
   }
   if (reason === 'WrongPassphrase') {
     setPhase(entry, { kind: 'awaiting-passphrase', failed: true });
+    finishReconnect(entry, 'requires_input');
     return;
   }
   if (isRetryableReason(reason) && entry.attempt < MAX_RECONNECT_ATTEMPTS) {
-    scheduleReconnect(entry, reason);
+    scheduleReconnect(entry, reason, origin);
     return;
   }
   setPhase(entry, { kind: 'closed', reason, retryable: isRetryableReason(reason) });
+  if (origin === 'session') {
+    entry.reconnecting = false;
+    return;
+  }
+  if (entry.reconnecting) {
+    finishReconnect(entry, 'failed');
+    return;
+  }
+  trackSshConnectFailed(entry.host.authMethod, reason);
+}
+
+/** Ends the automatic retry sequence and reports it exactly once. */
+function finishReconnect(entry: LiveSession, outcome: SshReconnectOutcome): void {
+  if (!entry.reconnecting) {
+    return;
+  }
+  entry.reconnecting = false;
+  trackSshReconnect(outcome);
 }
 
 /**
@@ -233,6 +270,7 @@ async function authFor(
         failed: false,
         label: host.id === entry.host.id ? null : host.label,
       });
+      finishReconnect(entry, 'requires_input');
       return null;
     }
     return { type: 'password', password };
@@ -261,6 +299,7 @@ async function authFor(
       const reason = reasonOf(error);
       if (reason === 'WrongPassphrase') {
         setPhase(entry, { kind: 'awaiting-passphrase', failed: passphrase !== undefined });
+        finishReconnect(entry, 'requires_input');
         return null;
       }
       fail(entry, reason);
@@ -272,61 +311,20 @@ async function authFor(
   return { type: 'keyboardInteractive' };
 }
 
-function scheduleReconnect(entry: LiveSession, reason: SshCloseReason): void {
+function scheduleReconnect(
+  entry: LiveSession,
+  reason: SshCloseReason,
+  origin: 'connect' | 'session'
+): void {
+  if (origin === 'session') {
+    entry.reconnecting = true;
+  }
   const next = entry.attempt + 1;
   setPhase(entry, { kind: 'reconnecting', attempt: next, reason });
   entry.timer = setTimeout(() => {
     entry.timer = null;
     void attempt(entry);
   }, reconnectDelayMs(next));
-}
-
-function releaseShell(entry: LiveSession): void {
-  const nativeIds = [...entry.jumpSessionIds];
-  if (entry.nativeSessionId !== null) {
-    nativeIds.push(entry.nativeSessionId);
-  }
-  entry.nativeSessionId = null;
-  entry.jumpSessionIds = [];
-  void disconnectAll(nativeIds);
-  const session = sessionById(entry.id);
-  const shellId = session?.shellId ?? null;
-  if (shellId !== null) {
-    void closeShellQuietly(shellId);
-  }
-  if (session !== null && (session.shellId !== null || session.pendingCommand !== null)) {
-    patchSession(entry.id, { shellId: null, pendingCommand: null });
-  }
-  patchSession(entry.id, { nativeSessionId: null });
-  void resetSessionForwards(entry.id);
-}
-
-async function closeShellQuietly(shellId: string): Promise<void> {
-  try {
-    const ssh = await sshPackage();
-    ssh.closeShell(shellId);
-  } catch {
-    // The shell already ended, or this build carries no module: nothing is
-    // left to release.
-  }
-}
-
-/** Closes the hop sessions an abandoned attempt opened, outermost last. */
-async function disconnectAll(sessionIds: readonly string[]): Promise<void> {
-  await Promise.all(sessionIds.toReversed().map(sessionId => forgetSession(sessionId)));
-}
-
-/**
- * Releases a native session the app no longer renders. A session left in the
- * core's registry keeps the connection state its host's next attempt waits on.
- */
-export async function forgetSession(nativeSessionId: string): Promise<void> {
-  try {
-    const ssh = await sshPackage();
-    await ssh.disconnect(nativeSessionId);
-  } catch {
-    // The screen that owned this connection is gone, so its resources are too.
-  }
 }
 
 function tmuxAttachCommand(host: SshHost): string {

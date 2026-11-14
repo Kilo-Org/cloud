@@ -8,7 +8,8 @@ import { hostPattern } from '../known-host-pattern';
 import { findKnownHost, trustHostKey } from '../known-hosts';
 import { sshPackage } from '../native';
 import { sshDatabase } from '../store';
-import { fail, forgetSession } from './attempt';
+import { fail } from './attempt';
+import { forgetSession } from './connection';
 import { type HostKeyVerdict, judgeHostKey } from './host-key';
 import { live, type LiveSession, setPhase, stillOpen } from './live';
 import { patchSession } from './session-store';
@@ -49,7 +50,7 @@ export function handleDisconnect(notice: DisconnectNotice): void {
       // attempt to the same host waits on. Closing it is what lets a retry
       // reach the network again.
       void forgetSession(notice.sessionId);
-      fail(entry, 'disconnected');
+      fail(entry, 'disconnected', { origin: 'session' });
       return;
     }
     const hop = entry.jumpSessionIds.indexOf(notice.sessionId);
@@ -58,7 +59,7 @@ export function handleDisconnect(notice: DisconnectNotice): void {
       // is retried from the outermost surviving session.
       entry.jumpSessionIds.splice(hop, 1);
       void forgetSession(notice.sessionId);
-      fail(entry, 'disconnected');
+      fail(entry, 'disconnected', { origin: 'session' });
       return;
     }
   }

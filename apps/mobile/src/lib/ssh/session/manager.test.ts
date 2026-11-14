@@ -13,12 +13,14 @@ vi.mock('../id', () => ({ newId: vi.fn() }));
 vi.mock('../native', () => ({ sshPackage: vi.fn() }));
 vi.mock('../store', () => ({ sshDatabase: vi.fn() }));
 vi.mock('../known-hosts', () => ({ findKnownHost: vi.fn(), trustHostKey: vi.fn() }));
+vi.mock('@/lib/analytics/posthog', () => ({ captureEvent: vi.fn() }));
 vi.mock('../forwards-runtime', () => ({
   handleForwardError: vi.fn(),
   resetSessionForwards: vi.fn(),
 }));
 vi.mock('./idle-notify', () => ({ forgetIdleNotify: vi.fn() }));
-vi.mock('./attempt', () => ({ attempt: vi.fn(), fail: state.fail, forgetSession: vi.fn() }));
+vi.mock('./attempt', () => ({ attempt: vi.fn(), fail: state.fail }));
+vi.mock('./connection', () => ({ forgetSession: vi.fn() }));
 vi.mock('./live', () => ({
   live: state.live,
   clearTimer: vi.fn(),
@@ -59,6 +61,8 @@ describe('native transport and terminal close ordering', () => {
 
   it('still handles a remote exit while its shell is current', () => {
     endShell('session', null);
-    expect(state.fail).toHaveBeenCalledWith(state.live.get('session'), 'user');
+    expect(state.fail).toHaveBeenCalledWith(state.live.get('session'), 'user', {
+      origin: 'session',
+    });
   });
 });

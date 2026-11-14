@@ -8,6 +8,7 @@ import { type ConfirmDialogRequest } from '@/components/ui/dialog';
 import { shareLocalFile } from '@/lib/share-remote-file';
 
 import { type FilePreview } from '@/components/ssh/files/file-preview-sheet';
+import { trackSshSftpTransfer } from '../analytics';
 import { nativeErrorCode, sshPackage } from '../native';
 import { joinRemotePath, previewKindOf } from './paths';
 import { allocatePreviewCache, type PreviewCacheFile, sweepPreviewCache } from './preview-cache';
@@ -137,6 +138,7 @@ export function useFileActions({
     setPreview(base);
     setPendingRetry(remotePathOf(entry));
     let cache: PreviewCacheFile | null = null;
+    let downloaded = false;
     try {
       const ssh = await sshPackage();
       if (request !== previewRequest.current) {
@@ -146,6 +148,8 @@ export function useFileActions({
       cache = allocated;
       previewCache.current = allocated;
       await ssh.download(sftpId, remotePathOf(entry), allocated.uri);
+      downloaded = true;
+      trackSshSftpTransfer('download', 'completed', null);
       if (request !== previewRequest.current) {
         allocated.release();
         return;
@@ -161,7 +165,11 @@ export function useFileActions({
         allocated.release();
       }
     } catch (error) {
-      const code = nativeErrorCode(error) ?? 'Protocol';
+      const nativeCode = nativeErrorCode(error);
+      const code = nativeCode ?? 'Protocol';
+      if (!downloaded) {
+        trackSshSftpTransfer('download', 'failed', nativeCode);
+      }
       cache?.release();
       if (request === previewRequest.current) {
         setPreview({ ...base, loading: false, code });

@@ -9,8 +9,16 @@
  * Matching is case-, separator-, and acronym-insensitive and covers letter
  * suffixes, so `Repository`, `raw_prompt`, `APIToken`, `repo_name`, and
  * `secret_value` are all rejected. The `repo_count` and `auth_ready` metrics
- * are explicit carve-outs.
+ * are explicit carve-outs, as is `authMethod`: an SSH credential-kind
+ * allowlist, never a header, token, or key value.
  */
+
+/** Payload keys that are closed enums or counts despite a prohibited term. */
+const ALLOWED_PROPERTY_KEYS: Record<string, true> = {
+  repo_count: true,
+  auth_ready: true,
+  auth_method: true,
+};
 
 const PROHIBITED_TERMS = [
   'email',
@@ -47,7 +55,7 @@ function normalizeKey(key: string): string {
 export function isProhibitedPropertyKey(key: string): boolean {
   const normalized = normalizeKey(key);
 
-  if (normalized === 'repo_count' || normalized === 'auth_ready') {
+  if (Object.hasOwn(ALLOWED_PROPERTY_KEYS, normalized)) {
     return false;
   }
 

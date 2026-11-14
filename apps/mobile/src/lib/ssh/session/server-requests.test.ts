@@ -30,7 +30,8 @@ vi.mock('../native', () => ({
 }));
 vi.mock('../store', () => ({ sshDatabase: state.sshDatabase }));
 vi.mock('../known-hosts', () => ({ findKnownHost: () => null, trustHostKey: vi.fn() }));
-vi.mock('./attempt', () => ({ fail: vi.fn(), forgetSession: vi.fn() }));
+vi.mock('./attempt', () => ({ fail: vi.fn() }));
+vi.mock('./connection', () => ({ forgetSession: vi.fn() }));
 vi.mock('./session-store', () => ({ patchSession: vi.fn() }));
 vi.mock('./live', () => ({
   live: state.live,

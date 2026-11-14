@@ -94,6 +94,55 @@ export const PR_RECONCILE_RESULTS = [
   'unresolved',
 ] as const;
 
+// SSH client outcomes. Every value is a closed allowlist: the events carry no
+// host, username, connection target, command, path, or key material.
+export const SSH_AUTH_METHODS = ['password', 'key', 'keyboard_interactive'] as const;
+export const SSH_FAILURE_CATEGORIES = [
+  'none',
+  'unknown',
+  'network',
+  'timeout',
+  'channel_closed',
+  'auth_failed',
+  'auth_cancelled',
+  'host_key_rejected',
+  'unsupported_algorithm',
+  'key_parse',
+  'wrong_passphrase',
+  'protocol',
+  'key_generation',
+  'not_found',
+  'permission_denied',
+  'cancelled',
+  'forwarding',
+  'local_io',
+  'invalid_export',
+  'output_limit',
+  'disconnected',
+  'user',
+  'key_missing',
+  'host_missing',
+  'unavailable',
+] as const;
+export const SSH_OPERATION_OUTCOMES = ['completed', 'failed', 'cancelled'] as const;
+export const SSH_RECONNECT_OUTCOMES = [
+  'succeeded',
+  'failed',
+  'requires_input',
+  'abandoned',
+] as const;
+export const SSH_TRANSFER_DIRECTIONS = ['upload', 'download'] as const;
+export const SSH_FORWARD_DIRECTIONS = ['local', 'remote'] as const;
+export const SSH_TERMINAL_OUTCOMES = ['connected', 'stopped', 'exited', 'failed'] as const;
+
+export type SshAuthMethod = (typeof SSH_AUTH_METHODS)[number];
+export type SshFailureCategory = (typeof SSH_FAILURE_CATEGORIES)[number];
+export type SshOperationOutcome = (typeof SSH_OPERATION_OUTCOMES)[number];
+export type SshReconnectOutcome = (typeof SSH_RECONNECT_OUTCOMES)[number];
+export type SshTransferDirection = (typeof SSH_TRANSFER_DIRECTIONS)[number];
+export type SshForwardDirection = (typeof SSH_FORWARD_DIRECTIONS)[number];
+export type SshTerminalOutcome = (typeof SSH_TERMINAL_OUTCOMES)[number];
+
 // ----- event name constants ------------------------------------------------
 
 // Existing mobile events (grandfathered names, exact current shapes).
@@ -123,6 +172,16 @@ export const CONSENT_OUTCOME_EVENT = 'consent_outcome';
 export const NOTIFICATION_PERMISSION_RESPONDED_EVENT = 'notification_permission_responded';
 export const NOTIFICATION_TOKEN_UPDATED_EVENT = 'notification_token_updated';
 export const ORGANIZATION_MEMBER_JOINED_EVENT = 'organization_member_joined';
+
+export const SSH_CONNECT_SUCCEEDED_EVENT = 'ssh_connect_succeeded';
+export const SSH_CONNECT_FAILED_EVENT = 'ssh_connect_failed';
+export const SSH_RECONNECT_EVENT = 'ssh_reconnect';
+export const SSH_SFTP_TRANSFER_EVENT = 'ssh_sftp_transfer';
+export const SSH_FORWARD_STARTED_EVENT = 'ssh_forward_started';
+export const SSH_FORWARD_FAILED_EVENT = 'ssh_forward_failed';
+export const SSH_EXPORT_EVENT = 'ssh_export';
+export const SSH_IMPORT_EVENT = 'ssh_import';
+export const SSH_SANDBOX_TERMINAL_EVENT = 'ssh_sandbox_terminal';
 
 // New terminal outcome events (Wave 2 ledger settle path only).
 export const SESSION_CREATE_SETTLED_EVENT = 'session_create_settled';
@@ -249,6 +308,63 @@ export const ANALYTICS_EVENT_SCHEMAS = {
   [ORGANIZATION_MEMBER_JOINED_EVENT]: z
     .object({
       role: z.enum(ORGANIZATION_ROLES),
+    })
+    .strict(),
+
+  // --- SSH client events (closed allowlists only) ---
+  // `category` is the failure category, `none` when the event is an outcome
+  // that did not fail. `authMethod` is the credential type, never a value.
+  [SSH_CONNECT_SUCCEEDED_EVENT]: z
+    .object({
+      category: z.enum(SSH_FAILURE_CATEGORIES),
+      authMethod: z.enum(SSH_AUTH_METHODS),
+    })
+    .strict(),
+  [SSH_CONNECT_FAILED_EVENT]: z
+    .object({
+      category: z.enum(SSH_FAILURE_CATEGORIES),
+      authMethod: z.enum(SSH_AUTH_METHODS),
+    })
+    .strict(),
+  [SSH_RECONNECT_EVENT]: z
+    .object({
+      outcome: z.enum(SSH_RECONNECT_OUTCOMES),
+    })
+    .strict(),
+  [SSH_SFTP_TRANSFER_EVENT]: z
+    .object({
+      direction: z.enum(SSH_TRANSFER_DIRECTIONS),
+      outcome: z.enum(SSH_OPERATION_OUTCOMES),
+      category: z.enum(SSH_FAILURE_CATEGORIES),
+    })
+    .strict(),
+  [SSH_FORWARD_STARTED_EVENT]: z
+    .object({
+      direction: z.enum(SSH_FORWARD_DIRECTIONS),
+      category: z.enum(SSH_FAILURE_CATEGORIES),
+    })
+    .strict(),
+  [SSH_FORWARD_FAILED_EVENT]: z
+    .object({
+      direction: z.enum(SSH_FORWARD_DIRECTIONS),
+      category: z.enum(SSH_FAILURE_CATEGORIES),
+    })
+    .strict(),
+  [SSH_EXPORT_EVENT]: z
+    .object({
+      outcome: z.enum(SSH_OPERATION_OUTCOMES),
+      category: z.enum(SSH_FAILURE_CATEGORIES),
+    })
+    .strict(),
+  [SSH_IMPORT_EVENT]: z
+    .object({
+      outcome: z.enum(SSH_OPERATION_OUTCOMES),
+      category: z.enum(SSH_FAILURE_CATEGORIES),
+    })
+    .strict(),
+  [SSH_SANDBOX_TERMINAL_EVENT]: z
+    .object({
+      outcome: z.enum(SSH_TERMINAL_OUTCOMES),
     })
     .strict(),
 

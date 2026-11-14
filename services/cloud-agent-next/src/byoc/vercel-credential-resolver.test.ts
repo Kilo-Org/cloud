@@ -42,10 +42,14 @@ const snapshot = {
   runtimeSnapshotId: 'snapshot-1',
 };
 
+const byocServiceSecret = 'byoc-service-secret';
+const sharedPlatformSecret = 'shared-platform-secret';
+
 const env = {
   KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
   AGENT_ENV_VARS_PRIVATE_KEY: keys.privateKey,
-  INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+  BYOC_INTERNAL_API_SECRET_PROD: { get: async () => byocServiceSecret },
+  INTERNAL_API_SECRET_PROD: { get: async () => sharedPlatformSecret },
 } as Env;
 
 type CredentialOwnerInput = {
@@ -462,6 +466,119 @@ describe('internal credential request redirects', () => {
         expect.any(String),
         expect.objectContaining({ redirect: 'manual' })
       );
+    }
+  );
+});
+
+describe('BYOC Vercel service credential', () => {
+  const rotatedByocSecret = 'rotated-byoc-secret';
+  const statusProjection = {
+    ...identity,
+    buildGeneration: snapshot.buildGeneration,
+    setupStatus: 'failed' as const,
+    setupStep: null,
+    setupError: 'test',
+    teamSlug: null,
+    projectSlug: null,
+    runtimeBuildId: null,
+    runtimeSnapshotId: null,
+    setupStartedAt: null,
+    setupCompletedAt: null,
+  };
+  const outboundRequests = [
+    {
+      name: 'credential lookup',
+      request: (workerEnv: Env) => fetchByocVercelCredential(workerEnv, identity),
+      response: () =>
+        Response.json(
+          credentialResponse({ ...identity, tokenEncrypted: encryptCredentialToken() })
+        ),
+    },
+    {
+      name: 'enrollment lookup',
+      request: (workerEnv: Env) =>
+        fetchByocVercelEnrollmentForUser(workerEnv, personalIdentity.userId),
+      response: () =>
+        Response.json({
+          ...personalIdentity,
+          setupStatus: 'ready',
+          setupStep: null,
+          setupError: null,
+          buildGeneration: snapshot.buildGeneration,
+          runtimeBuildId: 'runtime-build-1',
+          runtimeSnapshotId: snapshot.runtimeSnapshotId,
+          teamSlug: 'team-slug',
+          projectSlug: 'project-slug',
+        }),
+    },
+    {
+      name: 'status projection',
+      request: (workerEnv: Env) => projectByocVercelStatus(workerEnv, statusProjection),
+      response: () => Response.json({ updated: true }),
+    },
+  ];
+
+  function envWithByocSecret(reader: { get: () => Promise<string | null> }): Env {
+    return { ...env, BYOC_INTERNAL_API_SECRET_PROD: reader } as Env;
+  }
+
+  function stubFetch(response: () => Response) {
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => response());
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it.each(outboundRequests)(
+    'sends the BYOC service credential on the $name request',
+    async ({ request, response }) => {
+      const fetchMock = stubFetch(response);
+
+      await request(envWithByocSecret({ get: async () => rotatedByocSecret }));
+
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const init = fetchMock.mock.calls[0]?.[1];
+      expect(init?.headers).toEqual(
+        expect.objectContaining({ 'x-internal-api-key': rotatedByocSecret })
+      );
+      expect(JSON.stringify(init?.headers)).not.toContain(sharedPlatformSecret);
+    }
+  );
+
+  const unavailableReaders: { name: string; get: () => Promise<string | null> }[] = [
+    { name: 'returns no value', get: async () => null },
+    {
+      name: 'throws',
+      get: async () => {
+        throw new Error('secret store unavailable');
+      },
+    },
+  ];
+
+  it.each(unavailableReaders)(
+    'fails closed and skips the request when the BYOC service credential $name',
+    async ({ get }) => {
+      const fetchMock = stubFetch(() => Response.json({}));
+
+      await expect(
+        fetchByocVercelCredential(envWithByocSecret({ get }), identity)
+      ).rejects.toBeInstanceOf(ByocCredentialResolverError);
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(outboundRequests)(
+    'fails closed on the $name request when only the shared internal credential is bound',
+    async ({ request }) => {
+      const fetchMock = stubFetch(() => Response.json({}));
+      const workerEnv = {
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
+        AGENT_ENV_VARS_PRIVATE_KEY: keys.privateKey,
+        INTERNAL_API_SECRET_PROD: { get: async () => sharedPlatformSecret },
+      } as unknown as Env;
+
+      await expect(request(workerEnv)).rejects.toBeInstanceOf(ByocCredentialResolverError);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(JSON.stringify(fetchMock.mock.calls)).not.toContain(sharedPlatformSecret);
     }
   );
 });

@@ -6,7 +6,7 @@ import {
   vercelSetupStepSchema,
 } from '@/lib/byoc/vercel-connection';
 import { NextRequest } from 'next/server';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { BYOC_INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   GET as getInternalCredential,
   PATCH as updateInternalCredential,
@@ -726,7 +726,10 @@ describe('Internal Vercel credential ownership', () => {
       `http://localhost/api/internal/byoc/vercel-credentials/${credentialId}?${query}`,
       {
         method: body === undefined ? 'GET' : 'PATCH',
-        headers: { 'x-internal-api-key': INTERNAL_API_SECRET, 'content-type': 'application/json' },
+        headers: {
+          'x-internal-api-key': BYOC_INTERNAL_API_SECRET,
+          'content-type': 'application/json',
+        },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       }
     );
@@ -820,7 +823,7 @@ describe('Vercel connection JSON updates', () => {
           {
             method: 'PATCH',
             headers: {
-              'x-internal-api-key': INTERNAL_API_SECRET,
+              'x-internal-api-key': BYOC_INTERNAL_API_SECRET,
               'content-type': 'application/json',
             },
             body: JSON.stringify({
@@ -901,7 +904,7 @@ describe('Vercel connection JSON updates', () => {
         {
           method: 'PATCH',
           headers: {
-            'x-internal-api-key': INTERNAL_API_SECRET,
+            'x-internal-api-key': BYOC_INTERNAL_API_SECRET,
             'content-type': 'application/json',
           },
           body: JSON.stringify({
@@ -975,7 +978,7 @@ describe('Shared BYOC connections', () => {
         ? new URLSearchParams({ userId: personalUser.id })
         : new URLSearchParams({ organizationId });
       const headers = {
-        'x-internal-api-key': INTERNAL_API_SECRET,
+        'x-internal-api-key': BYOC_INTERNAL_API_SECRET,
         'content-type': 'application/json',
       };
       const enrollmentResponse = personal

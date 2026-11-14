@@ -319,8 +319,9 @@ Add:
 
 `apps/web/src/app/api/internal/byoc/vercel-credentials/[credentialId]/route.ts`
 
-Cloud Agent calls this endpoint with `x-internal-api-key` and both
-`credentialId` and `organizationId`. The endpoint:
+Cloud Agent calls this endpoint with `x-internal-api-key` set to the dedicated
+`BYOC_INTERNAL_API_SECRET` and both `credentialId` and `organizationId`. The
+endpoint:
 
 - verifies the internal secret with the repository's constant-time helper;
 - selects the row by both IDs;
@@ -360,8 +361,8 @@ It:
 
 1. Fetches the internal web endpoint using the raw
    `KILOCODE_BACKEND_BASE_URL` Worker value and
-   `await env.INTERNAL_API_SECRET_PROD.get()`, matching the existing outbound
-   internal-call pattern. Do not use the sandbox-rewritten backend URL.
+   `await env.BYOC_INTERNAL_API_SECRET_PROD.get()`, matching the existing
+   outbound internal-call pattern. Do not use the sandbox-rewritten backend URL.
 2. Uses `cache: 'no-store'`.
 3. Validates the response with Zod.
 4. Decrypts with `AGENT_ENV_VARS_PRIVATE_KEY` only immediately before an

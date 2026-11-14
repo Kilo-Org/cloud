@@ -134,6 +134,11 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "INTERNAL_API_SECRET_PROD",
     },
+    {
+      "binding": "BYOC_INTERNAL_API_SECRET_PROD",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "BYOC_INTERNAL_API_SECRET_PROD",
+    },
   ],
   /**
    * Smart Placement
@@ -403,6 +408,11 @@
           "binding": "INTERNAL_API_SECRET_PROD",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           "secret_name": "INTERNAL_API_SECRET_PROD",
+        },
+        {
+          "binding": "BYOC_INTERNAL_API_SECRET_PROD",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "BYOC_INTERNAL_API_SECRET_PROD",
         },
       ],
       "r2_buckets": [

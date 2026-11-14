@@ -493,6 +493,8 @@ export type Env = {
   CONTAINER_USAGE_METER: ContainerUsageRpcMethods & ContainerBillingStatusRpcMethods;
   /** Shared secret for internal service-to-service authentication */
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
+  /** Service credential for BYOC Vercel internal requests to the backend */
+  BYOC_INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
   /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */

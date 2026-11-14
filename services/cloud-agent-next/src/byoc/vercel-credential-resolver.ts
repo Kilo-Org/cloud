@@ -180,7 +180,7 @@ function ownerMatches(left: ByocVercelOwner, right: ByocVercelOwner): boolean {
 
 async function internalSecret(env: Env): Promise<string> {
   try {
-    const secret = await env.INTERNAL_API_SECRET_PROD.get();
+    const secret = await env.BYOC_INTERNAL_API_SECRET_PROD.get();
     if (secret) return secret;
   } catch {
     // Convert secret-store failures into the same safe resolver error.

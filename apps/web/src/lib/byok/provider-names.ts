@@ -45,18 +45,31 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
  */
 export type ByokProviderOption = { readonly id: UserByokProviderId; readonly name: string };
 
-const VERCEL_BYOK_PROVIDERS: readonly ByokProviderOption[] = [
-  ...VercelUserByokInferenceProviderIdSchema.options.map(id => ({
+/**
+ * Keys that exist but cannot be added: each serves a key created before its
+ * provider was retired. They are listed so an existing key keeps its name, and
+ * every addable list subtracts them.
+ */
+const LEGACY_ONLY_BYOK_PROVIDERS = [
+  { id: 'codestral', name: 'Legacy Codestral-only key' },
+] as const satisfies readonly ByokProviderOption[];
+
+type LegacyOnlyByokProviderId = (typeof LEGACY_ONLY_BYOK_PROVIDERS)[number]['id'];
+
+function isLegacyOnlyByokProviderId(providerId: string): providerId is LegacyOnlyByokProviderId {
+  return LEGACY_ONLY_BYOK_PROVIDERS.some(provider => provider.id === providerId);
+}
+
+const VERCEL_BYOK_PROVIDERS: readonly ByokProviderOption[] =
+  VercelUserByokInferenceProviderIdSchema.options.map(id => ({
     id,
     name: VERCEL_BYOK_PROVIDER_NAMES[id],
-  })),
-  { id: 'codestral', name: 'Legacy Codestral-only key' },
-];
+  }));
 
 export const DIRECT_BYOK_PROVIDERS_LIST: readonly ByokProviderOption[] =
   DirectUserByokInferenceProviderIdSchema.options.flatMap(id => {
-    // The deprecated Codestral-only key is not a direct provider and has no display name.
-    if (id === 'codestral') return [];
+    // A legacy-only key is not a direct provider and has no direct-BYOK display name.
+    if (isLegacyOnlyByokProviderId(id)) return [];
     return [{ id, name: DIRECT_BYOK_PROVIDERS_META[id] }];
   });
 
@@ -73,18 +86,19 @@ const GATEWAY_BYOK_PROVIDERS_LIST: readonly ByokProviderOption[] =
 
 export const BYOK_PROVIDERS: readonly ByokProviderOption[] = [
   ...DIRECT_BYOK_PROVIDERS_LIST,
+  ...LEGACY_ONLY_BYOK_PROVIDERS,
   ...VERCEL_BYOK_PROVIDERS,
   ...GATEWAY_BYOK_PROVIDERS_LIST,
 ].toSorted((a, b) => a.name.localeCompare(b.name));
 
 /**
  * The providers a key can be added for, in the order the pickers show them: every
- * provider except the deprecated Codestral-only key, which only serves a key that
- * already exists. The experimental direct providers are filtered per owner at the
+ * provider except the legacy-only keys, which only serve a key that already
+ * exists. The experimental direct providers are filtered per owner at the
  * call site, because their entitlement belongs to the organization.
  */
 export const ADD_BYOK_PROVIDERS: readonly ByokProviderOption[] = BYOK_PROVIDERS.filter(
-  provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
+  provider => !isLegacyOnlyByokProviderId(provider.id)
 );
 
 export function getByokProviderDisplayName(providerId: string): string {

@@ -146,6 +146,21 @@ describe('mapVercelModelIdToOpenRouter', () => {
     );
   });
 
+  it('maps a Vercel free model back to the OpenRouter free id of its override', () => {
+    const freeOverrides = new Map([
+      ['nvidia/nemotron-3.5-lightning:free', 'nvidia/nemotron-3.5-lightning-free'],
+    ]);
+    expect(mapVercelModelIdToOpenRouter('nvidia/nemotron-3.5-lightning-free', freeOverrides)).toBe(
+      'nvidia/nemotron-3.5-lightning:free'
+    );
+    expect(mapResolvedModelIdToVercel('nvidia/nemotron-3.5-lightning:free', freeOverrides)).toBe(
+      'nvidia/nemotron-3.5-lightning-free'
+    );
+    expect(mapResolvedModelIdToVercel('nvidia/nemotron-3.5-lightning', freeOverrides)).toBe(
+      'nvidia/nemotron-3.5-lightning'
+    );
+  });
+
   it('returns undefined when an override sends the reversed id to another Vercel model', () => {
     expect(
       mapVercelModelIdToOpenRouter('alibaba/qwen-max', new Map([['qwen/qwen-max', 'other/model']]))

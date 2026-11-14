@@ -132,6 +132,33 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
+  it('stops naming a session when the tray rows arrive without titles', () => {
+    const { sink } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    publisher.handleSessions(
+      [
+        { status: 'idle', title: 'Older session', updatedAt: '2026-01-01T00:00:00.000Z' },
+        { status: 'question', title: 'Newest session', updatedAt: '2026-01-02T00:00:00.000Z' },
+      ],
+      PUB_CTX
+    );
+    expect(getSurfaceExtras().newestSessionTitle).toBe('Newest session');
+
+    // Same rows, same statuses and timestamps: the counts and the wait anchor
+    // are identical, and only the name is gone. The surface extras must still
+    // stop naming a session, because the tray can no longer name one — nothing
+    // may leave the stale name on the widget.
+    publisher.handleSessions(
+      [
+        { status: 'idle', updatedAt: '2026-01-01T00:00:00.000Z' },
+        { status: 'question', updatedAt: '2026-01-02T00:00:00.000Z' },
+      ],
+      PUB_CTX
+    );
+    expect(getSurfaceExtras().newestSessionTitle).toBeNull();
+    publisher.dispose();
+  });
+
   it('starts the activity immediately on the first eligible emit', () => {
     vi.useFakeTimers();
     const { sink, calls } = makeSink();

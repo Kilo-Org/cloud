@@ -9,6 +9,7 @@ import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { cn } from '@/lib/utils';
 
 type ChoiceRowProps = {
@@ -63,12 +64,7 @@ export function ChoiceRow({
   // not restore the derived name once the state clears.
   const namedParts =
     children == null ? [label, description].flatMap(part => (part ? [part] : [])) : [];
-  // The check is the row's only non-text affordance, so a disabled row dims it
-  // instead of dimming the copy, whose caption is read.
-  let checkColor = 'transparent';
-  if (selected) {
-    checkColor = disabled ? colors.mutedForeground : colors.foreground;
-  }
+  const checkColor = selected ? selectionCheckColor(colors, disabled) : 'transparent';
 
   return (
     <Pressable

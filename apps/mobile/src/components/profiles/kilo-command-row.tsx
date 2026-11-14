@@ -1,7 +1,7 @@
 import { sessionLiveText } from '@kilocode/session-ingest-contracts';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, useColorScheme, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
@@ -83,13 +83,6 @@ export function KiloCommandRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const preview = useMemo(() => templatePreview(template), [template]);
-  // Same signal `useThemeColors` reads. The dark palette's `primaryForeground`
-  // is near-black, so an off switch drawn from it put a dark thumb on a dark
-  // track over the dark card; the off state asks for a light thumb on a track
-  // that stands off the card in both schemes.
-  const isDark = useColorScheme() === 'dark';
-  const offTrackColor = isDark ? colors.mutedForeground : colors.mutedSoft;
-  const offThumbColor = isDark ? colors.foreground : colors.primaryForeground;
   const controlClass = (disabled: boolean) =>
     cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
   const visibleName = `/${name}`;
@@ -133,8 +126,6 @@ export function KiloCommandRowView({
           accessibilityLabel={visibleName}
           disabled={onToggle === undefined}
           onValueChange={onToggle}
-          trackColor={{ false: offTrackColor, true: colors.primary }}
-          thumbColor={enabled ? colors.primaryForeground : offThumbColor}
         />
       </View>
       {onMoveUp !== undefined ||

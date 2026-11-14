@@ -15,6 +15,7 @@ import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
@@ -244,7 +245,7 @@ export default function RepoPickerScreen() {
                     {repo.fullName}
                   </Text>
                 </View>
-                {isSelected ? <Check size={18} color={colors.primary} /> : null}
+                {isSelected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
               </Pressable>
             );
           })}

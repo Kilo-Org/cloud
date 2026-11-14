@@ -186,6 +186,19 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
 
 /**
+ * The box an in-field clear control renders at the end of a search field.
+ *
+ * The control sits inside the field's content box next to its `TextInput`, so
+ * this box carries `DESIGN.md:364`'s 44pt target on its own node rather than
+ * through `hitSlop`: `hitSlop` grows the touch region but not the frame an
+ * accessibility audit reads, and a reach toward the input would take taps the
+ * field itself should get. 44pt is also the shared single-line `Input`'s
+ * `min-h-[44px]`, so a field whose content height that input already sets keeps
+ * its height, and the box has no side-dependent slop to resolve in RTL.
+ */
+export const FIELD_CLEAR_BOX_CLASS = 'h-[44px] w-[44px] items-center justify-center';
+
+/**
  * Per-side `hitSlop` of the shared `Button`'s compact size (`sm`), whose
  * `min-h-[36px]` frame stays the visual height. 5, not 4: a 36dp frame at
  * density 420 renders 35.81dp, and 4 per side then lands on 43.81dp — under

@@ -4,9 +4,11 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { FIELD_CLEAR_BOX_CLASS, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerRow } from '@/lib/model-picker-rows';
 import { type ModelPickerBridge } from '@/lib/picker-bridge';
+import { compiledDimensions } from '@/test/native-dimensions';
 
 import { ModelPickerContent } from './model-picker-content';
 
@@ -489,6 +491,76 @@ describe('ModelPickerContent deferred search', () => {
     // Clearing drops the query the rows derive from and hides the affordance.
     expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
     expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('lays the clear control out as its own target frame inside the field', async () => {
+    const renderer = await mount();
+    // The rounded field row: its height comes from the input's own
+    // `min-h-[44px]`, so comparing the row's class list across states proves
+    // the control's reveal cannot move the field.
+    const emptyFieldRows = findByType(renderer.root, 'View').filter(node =>
+      String(node.props.className).includes('rounded-full')
+    );
+    expect(emptyFieldRows).toHaveLength(1);
+    const emptyFieldClass = String(emptyFieldRows[0]?.props.className);
+    expect(emptyFieldClass).toContain('rounded-full');
+
+    // Nothing typed: no control. The frame an audit measures is a node's own
+    // box, and `hitSlop` never grows it, so a typed query must render a control
+    // whose box is the target.
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+
+    const clears = clearSearchButtons(renderer);
+    expect(clears).toHaveLength(1);
+    const [clear] = clears;
+    if (!clear) {
+      throw new Error('clear affordance not found');
+    }
+
+    // One box width/height pair only: compiling the class is what proves the
+    // real box, so a second, conflicting pair cannot hide behind the order
+    // Tailwind emits its rules in. The exported box carries the whole
+    // `h-[44px] w-[44px] items-center justify-center` quartet, whose literal
+    // pixel pair is pinned in `tap-target.test.ts`.
+    expect(clear.props.className).toContain(FIELD_CLEAR_BOX_CLASS);
+    // No slop at all: the box already reaches the target, and a reach across
+    // the row's `gap-2` toward the input would take the field's own taps.
+    expect(clear.props.hitSlop).toBeUndefined();
+
+    // The compiled box, not its class text, is what the control lays out.
+    const declarations = (await compiledDimensions(clear.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    expect(box.height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+
+    // Placement is the call site's logical trailing margin, not a physical one:
+    // `-me-3` is the pill's own `px-3` (10.5pt at the app's 14pt rem), so the
+    // box's trailing edge lands on the pill's edge and the whole box stays
+    // inside the pill's frame, and RTL mirrors it with the row instead of
+    // pushing the box onto the wrong side. `compiledDimensions` compiles only
+    // `h` / `w` / `min-h` / `min-w`, so the margin is a class check.
+    expect(clear.props.className).toContain('-me-3');
+    expect(clear.props.className).not.toMatch(/-m[rl]-/);
+
+    // Same field row in both states: revealing the control leaves the class
+    // list — and so the height the input's `min-h-[44px]` sets — untouched.
+    const typedFieldRows = findByType(renderer.root, 'View').filter(node =>
+      String(node.props.className).includes('rounded-full')
+    );
+    expect(typedFieldRows).toHaveLength(1);
+    expect(String(typedFieldRows[0]?.props.className)).toBe(emptyFieldClass);
 
     act(() => {
       renderer.unmount();

@@ -13,7 +13,7 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -281,14 +281,23 @@ export function ModelPickerContent() {
               ) : null}
             </View>
             {/* In-field clear, on every platform: `clearButtonMode` is iOS
-                only, so Android rendered the query with no way to reset it. */}
+                only, so Android rendered the query with no way to reset it.
+                The frame, not the 16pt glyph, is what an accessibility audit
+                reads, so the control renders a box that carries the 44pt target
+                on its own node. It adds no `hitSlop`: the box already reaches
+                the target, and a reach across `gap-2` would take taps the
+                search field should get. 44 is also the `Input` box's own
+                minimum height, so the field keeps its height. `-me-3` (the
+                pill's own `px-3`) puts the box's trailing edge on the pill's
+                edge, so the glyph keeps nearly its old inset and the whole box
+                stays inside the pill's frame, where iOS still delivers a tap;
+                it is a logical margin, so RTL mirrors it with the row. */}
             {search.length > 0 ? (
               <Pressable
                 onPress={handleClearSearch}
                 accessibilityLabel={t('common.clearSearch')}
                 accessibilityRole="button"
-                hitSlop={12}
-                className="active:opacity-70"
+                className={`${FIELD_CLEAR_BOX_CLASS} -me-3 active:opacity-70`}
               >
                 <X size={16} color={colors.mutedForeground} />
               </Pressable>

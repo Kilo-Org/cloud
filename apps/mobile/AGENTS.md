@@ -167,6 +167,9 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
+- Module state that belongs to a scope carries that scope's identity with the value, and every async result checks the identity it started under before it publishes: a reply for another account, or for a request a newer one replaced, must reach only its own caller.
+- A scope's value is never "the last one" and is never matched by its own content: no module-level `last…`/`current…`/`generation` fence around scoped state, and no classifying an `onChangeText` value as programmatic by comparing text.
+- State that must outlive the process (a token a row was written with, a retired attempt) is persisted and retired by writing a tombstone, not by a delete whose failure nobody awaits.
 
 ## React Native Rules
 

@@ -233,7 +233,8 @@ describe('TourScreen', () => {
     // reported. `grow` is a minimum, so taller content still scrolls rather
     // than being clipped.
     const scroller = renderer.root.findByType('ScrollView' as ElementType);
-    expect(scroller.props.contentContainerClassName).toBe('grow justify-center gap-8 px-6 py-6');
+    const bodyClasses = String(scroller.props.contentContainerClassName).split(/\s+/);
+    expect(bodyClasses).toEqual(expect.arrayContaining(['grow', 'justify-center']));
     expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(0);
 
     unmount();

@@ -312,7 +312,14 @@ export function SessionContextSheet({
           them behind a single ScrollView accessibilityLabel would shadow the
           natural read order. */}
       <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-        <View className="items-center gap-3 pt-2">
+        {/* The ring sits beside its value, not above it. Stacked, the ring held
+            the sheet's first text a ring-height down the scroll content, which
+            the design gate reads as empty space under the title: the ring draws
+            nothing the accessibility tree reports. Side by side, the ring fills
+            the row and the value centres on the ring's own middle, so the pair
+            reads as one figure and neither half floats off its partner's
+            centre. */}
+        <View className="flex-row items-center justify-center gap-3 pt-2">
           <ContextUsageRing
             size={SHEET_RING_SIZE}
             strokeWidth={SHEET_RING_STROKE}

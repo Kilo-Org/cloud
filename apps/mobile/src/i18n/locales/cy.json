@@ -1420,11 +1420,11 @@
       "activity": "Gweithgaredd"
     },
     "providerConnect": {
-      "githubApp": "Ap GitHub",
+      "githubApp": "yr ap GitHub",
       "githubError": "Ni ellid agor y broses sefydlu GitHub. Ceisiwch eto.",
-      "gitlabAccount": "Cyfrif GitLab",
+      "gitlabAccount": "y cyfrif GitLab",
       "gitlabError": "Ni ellid agor y broses sefydlu GitLab. Ceisiwch eto.",
-      "description": "Cysylltwch {{label}} Kilo i adolygu ceisiadau tynnu'n awtomatig.",
+      "description": "Cysylltwch {{label}} â Kilo i adolygu ceisiadau tynnu'n awtomatig.",
       "bitbucketError": "Ni ellid agor y broses sefydlu Bitbucket. Ceisiwch eto."
     },
     "overview": {

@@ -1397,9 +1397,9 @@
       "activity": "Attività"
     },
     "providerConnect": {
-      "githubApp": "App ta' GitHub",
+      "githubApp": "l-App ta' GitHub",
       "githubError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova.",
-      "gitlabAccount": "Kont ta' GitLab",
+      "gitlabAccount": "il-Kont ta' GitLab",
       "gitlabError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitLab. Jekk jogħġbok erġa' pprova.",
       "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament.",
       "bitbucketError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' Bitbucket. Jekk jogħġbok erġa' pprova."

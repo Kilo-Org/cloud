@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { REMOTE_MCP_SERVERS_KEY, SETTINGS_TOOLS_ENABLED_KEY } from '@/lib/storage-keys';
+
 import {
   addChatBackend,
   clearChatBackends,
@@ -11,12 +14,14 @@ import {
  *
  * The places remembered for a chat scope are cached so the same account and
  * organization answer with the same object — a fresh one each render would
- * re-run the open effect. The Kilo MCP connection is cached for the same
- * reason and carries the same secret: tools discovered with one account's
- * token. The remote MCP connection and the servers stored behind it carry that
- * secret too, and the settings-tools group switch is account-scoped. All of
- * them are dropped with the chats rather than kept for the next person to sign
- * in.
+ * re-run the open effect. The remote MCP connection and the servers stored
+ * behind it carry a secret, the settings-tools group switch is account-scoped,
+ * and the per-chat web-search choice belongs to a chat that is going away. All
+ * of them are dropped with the chats rather than kept for the next person to
+ * sign in.
+ *
+ * The Kilo MCP connection is dropped here too; its cache is tested beside it,
+ * in `kilo-mcp.test.ts`.
  */
 
 vi.mock('./registry', () => ({
@@ -27,41 +32,49 @@ vi.mock('./store', () => ({
   wipeChats: vi.fn(() => ['gone']),
 }));
 
+// `sign-out.ts` imports this module. Stub it so the Kilo MCP cache and its
+// client stay out of a test that owns the account boundary.
 vi.mock('./kilo-mcp', () => ({
   forgetKiloMcp: vi.fn(),
   forgetMcpEnabled: vi.fn().mockResolvedValue(undefined),
 }));
 
-const storedQuestions = vi.hoisted(() => new Map<string, string>());
+// One in-test disk behind the encrypted-kv boundary. The per-chat preferences
+// a boundary module writes land here, so a test waits on the stored value
+// instead of on a number of event-loop turns. Each mock returns a settled
+// promise, because an `async` arrow with nothing to await fails the linter.
+const encryptedKv = vi.hoisted(() => new Map<string, string>());
 vi.mock('@/lib/persist/encrypted-kv', () => ({
-  encryptedDatabase: async () => {
-    await Promise.resolve();
-    return {};
+  encryptedDatabase: () => Promise.resolve({}),
+  getItem: (scope: string, key: string) =>
+    Promise.resolve(encryptedKv.get(`${scope}:${key}`) ?? null),
+  setItem: (scope: string, key: string, value: string) => {
+    encryptedKv.set(`${scope}:${key}`, value);
+    return Promise.resolve();
   },
-  getItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    return storedQuestions.get(`${scope}:${key}`) ?? null;
-  },
-  setItem: async (scope: string, key: string, value: string) => {
-    await Promise.resolve();
-    storedQuestions.set(`${scope}:${key}`, value);
-  },
-  removeItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    storedQuestions.delete(`${scope}:${key}`);
+  removeItem: (scope: string, key: string) => {
+    encryptedKv.delete(`${scope}:${key}`);
+    return Promise.resolve();
   },
 }));
 
 // The remote MCP store and the settings-tools switch ride on the shared
 // SecureStore preference, which pulls sonner-native -> react-native (Flow
-// `import typeof`) into the node test environment. Mock the native boundaries
-// so the real stores under test can be seeded, read and cleared.
-const secureStore = vi.hoisted(() => ({
-  getItemAsync: vi.fn().mockResolvedValue(null),
-  setItemAsync: vi.fn().mockResolvedValue(undefined),
-  deleteItemAsync: vi.fn().mockResolvedValue(undefined),
+// `import typeof`) into the node test environment. Mock the native boundary
+// with an in-test disk: the real stores under test can be seeded, read and
+// cleared, and a test can wait until a write has landed.
+const secureStore = vi.hoisted(() => ({ disk: new Map<string, string>() }));
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: (key: string) => Promise.resolve(secureStore.disk.get(key) ?? null),
+  setItemAsync: (key: string, value: string) => {
+    secureStore.disk.set(key, value);
+    return Promise.resolve();
+  },
+  deleteItemAsync: (key: string) => {
+    secureStore.disk.delete(key);
+    return Promise.resolve();
+  },
 }));
-vi.mock('expo-secure-store', () => secureStore);
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
@@ -72,14 +85,14 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 
 const { chatPlaceOf, forgetChatPlaces } = await import('./scope');
-const { forgetKiloMcp, forgetMcpEnabled } = await import('./kilo-mcp');
-const { addRemoteMcpServer, clearRemoteMcpServers, listRemoteMcpServers } =
+const { addRemoteMcpServer, clearRemoteMcpServers, listRemoteMcpServers, parseRemoteMcpServers } =
   await import('./remote-mcp-store');
 const { remoteMcpState } = await import('./remote-mcp');
 const { clearSettingsToolsEnabled, isSettingsToolsEnabled, setSettingsToolsEnabled } =
   await import('./settings-tools-switch');
 const { clearChatsForSignOut, releaseChatsForAccountSwitch } = await import('./sign-out');
 const { askedIn, rememberAsked } = await import('./pending');
+const { setWebSearchEnabled, webSearchEnabledFor } = await import('./web-search-setting');
 
 /** A remote server the account added, so the clears have something to drop. */
 function addServer(): void {
@@ -91,19 +104,29 @@ function addServer(): void {
   });
 }
 
-// A preference becomes visible (and refreshes the snapshots built from it) once
-// its write lands, so the tests let the queued write settle before asserting.
-async function settlePreferences(): Promise<void> {
-  await new Promise<void>(resolve => {
-    setImmediate(resolve);
+/**
+ * Seeds the two secured preferences the boundary drops, and waits until both
+ * writes are on the fake disk and both stores have published them: a clear can
+ * only be shown to erase a value that landed first.
+ */
+async function seedSecuredPreferences(): Promise<void> {
+  addServer();
+  setSettingsToolsEnabled(false);
+  await vi.waitFor(() => {
+    expect(
+      parseRemoteMcpServers(secureStore.disk.get(REMOTE_MCP_SERVERS_KEY) ?? null)
+    ).toHaveLength(1);
+    expect(secureStore.disk.get(SETTINGS_TOOLS_ENABLED_KEY)).toBe('false');
+    // A store publishes one microtask after its write lands.
+    expect(listRemoteMcpServers()).toHaveLength(1);
+    expect(remoteMcpState()).toHaveLength(1);
   });
 }
 
 beforeEach(() => {
   forgetChatPlaces();
-  storedQuestions.clear();
-  vi.mocked(forgetKiloMcp).mockClear();
-  vi.mocked(forgetMcpEnabled).mockClear();
+  encryptedKv.clear();
+  secureStore.disk.clear();
   clearRemoteMcpServers();
   clearSettingsToolsEnabled();
   clearChatBackends();
@@ -125,26 +148,6 @@ describe('the places remembered for a chat scope', () => {
     await releaseChatsForAccountSwitch();
 
     expect(chatPlaceOf('user-1', 'org-1')).not.toBe(before);
-  });
-});
-
-describe('the Kilo MCP connection', () => {
-  it('is dropped when the account signs out', async () => {
-    await clearChatsForSignOut('user-1');
-
-    expect(forgetKiloMcp).toHaveBeenCalledTimes(1);
-  });
-
-  it('is dropped when another account signs in', async () => {
-    await releaseChatsForAccountSwitch();
-
-    expect(forgetKiloMcp).toHaveBeenCalledTimes(1);
-  });
-
-  it('takes the per-chat settings of the wiped chats with it', async () => {
-    await clearChatsForSignOut('user-1');
-
-    expect(forgetMcpEnabled).toHaveBeenCalledWith(['gone']);
   });
 });
 
@@ -195,11 +198,28 @@ describe('remembered question targets', () => {
   });
 });
 
+describe('the per-chat web-search choice', () => {
+  it('is dropped with the wiped chats and left on the chats that stay', async () => {
+    await setWebSearchEnabled('gone', false);
+    await setWebSearchEnabled('kept', false);
+    // Off differs from the default of a Kilo model, so a setting that did not
+    // land cannot read as off here.
+    expect(await webSearchEnabledFor('gone', 'kilo/one')).toBe(false);
+    expect(await webSearchEnabledFor('kept', 'kilo/one')).toBe(false);
+
+    await clearChatsForSignOut('user-1');
+
+    // The wiped chat reads the default of the model its next question goes to,
+    // which a stored choice of off cannot produce. The chat of another account
+    // keeps the choice it made.
+    expect(await webSearchEnabledFor('gone', 'kilo/one')).toBe(true);
+    expect(await webSearchEnabledFor('kept', 'kilo/one')).toBe(false);
+  });
+});
+
 describe('the remote MCP connection and its stored servers', () => {
   it('are dropped when the account signs out', async () => {
-    addServer();
-    setSettingsToolsEnabled(false);
-    await settlePreferences();
+    await seedSecuredPreferences();
     expect(listRemoteMcpServers()).toHaveLength(1);
     expect(remoteMcpState()).toHaveLength(1);
     expect(isSettingsToolsEnabled()).toBe(false);
@@ -211,12 +231,15 @@ describe('the remote MCP connection and its stored servers', () => {
     // The group switch is account-scoped: the next account starts from its
     // default rather than inheriting the previous account's choice.
     expect(isSettingsToolsEnabled()).toBe(true);
+    // The erase reaches the disk, not only the snapshots the screens read.
+    await vi.waitFor(() => {
+      expect(secureStore.disk.has(REMOTE_MCP_SERVERS_KEY)).toBe(false);
+      expect(secureStore.disk.has(SETTINGS_TOOLS_ENABLED_KEY)).toBe(false);
+    });
   });
 
   it('are dropped when another account signs in', async () => {
-    addServer();
-    setSettingsToolsEnabled(false);
-    await settlePreferences();
+    await seedSecuredPreferences();
     expect(listRemoteMcpServers()).toHaveLength(1);
     expect(remoteMcpState()).toHaveLength(1);
 
@@ -225,6 +248,10 @@ describe('the remote MCP connection and its stored servers', () => {
     expect(listRemoteMcpServers()).toEqual([]);
     expect(remoteMcpState()).toEqual([]);
     expect(isSettingsToolsEnabled()).toBe(true);
+    await vi.waitFor(() => {
+      expect(secureStore.disk.has(REMOTE_MCP_SERVERS_KEY)).toBe(false);
+      expect(secureStore.disk.has(SETTINGS_TOOLS_ENABLED_KEY)).toBe(false);
+    });
   });
 });
 

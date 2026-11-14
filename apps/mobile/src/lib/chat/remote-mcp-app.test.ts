@@ -1,3 +1,6 @@
+// eslint-disable-next-line import/no-nodejs-modules -- runs the page's own script in a node context
+import { createContext, runInContext } from 'node:vm';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -220,6 +223,60 @@ describe('the document a view draws', () => {
   });
 });
 
+type FrameWindow = { postMessage: (data: unknown, targetOrigin: string) => void };
+
+/** The iframe the page owns: the document it swaps in, and no URL of its own. */
+type Frame = { contentWindow: FrameWindow | null; srcdoc: string; src?: string };
+
+/** The seam the app calls on the page, and the event a stray message arrives as. */
+type Host = { mount: (html: string) => void; deliver: (text: string) => void };
+type RelayEvent = { source?: unknown; data?: unknown };
+
+/**
+ * The page as a webview runs it: its own script in a fresh context over one
+ * iframe, one bridge and the listeners it registers.
+ */
+const runPage = () => {
+  const script = /<script>([\s\S]*)<\/script>/.exec(VIEW_HOST_PAGE)?.[1] ?? '';
+  const posted: string[] = [];
+  const delivered: { data: unknown; targetOrigin: string }[] = [];
+  const listeners: ((event: RelayEvent) => void)[] = [];
+  const frameWindow: FrameWindow = {
+    postMessage: (data, targetOrigin) => {
+      delivered.push({ data, targetOrigin });
+    },
+  };
+  const frame: Frame = { contentWindow: frameWindow, srcdoc: '' };
+  const sandbox: Record<string, unknown> = {
+    document: { getElementById: (id: string) => (id === 'view' ? frame : null) },
+    ReactNativeWebView: {
+      postMessage: (text: string) => {
+        posted.push(text);
+      },
+    },
+    addEventListener: (type: string, listener: (event: RelayEvent) => void) => {
+      if (type === 'message') {
+        listeners.push(listener);
+      }
+    },
+  };
+  const context = createContext(sandbox);
+  // The page reads `window` as itself, the way a webview's global object is.
+  runInContext(`window = globalThis;\n${script}`, context);
+  return {
+    host: sandbox.kiloMcpHost as Host,
+    frame,
+    frameWindow,
+    posted,
+    delivered,
+    emit: (event: RelayEvent) => {
+      for (const listener of listeners) {
+        listener(event);
+      }
+    },
+  };
+};
+
 describe('the page a view is drawn in', () => {
   it('runs the view in a sandbox that can script and nothing else', () => {
     expect(VIEW_HOST_PAGE).toContain('sandbox="allow-scripts"');
@@ -234,17 +291,34 @@ describe('the page a view is drawn in', () => {
     }
   });
 
-  it('relays only the sandbox’s own messages, and posts them as text', () => {
-    expect(VIEW_HOST_PAGE).toContain('event.source !== view.contentWindow');
-    expect(VIEW_HOST_PAGE).toContain('window.ReactNativeWebView.postMessage(text)');
+  it('draws the resource document into the frame, and gives it no URL to fetch', () => {
+    const page = runPage();
+    page.host.mount('<p>halo</p>');
+    expect(page.frame.srcdoc).toBe('<p>halo</p>');
+    // The view cannot reach the network on its own say.
+    expect(page.frame.src).toBeUndefined();
+    expect(MAX_VIEW_BYTES).toBeGreaterThan(0);
   });
 
-  it('is the only document the webview loads, and it loads it as a file', () => {
-    // The sandbox's document comes from the resource, not from a URL the page
-    // fetches: `srcdoc` is what keeps the view from reaching the network on
-    // its own say.
-    expect(VIEW_HOST_PAGE).toContain('view.srcdoc = html');
-    expect(MAX_VIEW_BYTES).toBeGreaterThan(0);
+  it('relays only the frame’s own messages, and posts them as text', () => {
+    const page = runPage();
+    page.emit({ source: {}, data: 'x' });
+    expect(page.posted).toEqual([]);
+    page.emit({ source: undefined, data: 'x' });
+    expect(page.posted).toEqual([]);
+    page.emit({ source: page.frameWindow, data: 'hello' });
+    expect(page.posted).toEqual(['hello']);
+    page.emit({ source: page.frameWindow, data: { kind: 'chart' } });
+    expect(page.posted).toEqual(['hello', '{"kind":"chart"}']);
+  });
+
+  it('delivers a bridge message into the frame, and nothing while no frame is there', () => {
+    const page = runPage();
+    page.host.deliver('{"kind":"chart"}');
+    expect(page.delivered).toEqual([{ data: { kind: 'chart' }, targetOrigin: '*' }]);
+    page.frame.contentWindow = null;
+    page.host.deliver('{"kind":"chart"}');
+    expect(page.delivered).toHaveLength(1);
   });
 });
 

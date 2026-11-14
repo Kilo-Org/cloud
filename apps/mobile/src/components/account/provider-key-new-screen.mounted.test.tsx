@@ -86,12 +86,23 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 const FIELD = 'FormField' as ElementType;
 const BUTTON = 'Button' as ElementType;
 
+/** A tRPC client rejection, carrying the `data.code` the screen reads. */
+function serverRefusal(code: string, message: string): Error {
+  return Object.assign(new Error(message), { data: { code, message } });
+}
+
 let renderer: ReactTestRenderer | undefined = undefined;
 
 async function mount() {
   const view = await renderWithProviders(createElement(ProviderKeyNewScreen));
   renderer = view.renderer;
   return view.renderer.root;
+}
+
+function statusMessages(root: ReactTestRenderer['root']) {
+  return root
+    .findAll(node => Object.is(node.type, 'AccessibleStatus'))
+    .map(node => node.props.message);
 }
 
 function apiKeyField(root: ReactTestRenderer['root']) {
@@ -166,18 +177,67 @@ describe('ProviderKeyNewScreen', () => {
     expect(state.toastError).toHaveBeenCalledWith('Enter the key.');
   });
 
-  it('reports a refused key in place and stays on the form', async () => {
+  it('reports a duplicate key in place and stays on the form', async () => {
     const root = await mount();
     submit(root, 'sk-test-123');
 
     act(() => {
-      state.mutations[0]?.onError?.(new Error('That key was rejected by the provider'));
+      state.mutations[0]?.onError?.(
+        serverRefusal('CONFLICT', 'A key for this provider already exists')
+      );
     });
 
-    expect(
-      root.findAll(node => Object.is(node.type, 'AccessibleStatus')).map(node => node.props.message)
-    ).toEqual(['That key was rejected by the provider']);
+    expect(statusMessages(root)).toEqual([
+      'You already have a key for this provider. Remove it before you add another.',
+    ]);
     expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a key the provider format rejects', async () => {
+    const root = await mount();
+    submit(root, 'sk-test-123');
+
+    act(() => {
+      state.mutations[0]?.onError?.(
+        serverRefusal('UNPROCESSABLE_CONTENT', 'The key does not match the provider format')
+      );
+    });
+
+    expect(statusMessages(root)).toEqual([
+      'This key is not in the format this provider expects. Check it and try again.',
+    ]);
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a provider key the coding plan manages as read-only', async () => {
+    const root = await mount();
+    submit(root, 'sk-test-123');
+
+    act(() => {
+      state.mutations[0]?.onError?.(
+        serverRefusal('PRECONDITION_FAILED', "Your coding plan manages this provider's key")
+      );
+    });
+
+    expect(statusMessages(root)).toEqual([
+      "A coding plan manages this provider's key, and the key is read-only. Cancel the coding plan to add your own.",
+    ]);
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a store failure in its own words for a transport or server fault', async () => {
+    const root = await mount();
+    submit(root, 'sk-test-123');
+
+    act(() => {
+      state.mutations[0]?.onError?.(new Error('Network request failed'));
+    });
+    expect(statusMessages(root)).toEqual(['The key could not be saved. Try again.']);
+
+    act(() => {
+      state.mutations[0]?.onError?.(serverRefusal('INTERNAL_SERVER_ERROR', 'KMS unavailable'));
+    });
+    expect(statusMessages(root)).toEqual(['The key could not be saved. Try again.']);
   });
 
   it('drops the saved key so it cannot be sent twice', async () => {

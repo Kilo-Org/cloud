@@ -298,9 +298,12 @@ export class ScimSyncDO extends DurableObject<Env> {
   }
 
   /**
-   * Expires the parked rows past `PARKED_EVENT_RETENTION_MS`. One statement, so
-   * a failed tick removes nothing and the next one retries with a later cutoff;
-   * the alarm's guard owns the logging.
+   * Expires the parked rows past `PARKED_EVENT_RETENTION_MS`.
+   *
+   * The helper counts and then deletes, both inside this synchronous turn, so
+   * nothing can park a row between them. A throw during either leaves the rows
+   * in place for the next tick, which retries with a later cutoff; the alarm's
+   * guard owns the logging.
    */
   private pruneParkedEvents(): void {
     const removed = state.pruneParkedEvents(this.db, Date.now());

@@ -130,6 +130,22 @@ describe('CreateOrganizationScreen', () => {
     unmount();
   });
 
+  it('refuses a name of only invisible characters without a request', async () => {
+    const { renderer, unmount } = await mount();
+
+    // `String.prototype.trim` keeps zero-width spaces, so the old gate called
+    // this a name; the server's visible-character rule refuses it.
+    await type(renderer, '\u200B\u200B\u200B');
+    expect(submitOf(renderer).props.disabled).toBe(true);
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(mocks.createMutate).not.toHaveBeenCalled();
+    expect(texts(renderer)).toContain('Enter an organization name.');
+    unmount();
+  });
+
   it('creates with the trimmed name, selects the new organization and lands on its hub', async () => {
     mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
     const { renderer, unmount } = await mount();

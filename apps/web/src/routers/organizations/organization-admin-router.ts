@@ -49,6 +49,7 @@ import {
   mutateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { TRPCError } from '@trpc/server';
@@ -135,7 +136,11 @@ const OrganizationSearchResultSchema = z.object({
 });
 
 const OrganizationCreateInputSchema = z.object({
-  name: z.string().min(1, 'Organization name is required').trim(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Organization name is required')
+    .refine(hasVisibleText, 'Organization name is required'),
   parentOrganizationId: z.uuid().nullable().optional(),
 });
 

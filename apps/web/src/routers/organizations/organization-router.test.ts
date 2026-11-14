@@ -1012,6 +1012,27 @@ describe('organizations trpc router', () => {
         })
       ).rejects.toThrow('Organization name is required');
 
+      // Test with a name made only of zero-width spaces: `trim()` keeps them,
+      // so the row it would write renders blank.
+      const beforeZeroWidth = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+      const previousName = beforeZeroWidth[0].name;
+
+      await expect(
+        caller.organizations.update({
+          organizationId: testOrganization.id,
+          name: '\u200B\u200B\u200B',
+        })
+      ).rejects.toThrow('Organization name is required');
+
+      const afterZeroWidth = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+      expect(afterZeroWidth[0].name).toBe(previousName);
+
       // Test with name that's too long (over 100 characters)
       const longName = 'a'.repeat(101);
       await expect(

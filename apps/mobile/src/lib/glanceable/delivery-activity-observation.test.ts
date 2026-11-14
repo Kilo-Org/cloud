@@ -78,8 +78,9 @@ describe('observeActivity', () => {
     const observation = emptyActivityObservation(new Set<string>());
     const target = createTarget();
     const registered: string[] = [];
-    const registerToken = async (_registration: Registration, token: string) => {
+    const registerToken = (_registration: Registration, token: string): Promise<void> => {
       registered.push(token);
+      return Promise.resolve();
     };
     let reads = 0;
     const listeners = new Set<(event: { activityId: string; pushToken: string }) => void>();

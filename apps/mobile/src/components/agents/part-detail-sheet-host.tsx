@@ -7,9 +7,9 @@ import { OpenPartDetailContext } from './open-part-detail-context';
 import { findPartById } from './part-detail-model';
 import { PartDetailSheet } from './part-detail-sheet';
 import {
+  isSheetVisible,
   type PartDetailEvent,
   type PartDetailPhase,
-  isSheetVisible,
   presentedPartId,
   reducePartDetailPhase,
 } from './part-detail-sheet-phase';

@@ -184,8 +184,10 @@ describe('the saved-list load failure', () => {
           .findAll(node => (node.type as string) === 'Text')
           .some(node => node.props.children === 'Try again')
       );
-    expect(retry).toBeDefined();
-    (retry?.props.onPress as () => void)();
+    if (!retry) {
+      throw new Error('the retry control was not rendered');
+    }
+    (retry.props.onPress as () => void)();
 
     expect(store.retryLoad).toHaveBeenCalledTimes(1);
   });

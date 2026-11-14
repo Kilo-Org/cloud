@@ -87,8 +87,8 @@ describe('parseTokenPair', () => {
     });
   });
 
-  it('parses a token without refresh (legacy server)', () => {
-    expect(parseTokenPair({ token: 'abc' })).toEqual({ token: 'abc' });
+  it('returns the token-only pair with an own created key set to undefined', () => {
+    expect(parseTokenPair({ token: 'abc' })).toStrictEqual({ token: 'abc', created: undefined });
   });
 
   it('returns null for an empty object', () => {
@@ -119,10 +119,6 @@ describe('parseTokenPair', () => {
       token: 'abc',
       created: false,
     });
-  });
-
-  it('omits created when the server does not send it', () => {
-    expect(parseTokenPair({ token: 'abc' })).toEqual({ token: 'abc' });
   });
 });
 

@@ -1,6 +1,7 @@
 import { File, Paths } from 'expo-file-system';
 
 import { shareLocalFile } from '@/lib/share-remote-file';
+import { registerTempFile } from '@/lib/temp-file-registry';
 
 import { InvalidSshExportError, parseSshBackup, type SshBackup } from './backup-payload';
 import { nativeErrorCode, sshPackage } from './native';
@@ -29,11 +30,13 @@ export async function shareSshBackup(backup: SshBackup, passphrase: string): Pro
   try {
     await file.write(armored);
     await shareLocalFile(file.uri, { mimeType: 'application/octet-stream' });
-  } finally {
+  } catch (error) {
     if (file.exists) {
       file.delete();
     }
+    throw error;
   }
+  registerTempFile(file.uri);
 }
 
 export async function openSshBackup(armored: string, passphrase: string): Promise<SshBackup> {

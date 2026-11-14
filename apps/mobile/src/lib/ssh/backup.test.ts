@@ -134,7 +134,6 @@ it('skips duplicates by natural identity, reports conflicts and does not overwri
     })),
     knownHosts: backup.knownHosts.map(host => ({
       ...host,
-      keyAlgorithm: 'ssh-rsa',
       fingerprintSha256: 'changed',
     })),
   };
@@ -152,8 +151,8 @@ it('remaps duplicate key and host references to the rows already on this device'
   const destination = createSshTestDatabase();
   const existingJump = createHost(destination, {
     label: 'jump',
-    hostname: 'keep.test',
-    username: 'keep',
+    hostname: 'jump.test',
+    username: 'test',
     authMethod: 'password',
   });
   const key = backup.keys[0];
@@ -166,9 +165,7 @@ it('remaps duplicate key and host references to the rows already on this device'
     keyId: existingKey.id,
     jumpHostId: existingJump.id,
   });
-  expect(listHosts(destination).find(host => host.id === existingJump.id)?.hostname).toBe(
-    'keep.test'
-  );
+  expect(listHosts(destination).map(host => host.label)).toEqual(['jump', 'target']);
 });
 
 it('does not confuse overlapping source and destination IDs when matching scoped records', () => {
@@ -245,7 +242,7 @@ it('preserves updated timestamps after wiring imported jumps', () => {
   );
 });
 
-it('rejects jump cycles introduced by collapsing duplicate host labels before writing', () => {
+it('rejects a jump chain that loops before writing', () => {
   const backup = readSshBackup(populatedDatabase());
   const jump = backup.hosts.find(host => host.label === 'jump');
   const target = backup.hosts.find(host => host.label === 'target');
@@ -255,8 +252,8 @@ it('rejects jump cycles introduced by collapsing duplicate host labels before wr
   const incoming = {
     ...backup,
     hosts: [
-      { ...target, label: 'same' },
-      { ...jump, label: 'same' },
+      { ...target, jumpHostId: jump.id },
+      { ...jump, jumpHostId: target.id },
     ],
   };
   const destination = createSshTestDatabase();

@@ -123,6 +123,10 @@ export function useSshBackupImport(dev?: string) {
       trackSshImport('completed', null);
       await invalidate();
       toast.success(t('ssh.backup.imported'));
+      if (router.canGoBack()) {
+        router.back();
+        return;
+      }
       router.replace(SSH_HOSTS_ROUTE);
     } catch {
       setFailure('storage');

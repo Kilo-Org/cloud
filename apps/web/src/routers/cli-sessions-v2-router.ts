@@ -3100,7 +3100,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     try {
       const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
-      return { share_token: result.share_token };
+      /* Both the token and the capability: the app compares the capability it
+         created with the one a later read reports, so a client can tell its own
+         link from one made elsewhere. */
+      return { share_token: result.share_token, public_id: result.public_id };
     } catch (error) {
       if (error instanceof SessionShareTooLargeError) {
         throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });

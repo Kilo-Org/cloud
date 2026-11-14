@@ -17,7 +17,10 @@ type ShareQueryState = {
   refetch: () => Promise<void>;
 };
 
-type ShareHandler = (created: { share_token: string }) => Promise<void> | void;
+type ShareHandler = (created: {
+  share_token: string;
+  public_id: string | null;
+}) => Promise<void> | void;
 
 /** What the section asks the share mutation to create. */
 type ShareInput = {
@@ -268,7 +271,7 @@ describe('SessionShareSection created link', () => {
       throw new Error('the share mutation was not registered');
     }
     await act(async () => {
-      await onSuccess({ share_token: 'tok_1' });
+      await onSuccess({ share_token: 'tok_1', public_id: 'share_1' });
     });
     return renderer;
   }
@@ -280,7 +283,43 @@ describe('SessionShareSection created link', () => {
     expect(textContent(renderer.root)).toContain('http://localhost:3000/s/tok_1');
   });
 
-  it('drops the link when a later read reports it gone', async () => {
+  it('keeps offering the link while a later read names the same capability', async () => {
+    const renderer = await renderCreatedLink();
+
+    // A read taken after the create that names the same capability: still live.
+    holder.queryState = {
+      ...holder.queryState,
+      data: { public_id: 'share_1' },
+      dataUpdatedAt: Date.now() + 1_000,
+    };
+    rerenderSection(renderer);
+
+    expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(0);
+  });
+
+  it('stops offering Copy for the URL this sheet made when a read names another capability', async () => {
+    /* Rotating the link from another device writes a fresh capability, so the
+       URL this sheet holds is revoked while it still looks live here. Comparing
+       identities is what tells that from the link still being the live one. */
+    const renderer = await renderCreatedLink();
+
+    holder.queryState = {
+      ...holder.queryState,
+      data: { public_id: 'share_2' },
+      dataUpdatedAt: Date.now() + 1_000,
+    };
+    rerenderSection(renderer);
+
+    expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
+    expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-rotate')).toHaveLength(1);
+    // The current link can still be ended, and its confirmation says it is the
+    // current one.
+    expect(findByTestID(renderer.root, 'session-share-revoke')).toHaveLength(1);
+  });
+
+  it('shows the replaced line when a later read reports no link at all', async () => {
     const renderer = await renderCreatedLink();
 
     // A read that started after the create, answering that no link exists: the
@@ -293,7 +332,8 @@ describe('SessionShareSection created link', () => {
     rerenderSection(renderer);
 
     expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
-    expect(findByTestID(renderer.root, 'session-share-create')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-create')).toHaveLength(0);
   });
 
   it('drops the link when the sheet closes', async () => {

@@ -3880,6 +3880,8 @@
       "available": "Tools available: {{count}}",
       "none": "No tools available",
       "noneDescription": "The Kilo server answered with no tools.",
+      "notApplied": "Kilo tools were not added to this chat",
+      "notAppliedDescription": "Your choice is saved. Retry to use it in this chat now.",
       "unreachable": "Couldn't reach Kilo tools",
       "unreachableDescription": "The server did not answer. Check your connection, then try again.",
       "unauthorized": "Kilo tools refused this session",
@@ -4226,6 +4228,7 @@
       "unbindFailed": "Couldn't unbind repo",
       "repoValue": "Repository: {{name}}",
       "profileValue": "Profile: {{name}}",
+      "profileUnavailable": "This profile is no longer available. Choose another one.",
       "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions.",
       "pickerEmptyDescriptionOrganizationReadOnly": "An organization owner or admin can create an organization profile."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Expires in {{duration}}",
     "neverExpires": "Never expires",
     "includesNewMessages": "New messages are included.",
-    "excludesNewMessages": "New messages are excluded."
+    "excludesNewMessages": "New messages are excluded.",
+    "superseded": "This link was replaced somewhere else, so it no longer works."
   },
   "sharedSession": {
     "title": "Shared session",

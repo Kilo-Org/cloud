@@ -72,6 +72,7 @@ const mocks = vi.hoisted(() => ({
   captureEvent: vi.fn(),
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPresentedNotificationsAsync: vi.fn(),
   runNeedsInputInteraction: vi.fn(),
   requireOptionalNativeModule: vi.fn(),
   whenLanguagePreferenceLoaded: vi.fn(),
@@ -105,6 +106,7 @@ vi.mock('expo-notifications', () => ({
   setNotificationHandler: mocks.setNotificationHandler,
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPresentedNotificationsAsync: mocks.getPresentedNotificationsAsync,
   addNotificationResponseReceivedListener: (listener: ResponseListener) => {
     mocks.listeners.add(listener);
     return { remove: () => mocks.listeners.delete(listener) };
@@ -328,6 +330,7 @@ beforeEach(() => {
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.scheduleNotificationAsync.mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockResolvedValue(undefined);
+  mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
   mocks.getNotificationChannelAsync.mockResolvedValue(null);
   mocks.deleteNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -2576,12 +2579,38 @@ describe('foreground attention-push suppression', () => {
       dismiss: [],
       updates: [],
     });
+    // The marker is only a fast path; the OS says the notification is on screen.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: needsInput.notificationIdentifierForSession('ses_1') } },
+    ]);
 
     const behavior = await registration.handleNotification({
       request: { identifier: 'expo-push-remote-1', content: { data: attentionPush } },
     });
     expect(behavior.shouldShowBanner).toBe(false);
     expect(behavior.shouldSetBadge).toBe(false);
+  });
+
+  it('shows a foreground attention push whose app-owned notification the user dismissed', async () => {
+    const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({
+      publish: [postedRow],
+      dismiss: [],
+      updates: [],
+    });
+    // The user swiped the notification away: the marker is stale and must not
+    // suppress the only presentation the raise has left.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
+
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: 'expo-push-remote-1',
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+    expect(mocks.getPresentedNotificationsAsync).toHaveBeenCalled();
   });
 
   it('shows the app-owned needs-input notification even while its session is posted', async () => {

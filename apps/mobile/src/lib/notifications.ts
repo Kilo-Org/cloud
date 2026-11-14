@@ -75,7 +75,7 @@ import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter
 import { notificationDestinationForData } from './notification-path';
 import {
   isAppOwnedNeedsInputNotification,
-  isNeedsInputNotificationPosted,
+  readNeedsInputPresentation,
 } from './needs-input-notification';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
@@ -363,8 +363,8 @@ export function setupNotificationHandler() {
       if (
         data?.type === 'cloud_agent_session' &&
         data.category === 'attention' &&
-        isNeedsInputNotificationPosted(data.cliSessionId) &&
-        !isAppOwnedNeedsInputNotification(notification.request.identifier)
+        !isAppOwnedNeedsInputNotification(notification.request.identifier) &&
+        (await readNeedsInputPresentation(data.cliSessionId)) === 'presented'
       ) {
         return suppressed;
       }

@@ -160,19 +160,47 @@ export function isAppOwnedNeedsInputNotification(identifier: string | null | und
   return (identifier ?? '').startsWith(IDENTIFIER_PREFIX);
 }
 
-// The sessions whose app-owned needs-input notification is currently posted.
-// In-memory like the mount's notified set: a fresh process posts nothing until
-// the cached rows raise again, so a restart can only under-report (a duplicate
-// server push may show once), never suppress a raise that has no notification.
+// The sessions whose app-owned needs-input notification was posted. Only a fast
+// path: the OS is the authority on whether it is still on screen, because a swipe
+// never reaches the app. In-memory like the mount's notified set: a fresh process
+// posts nothing until the cached rows raise again, so a restart can only
+// under-report (a duplicate server push may show once), never suppress a raise
+// that has no notification.
 const postedSessions = new Set<string>();
 
 /**
- * Whether the app's own needs-input notification for this session is currently
- * on screen. Read by the foreground handler to suppress the server's attention
- * push — the app's notification is already the presentation.
+ * What the OS says about the app's own needs-input notification for a session.
+ * `unknown` means the OS could not be asked; a caller must never withhold a
+ * presentation on `unknown`.
  */
-export function isNeedsInputNotificationPosted(kiloSessionId: string): boolean {
-  return postedSessions.has(kiloSessionId);
+export type NeedsInputPresentation = 'presented' | 'absent' | 'unknown';
+
+/**
+ * Whether the app's own needs-input notification is on screen right now.
+ *
+ * The marker alone cannot answer this: the user can swipe the notification away
+ * and the SDK exposes no dismissal listener, so a stale marker would suppress the
+ * server's attention push for a raise that then has no notification at all. The
+ * marker is verified against the OS and dropped when the OS no longer holds it.
+ * A read that throws reports `unknown` and suppresses nothing.
+ */
+export async function readNeedsInputPresentation(
+  kiloSessionId: string
+): Promise<NeedsInputPresentation> {
+  if (!postedSessions.has(kiloSessionId)) {
+    return 'absent';
+  }
+  const identifier = notificationIdentifierForSession(kiloSessionId);
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    if (presented.some(notification => notification.request.identifier === identifier)) {
+      return 'presented';
+    }
+    postedSessions.delete(kiloSessionId);
+    return 'absent';
+  } catch {
+    return 'unknown';
+  }
 }
 
 /** Drop the posted marker once the raise's presentation is gone (result or dismissal). */

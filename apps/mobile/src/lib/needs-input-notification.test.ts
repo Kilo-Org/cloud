@@ -9,6 +9,7 @@ import {
   type NeedsInputNotificationRow,
   notificationIdentifierForSession,
   planNeedsInputNotifications,
+  readNeedsInputPresentation,
   reconcileNotifiedAfterApply,
   shouldPublishForSession,
 } from './needs-input-notification';
@@ -16,6 +17,7 @@ import {
 const mocks = vi.hoisted(() => ({
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPresentedNotificationsAsync: vi.fn(),
   getPermissionsAsync: vi.fn(),
 }));
 
@@ -23,6 +25,7 @@ vi.mock('expo-notifications', () => ({
   PermissionStatus: { GRANTED: 'granted' },
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPresentedNotificationsAsync: mocks.getPresentedNotificationsAsync,
   getPermissionsAsync: mocks.getPermissionsAsync,
 }));
 
@@ -47,6 +50,7 @@ beforeEach(() => {
   setTelemetrySink(null);
   mocks.scheduleNotificationAsync.mockReset().mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockReset().mockResolvedValue(undefined);
+  mocks.getPresentedNotificationsAsync.mockReset().mockResolvedValue([]);
   mocks.getPermissionsAsync.mockReset().mockResolvedValue({ status: 'granted' });
 });
 
@@ -56,6 +60,31 @@ describe('notificationIdentifierForSession', () => {
     expect(notificationIdentifierForSession('ses_1')).not.toBe(
       notificationIdentifierForSession('ses_2')
     );
+  });
+});
+
+describe('readNeedsInputPresentation', () => {
+  it('drops a marker whose notification the OS no longer holds', async () => {
+    await applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] });
+
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('absent');
+
+    // The marker is gone, so the next read answers without asking the OS again.
+    mocks.getPresentedNotificationsAsync.mockClear();
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('absent');
+    expect(mocks.getPresentedNotificationsAsync).not.toHaveBeenCalled();
+  });
+
+  it('reports unknown when the OS cannot be asked, keeping the marker', async () => {
+    await applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] });
+    mocks.getPresentedNotificationsAsync.mockRejectedValue(new Error('shade unavailable'));
+
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('unknown');
+
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: notificationIdentifierForSession('ses_1') } },
+    ]);
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('presented');
   });
 });
 

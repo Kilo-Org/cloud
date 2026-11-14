@@ -38,7 +38,10 @@ it('uses the counted transcript budget for generation and reported truncation', 
   expect(normalizedModuleSource).toContain('AppleModelBudget.outputCeiling');
   expect(normalizedModuleSource).toContain('options.maximumResponseTokens');
   expect(normalizedModuleSource).toContain('AppleModelBudget.responseLimit');
+  expect(normalizedModuleSource).toContain('model.tokenCount(for:');
   expect(normalizedModuleSource).toContain('reason: "context_window_exceeded"');
+  expect(normalizedModuleSource).toContain('usageSource == "reported"');
+  expect(normalizedModuleSource).toContain('outputTokens >= responseLimit');
   expect(normalizedModuleSource).toContain('completion.stop = "maxTokens"');
 });
 

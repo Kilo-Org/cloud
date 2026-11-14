@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./utils": "./src/utils.ts",
+    "./text": "./src/text.ts",
     "./support": "./src/support.ts",
     "./security-agent": "./src/security-agent/index.ts",
     "./auth": "./src/auth/index.ts",

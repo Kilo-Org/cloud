@@ -1,4 +1,5 @@
 import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -62,7 +63,7 @@ export function CreateOrganizationScreen() {
       return;
     }
     const name = nameRef.current.trim();
-    if (name.length === 0) {
+    if (!hasVisibleText(name)) {
       setErrorText(t('organization.create.nameRequired'));
       return;
     }
@@ -106,7 +107,7 @@ export function CreateOrganizationScreen() {
               if (Platform.OS === 'android') {
                 setText(value);
               }
-              setCanSubmit(value.trim().length > 0);
+              setCanSubmit(hasVisibleText(value));
               if (errorText != null) {
                 setErrorText(null);
               }

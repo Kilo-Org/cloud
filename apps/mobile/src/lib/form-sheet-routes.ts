@@ -18,6 +18,7 @@ export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
   ['agent-chat', 'instance-picker'],
   ['agent-chat', 'folder-picker'],
   ['agent-chat', 'profile-picker'],
+  ['ssh', 'prompt', '[session-id]'],
   ['context-picker'],
   ['todos', 'list-settings'],
   ['share-gate'],

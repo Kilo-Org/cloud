@@ -1,11 +1,16 @@
 import Foundation
 
-/// A shell channel as the terminal view sees it: bytes go straight from Rust
-/// to the view, and input comes back the same way. Nothing crosses JavaScript.
+/// A shell channel as the terminal view sees it: bytes go straight from Rust to
+/// the view, and input comes back the same way. Nothing crosses JavaScript.
 final class SshShellSource: TerminalByteSource, @unchecked Sendable {
   let sessionId: String
   private let channel: ShellChannel
   private let delivery: SinkDelivery
+
+  /// Set only after a sink received the exit; unbound closed shells remain attachable.
+  var terminated: Bool {
+    delivery.terminated
+  }
 
   init(sessionId: String, channel: ShellChannel, delivery: SinkDelivery) {
     self.sessionId = sessionId
@@ -13,14 +18,17 @@ final class SshShellSource: TerminalByteSource, @unchecked Sendable {
     self.delivery = delivery
   }
 
+  /// `onTerminated` runs once, on the thread that delivers the channel's exit,
+  /// after the bound sink has seen the close. It must not block.
   static func open(
     sessionId: String,
     session: SshSession,
     term: String,
     cols: UInt32,
-    rows: UInt32
+    rows: UInt32,
+    onTerminated: @escaping @Sendable () -> Void
   ) async throws -> SshShellSource {
-    let delivery = SinkDelivery()
+    let delivery = SinkDelivery(onTerminated: onTerminated)
     let channel = try await session.openShell(
       term: term,
       cols: cols,
@@ -77,36 +85,53 @@ final class SinkDelivery: ByteSink, @unchecked Sendable {
   private static let maxBufferedBytes = 64 * 1024
 
   private let lock = NSLock()
+  private let onTerminated: @Sendable () -> Void
   private var sink: TerminalSink?
-  private var buffering = true
+  private var closeDelivered = false
   private var buffered: [Data] = []
   private var bufferedBytes = 0
   private var closeEvent: (exitStatus: Int?, error: String?)?
 
+  init(onTerminated: @escaping @Sendable () -> Void) {
+    self.onTerminated = onTerminated
+  }
+
+  /// Written under `lock` and read from the module, which owns the source.
+  var terminated: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return closeDelivered
+  }
+
   func bind(_ next: TerminalSink?) {
+    guard let next else {
+      lock.lock()
+      sink = nil
+      lock.unlock()
+      return
+    }
     lock.lock()
     sink = next
-    buffering = false
     let pending = buffered
     buffered = []
     bufferedBytes = 0
-    let closed = closeEvent
-    lock.unlock()
-
-    guard let next else {
-      return
+    let closed = closeDelivered ? nil : closeEvent
+    if closed != nil {
+      closeDelivered = true
     }
+    lock.unlock()
 
     pending.forEach { next.onData($0) }
     if let closed {
       next.onClosed(exitStatus: closed.exitStatus, error: closed.error)
+      onTerminated()
     }
   }
 
   func onData(bytes: Data) {
     lock.lock()
     let target = sink
-    if target == nil && buffering && bufferedBytes + bytes.count <= Self.maxBufferedBytes {
+    if target == nil && bufferedBytes + bytes.count <= Self.maxBufferedBytes {
       buffered.append(bytes)
       bufferedBytes += bytes.count
     }
@@ -119,10 +144,21 @@ final class SinkDelivery: ByteSink, @unchecked Sendable {
     let status = exitStatus.map { Int($0) }
 
     lock.lock()
+    guard closeEvent == nil else {
+      lock.unlock()
+      return
+    }
     let target = sink
     closeEvent = (status, error)
+    if target != nil {
+      closeDelivered = true
+    }
     lock.unlock()
 
-    target?.onClosed(exitStatus: status, error: error)
+    if let target {
+      target.onClosed(exitStatus: status, error: error)
+      onTerminated()
+    }
   }
+
 }

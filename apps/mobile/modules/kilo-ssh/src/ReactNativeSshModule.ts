@@ -1,6 +1,7 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
 import type {
+  ForwardInfo,
   GeneratedKey,
   NativeConnectConfig,
   NativeExecOutput,
@@ -8,6 +9,7 @@ import type {
   NativeForwardStart,
   NativeShellOptions,
   ParsedKey,
+  SessionInfo,
   SftpEntry,
   SshEvents,
 } from './ReactNativeSsh.types';
@@ -35,6 +37,10 @@ declare class ReactNativeSshModule extends NativeModule<SshEvents> {
   notifyWhenIdle(shellId: string, quietMs: number, title: string, body: string | null): boolean;
   answerHostKey(requestId: string, accept: boolean): boolean;
   answerPrompts(requestId: string, answers: string[] | null): boolean;
+  /** Every session still open in the native registry. */
+  listSessions(): SessionInfo[];
+  /** Every forward still listening in the native registry. */
+  listForwards(): ForwardInfo[];
   isRetryableCode(code: string): boolean;
 
   openSftp(sessionId: string): Promise<string>;

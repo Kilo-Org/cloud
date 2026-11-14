@@ -1,7 +1,60 @@
 import Foundation
 
-/// Module state shared by the JavaScript thread and the Rust callback threads.
+/// What a session was opened against, kept so a later runtime can name it.
+struct SessionTarget: Sendable {
+  let host: String
+  let port: Int
+  let username: String
+  /// The JavaScript session this connection belongs to, so a reload adopts its row.
+  let appSessionId: String
+  let viaSessionId: String?
+}
+
+/// A forward together with what it was asked to do, so it can be described later.
+struct ForwardEntry: @unchecked Sendable {
+  let sessionId: String
+  let direction: String
+  let bindHost: String
+  let bindPort: Int
+  let port: Int
+  let handle: ForwardHandle
+}
+
+/**
+ * What a session held, handed back when the session ends.
+ *
+ * The shells close on the caller's thread because the terminal view reads them;
+ * the clients and listeners need the socket, so `shutDown` runs before it goes.
+ */
+struct ReleasedSession: @unchecked Sendable {
+  let session: SshSession
+  let shells: [(id: String, source: SshShellSource)]
+  let sftps: [SftpClient]
+  let forwards: [ForwardEntry]
+
+  func shutDown() async {
+    for client in sftps {
+      try? await client.shutdown()
+    }
+
+    for entry in forwards {
+      try? await entry.handle.stop()
+    }
+  }
+}
+
+/**
+ * Every live SSH resource, shared by the JavaScript thread and the Rust callback
+ * threads.
+ *
+ * The state is a process-wide singleton: a reload builds a new module instance
+ * while the sockets it opened are still live, so the next runtime has to find
+ * the sessions it never opened. The identifiers live here too, so a fresh
+ * runtime cannot reissue an id a live session still holds.
+ */
 final class SshModuleState: @unchecked Sendable {
+  static let shared = SshModuleState()
+
   let sessionIds = IdSequence(prefix: "session-")
   let shellIds = IdSequence(prefix: "shell-")
   let sftpIds = IdSequence(prefix: "sftp-")
@@ -10,15 +63,18 @@ final class SshModuleState: @unchecked Sendable {
 
   private let lock = NSLock()
   private var sessions: [String: SshSession] = [:]
+  private var targets: [String: SessionTarget] = [:]
   private var shells: [String: SshShellSource] = [:]
-  private var sftps: [String: SftpEntry] = [:]
+  private var sftps: [String: SftpClient] = [:]
+  private var sftpSessions: [String: String] = [:]
   private var forwards: [String: ForwardEntry] = [:]
   private var cancels: [String: CancelToken] = [:]
   private var hostKeyRequests: [String: PendingRequest<Bool>] = [:]
   private var promptRequests: [String: PendingRequest<PromptReply>] = [:]
 
-  func store(session: SshSession, id: String) {
+  func store(session: SshSession, id: String, target: SessionTarget) {
     lock.lock()
+    targets[id] = target
     sessions[id] = session
     lock.unlock()
   }
@@ -29,16 +85,56 @@ final class SshModuleState: @unchecked Sendable {
     return sessions[id]
   }
 
-  func removeSession(_ id: String) -> SshSession? {
+  func releaseSession(_ id: String) -> ReleasedSession? {
     lock.lock()
-    defer { lock.unlock() }
-    return sessions.removeValue(forKey: id)
+
+    guard let session = sessions.removeValue(forKey: id) else {
+      lock.unlock()
+
+      return nil
+    }
+
+    targets.removeValue(forKey: id)
+    let ownedShells = shells.filter { $0.value.sessionId == id }.map { (id: $0.key, source: $0.value) }
+    ownedShells.forEach { shells.removeValue(forKey: $0.id) }
+    let ownedSftpIds = sftpSessions.filter { $0.value == id }.map(\.key)
+    let ownedSftps = ownedSftpIds.compactMap { sftpId -> SftpClient? in
+      sftpSessions.removeValue(forKey: sftpId)
+
+      return sftps.removeValue(forKey: sftpId)
+    }
+    let ownedForwardIds = forwards.filter { $0.value.sessionId == id }.map(\.key)
+    let ownedForwards = ownedForwardIds.compactMap { forwards.removeValue(forKey: $0) }
+
+    lock.unlock()
+
+    return ReleasedSession(
+      session: session,
+      shells: ownedShells,
+      sftps: ownedSftps,
+      forwards: ownedForwards
+    )
   }
 
-  func allSessions() -> [SshSession] {
+  func sessionRecords() -> [SessionInfoRecord] {
     lock.lock()
     defer { lock.unlock() }
-    return Array(sessions.values)
+    return sessions.keys.compactMap { sessionId in
+      guard let target = targets[sessionId] else {
+        return nil
+      }
+      var record = SessionInfoRecord()
+      record.sessionId = sessionId
+      record.appSessionId = target.appSessionId
+      record.viaSessionId = target.viaSessionId
+      record.host = target.host
+      record.port = target.port
+      record.username = target.username
+      record.shellIds = shells.filter { $0.value.sessionId == sessionId }.map(\.key)
+      record.sftpIds = sftpSessions.filter { $0.value == sessionId }.map(\.key)
+      record.forwardIds = forwards.filter { $0.value.sessionId == sessionId }.map(\.key)
+      return record
+    }
   }
 
   func store(shell: SshShellSource, id: String) {
@@ -53,70 +149,51 @@ final class SshModuleState: @unchecked Sendable {
     return shells.removeValue(forKey: id)
   }
 
-  func shellIds(of sessionId: String) -> [String] {
+  func store(sftp: SftpClient, id: String, sessionId: String) {
     lock.lock()
-    defer { lock.unlock() }
-    return shells.filter { $0.value.sessionId == sessionId }.map { $0.key }
-  }
-
-  func allShellIds() -> [String] {
-    lock.lock()
-    defer { lock.unlock() }
-    return Array(shells.keys)
-  }
-
-  func store(sftp: SftpClient, sessionId: String, id: String) {
-    lock.lock()
-    sftps[id] = SftpEntry(sessionId: sessionId, client: sftp)
+    sftpSessions[id] = sessionId
+    sftps[id] = sftp
     lock.unlock()
   }
 
   func sftp(_ id: String) -> SftpClient? {
     lock.lock()
     defer { lock.unlock() }
-    return sftps[id]?.client
+    return sftps[id]
   }
 
   func removeSftp(_ id: String) -> SftpClient? {
     lock.lock()
     defer { lock.unlock() }
-    return sftps.removeValue(forKey: id)?.client
+    sftpSessions.removeValue(forKey: id)
+    return sftps.removeValue(forKey: id)
   }
 
-  func sftpIds(of sessionId: String) -> [String] {
+  func store(forward: ForwardEntry, id: String) {
     lock.lock()
-    defer { lock.unlock() }
-    return sftps.filter { $0.value.sessionId == sessionId }.map { $0.key }
-  }
-
-  func allSftps() -> [SftpClient] {
-    lock.lock()
-    defer { lock.unlock() }
-    return sftps.values.map { $0.client }
-  }
-
-  func store(forward: ForwardHandle, sessionId: String, id: String) {
-    lock.lock()
-    forwards[id] = ForwardEntry(sessionId: sessionId, handle: forward)
+    forwards[id] = forward
     lock.unlock()
   }
 
-  func removeForward(_ id: String) -> ForwardHandle? {
+  func removeForward(_ id: String) -> ForwardEntry? {
     lock.lock()
     defer { lock.unlock() }
-    return forwards.removeValue(forKey: id)?.handle
+    return forwards.removeValue(forKey: id)
   }
 
-  func forwardIds(of sessionId: String) -> [String] {
+  func forwardRecords() -> [ForwardInfoRecord] {
     lock.lock()
     defer { lock.unlock() }
-    return forwards.filter { $0.value.sessionId == sessionId }.map { $0.key }
-  }
-
-  func allForwards() -> [ForwardHandle] {
-    lock.lock()
-    defer { lock.unlock() }
-    return forwards.values.map { $0.handle }
+    return forwards.map { forwardId, entry in
+      var record = ForwardInfoRecord()
+      record.forwardId = forwardId
+      record.sessionId = entry.sessionId
+      record.direction = entry.direction
+      record.bindHost = entry.bindHost
+      record.bindPort = entry.bindPort
+      record.port = entry.port
+      return record
+    }
   }
 
   func store(cancel: CancelToken, id: String) {
@@ -135,12 +212,6 @@ final class SshModuleState: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     return cancels.removeValue(forKey: id)
-  }
-
-  func allCancels() -> [CancelToken] {
-    lock.lock()
-    defer { lock.unlock() }
-    return Array(cancels.values)
   }
 
   func store(hostKeyRequest: PendingRequest<Bool>, id: String) {
@@ -166,16 +237,4 @@ final class SshModuleState: @unchecked Sendable {
     defer { lock.unlock() }
     return promptRequests.removeValue(forKey: id)
   }
-}
-
-/// An SFTP client and the session whose disconnect it shares.
-private struct SftpEntry {
-  let sessionId: String
-  let client: SftpClient
-}
-
-/// A port forward and the session whose disconnect it shares.
-private struct ForwardEntry {
-  let sessionId: String
-  let handle: ForwardHandle
 }

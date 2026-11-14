@@ -10,6 +10,7 @@ class ConnectConfigRecord : Record {
   @Field var port: Int = 22
   @Field var username: String = ""
   @Field var auth: AuthRecord = AuthRecord()
+  @Field var appSessionId: String = ""
   @Field var connectTimeoutMs: Int = 15_000
   @Field var keepaliveIntervalS: Int = 15
 }
@@ -64,6 +65,29 @@ class ForwardConfigRecord : Record {
 
 class ForwardStartRecord(
   @Field val forwardId: String,
+  @Field val port: Int,
+) : Record
+
+/** A live session as the registry holds it, for a runtime that just started. */
+class SessionInfoRecord(
+  @Field val sessionId: String,
+  @Field val appSessionId: String,
+  @Field val viaSessionId: String?,
+  @Field val host: String,
+  @Field val port: Int,
+  @Field val username: String,
+  @Field val shellIds: List<String>,
+  @Field val sftpIds: List<String>,
+  @Field val forwardIds: List<String>,
+) : Record
+
+/** A live forward as the registry holds it. */
+class ForwardInfoRecord(
+  @Field val forwardId: String,
+  @Field val sessionId: String,
+  @Field val direction: String,
+  @Field val bindHost: String,
+  @Field val bindPort: Int,
   @Field val port: Int,
 ) : Record
 

@@ -56,6 +56,7 @@ vi.mock('@tanstack/react-query', async importOriginal => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
 }));
+vi.mock('@/lib/ssh/use-ssh-client-enabled', () => ({ useSshClientEnabled: () => false }));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));

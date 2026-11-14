@@ -213,6 +213,12 @@ type PreservedFields = {
    * tray `#N` mark and PR search survive a heartbeat and a snapshot.
    */
   associatedPr: ActiveSession['associatedPr'];
+  /**
+   * Sticky: WS payloads never carry the Cloud Agent runtime id, and it is what
+   * a sandbox terminal addresses its session by. Losing it to a heartbeat
+   * would close the only route to a live sandbox.
+   */
+  cloudAgentSessionId: string | undefined;
 };
 
 function readEnrichment(current: CachedActiveSession | undefined): PreservedFields {
@@ -229,6 +235,7 @@ function readEnrichment(current: CachedActiveSession | undefined): PreservedFiel
     organizationId: current?.organizationId,
     totalCostMicrodollars: current?.totalCostMicrodollars,
     associatedPr: current?.associatedPr,
+    cloudAgentSessionId: current?.cloudAgentSessionId,
   };
 }
 

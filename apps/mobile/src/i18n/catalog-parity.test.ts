@@ -27,7 +27,8 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * Empty: the `notifications.category.*Unavailable` reasons, the Agents tab
+ * Lands in every catalog, so the missing-key assertion stays strict for them:
+ * the `notifications.category.*Unavailable` reasons, the Agents tab
  * header link (`agents.sessionList.pastSessions`), the scheduled-session labels
  * the count lines, the session list and the glanceable surfaces show
  * (`common.scheduled`, `sessionRow.scheduled`, `glanceable.scheduledWakes`),

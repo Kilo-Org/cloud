@@ -16,6 +16,7 @@ import {
   whenProtectedDataAvailable,
 } from '@/lib/protected-data';
 import { PERSIST_DB_KEY } from '@/lib/storage-keys';
+import { enableForeignKeys } from './foreign-keys';
 import { kv } from './schema';
 
 /**
@@ -242,6 +243,8 @@ async function probeAndMigrate(db: KVDatabase): Promise<void> {
   // Drizzle owns the schema; a recreated (deleted) file has no
   // `__drizzle_migrations` table, so the migrations run again on it.
   await migrate(db, migrations);
+  // After the migrator, for the reason `enableForeignKeys` records.
+  enableForeignKeys(db.$client);
 }
 
 /**

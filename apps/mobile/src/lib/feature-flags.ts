@@ -4,6 +4,7 @@ import {
   CODE_REVIEW_MD_CONVERSION_FLAG,
   type FeatureFlagKey,
   ORGANIZATION_AUTO_MODEL_FLAG,
+  SSH_CLIENT_FLAG,
 } from '@kilocode/app-shared/feature-flags';
 import * as Application from 'expo-application';
 
@@ -61,6 +62,7 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
     minAppVersion: '1.0.16',
     defaultValue: false,
   },
+  { key: SSH_CLIENT_FLAG, minAppVersion: '1.0.16', defaultValue: false },
 ];
 
 const DEFINITIONS_BY_KEY: ReadonlyMap<string, FeatureFlagDefinition> = new Map(

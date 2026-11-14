@@ -280,9 +280,15 @@ describe('Home-only widget policy', () => {
     const olderDetails: Record<string, unknown> = { ...data.details };
     delete olderDetails.primaryKind;
     const parsed = homeWidgetDataSchema.parse({ snapshot: data.snapshot, details: olderDetails });
-    expect(parsed.details.primaryKind).toBeNull();
+    expect(parsed.details.primaryKind).toBeUndefined();
     expect(parsed.details.primaryTitle).toBe('Approve');
     expect(buildHomeWidgetPresentation(parsed, now).primaryTitle).toBe('Approve');
+    // A payload that carries an explicit null kind is the same unknown kind.
+    const nullKind = homeWidgetDataSchema.parse({
+      snapshot: data.snapshot,
+      details: { ...data.details, primaryKind: null },
+    });
+    expect(buildHomeWidgetPresentation(nullKind, now).primaryTitle).toBe('Approve');
   });
 
   it('retains expired counts and honest checkedAt without inventing activity at a missed wake', () => {

@@ -31,11 +31,11 @@ export const homeWidgetDetailsSchema = z.object({
   approvalKey: approvalKeySchema.default(null),
   /**
    * The kind whose row produced `primaryTitle`, so the title always describes
-   * the kind drawn beside it. Absent on payloads stored or pushed before this
-   * field existed, where `null` reads as unknown and keeps the title: a stored
-   * payload renders as it did.
+   * the kind drawn beside it. Optional on input: a payload stored or pushed
+   * before this field existed omits it, which reads as an unknown kind and
+   * keeps the title, so an older payload renders as it did.
    */
-  primaryKind: kindSchema.nullable().default(null),
+  primaryKind: kindSchema.nullable().optional(),
   primaryTitle: titleSchema.nullable(),
   waitingAgents: z
     .array(
@@ -241,6 +241,10 @@ export function buildHomeWidgetPresentation(
 ): HomeWidgetPresentation {
   const { snapshot, details } = data;
   const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
+  // A title is drawn only beside the kind it describes. A payload stored or
+  // pushed before details carried the kind omits it, which reads as unknown and
+  // keeps the title, so that payload renders as it did.
+  const titleKind = details.primaryKind ?? null;
   const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
   const scheduledAt = snapshot.scheduled > 0 ? timestampToIso(snapshot.scheduledAt) : null;
   return {
@@ -272,12 +276,8 @@ export function buildHomeWidgetPresentation(
     scheduledAt: terminal ? null : scheduledAt,
     approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
     awaitingUpdate: !terminal && wake !== null && now >= wake,
-    // A title is drawn only beside the kind it describes. An older payload
-    // carries no kind (`null`) and keeps its title, so it renders as it did.
     primaryTitle:
-      terminal ||
-      primaryKind === null ||
-      (details.primaryKind !== null && details.primaryKind !== primaryKind)
+      terminal || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
         ? null
         : details.primaryTitle,
     waitingAgents: terminal || snapshot.needsInput === 0 ? [] : details.waitingAgents,

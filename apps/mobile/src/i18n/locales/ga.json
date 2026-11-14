@@ -3576,7 +3576,7 @@
     },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",
-      "last30Days": "Na 30 lá deireanacha",
+      "orgLast30Days": "Na baill go léir · Na 30 lá deireanacha",
       "outputTokens": "Comharthaí aschuir",
       "requests": "Iarratais"
     },

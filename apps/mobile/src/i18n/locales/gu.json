@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",
-      "last30Days": "છેલ્લા 30 દિવસ",
+      "orgLast30Days": "બધા સભ્યો · છેલ્લા 30 દિવસ",
       "outputTokens": "આઉટપુટ ટોકન",
       "requests": "વિનંતીઓ"
     },

@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
-      "last30Days": "ያለፉት 30 ቀናት",
+      "orgLast30Days": "ሁሉም አባላት · ያለፉት 30 ቀናት",
       "outputTokens": "የውጤት ቶከኖች",
       "requests": "ጥያቄዎች"
     },

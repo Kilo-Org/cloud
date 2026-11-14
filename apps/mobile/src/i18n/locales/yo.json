@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",
-      "last30Days": "Ọjọ́ 30 tó kọjá",
+      "orgLast30Days": "Gbogbo àwọn ọmọ ẹgbẹ́ · Ọjọ́ 30 tó kọjá",
       "outputTokens": "Àwọn ìpín ọ̀rọ̀ ìjáde",
       "requests": "Àwọn ìbéèrè"
     },

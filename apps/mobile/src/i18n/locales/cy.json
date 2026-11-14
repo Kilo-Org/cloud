@@ -3629,7 +3629,7 @@
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
-      "last30Days": "Y 30 diwrnod diwethaf",
+      "orgLast30Days": "Holl aelodau · Y 30 diwrnod diwethaf",
       "outputTokens": "Tocynnau allbwn",
       "requests": "Ceisiadau"
     },

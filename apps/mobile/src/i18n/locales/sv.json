@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Inmatade token",
-      "last30Days": "Senaste 30 dagarna",
+      "orgLast30Days": "Alla medlemmar · Senaste 30 dagarna",
       "outputTokens": "Utmatade token",
       "requests": "Begäranden"
     },

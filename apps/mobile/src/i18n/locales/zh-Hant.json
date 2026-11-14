@@ -3422,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
-      "last30Days": "最近 30 天",
+      "orgLast30Days": "全體成員 · 最近 30 天",
       "outputTokens": "輸出詞元",
       "requests": "請求"
     },

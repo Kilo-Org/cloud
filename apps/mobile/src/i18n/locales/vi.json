@@ -3422,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
-      "last30Days": "30 Ngày qua",
+      "orgLast30Days": "Tất cả thành viên · 30 Ngày qua",
       "outputTokens": "Token đầu ra",
       "requests": "Yêu cầu"
     },

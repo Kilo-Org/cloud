@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",
-      "last30Days": "پچھلے 30 دن",
+      "orgLast30Days": "تمام اراکین · پچھلے 30 دن",
       "outputTokens": "آؤٹ پٹ ٹوکن",
       "requests": "درخواستیں"
     },

@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
-      "last30Days": "Viimeiset 30 päivää",
+      "orgLast30Days": "Kaikki jäsenet · Viimeiset 30 päivää",
       "outputTokens": "Tulostetokenit",
       "requests": "Pyynnöt"
     },

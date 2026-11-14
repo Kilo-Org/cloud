@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "ইনপুট টোকেন",
-      "last30Days": "গত ৩০ দিন",
+      "orgLast30Days": "সকল সদস্য · গত ৩০ দিন",
       "outputTokens": "আউটপুট টোকেন",
       "requests": "অনুরোধ"
     },

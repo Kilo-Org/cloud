@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Jeton antre",
-      "last30Days": "Dènye 30 jou",
+      "orgLast30Days": "Tout manm yo · Dènye 30 jou",
       "outputTokens": "Jeton sòti",
       "requests": "Demann"
     },

@@ -3422,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",
-      "last30Days": "पिछले 30 दिन",
+      "orgLast30Days": "सभी सदस्य · पिछले 30 दिन",
       "outputTokens": "आउटपुट टोकन",
       "requests": "अनुरोध"
     },

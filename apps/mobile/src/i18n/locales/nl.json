@@ -3422,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Invoertokens",
-      "last30Days": "Laatste 30 dagen",
+      "orgLast30Days": "Alle leden · Laatste 30 dagen",
       "outputTokens": "Uitvoertokens",
       "requests": "Verzoeken"
     },

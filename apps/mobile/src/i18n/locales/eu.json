@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
-      "last30Days": "Azken 30 egunak",
+      "orgLast30Days": "Kide guztiak · Azken 30 egunak",
       "outputTokens": "Irteerako tokenak",
       "requests": "Eskaerak"
     },

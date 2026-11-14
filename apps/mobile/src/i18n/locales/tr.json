@@ -3422,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
-      "last30Days": "Son 30 gün",
+      "orgLast30Days": "Tüm üyeler · Son 30 gün",
       "outputTokens": "Çıktı tokenları",
       "requests": "İstekler"
     },

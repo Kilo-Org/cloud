@@ -3470,7 +3470,7 @@
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",
-      "last30Days": "Últims 30 dies",
+      "orgLast30Days": "Tots els membres · Últims 30 dies",
       "outputTokens": "Tòkens de sortida",
       "requests": "Sol·licituds"
     },

@@ -3475,7 +3475,7 @@
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",
-      "last30Days": "30 הימים האחרונים",
+      "orgLast30Days": "כל החברים · 30 הימים האחרונים",
       "outputTokens": "טוקני פלט",
       "requests": "בקשות"
     },

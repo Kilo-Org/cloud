@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",
-      "last30Days": "Ngā rā e 30 kua hipa",
+      "orgLast30Days": "Ngā mema katoa · Ngā rā e 30 kua hipa",
       "outputTokens": "Ngā tōkena tāputa",
       "requests": "Ngā tono"
     },

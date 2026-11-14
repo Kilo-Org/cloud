@@ -3528,7 +3528,7 @@
     },
     "usageStats": {
       "inputTokens": "Входные токены",
-      "last30Days": "Последние 30 дней",
+      "orgLast30Days": "Все участники · Последние 30 дней",
       "outputTokens": "Выходные токены",
       "requests": "Запросы"
     },

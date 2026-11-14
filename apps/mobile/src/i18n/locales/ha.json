@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",
-      "last30Days": "Kwanaki 30 da suka gabata",
+      "orgLast30Days": "Membobi duka · Kwanaki 30 da suka gabata",
       "outputTokens": "Guntayen rubutun fitarwa",
       "requests": "Buƙatu"
     },

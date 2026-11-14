@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",
-      "last30Days": "Guyyoota 30 dhumaa",
+      "orgLast30Days": "Miseensoota hunda · Guyyoota 30 dhumaa",
       "outputTokens": "Tookanoota bu'aa",
       "requests": "Gaaffiiwwan"
     },

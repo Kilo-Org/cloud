@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Token masukan",
-      "last30Days": "30 Hari terakhir",
+      "orgLast30Days": "Semua ahli · 30 Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
     },

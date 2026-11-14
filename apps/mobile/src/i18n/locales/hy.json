@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Մուտքային տոկեններ",
-      "last30Days": "Վերջին 30 օր",
+      "orgLast30Days": "Բոլոր անդամները · Վերջին 30 օր",
       "outputTokens": "Ելքային տոկեններ",
       "requests": "Հարցումներ"
     },

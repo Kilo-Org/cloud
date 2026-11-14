@@ -3475,7 +3475,7 @@
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",
-      "last30Days": "Ultimi 30 giorni",
+      "orgLast30Days": "Tutti i membri · Ultimi 30 giorni",
       "outputTokens": "Token in uscita",
       "requests": "Richieste"
     },

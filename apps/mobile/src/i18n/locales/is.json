@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",
-      "last30Days": "Síðustu 30 dagar",
+      "orgLast30Days": "Allir meðlimir · Síðustu 30 dagar",
       "outputTokens": "Úttakstókar",
       "requests": "Beiðnir"
     },

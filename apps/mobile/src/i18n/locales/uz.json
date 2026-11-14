@@ -3417,7 +3417,7 @@
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",
-      "last30Days": "Oxirgi 30 kun",
+      "orgLast30Days": "Barcha a'zolar · Oxirgi 30 kun",
       "outputTokens": "Chiqish tokenlari",
       "requests": "So'rovlar"
     },

@@ -3422,7 +3422,7 @@
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",
-      "last30Days": "Letzte 30 Tage",
+      "orgLast30Days": "Alle Mitglieder · Letzte 30 Tage",
       "outputTokens": "Ausgabe-Tokens",
       "requests": "Anfragen"
     },

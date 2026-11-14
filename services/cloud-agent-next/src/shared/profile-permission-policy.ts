@@ -7,6 +7,15 @@ export type PermissionMap = Record<string, PermissionValue>;
 
 type AgentPermission = NonNullable<RuntimeAgentInput['config']['permission']>;
 
+/**
+ * A guarded session's map carries tool keys. Every other non-interactive
+ * session carries only the question denial, which states no command policy, so
+ * its profile agents keep their entries as written.
+ */
+export function isCommandGuardPermissionMap(permission: PermissionMap): boolean {
+  return Object.keys(permission).some(tool => tool !== 'question');
+}
+
 // A profile agent's permission map is reconciled with the session command
 // policy before it is stored, so the session policy and every stricter agent
 // restriction both apply.

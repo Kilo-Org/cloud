@@ -706,6 +706,82 @@ describe('legacy skill writing', () => {
   });
 });
 
+describe('runtime profile session policy scope', () => {
+  const agent = {
+    slug: 'reviewer',
+    name: 'Reviewer',
+    config: { permission: { edit: 'allow', bash: { '*': 'allow' } } },
+  };
+
+  it('writes the agent entry as given when the session states no command policy', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-scope-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { question: 'deny' },
+        runtimeAgents: [agent],
+      });
+      expect((await readAgentEntries(home)).reviewer?.permission).toEqual(agent.config.permission);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('shares one materialization across a question-only and a policy-free session', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-scope-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      await materializer.materialize(home, {
+        permission: { question: 'deny' },
+        runtimeAgents: [agent],
+      });
+      // A sibling without any permission map sees the same written entries.
+      await materializer.materialize(home, { runtimeAgents: [agent] });
+      expect((await readAgentEntries(home)).reviewer?.permission).toEqual(agent.config.permission);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('carries the publisher refusals for a review session', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-scope-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: {
+          edit: 'deny',
+          bash: { 'gh pr diff': 'allow', 'gh pr diff *': 'allow' },
+        },
+        githubReviewTarget: {
+          repo: 'acme/widgets',
+          pullRequestNumber: 42,
+          appType: 'standard',
+          botUserId: '42',
+        },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: {
+              permission: {
+                bash: { 'gh pr diff': 'allow', 'gh api repos/*/issues/*/comments*': 'allow' },
+              },
+            },
+          },
+        ],
+      });
+      const bash = (await readAgentEntries(home)).reviewer?.permission as Record<
+        string,
+        Record<string, string>
+      >;
+      expect(bash.bash?.['gh pr diff']).toBe('allow');
+      // The agent allowance for a comment endpoint is not written, so the
+      // publisher refusals decide those calls.
+      expect(bash.bash?.['gh api repos/*/issues/*/comments*']).toBeUndefined();
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('runtime profile permission narrowing', () => {
   it('writes an agent entry bounded by the session policy', async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));

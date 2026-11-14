@@ -211,6 +211,59 @@ suite('pinned Kilo profile permission narrowing', () => {
     }
   }, 60_000);
 
+  it('keeps the profile exception inside its own refusal and applies it', async () => {
+    if (!binary) throw new Error('KILO_781_BINARY is required');
+    const fixture = await activityFixture(binary, {
+      permission: SESSION_PERMISSION,
+      runtimeAgents: [
+        profileAgent('profile-exception', { bash: { '*': 'deny', 'git log *': 'allow' } }),
+      ],
+    });
+    try {
+      await initializeRepository(fixture.directory);
+      const written = (await writtenAgent(fixture, 'profile-exception'))?.permission as Record<
+        string,
+        Record<string, string>
+      >;
+      // The profile's own refusal and its exception are both written, in that
+      // order, so the last matching rule decides each command.
+      expect(written.bash?.['*']).toBe('deny');
+      expect(written.bash?.['git log *']).toBe('allow');
+      const keys = Object.keys(written.bash ?? {});
+      expect(keys.indexOf('*')).toBeLessThan(keys.indexOf('git log *'));
+
+      requestToolOnce(fixture, [{ name: 'bash', arguments: { command: 'git log --oneline -1' } }]);
+      const allowedSession = await fixture.session();
+      await fixture.prompt(
+        allowedSession,
+        'inspect the repository',
+        fixture.directory,
+        'profile-exception'
+      );
+      const allowed = await settledTool(fixture, allowedSession, 'bash');
+      expect(allowed.status).toBe('completed');
+      if (allowed.status !== 'completed') throw new Error('The exception did not run');
+      expect(allowed.output).toMatch(/^[0-9a-f]+ fixture-commit\n?$/);
+
+      requestToolOnce(fixture, [{ name: 'bash', arguments: { command: 'npm test' } }]);
+      const deniedSession = await fixture.session();
+      await fixture.prompt(
+        deniedSession,
+        'run the package tests',
+        fixture.directory,
+        'profile-exception'
+      );
+      const denied = await settledTool(fixture, deniedSession, 'bash');
+      expect(denied.status).toBe('error');
+      if (denied.status !== 'error') throw new Error('The refused command did not fail');
+      expect(denied.error).toContain(
+        'The user has specified a rule which prevents you from using this specific tool call.'
+      );
+    } finally {
+      await fixture.dispose();
+    }
+  }, 90_000);
+
   it('runs an inspection command that both policies allow', async () => {
     if (!binary) throw new Error('KILO_781_BINARY is required');
     const fixture = await activityFixture(binary, {

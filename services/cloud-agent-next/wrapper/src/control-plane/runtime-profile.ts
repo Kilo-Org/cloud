@@ -6,7 +6,12 @@ import {
   buildBuiltinAgentEntries,
   buildKiloCommandsConfiguration,
 } from '../../../src/shared/runtime-profile-config.js';
-import { narrowProfileAgents } from '../../../src/shared/profile-permission-policy.js';
+import {
+  isCommandGuardPermissionMap,
+  narrowProfileAgents,
+  type PermissionMap,
+} from '../../../src/shared/profile-permission-policy.js';
+import { buildGitHubReviewBashRules } from '../github-review-publish-config.js';
 import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
 import { writeRuntimeInstructions } from '../runtime-instructions.js';
 
@@ -18,6 +23,7 @@ type RuntimeProfile = Pick<
   | 'kiloCommands'
   | 'runtimeInstructions'
   | 'permission'
+  | 'githubReviewTarget'
 >;
 
 export type RuntimeProfileMaterializer = {
@@ -81,6 +87,31 @@ function stableValue(value: unknown): unknown {
   return value;
 }
 
+/**
+ * The permission map the written entries are composed against. A session
+ * without a command guard states no command policy, and a review session also
+ * carries the publisher refusals the runtime writes into the same map.
+ */
+function composedPermissionMap(profile: RuntimeProfile): PermissionMap | undefined {
+  const permission = profile.permission;
+  if (permission === undefined || !isCommandGuardPermissionMap(permission)) return undefined;
+  if (profile.githubReviewTarget === undefined) return permission;
+  const bash = permission['bash'];
+  const bashRules: Record<string, 'allow' | 'ask' | 'deny'> = {
+    ...(typeof bash === 'object' && bash !== null && !Array.isArray(bash) ? bash : {}),
+    ...(typeof bash === 'string' ? { '*': bash } : {}),
+    ...buildGitHubReviewBashRules(),
+  };
+  return { ...permission, bash: bashRules };
+}
+
+/** Apply the session command policy to the profile once, before it is keyed. */
+export function applySessionPermissionPolicy(profile: RuntimeProfile): RuntimeProfile {
+  const permission = composedPermissionMap(profile);
+  if (permission === undefined || profile.runtimeAgents === undefined) return profile;
+  return { ...profile, runtimeAgents: narrowProfileAgents(permission, profile.runtimeAgents) };
+}
+
 export function runtimeProfileConfigKey(profile: RuntimeProfile): string {
   return JSON.stringify(
     stableValue({
@@ -89,9 +120,6 @@ export function runtimeProfileConfigKey(profile: RuntimeProfile): string {
       runtimeAgents: profile.runtimeAgents ?? [],
       builtinAgents: profile.builtinAgents ?? {},
       kiloCommands: profile.kiloCommands ?? [],
-      // The written agent entries are narrowed against this map, so it belongs
-      // to the materialized content.
-      permission: profile.permission ?? null,
     })
   );
 }
@@ -105,8 +133,11 @@ export function createRuntimeProfileMaterializer(): RuntimeProfileMaterializer {
   const profiles = new Map<string, MaterializedProfile>();
 
   return {
-    async materialize(home, profile, options) {
+    async materialize(home, offered, options) {
       options?.signal?.throwIfAborted();
+      // Apply the session command policy once, so the key describes the entries
+      // that are written and a session without that policy keeps its identity.
+      const profile = applySessionPermissionPolicy(offered);
       const configKey = runtimeProfileConfigKey(profile);
       let entry = profiles.get(home);
       if (entry?.state === 'aborting') entry = undefined;
@@ -278,11 +309,7 @@ async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile):
   // so write the reconciled map against the permission map this route runs with.
   // A retained workspace configuration and a stored older route both read
   // through this function, so every path writes the same effective entry.
-  const permission = profile.permission;
-  const runtimeAgents =
-    permission === undefined || profile.runtimeAgents === undefined
-      ? profile.runtimeAgents
-      : narrowProfileAgents(permission, profile.runtimeAgents);
+  const { runtimeAgents } = applySessionPermissionPolicy(profile);
   const agents = {
     ...buildBuiltinAgentEntries(profile.builtinAgents),
     ...(runtimeAgents?.length

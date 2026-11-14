@@ -6,7 +6,12 @@ import { expect, it, vi } from 'vitest';
 
 import { appScreenLayout } from '@/components/app-screen-layout';
 import { type ScreenLayoutProps } from '@/components/centered-state-surface';
-import { armLeaveSettle, insideLeaveSettle, resetLeaveSettle } from '@/lib/navigation/leave-settle';
+import {
+  armLeaveSettle,
+  insideLeaveSettle,
+  resetLeaveSettle,
+  spendsLeaveBackPress,
+} from '@/lib/navigation/leave-settle';
 
 // The gate reads nothing else from React Native, and the mounted project cannot
 // parse the library's Flow-typed source: the wrapper is a plain host element.
@@ -157,7 +162,7 @@ it('follows the scene navigation it is replaced with instead of the old one', as
   expect(second.listenerCount()).toBe(0);
 });
 
-it('ends a dismissal’s settle window when this scene finishes appearing', async () => {
+it('ends a dismissal’s settle window and opens its grace when this scene finishes appearing', async () => {
   const { scene, view } = await mountScene(true);
   armLeaveSettle();
   expect(insideLeaveSettle()).toBe(true);
@@ -168,6 +173,8 @@ it('ends a dismissal’s settle window when this scene finishes appearing', asyn
     scene.finishTransition(false);
   });
   expect(insideLeaveSettle()).toBe(false);
+  // The grace that follows that end still belongs to the leave.
+  expect(spendsLeaveBackPress()).toBe(true);
 
   armLeaveSettle();
   // A scene that leaves is not the one a dismissal revealed.

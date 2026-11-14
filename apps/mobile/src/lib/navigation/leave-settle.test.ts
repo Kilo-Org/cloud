@@ -1,6 +1,8 @@
 // The two marks that make one Back close one screen when a press and a
 // screen's own dismissal overlap. Each ends on the event that settles it, so
-// neither depends on a device's speed nor outlives the leave it describes.
+// neither depends on a device's speed nor outlives the leave it describes. The
+// dismissal's window carries its animation and then a short grace, because the
+// reader's press on the screen that went may arrive just after it went.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,8 +13,11 @@ import {
   endLeaveSettle,
   insideLeaveSettle,
   LEAVE_SETTLE_BACKSTOP_MS,
+  LEAVE_SETTLE_GRACE_MS,
   noteAcceptedBack,
   resetLeaveSettle,
+  settleLeaveWindow,
+  spendsLeaveBackPress,
 } from '@/lib/navigation/leave-settle';
 
 beforeEach(() => {
@@ -22,6 +27,7 @@ beforeEach(() => {
 describe('leave settle window', () => {
   it('keeps a Back that arrives before any screen dismissed itself', () => {
     expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(false);
   });
 
   it('spends a Back that arrives after a screen dismissed itself', () => {
@@ -64,6 +70,8 @@ describe('leave settle window', () => {
       expect(insideLeaveSettle()).toBe(true);
       vi.advanceTimersByTime(1);
       expect(insideLeaveSettle()).toBe(false);
+      // No animation ended, so no grace covers a press after it.
+      expect(spendsLeaveBackPress()).toBe(false);
     });
 
     it('keeps the leave’s own end instead of the backstop when the event arrives first', () => {
@@ -72,6 +80,62 @@ describe('leave settle window', () => {
       vi.advanceTimersByTime(LEAVE_SETTLE_BACKSTOP_MS * 2);
       expect(insideLeaveSettle()).toBe(false);
     });
+  });
+});
+
+describe('leave grace', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('spends a Back in the moment after the leave’s animation ended', () => {
+    armLeaveSettle();
+    settleLeaveWindow();
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(true);
+  });
+
+  it('spends the last millisecond of the grace and lets the next one through', () => {
+    armLeaveSettle();
+    settleLeaveWindow();
+    vi.advanceTimersByTime(LEAVE_SETTLE_GRACE_MS - 1);
+    expect(spendsLeaveBackPress()).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(spendsLeaveBackPress()).toBe(false);
+  });
+
+  it('closes an open grace when a later dismissal starts', () => {
+    armLeaveSettle();
+    settleLeaveWindow();
+    vi.advanceTimersByTime(LEAVE_SETTLE_GRACE_MS - 100);
+
+    // The reader acted again inside the earlier grace, so this leave measures
+    // its own grace from its own end.
+    armLeaveSettle();
+    settleLeaveWindow();
+    vi.advanceTimersByTime(LEAVE_SETTLE_GRACE_MS - 1);
+    expect(spendsLeaveBackPress()).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(spendsLeaveBackPress()).toBe(false);
+  });
+
+  it('closes the grace at once when the shell spends its press', () => {
+    armLeaveSettle();
+    settleLeaveWindow();
+    endLeaveSettle();
+    expect(spendsLeaveBackPress()).toBe(false);
+  });
+
+  it('does not open a grace for a scene that appears with no leave open', () => {
+    // Every scene reports its own appearance transition, on every push and tab
+    // switch, so most of those ends belong to no leave at all.
+    settleLeaveWindow();
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(false);
   });
 });
 

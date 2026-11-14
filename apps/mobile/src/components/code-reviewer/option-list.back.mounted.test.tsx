@@ -4,8 +4,8 @@
 //
 // Two windows cover the pair. While this screen is still mounted it answers the
 // Back itself; after the navigator removed the route — the exit animation's
-// remainder — the app-level settle listener answers it, because a screen-level
-// listener no longer exists to do so.
+// remainder and a short grace after it — the app-level settle listener answers
+// it, because a screen-level listener no longer exists to do so.
 
 import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -14,8 +14,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   armLeaveSettle,
   clearAcceptedBack,
-  endLeaveSettle,
+  insideLeaveSettle,
+  LEAVE_SETTLE_GRACE_MS,
   resetLeaveSettle,
+  settleLeaveWindow,
+  spendsLeaveBackPress,
 } from '@/lib/navigation/leave-settle';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { OptionList } from './option-list';
@@ -188,7 +191,7 @@ describe('OptionList hardware Back during a save', () => {
     expect(routerBack).toHaveBeenCalledTimes(1);
   });
 
-  it('lets a Back through once the dismissed screen has finished leaving', async () => {
+  it('spends a Back that arrives while the grace after the dismissed screen runs', async () => {
     const gate = Promise.withResolvers<boolean>();
     const renderer = await mount(() => gate.promise);
     await press(row(renderer, 'All'));
@@ -197,14 +200,59 @@ describe('OptionList hardware Back during a save', () => {
       renderer.unmount();
     });
 
-    // The scene the dismissal revealed reports its appearance transition,
-    // which is the end of the leave this window described.
+    // The scene the dismissal revealed reports its appearance transition, which
+    // is the end of the leave this window described.
     act(() => {
-      endLeaveSettle();
+      settleLeaveWindow();
     });
 
-    expect(backPress.press()).toBe(false);
+    // The reader was still acting on the screen that went, so this press means
+    // that screen and the one beneath never receives it.
+    expect(backPress.press()).toBe(true);
     expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a Back through once the grace after the dismissed screen ended', async () => {
+    const gate = Promise.withResolvers<boolean>();
+    const renderer = await mount(() => gate.promise);
+    await press(row(renderer, 'All'));
+    await settleSave(gate);
+    act(() => {
+      renderer.unmount();
+    });
+
+    // Only the clock is faked: the mount helpers await real microtasks, and the
+    // window keeps the real backstop timer it armed.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      act(() => {
+        settleLeaveWindow();
+      });
+      // A deliberate press later is a press on the screen now shown.
+      vi.setSystemTime(Date.now() + LEAVE_SETTLE_GRACE_MS);
+
+      expect(backPress.press()).toBe(false);
+      expect(routerBack).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not spend a Back for a scene that appears with no leave open', async () => {
+    const pending = Promise.withResolvers<boolean>();
+    await mount(() => pending.promise);
+
+    // A push or a tab switch reports the arriving scene's transition end, and no
+    // dismissal of this app preceded it.
+    act(() => {
+      settleLeaveWindow();
+    });
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(false);
+
+    // The press belongs to the screen that push revealed.
+    expect(backPress.press()).toBe(false);
+    expect(routerBack).not.toHaveBeenCalled();
   });
 
   it('suppresses a save that resolves while the accepted Back is still committing', async () => {

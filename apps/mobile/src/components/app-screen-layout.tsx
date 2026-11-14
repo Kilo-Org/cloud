@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { NativeStateSurface, type ScreenLayoutProps } from '@/components/centered-state-surface';
-import { endLeaveSettle } from '@/lib/navigation/leave-settle';
+import { settleLeaveWindow } from '@/lib/navigation/leave-settle';
 
 /**
  * Hides every covered `(app)` stack scene from screen readers.
@@ -64,13 +64,14 @@ function CoveredScreenA11yGate({
 
 /**
  * Ends the settle window a dismissal opened when this scene's own appearance
- * finishes.
+ * finishes, and opens the grace that follows it.
  *
  * A screen that dismisses itself pops the route that revealed this scene, so
  * the transition that brings this scene in is the one that carried that screen
  * away, and its end is the end of that leave. That end is the only trustworthy
  * signal: a wall-clock span would have to guess the JavaScript commit plus the
- * platform transition, and a loaded device lengthens both.
+ * platform transition, and a loaded device lengthens both. The grace then covers
+ * the press of a reader still acting on the screen that went.
  */
 function SettledLeaveEndsWithThisScene({
   navigation,
@@ -80,7 +81,7 @@ function SettledLeaveEndsWithThisScene({
   useEffect(() => {
     const unsubscribe = navigation.addListener('transitionEnd', event => {
       if (!event.data.closing) {
-        endLeaveSettle();
+        settleLeaveWindow();
       }
     });
     return unsubscribe;

@@ -788,6 +788,43 @@ describe('directory conflict bounds', () => {
     expect((await readState(target)).parked).toEqual(['evt_1', 'evt_3']);
   });
 
+  it('keeps a spent window spent once an activation of that directory applies', async () => {
+    const target = stub('activation-does-not-rearm');
+    const clock = steppingClock(0);
+    const routes = [MISSING_DIRECTORY('dir_grp_01'), MISSING_DIRECTORY('dir_grp_02')];
+
+    // The directory's first conflict opens its window.
+    harness({ pages: [[groupEvent('evt_1')]], routes });
+    const held = await runInDurableObject(target, instance => instance.poll());
+    expect(held.heldFailure?.eventId).toBe('evt_1');
+
+    // A budget later the window is spent. The event that opened it parks, the
+    // activation behind it applies and binds the directory's organization, and
+    // the directory's next conflict parks at once: only the event that opened
+    // the window closes it, so the window stays spent across that activation.
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS);
+    harness({
+      pages: [
+        [
+          groupEvent('evt_1'),
+          directoryEvent('evt_2'),
+          groupEvent('evt_3', 'dsync.group.created', { groupId: 'dir_grp_02' }),
+        ],
+      ],
+      routes,
+    });
+    const result = await runInDurableObject(target, instance => instance.poll());
+
+    expect(result.eventsApplied).toBe(1);
+    expect(result.eventsParked).toBe(2);
+    expect(result.heldFailure).toBeNull();
+    expect(result.cursor).toBe('evt_3');
+
+    const state = await readState(target);
+    expect(state.parked).toEqual(['evt_1', 'evt_3']);
+    expect(state.parkedReasons['evt_3']).toContain('spent its conflict window');
+  });
+
   it('gives a directory a fresh window once the event that opened it applies', async () => {
     const target = stub('window-closed');
     const clock = steppingClock(0);

@@ -25,21 +25,13 @@ vi.mock('@sentry/react-native', () => ({ captureException }));
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
 
-// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-function flushMicrotasks(): Promise<void> {
-  return new Promise(resolve => {
-    setImmediate(resolve);
-  });
-}
-
 // The store is a module-level singleton that latches its one disk read, so a
 // fresh module graph gives a truly cold store whose preload-then-read can be
-// exercised end to end.
-async function freshStore(): Promise<typeof RemoteMcpStoreModule> {
+// exercised end to end. Awaiting the import settles module evaluation, which
+// starts the read but does not wait for it.
+function freshStore(): Promise<typeof RemoteMcpStoreModule> {
   vi.resetModules();
-  const mod = import('./remote-mcp-store');
-  await Promise.resolve();
-  return mod;
+  return import('./remote-mcp-store');
 }
 
 /** A complete draft, so each test names only the field it is about. */
@@ -301,8 +293,9 @@ describe('remote MCP server store', () => {
     getItemAsync.mockResolvedValue('{not json');
     const mod = await freshStore();
 
-    await flushMicrotasks();
+    await mod.whenRemoteMcpServersLoaded();
 
+    expect(mod.getRemoteMcpServersHasLoaded()).toBe(true);
     expect(mod.listRemoteMcpServers()).toEqual([]);
   });
 
@@ -317,7 +310,7 @@ describe('remote MCP server store', () => {
     getItemAsync.mockResolvedValue(JSON.stringify([stored]));
     const mod = await freshStore();
 
-    await flushMicrotasks();
+    await mod.whenRemoteMcpServersLoaded();
 
     expect(mod.listRemoteMcpServers()).toEqual([stored]);
   });
@@ -335,7 +328,7 @@ describe('remote MCP server store', () => {
     expect(mod.getRemoteMcpServersHasLoaded()).toBe(false);
 
     read.resolve(null);
-    await flushMicrotasks();
+    await mod.whenRemoteMcpServersLoaded();
 
     expect(mod.getRemoteMcpServersHasLoaded()).toBe(true);
   });
@@ -361,7 +354,10 @@ describe('remote MCP server store', () => {
         },
       ])
     );
-    await flushMicrotasks();
+    // The merge lands in the store's value before the load promise resolves
+    // (secure-store-preference sets the merge, then marks the load settled), so
+    // the list is final here without polling.
+    await mod.whenRemoteMcpServersLoaded();
 
     expect(mod.listRemoteMcpServers().map(server => server.id)).toEqual(['existing', 'new']);
   });

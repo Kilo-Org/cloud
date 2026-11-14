@@ -103,21 +103,25 @@ describe('shared tap-target geometry', () => {
     // The box is measured through the app's own pipeline, so a utility the
     // compiler fails to extract is caught, and the floor is the exported
     // constant rather than a second copy of the class's text.
-    expect(await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'height')).toBeGreaterThanOrEqual(
-      MIN_TAP_TARGET_DP
-    );
-    expect(await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'width')).toBeGreaterThanOrEqual(
-      MIN_TAP_TARGET_DP
-    );
+    const height = await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'height');
+    const width = await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'width');
+    // Whole pixels: the box lays out on the target's own edges, and a
+    // fractional utility is the retune this name rules out.
+    expect(Number.isInteger(height)).toBe(true);
+    expect(Number.isInteger(width)).toBe(true);
+    expect(height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     // Centring has no dp value to compile, so it stays a class check.
     expect(COMPACT_CONTROL_BOX_CLASS).toContain('items-center');
   });
 
   it('renders the icon target box at Android 48dp minimum from whole pixels', async () => {
-    expect(await compiledDp(ICON_TARGET_BOX_CLASS, 'height')).toBeGreaterThanOrEqual(
-      ICON_TARGET_DP
-    );
-    expect(await compiledDp(ICON_TARGET_BOX_CLASS, 'width')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    const height = await compiledDp(ICON_TARGET_BOX_CLASS, 'height');
+    const width = await compiledDp(ICON_TARGET_BOX_CLASS, 'width');
+    expect(Number.isInteger(height)).toBe(true);
+    expect(Number.isInteger(width)).toBe(true);
+    expect(height).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
     expect(ICON_TARGET_BOX_CLASS).toContain('items-center');
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
   });

@@ -193,6 +193,33 @@ async function recordStatements(stub: RelayStub): Promise<() => string[]> {
 }
 
 /**
+ * Counts the rows of `relay_commands` that a statement writes. `total_changes()` counts rows in
+ * every table, so it cannot attribute a change to this table; these triggers fire once per row this
+ * table writes, and only the probe row's own maintenance changes the counter. A statement that
+ * matches no row fires nothing, so an update that rewrites nothing adds nothing.
+ */
+async function countCommandWrites(stub: RelayStub): Promise<() => Promise<number>> {
+  await runInDurableObject(stub, (_instance, state) => {
+    const sql = state.storage.sql;
+    sql.exec('CREATE TABLE IF NOT EXISTS relay_write_probe (n INTEGER NOT NULL)');
+    sql.exec(
+      'INSERT INTO relay_write_probe (n) SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM relay_write_probe)'
+    );
+    for (const event of ['INSERT', 'UPDATE', 'DELETE'])
+      sql.exec(
+        `CREATE TRIGGER IF NOT EXISTS relay_command_${event.toLowerCase()} AFTER ${event} ON relay_commands
+         BEGIN UPDATE relay_write_probe SET n = n + 1; END`
+      );
+  });
+  return () =>
+    runInDurableObject(
+      stub,
+      (_instance, state) =>
+        state.storage.sql.exec<{ n: number }>('SELECT n FROM relay_write_probe').one().n
+    );
+}
+
+/**
  * The hand-off write: the UPDATE that records a command as delivered. The expiry sweep also issues
  * `UPDATE relay_commands` statements on every connect, but those carry a status/payload predicate
  * instead of assigning `delivered_at`, so the timestamp assignment separates a delivery from a
@@ -593,39 +620,34 @@ it('replays the retained mailbox on reconnect without rewriting delivered rows',
     await rpcResponse(
       fixture.stub.command({ ticket: token, command: fixture.command(id, { prompt: id }) })
     );
-  // `total_changes()` counts rows changed in every table, so it cannot attribute a change to
-  // `relay_commands`; the statement text does that, and the delta proves the statements that match
-  // no rows changed none.
+  // The probe counts the rows this table writes, so a sweep statement that matches no row adds
+  // nothing, and the statement text names the write that does land.
   const statements = await recordStatements(fixture.stub);
-  const changes = () =>
-    runInDurableObject(
-      fixture.stub,
-      (_instance, state) =>
-        state.storage.sql.exec<{ n: number }>('SELECT total_changes() AS n').one().n
-    );
-  const beforeFirst = { changes: await changes(), statements: statements().length };
+  const writes = await countCommandWrites(fixture.stub);
+  const beforeFirst = { writes: await writes(), statements: statements().length };
   const runner = await fixture.connect('runner');
   const first = await runner.next('send_message');
   const second = await runner.next('send_message');
   expect(first.body).toMatchObject({ commandID: 'replay-a', payload: { prompt: 'replay-a' } });
   expect(second.body).toMatchObject({ commandID: 'replay-b', payload: { prompt: 'replay-b' } });
-  // The first hand-off records the transition once per retained command, so exactly two statements
-  // assign `delivered_at`: one for `replay-a` and one for `replay-b`. The connect's expiry sweep
-  // issues `UPDATE relay_commands` statements too, but they carry a status/payload predicate and
-  // touch no row, so they are not deliveries.
+  // The first hand-off changes exactly two rows of `relay_commands`, one per retained command, and
+  // exactly two statements assign `delivered_at`: one for `replay-a` and one for `replay-b`. The
+  // connect's expiry sweep issues `UPDATE relay_commands` statements too, but they carry a
+  // status/payload predicate and touch no row, so neither the count nor the text records them as
+  // deliveries.
+  expect((await writes()) - beforeFirst.writes).toBe(2);
   expect(statements().slice(beforeFirst.statements).filter(recordsDelivery)).toHaveLength(2);
-  expect((await changes()) - beforeFirst.changes).toBe(2);
   runner.ws.close();
-  const beforeReplay = { changes: await changes(), statements: statements().length };
+  const beforeReplay = { writes: await writes(), statements: statements().length };
   const replacement = await fixture.connect('runner');
   const replayFirst = await replacement.next('send_message');
   const replaySecond = await replacement.next('send_message');
   expect(replayFirst.body).toEqual(first.body);
   expect(replaySecond.body).toEqual(second.body);
-  // Redelivery is not a state change: no statement of the second connection records a delivery, and
-  // no row in any table changes, so both rows keep the timestamp the first hand-off wrote.
+  // Redelivery is not a state change: the second connection writes no row of `relay_commands`, no
+  // statement of it records a delivery, and both rows keep the timestamp the first hand-off wrote.
+  expect((await writes()) - beforeReplay.writes).toBe(0);
   expect(statements().slice(beforeReplay.statements).filter(recordsDelivery)).toEqual([]);
-  expect((await changes()) - beforeReplay.changes).toBe(0);
   await runInDurableObject(fixture.stub, (_instance, state) => {
     expect(
       drizzle(state.storage)
@@ -724,13 +746,8 @@ it('keeps a queued command unrecorded when the runner hand-off send fails, then 
 it('sends no frame and changes no row when a runner connects to an empty mailbox', async () => {
   const fixture = await setup();
   const statements = await recordStatements(fixture.stub);
-  const changes = () =>
-    runInDurableObject(
-      fixture.stub,
-      (_instance, state) =>
-        state.storage.sql.exec<{ n: number }>('SELECT total_changes() AS n').one().n
-    );
-  const before = { changes: await changes(), statements: statements().length };
+  const writes = await countCommandWrites(fixture.stub);
+  const before = { writes: await writes(), statements: statements().length };
   const runner = await fixture.connect('runner');
   // Explicit bound on a real clock: the frame would already have been buffered by the runtime, so a
   // faked clock cannot advance it, and the wait only lets a real `send_message` surface.
@@ -741,14 +758,13 @@ it('sends no frame and changes no row when a runner connects to an empty mailbox
   expect(observed).toBe('timeout');
   const window = statements().slice(before.statements);
   // The expiry sweep issues `UPDATE relay_commands` statements even for an empty mailbox, so the
-  // statements that would add or record a command are what a connect must not run at all.
+  // probe shows those statements write no row, and the statements that would add or record a
+  // command are what a connect must not run at all.
+  expect((await writes()) - before.writes).toBe(0);
   expect(window.filter(recordsDelivery)).toEqual([]);
   expect(
     window.filter(statement => /insert\s+into\s+[`"]?relay_commands/i.test(statement))
   ).toEqual([]);
-  // `total_changes()` still adds the row-level half of the claim: the sweep statements changed no
-  // row in `relay_commands` or anywhere else, which the text alone cannot show.
-  expect((await changes()) - before.changes).toBe(0);
 });
 
 it('rejects offline liveOnly commands and clears delivered payloads without replaying after disconnection', async () => {

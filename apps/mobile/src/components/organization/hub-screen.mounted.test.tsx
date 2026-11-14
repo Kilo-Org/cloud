@@ -915,9 +915,7 @@ describe('Organization hub integrations rows', () => {
     act(() => {
       (inApp.props.onPress as () => void)();
     });
-    expect(routerPush).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/integrations?org=org-1'
-    );
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/integrations?org=org-1');
 
     act(() => {
       (web.props.onPress as () => void)();

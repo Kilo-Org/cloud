@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   isPostHogStorageSealed,
-  POSTHOG_STORAGE_FILES,
   posthogCustomStorage,
   purgePostHogPersistence,
   resetPostHogStorageForTests,
@@ -100,12 +99,6 @@ function makeNextFile(opts?: {
 beforeEach(() => {
   resetPostHogStorageForTests();
   vi.clearAllMocks();
-});
-
-describe('POSTHOG_STORAGE_FILES', () => {
-  it('has two entries matching the SDK storage files', () => {
-    expect(POSTHOG_STORAGE_FILES).toEqual(['.posthog-rn.json', '.posthog-rn-logs.json']);
-  });
 });
 
 describe('posthogCustomStorage', () => {

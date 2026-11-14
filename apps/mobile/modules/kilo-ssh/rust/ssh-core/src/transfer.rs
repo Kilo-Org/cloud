@@ -27,7 +27,7 @@ pub(crate) async fn download(
     cancel: &CancelToken,
 ) -> Result<u64, SshError> {
     let attributes = session
-        .symlink_metadata(remote.to_string())
+        .metadata(remote.to_string())
         .await
         .map_err(|error| sftp_error(remote, error))?;
     let staged = staging_path(local);

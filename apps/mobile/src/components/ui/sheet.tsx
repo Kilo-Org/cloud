@@ -344,10 +344,13 @@ export function Sheet({
       return undefined;
     }
     const timeout = setTimeout(() => {
-      // End the presentation before forwarding the close: the dismissal clears
-      // `mounted`, so the close it forwards cannot re-arm another owed occurrence.
-      settleDismiss(presentationRef.current);
+      // The close edge goes first, in the order the adapter reports them: the
+      // caller's `close` is a no-op against the phase it already dismissed, so a
+      // part queued behind this dismissal is not dismissed again by the close that
+      // follows the settled one. Both run in one flush, and the dismissal clears
+      // `mountedRef` before the close's re-render can re-arm another occurrence.
       settleClose(presentationRef.current);
+      settleDismiss(presentationRef.current);
       // The instance that still holds this dismissal is replaced: its own teardown
       // state would refuse to present from an unchanged index, and its late report
       // belongs to a presentation that is over. The fresh instance presents from

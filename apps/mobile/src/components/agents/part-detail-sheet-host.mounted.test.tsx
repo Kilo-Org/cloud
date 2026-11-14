@@ -723,4 +723,43 @@ describe('PartDetailSheetHost mounted', () => {
       vi.useRealTimers();
     }
   });
+
+  it('presents the part queued behind a dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      const mounted = renderer;
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        (propOf(findByType(mounted.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      // The next part is chosen while the dismissal is still outstanding.
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(sheetTitle(mounted)).toBe('bash: echo one');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      // The deadline reports the close before the dismissal: the queued part is not
+      // dismissed again by the close, so it is on screen afterwards.
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(mounted)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
 });

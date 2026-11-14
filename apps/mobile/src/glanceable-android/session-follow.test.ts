@@ -294,7 +294,8 @@ describe('restoreFollowedSessionCards', () => {
       { sessionId: 'session-7', userId: 'user-1', organizationId: null, approvalKey: null },
     ]);
 
-    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(true);
+    // The channel pass failed, so the follow set is still unknown.
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(false);
 
     // The card another scope left behind is pruned even though the channels could
     // not be created: reconciliation owns the cards, the channel pass only the post.
@@ -315,7 +316,9 @@ describe('restoreFollowedSessionCards', () => {
     mocks.getStoredSessionCards.mockReturnValue(own);
     mocks.ensureAndroidNotificationChannels.mockResolvedValue(false);
 
-    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(true);
+    // The follow set is still empty, so the result must not claim it is known: a
+    // headless push would release a token for a session this device does follow.
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(false);
 
     // A card restored before its channel existed would be posted into nothing and
     // never reposted once creation succeeded.

@@ -49,8 +49,10 @@ export async function restoreFollowedSessionCardsFromStorage(): Promise<boolean>
   dismissForeignSessionCards(ctx);
   if (!(await ensureAndroidNotificationChannels())) {
     // A restore posts the card through its channel, so a failed pass would leave it
-    // unposted and never reposted. The next launch reconciles and retries both.
-    return true;
+    // unposted and never reposted. The in-memory follow set is therefore still
+    // empty, which must not read as "this device follows nothing": the callers
+    // refuse to act on an unknown set, and the next launch reconciles again.
+    return false;
   }
   restoreFollowedSessionCards(ctx);
   return true;

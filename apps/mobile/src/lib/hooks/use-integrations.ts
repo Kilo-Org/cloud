@@ -13,6 +13,7 @@ import {
 } from '@/lib/pr-review/connect-gate-platform';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
  * The scope's connections, from the same read the web integrations hub uses:
@@ -126,7 +127,9 @@ export function useDisconnectIntegration(organizationId: string | undefined) {
 /**
  * The provider's connect URL. OAuth callbacks land on the web, so every
  * provider is connected there; GitHub additionally validates a one-time install
- * state token, which the minted URL carries.
+ * state token, which the minted URL carries. An organization whose mint is
+ * refused still gets the page, without the token, because the page mints its
+ * own state for the signed-in web user.
  */
 async function connectUrl(
   provider: IntegrationProvider,
@@ -135,12 +138,41 @@ async function connectUrl(
   if (provider !== 'github') {
     return getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId);
   }
-  const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-    ...(organizationId ? { organizationId } : {}),
-    returnTo: getIntegrationPagePath('github', organizationId),
-  });
-  return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token);
+  try {
+    const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+      ...(organizationId ? { organizationId } : {}),
+      returnTo: getIntegrationPagePath('github', organizationId),
+    });
+    return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token);
+  } catch (error) {
+    // An organization's mint needs `OWNER`/`ADMIN` and refuses everyone else
+    // with `UNAUTHORIZED`; a non-multi-installation organization that already
+    // has an active GitHub App connection is refused with `FORBIDDEN`. Neither
+    // can mint a token, and the page still works without one: it mints its own
+    // state for the signed-in web user. Both therefore open that page instead
+    // of an error toast, which would leave the row inert in exactly the state
+    // that needs a route to it. A non-tRPC rejection can carry a bare `code`, so
+    // only a real client error counts.
+    const code = readTrpcErrorField(error, 'code');
+    if (
+      organizationId &&
+      isTrpcClientError(error) &&
+      (code === 'FORBIDDEN' || code === 'UNAUTHORIZED')
+    ) {
+      return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId);
+    }
+    throw error;
+  }
 }
+
+/**
+ * The hub's Connect action: the provider whose launch is in flight, and the tap
+ * that starts one.
+ */
+export type IntegrationConnect = {
+  pendingProvider: IntegrationProvider | null;
+  connect: (provider: IntegrationProvider) => Promise<void>;
+};
 
 /**
  * Opens the web page that owns a provider's connect flow and waits for the
@@ -151,7 +183,7 @@ async function connectUrl(
 export function useIntegrationConnect(params: {
   organizationId?: string;
   onReturned: () => Promise<void>;
-}) {
+}): IntegrationConnect {
   const [pendingProvider, setPendingProvider] = useState<IntegrationProvider | null>(null);
 
   async function connect(provider: IntegrationProvider) {

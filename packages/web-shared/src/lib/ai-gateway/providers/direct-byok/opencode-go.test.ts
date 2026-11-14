@@ -189,6 +189,44 @@ describe('OpenCode Go session headers', () => {
   });
 });
 
+describe('OpenCode Go Chat Completions client headers', () => {
+  const upstream = {
+    apiUrl: 'https://opencode.ai/zen/go/v1',
+    apiUrlOverrides: {},
+    disableUrlSuffix: false,
+    apiKey: 'test-api-key',
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: null,
+  } as const;
+
+  test('sends its own session header and the credential as a bearer token', () => {
+    const headers = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+
+    expect(headers['x-opencode-session']).toEqual(expect.any(String));
+    expect(headers.authorization).toBeUndefined();
+    expect(headers['x-api-key']).toBeUndefined();
+  });
+
+  test('adds the credential header when the upstream does not take a bearer token', () => {
+    const headers = openCodeGo.chatCompletionsHeaders({
+      ...upstream,
+      apiUrlOverrides: {},
+      apiKeyHeader: 'x-api-key',
+    });
+
+    expect(headers['x-api-key']).toBe('test-api-key');
+    expect(headers['x-opencode-session']).toEqual(expect.any(String));
+  });
+
+  test('gives each client its own session', () => {
+    const first = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+    const second = openCodeGo.chatCompletionsHeaders({ ...upstream, apiUrlOverrides: {} });
+
+    expect(first['x-opencode-session']).not.toBe(second['x-opencode-session']);
+  });
+});
+
 describe('OpenCode Go AI SDK provider', () => {
   test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus'])(
     'uses the Anthropic Messages API for OpenCode Go model %s',

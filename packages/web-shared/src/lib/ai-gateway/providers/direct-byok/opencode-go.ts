@@ -4,6 +4,7 @@ import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai
 import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
+  credentialHeaders,
   faviconIcon,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
@@ -46,8 +47,8 @@ export default {
       removeChatCompletionsMessageNames(context.request.body);
     }
   },
-  chatCompletionsHeaders() {
-    return sessionHeaders(randomUUID());
+  chatCompletionsHeaders(upstream) {
+    return { ...credentialHeaders(upstream), ...sessionHeaders(randomUUID()) };
   },
   getAiSdkProvider(model) {
     return isMinimaxModel(model) || isQwenModel(model) ? { aiSdkProvider: 'anthropic' } : null;

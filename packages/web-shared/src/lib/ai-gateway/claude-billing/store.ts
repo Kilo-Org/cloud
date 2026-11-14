@@ -15,16 +15,10 @@ import {
   type DrizzleDatabase,
   type DrizzleTransaction,
 } from '@kilocode/web-shared/lib/drizzle';
+import { claudeBillingOwnerMatches, type ClaudeBillingOwner } from './owner';
 
-/**
- * Who a Claude billing connection belongs to: the person's personal account,
- * the person's own requests in one organization, or the organization's shared
- * services. A request uses only the connection of the owner it runs for.
- */
-export type ClaudeBillingOwner =
-  | { kind: 'personal'; kiloUserId: string }
-  | { kind: 'member'; kiloUserId: string; organizationId: string }
-  | { kind: 'shared_services'; organizationId: string };
+export type { ClaudeBillingOwner } from './owner';
+
 export type ClaudeBillingOwnerInput = {
   organizationId?: string;
   scope?: 'shared_services';
@@ -298,7 +292,7 @@ export async function insertClaudeBillingProfile(
     .where(eq(claude_billing_connections.user_profile_id, userProfileId))
     .limit(1);
   if (!row) throw new Error('Claude billing connection row is missing after insert');
-  if (!isInitialOwner(row, owner)) {
+  if (!claudeBillingOwnerMatches(row, owner)) {
     const [existingGrant] = await onDb
       .select({ id: claude_billing_connection_grants.id })
       .from(claude_billing_connection_grants)
@@ -435,17 +429,6 @@ async function deletePersonalAnthropicByokKey(
     );
 }
 
-function isInitialOwner(row: ClaudeBillingConnectionRow, owner: ClaudeBillingOwner): boolean {
-  switch (owner.kind) {
-    case 'personal':
-      return row.kilo_user_id === owner.kiloUserId && row.organization_id === null;
-    case 'member':
-      return row.kilo_user_id === owner.kiloUserId && row.organization_id === owner.organizationId;
-    case 'shared_services':
-      return row.kilo_user_id === null && row.organization_id === owner.organizationId;
-  }
-}
-
 async function reassignPayerOwnerColumns(
   tx: DrizzleTransaction,
   payerConnectionId: string,
@@ -518,7 +501,7 @@ export async function removeClaudeBillingGrant(
       .from(claude_billing_connections)
       .where(eq(claude_billing_connections.id, connection.id))
       .limit(1);
-    if (payerRow && isInitialOwner(payerRow, owner)) {
+    if (payerRow && claudeBillingOwnerMatches(payerRow, owner)) {
       await reassignPayerOwnerColumns(tx, connection.id, remaining);
       return null;
     }

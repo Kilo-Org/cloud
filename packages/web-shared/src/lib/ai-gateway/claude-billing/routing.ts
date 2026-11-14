@@ -95,8 +95,8 @@ function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner[]
  * shared-services connection's connector is gone. A person's own connection is
  * gated on the person making the request. A shared-services connection is gated
  * on the person who linked it last, because a service run's caller is a bot that
- * no release flag covers. The previous web app release does not report that
- * person, so the requester stands in, as it did there.
+ * no release flag covers. An answer that does not report that person falls back
+ * to the requester.
  */
 async function gateEmail(
   input: ClaudeBillingRoutingInput,

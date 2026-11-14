@@ -82,8 +82,10 @@ it('samples admission and always reports rejection using only bounded fields and
     reason: null,
     active: 2,
     active_non_llm: 0,
+    active_direct: 0,
     limit: 8,
     non_llm_limit: 2,
+    direct_limit: 5,
     pool_max: 10,
     pool: { total: 0, idle: 0, waiting: 0 },
     sample_rate: 0.01,
@@ -99,8 +101,10 @@ it('samples admission and always reports rejection using only bounded fields and
     reason: 'pool_waiting',
     active: 2,
     active_non_llm: 0,
+    active_direct: 0,
     limit: 8,
     non_llm_limit: 2,
+    direct_limit: 5,
     pool_max: 10,
     pool: { total: 0, idle: 0, waiting: 1 },
     sample_rate: 1,
@@ -181,8 +185,10 @@ describe('acquire', () => {
       reason: null,
       active: 1,
       active_non_llm: 0,
+      active_direct: 0,
       limit: 1,
       non_llm_limit: 1,
+      direct_limit: 1,
       pool_max: 3,
       pool: { total: 0, idle: 0, waiting: 0 },
       sample_rate: 0.01,
@@ -552,6 +558,157 @@ describe('non_llm writer class', () => {
       await expect(
         gate.acquire('queue', 'side', { ...nonLlm, maxWaitMs: 0 })
       ).resolves.toMatchObject({ admitted: false });
+      for (let index = ceiling; index < limit; index++) admitted(gate.tryAcquire('queue', 'llm'));
+      expect(gate.tryAcquire('queue', 'llm').admitted).toBe(false);
+    }
+  );
+});
+
+describe('direct writer class', () => {
+  type Gate = ReturnType<typeof createQueueWriterAdmission>;
+  const direct = { maxWaitMs: 250, writerClass: 'direct' } as const;
+  const nonLlm = { maxWaitMs: 0, writerClass: 'non_llm' } as const;
+  function admitted(slot: Awaited<ReturnType<Gate['acquire']>>) {
+    if (!slot.admitted) throw new Error(`expected admitted slot, got ${slot.reason}`);
+    return slot;
+  }
+  const logs = (level: 'info' | 'warn') =>
+    jest.mocked(console[level]).mock.calls.map(([line]) => JSON.parse(String(line)));
+  const holdDirect = async (gate: Gate, count: number) => {
+    const slots = [];
+    for (let index = 0; index < count; index++)
+      slots.push(admitted(await gate.acquire('ingress_direct', 'direct', direct)));
+    return slots;
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: 0 });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('holds at most five of the eight shared slots so LLM queue writes keep three', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const held = await holdDirect(gate, 5);
+    await expect(gate.acquire('ingress_direct', 'direct-6', direct)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    expect(logs('warn').at(-1)).toMatchObject({
+      writer_caller: 'ingress_direct',
+      writer_class: 'direct',
+      reason: 'queue_limit',
+      active: 5,
+      active_direct: 5,
+      direct_limit: 5,
+      slot_wait_ms: 0,
+      usage_id: 'direct-6',
+    });
+    const llm = Array.from({ length: 3 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    expect(gate.tryAcquire('queue', 'llm')).toEqual({ admitted: false, reason: 'queue_limit' });
+    for (const slot of [...held, ...llm]) slot.release();
+  });
+
+  it('composes with non_llm: 5 direct + 2 non_llm leave one LLM queue slot of the shared 8', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const held = await holdDirect(gate, 5);
+    const side = [
+      admitted(await gate.acquire('queue', 'side-1', nonLlm)),
+      admitted(await gate.acquire('queue', 'side-2', nonLlm)),
+    ];
+    await expect(gate.acquire('queue', 'side-3', nonLlm)).resolves.toMatchObject({
+      admitted: false,
+    });
+    await expect(gate.acquire('ingress_direct', 'direct-6', direct)).resolves.toMatchObject({
+      admitted: false,
+    });
+    const llm = admitted(gate.tryAcquire('queue', 'llm'));
+    expect(gate.tryAcquire('queue', 'llm')).toEqual({ admitted: false, reason: 'queue_limit' });
+    for (const slot of [...held, ...side, llm]) slot.release();
+    const all = Array.from({ length: 8 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    for (const slot of all) slot.release();
+  });
+
+  it('never waits, so it cannot take a FIFO place or overtake a waiting queue write', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const llm = Array.from({ length: 8 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    const waitingLlm = gate.acquire('queue', 'llm-waiter', { maxWaitMs: 250 });
+    await expect(gate.acquire('ingress_direct', 'direct', direct)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    llm[0].release();
+    const granted = admitted(await waitingLlm);
+    await expect(gate.acquire('ingress_direct', 'direct', direct)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    for (const slot of [granted, ...llm.slice(1)]) slot.release();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('applies the pool checks to direct calls below the ceiling', async () => {
+    const currentPool = pool();
+    const gate = createQueueWriterAdmission(currentPool);
+    currentPool.waitingCount = 1;
+    await expect(gate.acquire('ingress_direct', 'direct', direct)).resolves.toEqual({
+      admitted: false,
+      reason: 'pool_waiting',
+    });
+    currentPool.waitingCount = 0;
+    currentPool.totalCount = 8;
+    await expect(gate.acquire('ingress_direct', 'direct', direct)).resolves.toEqual({
+      admitted: false,
+      reason: 'pool_busy',
+    });
+  });
+
+  it('returns a released direct slot to its class and the shared limit once', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const held = await holdDirect(gate, 5);
+    held[0].release();
+    held[0].release();
+    const replacement = admitted(await gate.acquire('ingress_direct', 'direct', direct));
+    await expect(gate.acquire('ingress_direct', 'direct', direct)).resolves.toMatchObject({
+      admitted: false,
+    });
+    for (const slot of [...held.slice(1), replacement]) slot.release();
+    const llm = Array.from({ length: 8 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    for (const slot of llm) slot.release();
+  });
+
+  it('hands a slot released by a direct write to a waiting queue write', async () => {
+    const gate = createQueueWriterAdmission(pool());
+    const held = await holdDirect(gate, 5);
+    const llm = Array.from({ length: 3 }, () => admitted(gate.tryAcquire('queue', 'llm')));
+    const waitingLlm = gate.acquire('queue', 'llm-waiter', { maxWaitMs: 250 });
+    held[0].release();
+    const granted = admitted(await waitingLlm);
+    await expect(gate.acquire('ingress_direct', 'direct', direct)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
+    expect(logs('warn').at(-1)).toMatchObject({ active: 8, active_direct: 4 });
+    for (const slot of [...held.slice(1), ...llm, granted]) slot.release();
+  });
+
+  it.each([
+    [1, 1, 1],
+    [3, 1, 1],
+    [5, 3, 1],
+    [6, 4, 1],
+    [10, 8, 5],
+    [12, 10, 7],
+  ])(
+    'gives a %s-connection pool shared limit %s and direct ceiling %s',
+    async (max, limit, ceiling) => {
+      const gate = createQueueWriterAdmission(pool(max));
+      for (let index = 0; index < ceiling; index++)
+        admitted(await gate.acquire('ingress_direct', 'direct', direct));
+      await expect(gate.acquire('ingress_direct', 'direct', direct)).resolves.toMatchObject({
+        admitted: false,
+      });
       for (let index = ceiling; index < limit; index++) admitted(gate.tryAcquire('queue', 'llm'));
       expect(gate.tryAcquire('queue', 'llm').admitted).toBe(false);
     }

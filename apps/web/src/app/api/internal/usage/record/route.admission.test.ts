@@ -85,7 +85,10 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-async function holdWrites(count: number) {
+async function holdWrites(
+  count: number,
+  sourceFor: (index: number) => string = index => (index % 2 ? 'queue_vercel' : 'queue')
+) {
   const started = Promise.withResolvers<void>();
   const pending = Array.from({ length: count }, () =>
     Promise.withResolvers<Awaited<ReturnType<typeof saveUsageRelatedDataLocally>>>()
@@ -96,7 +99,7 @@ async function holdWrites(count: number) {
       return item.promise;
     })
   );
-  const work = pending.map((_, index) => POST(request(index % 2 ? 'queue_vercel' : 'queue')));
+  const work = pending.map((_, index) => POST(request(sourceFor(index))));
   await started.promise;
   return {
     pending,
@@ -216,32 +219,36 @@ it.each([
   });
 });
 
-it.each([undefined, 'region_handoff', 'unknown', 'QUEUE', 'sensitive-arbitrary-source'])(
-  'preserves bypass caller %s under full queue and pool pressure',
-  async source => {
-    const held = await holdWrites(8);
-    try {
-      writerPool.waitingCount = 1;
-      const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
-      const response = await POST(request(source));
-      expect(response.status).toBe(200);
-      expect(acquire).not.toHaveBeenCalled();
-      expect(persist).toHaveBeenLastCalledWith(
-        payload.core,
-        payload.metadata,
-        payload.prior_microdollar_usage,
-        payload.posthog_distinct_id,
-        payload.bouncer_usage_event,
-        {
-          entrypoint: 'writer_endpoint',
-          writer_caller: source === 'region_handoff' ? source : 'unknown',
-        }
-      );
-    } finally {
-      await held.drain();
-    }
+it.each([
+  undefined,
+  'region_handoff',
+  'unknown',
+  'QUEUE',
+  'INGRESS_DIRECT',
+  'sensitive-arbitrary-source',
+])('preserves bypass caller %s under full queue and pool pressure', async source => {
+  const held = await holdWrites(8);
+  try {
+    writerPool.waitingCount = 1;
+    const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
+    const response = await POST(request(source));
+    expect(response.status).toBe(200);
+    expect(acquire).not.toHaveBeenCalled();
+    expect(persist).toHaveBeenLastCalledWith(
+      payload.core,
+      payload.metadata,
+      payload.prior_microdollar_usage,
+      payload.posthog_distinct_id,
+      payload.bouncer_usage_event,
+      {
+        entrypoint: 'writer_endpoint',
+        writer_caller: source === 'region_handoff' ? source : 'unknown',
+      }
+    );
+  } finally {
+    await held.drain();
   }
-);
+});
 
 it.each(['recorded', 'duplicate', 'null', 'throw'] as const)(
   'releases the last slot after %s while other writes remain pending',
@@ -310,7 +317,9 @@ it('emits redacted bounded admission diagnostics and preserves writes when loggi
   expect(admission.map(line => line.outcome)).toEqual(['admitted', 'rejected']);
   expect(Object.keys(admission[0]).sort()).toEqual([
     'active',
+    'active_direct',
     'active_non_llm',
+    'direct_limit',
     'event',
     'limit',
     'non_llm_limit',
@@ -343,4 +352,109 @@ it('emits redacted bounded admission diagnostics and preserves writes when loggi
   jest.mocked(Math.random).mockReturnValueOnce(0).mockReturnValue(1);
   expect((await POST(request('queue'))).status).toBe(200);
   expect(persist).toHaveBeenCalledTimes(2);
+});
+
+it('admits ingress_direct as the direct writer class without waiting and records its caller', async () => {
+  jest.mocked(Math.random).mockReturnValue(0);
+  const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
+  const response = await POST(request('ingress_direct'));
+  expect(response.status).toBe(200);
+  expect(acquire).toHaveBeenCalledTimes(1);
+  expect(acquire).toHaveBeenCalledWith('ingress_direct', id, {
+    maxWaitMs: 0,
+    signal: expect.any(AbortSignal),
+    writerClass: 'direct',
+  });
+  expect(persist).toHaveBeenCalledWith(
+    payload.core,
+    payload.metadata,
+    payload.prior_microdollar_usage,
+    payload.posthog_distinct_id,
+    payload.bouncer_usage_event,
+    { entrypoint: 'writer_endpoint', writer_caller: 'ingress_direct' }
+  );
+  const admission = jest
+    .mocked(console.info)
+    .mock.calls.map(([line]) => (typeof line === 'string' ? JSON.parse(line) : null))
+    .find(line => line?.event === 'usage_writer_admission');
+  expect(admission).toMatchObject({
+    writer_caller: 'ingress_direct',
+    writer_class: 'direct',
+    outcome: 'admitted',
+    active: 1,
+    active_direct: 1,
+    direct_limit: 5,
+    slot_wait_ms: 0,
+  });
+});
+
+it('rejects a sixth held ingress_direct write at once with the queue_limit body while queue is admitted', async () => {
+  const held = await holdWrites(5, () => 'ingress_direct');
+  try {
+    const sixth = await POST(request('ingress_direct'));
+    expect(sixth.status).toBe(429);
+    await expect(sixth.json()).resolves.toEqual({
+      error: 'Usage writer overloaded',
+      reason: 'queue_limit',
+    });
+    expect(persist).toHaveBeenCalledTimes(5);
+    expect(JSON.parse(jest.mocked(console.warn).mock.calls[0][0])).toMatchObject({
+      writer_caller: 'ingress_direct',
+      writer_class: 'direct',
+      reason: 'queue_limit',
+      active: 5,
+      active_direct: 5,
+      slot_wait_ms: 0,
+      usage_id: id,
+    });
+    expect((await POST(request('queue'))).status).toBe(200);
+    held.pending[0].resolve(recorded);
+    expect((await held.work[0]).status).toBe(200);
+    expect((await POST(request('ingress_direct'))).status).toBe(200);
+    expect(persist).toHaveBeenCalledTimes(7);
+  } finally {
+    await held.drain();
+  }
+});
+
+it('rejects ingress_direct at once when queue writes hold all eight slots', async () => {
+  const held = await holdWrites(8);
+  try {
+    const response = await POST(request('ingress_direct'));
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Usage writer overloaded',
+      reason: 'queue_limit',
+    });
+    expect(persist).toHaveBeenCalledTimes(8);
+  } finally {
+    await held.drain();
+  }
+});
+
+it('composes the direct ceiling 429 with the shared client as a recognized admission rejection', async () => {
+  const held = await holdWrites(5, () => 'ingress_direct');
+  try {
+    const fetchWriter: typeof fetch = async (url, init) =>
+      POST(new NextRequest(new Request(url, init)));
+    const outcome = await recordLlmUsage(
+      payload,
+      {
+        url: 'http://localhost/api/internal/usage/record',
+        secret: 'synthetic-route-secret',
+        source: 'ingress_direct',
+        timeoutMs: 2000,
+      },
+      fetchWriter
+    );
+    expect(outcome).toEqual({
+      kind: 'unavailable',
+      reason: 'http_error',
+      status: 429,
+      admissionReason: 'queue_limit',
+    });
+    expect(persist).toHaveBeenCalledTimes(5);
+  } finally {
+    await held.drain();
+  }
 });

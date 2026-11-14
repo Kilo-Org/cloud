@@ -88,6 +88,7 @@ afterEach(() => {
 describe('usage writer telemetry caller context', () => {
   it.each([
     ['queue', 'queue'],
+    ['ingress_direct', 'ingress_direct'],
     ['region_handoff', 'region_handoff'],
     [undefined, 'unknown'],
     ['https://sensitive-invalid-source.example/path?token=secret', 'unknown'],

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mock world serves every discovered-state, retry-join and offline case; splitting it would duplicate the harness */
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -141,6 +142,91 @@ describe('the discovered state', () => {
     await ensureRemoteMcp(place, { retry: true });
 
     expect(world.calls[0]?.deps.discoverTimeoutMs).toBe(15_000);
+  });
+
+  it('asks a person’s Retry again after an automatic pass settles', async () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    world.servers = [alpha, beta];
+    const gate: { open?: () => void } = {};
+    const held = new Promise<void>(resolve => {
+      gate.open = resolve;
+    });
+    let call = 0;
+    answer = () => {
+      call += 1;
+      if (call === 1) {
+        return Effect.fail(
+          new RemoteMcpError({ serverId: 'alpha', kind: 'unreachable', cause: 'gone' })
+        );
+      }
+      if (call === 2) {
+        // eslint-disable-next-line typescript-eslint/promise-function-async -- the promise settles when the test releases it, not on an await
+        return Effect.promise(() => held).pipe(Effect.map(() => [tool('mcp_beta_read')]));
+      }
+      return Effect.succeed([tool('mcp_alpha_read')]);
+    };
+
+    const automatic = ensureRemoteMcp(place);
+    // The retry is tapped while the automatic pass is still running: alpha has
+    // already failed and beta is the reason the pass has not settled.
+    const retry = ensureRemoteMcp(place, { retry: true });
+    gate.open?.();
+    await Promise.all([automatic, retry]);
+
+    const alphaCalls = world.calls.filter(entry => entry.server.id === 'alpha');
+    expect(alphaCalls).toHaveLength(2);
+    // The retry asked with its own deadline, not the automatic pass's.
+    expect(alphaCalls[1]?.deps.discoverTimeoutMs).toBe(15_000);
+  });
+
+  it('asks again even when the running pass was itself a retry', async () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    world.servers = [alpha, beta];
+    const gate: { open?: () => void } = {};
+    const held = new Promise<void>(resolve => {
+      gate.open = resolve;
+    });
+    let call = 0;
+    answer = () => {
+      call += 1;
+      if (call === 1) {
+        return Effect.fail(
+          new RemoteMcpError({ serverId: 'alpha', kind: 'unreachable', cause: 'gone' })
+        );
+      }
+      if (call === 2) {
+        // eslint-disable-next-line typescript-eslint/promise-function-async -- the promise settles when the test releases it, not on an await
+        return Effect.promise(() => held).pipe(Effect.map(() => [tool('mcp_beta_read')]));
+      }
+      return Effect.succeed([tool('mcp_alpha_read')]);
+    };
+
+    const first = ensureRemoteMcp(place, { retry: true });
+    const second = ensureRemoteMcp(place, { retry: true });
+    gate.open?.();
+    await Promise.all([first, second]);
+
+    expect(world.calls.filter(entry => entry.server.id === 'alpha')).toHaveLength(2);
+  });
+
+  it('joins one pass for an automatic ask', async () => {
+    const alpha = server({ id: 'alpha' });
+    world.servers = [alpha];
+    const gate: { open?: () => void } = {};
+    const held = new Promise<void>(resolve => {
+      gate.open = resolve;
+    });
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- the promise settles when the test releases it, not on an await
+    answer = () => Effect.promise(() => held).pipe(Effect.map(() => [tool('mcp_alpha_read')]));
+
+    const first = ensureRemoteMcp(place);
+    const second = ensureRemoteMcp(place);
+    gate.open?.();
+    await Promise.all([first, second]);
+
+    expect(world.calls).toHaveLength(1);
   });
 
   it('sends the stored token for a bearer server and none for an open one', async () => {

@@ -277,8 +277,11 @@ function failOffline(servers: readonly StoredRemoteMcpServer[]): readonly Remote
  * A discovery that failed is not an answer: asking again reconnects, which is
  * what a Retry and the next chat both are. Neither is an answer with no tools in
  * it, because the next ask is what makes a transient empty catalog recoverable.
- * A call made while one is already running for the same key joins it rather
- * than opening a second connection.
+ * One discovery pass runs per key at a time: an automatic ask made while one is
+ * running joins it rather than opening a second connection, while a person's
+ * Retry waits for it to settle and then asks again for whatever is still
+ * missing, so a running pass can never answer a Retry with its own deadline's
+ * failure.
  *
  * After a cold start the stored list may not have been read yet, and an empty
  * list then means "not read" rather than "none": the ask waits for it, or a
@@ -307,14 +310,21 @@ export async function ensureRemoteMcp(
     pending.clear();
     publish();
   }
+  if (inFlight?.key === key) {
+    const running = inFlight;
+    await running.promise;
+    /* An automatic ask wants whatever the running pass finds. A person's Retry
+       is about a row that is already failed, so joining can only re-answer with
+       that pass's failure: wait for it, recompute what is still missing, and ask
+       again with the retry's own deadline. */
+    if (request.retry !== true) {
+      return snapshot;
+    }
+  }
   const missing = listRemoteMcpServers()
     .filter(server => server.enabled)
     .filter(server => !reusable(discovered.get(server.id)));
   if (missing.length === 0) {
-    return snapshot;
-  }
-  if (inFlight?.key === key) {
-    await inFlight.promise;
     return snapshot;
   }
   if (request.retry !== true && getCommittedConnectivityStatus() === 'offline') {

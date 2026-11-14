@@ -208,6 +208,12 @@ describe('getDatabaseClientConfig', () => {
         database: 'db/name',
       });
     });
+
+    it('rejects a malformed escape instead of passing it through', () => {
+      expect(() =>
+        getDatabaseClientConfig('postgres://us%40er:p%zz@db.example.com:5432/mydb')
+      ).toThrow(URIError);
+    });
   });
 
   describe('with DATABASE_CA set', () => {

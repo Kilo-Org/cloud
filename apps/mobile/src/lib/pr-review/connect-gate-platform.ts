@@ -77,7 +77,7 @@ function waitForForeground() {
  * a hand-off the system dropped — waits on a return that can never arrive, and
  * the row spins with no error and no retry.
  */
-const FOREGROUND_DEPARTURE_DEADLINE_MS = 10_000;
+export const FOREGROUND_DEPARTURE_DEADLINE_MS = 10_000;
 
 export type AuthorizationWait = {
   /**
@@ -168,7 +168,7 @@ export async function openAuthorizationAndWaitForReturn(
           delayEdge(deadline.promise, 'deadline'),
         ]);
         if (departure.edge === 'deadline') {
-          throw new Error('The browser did not come to the foreground');
+          throw new Error('The browser did not take the screen after the hand-off');
         }
       } finally {
         clearTimeout(timer);

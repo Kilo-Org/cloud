@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  FOREGROUND_DEPARTURE_DEADLINE_MS,
   launchConnectGateBrowser,
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
@@ -58,9 +59,6 @@ function flushMicrotasks(): Promise<unknown> {
   // abort or report guard, without a wall-clock wait.
   return Promise.all([Promise.resolve(), Promise.resolve(), Promise.resolve(), Promise.resolve()]);
 }
-
-/** Mirrors `FOREGROUND_DEPARTURE_DEADLINE_MS` in the module under test. */
-const HANDOFF_DEADLINE_MS = 10_000;
 
 function returnHandlers() {
   return { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
@@ -200,12 +198,12 @@ describe('Android launch', () => {
       const wait = openAuthorizationAndWaitForReturn('https://example.com/connect');
       const settled = Promise.allSettled([wait]);
       await flushMicrotasks();
-      await vi.advanceTimersByTimeAsync(HANDOFF_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(FOREGROUND_DEPARTURE_DEADLINE_MS);
 
       const [outcome] = await settled;
       expect(outcome.status).toBe('rejected');
       expect(outcome.status === 'rejected' ? outcome.reason : undefined).toMatchObject({
-        message: 'The browser did not come to the foreground',
+        message: 'The browser did not take the screen after the hand-off',
       });
       expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
     });
@@ -216,7 +214,7 @@ describe('Android launch', () => {
 
       const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
       await flushMicrotasks();
-      await vi.advanceTimersByTimeAsync(HANDOFF_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(FOREGROUND_DEPARTURE_DEADLINE_MS);
       await launch;
 
       expect(handlers.onOpenFailure).toHaveBeenCalledOnce();

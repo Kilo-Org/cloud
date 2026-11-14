@@ -8,7 +8,7 @@ import {
   assertKiloTokenIssuedAt,
   checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
-} from './kilo-token-verification.js';
+} from './kilo-token-verification';
 
 const audienceName = z
   .string()

@@ -6,7 +6,7 @@ import {
   assertKiloTokenIssuedAt,
   checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
-} from './kilo-token-verification.js';
+} from './kilo-token-verification';
 
 export const KILO_TOKEN_VERSION = 3;
 const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);

@@ -1,8 +1,10 @@
-import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { glanceableTitle } from '@kilocode/app-shared/home-widget';
+import {
+  glanceableStatusKind,
+  LIVE_ACTIVITY_MAX_LIFETIME_MS,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { glanceableSessionTitle } from '@kilocode/app-shared/home-widget';
 import { timestampMs, timestampToIso } from '@kilocode/app-shared/utils';
 import {
-  isDefaultSessionTitle,
   SESSION_LIVE_COMMAND_LIMIT,
   SESSION_LIVE_PLAN_STEP_LIMIT,
   SESSION_LIVE_TARGET_LIMIT,
@@ -22,19 +24,26 @@ import {
 } from './session-live-content';
 
 /**
- * The session card title (spec "Content" rule 2): the shared glanceable title
- * cut, so the card draws the same text the Home widget row would. This surface
- * adds only its own empty rule: an untitled session or the backend
- * `New session - <ISO>` placeholder gives null, so the card draws
+ * The session card title (spec "Content" rule 2): the card draws exactly what
+ * the Home widget row draws. An untitled session and the backend
+ * `New session - <ISO>` placeholder give null, so the card draws
  * `common.agent` instead.
  */
 export function sessionLiveActivityTitle(raw: string | null | undefined): string | null {
-  const title = glanceableTitle(raw);
-  if (title === '' || isDefaultSessionTitle(title)) return null;
-  return title;
+  return glanceableSessionTitle(raw);
 }
 
-/** The facts of one session row that the session card shows. */
+/**
+ * The facts of one session row that the session card shows. Every fact the
+ * card carries forward from the previous build follows one absence policy: a
+ * row that does not carry the fact omits it, and the card then keeps the value
+ * it already shows, because a tray rebuild carries only what the tray knows.
+ * `failure` is the one such fact whose explicit `null` means something,
+ * because it reports that nothing failed. `title`, `statusUpdatedAt` and
+ * `scheduledAt` are read only from the row, so they accept `null` from
+ * producers that serialize an absent value and never fall back to the
+ * previous build.
+ */
 export type SessionLiveActivityRow = {
   id: string;
   title?: string | null;
@@ -42,15 +51,15 @@ export type SessionLiveActivityRow = {
   statusUpdatedAt?: string | null;
   scheduledAt?: string | null;
   /** The stored summary the ingest service derived, when the row carries it. */
-  currentStep?: SessionLiveStep | null;
-  plan?: SessionLivePlan | null;
-  changes?: SessionLiveChanges | null;
-  permissionCommand?: string | null;
-  lastActivityAt?: string | null;
-  costMicrodollars?: number | null;
-  outcome?: SessionLiveOutcomeKind | null;
+  currentStep?: SessionLiveStep;
+  plan?: SessionLivePlan;
+  changes?: SessionLiveChanges;
+  permissionCommand?: string;
+  lastActivityAt?: string;
+  costMicrodollars?: number;
+  outcome?: SessionLiveOutcomeKind;
   failure?: SessionLiveFailureKind | null;
-  startedAt?: string | null;
+  startedAt?: string;
   /** True when this session has an open pull request; set on a finished row. */
   prOpened?: boolean;
 };
@@ -73,12 +82,21 @@ function maxCost(
   return Math.max(previous, next);
 }
 
+/**
+ * The keep-the-previous rule for a fact a row may not carry: an absent fact
+ * leaves what the card shows, and a carried one replaces it. `null` is not a
+ * row value here; only `failure` reports an absence with it.
+ */
+function carried<T>(value: T | undefined, previous: T | null | undefined): T | null {
+  return value === undefined ? (previous ?? null) : value;
+}
+
 /** How a finished session ended: the PR it opened, its diff, or nothing. */
 function outcomeKind(
   row: SessionLiveActivityRow,
   changes: SessionLiveChanges | null
 ): SessionLiveOutcomeKind {
-  if (row.outcome !== null && row.outcome !== undefined) return row.outcome;
+  if (row.outcome !== undefined) return row.outcome;
   if (row.prOpened === true) return 'pr_opened';
   return changes === null ? 'none' : 'changes';
 }
@@ -92,14 +110,16 @@ function outcomeKind(
  *   `awaitingPermission` is true only when that key is present.
  * - `statusSinceFallback` is used when the row has no usable status time.
  * - `scheduledAt` is set only for the scheduled status kind.
- * - The richer facts keep the value the row carries, and fall back to the
- *   content the card already shows. A tray row carries no step, plan, diff or
- *   outcome, so a local update must not wipe the ones a push delivered.
- * - A finished row with a failure reads as the `failed` kind, which the layout
- *   draws as a stopped turn. A row that carries `failure: null` reports no
- *   failure and clears the remembered one; a row with no `failure` key at all
- *   cannot report it either way, so the remembered failure survives, which is
- *   what keeps a push-delivered `failed` card through a tray rebuild.
+ * - One absence policy covers every optional fact: a row that does not carry
+ *   a fact omits it, and the card keeps the value it already shows. A tray row
+ *   carries no step, plan, diff or outcome, so a local update must not wipe
+ *   the ones a push delivered.
+ * - `failure` is the one exception to that policy. A finished row with a
+ *   failure reads as the `failed` kind, which the layout draws as a stopped
+ *   turn. A row that carries `failure: null` reports no failure and clears the
+ *   remembered one; a row with no `failure` key at all cannot report it either
+ *   way, so the remembered failure survives, which is what keeps a
+ *   push-delivered `failed` card through a tray rebuild.
  * - Every text field is read through the shared display rule before it reaches
  *   the card, so a value from any producer draws as the line it stands for.
  */
@@ -112,11 +132,11 @@ export function buildSessionLiveActivityContentState(
   const failure = row.failure === undefined ? (previous?.failure?.kind ?? null) : row.failure;
   const statusKind: SessionCardStatusKind = base === 'idle' && failure !== null ? 'failed' : base;
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
-  const changes = row.changes ?? previous?.changes ?? null;
+  const changes = carried(row.changes, previous?.changes);
   const finished = isFinishedSessionCardStatus(statusKind);
-  const step = row.currentStep ?? previous?.currentStep ?? null;
-  const plan = row.plan ?? previous?.plan ?? null;
-  const command = row.permissionCommand ?? previous?.permissionCommand ?? null;
+  const step = carried(row.currentStep, previous?.currentStep);
+  const plan = carried(row.plan, previous?.plan);
+  const command = carried(row.permissionCommand, previous?.permissionCommand);
   return {
     sessionId: row.id,
     title: sessionLiveActivityTitle(row.title),
@@ -172,7 +192,7 @@ export function sessionCardStaleAtSeconds(
  * older than this can no longer reach a card, so the server ignores and drops
  * it, and its session counts as unfollowed again.
  */
-export const SESSION_LIVE_ACTIVITY_MAX_AGE_MS = 8 * 60 * 60_000;
+export const SESSION_LIVE_ACTIVITY_MAX_AGE_MS = LIVE_ACTIVITY_MAX_LIFETIME_MS;
 
 // The recency term counts from this fixed origin, so two scores computed at
 // different times compare correctly.

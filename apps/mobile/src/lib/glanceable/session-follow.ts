@@ -131,14 +131,14 @@ export const finishFixtureSessionCard = (
         ? row
         : {
             ...row,
-            currentStep: content.currentStep ?? null,
-            plan: content.plan ?? null,
-            changes: content.changes ?? null,
-            lastActivityAt: content.lastActivityAt ?? null,
-            costMicrodollars: content.costMicrodollars ?? null,
-            outcome: content.outcome?.kind ?? null,
+            currentStep: content.currentStep ?? undefined,
+            plan: content.plan ?? undefined,
+            changes: content.changes ?? undefined,
+            lastActivityAt: content.lastActivityAt ?? undefined,
+            costMicrodollars: content.costMicrodollars ?? undefined,
+            outcome: content.outcome?.kind,
             failure: content.failure?.kind ?? null,
-            startedAt: content.startedAt ?? null,
+            startedAt: content.startedAt ?? undefined,
           },
     ],
     checkedAt

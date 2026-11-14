@@ -8,6 +8,7 @@ import {
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
   EMPTY_HOME_WIDGET_DETAILS,
+  glanceableSessionTitle,
   type HomeWidgetData,
   type HomeWidgetPresentation,
   type HomeWidgetSessionRow,
@@ -237,12 +238,17 @@ export function toWidgetProps(props: GlanceableViewProps): Partial<GlanceableVie
   if (home === undefined) {
     return widgetProps;
   }
-  // UserDefaults rejects null even inside the nested Home-only payload: its
-  // own nullable fields and each scheduled row's wake.
+  // The shared title rule runs here, so a session with no user-facing name
+  // loses its title; UserDefaults then rejects each remaining null.
   return Object.assign(widgetProps, {
     home: {
-      ...withoutNulls(home),
-      scheduledAgents: home.scheduledAgents.map(row => withoutNulls(row)),
+      ...withoutNulls({ ...home, primaryTitle: glanceableSessionTitle(home.primaryTitle) }),
+      waitingAgents: home.waitingAgents.map(row =>
+        withoutNulls({ ...row, title: glanceableSessionTitle(row.title) })
+      ),
+      scheduledAgents: home.scheduledAgents.map(row =>
+        withoutNulls({ ...row, title: glanceableSessionTitle(row.title) })
+      ),
     },
   });
 }

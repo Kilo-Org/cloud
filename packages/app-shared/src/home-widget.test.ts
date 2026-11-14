@@ -4,6 +4,7 @@ import {
   buildHomeWidgetDetails,
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
+  glanceableSessionTitle,
   homeWidgetRefreshAt,
   homeWidgetDataSchema,
   HOME_WIDGET_TITLE_LIMIT,
@@ -77,6 +78,21 @@ describe('Home-only widget policy', () => {
       expect(JSON.stringify(data)).not.toContain(forbidden);
     }
     expect(buildHomeWidgetDetails([{ status: 'permission' }]).waitingAgents[0]?.title).toBe('');
+  });
+
+  it('names a session through the shared rule and keeps a title that extends the placeholder', () => {
+    const placeholder = 'New session - 2026-09-22T01:09:45.623Z';
+    expect(glanceableSessionTitle(placeholder)).toBeNull();
+    expect(glanceableSessionTitle(' \n ')).toBeNull();
+    expect(glanceableSessionTitle('Named')).toBe('Named');
+    expect(glanceableSessionTitle(`${placeholder} follow-up`)).toBe(`${placeholder} follow-up`);
+    expect(glanceableSessionTitle('a'.repeat(HOME_WIDGET_TITLE_LIMIT + 5))).toHaveLength(
+      HOME_WIDGET_TITLE_LIMIT
+    );
+    // The stored details keep the plain cut, so every app build reads a payload.
+    expect(
+      buildHomeWidgetDetails([{ status: 'permission', title: placeholder }]).waitingAgents[0]?.title
+    ).toBe(placeholder);
   });
 
   it('carries only printed characters in a title', () => {
@@ -339,5 +355,21 @@ describe('native Home presentation timeline', () => {
     expect(buildHomeWidgetPresentationTimeline(data, now + GLANCEABLE_STALE_MS)).toHaveLength(1);
     data.snapshot.status = 'privacy';
     expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(1);
+  });
+
+  it('flips the stale flag exactly at the boundary the timeline publishes', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'permission', title: 'Approve', statusUpdatedAt: '2026-10-09T09:55:00Z' },
+      ],
+    });
+    const deadline = now + 30 * 60 * 1000;
+    const timeline = buildHomeWidgetPresentationTimeline(data, now);
+    expect(timeline.map(entry => entry.at)).toEqual([now, deadline]);
+    expect(buildHomeWidgetPresentation(data, deadline - 1).stale).toBe(false);
+    expect(buildHomeWidgetPresentation(data, deadline).stale).toBe(true);
+    expect(timeline[1]?.home.stale).toBe(true);
+    expect(timeline[1]?.home).toEqual(buildHomeWidgetPresentation(data, deadline));
   });
 });

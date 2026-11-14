@@ -302,11 +302,45 @@ describe('Home-only presentation and timeline', () => {
       snapshot,
       details: {
         ...EMPTY_HOME_WIDGET_DETAILS,
-        scheduledAgents: [{ title: '', scheduledAt: null }],
+        scheduledAgents: [{ title: 'Usage report', scheduledAt: null }],
       },
     };
     const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, data, NOW));
     expect(JSON.stringify(props)).not.toContain(':null');
-    expect(props.home?.scheduledAgents).toEqual([{ title: '' }]);
+    expect(props.home?.scheduledAgents).toEqual([{ title: 'Usage report' }]);
+  });
+
+  it('drops a placeholder title from the Home payload at the UserDefaults boundary', () => {
+    const placeholder = `New session - ${new Date(NOW).toISOString()}`;
+    const snapshot = snapshotFor([{ status: 'question' }]);
+    const data: HomeWidgetData = {
+      snapshot,
+      details: {
+        ...EMPTY_HOME_WIDGET_DETAILS,
+        primaryTitle: placeholder,
+        waitingAgents: [{ title: placeholder, kind: 'question' }],
+      },
+    };
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, data, NOW));
+    expect(JSON.stringify(props)).not.toContain(':null');
+    expect(props.home).not.toHaveProperty('primaryTitle');
+    expect(props.home?.waitingAgents).toEqual([{ kind: 'question' }]);
+
+    const named = toWidgetProps(
+      buildGlanceableViewProps(
+        snapshot,
+        {},
+        translate,
+        {
+          snapshot,
+          details: {
+            ...EMPTY_HOME_WIDGET_DETAILS,
+            waitingAgents: [{ title: 'Named wait', kind: 'question' }],
+          },
+        },
+        NOW
+      )
+    );
+    expect(named.home?.waitingAgents).toEqual([{ title: 'Named wait', kind: 'question' }]);
   });
 });

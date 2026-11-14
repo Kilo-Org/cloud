@@ -14,7 +14,7 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls, 500 wi
   ]);
   expect(production.vars.USAGE_WRITER_URL).toBe('https://app.kilo.ai/api/internal/usage/record');
   expect(production.vars.USAGE_INGEST_PARALLELISM).toBe('2');
-  expect(production.vars.USAGE_INGEST_HEDGE_MODE).toBe('off');
+  expect(production.vars.USAGE_INGEST_HEDGE_MODE).toBe('on');
   expect(production.vars.USAGE_INGEST_HEDGE_DELAY_MS).toBe('1000');
   expect(production.vars.USAGE_INGEST_HEDGE_PERCENT).toBe('50');
   expect(production.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');

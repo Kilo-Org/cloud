@@ -865,7 +865,7 @@ unchanged. Authentication, body reads and schema and size checks run first, as b
 | `USAGE_INGEST_HEDGE_DELAY_MS` | Whole milliseconds, clamped to 250–10000 | `1000` when missing or not a whole number |
 | `USAGE_INGEST_HEDGE_PERCENT` | Whole number 0–100; only read when the mode is `on` | `100` when missing or invalid |
 
-Production config sets `off`, delay 1000 and percent 50. Staging sets `on`, delay
+Production config sets `on`, delay 1000 and percent 50. Staging sets `on`, delay
 1000 and percent 100.
 
 - `off`, or an event that is not eligible: the single-queue path and its logs, unchanged.

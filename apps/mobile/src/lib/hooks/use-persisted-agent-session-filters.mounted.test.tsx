@@ -54,22 +54,38 @@ function mount(): () => HookApi {
   };
 }
 
+/** One turn: letting the event loop run hands the pending microtasks another tick. */
+async function flushOnce(): Promise<void> {
+  const tick = Promise.withResolvers<undefined>();
+  setImmediate(() => {
+    tick.resolve(undefined);
+  });
+  await act(async () => {
+    await tick.promise;
+  });
+}
+
 /** Lets the load, the save, and the state they write land. */
-async function flush(): Promise<void> {
-  for (let round = 0; round < 8; round += 1) {
-    // eslint-disable-next-line no-await-in-loop -- each turn hands the pending microtasks another tick
-    await act(async () => {
-      const tick = Promise.withResolvers<undefined>();
-      setImmediate(() => {
-        tick.resolve(undefined);
-      });
-      await tick.promise;
-    });
+async function flush(rounds = 8): Promise<void> {
+  if (rounds === 0) {
+    return;
   }
+  await flushOnce();
+  await flush(rounds - 1);
 }
 
 /** One write the hook started and has not finished: resolving it settles that save. */
 const pendingWrites: (() => void)[] = [];
+
+/** Settles the writes the edits scheduled, one per turn, until none are left. */
+async function settleWrites(rounds: number): Promise<void> {
+  if (rounds === 0) {
+    return;
+  }
+  pendingWrites.shift()?.();
+  await flush();
+  await settleWrites(rounds - 1);
+}
 
 beforeEach(() => {
   store.read.mockReset();
@@ -128,11 +144,7 @@ describe('usePersistedAgentSessionFilters persistence', () => {
     );
 
     // Settle every write the edits scheduled; nothing is left waiting.
-    for (let round = 0; round < 4; round += 1) {
-      pendingWrites.shift()?.();
-      // eslint-disable-next-line no-await-in-loop -- one write settles per turn
-      await flush();
-    }
+    await settleWrites(4);
 
     expect(pendingWrites).toEqual([]);
     expect(store.write.mock.lastCall?.[1]).toBe(

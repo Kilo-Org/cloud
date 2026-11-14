@@ -3375,7 +3375,7 @@
     },
     "usageStats": {
       "inputTokens": "Invoertokens",
-      "last30Days": "Laatste 30 dagen",
+      "orgLast30Days": "$t(usage.orgTitle) · Laatste 30 dagen",
       "outputTokens": "Uitvoertokens",
       "requests": "Verzoeken"
     },

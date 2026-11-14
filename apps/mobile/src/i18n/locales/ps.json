@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "د ننوتنې ټوکنونه",
-      "last30Days": "وروستۍ ۳۰ ورځې",
+      "orgLast30Days": "$t(usage.orgTitle) · وروستۍ ۳۰ ورځې",
       "outputTokens": "د وتنې ټوکنونه",
       "requests": "غوښتنې"
     },

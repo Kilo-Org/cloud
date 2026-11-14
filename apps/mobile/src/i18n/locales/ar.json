@@ -3587,7 +3587,7 @@
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",
-      "last30Days": "آخر 30 يومًا",
+      "orgLast30Days": "$t(usage.orgTitle) · آخر 30 يومًا",
       "outputTokens": "رموز الإخراج",
       "requests": "الطلبات"
     },

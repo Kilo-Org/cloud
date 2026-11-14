@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "تۆکنەکانی تێدراو",
-      "last30Days": "دوایین ٣٠ ڕۆژ",
+      "orgLast30Days": "$t(usage.orgTitle) · دوایین ٣٠ ڕۆژ",
       "outputTokens": "تۆکنەکانی دەرئەنجام",
       "requests": "داواکارییەکان"
     },

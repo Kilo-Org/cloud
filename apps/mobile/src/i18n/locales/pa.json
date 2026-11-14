@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "ਇਨਪੁੱਟ ਟੋਕਨ",
-      "last30Days": "ਪਿਛਲੇ 30 ਦਿਨ",
+      "orgLast30Days": "$t(usage.orgTitle) · ਪਿਛਲੇ 30 ਦਿਨ",
       "outputTokens": "ਆਉਟਪੁੱਟ ਟੋਕਨ",
       "requests": "ਬੇਨਤੀਆਂ"
     },

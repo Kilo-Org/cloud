@@ -42,7 +42,12 @@ type OrgUsageStatsProps = {
 };
 
 /**
- * "Last 30 days" eyebrow + 2x2 usage stat tile grid. Visible to all org roles.
+ * "Organization usage · last 30 days" eyebrow + 2x2 usage stat tile grid.
+ * Visible to all org roles.
+ *
+ * The eyebrow names the organization because the tiles are organization-wide
+ * totals, while the usage screen the grid opens is self-scoped for a member
+ * without a money role (`usage.orgSelfNotice`).
  *
  * The grid carries no entrance animation: it is the section's entire body, so a
  * fade that does not run leaves four cards unpainted while their frames and
@@ -64,7 +69,7 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
   const body = (
     <View className="gap-3">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('organization.usageStats.last30Days')}
+        {t('organization.usageStats.orgLast30Days')}
       </Text>
       <View className="gap-3">
         <View className="flex-row gap-3">

@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "توکن‌های ورودی",
-      "last30Days": "۳۰ روز گذشته",
+      "orgLast30Days": "$t(usage.orgTitle) · ۳۰ روز گذشته",
       "outputTokens": "توکن‌های خروجی",
       "requests": "درخواست‌ها"
     },

@@ -3428,7 +3428,7 @@
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",
-      "last30Days": "30 derniers jours",
+      "orgLast30Days": "$t(usage.orgTitle) · 30 derniers jours",
       "outputTokens": "Jetons de sortie",
       "requests": "Requêtes"
     },

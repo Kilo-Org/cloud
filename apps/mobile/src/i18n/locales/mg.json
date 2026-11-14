@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",
-      "last30Days": "30 Andro farany lasa",
+      "orgLast30Days": "$t(usage.orgTitle) · 30 Andro farany lasa",
       "outputTokens": "Sombin-tsoratra mivoaka",
       "requests": "Fangatahana"
     },

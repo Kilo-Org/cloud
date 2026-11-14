@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",
-      "last30Days": "Ụbọchị 30 gara aga",
+      "orgLast30Days": "$t(usage.orgTitle) · Ụbọchị 30 gara aga",
       "outputTokens": "Tokin mmepụta",
       "requests": "Arịrịọ"
     },

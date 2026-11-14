@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",
-      "last30Days": "Síðustu 30 dagar",
+      "orgLast30Days": "$t(usage.orgTitle) · Síðustu 30 dagar",
       "outputTokens": "Úttakstókar",
       "requests": "Beiðnir"
     },

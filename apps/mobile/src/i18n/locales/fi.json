@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
-      "last30Days": "Viimeiset 30 päivää",
+      "orgLast30Days": "$t(usage.orgTitle) · Viimeiset 30 päivää",
       "outputTokens": "Tulostetokenit",
       "requests": "Pyynnöt"
     },

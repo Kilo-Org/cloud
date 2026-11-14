@@ -3529,7 +3529,7 @@
     },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",
-      "last30Days": "Na 30 lá deireanacha",
+      "orgLast30Days": "$t(usage.orgTitle) · Na 30 lá deireanacha",
       "outputTokens": "Comharthaí aschuir",
       "requests": "Iarratais"
     },

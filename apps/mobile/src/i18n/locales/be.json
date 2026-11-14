@@ -3476,7 +3476,7 @@
     },
     "usageStats": {
       "inputTokens": "Уваходныя токены",
-      "last30Days": "Апошнія 30 дзён",
+      "orgLast30Days": "$t(usage.orgTitle) · Апошнія 30 дзён",
       "outputTokens": "Выходныя токены",
       "requests": "Запыты"
     },

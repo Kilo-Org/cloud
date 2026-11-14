@@ -3375,7 +3375,7 @@
     },
     "usageStats": {
       "inputTokens": "入力トークン",
-      "last30Days": "過去30日間",
+      "orgLast30Days": "$t(usage.orgTitle) · 過去30日間",
       "outputTokens": "出力トークン",
       "requests": "リクエスト"
     },

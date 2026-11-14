@@ -3529,7 +3529,7 @@
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
-      "last30Days": "L-aħħar 30 ġurnata",
+      "orgLast30Days": "$t(usage.orgTitle) · L-aħħar 30 ġurnata",
       "outputTokens": "Unitajiet tat-test tar-riżultat",
       "requests": "Talbiet"
     },

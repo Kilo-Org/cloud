@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Оролтын токенууд",
-      "last30Days": "Сүүлийн 30 хоног",
+      "orgLast30Days": "$t(usage.orgTitle) · Сүүлийн 30 хоног",
       "outputTokens": "Гаралтын токенууд",
       "requests": "Хүсэлтүүд"
     },

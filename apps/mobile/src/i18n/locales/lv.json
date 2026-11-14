@@ -3423,7 +3423,7 @@
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",
-      "last30Days": "Pēdējās 30 dienas",
+      "orgLast30Days": "$t(usage.orgTitle) · Pēdējās 30 dienas",
       "outputTokens": "Izvades tokeni",
       "requests": "Pieprasījumi"
     },

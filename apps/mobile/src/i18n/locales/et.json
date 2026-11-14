@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
-      "last30Days": "Viimased 30 päeva",
+      "orgLast30Days": "$t(usage.orgTitle) · Viimased 30 päeva",
       "outputTokens": "Väljundtokenid",
       "requests": "Päringud"
     },

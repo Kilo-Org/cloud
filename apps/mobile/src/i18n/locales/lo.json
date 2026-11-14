@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "ໂທເຄັນຂາເຂົ້າ",
-      "last30Days": "30 ວັນທີ່ຜ່ານມາ",
+      "orgLast30Days": "$t(usage.orgTitle) · 30 ວັນທີ່ຜ່ານມາ",
       "outputTokens": "ໂທເຄັນຂາອອກ",
       "requests": "ຄຳຂໍ"
     },

@@ -3476,7 +3476,7 @@
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",
-      "last30Days": "Pastarosios 30 dienų",
+      "orgLast30Days": "$t(usage.orgTitle) · Pastarosios 30 dienų",
       "outputTokens": "Išvesties žetonai",
       "requests": "Užklausos"
     },

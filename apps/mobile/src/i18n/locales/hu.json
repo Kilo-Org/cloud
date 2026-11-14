@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",
-      "last30Days": "Elmúlt 30 nap",
+      "orgLast30Days": "$t(usage.orgTitle) · Elmúlt 30 nap",
       "outputTokens": "Kimeneti tokenek",
       "requests": "Kérések"
     },

@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Διακριτικά εισόδου",
-      "last30Days": "Τελευταίες 30 ημέρες",
+      "orgLast30Days": "$t(usage.orgTitle) · Τελευταίες 30 ημέρες",
       "outputTokens": "Διακριτικά εξόδου",
       "requests": "Αιτήματα"
     },

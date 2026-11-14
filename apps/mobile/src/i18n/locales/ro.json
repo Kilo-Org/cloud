@@ -3423,7 +3423,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
-      "last30Days": "Ultimele 30 de zile",
+      "orgLast30Days": "$t(usage.orgTitle) · Ultimele 30 de zile",
       "outputTokens": "Tokenuri de ieșire",
       "requests": "Cereri"
     },

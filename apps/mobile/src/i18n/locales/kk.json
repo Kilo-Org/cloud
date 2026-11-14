@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Кіріс токендері",
-      "last30Days": "Соңғы 30 күн",
+      "orgLast30Days": "$t(usage.orgTitle) · Соңғы 30 күн",
       "outputTokens": "Шығыс токендері",
       "requests": "Сұраулар"
     },

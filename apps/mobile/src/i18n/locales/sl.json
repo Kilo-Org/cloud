@@ -3476,7 +3476,7 @@
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",
-      "last30Days": "Zadnjih 30 dni",
+      "orgLast30Days": "$t(usage.orgTitle) · Zadnjih 30 dni",
       "outputTokens": "Izhodni žetoni",
       "requests": "Zahteve"
     },

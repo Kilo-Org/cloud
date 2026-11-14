@@ -167,11 +167,6 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
-- A phase carried by two or more booleans, refs, or a nullable marker is one value: replace them with a discriminated union plus named transition functions in the file that owns it, and put pure transitions in a `.ts` module when the owner is a component or hook.
-- Make the invalid combination unrepresentable in the type, not just avoided: a question's mode picks its answer type (`SingleAnswer` has one choice index, not a set), a cache entry owns its holder count, and a claim is one value.
-- Never clear a queued intent before the operation that consumes it succeeds, and acknowledge it on the object that operation installed — `onto` copies the chat, so a later write must resolve the moved session id.
-- Never let a scroll or UI claim and a "the user owns this" flag be set independently; a send outranks a drag and blocks resume retries until a new anchor or a reset.
-- The local unions this rule produced: `SingleAnswer`/`MultiAnswer` (`components/agents/question-card-answer.ts`), `SessionPositionClaim` (`components/agents/use-session-auto-scroll-state.ts`), `FenceWalkEntry` (`components/agents/code-block-model.ts`), `ToolSetIntent` (`lib/chat/registry.ts`), `ToolLoop` (`lib/chat/native-model-client.ts`), `SavedFilters` (`lib/hooks/use-persisted-agent-session-filters.ts`).
 
 ## React Native Rules
 

@@ -75,57 +75,77 @@ function emptyConfig(): ParsedLocalConfig {
   return { agents: [], commands: [], skills: [], instructions: [] };
 }
 
-function parseAgentMarkdown(entry: ArchiveEntry, state: ParseState): void {
-  const slug = entry.path.split('/')[1].slice(0, -3);
-  if (CLI_BUILTIN_AGENT_SLUGS.has(slug)) return;
-  if (!claimPath(state, entry.path, 'agents', slug)) return;
+/** One markdown definition family; every intentional difference between agents and commands lives here. */
+type MarkdownDefinitionFamily = {
+  category: 'agents' | 'commands';
+  noun: 'Agent' | 'Command';
+  fields: Set<string>;
+  /** Agents only: a local entry for a CLI built-in tunes the built-in instead of defining an agent. */
+  skipSlugs?: Set<string>;
+};
+
+const AGENT_MARKDOWN_FAMILY: MarkdownDefinitionFamily = {
+  category: 'agents',
+  noun: 'Agent',
+  fields: MARKDOWN_AGENT_FIELDS,
+  skipSlugs: CLI_BUILTIN_AGENT_SLUGS,
+};
+
+const COMMAND_MARKDOWN_FAMILY: MarkdownDefinitionFamily = {
+  category: 'commands',
+  noun: 'Command',
+  fields: MARKDOWN_COMMAND_FIELDS,
+};
+
+/**
+ * Claim one markdown definition and read its fields. The caller's directory pass
+ * has already checked the two-segment `.md` shape. Returns null when the entry is
+ * skipped or already claimed, or when its frontmatter is invalid, which is
+ * reported here.
+ */
+function readMarkdownDefinition(
+  entry: ArchiveEntry,
+  state: ParseState,
+  family: MarkdownDefinitionFamily
+): { name: string; fields: Record<string, unknown>; body: string } | null {
+  const name = entry.path.split('/')[1].slice(0, -3);
+  if (family.skipSlugs?.has(name)) return null;
+  if (!claimPath(state, entry.path, family.category, name)) return null;
 
   const frontmatter = parseFrontmatter(entry.content);
   if (frontmatter.status === 'error') {
-    registerIdentity(state, 'agents', slug, entry.path);
+    registerIdentity(state, family.category, name, entry.path);
     state.issues.push(
       makeIssue(
         'error',
         'invalid-frontmatter',
-        'agents',
+        family.category,
         entry.path,
         null,
-        `Agent frontmatter is invalid: ${frontmatter.message}`
+        `${family.noun} frontmatter is invalid: ${frontmatter.message}`
       )
     );
-    return;
+    return null;
   }
   const fields = frontmatter.status === 'ok' ? frontmatter.data : {};
   const body = (frontmatter.status === 'ok' ? frontmatter.body : entry.content).trim();
-  const config = pickFields(fields, MARKDOWN_AGENT_FIELDS);
-  if (body.length > 0) config.prompt = body;
-  addAgent(state, slug, slug, config, entry.path);
+  return { name, fields: pickFields(fields, family.fields), body };
+}
+
+function parseAgentMarkdown(entry: ArchiveEntry, state: ParseState): void {
+  const definition = readMarkdownDefinition(entry, state, AGENT_MARKDOWN_FAMILY);
+  if (!definition) return;
+  const { name, fields, body } = definition;
+  if (body.length > 0) fields.prompt = body;
+  addAgent(state, name, name, fields, entry.path);
 }
 
 function parseCommandMarkdown(entry: ArchiveEntry, state: ParseState): void {
-  const name = entry.path.split('/')[1].slice(0, -3);
-  if (!claimPath(state, entry.path, 'commands', name)) return;
-
-  const frontmatter = parseFrontmatter(entry.content);
-  if (frontmatter.status === 'error') {
-    registerIdentity(state, 'commands', name, entry.path);
-    state.issues.push(
-      makeIssue(
-        'error',
-        'invalid-frontmatter',
-        'commands',
-        entry.path,
-        null,
-        `Command frontmatter is invalid: ${frontmatter.message}`
-      )
-    );
-    return;
-  }
-  const fields = frontmatter.status === 'ok' ? frontmatter.data : {};
-  const body = (frontmatter.status === 'ok' ? frontmatter.body : entry.content).trim();
-  const command = pickFields(fields, MARKDOWN_COMMAND_FIELDS);
-  command.template = body;
-  addCommand(state, name, command, entry.path);
+  const definition = readMarkdownDefinition(entry, state, COMMAND_MARKDOWN_FAMILY);
+  if (!definition) return;
+  const { name, fields, body } = definition;
+  fields.template = body;
+  addCommand(state, name, fields, entry.path);
 }
 
 function parseDefinitionDirectories(

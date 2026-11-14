@@ -168,6 +168,52 @@ function reportMalformedSection(
   );
 }
 
+/** One definition family read from a config file, with only its wording and target differing. */
+type EntrySectionFamily = {
+  keys: readonly string[];
+  category: 'agents' | 'commands';
+  noun: 'Agent' | 'Command';
+  expected: string;
+  target: ConfigSections['agentEntries'];
+};
+
+/**
+ * Read one definition family: skip an absent key, report a section that is not
+ * an object, and report each entry that is not an object. Every family reads the
+ * same way, so the two families take the same path here.
+ */
+function readEntrySection(
+  parsed: Record<string, unknown>,
+  state: ParseState,
+  configEntry: ArchiveEntry,
+  { keys, category, noun, expected, target }: EntrySectionFamily
+): void {
+  for (const key of keys) {
+    const value = parsed[key];
+    if (value === undefined) continue;
+    if (!isPlainObject(value)) {
+      reportMalformedSection(state, configEntry, key, category, expected);
+      continue;
+    }
+    for (const [name, entryValue] of Object.entries(value)) {
+      if (!isPlainObject(entryValue)) {
+        state.issues.push(
+          makeIssue(
+            'error',
+            'unmapped-entry',
+            category,
+            `${configEntry.path}#${key}.${name}`,
+            null,
+            `${noun} entry "${name}" is not an object`
+          )
+        );
+        continue;
+      }
+      target.push({ name, value: entryValue });
+    }
+  }
+}
+
 /** Longest glob echoed back in an issue message. */
 const GLOB_ECHO_LENGTH = 64;
 
@@ -289,61 +335,20 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
     return sections;
   }
 
-  for (const key of AGENT_SECTION_KEYS) {
-    const value = parsed[key];
-    if (value === undefined) continue;
-    if (!isPlainObject(value)) {
-      reportMalformedSection(state, configEntry, key, 'agents', 'an object of agent definitions');
-      continue;
-    }
-    for (const [name, entryValue] of Object.entries(value)) {
-      if (!isPlainObject(entryValue)) {
-        state.issues.push(
-          makeIssue(
-            'error',
-            'unmapped-entry',
-            'agents',
-            `${configEntry.path}#${key}.${name}`,
-            null,
-            `Agent entry "${name}" is not an object`
-          )
-        );
-        continue;
-      }
-      sections.agentEntries.push({ name, value: entryValue });
-    }
-  }
-
-  for (const key of COMMAND_SECTION_KEYS) {
-    const value = parsed[key];
-    if (value === undefined) continue;
-    if (!isPlainObject(value)) {
-      reportMalformedSection(
-        state,
-        configEntry,
-        key,
-        'commands',
-        'an object of command definitions'
-      );
-      continue;
-    }
-    for (const [name, entryValue] of Object.entries(value)) {
-      if (!isPlainObject(entryValue)) {
-        state.issues.push(
-          makeIssue(
-            'error',
-            'unmapped-entry',
-            'commands',
-            `${configEntry.path}#${key}.${name}`,
-            null,
-            `Command entry "${name}" is not an object`
-          )
-        );
-        continue;
-      }
-      sections.commandEntries.push({ name, value: entryValue });
-    }
-  }
+  readEntrySection(parsed, state, configEntry, {
+    keys: AGENT_SECTION_KEYS,
+    category: 'agents',
+    noun: 'Agent',
+    expected: 'an object of agent definitions',
+    target: sections.agentEntries,
+  });
+  readEntrySection(parsed, state, configEntry, {
+    keys: COMMAND_SECTION_KEYS,
+    category: 'commands',
+    noun: 'Command',
+    expected: 'an object of command definitions',
+    target: sections.commandEntries,
+  });
 
   const instructions = parsed.instructions;
   if (typeof instructions === 'string') {

@@ -107,14 +107,26 @@ type TokenField =
 /** The text the field holds, which is both its default and what a save sends. */
 function tokenText(field: TokenField, savedToken: string): string {
   switch (field.kind) {
-    case 'saved':
+    case 'saved': {
       return savedToken;
-    case 'typed':
+    }
+    case 'typed': {
       return field.text;
-    case 'retargeted':
+    }
+    case 'retargeted': {
       return '';
+    }
+    default: {
+      return '';
+    }
   }
 }
+
+/** The token field a URL edit leaves behind, and whether it has to be mounted again. */
+type TokenFieldRetarget = {
+  readonly field: TokenField;
+  readonly remount: boolean;
+};
 
 /**
  * What the token field becomes when the URL names `endpoint`, and whether it has
@@ -131,7 +143,7 @@ function retargetTokenField(
   field: TokenField,
   savedEndpoint: string | null,
   endpoint: string | null
-): { readonly field: TokenField; readonly remount: boolean } {
+): TokenFieldRetarget {
   if (field.kind === 'typed') {
     if (field.endpoint === null) {
       return { field: { kind: 'typed', text: field.text, endpoint }, remount: false };

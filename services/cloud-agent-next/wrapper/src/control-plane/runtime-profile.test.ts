@@ -94,6 +94,15 @@ const nextProfile = {
   kiloCommands: [{ name: 'next-command', template: 'Next command' }],
 };
 
+type AgentEntries = Record<string, Record<string, unknown>>;
+
+async function readAgentEntries(home: string): Promise<AgentEntries> {
+  const config = JSON.parse(await fs.readFile(profileConfigPath(home), 'utf8')) as {
+    agent: AgentEntries;
+  };
+  return config.agent;
+}
+
 async function expectPreviousProfile(home: string, previousConfig: string): Promise<void> {
   expect(await fs.readFile(path.join(home, '.kilocode/skills/previous/SKILL.md'), 'utf8')).toBe(
     'Keep me'
@@ -691,6 +700,90 @@ describe('legacy skill writing', () => {
       );
       expect(existsSync(path.join(skillDir, 'x'.repeat(201)))).toBe(false);
       expect(existsSync(path.join(home, '.kilocode/skills/outside.txt'))).toBe(false);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('runtime profile permission narrowing', () => {
+  it('writes an agent entry bounded by the session policy', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { edit: 'deny', bash: { '*': 'deny', 'git log *': 'allow' } },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { edit: 'allow', bash: { '*': 'allow' } } },
+          },
+        ],
+      });
+      const entries = await readAgentEntries(home);
+      const permission = entries.reviewer?.permission as Record<string, unknown> | undefined;
+      expect(permission?.edit).not.toBe('allow');
+      const bash = permission?.bash as Record<string, unknown> | undefined;
+      expect(bash?.['*']).not.toBe('allow');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a runtime agent denial that is stricter than the session', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { bash: { '*': 'allow', 'rm *': 'deny' } },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { bash: { 'git push': 'deny' } } },
+          },
+        ],
+      });
+      const entries = await readAgentEntries(home);
+      // The agent's own denial survives and the session's denial reaches the
+      // file too, which a verbatim copy of the agent map cannot produce.
+      expect(entries.reviewer?.permission).toEqual({
+        bash: { 'git push': 'deny', 'rm *': 'deny' },
+      });
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('writes the agent permission verbatim when the session has no permission map', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    const permission = { edit: 'allow', bash: { '*': 'deny', 'git log *': 'allow' } };
+    try {
+      await materializeRuntimeProfile(home, {
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: { permission } }],
+      });
+      const entries = await readAgentEntries(home);
+      expect(entries.reviewer?.permission).toEqual(permission);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('omits the permission key when the session policy leaves no entry', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { edit: 'deny' },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { mode: 'subagent', permission: { edit: 'allow' } },
+          },
+        ],
+      });
+      const entries = await readAgentEntries(home);
+      expect(entries.reviewer).toEqual({ mode: 'subagent' });
+      expect('permission' in (entries.reviewer ?? {})).toBe(false);
     } finally {
       await fs.rm(home, { recursive: true, force: true });
     }

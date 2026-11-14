@@ -6,12 +6,18 @@ import {
   buildBuiltinAgentEntries,
   buildKiloCommandsConfiguration,
 } from '../../../src/shared/runtime-profile-config.js';
+import { narrowProfileAgents } from '../../../src/shared/profile-permission-policy.js';
 import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
 import { writeRuntimeInstructions } from '../runtime-instructions.js';
 
 type RuntimeProfile = Pick<
   ControlPlaneRouteSpec,
-  'runtimeSkills' | 'runtimeAgents' | 'builtinAgents' | 'kiloCommands' | 'runtimeInstructions'
+  | 'runtimeSkills'
+  | 'runtimeAgents'
+  | 'builtinAgents'
+  | 'kiloCommands'
+  | 'runtimeInstructions'
+  | 'permission'
 >;
 
 export type RuntimeProfileMaterializer = {
@@ -83,6 +89,9 @@ export function runtimeProfileConfigKey(profile: RuntimeProfile): string {
       runtimeAgents: profile.runtimeAgents ?? [],
       builtinAgents: profile.builtinAgents ?? {},
       kiloCommands: profile.kiloCommands ?? [],
+      // The written agent entries are narrowed against this map, so it belongs
+      // to the materialized content.
+      permission: profile.permission ?? null,
     })
   );
 }
@@ -265,11 +274,20 @@ async function commitRuntimeProfileConfig(
 }
 
 async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile): Promise<boolean> {
+  // A profile agent's permission map applies together with the session policy,
+  // so write the reconciled map against the permission map this route runs with.
+  // A retained workspace configuration and a stored older route both read
+  // through this function, so every path writes the same effective entry.
+  const permission = profile.permission;
+  const runtimeAgents =
+    permission === undefined || profile.runtimeAgents === undefined
+      ? profile.runtimeAgents
+      : narrowProfileAgents(permission, profile.runtimeAgents);
   const agents = {
     ...buildBuiltinAgentEntries(profile.builtinAgents),
-    ...(profile.runtimeAgents?.length
+    ...(runtimeAgents?.length
       ? Object.fromEntries(
-          profile.runtimeAgents.map(agent => [agent.slug, buildAgentEntryFromRuntimeAgent(agent)])
+          runtimeAgents.map(agent => [agent.slug, buildAgentEntryFromRuntimeAgent(agent)])
         )
       : {}),
   };

@@ -25,7 +25,6 @@ import { describe, test, expect, beforeEach, afterEach, jest as jestGlobal } fro
 import {
   requireAdmissionPayload,
   countAdmissionCondition,
-  pendingAdmissionCountsForTests,
   resetAdmissionCountersForTests,
   validateAdmissionPayload,
   issueAdmissionChallenge,
@@ -43,6 +42,7 @@ import { __test__ as rateLimitTest } from './firewall-rate-limit';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { native_attested_keys } from '@kilocode/db/schema';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core/dialect';
@@ -82,6 +82,25 @@ const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockVerifyAppleAttestation = jest.mocked(verifyAppleAttestation);
 const mockVerifyAppleAssertion = jest.mocked(verifyAppleAssertion);
 const mockVerifyPlayIntegrity = jest.mocked(verifyPlayIntegrity);
+const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
+
+/** The aggregate telemetry line the module writes once per closed window. */
+type AggregateLine = {
+  event: 'native_admission_aggregate';
+  metric: string;
+  count: number;
+  intervalMs: number;
+  windowStart: string;
+  at: string;
+};
+
+/** Aggregate lines written to the warn sink so far, in emission order. */
+function aggregateLines(): AggregateLine[] {
+  return mockWarnExceptInTest.mock.calls.flatMap(([message]: unknown[]) => {
+    const parsed = JSON.parse(String(message)) as { event?: string };
+    return parsed.event === 'native_admission_aggregate' ? [parsed as AggregateLine] : [];
+  });
+}
 
 // Helper to create a minimal NextRequest-like object for issueAdmissionChallenge
 function makeRequest(): any {
@@ -417,7 +436,11 @@ describe('requireAdmissionPayload', () => {
   });
 
   test('reports a payload longer than the limit on its own metric', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(4_000_000);
+    mockWarnExceptInTest.mockClear();
     resetAdmissionCountersForTests();
+
     expect(
       requireAdmissionPayload({
         admission: {
@@ -428,11 +451,38 @@ describe('requireAdmissionPayload', () => {
         },
       })
     ).toBeUndefined();
-    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_oversized: 1 });
+
+    // Nothing is written while the window is open.
+    expect(aggregateLines()).toEqual([]);
+
+    // Any later counted condition closes the window the oversized payload was
+    // counted in.
+    now.mockReturnValue(4_061_000);
+    countAdmissionCondition('native_admission_missing');
+
+    const oversizedLines = aggregateLines().filter(
+      line => line.metric === 'native_admission_oversized'
+    );
+    expect(oversizedLines).toStrictEqual([
+      {
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_oversized',
+        count: 1,
+        intervalMs: 60_000,
+        windowStart: new Date(4_000_000).toISOString(),
+        at: new Date(4_061_000).toISOString(),
+      },
+    ]);
+
+    jestGlobal.restoreAllMocks();
   });
 
   test('reports nothing for a payload at the limit', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(5_000_000);
+    mockWarnExceptInTest.mockClear();
     resetAdmissionCountersForTests();
+
     expect(
       requireAdmissionPayload({
         admission: {
@@ -443,7 +493,29 @@ describe('requireAdmissionPayload', () => {
         },
       })
     ).toBeDefined();
-    expect(pendingAdmissionCountsForTests()).toEqual({});
+
+    // One counted condition in the same window, then one past the interval to
+    // force the flush. Counts are added after the roll, so the condition that
+    // closes a window is not the one that flushes it.
+    now.mockReturnValue(5_030_000);
+    countAdmissionCondition('native_admission_missing');
+    now.mockReturnValue(5_061_000);
+    countAdmissionCondition('native_admission_missing');
+
+    // The forced flush emitted the counted metric only: the at-limit payload
+    // was never counted, so no oversized line exists in any window.
+    expect(aggregateLines()).toStrictEqual([
+      {
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_missing',
+        count: 1,
+        intervalMs: 60_000,
+        windowStart: new Date(5_000_000).toISOString(),
+        at: new Date(5_061_000).toISOString(),
+      },
+    ]);
+
+    jestGlobal.restoreAllMocks();
   });
 });
 
@@ -1028,8 +1100,10 @@ describe('persistAttestedKey', () => {
 
 describe('countAdmissionCondition', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     // Earlier tests in this file call the gate at real wall-clock time, which
-    // opens a window far in the future of this test's mocked clock.
+    // opens a window far in the future of this test's mocked clock, so the
+    // module-global window has to be reset for the mocked clock to start one.
     resetAdmissionCountersForTests();
   });
 
@@ -1038,24 +1112,83 @@ describe('countAdmissionCondition', () => {
     jestGlobal.restoreAllMocks();
   });
 
-  test('folds refusals into one window instead of one event per request', () => {
+  test('folds counts into one window line instead of one line per count', () => {
     const now = jestGlobal.spyOn(Date, 'now');
     now.mockReturnValue(1_000_000);
 
     countAdmissionCondition('native_admission_refused');
     countAdmissionCondition('native_admission_refused');
 
-    // Both refusals are counted in the open window, and neither became an
-    // event of its own.
-    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_refused: 2 });
+    // The window is still open, so no line has been written and no refusal
+    // became an event of its own.
+    expect(aggregateLines()).toStrictEqual([]);
     expect(mockCaptureMessage).not.toHaveBeenCalled();
 
-    // The next interval flushes the window and starts a fresh count.
+    // The next interval closes the window and starts a fresh count.
     now.mockReturnValue(1_061_000);
     countAdmissionCondition('native_admission_refused');
 
-    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_refused: 1 });
+    const flushed = aggregateLines();
+    expect(flushed).toHaveLength(1);
+    expect(flushed[0]).toStrictEqual({
+      event: 'native_admission_aggregate',
+      metric: 'native_admission_refused',
+      count: 2,
+      intervalMs: 60_000,
+      windowStart: new Date(1_000_000).toISOString(),
+      at: new Date(1_061_000).toISOString(),
+    });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    // The count that closed the window opened the next one.
+    now.mockReturnValue(1_121_000);
+    countAdmissionCondition('native_admission_refused');
+
+    const both = aggregateLines();
+    expect(both).toHaveLength(2);
+    expect(both[1]).toStrictEqual({
+      event: 'native_admission_aggregate',
+      metric: 'native_admission_refused',
+      count: 1,
+      intervalMs: 60_000,
+      windowStart: new Date(1_061_000).toISOString(),
+      at: new Date(1_121_000).toISOString(),
+    });
+  });
+
+  test('emits one line per metric in the same window', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(2_000_000);
+
+    countAdmissionCondition('native_admission_missing');
+    countAdmissionCondition('native_admission_missing');
+    countAdmissionCondition('native_admission_refused');
+
+    expect(aggregateLines()).toStrictEqual([]);
+
+    now.mockReturnValue(2_061_000);
+    countAdmissionCondition('native_admission_refused');
+
+    const lines = aggregateLines().sort((a, b) => a.metric.localeCompare(b.metric));
+
+    expect(lines).toStrictEqual([
+      {
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_missing',
+        count: 2,
+        intervalMs: 60_000,
+        windowStart: new Date(2_000_000).toISOString(),
+        at: new Date(2_061_000).toISOString(),
+      },
+      {
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_refused',
+        count: 1,
+        intervalMs: 60_000,
+        windowStart: new Date(2_000_000).toISOString(),
+        at: new Date(2_061_000).toISOString(),
+      },
+    ]);
   });
 });
 

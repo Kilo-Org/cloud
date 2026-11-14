@@ -102,13 +102,10 @@ describe('secure backend profiles', () => {
     const auth = await import('@/lib/auth/auth-epoch');
     auth.bumpAuthEpoch();
     store.clearChatBackends();
-    await new Promise<undefined>(resolve => {
-      setImmediate(() => {
-        resolve(undefined);
-      });
+    await vi.waitFor(() => {
+      expect(deleteItemAsync).toHaveBeenCalledWith('chat-backends');
     });
     expect(store.listChatBackends()).toEqual([]);
-    expect(deleteItemAsync).toHaveBeenCalledWith('chat-backends');
     expect(() => store.updateChatBackend(old.id, draft)).toThrow('staleBackend');
   });
 
@@ -152,7 +149,7 @@ describe('secure backend profiles', () => {
     { models: [{ id: 'bad\nid', name: 'Bad', tools: false }] },
   ])('rejects invalid user input without leaking secrets: %j', async patch => {
     const store = await import('./backend-store');
-    expect(() => store.validateChatBackendDraft({ ...draft, ...patch })).toThrow('invalidInput');
+    expect(() => store.validateChatBackendDraft({ ...draft, ...patch })).toThrow(/^invalidInput$/u);
   });
 
   it('persists the selected limit field and defaults profiles that predate the setting', async () => {

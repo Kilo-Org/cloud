@@ -155,8 +155,7 @@ public final class TerminalSession extends TerminalOutput {
         description.append(']');
 
         byte[] bytesToWrite = description.toString().getBytes(StandardCharsets.UTF_8);
-        mEmulator.append(bytesToWrite, bytesToWrite.length);
-        notifyScreenUpdate();
+        appendOutput(bytesToWrite, 0, bytesToWrite.length);
 
         mClient.onSessionFinished(this);
     }

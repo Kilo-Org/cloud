@@ -37,6 +37,7 @@ class ReactNativeSshTerminalModule : Module() {
 
     View(ReactNativeSshTerminalView::class) {
       Events(
+        "onSourceBound",
         "onResize",
         "onLinkPress",
         "onBell",

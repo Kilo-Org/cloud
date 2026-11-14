@@ -18,7 +18,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { clearDraft, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
+import { clearDraft, clearDraftIfStill, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
@@ -221,10 +221,12 @@ export function ReplyInput({
     }
     const body = bodyRef.current.trim();
     if (!body) {
+      // The family's own validation copy, and a local rejection has no toast
+      // owner: it announces through the inline box like the composer's.
       attempt.fail({
         kind: 'body-empty',
-        message: t('prReview.discussion.replyBody'),
-        announce: 'silent',
+        message: t('prReview.composer.bodyEmpty'),
+        announce: 'here',
       });
       return;
     }
@@ -265,6 +267,12 @@ export function ReplyInput({
       // A departed surface's token is dead: a newer mount owns the key, and the
       // draft it is typing must survive this late success.
       if (!attempt.succeed()) {
+        // A newer mount owns the slot: clear only the body this submit posted,
+        // so a draft typed after the unmount survives and the posted text does
+        // not re-seed the field on the next open.
+        if (userId) {
+          void clearDraftIfStill(userId, replyDraftKey, JSON.stringify(bodyRef.current));
+        }
         return;
       }
       bodyRef.current = '';

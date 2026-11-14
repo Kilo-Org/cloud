@@ -22,7 +22,7 @@ import {
 } from './reply-input.test-helpers';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
-import { clearDraft } from '@/lib/persist/drafts';
+import { clearDraft, clearDraftIfStill } from '@/lib/persist/drafts';
 
 type ReplyMutation = ReturnType<typeof useReplyToCommentMutation>;
 
@@ -73,6 +73,7 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 vi.mock('@/lib/persist/drafts', () => ({
   saveDraft: vi.fn(),
   clearDraft: vi.fn(),
+  clearDraftIfStill: vi.fn(),
   prReplyDraftKey: vi.fn(() => 'pr-reply:key'),
 }));
 
@@ -111,6 +112,7 @@ beforeEach(() => {
   gate.status.mockResolvedValue({ accepted: true, currentVersion: 'v1' });
   termsStatus.accept.mockReset();
   vi.mocked(clearDraft).mockReset();
+  vi.mocked(clearDraftIfStill).mockReset();
 });
 
 afterEach(() => {
@@ -212,6 +214,30 @@ describe('ReplyInput submit', () => {
     expect(clearDraft).toHaveBeenCalledWith('u1', `pr-reply:key@${providerPrRefKey(GITLAB_REF)}`);
   });
 
+  it('clears the posted body when a deferred success lands with no replacement draft', async () => {
+    const deferred = Promise.withResolvers<unknown>();
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockReturnValue(deferred.promise);
+    const renderer = await mount(
+      createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
+    );
+    typeBody(renderer, 'hello');
+    act(() => {
+      pressReply(renderer);
+    });
+
+    // The user left without typing again: the durable draft still holds the
+    // body that was just posted, so reopening must not re-seed it.
+    unmountAll();
+    await act(async () => {
+      deferred.resolve({});
+      await Promise.resolve();
+    });
+
+    expect(clearDraftIfStill).toHaveBeenCalledWith('u1', 'pr-reply:key', JSON.stringify('hello'));
+    expect(clearDraft).not.toHaveBeenCalled();
+  });
+
   it('keeps the replacement draft when a deferred reply resolves after unmount', async () => {
     const deferred = Promise.withResolvers<unknown>();
     const mutateAsync = vi.fn<() => Promise<unknown>>();
@@ -269,6 +295,17 @@ describe('ReplyInput draft seeding', () => {
 });
 
 describe('ReplyInput failure copy', () => {
+  it('words an empty reply with the family validation copy, not the field label', async () => {
+    const renderer = await mount(
+      createElement(ReplyInput, { ...baseProps, reply: makeReply(vi.fn()) })
+    );
+    await pressReplyAndSettle(renderer);
+
+    expect(failureCopy(renderer)).toBe('Comment body cannot be empty.');
+    expect(replyEnabled(renderer)).toBe(false);
+  });
+
+
   it('renders the reply surface copy for a rejected reply', async () => {
     const mutateAsync = vi.fn<() => Promise<unknown>>();
     mutateAsync.mockRejectedValue(

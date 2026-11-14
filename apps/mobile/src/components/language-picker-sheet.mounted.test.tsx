@@ -275,12 +275,23 @@ describe('LanguagePickerSheet apply', () => {
     // the typed query.
     expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
-    expect(emptyState?.props.placement).toBeUndefined();
+    // The list's content box owns where the state sits: it fills the sheet body
+    // and centres the state in it, and the state itself opens no scroller of
+    // its own that would collapse to its own height.
+    expect(emptyState?.props.placement).toBe('static');
+    const emptyContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(emptyContentStyle).toMatchObject({ flexGrow: 1, justifyContent: 'center' });
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');
     });
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    // Rows keep the box at its own height, so the first row starts where the
+    // list starts instead of being pushed down a filled body.
+    const listContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(listContentStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
 
     renderer.unmount();
   });
@@ -372,6 +383,11 @@ describe('LanguagePickerSheet apply', () => {
     expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    // The field is the list's own header here, so the content box must stay
+    // top-aligned: centring the empty state would push the field off the top.
+    const compactContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(compactContentStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');

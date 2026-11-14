@@ -41,10 +41,19 @@ import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib
 // the list fills the sheet's body. The list stays transparent: the route's
 // themed `contentStyle` paints the surface (see the (auth) layout), and a
 // second opaque layer would cover the sheet's own themed surface.
-const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingBottom: 16,
+const listFlexStyle = { flex: 1 } satisfies ViewStyle,
+  listPadStyle = { paddingHorizontal: 16, paddingBottom: 16 } satisfies ViewStyle;
+// A query that matches nothing leaves the no-match state as the list's only
+// content, and the sheet body is far taller than it. Without this the content
+// box shrinks to the state's own height, so the state's own centring collapses
+// and the message hugs the top of a blank sheet. The box then fills the body and
+// centres the state in it. Rows keep the box at its own height, so the first row
+// starts at the list's first pixel; a search field that leads the list is
+// content too, and must stay at the top, so that list keeps the plain style.
+const emptyListContentContainerStyle = {
+  ...listPadStyle,
+  flexGrow: 1,
+  justifyContent: 'center',
 } satisfies ViewStyle;
 
 type RestartFailure = 'reload-failed' | 'restart-skipped';
@@ -140,6 +149,7 @@ export function LanguagePickerSheet({
     () => languagePickerItems(query, appliedLanguage, applied === 'device'),
     [query, appliedLanguage, applied]
   );
+  const listIsEmpty = items.length === 0 && !searchInList;
   // The list's memoized cells compare `renderItem` and `extraData` by identity
   // before re-rendering a row (see the security-agent finding list). `selected`
   // and the in-flight `busy` state therefore have to travel through `extraData`:
@@ -367,12 +377,15 @@ export function LanguagePickerSheet({
         `ref` above), so a branch that re-parents it between the list header and
         an empty-state wrapper remounts the native input: a query that matched
         nothing would close the keyboard and drop the typed text. The empty
-        state is the list's own empty component, which leaves the field in place.
+        state is the list's own empty component, which leaves the field in
+        place; `placement="static"` keeps it out of a scroller of its own, so the
+        list's content box owns where it sits (see
+        `emptyListContentContainerStyle`).
       */}
       <FlashList
         nestedScrollEnabled
-        style={listStyle}
-        contentContainerStyle={listContentContainerStyle}
+        style={listFlexStyle}
+        contentContainerStyle={listIsEmpty ? emptyListContentContainerStyle : listPadStyle}
         data={items}
         extraData={rowExtraData}
         keyExtractor={item => item.key}
@@ -380,6 +393,7 @@ export function LanguagePickerSheet({
         ListHeaderComponent={searchInList ? searchField : undefined}
         ListEmptyComponent={
           <EmptyState
+            placement="static"
             icon={SearchX}
             title={t('language.noMatches')}
             description={t('agents.sessionList.tryDifferentSearch')}

@@ -101,7 +101,7 @@ import {
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
@@ -141,6 +141,18 @@ const CONVERSATION_COMMENT_PATH =
 // comment's body, so the sheet opens as the READ surface and Save is the
 // UPDATE surface.
 const COMMENT_EDIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-edit' as const;
+
+/**
+ * The not-found message names the object in the reader's own provider terms, so
+ * a merge request is never called a pull request or the reverse. GitHub keeps
+ * the terminal copy; the two provider scopes name the connection, because both
+ * fold a connection failure into the same NOT_FOUND a removed item produces.
+ */
+const DISCUSSION_UNAVAILABLE_MESSAGE = {
+  github: 'prReview.discussion.unavailableMessage',
+  gitlab: 'prReview.terms.discussionUnavailableMessage',
+  bitbucket: 'prReview.pullRequestDiscussionUnavailableMessage',
+} as const satisfies Record<ProviderPrPlatform, string>;
 
 export function PrReviewDiscussionTab({
   owner,
@@ -447,14 +459,8 @@ export function PrReviewDiscussionTab({
     // GitLab folds its connection failures into the same NOT_FOUND a deleted
     // merge request produces, so provider scopes offer the read retry and the
     // connection check instead of a dead end (GitHub keeps the terminal copy).
-    // Each provider scope names its own object, so the message never calls a
-    // merge request a pull request or the reverse.
     const isProviderScope = ref.platform !== 'github';
-    const unavailableMessage = isMergeRequest
-      ? t('prReview.terms.discussionUnavailableMessage')
-      : isProviderScope
-        ? t('prReview.pullRequestDiscussionUnavailableMessage')
-        : t('prReview.discussion.unavailableMessage');
+    const unavailableMessage = t(DISCUSSION_UNAVAILABLE_MESSAGE[ref.platform]);
     return (
       <>
         <QueryError

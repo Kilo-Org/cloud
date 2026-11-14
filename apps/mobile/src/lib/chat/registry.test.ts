@@ -54,6 +54,8 @@ let failOpenFor: string | undefined = undefined;
 let missingToolsFor: string | undefined = undefined;
 /** A session id whose stored names no longer resolve when it is cloned onto. */
 let missingCloneFor: string | undefined = undefined;
+/** A session id whose next clone fails, whatever it is cloned onto, once. */
+let failCloneOnce: string | undefined = undefined;
 /** A session id whose history read fails, so the half-open path can be exercised. */
 let failHistoryFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
@@ -266,6 +268,11 @@ vi.mock('@kilocode/harness-sdk', () => {
       onto: { readonly tools?: readonly string[]; readonly model?: string } | undefined
     ) => {
       clonedWith = onto;
+      /* A backend can refuse the copy for any reason; this is that refusal. */
+      if (failCloneOnce === id) {
+        failCloneOnce = undefined;
+        return Effect.fail(new FakeToolMissingError());
+      }
       /* A clone that names no tools keeps the stored set, so it is the one that
          fails when the registry no longer holds those names. */
       if (missingCloneFor === id && onto?.tools === undefined) {
@@ -510,6 +517,7 @@ beforeEach(async () => {
   failOpenFor = undefined;
   missingToolsFor = undefined;
   missingCloneFor = undefined;
+  failCloneOnce = undefined;
   failHistoryFor = undefined;
   failForgetFor = undefined;
   failAnswerFor = undefined;
@@ -592,6 +600,65 @@ describe('what a chat is opened with', () => {
     expect(clonedWith).toBeUndefined();
     expect(snapshotOf(opened).sessionId).toBe('s1');
     expect(asked.at(-1)).toEqual({ sessionId: 's1', text: 'hello' });
+  });
+});
+
+describe('a tool change queued while an answer was arriving', () => {
+  it('keeps the queued change when its move fails on a session the store has not written', async () => {
+    /* The store has no row, so the pending change is the only reason to move.
+       A move that fails must leave it for the retry: clearing it first drops the
+       switch the person flipped and asks the question on the old tool set. */
+    storedTools = null;
+    settingsSwitch.enabled = false;
+    await refreshChatTools();
+    await settled();
+    failCloneOnce = opened;
+
+    await say(opened, { text: 'hello', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: BASE });
+    expect(snapshotOf(opened).sessionId).toBe('s1');
+    expect(snapshotOf(opened).failed).not.toBeNull();
+
+    /* The retry proves the change survived: without it the chat has no reason
+       to move, and the question goes out on the names it was opened with. */
+    clonedWith = undefined;
+    await say(opened, { text: 'hello again', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: BASE });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('clears the applied change on the chat the move installed', async () => {
+    storedTools = null;
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    /* The switch moves while the answer is still arriving, so the change waits
+       for the settle instead of being applied under the answer. */
+    settingsSwitch.enabled = false;
+    await refreshChatTools();
+    await settled();
+    expect(clonedWith).toBeUndefined();
+    expect(clonesMade).toBe(0);
+
+    finish?.();
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: BASE });
+    expect(clonesMade).toBe(1);
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+
+    /* The change landed on the session it moved to. A second round must move
+       again only if the installed chat still waits on it. */
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    finish?.();
+    await settled();
+
+    expect(clonesMade).toBe(1);
   });
 });
 

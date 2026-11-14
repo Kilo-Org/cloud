@@ -84,8 +84,9 @@ function ProviderRow({
  *
  * The screen refuses a last-method tap itself, without asking the server, and
  * that sentence retires as soon as the loaded list shows a second method; a
- * server refusal stands until the reader's next tap on a row, because the
- * server's answer is about the account, not about the list this render drew.
+ * server refusal stands until the screen refuses a later tap itself or the
+ * server answers again, because the server's answer is about the account, not
+ * about the list this render drew.
  *
  * Adding a method is the web's round trip (the OAuth callback needs the browser
  * session that starts it), so the row opens the connected-accounts page in the

@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { type SshHost } from '../hosts';
+import type * as Biometric from './biometric';
 import { attempt, fail } from './attempt';
 import { live, type LiveSession } from './live';
-import { retrySession } from './manager';
-import { sessionById, writeSession } from './session-store';
+import { resumeSshSessions, retrySession } from './manager';
+import { patchSession, sessionById, writeSession } from './session-store';
 
 const state = vi.hoisted(() => ({
+  app: {
+    currentState: 'active',
+    addEventListener:
+      vi.fn<(event: string, listener: (value: string) => void) => { remove: () => void }>(),
+  },
   disconnect: vi.fn(),
   closeShell: vi.fn(),
   connect: vi.fn(),
@@ -44,7 +50,11 @@ vi.mock('../forwards-runtime', () => ({
   autoStartForwards: vi.fn(),
   resetSessionForwards: vi.fn(),
 }));
-vi.mock('./biometric', () => ({ requireKeyAccess: state.access }));
+vi.mock('react-native', () => ({ AppState: state.app }));
+vi.mock('./biometric', async importOriginal => {
+  const original = await importOriginal<typeof Biometric>();
+  return { ...original, requireKeyAccess: state.access };
+});
 vi.mock('../native', () => ({
   nativeErrorCode: () => 'ChannelClosed',
   sshPackage: () =>
@@ -80,6 +90,8 @@ function createEntry(): LiveSession {
 let entry = createEntry();
 beforeEach(() => {
   vi.clearAllMocks();
+  state.app.currentState = 'active';
+  state.app.addEventListener.mockImplementation(() => ({ remove: vi.fn() }));
   live.clear();
   entry = createEntry();
   live.set(entry.id, entry);
@@ -124,6 +136,46 @@ it('starts a requested retry immediately and clears the pending backoff timer', 
     expect(state.connect).toHaveBeenCalledTimes(1);
     expect(sessionById('app')?.phase.kind).toBe('connected');
   });
+});
+
+it('leaves an existing background socket untouched when sessions resume', () => {
+  state.app.currentState = 'background';
+  resumeSshSessions();
+  state.app.currentState = 'active';
+  resumeSshSessions();
+  expect(state.connect).not.toHaveBeenCalled();
+  expect(state.access).not.toHaveBeenCalled();
+  expect(entry.nativeSessionId).toBe('target');
+  expect(sessionById('app')?.phase.kind).toBe('connected');
+});
+
+it('keeps a background reconnect pending until the app is active, then unlocks once', async () => {
+  entry.nativeSessionId = null;
+  entry.jumpSessionIds = [];
+  entry.attempt = 0;
+  patchSession('app', {
+    phase: { kind: 'reconnecting', attempt: 1, reason: 'disconnected' },
+  });
+  state.app.currentState = 'background';
+  const reconnect = attempt(entry);
+  await Promise.resolve();
+  expect(sessionById('app')?.phase.kind).toBe('reconnecting');
+  expect(entry.connecting).toBe(true);
+  resumeSshSessions();
+  expect(state.access).not.toHaveBeenCalled();
+  expect(state.connect).not.toHaveBeenCalled();
+  state.app.currentState = 'inactive';
+  state.app.addEventListener.mock.calls[0]?.[1]('inactive');
+  await Promise.resolve();
+  expect(state.access).not.toHaveBeenCalled();
+  state.app.currentState = 'active';
+  resumeSshSessions();
+  state.app.addEventListener.mock.calls[0]?.[1]('active');
+  await reconnect;
+  expect(state.access).toHaveBeenCalledTimes(1);
+  expect(state.connect).toHaveBeenCalledTimes(1);
+  expect(sessionById('app')?.phase.kind).toBe('connected');
+  expect(state.app.addEventListener.mock.results[0]?.value.remove).toHaveBeenCalledOnce();
 });
 
 it('disconnects target and hops and clears their ids on a channel ending', async () => {

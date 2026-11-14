@@ -34,9 +34,7 @@ function watchAppState(): void {
  */
 export async function requireKeyAccess(promptMessage: string): Promise<boolean> {
   watchAppState();
-  if (AppState.currentState === 'background') {
-    return false;
-  }
+  await waitForForeground();
   if (unlocked) {
     return true;
   }
@@ -53,6 +51,20 @@ export async function requireKeyAccess(promptMessage: string): Promise<boolean> 
       pending = null;
     }
   }
+}
+
+export function waitForForeground(): Promise<void> | null {
+  if (AppState.currentState === 'active') {
+    return null;
+  }
+  const { promise, resolve } = Promise.withResolvers<void>();
+  const subscription = AppState.addEventListener('change', state => {
+    if (state === 'active') {
+      subscription.remove();
+      resolve();
+    }
+  });
+  return promise;
 }
 
 async function unlock(promptMessage: string, period: number): Promise<boolean> {

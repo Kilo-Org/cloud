@@ -332,7 +332,9 @@ describe('KiloCommandFormSheet duplicate name', () => {
     const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'name-conflict' } });
 
     act(() => {
-      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)('ok-name');
+      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)(
+        'ok-name'
+      );
     });
     callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
 

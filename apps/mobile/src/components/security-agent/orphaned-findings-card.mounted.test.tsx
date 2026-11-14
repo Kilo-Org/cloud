@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { act, TestRenderer } from '@/test/renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { OrphanedFindingsCard } from './orphaned-findings-card';
@@ -44,7 +44,7 @@ vi.mock('@/lib/a11y/tap-target', () => ({
   LINE_ACTION_HIT_SLOP: 8,
 }));
 
-vi.mock('@/lib/format', () => ({ formatNumber: (value: number) => String(value) }));
+vi.mock('@/lib/format', () => ({ formatNumber: String }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),

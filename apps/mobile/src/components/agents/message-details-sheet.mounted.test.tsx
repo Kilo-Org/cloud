@@ -24,7 +24,7 @@ const native = vi.hoisted(() => ({
   copyFails: false,
   announce: vi.fn(),
   writes: 0,
-  gate: null as Promise<void> | null,
+  gate: null as Promise<unknown> | null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000', mutedForeground: '#999' }),
@@ -453,7 +453,7 @@ describe('MessageDetailsSheet mounted', () => {
   });
 
   it('issues one clipboard write for a second Copy press during the first', async () => {
-    const gate = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<unknown>();
     native.gate = gate.promise;
     const renderer = await mountSheet(storedMessage(assistantInfo(), [textPart('copy once')]));
 
@@ -466,7 +466,7 @@ describe('MessageDetailsSheet mounted', () => {
     expect(native.writes).toBe(1);
 
     await act(async () => {
-      gate.resolve();
+      gate.resolve(undefined);
       await Promise.resolve();
       await Promise.resolve();
     });

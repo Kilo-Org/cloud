@@ -65,11 +65,11 @@ function mount() {
     ref.current = TestRenderer.create(
       createElement(AdvancedConfigPanel, {
         selectedProfileId: null,
-        onSelectProfile: vi.fn(),
+        onSelectProfile: vi.fn(() => undefined),
         manualVars: [{ key: 'API_KEY', value: 'secret', isSecret: true }],
         manualCommands: [],
-        onManualVarsChange: vi.fn(),
-        onManualCommandsChange: vi.fn(),
+        onManualVarsChange: vi.fn(() => undefined),
+        onManualCommandsChange: vi.fn(() => undefined),
       })
     );
   });

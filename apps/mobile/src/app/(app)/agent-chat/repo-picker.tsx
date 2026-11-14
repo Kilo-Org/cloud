@@ -102,11 +102,10 @@ export default function RepoPickerScreen() {
   }, [bridge, filtered, deferredSearch]);
 
   const selection = useSurfaceFeedback<PickerSelectionFailure>();
-  const beginSelection = selection.begin;
 
   const handleSelect = useCallback(
     (repo: string) => {
-      if (beginSelection() === null) {
+      if (selection.begin() === null) {
         // A second tap in the dismissal burst must not select and pop again.
         // The attempt stays pending until this route unmounts, which is the
         // adapter's invalidation; a picker that fails to pop therefore keeps
@@ -120,7 +119,7 @@ export default function RepoPickerScreen() {
       bridgeRef.current = undefined;
       closePicker();
     },
-    [beginSelection, closePicker]
+    [closePicker, selection]
   );
 
   if (!bridge) {

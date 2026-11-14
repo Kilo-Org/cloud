@@ -7,7 +7,7 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { assertSurfaceFailureHandled, type SurfaceFeedback } from '@/lib/surface-feedback';
 
 /** The clipboard's refusal; the line under Copy renders it. */
-export type CopyFailure = { readonly kind: 'copy-failed' };
+type CopyFailure = { readonly kind: 'copy-failed' };
 
 /**
  * Details-sheet Copy path: immediate clipboard write, no ActionSheet, and no
@@ -38,16 +38,20 @@ function copyStatusLabel(
   t: (key: string) => string
 ): string | null {
   switch (feedback.status) {
-    case 'failed':
+    case 'failed': {
       // One refusal arm: the line under Copy is the whole surface for it.
       return t('common.couldNotCopyToClipboard');
-    case 'succeeded':
+    }
+    case 'succeeded': {
       return t('common.copiedToClipboard');
+    }
     case 'idle':
-    case 'pending':
+    case 'pending': {
       return null;
-    default:
+    }
+    default: {
       return assertSurfaceFailureHandled(feedback);
+    }
   }
 }
 
@@ -62,11 +66,14 @@ function copyStatusLabel(
  * starts from the call to action without a lifecycle reset, and a write that
  * settles after the block went away publishes nothing.
  */
-export function useMessageDetailsCopyFeedback(): {
+/** What the Copy block renders and calls. */
+export type MessageDetailsCopyFeedback = Readonly<{
   feedback: SurfaceFeedback<CopyFailure>;
   status: string | null;
   handleCopy: (copyText: string | null | undefined) => void;
-} {
+}>;
+
+export function useMessageDetailsCopyFeedback(): MessageDetailsCopyFeedback {
   const { t } = useTranslation();
   const copies = useSurfaceFeedback<CopyFailure>();
   return {

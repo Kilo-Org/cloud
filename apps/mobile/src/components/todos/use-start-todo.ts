@@ -21,7 +21,7 @@ type StartableTodo = { id: string; title: string; notes: string | null };
 type StartDefaults = Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'>;
 
 /** The refusal a start publishes; the toast owns the copy, the row only its spinner. */
-export type StartTodoFailure = { readonly kind: 'start-failed' };
+type StartTodoFailure = { readonly kind: 'start-failed' };
 
 /** What the to-do screens get from `useStartTodo`. */
 export type StartTodoControls = {

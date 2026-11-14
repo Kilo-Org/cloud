@@ -162,7 +162,9 @@ describe('useStartTodo start now', () => {
   it('starting a second to-do leaves the first row’s start visible and refuses a second press on it', async () => {
     const firstStart = Promise.withResolvers<unknown>();
     const secondStart = Promise.withResolvers<unknown>();
-    state.startAgent.mockReturnValueOnce(firstStart.promise).mockReturnValueOnce(secondStart.promise);
+    state.startAgent
+      .mockReturnValueOnce(firstStart.promise)
+      .mockReturnValueOnce(secondStart.promise);
     const other = { id: 'todo-2', title: 'Second task', notes: null };
 
     await act(async () => {

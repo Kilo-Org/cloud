@@ -50,8 +50,7 @@ export function UpNextSection({
       {items.map(item => {
         const list = lists.data?.find(candidate => candidate.id === item.listId);
         const newestSession = item.sessions[0] ?? null;
-        const canPress =
-          !isStarting(item.id) && (newestSession !== null || list !== undefined);
+        const canPress = !isStarting(item.id) && (newestSession !== null || list !== undefined);
         const actionLabel = newestSession
           ? t('notifications.action.openSession')
           : t('agentChat.newSession.startSession');

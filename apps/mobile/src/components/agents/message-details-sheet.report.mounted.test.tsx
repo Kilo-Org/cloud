@@ -3,16 +3,12 @@
 // settles the attempt it captured. Real TanStack mutations over a faked
 // transport, because per-call callbacks would be replaced by a later call.
 
-import {
-  type AssistantMessage,
-  type Part,
-  type StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
+import { type AssistantMessage, type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, TestRenderer } from '@/test/renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { MessageDetailsSheet } from './message-details-sheet';
@@ -46,7 +42,7 @@ vi.mock('@/components/destructive-confirm-dialog', () => ({
   DestructiveConfirmDialog: 'DestructiveConfirmDialog',
 }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
-vi.mock('expo-clipboard', () => ({ setStringAsync: async () => true }));
+vi.mock('expo-clipboard', () => ({ setStringAsync: () => Promise.resolve(true) }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'success' },

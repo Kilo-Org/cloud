@@ -69,7 +69,8 @@ export function SaveProfileSheet({
   const descriptionRef = useRef('');
   const [setAsDefault, setSetAsDefault] = useState(false);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
-  const { feedback, failure, begin } = useSurfaceFeedback<SaveProfileFailure>();
+  const save = useSurfaceFeedback<SaveProfileFailure>();
+  const feedback = save.feedback;
   const isSaving = feedback.status === 'pending';
 
   const hasSecrets = envVars.some(envVar => envVar.isSecret);
@@ -102,7 +103,7 @@ export function SaveProfileSheet({
     }
     setDescriptionError(null);
 
-    const attempt = begin();
+    const attempt = save.begin();
     if (attempt === null) {
       return;
     }
@@ -143,7 +144,7 @@ export function SaveProfileSheet({
         showsVerticalScrollIndicator={false}
       >
         <Text variant="muted">{t('agentChat.newSession.saveProfileDescription')}</Text>
-        {failure !== null ? (
+        {save.failure !== null ? (
           <AccessibleStatus className="text-sm" message={saveFailureMessage(t)} />
         ) : null}
         <ProfileNameField

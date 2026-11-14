@@ -149,22 +149,20 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const completingProductId = purchases.snapshot.pendingKeys[0] ?? null;
   // The screen renders one error line, so the owner reads the failed entry (an
   // absent key reads idle). A pending entry can never be disturbed by this.
-  const failedPhase = [...purchases.snapshot.states.values()].find(
-    phase => phase.status === 'failed'
-  );
+  // One line on screen, so the first failed entry names it. A pending entry can
+  // never be disturbed by clearError, which only retires `failed`.
   const errorMessageKey =
-    failedPhase !== undefined && failedPhase.status === 'failed'
-      ? failedPhase.failure.messageKey
-      : null;
+    [...purchases.snapshot.states.values()].find(phase => phase.status === 'failed')?.failure
+      .messageKey ?? null;
   const clearError = useCallback(() => {
     for (const [key, phase] of purchases.snapshot.states) {
       if (phase.status === 'failed') {
         purchases.clearWhere(key, () => true);
       }
     }
-    // `snapshot.states` and `clearWhere` keep their identity until the store
-    // changes, which is what makes this safe as a dependency.
-  }, [purchases.clearWhere, purchases.snapshot.states]);
+    // The controller's identity holds until the store changes, so reading the
+    // snapshot inside the callback is what keeps this correct.
+  }, [purchases]);
   const [completedPurchaseCount, setCompletedPurchaseCount] = useState(0);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
@@ -335,6 +333,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       }),
     [
       appAccountToken,
+      clearError,
       completeAppStorePurchase.mutateAsync,
       completePlayPurchase.mutateAsync,
       creditPackAppleProductIds,
@@ -505,15 +504,17 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
           fetchPendingStorePurchases(storefront),
           'the pending purchase lookup'
         );
-        for (const purchase of pending.filter(candidate =>
-          isRecoverableCreditPurchase(
-            candidate,
-            creditPackAppleProductIds,
-            creditPackGoogleProductIds
-          )
-        )) {
-          await completeStorePurchaseInSession(purchase);
-        }
+        await Promise.all(
+          pending
+            .filter(candidate =>
+              isRecoverableCreditPurchase(
+                candidate,
+                creditPackAppleProductIds,
+                creditPackGoogleProductIds
+              )
+            )
+            .map(purchase => completeStorePurchaseInSession(purchase))
+        );
         unreconciledProductIdsRef.current.delete(productId);
         return true;
       } catch {
@@ -522,7 +523,12 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [completeStorePurchaseInSession, creditPackAppleProductIds, creditPackGoogleProductIds, storefront]
+    [
+      completeStorePurchaseInSession,
+      creditPackAppleProductIds,
+      creditPackGoogleProductIds,
+      storefront,
+    ]
   );
 
   const startPurchase = useCallback(
@@ -581,6 +587,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       beginPurchase,
       clearError,
       reconcilePurchaseIntent,
+      storefront,
       toastPurchaseError,
     ]
   );

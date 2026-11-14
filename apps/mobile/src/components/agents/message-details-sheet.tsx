@@ -1,6 +1,5 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import { useMutation } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
@@ -8,72 +7,20 @@ import { useTranslation } from 'react-i18next';
 import { getLanguageSnapshot } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
-import { useTRPC } from '@/lib/trpc';
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { useMessageDetailsCopyFeedback } from './message-details-copy';
+import { DetailsCopyAction } from './message-details-copy-action';
 import { getMessageDetailsContent } from './message-details-content';
 import { type MessageDeliveryStatement } from './message-failure-state';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
 import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
-import {
-  buildReportAiResponseErrorToast,
-  buildReportAiResponseInput,
-  classifyReportAiResponseFailure,
-  type ReportAiResponseInput,
-  reportAiResponseSubmittedToast,
-  shouldShowReportAiResponse,
-} from './report-ai-response';
-
-/** The report's own refusal; the toast owns the copy, the phase only the button. */
-type ReportFailure = { readonly kind: 'report-failed' };
-
-/**
- * The Copy pressable and its feedback line, as one block. The sheet mounts it
- * with a `key` per message and per visibility, so a new message or a reopen
- * starts from the call to action instead of inheriting the previous outcome.
- */
-function DetailsCopyAction({ copyText }: Readonly<{ copyText: string }>) {
-  const { t } = useTranslation();
-  const copy = useMessageDetailsCopyFeedback();
-  return (
-    <View className="gap-2">
-      <Pressable
-        onPress={() => {
-          copy.handleCopy(copyText);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t('agentChat.messageDetails.copyMessage')}
-        className="rounded-md border border-border px-4 py-3 active:opacity-70"
-        testID="message-details-copy"
-      >
-        <Text className="text-center text-base font-medium text-foreground">
-          {t('agentChat.messageDetails.copyMessage')}
-        </Text>
-      </Pressable>
-      {copy.status ? (
-        <Text
-          className={cn(
-            'text-center text-sm',
-            copy.feedback.status === 'failed' ? 'text-destructive' : 'text-foreground'
-          )}
-          testID="message-details-copy-feedback"
-        >
-          {copy.status}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
+import { useMessageReport } from './use-message-report';
 
 type MessageDetailsSheetProps = {
   visible: boolean;
@@ -109,9 +56,9 @@ export function MessageDetailsSheet({
 }: Readonly<MessageDetailsSheetProps>) {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const trpc = useTRPC();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
+  const { showReport, handleReport } = useMessageReport(message, confirm);
   const [selectVisible, setSelectVisible] = useState(false);
   const content = useMemo(
     () => (message ? getMessageDetailsContent(message, modelOptions, deliveryState) : null),
@@ -121,74 +68,6 @@ export function MessageDetailsSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- language drives the resolved copy inside getMessageDetailsContent
     [message, modelOptions, deliveryState, getLanguageSnapshot()]
   );
-  // Keyed by the reported target: two messages can report concurrently, and a
-  // report in flight hides its button until it settles.
-  const report = useKeyedSurfaceFeedback<string, ReportFailure>();
-
-  const reportMutation = useMutation(
-    trpc.moderation.reportContent.mutationOptions({
-      onSuccess: result => {
-        announcingToast.success(reportAiResponseSubmittedToast(result.receiptId));
-      },
-    })
-  );
-
-  const startReport = (input: ReportAiResponseInput) => {
-    const attempt = report.begin(input.targetId);
-    if (attempt === null) {
-      // This message is already reporting.
-      return;
-    }
-    void (async () => {
-      try {
-        await reportMutation.mutateAsync(input);
-        // The button staying hidden is the rendered outcome of a report.
-        attempt.succeed();
-      } catch (error) {
-        attempt.fail({ kind: 'report-failed' });
-        const failure = classifyReportAiResponseFailure(error);
-        const errorToast = buildReportAiResponseErrorToast(failure, () => {
-          startReport(input);
-        });
-        announcingToast.error(
-          errorToast.message,
-          errorToast.action ? { action: errorToast.action } : undefined
-        );
-      }
-    })();
-  };
-
-  const reportPhase = message === null ? undefined : report.snapshot.states.get(message.info.id);
-  const showReport =
-    message !== null &&
-    shouldShowReportAiResponse(message) &&
-    reportPhase?.status !== 'pending' &&
-    reportPhase?.status !== 'succeeded';
-
-  useEffect(() => {
-    if (!visible) {
-      setSelectVisible(false);
-    }
-  }, [visible]);
-
-  const handleReport = () => {
-    if (!message) {
-      return;
-    }
-    const input = buildReportAiResponseInput(message);
-    if (!input) {
-      return;
-    }
-    confirm({
-      title: t('agentChat.messageDetails.reportAiResponse'),
-      message: t('agentChat.messageDetails.reportAiResponseConfirm'),
-      confirmLabel: t('agentChat.messageDetails.report'),
-      onConfirm: () => {
-        startReport(input);
-      },
-    });
-  };
-
   return (
     <SessionPageSheet
       dismissible

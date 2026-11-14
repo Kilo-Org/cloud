@@ -12,6 +12,7 @@ import '@/i18n';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { PrReviewCommentComposer } from './pr-review-comment-composer';
+import { PR_OPERATION_PERSISTENCE_FAILED_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { clearDraft } from '@/lib/persist/drafts';
 
 // The Expo modules below read the build-time `__DEV__` global at import time
@@ -272,6 +273,26 @@ describe('PrReviewCommentComposer submit phase', () => {
     expect(hasReconnectNotice(renderer)).toBe(false);
     expect(pendingReview.addComment).not.toHaveBeenCalled();
     expect(baseProps.onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('blocks the primary on an unrecorded intent and recovers on an edit', async () => {
+    const rejection = new Error(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+    createComment.mutateAsync.mockImplementation(() => {
+      createComment.publish.current?.({ error: rejection });
+      return Promise.reject(rejection);
+    });
+    const renderer = await mountComposer();
+    typeBody(renderer, 'hello');
+    await pressAndSettle(renderer, 'Comment now');
+
+    expect(hasCopy(renderer, 'We could not record this action. Please try again later.')).toBe(true);
+    // The intent never reached the ledger: the same body must not be retried.
+    expect(isDisabled(renderer, 'Comment now')).toBe(true);
+
+    // An edit is a new intent, so the line retires and the CTA returns.
+    typeBody(renderer, 'hello again');
+    expect(hasCopy(renderer, 'We could not record this action. Please try again later.')).toBe(false);
+    expect(isDisabled(renderer, 'Comment now')).toBe(false);
   });
 
   it('issues one comment for two taps during the Terms status round-trip', async () => {

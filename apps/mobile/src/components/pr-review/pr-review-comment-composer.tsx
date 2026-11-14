@@ -79,6 +79,7 @@ const BLOCKING = new Set<PrInlineFailure['kind']>([
   'forbidden',
   'reconnect',
   'not-found',
+  'not-recorded',
 ]);
 
 export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
@@ -167,7 +168,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     setHasBody(value.trim().length > 0);
     // An edit retires the recoverable rejections — including the local
     // empty-body validation.
-    clearWhere(f => f.kind === 'bad-request' || f.kind === 'body-empty');
+    clearWhere(
+      f => f.kind === 'bad-request' || f.kind === 'body-empty' || f.kind === 'not-recorded'
+    );
     if (draftUserId) {
       saveDraft(draftUserId, commentDraftKey, value);
     }
@@ -343,7 +346,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     }
     bodyRef.current = block;
     setHasBody(block.trim().length > 0);
-    clearWhere(f => f.kind === 'bad-request' || f.kind === 'body-empty');
+    clearWhere(
+      f => f.kind === 'bad-request' || f.kind === 'body-empty' || f.kind === 'not-recorded'
+    );
     // Persist the inserted suggestion like a typed change, so a process kill
     // after Insert (with no later keystroke) does not lose the suggestion.
     if (draftUserId) {

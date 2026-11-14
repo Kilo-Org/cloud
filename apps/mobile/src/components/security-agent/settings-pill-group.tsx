@@ -30,12 +30,18 @@ import { cn } from '@/lib/utils';
  */
 export function PillGroup<T extends string>({
   label,
+  accessibilityLabel,
   options,
   value,
   disabled,
   onChange,
 }: Readonly<{
   label: string;
+  /**
+   * Names the group when pickers on one screen share a visible label. The
+   * visible `label` stays unchanged. Defaults to `label`.
+   */
+  accessibilityLabel?: string;
   options: readonly { value: T; label: string }[];
   /** `null` when nothing is selected yet, e.g. an unset dismissal reason. */
   value: T | null;
@@ -46,7 +52,10 @@ export function PillGroup<T extends string>({
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-muted-foreground">{label}</Text>
-      <RadioGroup label={label} className="overflow-hidden rounded-lg bg-secondary">
+      <RadioGroup
+        label={accessibilityLabel ?? label}
+        className="overflow-hidden rounded-lg bg-secondary"
+      >
         {options.map((option, index) => {
           const active = value === option.value;
           return (

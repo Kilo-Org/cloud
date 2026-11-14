@@ -30,10 +30,14 @@ const trackInteraction = vi.hoisted(() => ({
 const toggleRows = vi.hoisted(() => ({
   rows: [] as {
     title: string;
+    accessibilityLabel?: string;
     value: boolean;
     disabled: boolean;
     onValueChange: (value: boolean) => void;
   }[],
+}));
+const pillGroups = vi.hoisted(() => ({
+  groups: [] as { label: string; accessibilityLabel?: string }[],
 }));
 const saveButton = vi.hoisted(() => ({
   onSave: null as (() => Promise<void>) | null,
@@ -68,7 +72,10 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
   }),
 }));
 vi.mock('@/components/security-agent/settings-pill-group', () => ({
-  PillGroup: () => null,
+  PillGroup: (props: { label: string; accessibilityLabel?: string }) => {
+    pillGroups.groups.push(props);
+    return null;
+  },
 }));
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: (props: { onSave: () => Promise<void> }) => {
@@ -79,6 +86,7 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
 vi.mock('@/components/security-agent/settings-toggle-row', () => ({
   ToggleRow: (props: {
     title: string;
+    accessibilityLabel?: string;
     value: boolean;
     disabled: boolean;
     onValueChange: (value: boolean) => void;
@@ -153,6 +161,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     save.mutateAsync.mockResolvedValue({});
     trackInteraction.mutate.mockClear();
     toggleRows.rows = [];
+    pillGroups.groups = [];
     saveButton.onSave = null;
     toastSuccess.mockClear();
   });
@@ -207,5 +216,35 @@ describe('AutomationSettingsScreen approval gate', () => {
     renderScreen();
 
     expect(approvalRow().disabled).toBe(true);
+  });
+
+  it('names each repeated control with the section it belongs to', () => {
+    config.data = enabledConfig({ autoAnalysisEnabled: true, autoRemediationEnabled: true });
+    renderScreen();
+
+    const analysisSection = i18n.t('securityAgent.automation.autoAnalysis');
+    const remediationSection = i18n.t('securityAgent.automation.autoRemediation');
+    const includeTitle = i18n.t('securityAgent.automation.includeExistingFindings');
+    const severityTitle = i18n.t('securityAgent.automation.minimumSeverity');
+
+    const includeNames = toggleRows.rows
+      .filter(row => row.title === includeTitle)
+      .map(row => row.accessibilityLabel);
+    expect(includeNames).toHaveLength(2);
+    const includeAnalysis = includeNames.filter(name => name?.includes(analysisSection));
+    const includeRemediation = includeNames.filter(name => name?.includes(remediationSection));
+    expect(includeAnalysis).toHaveLength(1);
+    expect(includeRemediation).toHaveLength(1);
+
+    const severityGroups = pillGroups.groups.filter(group => group.label === severityTitle);
+    expect(severityGroups).toHaveLength(2);
+    const severityNames = severityGroups.map(group => group.accessibilityLabel);
+    const severityAnalysis = severityNames.filter(name => name?.includes(analysisSection));
+    const severityRemediation = severityNames.filter(name => name?.includes(remediationSection));
+    expect(severityAnalysis).toHaveLength(1);
+    expect(severityRemediation).toHaveLength(1);
+
+    const names = [...includeNames, ...severityNames];
+    expect(new Set(names).size).toBe(4);
   });
 });

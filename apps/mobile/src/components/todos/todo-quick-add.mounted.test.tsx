@@ -148,7 +148,6 @@ describe('To-do quick add', () => {
     expect(errorLine()).toBeNull();
   });
 
-
   it('clears the field only once the add is confirmed', async () => {
     const pending = Promise.withResolvers<undefined>();
     state.onAdd.mockReturnValueOnce(pending.promise);

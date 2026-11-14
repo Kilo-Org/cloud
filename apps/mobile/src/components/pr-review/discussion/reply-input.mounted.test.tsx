@@ -305,7 +305,6 @@ describe('ReplyInput failure copy', () => {
     expect(replyEnabled(renderer)).toBe(false);
   });
 
-
   it('renders the reply surface copy for a rejected reply', async () => {
     const mutateAsync = vi.fn<() => Promise<unknown>>();
     mutateAsync.mockRejectedValue(

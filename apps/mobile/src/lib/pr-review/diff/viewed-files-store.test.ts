@@ -269,6 +269,42 @@ describe('viewed-files-store', () => {
     expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: true });
   });
 
+  it('does not un-tick a path from a read taken while its write is still open', async () => {
+    /* Two surfaces read one PR's set. A toggle is optimistic and its durable
+       write settles later; a revalidation that starts inside that window reads
+       the set from before the write, so publishing it would take the tick back
+       off the file the person just ticked. Only the toggle's own revalidation —
+       after the write landed — may change the set. */
+    const durable: string[] = [];
+    storeMocks.getViewedFiles.mockImplementation(async () => {
+      await Promise.resolve();
+      return [...durable];
+    });
+    const writeGate = Promise.withResolvers<undefined>();
+    storeMocks.toggleViewedFile.mockImplementation(async (input: { path: string }) => {
+      await writeGate.promise;
+      durable.push(input.path);
+    });
+    subscribeViewedFiles(REF, SHA1, listenerStub());
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
+
+    const toggling = applyViewedFilesToggle(REF, SHA1, 'a.ts');
+    expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
+
+    // Both a single revalidation and the fan-out after another key's toggle
+    // land in the window and must not publish the pre-write set.
+    await revalidateViewedFiles(REF, SHA1);
+    expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
+    revalidateAllViewedFiles();
+    await flushTurn();
+    expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
+
+    writeGate.resolve(undefined);
+    await toggling;
+    await waitFor(() => storeMocks.getViewedFiles.mock.calls.length > 0);
+    expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
+  });
+
   it('resetViewedFilesStoreForTests clears every entry', async () => {
     storeMocks.getViewedFiles.mockResolvedValue(['a.ts']);
     subscribeViewedFiles(REF, SHA1, listenerStub());

@@ -986,6 +986,29 @@ describe('the Approve press of one session card', () => {
     });
   });
 
+  it('retires a superseded entry even when the card already draws the pushed request', () => {
+    const card = followOne();
+    awaitRequest(card, APPROVAL_A);
+    const keyA = sessionCardPressKey('session-1', APPROVAL_A);
+    failPress(keyA);
+
+    // A server push moved the card to the next request, so the tray rebuild
+    // draws exactly what is already on screen and no update runs; only the
+    // unconditional prune can retire the failed entry.
+    awaitRequest(card, APPROVAL_B);
+    // The rebuild stamps the sync's own version; matching it keeps the drawn
+    // content identical to the pushed card.
+    card.props = { ...card.props, updatedAt: new Date(NOW + 60_000).toISOString() };
+    syncFollowedSessionCards(
+      // The row reports the same request the push already drew.
+      [{ ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:02:00.000Z' }],
+      NOW + 60_000
+    );
+
+    expect(_sessionCardPressKeysForTests()).not.toContain(keyA);
+    expect(card.update).not.toHaveBeenCalled();
+  });
+
   it('keeps one entry per current request and refuses a token minted for a deleted key', async () => {
     const card = followOne();
     awaitRequest(card, APPROVAL_A);

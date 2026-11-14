@@ -335,15 +335,16 @@ export function syncFollowedSessionCards(
         // the ones the last push delivered instead of wiping them.
         previous: current ?? undefined,
       });
+      // A server push updates the card directly, so the rebuild can equal what
+      // it already shows and the draw branch below never runs. Prune every
+      // followed session's superseded press entries here instead: one entry per
+      // request would otherwise accumulate for the session's whole history.
+      forgetSessionCardPress(sessionId, cardPressKey(current));
       // A failed run ends like a finished one, with its stop reason.
       if (content.statusKind === 'idle' || content.statusKind === 'failed') {
         forgetFollow(sessionId);
         endCard(activity, after(new Date(Date.now() + SESSION_FINISHED_DISMISS_MS)), content);
       } else if (!drawsSame(current, content)) {
-        // Only the request the card currently shows may contribute press props;
-        // every other entry for this session is retired so the store cannot
-        // grow with the session's history of requests.
-        forgetSessionCardPress(sessionId, cardPressKey(current));
         void settleCardWork(
           activity.update(
             { ...content, ...currentCardPressProps(current) },

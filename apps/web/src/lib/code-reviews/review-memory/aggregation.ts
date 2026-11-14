@@ -4,12 +4,7 @@ import type { CodeReviewFeedbackEvent } from '@kilocode/db/schema';
 import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';
 import { listRecentFeedbackEvents, upsertScopeProposal } from './db';
-import {
-  createReviewMemoryGatewayProvider,
-  generateReviewMemoryStructuredOutput,
-  resolveReviewMemoryActor,
-  resolveReviewMemoryModel,
-} from './llm';
+import { createReviewMemoryGatewayForOwner, generateReviewMemoryStructuredOutput } from './llm';
 import { reviewMemoryRetentionCutoff } from './retention';
 
 const REVIEW_MEMORY_FORBIDDEN_PROPOSAL_PATTERN =
@@ -69,14 +64,9 @@ export async function generateReviewMemoryProposalWithGateway(input: {
   tokensIn?: number | null;
   tokensOut?: number | null;
 }> {
-  const actor = await resolveReviewMemoryActor(input.owner);
-  const { modelSlug } = await resolveReviewMemoryModel({
+  const { modelSlug, provider } = await createReviewMemoryGatewayForOwner({
     owner: input.owner,
     platform: input.platform,
-  });
-  const provider = createReviewMemoryGatewayProvider({
-    owner: input.owner,
-    actor,
     userAgent: 'Kilo Review Memory Analyzer',
   });
   const result = await generateReviewMemoryStructuredOutput({

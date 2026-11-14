@@ -300,17 +300,63 @@ describe('narrowProfilePermission', () => {
     expect(resolve(session, composed, 'bash', 'git log --output=/tmp/x')).toBe('deny');
   });
 
-  it('keeps an agent ask as written', () => {
+  it('keeps an agent ask as written and carries the session decisions it reaches', () => {
+    // A session that says nothing about the tool leaves the ask as written.
     expect(narrowProfilePermission({ edit: 'deny' }, { bash: { '*': 'ask' } })).toEqual({
       bash: { '*': 'ask' },
     });
+    // The session's catch-all refusal follows the ask and decides, because a
+    // session refusal never becomes a prompt; its allows become the profile's
+    // ask, which is the stricter of the two.
     expect(narrowProfilePermission(reviewSession, { bash: { '*': 'ask' } })).toEqual({
-      bash: { '*': 'ask' },
+      bash: {
+        '*': 'deny',
+        'gh pr diff': 'ask',
+        'gh pr diff *': 'ask',
+        'git log': 'ask',
+        'git log *': 'ask',
+        'git push': 'deny',
+        'git push *': 'deny',
+      },
     });
-    // An ask is stricter than an allowance, so it needs no session rules after it.
-    expect(narrowProfilePermission(reviewSession, { bash: { 'git log *': 'ask' } })).toEqual({
+    const composed = narrowProfilePermission(reviewSession, {
       bash: { 'git log *': 'ask' },
-    });
+    }) as PermissionMap;
+    expect(composed['bash']).toEqual({ '*': 'deny', 'git log': 'ask', 'git log *': 'ask' });
+    expect(resolve(reviewSession, composed, 'bash', 'git log --oneline')).toBe('ask');
+    expect(resolve(reviewSession, composed, 'bash', 'node x')).toBe('deny');
+  });
+
+  it('carries the session refusals an agent ask can reach', () => {
+    const session: PermissionMap = {
+      bash: { '*': 'deny', 'git log': 'allow', 'git log *': 'allow' },
+    };
+    const composed = narrowProfilePermission(session, { bash: { '*': 'ask' } }) as PermissionMap;
+    // The catch-all refusal decides every command the session wrote no allow
+    // for, and the session's allows keep the profile's ask.
+    expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'git push')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('ask');
+  });
+
+  it('does not let an agent ask widen a flat session denial', () => {
+    const session: PermissionMap = { bash: 'deny' };
+    const composed = narrowProfilePermission(session, { bash: { '*': 'ask' } }) as PermissionMap;
+    // The session's flat refusal covers every command of the tool, so no prompt
+    // survives.
+    expect(composed['bash']).toEqual({ '*': 'deny' });
+    expect(resolve(session, composed, 'bash', 'npm test')).toBe('deny');
+  });
+
+  it('keeps an agent ask over a session allow for the same tool', () => {
+    const session: PermissionMap = { bash: 'allow' };
+    const composed = narrowProfilePermission(session, {
+      bash: { '*': 'ask', 'rm *': 'deny' },
+    }) as PermissionMap;
+    // The session allows every command, so the profile's ask stands as written
+    // and its own refusal still decides the destructive form.
+    expect(resolve(session, composed, 'bash', 'ls -la')).toBe('ask');
+    expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
   });
 
   it('drops an empty agent map', () => {
@@ -336,10 +382,12 @@ describe('narrowProfilePermission', () => {
     ).toEqual({ bash: { '*': 'allow', 'rm *': 'deny' } });
   });
 
-  it('keeps a flat ask action when the session sets no restriction', () => {
+  it('keeps a flat ask action only where the session denies nothing', () => {
     expect(narrowProfilePermission({}, 'ask')).toBe('ask');
     expect(narrowProfilePermission({ todowrite: 'allow' }, 'ask')).toBe('ask');
-    expect(narrowProfilePermission({ edit: 'deny' }, 'ask')).toBe('ask');
+    // A prompt where the session refuses a tool would be wider than the session.
+    expect(narrowProfilePermission({ edit: 'deny' }, 'ask')).toBeUndefined();
+    expect(narrowProfilePermission({ bash: { '*': 'deny' } }, 'ask')).toBeUndefined();
     expect(narrowProfilePermission({ edit: 'deny' }, 'allow')).toBeUndefined();
     expect(narrowProfilePermission({}, 'allow')).toBe('allow');
   });

@@ -58,9 +58,16 @@ function patternsMayCover(a: string, b: string): boolean {
  *
  * The composed rule list is built by order rather than by comparing pattern
  * text. Agent rules come first in their own order, so a profile's exception
- * after its own refusal survives, and an agent allowance is kept only where the
- * session writes an allow for that same pattern, because the session decides
- * every other pattern.
+ * after its own refusal survives.
+ *
+ * An agent refusal applies as written. An agent ask applies as written too, and
+ * carries every session decision of the commands it can reach, in the session's
+ * order: a session refusal stays a refusal, and a session allow becomes the
+ * profile's ask because the profile chose to ask there. A session refusal can
+ * therefore never become a prompt.
+ *
+ * An agent allowance is kept only where the session writes an allow for that
+ * same pattern, because the session decides every other pattern.
  *
  * A kept allowance is followed by each later session refusal that can decide a
  * command it covers. Only refusals are carried: an appended allow would lift a
@@ -87,7 +94,14 @@ function composeRuleMap(
     // write the same pattern, which is what the session permits.
     if (action === 'allow' && session[pattern] !== 'allow') continue;
     composed.push([pattern, action]);
-    if (action !== 'allow') continue;
+    if (action === 'deny') continue;
+    if (action === 'ask') {
+      for (const [sessionPattern, sessionAction] of sessionEntries) {
+        if (!patternsMayCover(pattern, sessionPattern)) continue;
+        composed.push([sessionPattern, sessionAction === 'allow' ? 'ask' : sessionAction]);
+      }
+      continue;
+    }
     const index = sessionEntries.findIndex(([key]) => key === pattern);
     if (index < 0) continue;
     for (const [denyIndex, [denyPattern, denyAction]] of sessionEntries.entries()) {
@@ -119,11 +133,12 @@ export function narrowProfilePermission(
   agent: AgentPermission
 ): PermissionValue | PermissionMap | undefined {
   if (isPermissionAction(agent)) {
-    // A flat action covers every tool. A refusal and an ask apply as written; a
-    // flat allowance is omitted when the session restricts any tool, so the
-    // session policy governs that agent.
-    if (agent !== 'allow') return agent;
-    return Object.values(session).some(value => valueHasDenial(value)) ? undefined : 'allow';
+    // A flat action covers every tool. A refusal applies as written. A flat ask
+    // or allowance is omitted when the session denies any tool, because a prompt
+    // or an allowance there would be wider than the session, so the session
+    // policy governs that agent.
+    if (agent === 'deny') return agent;
+    return Object.values(session).some(value => valueHasDenial(value)) ? undefined : agent;
   }
   if (typeof agent !== 'object' || agent === null) return undefined;
   const narrowed: PermissionMap = {};

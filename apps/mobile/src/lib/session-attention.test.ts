@@ -197,13 +197,44 @@ describe('ack store state machine', () => {
     expect(isAttentionAcked('s1', { raiseId: 'permission' })).toBe(true);
   });
 
-  it('reads a status-only ack as answered for every raise of that status', () => {
+  it('a status-only ack answers a dated raise it can order, not one after it', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T10:00:00.000Z'));
     ackSessionAttention('s1', 'permission');
 
-    // Nothing the ack holds can tell two permissions apart, so it answers both;
-    // a raise of the other kind is a different raise.
-    expect(isAttentionAcked('s1', { raiseId: 'R2', status: 'permission' })).toBe(true);
-    expect(isAttentionAcked('s1', { raiseId: 'R2', status: 'question' })).toBe(false);
+    // A raise dated before the answer is the one the person answered.
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T09:59:30.000Z', status: 'permission' })
+    ).toBe(true);
+    // A raise after it is a new raise, whichever status it carries.
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T10:00:30.000Z', status: 'permission' })
+    ).toBe(false);
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T10:00:30.000Z', status: 'question' })
+    ).toBe(false);
+  });
+
+  it('a dated raise observed after a status-only ack shows its badge', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T10:00:00.000Z'));
+    const earlier = '2026-10-12T09:59:30.000Z';
+    const later = '2026-10-12T10:00:30.000Z';
+    ackSessionAttention('s1', 'permission');
+    expect(isAttentionAcked('s1', { raiseId: earlier, status: 'permission' })).toBe(true);
+
+    /* The stored row arrives with its own status time: the raise it names is
+       newer than the answer, so it is a raise the person has not answered. */
+    reconcileSessionAttention('s1', 'permission', later);
+
+    expect(isAttentionAcked('s1', { raiseId: later, status: 'permission' })).toBe(false);
+    expect(
+      shouldShowNeedsInput({
+        status: 'permission',
+        raiseId: later,
+        isAcked: isAttentionAcked('s1', { raiseId: later, status: 'permission' }),
+      })
+    ).toBe(true);
   });
 
   it('does not reuse a raise that was already answered', () => {

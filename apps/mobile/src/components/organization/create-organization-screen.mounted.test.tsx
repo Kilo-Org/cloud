@@ -174,6 +174,52 @@ describe('CreateOrganizationScreen', () => {
     unmount();
   });
 
+  it('keeps the submit control disabled while the completion runs', async () => {
+    const pending = Promise.withResolvers<{ organization: { id: string } }>();
+    mocks.createMutate.mockReturnValue(pending.promise);
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    expect(submitOf(renderer).props.disabled).toBe(true);
+
+    await act(() => {
+      pending.resolve({ organization: { id: 'org-new' } });
+    });
+    expect(submitOf(renderer).props.disabled).toBe(false);
+    unmount();
+  });
+
+  it('leaves the selection alone when the screen lost focus before the create finished', async () => {
+    const pending = Promise.withResolvers<{ organization: { id: string } }>();
+    mocks.createMutate.mockReturnValue(pending.promise);
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    // A push covers the screen without unmounting it, so the create must not
+    // move the selection of a screen the person is no longer looking at. In the
+    // app the blur subscription re-renders the screen; the field edit here
+    // gives the component that render, and the focus ref follows it.
+    mocks.focused.current = false;
+    await type(renderer, '  ');
+    await act(() => {
+      pending.resolve({ organization: { id: 'org-new' } });
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['organizations.list'] });
+    expect(mocks.setOrganizationId).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('only refreshes the list when the screen was left before the create finished', async () => {
     const pending = Promise.withResolvers<{ organization: { id: string } }>();
     mocks.createMutate.mockReturnValue(pending.promise);

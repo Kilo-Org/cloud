@@ -47,6 +47,9 @@ export function CreateOrganizationScreen() {
   const [text, setText] = useState('');
   const [canSubmit, setCanSubmit] = useState(false);
   const [message, setMessage] = useState<CreateMessage | null>(null);
+  // The submit control stays disabled from the tap until the completion ends,
+  // so it never looks actionable while the lock below drops its taps.
+  const [settling, setSettling] = useState(false);
   // The create outlives this screen: a back press or a push while the request
   // or the list refresh runs must not move the active organization. The
   // completion reads these live values, never the render that started it.
@@ -96,6 +99,7 @@ export function CreateOrganizationScreen() {
         stackSafeRouter.replace(ORGANIZATION_HUB_PATH);
       } finally {
         submitLockedRef.current = false;
+        setSettling(false);
       }
     },
     [queryClient, stackSafeRouter, t, trpc]
@@ -113,6 +117,7 @@ export function CreateOrganizationScreen() {
     },
     onError: (error: unknown) => {
       submitLockedRef.current = false;
+      setSettling(false);
       setMessage({ text: organizationErrorMessage(error), tone: 'error' });
     },
   });
@@ -128,6 +133,7 @@ export function CreateOrganizationScreen() {
     }
     setMessage(null);
     submitLockedRef.current = true;
+    setSettling(true);
     createOrganization.mutate({ name });
   };
 
@@ -192,7 +198,7 @@ export function CreateOrganizationScreen() {
         <Button
           className={STATE_ACTION_CLASS}
           onPress={submit}
-          disabled={!canSubmit}
+          disabled={!canSubmit || settling}
           loading={pending}
         >
           <Text className="text-primary-foreground">{t('organization.create.title')}</Text>

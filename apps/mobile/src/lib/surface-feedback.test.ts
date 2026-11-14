@@ -26,6 +26,14 @@ describe('createSurfaceFeedbackStore', () => {
     expect(store.getSnapshot().states.get('a')).toEqual({ status: 'pending' });
   });
 
+  it('re-admits a settled key at the end of the admission order', () => {
+    const store = createStore();
+    store.begin('a')?.fail({ kind: 'terminal', message: 'first' });
+    store.begin('b');
+    store.begin('a');
+    expect(store.getSnapshot().pendingKeys).toEqual(['b', 'a']);
+  });
+
   it('refuses a second admission while the key is pending and keeps the first token', () => {
     const store = createStore();
     const first = store.begin('a');

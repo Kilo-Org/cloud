@@ -47,7 +47,7 @@ export type SurfaceFeedbackSnapshot<Key extends string, Failure extends SurfaceF
   readonly pendingKeys: readonly Key[];
 };
 
-export type SurfaceFeedbackStore<Key extends string, Failure extends SurfaceFailure> = {
+type SurfaceFeedbackStore<Key extends string, Failure extends SurfaceFailure> = {
   /**
    * Admits an attempt synchronously and marks the key `pending`. Returns `null`
    * when the key is already pending: the caller MUST NOT start the work. This is
@@ -135,6 +135,10 @@ export function createSurfaceFeedbackStore<
     }
     nextGeneration += 1;
     const generation = nextGeneration;
+    // A settled entry is replaced, not overwritten in place: deleting it first
+    // puts the new admission at the end of the map, so `pendingKeys` stays in
+    // admission order after a re-admission.
+    entries.delete(key);
     entries.set(key, { phase: 'pending', generation });
     notify();
 

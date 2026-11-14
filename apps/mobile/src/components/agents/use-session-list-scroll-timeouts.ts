@@ -3,17 +3,35 @@ import { type RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 type Timeout = ReturnType<typeof setTimeout>;
 
 /**
- * One transcript scroller's three timers: the programmatic-scroll window, the
- * follow retry, and the drag's reclaim window.
+ * How long a released drag waits for its momentum end before the drag counts as
+ * settled: `onMomentumScrollEnd` is not guaranteed for a short or slow drag.
+ */
+export const DRAG_SETTLE_MS = 100;
+
+/**
+ * How long a fling may report nothing before its motion is considered over. A
+ * momentum end can be dropped by the platform, and motion that never ends would
+ * disable every scheduled resume scroll for the rest of the screen.
+ */
+export const MOMENTUM_BOUND_MS = 2000;
+
+/**
+ * One transcript scroller's timers and the fact of whether it is moving.
  *
- * They belong together because they outlive the callbacks that start them and a
- * scroller that goes away must leave none of them firing: the mount owns all
- * three, clears any of them on demand, and clears every one on unmount.
+ * The programmatic-scroll window, the follow retry and the drag settle belong
+ * together because they outlive the callbacks that start them, and a scroller
+ * that goes away must leave none of them firing.
+ *
+ * Motion lives here because it has one writer. Every path that ends motion —
+ * the momentum end, a drag that ends without one, a fling that never reports
+ * its end, a session reset and unmount — clears it through `endMotion`, so it
+ * cannot be left true by a missing native event.
  */
 export function useSessionListScrollTimeouts() {
   const resetRef = useRef<Timeout | null>(null);
   const retryRef = useRef<Timeout | null>(null);
-  const userScrollingRef = useRef<Timeout | null>(null);
+  const motionRef = useRef(false);
+  const motionTimeoutRef = useRef<Timeout | null>(null);
   const clear = useCallback((ref: RefObject<Timeout | null>) => {
     const timeout = ref.current;
     if (timeout !== null) {
@@ -27,21 +45,51 @@ export function useSessionListScrollTimeouts() {
   const clearRetry = useCallback(() => {
     clear(retryRef);
   }, [clear, retryRef]);
-  const clearUserScrolling = useCallback(() => {
-    clear(userScrollingRef);
-  }, [clear, userScrollingRef]);
+  const endMotion = useCallback(() => {
+    clear(motionTimeoutRef);
+    motionRef.current = false;
+  }, [clear, motionTimeoutRef]);
+  /** The user put a finger down, or a fling is running: the list is moving. */
+  const beginMotion = useCallback(() => {
+    motionRef.current = true;
+  }, [motionRef]);
+  /**
+   * Motion ends after `ms` unless something ends it first. `onSettled` runs at
+   * that moment too, so the claim a drag leaves behind settles on the same
+   * timer that ends its motion.
+   */
+  const settleMotion = useCallback(
+    (ms: number, onSettled?: () => void) => {
+      clear(motionTimeoutRef);
+      motionTimeoutRef.current = setTimeout(() => {
+        motionTimeoutRef.current = null;
+        motionRef.current = false;
+        onSettled?.();
+      }, ms);
+    },
+    [clear, motionTimeoutRef]
+  );
 
   useEffect(
     () => () => {
       clearReset();
       clearRetry();
-      clearUserScrolling();
+      endMotion();
     },
-    [clearReset, clearRetry, clearUserScrolling]
+    [clearReset, clearRetry, endMotion]
   );
 
   return useMemo(
-    () => ({ resetRef, retryRef, userScrollingRef, clearReset, clearRetry, clearUserScrolling }),
-    [clearReset, clearRetry, clearUserScrolling]
+    () => ({
+      resetRef,
+      retryRef,
+      motionRef,
+      clearReset,
+      clearRetry,
+      beginMotion,
+      settleMotion,
+      endMotion,
+    }),
+    [clearReset, clearRetry, beginMotion, settleMotion, endMotion, motionRef]
   );
 }

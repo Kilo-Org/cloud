@@ -169,7 +169,7 @@ export function SessionMessageList<T>({
     scrollToLatestAnimated,
     suppressAutoFollow,
     claimRef,
-    listMovingRef,
+    motionRef,
     followTailFromSend,
     handleContentSizeChange,
     handleListLayout,
@@ -283,7 +283,7 @@ export function SessionMessageList<T>({
     isInFlightRef: inFlightRef,
     listRef,
     claimRef,
-    listMovingRef,
+    motionRef,
     suppressAutoFollow,
     resumeAt,
   });

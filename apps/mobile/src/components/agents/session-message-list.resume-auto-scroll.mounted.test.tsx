@@ -704,6 +704,33 @@ describe('SessionMessageList resume anchor vs tail auto-follow', () => {
     expect(scrollCalls).toEqual(['index:0']);
   });
 
+  it('ends a fling that never reports its end, so a later resume still scrolls', () => {
+    // Regression: motion was a second flag cleared only by the momentum end, so
+    // a platform that dropped that event left the list "moving" for the rest of
+    // the screen and every later ?at= resume refused to scroll.
+    vi.useFakeTimers();
+
+    const items = [resumeItem('msg-1'), resumeItem('msg-2'), resumeItem('msg-3')];
+    const mounted = mountListKeep({ items, resumeAt: 'msg-2' });
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    // A fling starts, a send takes the position, and a new anchor arrives while
+    // the list is still moving. No momentum end ever follows.
+    beginUserDrag();
+    beginMomentum();
+    updateList(mounted, { items, resumeAt: 'msg-2', followTailNonce: 1 });
+    updateList(mounted, { items, resumeAt: 'msg-1', followTailNonce: 1 });
+    scrollCalls.length = 0;
+
+    // The bound ends the motion, and the next retry lands the anchor.
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    expect(scrollCalls).toContain('index:0');
+  });
+
   it('does not replay an earlier send when the list mounts following the tail', () => {
     vi.useFakeTimers();
 

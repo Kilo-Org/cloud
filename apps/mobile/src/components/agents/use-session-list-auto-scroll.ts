@@ -25,7 +25,11 @@ import {
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
-import { useSessionListScrollTimeouts } from '@/components/agents/use-session-list-scroll-timeouts';
+import {
+  DRAG_SETTLE_MS,
+  MOMENTUM_BOUND_MS,
+  useSessionListScrollTimeouts,
+} from '@/components/agents/use-session-list-scroll-timeouts';
 import { useSessionTailRepin } from '@/components/agents/use-session-tail-repin';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 
@@ -88,11 +92,6 @@ export function useSessionListAutoScroll<ItemT>({
   // this replaced: they could disagree (a live fling beside a send), and a
   // stale fling event could then turn the send's follow off.
   const claimRef = useRef<SessionPositionClaim>({ kind: 'free' });
-  // Whether the list is moving under the user's finger or its fling. Ownership
-  // and motion are different facts: a send takes the position over, but the
-  // fling it interrupted is still moving the viewport, and a scheduled resume
-  // must not yank it mid-fling.
-  const listMovingRef = useRef(false);
   const lastContentHeightRef = useRef(0);
   // Newest item key seen by the previous render. The item-count effect
   // compares against it to tell a genuine append (newest key changed) from
@@ -151,8 +150,9 @@ export function useSessionListAutoScroll<ItemT>({
    */
   const followTailFromSend = useCallback(() => {
     claimRef.current = claimAfterSend(claimRef.current);
-    // The fling's trailing momentum end leaves the send's claim alone.
-    timeouts.clearUserScrolling();
+    // The motion keeps its own bound: a send owns the position, not the fling
+    // it interrupted, and clearing the bound here would leave the list "moving"
+    // for as long as the platform never reports the fling's end.
     shouldAutoScrollRef.current = true;
     setIsAtBottom(true);
     scrollToLatestMessage();
@@ -247,6 +247,11 @@ export function useSessionListAutoScroll<ItemT>({
   useEffect(() => {
     const sessionChanged = resetKeyRef.current !== resetKey;
     resetKeyRef.current = resetKey;
+    if (sessionChanged) {
+      // A session reset is not a new anchor: whatever was moving belonged to the
+      // conversation being left, and nothing will report its end.
+      timeouts.endMotion();
+    }
     const resumeChanged = resumeKeyRef.current !== resumeKey;
     resumeKeyRef.current = resumeKey;
     if (resumeChanged) {
@@ -261,7 +266,7 @@ export function useSessionListAutoScroll<ItemT>({
     lastNewestItemKeyRef.current = null;
     claimRef.current = claimAfterReset(claimRef.current);
     setIsAtBottom(prev => (prev === initial.isAtBottom ? prev : initial.isAtBottom));
-  }, [resetKey, initialAutoScroll, resumeKey]);
+  }, [resetKey, initialAutoScroll, resumeKey, timeouts]);
 
   useEffect(() => {
     const newestKeyChanged = lastNewestItemKeyRef.current !== newestItemKey;
@@ -303,40 +308,35 @@ export function useSessionListAutoScroll<ItemT>({
     // The user's own drag is the current claim on the position: it replaces a
     // send's claim, which a later link is allowed to release (a drag's is not).
     claimRef.current = claimAfterDragBegin(claimRef.current);
-    listMovingRef.current = true;
     isAutoScrollingRef.current = false;
+    timeouts.beginMotion();
     timeouts.clearReset();
     timeouts.clearRetry();
-    timeouts.clearUserScrolling();
   }, [timeouts]);
 
   const handleScrollEndDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       updateAutoScrollFromEvent(event);
       // onMomentumScrollEnd is not guaranteed to fire for every drag (short or
-      // slow drags release without momentum). Schedule a fallback so the drag
-      // claim cannot get stuck live. onMomentumScrollBegin cancels this when
-      // real momentum is starting; onMomentumScrollEnd will then settle it.
-      timeouts.clearUserScrolling();
-      timeouts.userScrollingRef.current = setTimeout(() => {
+      // slow drags release without momentum). The settle ends both the motion
+      // and the claim; a real fling replaces it with its own bound.
+      timeouts.settleMotion(DRAG_SETTLE_MS, () => {
         claimRef.current = claimAfterDragEnd(claimRef.current);
-        listMovingRef.current = false;
-        timeouts.userScrollingRef.current = null;
-      }, 100);
+      });
     },
     [timeouts, updateAutoScrollFromEvent]
   );
 
   const handleMomentumScrollBegin = useCallback(() => {
-    timeouts.clearUserScrolling();
+    // The fling is real, and it may never report its end: one bound, not none.
+    timeouts.settleMotion(MOMENTUM_BOUND_MS);
   }, [timeouts]);
 
   const handleMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      timeouts.clearUserScrolling();
+      timeouts.endMotion();
       // A late momentum end follows a drag; a send's claim outranks it.
       claimRef.current = claimAfterMomentumEnd(claimRef.current);
-      listMovingRef.current = false;
       updateAutoScrollFromEvent(event);
     },
     [timeouts, updateAutoScrollFromEvent]
@@ -422,9 +422,10 @@ export function useSessionListAutoScroll<ItemT>({
     /**
      * True while the list is moving under the user. Ownership and motion are
      * different facts: a send takes the position over without ending the fling
-     * it interrupted, and a resume must not scroll mid-fling.
+     * it interrupted, and a resume must not scroll mid-fling. Its one writer is
+     * the timeouts hook, which ends it on every path that ends motion.
      */
-    listMovingRef,
+    motionRef: timeouts.motionRef,
     handleContentSizeChange,
     handleListLayout,
     handleScroll,

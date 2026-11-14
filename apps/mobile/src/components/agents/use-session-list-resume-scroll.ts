@@ -69,9 +69,10 @@ type UseSessionListResumeScrollParams<ItemT> = {
   /**
    * True while the list is moving under the user. Ownership and motion are
    * different facts: a send takes the position over without ending the fling it
-   * interrupted, and no scheduled scroll may yank the list mid-fling.
+   * interrupted, and no scheduled scroll may yank the list mid-fling. The
+   * timeouts hook ends it on every path that ends motion.
    */
-  listMovingRef: RefObject<boolean>;
+  motionRef: RefObject<boolean>;
   suppressAutoFollow: (ms: number) => void;
   /**
    * Message id a `?at=` deep link wants the transcript to open on. When it is
@@ -113,7 +114,7 @@ export function useSessionListResumeScroll<ItemT>({
   isInFlightRef,
   listRef,
   claimRef,
-  listMovingRef,
+  motionRef,
   suppressAutoFollow,
   resumeAt,
 }: UseSessionListResumeScrollParams<ItemT>): void {
@@ -160,7 +161,7 @@ export function useSessionListResumeScroll<ItemT>({
               clearResumeRetries();
               return;
             }
-            if (listMovingRef.current) {
+            if (motionRef.current) {
               return;
             }
             const index = latest.anchorIds.indexOf(latest.resumeAnchor);
@@ -184,7 +185,7 @@ export function useSessionListResumeScroll<ItemT>({
         );
       }
     },
-    [clearResumeRetries, claimRef, listMovingRef, listRef, suppressAutoFollow]
+    [clearResumeRetries, claimRef, motionRef, listRef, suppressAutoFollow]
   );
   useEffect(() => clearResumeRetries, [clearResumeRetries]);
   useEffect(() => {
@@ -224,7 +225,7 @@ export function useSessionListResumeScroll<ItemT>({
       // An in-flight drag (or a fling a send interrupted) must not be yanked
       // either: the immediate scroll waits for the list to settle. The retry
       // chain below still lands the anchor once it has, so nothing is lost.
-      if (!listMovingRef.current) {
+      if (!motionRef.current) {
         // Arm the suppression before any scroll this plan issues: FlashList's
         // bottom-start events (cold) or this scroll's own 5-step events (warm)
         // read "at the bottom" and would arm the tail follow, whose
@@ -298,7 +299,7 @@ export function useSessionListResumeScroll<ItemT>({
     isInFlightRef,
     listRef,
     claimRef,
-    listMovingRef,
+    motionRef,
     clearResumeRetries,
     scheduleResumeRetries,
     suppressAutoFollow,

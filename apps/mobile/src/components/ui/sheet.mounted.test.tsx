@@ -204,6 +204,27 @@ describe('Sheet', () => {
     expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
   });
 
+  it('holds the whole window for a full-height detent and leaves a partial one content-sized', async () => {
+    const full = await mount({ snapPoints: ['100%'] });
+    const fullNode = sheet(full.renderer);
+    if (!fullNode) {
+      throw new Error('sheet not rendered');
+    }
+    // Android sizes the sheet's surface to the hosted React content, and React
+    // attaches that content after the sheet presents. A full-window detent must
+    // hold its height from the first measure, or the sheet opens short and jumps
+    // to the window when the content lands.
+    expect(fullNode.props.contentFillsHeight).toBe(true);
+
+    const partial = await mount({ snapPoints: ['60%'] });
+    const partialNode = sheet(partial.renderer);
+    if (!partialNode) {
+      throw new Error('sheet not rendered');
+    }
+    // A partial detent keeps sizing itself to its content.
+    expect(partialNode.props.contentFillsHeight).toBe(false);
+  });
+
   it('turns only the drag gesture off when the content scrolls', async () => {
     const { renderer } = await mount({ dismissGestures: false });
     const node = sheet(renderer);

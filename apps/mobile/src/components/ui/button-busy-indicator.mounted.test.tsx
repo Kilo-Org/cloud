@@ -17,6 +17,7 @@ const theme = vi.hoisted(() => ({
     destructive: '#654321',
     destructiveSolidForeground: '#fedcba',
     accentSoftTintForeground: '#1a1a10',
+    selectionForeground: '#556677',
   },
 }));
 const platform = vi.hoisted(() => ({ OS: 'android' }));
@@ -96,6 +97,25 @@ describe('Button busy mark', () => {
     );
     expect(track.props.style).toMatchObject({ borderColor: ink });
   });
+
+  // A caller that repaints its fill and ink itself names the token its mark
+  // follows: the mark stands where the label stood, so the variant's own mark
+  // would land in a different ink from the label it replaces.
+  it('draws a caller-chosen mark ink in place of the variant default', () => {
+    const root = render({
+      loading: true,
+      accessibilityLabel: 'Retry',
+      loadingMark: 'selectionForeground',
+    });
+
+    expect(busyMarks(root)[0]?.props.color).toBe('#556677');
+    expect(busyMarks(root)[0]?.props.color).not.toBe('#abcdef');
+    const track = root.find(
+      n => n.type === View && `${n.props.className ?? ''}`.includes('rounded-full')
+    );
+    expect(track.props.style).toMatchObject({ borderColor: '#556677' });
+  });
+
   it.each(['default', 'icon'] as const)(
     'leaves the native iOS spinner unobstructed for size %s',
     size => {

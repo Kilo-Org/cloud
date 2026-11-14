@@ -57,9 +57,11 @@ export function ScopeAccessDeniedScreen({
           {/* Retry is the one filled control on this surface, so it keeps the
               light mode's weight in both themes: dark `--primary` is the brand
               yellow that glares on the near-black page, so dark takes the muted
-              olive `--selection` with its own foreground ink. */}
+              olive `--selection` with its own foreground ink, and the busy mark
+              follows that same ink while the request runs. */}
           <Button
             className="bg-primary dark:bg-selection"
+            loadingMark="selectionForeground"
             onPress={onRetry}
             loading={isRetrying}
             accessibilityLabel={t('common.retry')}

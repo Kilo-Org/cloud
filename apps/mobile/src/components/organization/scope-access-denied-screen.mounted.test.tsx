@@ -135,6 +135,9 @@ describe('ScopeAccessDeniedScreen', () => {
     expect(String(retry?.props.className)).toContain('dark:bg-selection');
     const retryLabel = retry ? findByType(retry, 'TextMock')[0] : undefined;
     expect(String(retryLabel?.props.className)).toContain('dark:text-selection-foreground');
+    // The busy mark stands in the label's place, so it paints the ink the dark
+    // override gives that label rather than the variant's own mark token.
+    expect(retry?.props.loadingMark).toBe('selectionForeground');
     expect(String(button('Back to profile', renderer.root)?.props.className)).not.toContain(
       'dark:bg-selection'
     );

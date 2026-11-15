@@ -957,25 +957,22 @@ export function targetKindForEntry(
 }
 
 /**
- * The one input field the resolver of each admin procedure reads to name the
- * record it acts on. The map names that field per procedure, so a request body
- * cannot influence the binding through any other field. Procedures that act on
- * no single record are absent and yield no field.
+ * The one input field the resolver of each account-area admin procedure reads
+ * to name the account it acts on. Every procedure in the area takes `userId`
+ * except the two listed here, so the binding always names the value the
+ * resolver acts on and no other key in the body can name a target.
  */
-export const TARGET_ID_FIELD_BY_ADMIN_PROCEDURE: Record<string, string> = {
-  'admin.users.resetAPIKey': 'userId',
-  'admin.users.signOutBrowserSessions': 'userId',
-  'admin.users.checkKiloPass': 'userId',
-  'admin.users.resetToMagicLinkLogin': 'userId',
-  'admin.users.releaseEmailAddress': 'userId',
-  'admin.users.updateBlockStatus': 'userId',
-  'admin.users.setPersonalAccountDisabled': 'userId',
-  'admin.users.recomputeBalances': 'userId',
-  'admin.users.DEV_ONLY_messUpBalance': 'userId',
-  'admin.users.cancelAndRefundKiloPass': 'userId',
-  'admin.users.setPlatformAdminAccess': 'userId',
-  'admin.users.setAdminPermissions': 'userId',
+const ACCOUNT_AREA_ID_FIELD = 'userId';
+
+/**
+ * Per-procedure overrides: the field the resolver reads, or `null` for a
+ * procedure in an account area that acts on another record and so names no
+ * target. A procedure absent from this map and outside the account area names
+ * no target either.
+ */
+export const TARGET_ID_FIELD_BY_ADMIN_PROCEDURE: Record<string, string | null> = {
   'admin.users.addNote': 'kilo_user_id',
+  'admin.users.deleteNote': null,
   'admin.internalBotUsers.create': 'organizationId',
   'admin.salesDemo.reset': 'organizationId',
   'admin.ossSponsorship.addExistingOrgToOss': 'organizationId',
@@ -985,10 +982,19 @@ export const TARGET_ID_FIELD_BY_ADMIN_PROCEDURE: Record<string, string> = {
 
 /** The input field that procedure's resolver reads, or null when it has none. */
 export function targetIdFieldForAdminProcedure(path: string): string | null {
-  const field: string | undefined = Object.hasOwn(TARGET_ID_FIELD_BY_ADMIN_PROCEDURE, path)
-    ? TARGET_ID_FIELD_BY_ADMIN_PROCEDURE[path]
-    : undefined;
-  return field ?? null;
+  if (Object.hasOwn(TARGET_ID_FIELD_BY_ADMIN_PROCEDURE, path)) {
+    return TARGET_ID_FIELD_BY_ADMIN_PROCEDURE[path] ?? null;
+  }
+  return path.startsWith('admin.users.') ? ACCOUNT_AREA_ID_FIELD : null;
+}
+
+/**
+ * The target kind an input field names. The binding records the kind of the
+ * value it holds, so a field that names an organization is not reported as an
+ * account.
+ */
+export function targetKindForInputField(field: string): PrivilegedTargetKind {
+  return field === 'organizationId' ? 'organization' : 'user';
 }
 
 function readInputField(input: object, field: string): unknown {

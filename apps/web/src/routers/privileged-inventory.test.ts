@@ -13,6 +13,7 @@ import {
   resolvesOwnStepUp,
   targetIdFieldForAdminProcedure,
   targetIdFromInput,
+  targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   SUPPORT_NEVER_KEYS,
@@ -624,6 +625,18 @@ describe('targetIdFromInput', () => {
     expect(targetIdFromInput(field, { organizationId: 'org-1' })).toBe('org-1');
   });
 
+  test('reads userId for an account-area procedure that is not listed', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.updateBlockStatus');
+    expect(field).toBe('userId');
+    expect(targetIdFromInput(field, { userId: 'user-4' })).toBe('user-4');
+  });
+
+  test('records the kind the field names', () => {
+    expect(targetKindForInputField('userId')).toBe('user');
+    expect(targetKindForInputField('kilo_user_id')).toBe('user');
+    expect(targetKindForInputField('organizationId')).toBe('organization');
+  });
+
   test('names no field for procedures without a single target', () => {
     expect(targetIdFieldForAdminProcedure('admin.supportAccess.deny')).toBeNull();
     expect(targetIdFieldForAdminProcedure('admin.users.deleteNote')).toBeNull();
@@ -683,7 +696,7 @@ describe('admin target id fields name mounted mutations', () => {
       if ((procedure._def?.type ?? 'query') !== 'mutation') {
         problems.push(`${route}: ${procedure._def?.type ?? 'query'}, expected mutation`);
       }
-      if (field.trim().length === 0) problems.push(`${route} (empty field)`);
+      if (field !== null && field.trim().length === 0) problems.push(`${route} (empty field)`);
     }
 
     expect(problems).toEqual([]);

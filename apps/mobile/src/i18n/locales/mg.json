@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Porofon'ny tatitra",
-      "description": "Ny porofon'ny tatitra nalefanao. Tehirizo ity id ity mba hanondroana azy any aoriana.",
+      "description": "Tehirizo ity id ity mba hanondroana azy any aoriana.",
       "receiptLabel": "Porofo",
       "copyReceiptId": "Adikao ny ID amin'ny porofo",
       "appealLabel": "Fampakarana",

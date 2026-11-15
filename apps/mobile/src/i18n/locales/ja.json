@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "通報の受付確認",
-      "description": "送信した通報の受付確認です。後で参照できるよう、このIDを保管してください。",
+      "description": "後で参照できるよう、このIDを保管してください。",
       "receiptLabel": "受付",
       "copyReceiptId": "受付IDをコピー",
       "appealLabel": "異議申し立て",

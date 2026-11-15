@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Potvrda prijave",
-      "description": "Potvrda za poslanu prijavu. Sačuvaj ovaj ID kao referencu za kasnije.",
+      "description": "Sačuvaj ovaj ID kao referencu za kasnije.",
       "receiptLabel": "Potvrda",
       "copyReceiptId": "Kopiraj ID potvrde",
       "appealLabel": "Žalba",

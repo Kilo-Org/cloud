@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Potvrzení o nahlášení",
-      "description": "Potvrzení k nahlášení, které jste odeslali. Uschovejte si toto ID, abyste se na něj mohli později odkázat.",
+      "description": "Uschovejte si toto ID, abyste se na něj mohli později odkázat.",
       "receiptLabel": "Potvrzení",
       "copyReceiptId": "Kopírovat ID potvrzení",
       "appealLabel": "Odvolání",

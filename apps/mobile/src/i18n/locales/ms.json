@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Resit laporan",
-      "description": "Resit untuk laporan yang anda serahkan. Simpan ID ini untuk merujuknya kemudian.",
+      "description": "Simpan ID ini untuk merujuknya kemudian.",
       "receiptLabel": "Resit",
       "copyReceiptId": "Salin ID resit",
       "appealLabel": "Rayuan",

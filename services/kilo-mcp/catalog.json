@@ -16915,6 +16915,34 @@
     ],
     "searchBlob": "moderation.listHiddenUsers List the GitHub logins of all users the current user has blocked and muted. moderation listhiddenusers"
   },
+  "moderation.listReportReceipts": {
+    "path": "moderation.listReportReceipts",
+    "kind": "query",
+    "summary": "List your own content moderation report receipts and their statuses, newest first, with cursor-based pagination. Use it to review reports you filed, check triage and appeal status, or page through your report history.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      }
+    },
+    "tags": [
+      "moderation",
+      "listreportreceipts",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "moderation.listReportReceipts List your own content moderation report receipts and their statuses, newest first, with cursor-based pagination. Use it to review reports you filed, check triage and appeal status, or page through your report history. moderation listreportreceipts cursor limit cursor limit"
+  },
   "moderation.muteUser": {
     "path": "moderation.muteUser",
     "kind": "mutation",

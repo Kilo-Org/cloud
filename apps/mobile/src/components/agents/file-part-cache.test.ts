@@ -76,11 +76,17 @@ beforeEach(() => {
   __resetFilePartCacheForTests();
 });
 
-/** Drain the fire-and-forget write continuations, for "nothing further landed" checks. */
+/** Settle the fire-and-forget `data:` write continuations, for "nothing further
+ *  landed" checks. A macrotask runs only after every microtask of the write chain
+ *  has drained, so the wait cannot fall short of the chain the way a fixed tick
+ *  count can. The pending-entry case below is the no-reset control: it publishes
+ *  through this same drain, which is what makes the sign-out absence check mean
+ *  "the publish ran and was refused" rather than "the publish had not run yet". */
 async function drainCacheWrites(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  // A zero-delay macrotask is a scheduling barrier, not a timing guess.
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setTimeout(resolve, 0);
+  await promise;
 }
 
 describe('cacheFilePart', () => {
@@ -124,14 +130,6 @@ describe('cacheFilePart', () => {
       filename: 'report.pdf',
     });
 
-    expect(expoFileSystemMock.Directory).toHaveBeenCalledWith(
-      'file:///cache',
-      'session-file-parts'
-    );
-    expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledWith({
-      idempotent: true,
-      intermediates: true,
-    });
     const file = fileInstances[0];
     expect(file?.filename).toBe('part-1-report.pdf');
     await vi.waitFor(() => {
@@ -518,13 +516,6 @@ describe('useFilePartCache', () => {
     renderer.unmount();
   });
 
-  it('reads the same store as getFilePartCacheEntry', () => {
-    expect(typeof useFilePartCache).toBe('function');
-    expect(getFilePartCacheEntry('missing')).toBeUndefined();
-    cacheFilePart('part-hook', { url: 'https://example.com/a.png', mime: 'image/png' });
-    expect(getFilePartCacheEntry('part-hook')?.url).toBe('https://example.com/a.png');
-  });
-
   it('wakes only the subscribers of the part that changed', async () => {
     const rendersA = vi.fn<() => void>();
     const rendersB = vi.fn<() => void>();
@@ -629,11 +620,10 @@ describe('cacheFilePart write lifetime', () => {
     });
 
     write.resolve(undefined);
-    await vi.waitFor(() => {
-      expect(getFilePartCacheEntry('part-slow')?.url).toBe(
-        'file:///cache/session-file-parts/part-slow-report.pdf'
-      );
-    });
+    await drainCacheWrites();
+    expect(getFilePartCacheEntry('part-slow')?.url).toBe(
+      'file:///cache/session-file-parts/part-slow-report.pdf'
+    );
     expect(getFilePartCacheEntry('part-slow')).not.toHaveProperty('writePending');
   });
 

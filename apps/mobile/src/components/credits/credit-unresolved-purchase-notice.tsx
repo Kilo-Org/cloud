@@ -26,7 +26,7 @@ const WARNING_KEYS = {
 } as const satisfies Record<CreditPurchaseResolution, string>;
 
 /** Every variant the notice can paint, in the order the reserve lays them out. */
-export const CREDIT_PURCHASE_RESOLUTIONS = [
+const CREDIT_PURCHASE_RESOLUTIONS = [
   'unknown',
   'found',
   'not-found',
@@ -109,6 +109,7 @@ function NoticeCopy({
       <Text>{t('credits.buyAgain')}</Text>
     </Button>
   );
+  const actions = buyAgainFirst ? [buyAgain, reconcile] : [reconcile, buyAgain];
   return (
     <View className="gap-3">
       {announce ? (
@@ -122,9 +123,7 @@ function NoticeCopy({
           <Text className="text-sm text-muted-foreground">{priceLabel}</Text>
         </View>
       )}
-      <View className="flex-row flex-wrap gap-3">
-        {showBuyAgain ? (buyAgainFirst ? [buyAgain, reconcile] : [reconcile, buyAgain]) : reconcile}
-      </View>
+      <View className="flex-row flex-wrap gap-3">{showBuyAgain ? actions : reconcile}</View>
     </View>
   );
 }

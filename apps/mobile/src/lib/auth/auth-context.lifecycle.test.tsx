@@ -468,6 +468,13 @@ vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
 }));
 
+// The account boundary also drops the retained merge intent keys, and their
+// store mints through expo-crypto, whose expo root needs `__DEV__`. This suite
+// asserts the teardown ordering, and the store's own suite covers the clear.
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => ({
+  clearMergeOperationKeys: vi.fn(),
+}));
+
 vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));

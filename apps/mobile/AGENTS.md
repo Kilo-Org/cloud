@@ -164,11 +164,28 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
-- Optimistic updates come in two kinds, and each has exactly one owner. A value that lives in the TanStack query cache is owned by its mutation: snapshot in `onMutate`, roll back in `onError` only when `isLatestMutationGeneration` says this mutation still owns the key, reconcile in `onSettled`. Never add a second optimistic owner over the same query-backed value.
-- Only the per-chat web-search and Kilo MCP flags use the registry's `setChatFlag` (`@/lib/chat/registry`), which persists and applies them in the chat's own operation order and publishes the result through `ChatState`. Other standalone persisted values stay with their owning stores; components must not add a competing optimistic mirror beside either kind.
+- Optimistic updates have one owner each. A value in the TanStack query cache belongs to its mutation: snapshot in `onMutate`, roll back in `onError` only while `isLatestMutationGeneration` says this mutation still owns the key, and reconcile in `onSettled`. Never add a second optimistic copy over a query-backed value.
+- The per-chat web search and Kilo MCP choices belong to the chat registry. Change them only through `setChatFlag` and `retryChatFlag` in `@/lib/chat/registry`. Other stored values stay with the store that owns them; a component must not keep its own optimistic copy beside it.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
 - A dispatched purchase admission survives routes and process restarts. The SDK pools native purchase promises: a native outcome may retire an intent only when exactly one dispatched intent exists, it was dispatched in this process, no earlier unresolved request exists, and the outcome is not a transport disconnection. Other outcomes are transaction-deduplicated recovery input only. Informed “Buy again” consent releases the current barrier but preserves earlier uncertainty. Reserved, never-dispatched intents are released; empty queries never silently authorize another charge. A completion the backend refuses for good is reported as a terminal refusal with its own copy and a consent exit, and an admission whose stored record cannot be read keeps the barrier until the person consents to replace it: the retry of that read names no pack, and no row may take a charge while the earlier state is unknown.
+- Retained merge keys retire only when the fingerprint and the captured key both still match. At capacity, refuse new intents; never evict an unresolved one.
+
+## State Machines
+
+A phase that several flags, refs, nullable fields, or timers encode together is an implicit state machine. Do not write one.
+
+- Model each phase as one discriminated union with a tag for each state, and keep each payload inside the state that owns it.
+- Before you add a flag beside existing state, list the combinations it creates. If one is invalid, extend the union instead.
+- Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
+- For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
+  - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
+  - Settle the attempt once, with `succeed()`, `fail(failure)`, or `abandon()` when there is no outcome. `abandon()` removes the key's entry. `succeed()` and `fail()` keep it until the next `begin()` for that key or until the surface unmounts; `clearWhere` retires only a failure. If nothing on the surface renders the failure (for example, a toast already reports it), use `abandon()`.
+  - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
+  - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
+- Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
+- A purchase keeps its own request and transaction records. Never settle one by looking it up by product id.
+- A regression test for one of these bugs must fail on the code before the fix. Prove that once before the fix lands.
 
 ## React Native Rules
 

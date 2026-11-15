@@ -1621,7 +1621,7 @@ describe('CreditPurchaseScreen', () => {
     expect(reserve.children).toHaveLength(4);
     for (const cell of reserve.children) {
       if (typeof cell === 'string') {
-        throw new Error('expected a reserved notice cell');
+        throw new TypeError('expected a reserved notice cell');
       }
       expect(classNameOf(cell)).toContain('w-full');
       expect(classNameOf(cell)).toContain('shrink-0');

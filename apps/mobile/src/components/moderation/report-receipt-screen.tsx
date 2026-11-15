@@ -43,6 +43,37 @@ const APPEAL_KEYS = {
   rejected: 'profile.reportReceipt.appealRejected',
 } as const;
 
+const NEXT_STEP_KEYS = {
+  received: 'profile.reportReceipt.nextStepReceived',
+  inReview: 'profile.reportReceipt.nextStepInReview',
+  appeal: 'profile.reportReceipt.nextStepAppeal',
+  final: 'profile.reportReceipt.nextStepFinal',
+} as const;
+
+/**
+ * The sentence that says what happens next, or `null` when there is nothing to
+ * add: the appeal button is the next step itself, and a status the server adds
+ * is shown by its row without a sentence this screen cannot derive.
+ */
+function nextStepKey(triageStatus: string, appealStatus: string): string | null {
+  if (appealStatus === 'submitted') {
+    return NEXT_STEP_KEYS.appeal;
+  }
+  if (appealStatus === 'accepted' || appealStatus === 'rejected') {
+    return NEXT_STEP_KEYS.final;
+  }
+  if (appealStatus !== 'none') {
+    return null;
+  }
+  if (triageStatus === 'received') {
+    return NEXT_STEP_KEYS.received;
+  }
+  if (triageStatus === 'open') {
+    return NEXT_STEP_KEYS.inReview;
+  }
+  return null;
+}
+
 /**
  * Translates a status the server reports, through the key its dictionary holds.
  * An unrecognised status is shown as the server sent it, so a status added on the
@@ -116,6 +147,9 @@ function StatusRow({
  * An appeal can be submitted once. When it can, the button asks first: the
  * submission cannot be taken back, so it is confirmed the way a non-destructive
  * but final action is (`Alert.alert`), not with the red affordance of a deletion.
+ *
+ * The screen states the next step whenever it offers no appeal, and stays silent
+ * when the appeal button is the next step.
  */
 export function ReportReceiptScreen() {
   const { t } = useTranslation();
@@ -176,6 +210,8 @@ export function ReportReceiptScreen() {
     receipt.data.appealStatus === 'none' &&
     (receipt.data.triageStatus === 'actioned' || receipt.data.triageStatus === 'rejected');
 
+  const nextStep = nextStepKey(receipt.data.triageStatus, receipt.data.appealStatus);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profile.reportReceipt.title')} />
@@ -202,6 +238,11 @@ export function ReportReceiptScreen() {
             value={statusLabel(APPEAL_KEYS, receipt.data.appealStatus)}
           />
         </View>
+        {nextStep === null ? null : (
+          <Text variant="muted" className="text-xs">
+            {t(nextStep)}
+          </Text>
+        )}
         {appealable ? (
           <Button
             variant="outline"

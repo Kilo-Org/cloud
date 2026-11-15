@@ -65,6 +65,15 @@ import { type SurfaceAttempt } from '@/lib/surface-feedback';
 import { useTRPC } from '@/lib/trpc';
 import { type CreditPurchaseResolution } from './credit-unresolved-purchase-notice';
 
+/**
+ * The mount flag, read through a call. A direct `mountedRef.current` read after
+ * an earlier guard in the same async body is narrowed by the compiler even
+ * though the screen can unmount while the body awaits.
+ */
+function isStillMounted(ref: { readonly current: boolean }): boolean {
+  return ref.current;
+}
+
 function toCreditProductListing(product: ProductOrSubscription): StoreCreditProductListing | null {
   if (product.type !== 'in-app') {
     return null;
@@ -501,7 +510,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       reconciliation: PurchaseRequestRecord | null = null
     ): Promise<CreditPurchaseCompletion | undefined> => {
       if (!isCurrentAuthEpoch(authEpochRef.current)) {
-        return;
+        return undefined;
       }
       if (
         !isRecoverableCreditPurchase(
@@ -510,19 +519,19 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
           creditPackGoogleProductIds
         )
       ) {
-        return;
+        return undefined;
       }
       const id = getPurchaseCompletionId(purchase);
       if (
         recoveredPurchaseIdsRef.current.has(id) ||
         recoveryInFlightPurchaseIdsRef.current.has(id)
       ) {
-        return;
+        return undefined;
       }
       const requestOwner = reconciliation ?? pendingPurchaseRef.current;
       const intent = await restoreCreditPurchaseIntent();
       if (!isCurrentAuthEpoch(authEpochRef.current)) {
-        return;
+        return undefined;
       }
       const owned =
         intent !== null &&
@@ -531,7 +540,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       if (owned) {
         await identifyCreditPurchaseTransaction(intent, purchase);
         if (!isCurrentAuthEpoch(authEpochRef.current)) {
-          return;
+          return undefined;
         }
       }
       recoveryInFlightPurchaseIdsRef.current.add(id);
@@ -673,7 +682,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         const related = (purchase: Purchase) =>
           purchase.productId === record.intent.productId ||
           matchesCreditPurchaseIntent(record.intent, purchase);
-        resolution = pending.some(related) ? 'found' : 'not-found';
+        resolution = pending.some(purchase => related(purchase)) ? 'found' : 'not-found';
         const results = await Promise.all(
           pending.map(async purchase => ({
             purchase,
@@ -764,7 +773,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       let reservedIntent: CreditPurchaseIntent | null = null;
       try {
         await restoreCreditPurchaseAuthority();
-        if (!attempt.owns() || !isCurrentAuthEpoch(epoch) || !mountedRef.current) {
+        if (!attempt.owns() || !isCurrentAuthEpoch(epoch) || !isStillMounted(mountedRef)) {
           return false;
         }
         const admitted = await admitCreditPurchaseIntent(storeProductId, appAccountToken);
@@ -889,18 +898,18 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     ) {
       return false;
     }
-    let intent: CreditPurchaseIntent | null;
+    let intent: CreditPurchaseIntent | null = null;
     try {
       intent = await restoreCreditPurchaseIntent();
     } catch {
       // The stored admission still cannot be read. The status region keeps its
       // retry and consent exits, and no new charge may be admitted meanwhile.
-      if (mountedRef.current && isCurrentAuthEpoch(authEpochRef.current)) {
+      if (isStillMounted(mountedRef) && isCurrentAuthEpoch(authEpochRef.current)) {
         setPurchaseHydration('failed');
       }
       return false;
     }
-    if (!mountedRef.current || !isCurrentAuthEpoch(authEpochRef.current)) {
+    if (!isStillMounted(mountedRef) || !isCurrentAuthEpoch(authEpochRef.current)) {
       return false;
     }
     setPurchaseHydration('ready');
@@ -992,7 +1001,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         showError(creditStoreTimeoutKey(storefront));
       }
     }
-    let restored: CreditPurchaseIntent | null;
+    let restored: CreditPurchaseIntent | null = null;
     try {
       restored = await restoreCreditPurchaseIntent();
     } catch (error) {
@@ -1031,13 +1040,13 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     if (!mountedRef.current || !isCurrentAuthEpoch(authEpochRef.current)) {
       return false;
     }
-    let replaced: boolean;
+    let replaced = false;
     try {
       replaced = await consentToReplaceMalformedCreditPurchaseIntent();
     } catch {
       return false;
     }
-    if (!replaced || !mountedRef.current || !isCurrentAuthEpoch(authEpochRef.current)) {
+    if (!replaced || !isStillMounted(mountedRef) || !isCurrentAuthEpoch(authEpochRef.current)) {
       return false;
     }
     setMalformedPurchaseAdmission(false);

@@ -7,10 +7,11 @@ import {
   appendPartTextChunks,
   clonePart,
   createReadonlyPartView,
+  createSubscriberRegistry,
   forgetPartUpdateTime,
-  insertSorted,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
+  messageIdKey,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
@@ -25,17 +26,17 @@ function createMemoryStorage(): SessionStorage {
   // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
   const partEvidence = new Map<string, number>();
 
-  const subscribers = new Map<string, Set<() => void>>();
+  const subscribers = createSubscriberRegistry();
 
   const storage: SessionStorage = {
     upsertMessage(info) {
       const existing = messages.get(info.id);
       messages.set(info.id, info);
       if (existing) {
-        notify(subscribers, `message:${info.id}`);
+        subscribers.notifyMessage(info.id);
       } else {
-        messageIds = insertSorted(messageIds, info.id);
-        notify(subscribers, 'messageIds');
+        messageIds = insertSortedBy(messageIds, info.id, messageIdKey);
+        subscribers.notifyMessageIds();
       }
     },
 
@@ -94,18 +95,7 @@ function createMemoryStorage(): SessionStorage {
       return snapshot;
     },
 
-    subscribe(key, callback) {
-      let set = subscribers.get(key);
-      if (!set) {
-        set = new Set();
-        subscribers.set(key, set);
-      }
-      set.add(callback);
-      return () => {
-        set.delete(callback);
-        if (set.size === 0) subscribers.delete(key);
-      };
-    },
+    subscribe: subscribers.subscribe,
 
     clear() {
       storageVersions.delete(storage);
@@ -119,12 +109,12 @@ function createMemoryStorage(): SessionStorage {
       partEvidence.clear();
 
       for (const messageId of existingMessageIds) {
-        notify(subscribers, `message:${messageId}`);
+        subscribers.notifyMessage(messageId);
       }
       for (const messageId of existingPartMessageIds) {
-        notify(subscribers, `parts:${messageId}`);
+        subscribers.notifyParts(messageId);
       }
-      notify(subscribers, 'messageIds');
+      subscribers.notifyMessageIds();
     },
 
     deleteMessage(messageId) {
@@ -143,12 +133,12 @@ function createMemoryStorage(): SessionStorage {
       parts.delete(messageId);
       partsSnapshot.delete(messageId);
       if (hadParts) {
-        notify(subscribers, `parts:${messageId}`);
+        subscribers.notifyParts(messageId);
       }
 
       if (!hadMessage) return;
-      notify(subscribers, `message:${messageId}`);
-      notify(subscribers, 'messageIds');
+      subscribers.notifyMessage(messageId);
+      subscribers.notifyMessageIds();
     },
   };
   return storage;

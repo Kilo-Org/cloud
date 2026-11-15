@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ከእንግዲህ አይገኝም። ከታች ማከማቻ ይምረጡ።",
       "prefillModelUnavailable": "{{model}} ከእንግዲህ አይገኝም። ነባሪ ሞዴልዎ ጥቅም ላይ እየዋለ ነው።",
       "couldNotReadPendingSessions": "የሚጠባበቁ ክፍለ ጊዜዎችን ማንበብ አልተቻለም። እንደገና ይሞክሩ።",
-      "failedToCreate": "ክፍለ ጊዜ መፍጠር አልተሳካም።",
+      "failedToCreate": "ክፍለ ጊዜ መፍጠር አልተሳካም",
       "checkOrganizationAccess": "እባክዎ ወደ ይህ ድርጅት ያለዎትን መዳረሻ ያረጋግጡ እና እንደገና ይሞክሩ።",
       "couldNotRefreshRepositories": "ማከማቻዎችን ማደስ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "discardDraftTitle": "ረቂቁን ማስወገድ ይፈልጋሉ?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ለተጫነው ታሪክ ያልተመደበ ወጪ",
       "ofWindowTokens": "ከ{{window}} ቶከኖች",
       "tokens": "ቶከኖች",
+      "tokens_one": "ቶከን",
+      "tokens_other": "ቶከኖች",
       "tokensWithPercentage": "ቶከኖች ({{percentage}})",
       "stepsCount_one": "{{steps}} እርምጃ",
       "stepsCount": "{{steps}} እርምጃዎች",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ይጫኑ",
       "loadWithHost": "{{host}}ን ይጫኑ",
-      "httpsOnly": "በHTTPS የሚጫኑ ምስሎች ብቻ ይፈቀዳሉ።",
+      "httpsOnly": "HTTPS ምስሎች ብቻ",
       "trustTitle": "ከ{{host}} ምስል ይጫኑ?",
       "trustMessage": "{{host}}ን ማመን ምስሎቹን በየጊዜው ሳይጠይቅ ይጭናል። በኋላ ከታመኑ አስተናጋጆች ላይ ሊያስወግዱት ይችላሉ።",
       "loadOnce": "አንድ ጊዜ ጫን"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "ከGoogle Play ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
     "storeTimedOut": "App Store በወቅቱ አልሰራም። እንደገና ይሞክሩ።",
     "storeTimedOutPlay": "Google Play በወቅቱ አልሰራም። እንደገና ይሞክሩ።",
-    "unresolvedPurchase": "የቀደመው ግዢዎ አሁንም ሊጠናቀቅና ክሬዲቱን ወደ ቀሪ ሂሳብዎ ሊጨምር ይችላል። እንደገና መግዛት ሌላ የተለየ ግዢ ይጀምራል፤ ይህም እንደገና ሊያስከፍልዎ ይችላል።",
-    "buyAgain": "እንደገና ይግዙ",
     "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው ክሬዲት የሌላ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።",
     "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው ክሬዲት የተለየ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።"
   },

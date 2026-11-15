@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} pole enam saadaval. Vali allpool hoidla.",
       "prefillModelUnavailable": "{{model}} pole enam saadaval. Kasutatakse sinu vaikemudelit.",
       "couldNotReadPendingSessions": "Ootel seansside lugemine ebaõnnestus. Proovi uuesti.",
-      "failedToCreate": "Seansi loomine ebaõnnestus.",
+      "failedToCreate": "Seansi loomine ebaõnnestus",
       "checkOrganizationAccess": "Kontrolli oma juurdepääsu sellele organisatsioonile ja proovi uuesti.",
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kulu, mis ei kajastu laaditud ajaloos",
       "ofWindowTokens": "{{window}} tokenist",
       "tokens": "tokenit",
+      "tokens_one": "token",
+      "tokens_other": "tokenit",
       "tokensWithPercentage": "tokenit ({{percentage}})",
       "stepsCount_one": "{{steps}} samm",
       "stepsCount": "{{steps}} sammu",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Laadi",
       "loadWithHost": "Laadi {{host}}",
-      "httpsOnly": "Laadida saab ainult HTTPS-ühendusega pilte.",
+      "httpsOnly": "Ainult HTTPS-pildid",
       "trustTitle": "Laadi pilt saidilt {{host}}?",
       "trustMessage": "Kui usaldad hosti {{host}}, laaditakse selle pildid ilma iga kord küsimata. Saad selle hiljem jaotises Usaldatud hostid tühistada.",
       "loadOnce": "Laadi üks kord"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play ei tagastanud ühtegi sobivat krediidipaketti.",
     "storeTimedOut": "App Store ei vastanud õigeaegselt. Proovi uuesti.",
     "storeTimedOutPlay": "Google Play ei vastanud õigeaegselt. Proovi uuesti.",
-    "unresolvedPurchase": "Sinu varasem ost võib veel lõpule jõuda ja selle krediit sinu saldole lisanduda. Uuesti ostes alustad eraldi ostu ja sinult võidakse uuesti tasu võtta.",
-    "buyAgain": "Osta uuesti",
     "purchaseOwnedByAnotherAccount": "Selle Apple Accountiga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellele Kilo kontole.",
     "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellele Kilo kontole."
   },

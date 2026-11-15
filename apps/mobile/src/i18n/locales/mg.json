@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "Tsy azo ampiasaina intsony ny {{repo}}. Misafidiana tahirin-kaody etsy ambany.",
       "prefillModelUnavailable": "Tsy azo ampiasaina intsony ny {{model}}. Ny modely voafidinao mialoha no ampiasaina.",
       "couldNotReadPendingSessions": "Tsy voavaky ny fotoam-piasana miandry. Andramo indray.",
-      "failedToCreate": "Tsy nahomby ny famoronana fotoam-piasana.",
+      "failedToCreate": "Tsy nahomby ny famoronana fotoam-piasana",
       "checkOrganizationAccess": "Jereo ny fidiranao amin'ity fikambanana ity, avy eo andramo indray azafady.",
       "couldNotRefreshRepositories": "Tsy nahomby ny fanavaozana ny lisitry ny tahirin-kaody. Andramo indray azafady.",
       "discardDraftTitle": "Hariana ve ny volavola?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Vidiny tsy tafiditra amin'ny tantara voaray",
       "ofWindowTokens": "amin'ny sombin-tsoratra {{window}}",
       "tokens": "sombin-tsoratra",
+      "tokens_one": "sombin-tsoratra",
+      "tokens_other": "sombin-tsoratra",
       "tokensWithPercentage": "sombin-tsoratra ({{percentage}})",
       "stepsCount_one": "dingana {{steps}}",
       "stepsCount": "dingana {{steps}}",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Alao",
       "loadWithHost": "Alao avy amin'ny {{host}}",
-      "httpsOnly": "Sary avy amin'ny HTTPS ihany no ekena.",
+      "httpsOnly": "Sary avy amin'ny HTTPS ihany",
       "trustTitle": "Alao ny sary avy amin'ny {{host}}?",
       "trustMessage": "Ny fitokisana an'i {{host}} dia mampiditra ny sariny tsy manontany isaky ny mandeha. Azonao atao ny manafoana izany ao amin'ny Mpampiantrano atokisana.",
       "loadOnce": "Alao indray mandeha"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
     "storeTimedOut": "Tsy namaly tamin'ny fotoana ilay App Store. Andramo indray.",
     "storeTimedOutPlay": "Tsy namaly tamin'ny fotoana ilay Google Play. Andramo indray.",
-    "unresolvedPurchase": "Mety mbola ho vita ny fividiananao teo aloha ka hampiana ao amin'ny balananao ny kireditra avy amin'izany. Ny fividianana indray dia manomboka fividianana vaovao misaraka amin'ilay teo aloha ary mety hampandoa vola anao indray.",
-    "buyAgain": "Hividy indray",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   },

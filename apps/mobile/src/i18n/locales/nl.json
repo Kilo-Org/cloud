@@ -1623,7 +1623,7 @@
       "prefillRepoUnavailable": "{{repo}} is niet meer beschikbaar. Kies hieronder een repository.",
       "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt.",
       "couldNotReadPendingSessions": "De wachtende sessies konden niet worden uitgelezen. Probeer het opnieuw.",
-      "failedToCreate": "De sessie kon niet worden aangemaakt.",
+      "failedToCreate": "De sessie kon niet worden aangemaakt",
       "checkOrganizationAccess": "Controleer je toegang tot deze organisatie en probeer het opnieuw.",
       "couldNotRefreshRepositories": "De repositories konden niet worden vernieuwd. Probeer het opnieuw.",
       "discardDraftTitle": "Concept verwijderen?",
@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "Kosten die niet aan de geladen geschiedenis zijn toegewezen",
       "ofWindowTokens": "van {{window}} tokens",
       "tokens": "teksttokens",
+      "tokens_one": "teksttoken",
+      "tokens_other": "teksttokens",
       "tokensWithPercentage": "tokens ({{percentage}} benut)",
       "stepsCount_one": "{{steps}} stap",
       "stepsCount": "{{steps}} stappen",
@@ -2319,7 +2321,7 @@
     "markdownImage": {
       "load": "Laden",
       "loadWithHost": "{{host}} laden",
-      "httpsOnly": "Alleen afbeeldingen via HTTPS zijn toegestaan.",
+      "httpsOnly": "Alleen afbeeldingen via HTTPS",
       "trustTitle": "Afbeelding van {{host}} laden?",
       "trustMessage": "Als je {{host}} vertrouwt, worden de afbeeldingen geladen zonder het elke keer te vragen. Je kunt dit later intrekken onder Vertrouwde hosts.",
       "loadOnce": "Eenmalig laden"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play heeft geen overeenkomende creditpakketten geretourneerd.",
     "storeTimedOut": "De App Store reageerde niet op tijd. Opnieuw proberen.",
     "storeTimedOutPlay": "Google Play reageerde niet op tijd. Opnieuw proberen.",
-    "unresolvedPurchase": "Je eerdere aankoop kan alsnog worden afgerond, waarna de bijbehorende credits aan je saldo worden toegevoegd. Als je opnieuw koopt, start je een aparte aankoop waarvoor je mogelijk opnieuw moet betalen.",
-    "buyAgain": "Opnieuw kopen",
     "purchaseOwnedByAnotherAccount": "De credits op deze Apple Account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken.",
     "purchaseOwnedByAnotherAccountPlay": "De credits op dit Google Play-account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken."
   },

@@ -1623,7 +1623,7 @@
       "prefillRepoUnavailable": "{{repo}} không còn dùng được. Hãy chọn kho mã khác bên dưới.",
       "prefillModelUnavailable": "{{model}} không còn dùng được. Hiện đang dùng mô hình mặc định của bạn.",
       "couldNotReadPendingSessions": "Không thể đọc danh sách phiên đang chờ. Vui lòng thử lại.",
-      "failedToCreate": "Không thể tạo phiên.",
+      "failedToCreate": "Không thể tạo phiên",
       "checkOrganizationAccess": "Vui lòng kiểm tra quyền truy cập của bạn vào tổ chức này rồi thử lại.",
       "couldNotRefreshRepositories": "Không thể làm mới danh sách kho mã. Vui lòng thử lại.",
       "discardDraftTitle": "Hủy bản nháp?",
@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "Chi phí không thuộc phần lịch sử đã tải",
       "ofWindowTokens": "trên {{window}} token",
       "tokens": "token",
+      "tokens_other": "token",
+      "tokens_one": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} bước",
       "stepsCount": "{{steps}} bước",
@@ -2319,7 +2321,7 @@
     "markdownImage": {
       "load": "Tải",
       "loadWithHost": "Tải {{host}}",
-      "httpsOnly": "Chỉ hỗ trợ hình ảnh qua HTTPS.",
+      "httpsOnly": "Chỉ hình ảnh qua HTTPS",
       "trustTitle": "Tải hình ảnh từ {{host}}?",
       "trustMessage": "Tin cậy {{host}} sẽ tải hình ảnh của máy chủ này mà không hỏi mỗi lần. Bạn có thể bỏ tin cậy sau trong Máy chủ được tin cậy.",
       "loadOnce": "Tải một lần"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play không trả về gói tín dụng phù hợp nào.",
     "storeTimedOut": "App Store không phản hồi kịp thời. Thử lại.",
     "storeTimedOutPlay": "Google Play không phản hồi kịp thời. Thử lại.",
-    "unresolvedPurchase": "Giao dịch mua trước đó của bạn vẫn có thể hoàn tất và thêm số tín dụng tương ứng vào số dư của bạn. Mua lần nữa sẽ bắt đầu một giao dịch mua riêng biệt và có thể khiến bạn bị tính phí lần nữa.",
-    "buyAgain": "Mua lần nữa",
     "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
     "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."
   },

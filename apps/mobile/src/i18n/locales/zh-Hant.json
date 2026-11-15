@@ -1623,7 +1623,7 @@
       "prefillRepoUnavailable": "{{repo}} 已無法使用。請在下方選取儲存庫。",
       "prefillModelUnavailable": "{{model}} 已無法使用。目前使用你的預設模型。",
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
-      "failedToCreate": "無法建立工作階段。",
+      "failedToCreate": "無法建立工作階段",
       "checkOrganizationAccess": "請檢查您對此組織的存取權限，然後再試一次。",
       "couldNotRefreshRepositories": "無法重新整理儲存庫。請再試一次。",
       "discardDraftTitle": "捨棄草稿？",
@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "未計入已載入記錄的費用",
       "ofWindowTokens": "共 {{window}} 個詞元",
       "tokens": "詞元",
+      "tokens_other": "詞元",
+      "tokens_one": "詞元",
       "tokensWithPercentage": "個詞元（{{percentage}}）",
       "stepsCount_one": "{{steps}} 個步驟",
       "stepsCount": "{{steps}} 個步驟",
@@ -2319,7 +2321,7 @@
     "markdownImage": {
       "load": "載入",
       "loadWithHost": "載入 {{host}}",
-      "httpsOnly": "僅支援 HTTPS 圖片。",
+      "httpsOnly": "僅 HTTPS 圖片",
       "trustTitle": "從 {{host}} 載入圖片？",
       "trustMessage": "信任 {{host}} 後，其圖片將不再每次詢問即可載入。你可以稍後在信任的主機中撤銷。",
       "loadOnce": "僅載入一次"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
     "storeTimedOut": "App Store 未及時回應。請再試一次。",
     "storeTimedOutPlay": "Google Play 未及時回應。請再試一次。",
-    "unresolvedPurchase": "你先前的購買仍可能完成，並將該次購買的點數加入你的餘額。再次購買會建立另一筆購買，並可能再次向你收費。",
-    "buyAgain": "再次購買",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   },

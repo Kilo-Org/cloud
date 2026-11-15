@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} තවදුරටත් ලබාගත නොහැක. පහත ගබඩාවක් තෝරන්න.",
       "prefillModelUnavailable": "{{model}} තවදුරටත් ලබා ගත නොහැක. ඔබේ පෙරනිමි මාදිලිය භාවිත වේ.",
       "couldNotReadPendingSessions": "පොරොත්තුවේ ඇති සැසි කියවිය නොහැකි විය. නැවත උත්සාහ කරන්න.",
-      "failedToCreate": "සැසියක් සෑදිය නොහැකි විය.",
+      "failedToCreate": "සැසියක් සෑදිය නොහැකි විය",
       "checkOrganizationAccess": "මෙම සංවිධානයට ඔබගේ ප්‍රවේශය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "couldNotRefreshRepositories": "ගබඩා නැවුම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "discardDraftTitle": "කටු සටහන ඉවතලන්නද?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "පූරණය කළ ඉතිහාසයට අයත් නොවන පිරිවැය",
       "ofWindowTokens": "ටෝකන {{window}} න්",
       "tokens": "ටෝකන",
+      "tokens_one": "ටෝකන",
+      "tokens_other": "ටෝකන",
       "tokensWithPercentage": "ටෝකන ({{percentage}})",
       "stepsCount_one": "පියවර {{steps}} ක්",
       "stepsCount": "පියවර {{steps}}ක්",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "පූරණය කරන්න",
       "loadWithHost": "{{host}} පූරණය කරන්න",
-      "httpsOnly": "HTTPS රූප පමණක් පූරණය කළ හැක.",
+      "httpsOnly": "HTTPS රූප පමණක්",
       "trustTitle": "{{host}} වෙතින් රූපය පූරණය කරන්නද?",
       "trustMessage": "{{host}} විශ්වාස කිරීමෙන් එහි රූප සෑම විටම නොඅසා පූරණය වේ. පසුව විශ්වාස කළ ධාරක තුළ එය ඉවත් කළ හැක.",
       "loadOnce": "එක් වරක් පූරණය කරන්න"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
     "storeTimedOut": "App Store නියමිත වේලාව තුළ ප්‍රතිචාර නොදැක්වීය. නැවත උත්සාහ කරන්න.",
     "storeTimedOutPlay": "Google Play නියමිත වේලාව තුළ ප්‍රතිචාර නොදැක්වීය. නැවත උත්සාහ කරන්න.",
-    "unresolvedPurchase": "ඔබේ පෙර මිලදී ගැනීම පසුව සම්පූර්ණ වී එහි ක්‍රෙඩිට් ඔබේ ශේෂයට එක් විය හැක. නැවත මිලදී ගැනීමෙන් වෙනම මිලදී ගැනීමක් ආරම්භ වන අතර ඔබෙන් නැවත මුදල් අය විය හැක.",
-    "buyAgain": "නැවත මිලදී ගන්න",
     "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
     "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
   },

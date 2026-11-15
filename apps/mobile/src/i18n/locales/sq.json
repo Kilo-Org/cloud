@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "Depoja {{repo}} nuk është më e disponueshme. Zgjidh një depo më poshtë.",
       "prefillModelUnavailable": "{{model}} nuk është më i disponueshëm. Po përdoret modeli yt i parazgjedhur.",
       "couldNotReadPendingSessions": "Nuk u lexuan seancat në pritje. Provo përsëri.",
-      "failedToCreate": "Nuk u krijua seanca.",
+      "failedToCreate": "Nuk u krijua seanca",
       "checkOrganizationAccess": "Kontrollo aksesin tënd në këtë organizatë dhe provo përsëri.",
       "couldNotRefreshRepositories": "Nuk u rifreskuan depot. Provo përsëri.",
       "discardDraftTitle": "Të fshihet drafti?",
@@ -2815,7 +2815,9 @@
       "stepsCount_other": "{{steps}} hapa",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
-      "modelsCount_other": "Modelet ({{displayCount}})"
+      "modelsCount_other": "Modelet ({{displayCount}})",
+      "tokens_one": "token",
+      "tokens_other": "tokenë"
     },
     "sessionChanges": {
       "viewChanges": "Shiko ndryshimet",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Ngarko",
       "loadWithHost": "Ngarko {{host}}",
-      "httpsOnly": "Lejohen vetëm imazhe me HTTPS.",
+      "httpsOnly": "Vetëm imazhe me HTTPS",
       "trustTitle": "Ngarko imazhin nga {{host}}?",
       "trustMessage": "Kur i beson {{host}}, imazhet e tij ngarkohen pa pyetur çdo herë. Mund t'i hiqni besimin më vonë te Serverët e besuar.",
       "loadOnce": "Ngarko një herë"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play nuk ktheu paketa kreditesh që përputhen.",
     "storeTimedOut": "App Store nuk u përgjigj në kohë. Provo përsëri.",
     "storeTimedOutPlay": "Google Play nuk u përgjigj në kohë. Provoni përsëri.",
-    "unresolvedPurchase": "Blerja juaj e mëparshme mund të përfundojë më vonë dhe të shtojë kreditet e saj. Nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
-    "buyAgain": "Bli sërish",
     "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."
   },

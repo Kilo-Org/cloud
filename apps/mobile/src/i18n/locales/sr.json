@@ -2207,7 +2207,7 @@
       "prefillRepoUnavailable": "{{repo}} više nije dostupan. Izaberi repozitorijum ispod.",
       "prefillModelUnavailable": "{{model}} više nije dostupan. Koristi se tvoj podrazumevani model.",
       "couldNotReadPendingSessions": "Čitanje sesija na čekanju nije uspelo. Pokušaj ponovo.",
-      "failedToCreate": "Kreiranje sesije nije uspelo.",
+      "failedToCreate": "Kreiranje sesije nije uspelo",
       "checkOrganizationAccess": "Proveri pristup ovoj organizaciji i pokušaj ponovo.",
       "couldNotRefreshRepositories": "Osvežavanje repozitorijuma nije uspelo. Pokušaj ponovo.",
       "discardDraftTitle": "Odbaciti nacrt?",
@@ -2866,7 +2866,10 @@
       "stepsCount_few": "{{steps}} koraka",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})",
-      "modelsCount_few": "Modeli ({{displayCount}})"
+      "modelsCount_few": "Modeli ({{displayCount}})",
+      "tokens_one": "token",
+      "tokens_few": "tokena",
+      "tokens_other": "tokena"
     },
     "sessionChanges": {
       "viewChanges": "Prikaži izmene",
@@ -2913,7 +2916,7 @@
     "markdownImage": {
       "load": "Učitaj",
       "loadWithHost": "Učitaj {{host}}",
-      "httpsOnly": "Dozvoljene su samo slike dostupne preko HTTPS veze.",
+      "httpsOnly": "Samo slike preko HTTPS veze",
       "trustTitle": "Učitati sliku sa {{host}}?",
       "trustMessage": "Ako označiš {{host}} kao pouzdan, njegove slike će se učitavati bez pitanja svaki put. To kasnije možeš ukloniti u Pouzdani hostovi.",
       "loadOnce": "Učitaj jednom"
@@ -4290,8 +4293,6 @@
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
     "storeTimedOut": "App Store nije odgovorio na vreme. Pokušaj ponovo.",
     "storeTimedOutPlay": "Google Play nije odgovorio na vreme. Pokušajte ponovo.",
-    "unresolvedPurchase": "Tvoja prethodna kupovina još uvek može da se dovrši i doda kupljene kredite na tvoj saldo. Ako ponovo kupiš, započinješ zasebnu kupovinu koja može ponovo da ti bude naplaćena.",
-    "buyAgain": "Kupi ponovo",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom nalogu Apple Account pripadaju drugom Kilo nalogu. Prijavi se na taj Kilo nalog da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
   },

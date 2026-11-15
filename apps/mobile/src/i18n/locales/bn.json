@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} আর ব্যবহার করা যাচ্ছে না। নিচে একটি রিপোজিটরি বেছে নিন।",
       "prefillModelUnavailable": "{{model}} আর ব্যবহার করা যাচ্ছে না। আপনার ডিফল্ট মডেল ব্যবহার করা হচ্ছে।",
       "couldNotReadPendingSessions": "অপেক্ষমাণ সেশনের তথ্য পড়া যায়নি। আবার চেষ্টা করুন।",
-      "failedToCreate": "সেশন তৈরি করা যায়নি।",
+      "failedToCreate": "সেশন তৈরি করা যায়নি",
       "checkOrganizationAccess": "এই সংস্থায় আপনার অ্যাক্সেস পরীক্ষা করে আবার চেষ্টা করুন।",
       "couldNotRefreshRepositories": "রিপোজিটরি রিফ্রেশ করা যায়নি। আবার চেষ্টা করুন।",
       "discardDraftTitle": "খসড়া বাতিল করবেন?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "লোড করা ইতিহাসের বাইরের খরচ",
       "ofWindowTokens": "{{window}} টোকেনের মধ্যে",
       "tokens": "টোকেন",
+      "tokens_one": "টোকেন",
+      "tokens_other": "টোকেন",
       "tokensWithPercentage": "টোকেন ({{percentage}})",
       "stepsCount_one": "{{steps}}টি ধাপ",
       "stepsCount": "{{steps}}টি ধাপ",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "লোড করুন",
       "loadWithHost": "{{host}} লোড করুন",
-      "httpsOnly": "শুধু HTTPS-এর ছবি লোড করা যায়।",
+      "httpsOnly": "শুধু HTTPS-এর ছবি",
       "trustTitle": "{{host}} থেকে ছবি লোড করবেন?",
       "trustMessage": "{{host}}-কে বিশ্বস্ত করলে প্রতিবার না জিজ্ঞেস করেই তার ছবি লোড হবে। পরে বিশ্বস্ত হোস্ট থেকে এটি প্রত্যাহার করতে পারবেন।",
       "loadOnce": "একবার লোড করুন"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play কোনো মিলে যাওয়া ক্রেডিট প্যাক ফেরত দেয়নি।",
     "storeTimedOut": "App Store সময়মতো সাড়া দেয়নি। আবার চেষ্টা করুন।",
     "storeTimedOutPlay": "Google Play সময়মতো সাড়া দেয়নি। আবার চেষ্টা করুন।",
-    "unresolvedPurchase": "আপনার আগের কেনাকাটা এখনও সম্পন্ন হতে পারে এবং সেই কেনাকাটার ক্রেডিট যোগ হতে পারে। আবার কিনলে আলাদা একটি কেনাকাটা শুরু হবে এবং আপনার কাছ থেকে আবার টাকা নেওয়া হতে পারে।",
-    "buyAgain": "আবার কিনুন",
     "purchaseOwnedByAnotherAccount": "এই Apple Account-এর ক্রেডিট অন্য একটি Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন-ইন করুন।",
     "purchaseOwnedByAnotherAccountPlay": "এই Google Play অ্যাকাউন্টের ক্রেডিট একটি ভিন্ন Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন ইন করুন।"
   },

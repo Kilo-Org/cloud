@@ -32,7 +32,6 @@ import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
 import { useCreditNativeIap } from './credit-native-iap-owner';
 import { CreditExpiryNote } from './credit-expiry-note';
-import { CreditUnresolvedPurchaseNotice } from './credit-unresolved-purchase-notice';
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
@@ -53,10 +52,6 @@ export function CreditPurchaseScreen() {
     connected,
     fetchStoreProducts,
     purchase,
-    reconcilePurchase,
-    buyAgain,
-    unresolvedProductId,
-    buyAgainProductId,
     reconnectStore,
     completingProductId,
     errorMessageKey: purchaseErrorMessageKey,
@@ -120,37 +115,6 @@ export function CreditPurchaseScreen() {
     clearError();
     void purchase(pack);
   };
-
-  const handleReconcilePress = (pack: StoreCreditProduct) => {
-    selectionHaptic();
-    clearError();
-    void reconcilePurchase(pack);
-  };
-
-  const handleBuyAgainPress = (pack: StoreCreditProduct) => {
-    selectionHaptic();
-    clearError();
-    void buyAgain(pack);
-  };
-
-  // One label source for the row and the notice: the pack amount reads the same
-  // on both, so consent names the same pack the list sells.
-  const formatPackLabel = (pack: StoreCreditProduct) =>
-    t('credits.packLabel', {
-      amount: isolateLtrBidiText(formatPrefixedMoney(pack.backend.amountUsd, i18n.language)),
-    });
-
-  const unresolvedPack =
-    unresolvedProductId === null
-      ? null
-      : (products.find(pack => pack.storeProductId === unresolvedProductId) ?? null);
-  // Buy again is offered for the one pack the warning names, and only once the
-  // store priced it: its label must name one exact charge.
-  const buyAgainAvailable =
-    unresolvedPack !== null &&
-    buyAgainProductId !== null &&
-    unresolvedPack.storeProductId === buyAgainProductId &&
-    unresolvedPack.displayPrice !== null;
 
   const renderBalanceValue = () => {
     if (balancePending) {
@@ -219,29 +183,6 @@ export function CreditPurchaseScreen() {
             className="px-1 text-sm"
           />
 
-          {unresolvedProductId !== null && (
-            <CreditUnresolvedPurchaseNotice
-              actionsDisabled={purchasing || !connected}
-              buyAgainAvailable={buyAgainAvailable}
-              onBuyAgain={() => {
-                if (unresolvedPack !== null) {
-                  handleBuyAgainPress(unresolvedPack);
-                }
-              }}
-              onReconcile={() => {
-                if (unresolvedPack !== null) {
-                  handleReconcilePress(unresolvedPack);
-                }
-              }}
-              packLabel={unresolvedPack !== null ? formatPackLabel(unresolvedPack) : null}
-              priceLabel={
-                unresolvedPack !== null
-                  ? (unresolvedPack.displayPrice ?? t('credits.priceUnavailable'))
-                  : null
-              }
-            />
-          )}
-
           {storeUnavailable && (
             <View className="gap-3 rounded-xl border border-border bg-card p-5">
               <Text className="font-semibold text-foreground">
@@ -285,7 +226,11 @@ export function CreditPurchaseScreen() {
               // The pack names a credit amount in the same shape as the balance
               // above it. The store's own localized price stays as the store
               // wrote it.
-              const packLabel = formatPackLabel(pack);
+              const packLabel = t('credits.packLabel', {
+                amount: isolateLtrBidiText(
+                  formatPrefixedMoney(pack.backend.amountUsd, i18n.language)
+                ),
+              });
               const expiryMessageKey = getStoreCreditExpiryMessageKey(pack.backend, storefront);
               const expiryMessage = expiryMessageKey ? t(expiryMessageKey) : undefined;
               const hasStorePrice = pack.storeProductId !== null && pack.displayPrice !== null;

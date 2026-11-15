@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} кодын санг ашиглах боломжгүй болсон. Доороос өөр кодын сан сонгоно уу.",
       "prefillModelUnavailable": "{{model}} загварыг ашиглах боломжгүй болсон. Таны үндсэн загварыг ашиглаж байна.",
       "couldNotReadPendingSessions": "Хүлээгдэж буй сессүүдийг уншиж чадсангүй. Дахин оролдоно уу.",
-      "failedToCreate": "Сесс үүсгэж чадсангүй.",
+      "failedToCreate": "Сесс үүсгэж чадсангүй",
       "checkOrganizationAccess": "Энэ байгууллагад хандах эрхээ шалгаад дахин оролдоно уу.",
       "couldNotRefreshRepositories": "Кодын сангийн жагсаалтыг шинэчилж чадсангүй. Дахин оролдоно уу.",
       "discardDraftTitle": "Нооргийг устгах уу?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Ачаалагдсан түүхэд хамаарахгүй зардал",
       "ofWindowTokens": "{{window}} токеноос",
       "tokens": "токен",
+      "tokens_one": "токен",
+      "tokens_other": "токен",
       "tokensWithPercentage": "токен ({{percentage}})",
       "stepsCount_one": "{{steps}} алхам",
       "stepsCount": "{{steps}} алхам",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Ачаалах",
       "loadWithHost": "{{host}}-оос ачаалах",
-      "httpsOnly": "Зөвхөн HTTPS холбоостой зургийг ачаална.",
+      "httpsOnly": "Зөвхөн HTTPS холбоостой зураг",
       "trustTitle": "{{host}}-аас зургийг ачаалах уу?",
       "trustMessage": "{{host}}-д итгэвэл түүний зургуудыг дахин асуулгүйгээр ачаална. Дараа нь Итгэмжлэгдсэн хостууд хэсгээс цуцалж болно.",
       "loadOnce": "Нэг удаа ачаалах"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play тохирох кредит багц буцаагаагүй.",
     "storeTimedOut": "App Store хугацаандаа хариу өгөөгүй. Дахин оролдох",
     "storeTimedOutPlay": "Google Play хугацаандаа хариу өгөөгүй. Дахин оролдох",
-    "unresolvedPurchase": "Таны өмнөх худалдан авалт дараа нь амжилттай болж, кредит нь таны үлдэгдэлд нэмэгдэж магадгүй. Дахин худалдан авах нь тусдаа худалдан авалт үүсгэж, танаас дахин төлбөр авч болзошгүй бөгөөд амжилттай болсон худалдан авалт бүрийн кредит таны үлдэгдэлд нэмэгдэнэ.",
-    "buyAgain": "Дахин худалдан авах",
     "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү.",
     "purchaseOwnedByAnotherAccountPlay": "Энэ Google Play бүртгэл дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү."
   },

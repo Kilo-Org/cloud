@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} haipatikani tena. Chagua hazina hapa chini.",
       "prefillModelUnavailable": "{{model}} haipatikani tena. Modeli yako chaguomsingi inatumika.",
       "couldNotReadPendingSessions": "Imeshindikana kusoma vikao vinavyosubiri. Jaribu tena.",
-      "failedToCreate": "Imeshindikana kuunda kikao.",
+      "failedToCreate": "Imeshindikana kuunda kikao",
       "checkOrganizationAccess": "Tafadhali angalia ufikiaji wako wa shirika hili, kisha ujaribu tena.",
       "couldNotRefreshRepositories": "Imeshindikana kupakia upya hazina. Tafadhali jaribu tena.",
       "discardDraftTitle": "Ungependa kufuta rasimu?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Gharama ambayo haihusishwi na historia iliyopakiwa",
       "ofWindowTokens": "kati ya tokeni {{window}}",
       "tokens": "tokeni",
+      "tokens_one": "tokeni",
+      "tokens_other": "tokeni",
       "tokensWithPercentage": "tokeni ({{percentage}})",
       "stepsCount_one": "hatua {{steps}}",
       "stepsCount": "Hatua {{steps}}",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Pakia",
       "loadWithHost": "Pakia {{host}}",
-      "httpsOnly": "Ni picha za HTTPS pekee zinazoruhusiwa.",
+      "httpsOnly": "Picha za HTTPS pekee",
       "trustTitle": "Pakia picha kutoka {{host}}?",
       "trustMessage": "Kumuamini {{host}} kutapakia picha zake bila kuuliza kila mara. Unaweza kuondoa hii baadaye kwenye Tovuti zinazoaminika.",
       "loadOnce": "Pakia mara moja"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play haikurudisha pakiti za salio zinazolingana.",
     "storeTimedOut": "App Store haikujibu kwa wakati. Jaribu tena.",
     "storeTimedOutPlay": "Google Play haikujibu kwa wakati. Jaribu tena.",
-    "unresolvedPurchase": "Ununuzi wako wa awali bado unaweza kukamilika na kuongeza salio ulilonunua. Kununua tena huanzisha ununuzi mwingine na unaweza kutozwa tena.",
-    "buyAgain": "Nunua tena",
     "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
     "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."
   },

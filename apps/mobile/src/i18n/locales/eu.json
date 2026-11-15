@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} jada ez dago erabilgarri. Aukeratu biltegi bat behean.",
       "prefillModelUnavailable": "{{model}} jada ez dago erabilgarri. Zure modelo lehenetsia erabiltzen ari da.",
       "couldNotReadPendingSessions": "Ezin izan dira zain dauden saioak irakurri. Saiatu berriro.",
-      "failedToCreate": "Ezin izan da saioa sortu.",
+      "failedToCreate": "Ezin izan da saioa sortu",
       "checkOrganizationAccess": "Egiaztatu zure sarbidea erakunde honetara eta saiatu berriro.",
       "couldNotRefreshRepositories": "Ezin izan da biltegien zerrenda freskatu. Saiatu berriro.",
       "discardDraftTitle": "Baztertu zirriborroa?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kargatutako historiari esleitu gabeko kostua",
       "ofWindowTokens": "{{window}} tokenetik",
       "tokens": "token",
+      "tokens_one": "token",
+      "tokens_other": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} urrats",
       "stepsCount": "{{steps}} urrats",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Kargatu",
       "loadWithHost": "Kargatu {{host}}",
-      "httpsOnly": "HTTPS bidezko irudiak soilik onartzen dira.",
+      "httpsOnly": "HTTPS bidezko irudiak soilik",
       "trustTitle": "Kargatu irudia {{host}}(e)tik?",
       "trustMessage": "{{host}} ostalariari konfiantza emanez gero, haren irudiak ez dira aldi bakoitzean galdetu gabe kargatuko. Geroago konfiantza hori kendu dezakezu Konfiantzako ostalariak atalean.",
       "loadOnce": "Kargatu behin"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
     "storeTimedOut": "App Store-k ez du denboran erantzun. Saiatu berriro.",
     "storeTimedOutPlay": "Google Play-k ez du denboran erantzun. Saiatu berriro.",
-    "unresolvedPurchase": "Baliteke zure aurreko erosketa oraindik burutzea eta dagozkion kredituak zure saldoari gehitzea. Berriro erosiz gero, beste erosketa bat hasiko da, eta baliteke berriro kobratzea.",
-    "buyAgain": "Erosi berriro",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
   },

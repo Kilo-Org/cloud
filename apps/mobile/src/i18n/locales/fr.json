@@ -2191,6 +2191,9 @@
       "olderActivityDescription": "Coût non attribué à l'historique chargé",
       "ofWindowTokens": "sur {{window}} jetons",
       "tokens": "jetons",
+      "tokens_one": "jeton",
+      "tokens_many": "de jetons",
+      "tokens_other": "jetons",
       "tokensWithPercentage": "jetons ({{percentage}})",
       "stepsCount_one": "{{steps}} étape",
       "stepsCount": "{{steps}} étapes",
@@ -4290,8 +4293,6 @@
     "noMatchingProductsPlay": "Google Play n'a renvoyé aucun pack de crédits correspondant.",
     "storeTimedOut": "L'App Store n'a pas répondu à temps. Réessayez.",
     "storeTimedOutPlay": "Google Play n'a pas répondu à temps. Réessayez.",
-    "unresolvedPurchase": "Votre achat précédent peut encore être finalisé et ajouter les crédits correspondants à votre solde. Acheter à nouveau lance un achat distinct et peut entraîner une nouvelle facturation.",
-    "buyAgain": "Acheter à nouveau",
     "purchaseOwnedByAnotherAccount": "Les crédits sur ce compte Apple appartiennent à un autre compte Kilo. Connectez-vous à cet autre compte Kilo pour les utiliser.",
     "purchaseOwnedByAnotherAccountPlay": "Les crédits sur ce compte Google Play appartiennent à un autre compte Kilo. Connectez-vous à ce compte Kilo pour les utiliser."
   },

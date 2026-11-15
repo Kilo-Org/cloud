@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} er ekki lengur tiltækt. Veldu kóðasafn hér að neðan.",
       "prefillModelUnavailable": "{{model}} er ekki lengur tiltækt. Sjálfgefna líkanið þitt er notað í staðinn.",
       "couldNotReadPendingSessions": "Ekki tókst að lesa lotur í bið. Reyndu aftur.",
-      "failedToCreate": "Ekki tókst að búa til lotu.",
+      "failedToCreate": "Ekki tókst að búa til lotu",
       "checkOrganizationAccess": "Athugaðu aðganginn þinn að þessari stofnun, og reyndu aftur.",
       "couldNotRefreshRepositories": "Ekki tókst að endurnýja kóðasöfnin. Reyndu aftur.",
       "discardDraftTitle": "Farga drögum?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kostnaður sem tengist ekki ferlinum sem hefur verið hlaðið",
       "ofWindowTokens": "af {{window}} tókum",
       "tokens": "tókar",
+      "tokens_one": "tókar",
+      "tokens_other": "tókar",
       "tokensWithPercentage": "tókar ({{percentage}})",
       "stepsCount_one": "{{steps}} skref",
       "stepsCount": "{{steps}} skref",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Hlaða",
       "loadWithHost": "Hlaða mynd frá {{host}}",
-      "httpsOnly": "Aðeins er hægt að hlaða myndum með HTTPS.",
+      "httpsOnly": "Aðeins myndir með HTTPS",
       "trustTitle": "Hlaða mynd frá {{host}}?",
       "trustMessage": "Að treysta {{host}} hleður myndum þess án þess að spyrja í hvert sinn. Þú getur afturkallað það síðar undir Traustir vefþjónar.",
       "loadOnce": "Hlaða einu sinni"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play skilaði engum samsvarandi inneignarpökkum.",
     "storeTimedOut": "App Store svaraði ekki tímanlega. Reyndu aftur.",
     "storeTimedOutPlay": "Google Play svaraði ekki tímanlega. Reyndu aftur.",
-    "unresolvedPurchase": "Fyrri kaup þín gætu enn gengið í gegn og inneignin sem þeim fylgir bæst við stöðuna þína. Ef þú kaupir aftur stofnarðu til nýrra kaupa og gætir þurft að greiða aftur.",
-    "buyAgain": "Kaupa aftur",
     "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
     "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
   },

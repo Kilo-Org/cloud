@@ -212,18 +212,6 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
         await Promise.resolve();
         return false;
       },
-      // The fixture shows pack layout, not the money exits: these never touch a
-      // store, and the notice stays absent because no purchase is unresolved.
-      unresolvedProductId: null,
-      buyAgainProductId: null,
-      reconcilePurchase: async () => {
-        await Promise.resolve();
-        return false;
-      },
-      buyAgain: async () => {
-        await Promise.resolve();
-        return false;
-      },
       // The completing state keeps the first pack's purchase open, which is the
       // only way to render its in-flight label without a store.
       completingProductId: state === 'completing' ? (listings(state)[0]?.id ?? null) : null,

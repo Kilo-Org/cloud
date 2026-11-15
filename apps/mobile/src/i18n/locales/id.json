@@ -1623,7 +1623,7 @@
       "prefillRepoUnavailable": "{{repo}} tidak lagi tersedia. Pilih repositori di bawah.",
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Model bawaanmu digunakan sebagai pengganti.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu diproses. Coba lagi.",
-      "failedToCreate": "Gagal membuat sesi.",
+      "failedToCreate": "Gagal membuat sesi",
       "checkOrganizationAccess": "Periksa aksesmu ke organisasi ini, lalu coba lagi.",
       "couldNotRefreshRepositories": "Tidak dapat memuat ulang repositori. Coba lagi.",
       "discardDraftTitle": "Buang draf?",
@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "Biaya di luar riwayat yang dimuat",
       "ofWindowTokens": "dari {{window}} token",
       "tokens": "token",
+      "tokens_other": "token",
+      "tokens_one": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} langkah",
       "stepsCount": "{{steps}} langkah",
@@ -2319,7 +2321,7 @@
     "markdownImage": {
       "load": "Muat",
       "loadWithHost": "Muat {{host}}",
-      "httpsOnly": "Hanya gambar melalui HTTPS yang dapat dimuat.",
+      "httpsOnly": "Hanya gambar melalui HTTPS",
       "trustTitle": "Muat gambar dari {{host}}?",
       "trustMessage": "Mempercayai {{host}} akan memuat gambarnya tanpa bertanya setiap saat. Anda dapat mencabutnya nanti di Host tepercaya.",
       "loadOnce": "Muat sekali"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play tidak mengembalikan paket kredit yang cocok.",
     "storeTimedOut": "App Store tidak merespons tepat waktu. Coba lagi.",
     "storeTimedOutPlay": "Google Play tidak merespons tepat waktu. Coba lagi.",
-    "unresolvedPurchase": "Pembelian Anda sebelumnya mungkin masih akan selesai dan menambahkan kredit dari pembelian tersebut. Membeli lagi akan memulai pembelian terpisah dan Anda mungkin akan dikenai biaya lagi.",
-    "buyAgain": "Beli lagi",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   },

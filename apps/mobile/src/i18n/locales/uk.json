@@ -1659,7 +1659,7 @@
       "prefillRepoUnavailable": "Репозиторій {{repo}} більше недоступний. Виберіть інший нижче.",
       "prefillModelUnavailable": "Модель {{model}} більше недоступна. Використовується ваша типова модель.",
       "couldNotReadPendingSessions": "Не вдалося прочитати дані сеансів у черзі. Спробуйте ще раз.",
-      "failedToCreate": "Не вдалося створити сеанс.",
+      "failedToCreate": "Не вдалося створити сеанс",
       "checkOrganizationAccess": "Перевірте свій доступ до цієї організації, а потім спробуйте ще раз.",
       "couldNotRefreshRepositories": "Не вдалося оновити список репозиторіїв. Спробуйте ще раз.",
       "discardDraftTitle": "Видалити чернетку?",
@@ -2318,6 +2318,10 @@
       "olderActivityDescription": "Витрати, не враховані в завантаженій історії",
       "ofWindowTokens": "з {{window}} токенів",
       "tokens": "токени",
+      "tokens_one": "токен",
+      "tokens_few": "токени",
+      "tokens_many": "токенів",
+      "tokens_other": "токена",
       "tokensWithPercentage": "ток. ({{percentage}})",
       "stepsCount_one": "{{steps}} крок",
       "stepsCount": "Кроків: {{steps}}",
@@ -2375,7 +2379,7 @@
     "markdownImage": {
       "load": "Завантажити",
       "loadWithHost": "Завантажити з {{host}}",
-      "httpsOnly": "Можна завантажувати зображення лише через HTTPS.",
+      "httpsOnly": "Лише зображення через HTTPS",
       "trustTitle": "Завантажити зображення з {{host}}?",
       "trustMessage": "Довіра до {{host}} дозволить завантажувати його зображення без запиту щоразу. Пізніше це можна скасувати в розділі Довірені хости.",
       "loadOnce": "Завантажити один раз"
@@ -4351,8 +4355,6 @@
     "noMatchingProductsPlay": "Google Play не повернув відповідні пакети кредитів.",
     "storeTimedOut": "App Store не відповів у час. Спробуйте ще раз.",
     "storeTimedOutPlay": "Google Play не відповів у час. Спробуйте ще раз.",
-    "unresolvedPurchase": "Ваша попередня покупка ще може завершитися, і кредити за неї буде додано на ваш баланс. Купуючи знову, ви розпочинаєте окрему покупку, за яку з вас можуть знову стягнути кошти.",
-    "buyAgain": "Купити знову",
     "purchaseOwnedByAnotherAccount": "Кредити в цьому Apple Account належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися.",
     "purchaseOwnedByAnotherAccountPlay": "Кредити в цьому обліковому записі Google Play належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися."
   },

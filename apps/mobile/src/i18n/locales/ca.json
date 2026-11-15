@@ -2207,7 +2207,7 @@
       "prefillRepoUnavailable": "{{repo}} ja no està disponible. Tria un repositori a continuació.",
       "prefillModelUnavailable": "{{model}} ja no està disponible. S'està utilitzant el teu model predeterminat.",
       "couldNotReadPendingSessions": "No s'han pogut llegir les sessions pendents. Torna-ho a provar.",
-      "failedToCreate": "No s'ha pogut crear la sessió.",
+      "failedToCreate": "No s'ha pogut crear la sessió",
       "checkOrganizationAccess": "Comproveu el vostre accés a aquesta organització i torneu-ho a provar.",
       "couldNotRefreshRepositories": "No s'han pogut actualitzar els repositoris. Torna-ho a provar.",
       "discardDraftTitle": "Vols descartar l'esborrany?",
@@ -2675,7 +2675,7 @@
       "loadingDescription": "S'estan esperant missatges de l'agent secundari…"
     },
     "messageBubble": {
-      "failure": "Error: {{title}}.",
+      "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Pots tornar-ho a provar.",
       "copyToComposer": "Copia al camp de missatge",
       "queuedAccessibility": "Missatge en cua",
@@ -2858,6 +2858,9 @@
       "olderActivityDescription": "Cost no atribuït a l'historial carregat",
       "ofWindowTokens": "de {{window}} tòkens",
       "tokens": "unitats de text",
+      "tokens_one": "unitat de text",
+      "tokens_many": "d'unitats de text",
+      "tokens_other": "unitats de text",
       "tokensWithPercentage": "tòkens ({{percentage}})",
       "stepsCount_one": "{{steps}} pas",
       "stepsCount": "{{steps}} passos",
@@ -2913,7 +2916,7 @@
     "markdownImage": {
       "load": "Carrega",
       "loadWithHost": "Carrega {{host}}",
-      "httpsOnly": "Només es permeten imatges amb HTTPS.",
+      "httpsOnly": "Només imatges amb HTTPS",
       "trustTitle": "Carregar la imatge de {{host}}?",
       "trustMessage": "Si confies en {{host}}, les seves imatges es carregaran sense preguntar cada vegada. Pots revocar-ho més tard a Servidors de confiança.",
       "loadOnce": "Carrega una vegada"
@@ -4290,8 +4293,6 @@
     "noMatchingProductsPlay": "Google Play no ha retornat cap paquet de crèdits coincident.",
     "storeTimedOut": "L'App Store no ha respost a temps. Torna-ho a provar.",
     "storeTimedOutPlay": "Google Play no ha respost a temps. Torna-ho a provar.",
-    "unresolvedPurchase": "La teva compra anterior encara es pot completar i afegir els crèdits corresponents al teu saldo. Si tornes a comprar, iniciaràs una nova compra i se't podria tornar a cobrar.",
-    "buyAgain": "Torna a comprar",
     "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
     "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."
   },

@@ -2289,7 +2289,7 @@
       "prefillRepoUnavailable": "{{repo}} m'għadux disponibbli. Agħżel repożitorju hawn taħt.",
       "prefillModelUnavailable": "{{model}} m'għadux disponibbli. Qed jintuża l-mudell prestabbilit tiegħek.",
       "couldNotReadPendingSessions": "Ma setgħux jinqraw is-sessjonijiet pendenti. Erġa' pprova.",
-      "failedToCreate": "Ma setgħetx tinħoloq is-sessjoni.",
+      "failedToCreate": "Ma setgħetx tinħoloq is-sessjoni",
       "checkOrganizationAccess": "Iċċekkja l-aċċess tiegħek għal din l-organizzazzjoni, imbagħad erġa' pprova.",
       "couldNotRefreshRepositories": "Ma setgħux jiġu aġġornati r-repożitorji. Erġa' pprova.",
       "discardDraftTitle": "Twarrab l-abbozz?",
@@ -2956,6 +2956,11 @@
       "olderActivityDescription": "Spiża mhux attribwita lill-istorja mgħobbija",
       "ofWindowTokens": "minn {{window}} unitajiet tat-test",
       "tokens": "unitajiet tat-test",
+      "tokens_one": "unità tat-test",
+      "tokens_two": "unitajiet tat-test",
+      "tokens_few": "unitajiet tat-test",
+      "tokens_many": "unità tat-test",
+      "tokens_other": "unitajiet tat-test",
       "tokensWithPercentage": "unitajiet tat-test ({{percentage}})",
       "stepsCount_one": "{{steps}} pass",
       "stepsCount": "{{steps}} passi",
@@ -3015,7 +3020,7 @@
     "markdownImage": {
       "load": "Għabbi",
       "loadWithHost": "Għabbi {{host}}",
-      "httpsOnly": "Jistgħu jitgħabbew biss immaġnijiet minn HTTPS.",
+      "httpsOnly": "Immaġnijiet minn HTTPS biss",
       "trustTitle": "Għabbi l-immaġni minn {{host}}?",
       "trustMessage": "Jekk tafda lil {{host}}, l-immaġnijiet tiegħu jitgħabbew mingħajr ma jistaqsi kull darba. Tista' tirtira dan aktar tard f'Ospitanti fdati.",
       "loadOnce": "Għabbi darba"
@@ -4412,8 +4417,6 @@
     "noMatchingProductsPlay": "Google Play ma rritornax pakketti tal-krediti li jaqblu.",
     "storeTimedOut": "L-App Store ma wieġebx f'ħinha. Erġa' pprova.",
     "storeTimedOutPlay": "Google Play ma wieġebx f'ħinha. Erġa' pprova.",
-    "unresolvedPurchase": "Ix-xiri preċedenti tiegħek xorta jista' jitlesta u jżid il-krediti tiegħu mal-bilanċ tiegħek. Jekk terġa' tixtri, tibda xiri ieħor u tista' terġa' tiġi ċċarġjat.",
-    "buyAgain": "Ixtri mill-ġdid",
     "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
     "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."
   },

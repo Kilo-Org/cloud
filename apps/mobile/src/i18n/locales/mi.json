@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "Kāore a {{repo}} e wātea ana ināianei. Kōwhiria tētahi putunga waehere ki raro nei.",
       "prefillModelUnavailable": "Kāore a {{model}} e wātea ana ināianei. Kei te whakamahia tō tauira taunoa.",
       "couldNotReadPendingSessions": "Kāore i taea te pānui i ngā wātū e tatari ana. Whakamātau anō.",
-      "failedToCreate": "Kāore i taea te hanga i te wātū.",
+      "failedToCreate": "Kāore i taea te hanga i te wātū",
       "checkOrganizationAccess": "Tirohia tō urunga ki tēnei rōpū, kātahi ka whakamātau anō.",
       "couldNotRefreshRepositories": "Kāore i taea te whakahou i ngā putunga waehere. Whakamātau anō.",
       "discardDraftTitle": "Mukua te hukihuki?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Te utu kāore i tautapatia ki te hītori kua utaina",
       "ofWindowTokens": "o te {{window}} tōkena",
       "tokens": "waeine kuputuhi",
+      "tokens_one": "waeine kuputuhi",
+      "tokens_other": "waeine kuputuhi",
       "tokensWithPercentage": "tōkena ({{percentage}})",
       "stepsCount_one": "{{steps}} hipanga",
       "stepsCount": "{{steps}} hipanga",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Utaina",
       "loadWithHost": "Utaina {{host}}",
-      "httpsOnly": "Ko ngā atahanga HTTPS anake ka whakaaetia.",
+      "httpsOnly": "Ko ngā atahanga HTTPS anake",
       "trustTitle": "Utaina te atahanga mai i {{host}}?",
       "trustMessage": "Mā te whirinaki ki {{host}} ka utaina ōna atahanga me te kore pātai i ia wā. Ka taea te whakakore ā muri ake i Ngā paetukutuku whirinaki.",
       "loadOnce": "Utaina kotahi"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Kāore Google Play i whakahoki i ētahi pākete whiwhinga ōrite.",
     "storeTimedOut": "Kāore te App Store i whakautu i te wā. Whakamātau anō.",
     "storeTimedOutPlay": "Kāore a Google Play i whakautu i te wā. Whakamātau anō.",
-    "unresolvedPurchase": "Tērā pea ka oti tonu tō hokonga o mua, ā, ka tāpirihia ngā whiwhinga o taua hokonga ki tō toenga. Ki te hoko anō koe, ka tīmata he hokonga hou, ā, tērā pea ka tangohia anō he moni i a koe.",
-    "buyAgain": "Hoko anō",
     "purchaseOwnedByAnotherAccount": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei Apple Account. Whakauru ki taua pūkete Kilo hei whakamahi.",
     "purchaseOwnedByAnotherAccountPlay": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei pūkete Google Play. Whakauru ki taua pūkete Kilo hei whakamahi."
   },

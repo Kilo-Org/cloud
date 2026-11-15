@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ఇక అందుబాటులో లేదు. కింద మరో రిపోజిటరీని ఎంచుకోండి.",
       "prefillModelUnavailable": "{{model}} ఇక అందుబాటులో లేదు. మీ డిఫాల్ట్ మోడల్‌ను ఉపయోగిస్తున్నాము.",
       "couldNotReadPendingSessions": "వేచి ఉన్న సెషన్‌ల వివరాలను చదవలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
-      "failedToCreate": "సెషన్‌ను సృష్టించలేకపోయాము.",
+      "failedToCreate": "సెషన్‌ను సృష్టించలేకపోయాము",
       "checkOrganizationAccess": "ఈ సంస్థకు మీ యాక్సెస్‌ను సరిచూసి, మళ్లీ ప్రయత్నించండి.",
       "couldNotRefreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
       "discardDraftTitle": "చిత్తుప్రతిని తొలగించాలా?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "లోడ్ చేసిన చరిత్రకు కేటాయించని ఖర్చు",
       "ofWindowTokens": "{{window}} టోకెన్లలో",
       "tokens": "టోకెన్లు",
+      "tokens_one": "టోకెన్",
+      "tokens_other": "టోకెన్లు",
       "tokensWithPercentage": "టోకెన్లు ({{percentage}})",
       "stepsCount_one": "{{steps}} దశ",
       "stepsCount": "{{steps}} దశలు",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "లోడ్ చేయండి",
       "loadWithHost": "{{host}} నుండి లోడ్ చేయండి",
-      "httpsOnly": "HTTPS చిత్రాలను మాత్రమే లోడ్ చేయవచ్చు.",
+      "httpsOnly": "HTTPS చిత్రాలను మాత్రమే",
       "trustTitle": "{{host}} నుండి చిత్రాన్ని లోడ్ చేయాలా?",
       "trustMessage": "{{host}} ను విశ్వసిస్తే, దాని చిత్రాలు ప్రతిసారీ అడగకుండా లోడ్ అవుతాయి. తర్వాత విశ్వసించిన హోస్ట్‌లలో దీన్ని ఉపసంహరించవచ్చు.",
       "loadOnce": "ఒకసారి లోడ్ చేయండి"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play సరిపోలే క్రెడిట్ ప్యాక్‌లను అందించలేదు.",
     "storeTimedOut": "App Store సమయానికి స్పందించలేదు. మళ్లీ ప్రయత్నించండి.",
     "storeTimedOutPlay": "Google Play సమయానికి స్పందించలేదు. మళ్లీ ప్రయత్నించండి.",
-    "unresolvedPurchase": "మీ మునుపటి కొనుగోలు తర్వాత పూర్తయి, దానికి సంబంధించిన క్రెడిట్‌లు మీ బ్యాలెన్స్‌కు జోడించబడవచ్చు. మళ్లీ కొనడం వల్ల వేరొక కొనుగోలు ప్రారంభమవుతుంది, దాని కోసం మీకు మళ్లీ ఛార్జీ విధించబడవచ్చు.",
-    "buyAgain": "మళ్లీ కొనండి",
     "purchaseOwnedByAnotherAccount": "ఈ Apple Accountలోని క్రెడిట్‌లు వేరే Kilo ఖాతాకు చెందుతాయి. వాటిని ఉపయోగించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి.",
     "purchaseOwnedByAnotherAccountPlay": "ఈ Google Play ఖాతాలోని క్రెడిట్‌లు వేరే Kilo ఖాతాకు చెందుతాయి. వాటిని ఉపయోగించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి."
   },

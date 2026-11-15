@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} is nie meer beskikbaar nie. Kies 'n bewaarplek hieronder.",
       "prefillModelUnavailable": "{{model}} is nie meer beskikbaar nie. Jou standaardmodel word gebruik.",
       "couldNotReadPendingSessions": "Die hangende sessies kon nie gelees word nie. Probeer weer.",
-      "failedToCreate": "Die sessie kon nie geskep word nie.",
+      "failedToCreate": "Die sessie kon nie geskep word nie",
       "checkOrganizationAccess": "Kontroleer jou toegang tot hierdie organisasie en probeer asseblief weer.",
       "couldNotRefreshRepositories": "Die bewaarplekke kon nie verfris word nie. Probeer asseblief weer.",
       "discardDraftTitle": "Konsep weggooi?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Koste wat nie aan die gelaaide geskiedenis toegeskryf is nie",
       "ofWindowTokens": "van {{window}} tekens",
       "tokens": "tekseenhede",
+      "tokens_one": "tekseenheid",
+      "tokens_other": "tekseenhede",
       "tokensWithPercentage": "tekens ({{percentage}})",
       "stepsCount_one": "{{steps}} stap",
       "stepsCount": "{{steps}} stappe",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Laai",
       "loadWithHost": "Laai {{host}}",
-      "httpsOnly": "Slegs HTTPS-afbeeldings word toegelaat.",
+      "httpsOnly": "Slegs HTTPS-afbeeldings",
       "trustTitle": "Laai beeld vanaf {{host}}?",
       "trustMessage": "As jy {{host}} vertrou, laai sy beelde sonder om elke keer te vra. Jy kan dit later onder Vertroude gashere herroep.",
       "loadOnce": "Laai een keer"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
     "storeTimedOut": "App Store het nie betyds gereageer nie. Probeer weer.",
     "storeTimedOutPlay": "Google Play het nie betyds gereageer nie. Probeer weer.",
-    "unresolvedPurchase": "Jou vorige aankoop kan steeds voltooi word en die krediete daarvan kan by jou saldo gevoeg word. As jy weer koop, begin jy 'n afsonderlike aankoop waarvoor jy dalk weer moet betaal.",
-    "buyAgain": "Koop weer",
     "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
     "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
   },

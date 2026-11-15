@@ -2248,7 +2248,7 @@
       "prefillRepoUnavailable": "Рэпазіторый {{repo}} больш недаступны. Выберыце іншы ніжэй.",
       "prefillModelUnavailable": "Мадэль {{model}} больш недаступная. Выкарыстоўваецца ваша прадвызначаная мадэль.",
       "couldNotReadPendingSessions": "Не ўдалося прачытаць даныя сеансаў у чаканні. Паспрабуйце яшчэ раз.",
-      "failedToCreate": "Не ўдалося стварыць сеанс.",
+      "failedToCreate": "Не ўдалося стварыць сеанс",
       "checkOrganizationAccess": "Праверце доступ да гэтай арганізацыі і паспрабуйце яшчэ раз.",
       "couldNotRefreshRepositories": "Не ўдалося абнавіць рэпазіторыі. Паспрабуйце яшчэ раз.",
       "discardDraftTitle": "Выдаліць чарнавік?",
@@ -2907,6 +2907,10 @@
       "olderActivityDescription": "Кошт, не аднесены да загружанай гісторыі",
       "ofWindowTokens": "з {{window}} токенаў",
       "tokens": "токенаў",
+      "tokens_one": "токен",
+      "tokens_few": "токены",
+      "tokens_many": "токенаў",
+      "tokens_other": "токена",
       "tokensWithPercentage": "токенаў ({{percentage}})",
       "stepsCount_one": "{{steps}} крок",
       "stepsCount": "{{steps}} кроку",
@@ -2964,7 +2968,7 @@
     "markdownImage": {
       "load": "Загрузіць",
       "loadWithHost": "Загрузіць выяву з {{host}}",
-      "httpsOnly": "Можна загружаць выявы толькі праз HTTPS.",
+      "httpsOnly": "Толькі выявы праз HTTPS",
       "trustTitle": "Загрузіць выяву з {{host}}?",
       "trustMessage": "Калі даверыцца {{host}}, яго выявы будуць загружацца без штогадовага пытання. Пазней вы можаце адклікаць давер у раздзеле Давераныя сайты.",
       "loadOnce": "Загрузіць адзін раз"
@@ -4351,8 +4355,6 @@
     "noMatchingProductsPlay": "Google Play не вярнуў адпаведных набораў крэдытаў.",
     "storeTimedOut": "App Store не адказаў своечасова. Паспрабаваць яшчэ раз.",
     "storeTimedOutPlay": "Google Play не адказаў своечасова. Паспрабаваць яшчэ раз.",
-    "unresolvedPurchase": "Ваша папярэдняя пакупка яшчэ можа завяршыцца, і крэдыты за яе будуць дададзены на ваш баланс. Калі вы купіце зноў, пачнецца асобная пакупка, за якую з вас могуць зноў спісаць грошы.",
-    "buyAgain": "Купіць зноў",
     "purchaseOwnedByAnotherAccount": "Крэдыты на гэтым Apple Account належаць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб імі карыстацца.",
     "purchaseOwnedByAnotherAccountPlay": "Крэдыты на гэтым Google Play належаць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб імі карыстацца."
   },

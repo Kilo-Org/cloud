@@ -2248,7 +2248,7 @@
       "prefillRepoUnavailable": "Repozitár {{repo}} už nie je dostupný. Nižšie vyber iný repozitár.",
       "prefillModelUnavailable": "Model {{model}} už nie je dostupný. Používa sa tvoj predvolený model.",
       "couldNotReadPendingSessions": "Čakajúce relácie sa nepodarilo načítať. Skús to znova.",
-      "failedToCreate": "Reláciu sa nepodarilo vytvoriť.",
+      "failedToCreate": "Reláciu sa nepodarilo vytvoriť",
       "checkOrganizationAccess": "Skontroluj si prístup k tejto organizácii a skús to znova.",
       "couldNotRefreshRepositories": "Repozitáre sa nepodarilo obnoviť. Skús to znova.",
       "discardDraftTitle": "Zahodiť koncept?",
@@ -2907,6 +2907,10 @@
       "olderActivityDescription": "Náklady nepriradené k načítanej histórii",
       "ofWindowTokens": "z {{window}} tokenov",
       "tokens": "tokeny",
+      "tokens_one": "token",
+      "tokens_few": "tokeny",
+      "tokens_many": "tokenu",
+      "tokens_other": "tokenov",
       "tokensWithPercentage": "tokenov ({{percentage}})",
       "stepsCount_one": "{{steps}} krok",
       "stepsCount": "{{steps}} krokov",
@@ -2964,7 +2968,7 @@
     "markdownImage": {
       "load": "Načítať",
       "loadWithHost": "Načítať {{host}}",
-      "httpsOnly": "Načítať možno iba obrázky cez HTTPS.",
+      "httpsOnly": "Iba obrázky cez HTTPS",
       "trustTitle": "Načítať obrázok z {{host}}?",
       "trustMessage": "Ak serveru {{host}} dôveruješ, jeho obrázky sa budú načítavať bez každodenného pýtania. Neskôr to môžeš odobrať v Dôveryhodné servery.",
       "loadOnce": "Načítať raz"
@@ -4351,8 +4355,6 @@
     "noMatchingProductsPlay": "Google Play nevrátil žiadne zodpovedajúce balíky kreditov.",
     "storeTimedOut": "App Store nereagoval včas. Skúste to znova.",
     "storeTimedOutPlay": "Google Play nereagoval včas. Skúste to znova.",
-    "unresolvedPurchase": "Váš predchádzajúci nákup sa ešte môže dokončiť a kredity z neho sa môžu pridať do vášho zostatku. Ak kúpite znova, začnete ďalší samostatný nákup a môže vám byť znova účtovaná platba.",
-    "buyAgain": "Kúpiť znova",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
   },

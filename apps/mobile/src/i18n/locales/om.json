@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} kana booda hin argamu. Gadiitti kuusaa koodii filadhu.",
       "prefillModelUnavailable": "{{model}} kana booda hin argamu. Moodela durtii kee fayyadamaa jirra.",
       "couldNotReadPendingSessions": "Turtiiwwan eegumsarra jiran dubbisuu hin danda'amne. Deebi'ii yaali.",
-      "failedToCreate": "Turtii uumuu hin danda'amne.",
+      "failedToCreate": "Turtii uumuu hin danda'amne",
       "checkOrganizationAccess": "Dhaabbata kanaaf galii kee mirkaneessitii deebi'ii yaali.",
       "couldNotRefreshRepositories": "Kuusaawwan koodii haaromsuu hin danda'amne. Deebi'ii yaali.",
       "discardDraftTitle": "Wixinee haqxaa?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Baasii seenaa fe'ametti hin ramadamne",
       "ofWindowTokens": "tookanoota {{window}} keessaa",
       "tokens": "tookanoota",
+      "tokens_one": "tookana",
+      "tokens_other": "tookanoota",
       "tokensWithPercentage": "tookanoota ({{percentage}})",
       "stepsCount_one": "tarkaanfii {{steps}}",
       "stepsCount": "tarkaanfiiwwan {{steps}}",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Fe'i",
       "loadWithHost": "{{host}} fe'i",
-      "httpsOnly": "Suuraaleen HTTPS qofti hayyamamu.",
+      "httpsOnly": "Suuraaleen HTTPS qofti",
       "trustTitle": "Suuraa {{host}} irraa fe'uu?",
       "trustMessage": "{{host}} amanachuun suuraa isaa yeroo hunda gaafachuu malee fe'a. Booda Keessummeessitoota amanaman keessatti haquu dandeessa.",
       "loadOnce": "Yeroo tokko fe'i"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play paakeejii kireeditii walsimu hin deebisne.",
     "storeTimedOut": "App Store yeroo kessatti hin deebine. Irra deebi'ii yaali.",
     "storeTimedOutPlay": "Google Play yeroo kessatti hin deebine. Irra deebi'ii yaali.",
-    "unresolvedPurchase": "Bittaan kee duraanii ammas xumuramee kireedita isaa baalansii kee irratti dabaluu danda'a. Irra deebi'anii bituun bittaa biraa jalqaba, akkasumas ammas si kaffalchiisuu danda'a.",
-    "buyAgain": "Irra deebi'ii biti",
     "purchaseOwnedByAnotherAccount": "Kireeditiin Apple Account kana irratti jiru kan herrega Kilo biraati. Fayyadamuuf herrega Kilo sanatti seeni.",
     "purchaseOwnedByAnotherAccountPlay": "Kireeditiin akaawuntii Google Play kana irratti jiru akaawuntii Kilo adda tokko kan ta'e dha. Fayyadamuuf akaawuntii Kilo sana seeni."
   },

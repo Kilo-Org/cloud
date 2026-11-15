@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ei ole enää käytettävissä. Valitse koodivarasto alta.",
       "prefillModelUnavailable": "{{model}} ei ole enää käytettävissä. Käytetään oletusmalliasi.",
       "couldNotReadPendingSessions": "Odottavia istuntoja ei voitu lukea. Yritä uudelleen.",
-      "failedToCreate": "Istunnon luonti epäonnistui.",
+      "failedToCreate": "Istunnon luonti epäonnistui",
       "checkOrganizationAccess": "Tarkista oikeutesi tähän organisaatioon ja yritä uudelleen.",
       "couldNotRefreshRepositories": "Koodivarastoja ei voitu päivittää. Yritä uudelleen.",
       "discardDraftTitle": "Hylätäänkö luonnos?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kustannukset, joita ei ole kohdistettu ladattuun historiaan",
       "ofWindowTokens": "/ {{window}} tokenia",
       "tokens": "tokenia",
+      "tokens_one": "token",
+      "tokens_other": "tokenia",
       "tokensWithPercentage": "tokenia ({{percentage}})",
       "stepsCount_one": "{{steps}} vaihe",
       "stepsCount": "{{steps}} vaihetta",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Lataa",
       "loadWithHost": "Lataa kuva verkkotunnuksesta {{host}}",
-      "httpsOnly": "Vain HTTPS-yhteydellä ladattavat kuvat sallitaan.",
+      "httpsOnly": "Vain HTTPS-kuvat",
       "trustTitle": "Ladataanko kuva verkkotunnuksesta {{host}}?",
       "trustMessage": "Kun luotat verkkotunnukseen {{host}}, sen kuvat ladataan ilman erillistä kysymystä. Voit perua luottamuksen myöhemmin kohdassa Luotetut verkkotunnukset.",
       "loadOnce": "Lataa kerran"
@@ -4229,8 +4231,6 @@
     "noMatchingProductsPlay": "Google Play ei palauttanut yhtään sopivaa krediittipakettia.",
     "storeTimedOut": "App Store ei vastannut ajoissa. Yritä uudelleen.",
     "storeTimedOutPlay": "Google Play ei vastannut ajoissa. Yritä uudelleen.",
-    "unresolvedPurchase": "Aiempi ostoksesi voi vielä toteutua, jolloin sen krediitit lisätään saldoosi. Ostamalla uudelleen aloitat erillisen ostoksen, josta sinua voidaan veloittaa uudelleen, ja jokainen toteutunut ostos lisää omat krediittinsä saldoosi.",
-    "buyAgain": "Osta uudelleen",
     "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
     "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille."
   },

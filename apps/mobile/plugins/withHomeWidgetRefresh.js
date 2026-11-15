@@ -11,7 +11,8 @@ const {
 const TARGET = 'ExpoWidgetsTarget';
 const GROUP = 'group.com.kilocode.kiloapp';
 const KEYCHAIN = '$(AppIdentifierPrefix)com.kilocode.kiloapp.home-widget-refresh';
-const FILES = ['HomeWidgetRefreshStore.swift', 'HomeWidgetTimelineProvider.swift'];
+const MODULE_FILES = ['HomeWidgetRefreshStore.swift', 'HomeWidgetAccessibilityLabel.swift'];
+const PROVIDER_FILE = 'HomeWidgetTimelineProvider.swift';
 
 function integrateProvider(source) {
   if (source.includes('HomeWidgetTimelineProvider(name: name)')) return source;
@@ -88,8 +89,10 @@ module.exports = function withHomeWidgetRefresh(config) {
       const module = path.join(cfg.modRequest.projectRoot, 'modules/home-widget-refresh/ios');
       if (!fs.existsSync(path.join(root, 'ActiveAgentsWidget.swift')))
         throw new Error('expo-widgets must generate its target before Home refresh');
-      fs.copyFileSync(path.join(module, FILES[0]), path.join(root, FILES[0]));
-      fs.copyFileSync(path.join(module, 'WidgetExtension', FILES[1]), path.join(root, FILES[1]));
+      for (const file of MODULE_FILES) {
+        fs.copyFileSync(path.join(module, file), path.join(root, file));
+      }
+      fs.copyFileSync(path.join(module, 'WidgetExtension', PROVIDER_FILE), path.join(root, PROVIDER_FILE));
       const widgetPath = path.join(root, 'ActiveAgentsWidget.swift');
       fs.writeFileSync(widgetPath, integrateProvider(fs.readFileSync(widgetPath, 'utf8')));
       const infoPath = path.join(root, 'Info.plist');
@@ -120,7 +123,7 @@ module.exports = function withHomeWidgetRefresh(config) {
         String(groups[key].path).replaceAll('"', '') === TARGET
     );
     if (!groupKey) throw new Error('Home widget group must exist before attaching refresh sources');
-    for (const file of FILES) {
+    for (const file of [...MODULE_FILES, PROVIDER_FILE]) {
       if (!project.hasFile(file)) {
         project.addSourceFile(file, { target: uuid }, groupKey);
       }

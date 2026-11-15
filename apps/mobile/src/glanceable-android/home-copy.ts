@@ -4,11 +4,11 @@ import {
 } from '@kilocode/app-shared/home-widget';
 import { parseTimestamp } from '@kilocode/app-shared/utils';
 
+import { type GlanceableCountFormat } from '@/lib/glanceable/count-format';
 import { type GlanceableCountKind } from '@/lib/glanceable/presentation';
 import { type GlanceableActionFeedback } from '@/lib/glanceable/surface-extras';
 
 export type AndroidWidgetCount = { label: string; kind: GlanceableCountKind; count: string };
-export type GlanceableCountFormat = (value: number) => string;
 /** A clock time, with the date added when `at` is not today. */
 export type GlanceableClockFormat = (at: string) => string;
 
@@ -180,6 +180,6 @@ export function buildAndroidHomeCopy(
       translate('glanceable.openAgents'),
     ]
       .filter(Boolean)
-      .join(', '),
+      .join(translate('common.listJoiner')),
   };
 }

@@ -208,9 +208,12 @@ enum HomeWidgetRefreshStore {
             clearLocked(defaults)
             defaults.set(["scopeKey": config["scopeKey"]!, "accountEpoch": config["accountEpoch"]!], forKey: "homeWidgetTerminalFence")
             let copy = config["copy"] as? [String: String] ?? [:]
-            defaults.set([["timestamp": Int(Date().timeIntervalSince1970 * 1000),
-              "props": ["statusLine": copy["privacy"] ?? "", "countLines": [], "primaryCount": 0,
-                "actions": ["approve": false, "newAgent": false]]]], forKey: timelineKey)
+            let status = copy["privacy"].flatMap { $0.isEmpty ? nil : $0 } ?? copy["signed_out"] ?? ""
+            var props: [String: Any] = ["statusLine": status, "countLines": [], "primaryCount": 0,
+              "actions": ["approve": false, "newAgent": false]]
+            // One part only, so the label is the status copy and carries no joiner.
+            props["accessibilityLabel"] = homeWidgetAccessibilityLabel(["statusLine": status, "listJoiner": copy["listJoiner"] as Any])
+            defaults.set([["timestamp": Int(Date().timeIntervalSince1970 * 1000), "props": props]], forKey: timelineKey)
             defaults.synchronize()
           }
         }
@@ -277,7 +280,15 @@ enum HomeWidgetRefreshStore {
           props["scheduledAt"] = presentation["scheduledAt"]
           props["newestTitle"] = nil
           props["actionFeedback"] = nil
-          props["accessibilityLabel"] = counts.map { "\($0["count"] ?? 0) \(copy[$0["kind"] as? String ?? ""] ?? "")" }.joined(separator: ", ")
+          // Built from the final props: the expiry branch above may have cleared the counts.
+          var labelInput: [String: Any] = [:]
+          labelInput["statusLine"] = props["statusLine"]
+          labelInput["countLines"] = props["countLines"]
+          labelInput["openAgents"] = copy["openAgents"]
+          labelInput["listJoiner"] = copy["listJoiner"]
+          labelInput["digits"] = copy["digits"]
+          labelInput["group"] = copy["group"]
+          props["accessibilityLabel"] = homeWidgetAccessibilityLabel(labelInput)
           // The rebuild owns the marker: strip every copy so only the carried
           // press below can put one back on the first entry while it is fresh.
           props.removeValue(forKey: "pendingAction")

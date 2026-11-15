@@ -1,5 +1,7 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { type GlanceableCountFormat } from './count-format';
+
 /**
  * Maps the snapshot plus optional surface flags to the locked copy keys, the
  * compact primary count, and the spoken-label shape. Precedence:
@@ -131,11 +133,16 @@ export function glanceableSpokenLabelKeys(
   return parts;
 }
 
-/** Translated status, numeric counts in rank order, then the Open agents action. */
+/**
+ * Translated status, numeric counts in rank order, then the Open agents action.
+ * The surface's own formatter draws the counts, and the catalog's list joiner
+ * separates the parts.
+ */
 export function glanceableSpokenLabel(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  formatCount: GlanceableCountFormat
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   const parts: string[] = [];
@@ -144,9 +151,9 @@ export function glanceableSpokenLabel(
   }
   if (status === 'happy' || status === 'stale') {
     for (const { key, count } of glanceableCountLines(snapshot).filter(line => line.count > 0)) {
-      parts.push(`${count} ${translate(key)}`);
+      parts.push(`${formatCount(count)} ${translate(key)}`);
     }
   }
   parts.push(translate('glanceable.openAgents'));
-  return parts.join(', ');
+  return parts.join(translate('common.listJoiner'));
 }

@@ -10,6 +10,7 @@ import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-a
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
+import { formatGlanceableCount } from '@/lib/glanceable/count-format';
 import {
   getHomeWidgetDataForSnapshot,
   getLastHomeWidgetData,
@@ -19,7 +20,6 @@ import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import {
   formatGlanceableAgo,
   formatGlanceableClock,
-  formatGlanceableCount,
   isWidgetRtl,
 } from './count-format';
 import { getStoredWidgetSnapshot } from './live-update';

@@ -1,5 +1,6 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { type GlanceableCountFormat } from '@/lib/glanceable/count-format';
 import {
   glanceableCountLines,
   glanceableScheduledAt,
@@ -8,7 +9,7 @@ import {
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
 
-import { type GlanceableClockFormat, type GlanceableCountFormat } from './home-copy';
+import { type GlanceableClockFormat } from './home-copy';
 
 /**
  * The ongoing notification's system-template content (round 8). It is visible

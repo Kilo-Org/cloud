@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { glanceableDigits, glanceableGroupSeparator } from '@/lib/glanceable/count-format';
 
 /** Both native renderers and the background provider use the same translated labels. */
 export function getHomeWidgetCopy() {
@@ -26,6 +27,13 @@ export function getHomeWidgetCopy() {
     approve: i18n.t('common.approve'),
     newAgent: i18n.t('glanceable.newAgent'),
     openAgents: i18n.t('glanceable.openAgents'),
+    expired: i18n.t('glanceable.expired'),
+    // The Home presentation's `unavailable` status draws and speaks the
+    // privacy copy, the mapping the Android Home copy already uses.
+    unavailable: i18n.t('glanceable.privacy'),
+    listJoiner: i18n.t('common.listJoiner'),
+    digits: glanceableDigits(),
+    group: glanceableGroupSeparator(),
     locale: i18n.language,
   };
 }

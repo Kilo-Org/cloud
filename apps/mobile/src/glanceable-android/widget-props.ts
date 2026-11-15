@@ -9,6 +9,7 @@ import {
   type HomeWidgetPresentation,
 } from '@kilocode/app-shared/home-widget';
 
+import { type GlanceableCountFormat } from '@/lib/glanceable/count-format';
 import {
   glanceableCountLines,
   glanceableScheduledAt,
@@ -25,7 +26,6 @@ import {
   type AndroidWidgetHomeCopy,
   buildAndroidHomeCopy,
   type GlanceableClockFormat,
-  type GlanceableCountFormat,
 } from './home-copy';
 
 export type GlanceableAgoFormat = (at: string) => string;
@@ -110,7 +110,7 @@ export function buildAndroidWidgetProps(
       approveLabel: translate('common.approve'),
       newAgentLabel: translate('glanceable.newAgent'),
     },
-    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy),
+    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy, formatCount),
   };
 }
 

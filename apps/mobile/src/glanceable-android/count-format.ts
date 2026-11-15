@@ -1,20 +1,8 @@
 import { getCalendars } from 'expo-localization';
 import { i18n } from '@/i18n';
 import { RTL_LANGUAGES, type SupportedLanguage } from '@/i18n/languages';
-import { dateTimeFormat, numberFormat } from '@/lib/intl-cache';
+import { dateTimeFormat } from '@/lib/intl-cache';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
-
-/**
- * Draw a count in the active language's own digits.
- *
- * Unlike the iOS widget extension, the Android surfaces render in the app's own
- * JS runtime, so `Intl` is already there and no digit table has to be baked into
- * a layout. Grouping is on, with the language's own separator, so a count of
- * four figures or more reads as the app's other numbers do.
- */
-export function formatGlanceableCount(value: number): string {
-  return numberFormat(i18n.language, { useGrouping: true }).format(value);
-}
 
 /**
  * Whether the active language reads right to left.

@@ -15,6 +15,7 @@ import {
 } from '@kilocode/app-shared/home-widget';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
+import { formatGlanceableCount } from '@/lib/glanceable/count-format';
 import {
   type GlanceableCountKind,
   glanceableCountLines,
@@ -215,7 +216,7 @@ export function buildGlanceableViewProps(
     newestResultKind,
     newestResultLabel,
     newestResultAt: newestResultKind === null ? null : snapshot.newestResultAt,
-    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy),
+    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy, formatGlanceableCount),
   };
 }
 

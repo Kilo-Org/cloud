@@ -10,6 +10,7 @@ import { i18n } from '@/i18n';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { getTerminalBlankEpoch, subscribeGlanceableTerminalEnd } from '@/lib/glanceable/cleanup';
+import { formatGlanceableCount } from '@/lib/glanceable/count-format';
 import {
   getHomeWidgetDataForSnapshot,
   getLastHomeWidgetData,
@@ -39,7 +40,6 @@ import { androidSink, handleAppStateActive, refreshPostedCardAction } from './an
 import {
   formatGlanceableAgo,
   formatGlanceableClock,
-  formatGlanceableCount,
   isWidgetRtl,
 } from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';

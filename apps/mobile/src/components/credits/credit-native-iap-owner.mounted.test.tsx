@@ -730,6 +730,48 @@ describe('CreditNativeIapOwner', () => {
     }
   });
 
+  it('names a pending payment instead of a store timeout', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'pending',
+      message: 'Purchase is pending',
+    });
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
+    await flushPromises();
+
+    expect(handle.value?.purchaseWait).toEqual({
+      productId: APPLE_PRODUCT_ID,
+      kind: 'pending',
+    });
+    expect(handle.value?.errorMessageKey).toBeNull();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+  });
+
+  it('names a deferred payment instead of a store timeout', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'deferred-payment',
+      message: 'Waiting for approval',
+    });
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
+    await flushPromises();
+
+    expect(handle.value?.purchaseWait).toEqual({
+      productId: APPLE_PRODUCT_ID,
+      kind: 'pending',
+    });
+    expect(handle.value?.errorMessageKey).toBeNull();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+  });
+
   it('ignores a request timeout after its account epoch has ended', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

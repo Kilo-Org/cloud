@@ -489,6 +489,11 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
               retireCreditPurchaseIntent(record.intent);
               record.settle();
             }
+            if (pending && pendingPurchaseRef.current === record) {
+              // Play's pending payment and StoreKit's deferred one are states
+              // to wait out, not failures: the row says so and stays busy.
+              markPurchaseWait({ productId: record.intent.productId, kind: 'pending' });
+            }
             // An answer that arrives after the deadline is the sheet closing:
             // when the outcome is this request's, the wait and its barrier end
             // even if the person cancelled.

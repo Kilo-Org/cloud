@@ -21,6 +21,10 @@ const formDraftMock = vi.hoisted(() => ({
   clearFormDrafts: vi.fn(),
 }));
 
+const mergeOperationKeyMock = vi.hoisted(() => ({
+  clearMergeOperationKeys: vi.fn(),
+}));
+
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
 
 // The App Intents catalog is the same titles in another place; the boundary's
@@ -36,6 +40,11 @@ vi.mock('@/lib/pr-review/recent-prs', () => recentPrsMock);
 // The draft map has no reader outside a mounted form, so the boundary's call is
 // spied here; the store's own behavior is pinned in `lib/form-draft.mounted.test.tsx`.
 vi.mock('@/lib/form-draft', () => formDraftMock);
+
+// The retained merge intent keys live in a module-level store; the boundary's
+// call is spied here and the store's own behavior is pinned in
+// `lib/operation-key-store.test.ts`.
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => mergeOperationKeyMock);
 
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
@@ -561,5 +570,11 @@ describe('clearSessionScopedState', () => {
     clearSessionScopedState();
 
     expect(formDraftMock.clearFormDrafts).toHaveBeenCalled();
+  });
+
+  it('drops the retained merge intent keys, so no merge replays across accounts', () => {
+    clearSessionScopedState();
+
+    expect(mergeOperationKeyMock.clearMergeOperationKeys).toHaveBeenCalled();
   });
 });

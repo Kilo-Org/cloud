@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
+import type * as SurfaceFeedbackModule from '@/lib/surface-feedback';
 import { i18n } from '@/i18n';
 import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { type TodoList } from '@/lib/todos/todo-types';
@@ -62,6 +63,25 @@ vi.mock('@/lib/hooks/use-organization-queries', async () => {
   };
 });
 
+/** The one part of a surface store a case can read from outside the hook. */
+type RecordedSnapshot = { readonly states: ReadonlyMap<string, unknown> };
+type RecordedStore = { getSnapshot: () => RecordedSnapshot };
+
+/** Every surface store the adapters created, so a case can see what a settle left. */
+const stores = vi.hoisted(() => ({ all: [] as RecordedStore[] }));
+
+vi.mock('@/lib/surface-feedback', async importOriginal => {
+  const actual = await importOriginal<typeof SurfaceFeedbackModule>();
+  return {
+    ...actual,
+    createSurfaceFeedbackStore: () => {
+      const created: RecordedStore = actual.createSurfaceFeedbackStore();
+      stores.all.push(created);
+      return created;
+    },
+  };
+});
+
 const todo = { id: 'todo-1', title: 'Ship the fix', notes: null };
 const list: Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'> = {
   organizationId: 'organization-1',
@@ -100,6 +120,7 @@ beforeEach(async () => {
   state.orgs = [];
   state.link.mockResolvedValue(undefined);
   state.invalidate.mockResolvedValue(undefined);
+  stores.all.length = 0;
   act(() => {
     renderer = TestRenderer.create(createElement(Probe, { holder }));
   });
@@ -136,7 +157,7 @@ describe('useStartTodo start now', () => {
     expect(state.toastError).toHaveBeenCalledExactlyOnceWith(
       i18n.t('todos.item.startRefreshFailed')
     );
-    expect(mounted().startingTodoId).toBeNull();
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('opens the started session when the cache refresh fails', async () => {
@@ -160,7 +181,7 @@ describe('useStartTodo start now', () => {
     // The adapter forwards the options argument, so a refusal with no step is
     // still this call reaching the toast.
     expect(state.toastError).toHaveBeenCalledExactlyOnceWith('No credits left', undefined);
-    expect(mounted().startingTodoId).toBeNull();
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('offers the plan step with the trial refusal to a role that can change the plan', async () => {
@@ -192,7 +213,7 @@ describe('useStartTodo start now', () => {
       '/(app)/(tabs)/(3_profile)/organization/billing?org=organization-1'
     );
     expect(state.navigate).not.toHaveBeenCalled();
-    expect(mounted().startingTodoId).toBeNull();
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('keeps the owner-naming refusal and no step for a role that cannot change the plan', async () => {
@@ -223,7 +244,22 @@ describe('useStartTodo start now', () => {
 
     expect(state.navigate).not.toHaveBeenCalled();
     expect(state.toastError).toHaveBeenCalledExactlyOnceWith(i18n.t('common.somethingWentWrong'));
-    expect(mounted().startingTodoId).toBeNull();
+    expect(mounted().isStarting(todo.id)).toBe(false);
+  });
+
+  it('leaves no entry behind after a refused start', async () => {
+    state.startAgent.mockResolvedValue({ ok: false, message: 'No credits left' });
+
+    await start();
+
+    // The toast owns the refusal copy and the row reads only a pending phase, so
+    // a settled failure would sit in the store for the life of this surface.
+    expect(stores.all.map(store => store.getSnapshot().states.size)).toEqual([0]);
+
+    state.startAgent.mockRejectedValue(new Error('exploded'));
+    await start();
+    expect(stores.all.map(store => store.getSnapshot().states.size)).toEqual([0]);
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('ignores a second start for a to-do that is already starting', async () => {
@@ -240,6 +276,80 @@ describe('useStartTodo start now', () => {
 
     expect(state.startAgent).toHaveBeenCalledOnce();
     expect(state.navigate).toHaveBeenCalledExactlyOnceWith('session-3', 'organization-1');
+  });
+
+  it('starting a second to-do leaves the first row’s start visible and refuses a second press on it', async () => {
+    const firstStart = Promise.withResolvers<unknown>();
+    const secondStart = Promise.withResolvers<unknown>();
+    state.startAgent
+      .mockReturnValueOnce(firstStart.promise)
+      .mockReturnValueOnce(secondStart.promise);
+    const other = { id: 'todo-2', title: 'Second task', notes: null };
+
+    await act(async () => {
+      void mounted().startNow(todo, list);
+      void mounted().startNow(other, list);
+      await Promise.resolve();
+    });
+
+    // Both rows show their own start while both requests are out.
+    expect(mounted().isStarting(todo.id)).toBe(true);
+    expect(mounted().isStarting(other.id)).toBe(true);
+
+    await act(async () => {
+      secondStart.resolve({ ok: true, sessionId: 'session-b', message: '' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Settling the second start must not hide the first row's spinner.
+    expect(mounted().isStarting(todo.id)).toBe(true);
+    expect(mounted().isStarting(other.id)).toBe(false);
+
+    await act(async () => {
+      // A second press on the to-do that is still starting is refused.
+      await mounted().startNow(todo, list);
+      firstStart.resolve({ ok: true, sessionId: 'session-a', message: '' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // One start for A and one for B: the second press on A never reached the agent.
+    expect(state.startAgent).toHaveBeenCalledTimes(2);
+    expect(mounted().isStarting(todo.id)).toBe(false);
+  });
+
+  it('keeps the row starting until the started session is linked and opened', async () => {
+    state.startAgent.mockResolvedValue({ ok: true, sessionId: 'session-link', message: '' });
+    const linking = Promise.withResolvers<undefined>();
+    state.link.mockReturnValue(linking.promise);
+
+    await act(async () => {
+      void mounted().startNow(todo, list);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The agent has answered, but the to-do's session link is still out: the row
+    // has no session yet, so its start is still running and stays admitted.
+    expect(state.link).toHaveBeenCalledOnce();
+    expect(mounted().isStarting(todo.id)).toBe(true);
+
+    await act(async () => {
+      await mounted().startNow(todo, list);
+    });
+    expect(state.startAgent).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      linking.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(state.navigate).toHaveBeenCalledExactlyOnceWith('session-link', 'organization-1');
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('opens the review route when the list has no repository', async () => {

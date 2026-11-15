@@ -1890,6 +1890,8 @@
       "reasonUnknown": "Unrecognized reason",
       "repositoryNotRecorded": "Repository not recorded",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Report summary",
       "title": "Audit report",
       "unavailable": "Audit report unavailable",

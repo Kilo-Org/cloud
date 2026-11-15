@@ -7,11 +7,11 @@ import {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  createSubscriberRegistry,
   forgetPartUpdateTime,
-  insertPartSorted,
-  insertSorted,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
+  messageIdKey,
   orderMessageIds,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
@@ -307,42 +307,44 @@ function upsert(arr: Part[], part: Part, eventTime?: number): Part[] {
   return upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, orderingEvidence);
 }
 
-describe('insertSorted', () => {
-  test('inserts into empty array', () => {
-    expect(insertSorted([], 'b')).toEqual(['b']);
+describe('insertSortedBy', () => {
+  const partKey = (part: Part): string => part.id;
+
+  test('inserts a message id into an empty array', () => {
+    expect(insertSortedBy([], 'b', messageIdKey)).toEqual(['b']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = ['b', 'd'];
-    expect(insertSorted(arr, 'a')).toEqual(['a', 'b', 'd']);
-    expect(insertSorted(arr, 'c')).toEqual(['b', 'c', 'd']);
-    expect(insertSorted(arr, 'e')).toEqual(['b', 'd', 'e']);
+  test('inserts a part into an empty array', () => {
+    const part = makePart('b');
+    expect(insertSortedBy<Part>([], part, partKey)).toEqual([part]);
   });
 
-  test('does not mutate input', () => {
-    const arr = ['a', 'c'];
-    insertSorted(arr, 'b');
-    expect(arr).toEqual(['a', 'c']);
-  });
-});
-
-describe('insertPartSorted', () => {
-  test('inserts into empty array', () => {
-    const p = makePart('b');
-    expect(insertPartSorted([], p)).toEqual([p]);
+  test('inserts a message id at beginning, middle, and end', () => {
+    const ids = ['b', 'd'];
+    expect(insertSortedBy(ids, 'a', messageIdKey)).toEqual(['a', 'b', 'd']);
+    expect(insertSortedBy(ids, 'c', messageIdKey)).toEqual(['b', 'c', 'd']);
+    expect(insertSortedBy(ids, 'e', messageIdKey)).toEqual(['b', 'd', 'e']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = [makePart('b'), makePart('d')];
-    expect(insertPartSorted(arr, makePart('a')).map(p => p.id)).toEqual(['a', 'b', 'd']);
-    expect(insertPartSorted(arr, makePart('c')).map(p => p.id)).toEqual(['b', 'c', 'd']);
-    expect(insertPartSorted(arr, makePart('e')).map(p => p.id)).toEqual(['b', 'd', 'e']);
+  test('inserts a part at beginning, middle, and end', () => {
+    const parts = [makePart('b'), makePart('d')];
+    const inserted = (id: string) =>
+      insertSortedBy(parts, makePart(id), partKey).map(part => part.id);
+    expect(inserted('a')).toEqual(['a', 'b', 'd']);
+    expect(inserted('c')).toEqual(['b', 'c', 'd']);
+    expect(inserted('e')).toEqual(['b', 'd', 'e']);
   });
 
-  test('does not mutate input', () => {
-    const arr = [makePart('a'), makePart('c')];
-    insertPartSorted(arr, makePart('b'));
-    expect(arr).toHaveLength(2);
+  test('does not mutate the message id array', () => {
+    const ids = ['a', 'c'];
+    insertSortedBy(ids, 'b', messageIdKey);
+    expect(ids).toEqual(['a', 'c']);
+  });
+
+  test('does not mutate the part array', () => {
+    const parts = [makePart('a'), makePart('c')];
+    insertSortedBy(parts, makePart('b'), partKey);
+    expect(parts).toHaveLength(2);
   });
 });
 
@@ -762,10 +764,9 @@ describe('publishPartsChanged', () => {
     const snapshot = new Map<string, Part[] | null>([['msg-1', [makePart('a')]]]);
     const partsCallback = jest.fn();
     const messageCallback = jest.fn();
-    const subscribers = new Map<string, Set<() => void>>([
-      ['parts:msg-1', new Set([partsCallback])],
-      ['message:msg-1', new Set([messageCallback])],
-    ]);
+    const subscribers = createSubscriberRegistry();
+    subscribers.subscribe('parts:msg-1', partsCallback);
+    subscribers.subscribe('message:msg-1', messageCallback);
 
     publishPartsChanged(snapshot, subscribers, 'msg-1');
 
@@ -788,25 +789,28 @@ describe('createSeedTextPart', () => {
   });
 });
 
-describe('notify', () => {
+describe('createSubscriberRegistry', () => {
   test('calls all registered callbacks for matching key', () => {
     const cb1 = jest.fn();
     const cb2 = jest.fn();
-    const subs = new Map([['k', new Set([cb1, cb2])]]);
-    notify(subs, 'k');
+    const registry = createSubscriberRegistry();
+    registry.subscribe('k', cb1);
+    registry.subscribe('k', cb2);
+    registry.notify('k');
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
   });
 
   test('no-op for missing key', () => {
     const cb = jest.fn();
-    const subs = new Map([['k', new Set([cb])]]);
-    notify(subs, 'other');
+    const registry = createSubscriberRegistry();
+    registry.subscribe('k', cb);
+    registry.notify('other');
     expect(cb).not.toHaveBeenCalled();
   });
 
-  test('no-op for empty subscriber map', () => {
-    expect(() => notify(new Map(), 'k')).not.toThrow();
+  test('no-op for empty registry', () => {
+    expect(() => createSubscriberRegistry().notify('k')).not.toThrow();
   });
 });
 

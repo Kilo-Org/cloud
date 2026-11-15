@@ -10,10 +10,11 @@ import {
   appendPartTextChunks,
   clonePart,
   createReadonlyPartView,
+  createSubscriberRegistry,
   forgetPartUpdateTime,
-  insertSorted,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
+  messageIdKey,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
@@ -55,7 +56,7 @@ function createJotaiStorage(
   // Ordering evidence of the last accepted update per part, owned next to the
   // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
   const partEvidence = new Map<string, number>();
-  const subscribers = new Map<string, Set<() => void>>();
+  const subscribers = createSubscriberRegistry();
 
   // Coalesced delta publication. `applyPartDelta` buffers the incoming chunk
   // and schedules one flush; the flush applies every buffered chunk for a part
@@ -142,10 +143,10 @@ function createJotaiStorage(
       next.set(info.id, info);
       store.set(messagesAtom, next);
       if (existing) {
-        notify(subscribers, `message:${info.id}`);
+        subscribers.notifyMessage(info.id);
       } else {
-        store.set(messageIdsAtom, insertSorted(store.get(messageIdsAtom), info.id));
-        notify(subscribers, 'messageIds');
+        store.set(messageIdsAtom, insertSortedBy(store.get(messageIdsAtom), info.id, messageIdKey));
+        subscribers.notifyMessageIds();
       }
     },
 
@@ -227,18 +228,7 @@ function createJotaiStorage(
       return snapshot;
     },
 
-    subscribe(key, callback) {
-      let set = subscribers.get(key);
-      if (!set) {
-        set = new Set();
-        subscribers.set(key, set);
-      }
-      set.add(callback);
-      return () => {
-        set.delete(callback);
-        if (set.size === 0) subscribers.delete(key);
-      };
-    },
+    subscribe: subscribers.subscribe,
 
     clear() {
       storageVersions.delete(storage);
@@ -254,12 +244,12 @@ function createJotaiStorage(
       partEvidence.clear();
 
       for (const messageId of existingMessageIds) {
-        notify(subscribers, `message:${messageId}`);
+        subscribers.notifyMessage(messageId);
       }
       for (const messageId of existingPartMessageIds) {
-        notify(subscribers, `parts:${messageId}`);
+        subscribers.notifyParts(messageId);
       }
-      notify(subscribers, 'messageIds');
+      subscribers.notifyMessageIds();
     },
 
     deleteMessage(messageId) {
@@ -287,12 +277,12 @@ function createJotaiStorage(
       partsSnapshot.delete(messageId);
       if (hadParts) {
         bumpPartsRevision();
-        notify(subscribers, `parts:${messageId}`);
+        subscribers.notifyParts(messageId);
       }
 
       if (!hadMessage) return;
-      notify(subscribers, `message:${messageId}`);
-      notify(subscribers, 'messageIds');
+      subscribers.notifyMessage(messageId);
+      subscribers.notifyMessageIds();
     },
   };
   return storage;

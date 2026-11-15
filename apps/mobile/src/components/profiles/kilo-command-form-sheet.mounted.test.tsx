@@ -7,12 +7,15 @@ import {
   KiloCommandFormSheet,
   type KiloCommandSaveFailure,
 } from '@/components/profiles/kilo-command-form-sheet';
-import { act, type ReactTestInstance } from '@/test/renderer';
+import { type KiloCommandSource } from '@/components/profiles/profile-kilo-commands-model';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
+import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
   onClose: vi.fn(),
   onCreate: vi.fn(),
+  onUpdate: vi.fn(),
   confirm: vi.fn(),
   scrollTo: vi.fn(),
 }));
@@ -411,5 +414,81 @@ describe('KiloCommandFormSheet subtask row', () => {
     expect(toggles.map(node => node.props.accessibilityLabel)).toEqual([label]);
 
     unmount();
+  });
+});
+
+describe('KiloCommandFormSheet refetched command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+  });
+
+  afterEach(() => {
+    // The draft is module-level: a later case must not reopen on it.
+    resetFormDraftsForTests();
+  });
+
+  it('submits the text the field shows when the profile refetches while the sheet is open', () => {
+    const command: KiloCommandSource = {
+      id: 'cmd-1',
+      name: 'release-notes',
+      description: 'Draft the release notes',
+      template: 'Summarize $ARGUMENTS',
+      agent: 'reviewer',
+      model: null,
+      subtask: false,
+      enabled: true,
+      sortOrder: 0,
+    };
+    /* One host whose `command` prop the case replaces, so the sheet stays
+       mounted the way a refetch leaves it. */
+    function SheetHost({ refetched }: Readonly<{ refetched: KiloCommandSource }>) {
+      return createElement(KiloCommandFormSheet, {
+        draftScope: 'profiles:slash-commands:profile-1',
+        command: refetched,
+        existingNames: [],
+        isSaving: false,
+        onClose: () => {
+          h.onClose();
+        },
+        onCreate: (payload: unknown) => {
+          h.onCreate(payload);
+        },
+        onUpdate: (payload: unknown) => {
+          h.onUpdate(payload);
+        },
+        onFieldEdited: () => undefined,
+      });
+    }
+    const mounted: { renderer?: TestRenderer.ReactTestRenderer } = {};
+    act(() => {
+      mounted.renderer = TestRenderer.create(createElement(SheetHost, { refetched: command }));
+    });
+    const renderer = mounted.renderer;
+    if (!renderer) {
+      throw new Error('the sheet did not mount');
+    }
+
+    // A refetch under the open sheet reports the command with no template. The
+    // field keeps the text it mounted with, so Save must send that text instead
+    // of refusing a visibly non-empty field.
+    act(() => {
+      renderer.update(createElement(SheetHost, { refetched: { ...command, template: '' } }));
+    });
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    expect(findField(renderer.root, 'Template').props.error).toBeUndefined();
+    expect(h.onUpdate).toHaveBeenCalledWith({
+      name: 'release-notes',
+      description: 'Draft the release notes',
+      template: 'Summarize $ARGUMENTS',
+      agent: 'reviewer',
+      model: null,
+      subtask: false,
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
   });
 });

@@ -124,7 +124,12 @@ export function KiloCommandFormSheet({
 }: KiloCommandFormSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const initial = initialKiloCommandFormState(command ?? undefined);
+  // The values the fields are drawn from belong to the open form, not to the
+  // query: a refetch can rewrite `command` under the sheet, and `FormField`
+  // writes `defaultValue` once at mount. A mount-time snapshot is therefore what
+  // the field shows, and the draft fallback `useFormDraftRef` reads, so Save
+  // submits exactly the text on screen.
+  const [initial] = useState(() => initialKiloCommandFormState(command ?? undefined));
   const scope = draftScope;
   const nameRef = useFormDraftRef(scope, 'name', initial.name);
   const descriptionRef = useFormDraftRef(scope, 'description', initial.description);

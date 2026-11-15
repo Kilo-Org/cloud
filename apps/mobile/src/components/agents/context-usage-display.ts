@@ -10,8 +10,6 @@ export type ContextTone = 'primary' | 'warning' | 'destructive' | 'neutral';
 const WARNING_TONE_THRESHOLD = 75;
 const DESTRUCTIVE_TONE_THRESHOLD = 90;
 
-const INDETERMINATE_ARC_FRACTION = 0.25;
-
 export function formatExactTokens(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens < 0) {
     return '0';
@@ -52,14 +50,6 @@ export function getArcFraction(percentage: number | undefined): number | undefin
   return percentage / 100;
 }
 
-/**
- * Stable partial neutral arc used by the ring when capacity is unknown. Kept
- * pure and exported so the visual is testable without an RN render harness.
- */
-export function getIndeterminateArcFraction(): number {
-  return INDETERMINATE_ARC_FRACTION;
-}
-
 export function getRemainingTokens(info: SessionContextInfo): number | undefined {
   if (info.contextWindow === undefined) {
     return undefined;
@@ -86,7 +76,7 @@ export type HeaderPillContent = {
    */
   costSlot: PillCostSlot;
   tone: ContextTone;
-  /** `undefined` = indeterminate arc; `0` = track only (no usage asserted). */
+  /** `undefined` = unknown capacity (track only); `0` = track only (no usage). */
   arcFraction: number | undefined;
   interactive: boolean;
   /**
@@ -117,7 +107,7 @@ export function getHeaderPillContent({
     const tone = getContextTone(info.percentage);
     // The pill reports context usage as a percentage only. While the model's
     // context window is unresolved there is no honest denominator, so the pill
-    // paints nothing for it: the ring's indeterminate arc carries the unknown,
+    // paints nothing for it: the ring's bare track carries the unknown,
     // the sheet still shows the tokens, and a marker here would sit right
     // before the cost and read as a negative amount.
     const primary =

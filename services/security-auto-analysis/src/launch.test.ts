@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import {
-  clearAnalysisStatus,
+  clearSupersededAnalysisStatus,
   getSecurityAgentConfigForOwner,
   getSecurityFindingById,
   setFindingPending,
@@ -19,7 +19,7 @@ import { generateControlToken, generateTriageToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
 
 vi.mock('./db/queries.js', () => ({
-  clearAnalysisStatus: vi.fn(),
+  clearSupersededAnalysisStatus: vi.fn(),
   getSecurityAgentConfigForOwner: vi.fn(),
   getSecurityFindingById: vi.fn(),
   setFindingPending: vi.fn(),
@@ -257,7 +257,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       auto_dismiss_confidence_threshold: 'high',
     } as never);
     vi.mocked(setFindingPending).mockResolvedValue(undefined);
-    vi.mocked(clearAnalysisStatus).mockResolvedValue(undefined);
+    vi.mocked(clearSupersededAnalysisStatus).mockResolvedValue(undefined);
     vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
     vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({ outcome: 'admitted' });
   });
@@ -435,7 +435,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
         }),
       })
     );
-    expect(clearAnalysisStatus).not.toHaveBeenCalled();
+    expect(clearSupersededAnalysisStatus).not.toHaveBeenCalled();
   });
 
   it('launches sandbox analysis when explicitly forced by remediation', async () => {
@@ -873,6 +873,30 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession')).toHaveLength(0);
   });
 
+  it("clears only this claim's status when a triage-only start was superseded", async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'Maintain manual review.',
+      suggestedAction: 'manual_review',
+    });
+    vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: false });
+
+    await expect(startSecurityAnalysis(createParams(false, vi.fn() as never))).resolves.toEqual({
+      started: false,
+      error: 'Finding was superseded during analysis',
+    });
+
+    expect(clearSupersededAnalysisStatus).toHaveBeenCalledWith(
+      {},
+      {
+        findingId: finding.id,
+        claimToken: 'manual-claim-token',
+      }
+    );
+  });
+
   it("releases only this attempt's prepared session when the claim was superseded", async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
     vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
@@ -887,7 +911,13 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
     ).resolves.toEqual({ started: false, error: 'Finding was superseded during analysis' });
 
-    expect(clearAnalysisStatus).toHaveBeenCalledWith({}, finding.id);
+    expect(clearSupersededAnalysisStatus).toHaveBeenCalledWith(
+      {},
+      {
+        findingId: finding.id,
+        claimToken: 'manual-claim-token',
+      }
+    );
     // The interrupt must carry the prepared id from this attempt, never an id
     // read from the finding row, because a newer attempt may already own that row.
     const interrupts = requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession');

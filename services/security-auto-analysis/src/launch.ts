@@ -4,7 +4,7 @@ import type { WorkerDb } from '@kilocode/db/client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import { buildSecurityFindingAnalysisInput } from '@kilocode/worker-utils/security-remediation-policy';
 import {
-  clearAnalysisStatus,
+  clearSupersededAnalysisStatus,
   getSecurityFindingById,
   setFindingPending,
   tryAcquireAnalysisStartLease,
@@ -293,7 +293,10 @@ export async function startSecurityAnalysis(
         outcome: { type: 'triage-only-completed', analysis: triageOnlyAnalysis },
       });
       if (!transition.transitioned) {
-        await clearAnalysisStatus(params.db, params.findingId);
+        await clearSupersededAnalysisStatus(params.db, {
+          findingId: params.findingId,
+          claimToken: params.lifecycleClaim.claimToken,
+        });
         return { started: false, error: 'Finding was superseded during analysis' };
       }
       await maybeAutoDismissCompletedAnalysis({
@@ -379,7 +382,10 @@ export async function startSecurityAnalysis(
       outcome: { type: 'sandbox-running', cloudAgentSessionId, kiloSessionId },
     });
     if (!runningTransition.transitioned) {
-      await clearAnalysisStatus(params.db, params.findingId);
+      await clearSupersededAnalysisStatus(params.db, {
+        findingId: params.findingId,
+        claimToken: params.lifecycleClaim.claimToken,
+      });
       return { started: false, error: 'Finding was superseded during analysis' };
     }
 

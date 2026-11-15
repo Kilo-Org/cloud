@@ -807,17 +807,38 @@ export async function setFindingPending(
 }
 
 /**
- * Clear analysis_status so a superseded finding no longer counts against
- * the owner's concurrency cap in countRunningAnalyses().
+ * Clear analysis_status so a superseded finding no longer counts against the
+ * owner's concurrency cap in claimRowsForOwner(), while the start it aborted
+ * still owns the finding.
+ *
+ * Guarded by this attempt's claim token: the reset only lands while the queue
+ * row named by `claimToken` is still active. A newer claim that already owns
+ * the finding's `pending`/`running` state keeps it, so the reset cannot
+ * undercount inflight work.
  */
-export async function clearAnalysisStatus(db: WorkerDb, findingId: string): Promise<void> {
+export async function clearSupersededAnalysisStatus(
+  db: WorkerDb,
+  params: { findingId: string; claimToken: string }
+): Promise<void> {
   await db
     .update(security_findings)
     .set({
       analysis_status: null,
       updated_at: sql`now()`.mapWith(String),
     })
-    .where(eq(security_findings.id, findingId));
+    .where(
+      and(
+        eq(security_findings.id, params.findingId),
+        inArray(security_findings.analysis_status, ['pending', 'running']),
+        sql`EXISTS (
+          SELECT 1
+          FROM ${security_analysis_queue}
+          WHERE ${security_analysis_queue.finding_id} = ${security_findings.id}
+            AND ${security_analysis_queue.claim_token} = ${params.claimToken}
+            AND ${security_analysis_queue.queue_status} IN ('pending', 'running')
+        )`
+      )
+    );
 }
 
 /**

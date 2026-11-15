@@ -90,6 +90,30 @@ const PermissionConfigContractSchema = z.union([
   z.record(z.string(), z.unknown()),
 ]);
 
+/**
+ * Every agent config field the runtime contract accepts. The schema below is
+ * built from this map, and the import derives its allowed field sets from the
+ * same keys, so a field added here is a field the import can carry.
+ */
+const RUNTIME_AGENT_CONFIG_SHAPE = {
+  prompt: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_PROMPT).optional(),
+  description: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_DESCRIPTION).optional(),
+  mode: z.enum(['subagent', 'primary', 'all']).optional(),
+  model: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
+  variant: z.string().max(50).optional(),
+  temperature: z.number().optional(),
+  top_p: z.number().optional(),
+  steps: z.number().int().positive().optional(),
+  hidden: z.boolean().optional(),
+  disable: z.boolean().optional(),
+  color: z.string().max(50).optional(),
+  permission: PermissionConfigContractSchema.optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
+} satisfies z.ZodRawShape;
+
+/** The agent config keys of {@link RUNTIME_AGENT_CONFIG_SHAPE}. */
+export const RUNTIME_AGENT_CONFIG_KEYS = Object.keys(RUNTIME_AGENT_CONFIG_SHAPE);
+
 export const RuntimeAgentContractSchema = z.object({
   slug: z
     .string()
@@ -101,28 +125,19 @@ export const RuntimeAgentContractSchema = z.object({
     }),
   name: z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_NAME_LENGTH),
   config: z
-    .object({
-      prompt: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_PROMPT).optional(),
-      description: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_DESCRIPTION).optional(),
-      mode: z.enum(['subagent', 'primary', 'all']).optional(),
-      model: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
-      variant: z.string().max(50).optional(),
-      temperature: z.number().optional(),
-      top_p: z.number().optional(),
-      steps: z.number().int().positive().optional(),
-      hidden: z.boolean().optional(),
-      disable: z.boolean().optional(),
-      color: z.string().max(50).optional(),
-      permission: PermissionConfigContractSchema.optional(),
-      options: z.record(z.string(), z.unknown()).optional(),
-    })
+    .object(RUNTIME_AGENT_CONFIG_SHAPE)
     .refine(c => !c.variant || (typeof c.model === 'string' && c.model.length > 0), {
       message: 'variant requires a model — variants are model-specific',
       path: ['variant'],
     }),
 });
 
-export const RuntimeKiloCommandContractSchema = z.object({
+/**
+ * Every kilo command field the runtime contract accepts. The schema below is
+ * built from this map, and the import derives its allowed field sets from the
+ * same keys, so a field added here is a field the import can carry.
+ */
+const RUNTIME_KILO_COMMAND_SHAPE = {
   name: z
     .string()
     .min(1)
@@ -143,7 +158,12 @@ export const RuntimeKiloCommandContractSchema = z.object({
   agent: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_SLUG_LENGTH).nullable().optional(),
   model: z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
   subtask: z.boolean().optional(),
-});
+} satisfies z.ZodRawShape;
+
+/** The kilo command keys of {@link RUNTIME_KILO_COMMAND_SHAPE}, including `name`. */
+export const RUNTIME_KILO_COMMAND_KEYS = Object.keys(RUNTIME_KILO_COMMAND_SHAPE);
+
+export const RuntimeKiloCommandContractSchema = z.object(RUNTIME_KILO_COMMAND_SHAPE);
 
 export const RuntimeAgentsContractSchema = z
   .array(RuntimeAgentContractSchema)

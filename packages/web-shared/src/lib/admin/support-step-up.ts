@@ -68,6 +68,9 @@ export const supportStepUpPort: SupportStepUpPort = {
   },
 };
 
+/** Requests whose support write use already passed step-up. */
+const claimedRequests = new WeakSet<object>();
+
 /**
  * Step-up for a use of an already-issued support write grant.
  *
@@ -88,12 +91,20 @@ export const supportStepUpPort: SupportStepUpPort = {
  *
  * With the switch off the write is still refused: the reuse path must not
  * become a way to spend an operation grant without step-up enabled.
+ *
+ * A resolver can also be entered more than once for one request: the
+ * organization middleware resolves access, and a handler may call
+ * `ensureOrganizationAccess` again to assert a narrower role. Both entries
+ * authorize the same operation, so the second one reuses the claim the first
+ * one made instead of spending the proof a second time.
  */
 export async function requireSupportWriteUseStepUp(params: {
   userId: string;
   organizationId: string;
   /** The state the upstream guard left on the context, when one ran. */
   upstreamStepUpState?: AdminStepUpState;
+  /** The request context, used to claim once per request. */
+  requestToken?: object;
   credential?: SupportStepUpCredential;
   webSessionId?: string | null;
   route?: string | null;
@@ -104,6 +115,7 @@ export async function requireSupportWriteUseStepUp(params: {
     refuse('support_write');
   }
   if (params.upstreamStepUpState?.status === 'fresh') return;
+  if (params.requestToken && claimedRequests.has(params.requestToken)) return;
 
   await supportStepUpPort.requireFresh({
     userId: params.userId,
@@ -116,4 +128,6 @@ export async function requireSupportWriteUseStepUp(params: {
     method: params.method ?? null,
     surface: params.surface ?? 'trpc',
   });
+
+  if (params.requestToken) claimedRequests.add(params.requestToken);
 }

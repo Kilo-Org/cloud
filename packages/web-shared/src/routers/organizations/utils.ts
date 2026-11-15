@@ -440,6 +440,7 @@ export async function resolveOrganizationAccess(
           userId: ctx.user.id,
           organizationId,
           upstreamStepUpState: ctx.adminStepUpState,
+          requestToken: ctx,
           credential: ctx.credential,
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,

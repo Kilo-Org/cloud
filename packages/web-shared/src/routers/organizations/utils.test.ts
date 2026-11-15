@@ -865,6 +865,22 @@ describe('binary support organization access', () => {
     }
   });
 
+  test('one request claims a support write use once even when the resolver runs twice', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await approveWriteGrant(admin.id, organization.id);
+    const writeCtx = await writeCtxWithStepUp(admin, organization.id);
+
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
+      await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
+      expect(requireFreshSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+  });
+
   test('a support write use is still refused while step-up is switched off', async () => {
     setSupportEnabled(true);
     delete process.env.ADMIN_STEP_UP_ENABLED;

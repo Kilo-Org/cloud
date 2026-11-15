@@ -33,6 +33,7 @@ import {
   admitCreditPurchaseIntent,
   type CreditPurchaseIntent,
   currentCreditPurchaseIntent,
+  currentCreditPurchaseIntentFor,
   identifyCreditPurchaseTransaction,
   markCreditPurchaseIntentDispatched,
   matchesCreditPurchaseIntent,
@@ -250,7 +251,9 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const purchaseWaitRef = useRef<CreditPurchaseWait | null>(null);
   const markPurchaseWait = useCallback((wait: CreditPurchaseWait | null) => {
     purchaseWaitRef.current = wait;
-    if (mountedRef.current) {
+    // A cleared wait must land even after an account change; a new one belongs
+    // to the session that is running.
+    if (mountedRef.current && (wait === null || isCurrentAuthEpoch(authEpochRef.current))) {
       setPurchaseWait(wait);
     }
   }, []);
@@ -276,11 +279,12 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // A remounted screen must show the barrier its process already holds: the
   // intent outlives the screen, so the notice and any wait start from it.
   useEffect(() => {
-    const intent = currentCreditPurchaseIntent();
+    const intent = currentCreditPurchaseIntentFor(appAccountToken);
     if (intent === null) {
       return;
     }
     markUnresolvedPurchase('unknown');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: the token that arrives later is answered by the effect below
   }, [markUnresolvedPurchase]);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   // The transaction each delivery is being completed for, and that completion's
@@ -762,6 +766,11 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             isCurrentAuthEpoch(owner.epoch) &&
             owner.attempt.owns()
           ) {
+            if (attributableOwner !== null) {
+              // This delivery was this request's own outcome, so it leaves the
+              // pool with it: the next purchase is unambiguous.
+              settleCreditPurchaseDispatch(owner.intent);
+            }
             pendingPurchaseRef.current = null;
             owner.settle();
             markUnresolvedPurchase(
@@ -1106,7 +1115,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     ) {
       return Promise.resolve(false);
     }
-    const intent = currentCreditPurchaseIntent();
+    const intent = currentCreditPurchaseIntentFor(appAccountToken);
     if (!isStillMounted(mountedRef) || !isCurrentAuthEpoch(authEpochRef.current)) {
       return Promise.resolve(false);
     }
@@ -1131,7 +1140,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     };
     pendingPurchaseRef.current = record;
     return reconcilePurchaseIntent(record);
-  }, [beginPurchase, clearBlockedPurchase, reconcilePurchaseIntent]);
+  }, [appAccountToken, beginPurchase, clearBlockedPurchase, reconcilePurchaseIntent]);
 
   const buyAgain = useCallback(
     async (pack: StoreCreditProduct): Promise<boolean> => {
@@ -1318,21 +1327,16 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // receipt must never be posted under the wrong account's token. An empty
   // token is the catalogue still answering, not another account, so a
   // transition from or to it keeps the barrier.
-  const accountTokenRef = useRef(appAccountToken);
   useEffect(() => {
     if (appAccountToken === '') {
       // The catalogue has not named an account yet: that is no verdict, and it
       // must not erase the token the barrier belongs to.
       return;
     }
-    const previous = accountTokenRef.current;
-    accountTokenRef.current = appAccountToken;
-    if (previous === '' || previous === appAccountToken) {
+    // The helper drops a record another account admitted, whatever the token
+    // read before it, so an arriving token cannot inherit a foreign barrier.
+    if (currentCreditPurchaseIntentFor(appAccountToken) !== null) {
       return;
-    }
-    const intent = currentCreditPurchaseIntent();
-    if (intent !== null) {
-      retireCreditPurchaseIntent(intent);
     }
     clearCreditPurchaseDispatches();
     pendingPurchaseRef.current = null;

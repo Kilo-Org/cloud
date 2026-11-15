@@ -403,36 +403,6 @@ export function CreditPurchaseScreen() {
               rows keep exactly the priced row's height so the list never jumps
               when the store answers. */}
           <View className="gap-3">
-            {/* The purchase state is one card in this slot: a request the store
-                has not answered yet, or the barrier an unresolved charge
-                leaves. The rows below stay in place under it, and no other card
-                in the slot can show beside it. */}
-            {hasUnresolvedPurchase ? (
-              <CreditUnresolvedPurchaseNotice
-                actionsDisabled={statusActionsDisabled}
-                buyAgainAvailable={buyAgainAvailable}
-                onBuyAgain={handleBuyAgainPress}
-                onReconcile={handleReconcilePress}
-                packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
-                priceLabel={
-                  buyAgainTarget !== null
-                    ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
-                    : null
-                }
-                resolution={purchaseResolution}
-                waitCopy={waitCopy}
-              />
-            ) : (
-              waitCopy !== null && (
-                <View
-                  className="rounded-xl border border-border bg-card p-5"
-                  testID="credit-purchase-wait-card"
-                >
-                  <AccessibleStatus className="text-sm" message={waitCopy} />
-                </View>
-              )
-            )}
-
             {/* The account read gates both catalogue reads, so its failure is
                 the one state where nothing else can settle. It gets the same
                 card shape as the store's failure, with its own retry: an empty
@@ -614,6 +584,39 @@ export function CreditPurchaseScreen() {
                   </Pressable>
                 );
               })}
+          </View>
+
+          {/* The purchase state is its own slot after the pack rows: a request
+              the store has not answered yet, or the barrier an unresolved charge
+              leaves. It sits below the rows so its arrival, change or removal
+              never moves one, and the footer copy stays pinned outside the
+              scroller. */}
+          <View className="gap-3">
+            {hasUnresolvedPurchase ? (
+              <CreditUnresolvedPurchaseNotice
+                actionsDisabled={statusActionsDisabled}
+                buyAgainAvailable={buyAgainAvailable}
+                onBuyAgain={handleBuyAgainPress}
+                onReconcile={handleReconcilePress}
+                packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
+                priceLabel={
+                  buyAgainTarget !== null
+                    ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
+                    : null
+                }
+                resolution={purchaseResolution}
+                waitCopy={waitCopy}
+              />
+            ) : (
+              waitCopy !== null && (
+                <View
+                  className="rounded-xl border border-border bg-card p-5"
+                  testID="credit-purchase-wait-card"
+                >
+                  <AccessibleStatus className="text-sm" message={waitCopy} />
+                </View>
+              )
+            )}
           </View>
 
           {/* The room the floating purchase error needs at the end of the

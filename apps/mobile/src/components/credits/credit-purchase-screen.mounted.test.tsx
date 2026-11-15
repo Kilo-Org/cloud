@@ -1947,7 +1947,7 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
     unmountSecond();
   });
 
-  it('never reorders a pack row or moves the copy below them when the card appears', async () => {
+  it('leaves every pack row where it is when the purchase card appears, changes and goes', async () => {
     owner.hasUnresolvedPurchase = true;
     owner.purchaseResolution = 'found';
 
@@ -1962,9 +1962,9 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
     );
     await waitFor(() => packRows(withoutCard).length === 4);
 
-    // The rows keep their order and their copy exactly; the card joins the
-    // slot's cards, and the description lives in the footer the card cannot
-    // push.
+    // The card lives in its own slot after the rows, so the rows keep their
+    // place, their order and their copy exactly.
+    expect(rowPlacement(withoutCard)).toEqual(rowPlacement(renderer));
     expect(packRows(withoutCard).map(row => labelOf(row))).toEqual(labelsWithCard);
     expect(byTestId(withoutCard, cardId)).toBeUndefined();
     expect(allText(renderer)).toContain(allText(withoutCard).trim().split(' ')[0] ?? '');

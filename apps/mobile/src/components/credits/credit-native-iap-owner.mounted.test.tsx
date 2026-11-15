@@ -838,6 +838,104 @@ describe('CreditNativeIapOwner', () => {
     expect(reopened.handle.value?.purchaseResolution).toBe('unknown');
   });
 
+  it("does not inherit another account's barrier on a remount", async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const first = await mountOwner();
+      const pending = first.handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await flushPromises();
+      expect(first.handle.value?.hasUnresolvedPurchase).toBe(true);
+      await act(async () => {
+        first.renderer.unmount();
+        await Promise.resolve();
+      });
+
+      // Another account signs in before this screen mounts.
+      mockedQuery.serverProductsData = {
+        appAccountToken: '11111111-2222-3333-4444-555555555555',
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      const reopened = await mountOwner();
+      await flushPromises();
+      expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(reopened.handle.value?.purchaseWait).toBeNull();
+      expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not inherit a barrier when the other account token arrives after an empty render', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const first = await mountOwner();
+      const pending = first.handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await act(async () => {
+        first.renderer.unmount();
+        await Promise.resolve();
+      });
+
+      mockedQuery.serverProductsData = undefined;
+      const reopened = await mountOwner();
+      await flushPromises();
+      expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+
+      mockedQuery.serverProductsData = {
+        appAccountToken: '11111111-2222-3333-4444-555555555555',
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      await act(async () => {
+        reopened.renderer.update(ownerElement(reopened.handle));
+        await Promise.resolve();
+      });
+      expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps its own barrier on a remount with the same account token', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const first = await mountOwner();
+      const pending = first.handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await act(async () => {
+        first.renderer.unmount();
+        await Promise.resolve();
+      });
+
+      const reopened = await mountOwner();
+      await flushPromises();
+      expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the barrier when the catalogue token arrives after an empty first render', async () => {
     // A barrier admitted under this account survives a remount whose first
     // renders have no catalogue answer (and so no account token).
@@ -1072,16 +1170,31 @@ describe('CreditNativeIapOwner', () => {
       code: 'pending',
       message: 'Purchase is pending',
     });
-    const { handle } = await mountOwner();
-    expect(await handle.value?.purchase(creditPack)).toBe(false);
-    await flushPromises();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      expect(await handle.value?.purchase(creditPack)).toBe(false);
+      await flushPromises();
 
-    expect(handle.value?.purchaseWait).toEqual({
-      productId: APPLE_PRODUCT_ID,
-      kind: 'pending',
-    });
-    expect(handle.value?.errorMessageKey).toBeNull();
-    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'pending',
+      });
+      expect(handle.value?.errorMessageKey).toBeNull();
+      expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+
+      // Past the deadline the row is released and the pending copy stays.
+      await vi.advanceTimersByTimeAsync(16_000);
+      await flushPromises();
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'pending',
+      });
+      expect(handle.value?.errorMessageKey).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('names a deferred payment instead of a store timeout', async () => {

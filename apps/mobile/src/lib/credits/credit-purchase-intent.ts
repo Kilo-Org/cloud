@@ -35,6 +35,26 @@ export function currentCreditPurchaseIntent(): CreditPurchaseIntent | null {
 }
 
 /**
+ * The request this account may inherit, or null when it belongs to another.
+ *
+ * Two different non-empty tokens are an account change: the record is dropped
+ * and never inherited, so no screen shows another account's barrier and no
+ * retry posts its receipts under this token. An empty token is the catalogue
+ * still answering and inherits nothing it can contradict.
+ */
+export function currentCreditPurchaseIntentFor(accountToken: string): CreditPurchaseIntent | null {
+  if (
+    intent !== null &&
+    accountToken !== '' &&
+    intent.accountToken !== '' &&
+    intent.accountToken !== accountToken
+  ) {
+    retireCreditPurchaseIntent(intent);
+  }
+  return intent;
+}
+
+/**
  * Admits one request for this product. A record from another account or auth
  * epoch is dropped first: the barrier belongs to the session that started it.
  */

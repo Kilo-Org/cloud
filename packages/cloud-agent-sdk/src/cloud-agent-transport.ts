@@ -7,6 +7,7 @@
  */
 import type { ToolDisplayMode } from './tool-detail-marker';
 import { createBackgroundActivityReader } from './background-activity';
+import { setBounded } from './bounded-map';
 import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { isChatEvent, type NormalizedEvent } from './normalizer';
@@ -142,16 +143,6 @@ function snapshotReadFailureMessage(error: unknown): string {
 }
 const MAX_EVENT_VERSIONS = 2048;
 const MAX_SESSION_INFO_VERSIONS = 1024;
-
-/** Records `cursor` as the newest version of `key`, evicting the least recently set key. */
-function rememberVersion<K>(versions: Map<K, number>, key: K, cursor: number, max: number): void {
-  versions.delete(key);
-  versions.set(key, cursor);
-  if (versions.size > max) {
-    const oldest = versions.keys().next().value;
-    if (oldest !== undefined) versions.delete(oldest);
-  }
-}
 
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
   const websocketBaseUrl = config.websocketBaseUrl;
@@ -302,12 +293,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           if (raw.cursor === undefined) return;
           const previous = sessionInfoVersions.get(event.info.id);
           if (previous !== undefined && raw.cursor <= previous) return;
-          rememberVersion(
-            sessionInfoVersions,
-            event.info.id,
-            raw.cursor,
-            MAX_SESSION_INFO_VERSIONS
-          );
+          setBounded(sessionInfoVersions, event.info.id, raw.cursor, MAX_SESSION_INFO_VERSIONS);
         }
         sink.onServiceEvent(event);
       }
@@ -442,12 +428,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       const infoCursor = sessionInfoVersions.get(page.info.id);
       if (!version || infoCursor === undefined || version.cursor >= infoCursor) {
         if (version)
-          rememberVersion(
-            sessionInfoVersions,
-            page.info.id,
-            version.cursor,
-            MAX_SESSION_INFO_VERSIONS
-          );
+          setBounded(sessionInfoVersions, page.info.id, version.cursor, MAX_SESSION_INFO_VERSIONS);
         replaySnapshotPage(sink, page, version);
       } else {
         replayStoredMessages(page.messages, event => sink.onChatEvent(event), version);
@@ -620,7 +601,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
               if (previous !== undefined && raw.cursor <= previous) return;
               // Bootstrap ancillary rows need not be cursor-ordered; transcript row guards
               // reject stale payloads even after this recent-event cache evicts them.
-              rememberVersion(eventVersions, raw.eventId, raw.cursor, MAX_EVENT_VERSIONS);
+              setBounded(eventVersions, raw.eventId, raw.cursor, MAX_EVENT_VERSIONS);
             }
           }
           // Track high-water mark for reconnect fromId only. Do not filter

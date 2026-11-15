@@ -344,8 +344,6 @@
       "rowSubtitle": "Jiri ịkwụ ụgwọ nke onye na-enye ọrụ gị",
       "manageOnWebReason": "Ndị na-enye ọrụ ndị a chọrọ ozi nbanye ahaziri ahazi",
       "description": "A na-akwụ ụgwọ arịrịọ site n'igodo ndị a n'akaụntụ onye na-enye ọrụ gị kama n'ego fọdụrụ gị na Kilo.",
-      "enabled": "Na-eji ya",
-      "disabled": "Agbanyụrụ",
       "managedByPlan": "Atụmatụ koodu gị na-ahazi ya",
       "enableKey": "Gbanye igodo {{provider}}",
       "test": "Nwalee igodo",
@@ -416,6 +414,7 @@
       "title": "Akwụkwọ nnata akụkọ",
       "description": "Akwụkwọ nnata maka akụkọ ị zitere. Debe id a ka i jiri ya zoo aka na ya ma emechaa.",
       "receiptLabel": "Akwụkwọ nnata",
+      "copyReceiptId": "Detuo ID akwụkwọ nnata",
       "appealLabel": "Mkpegharị",
       "triageReceived": "Anatara",
       "triageOpen": "Na-enyocha",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ntọala òtù na weebụ",
+      "integrations": "Njikọ na weebụ",
       "usageDetails": "Nkọwa ojiji",
       "providersAndModels": "Ndị na-enye ọrụ na model",
       "groups": "Ìgwè",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",
-      "last30Days": "Ụbọchị 30 gara aga",
+      "orgLast30Days": "Ndị otu niile · Ụbọchị 30 gara aga",
       "outputTokens": "Tokin mmepụta",
       "requests": "Arịrịọ"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Ọrụ ejikọrọ",
     "entrySubtitle": "GitHub, Slack, Linear na ndị ọzọ",
     "subtitle": "Jikọọ ngwaọrụ mmepe gị na usoro ọrụ gị na Kilo",
-    "emptyHint": "Enwebeghị njikọ ọ bụla.",
     "disconnect": "Kwụsị njikọ",
     "disconnectTitle": "Kwụsị njikọ {{provider}}?",
     "disconnectMessage": "Kilo agaghị azaghachi ọzọ na {{provider}}. Ị nwere ike ijikọ ọzọ mgbe ọ bụla.",

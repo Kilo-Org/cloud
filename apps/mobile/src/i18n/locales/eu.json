@@ -344,8 +344,6 @@
       "rowSubtitle": "Erabili zure hornitzailearen fakturazioa",
       "manageOnWebReason": "Hornitzaile hauek egiturazko kredentzialak behar dituzte.",
       "description": "Gako hauen bidezko eskaerak zure hornitzaile-kontuan fakturatzen dira, ez zure Kilo saldoan.",
-      "enabled": "Erabiltzen",
-      "disabled": "Desaktibatuta",
       "managedByPlan": "Zure kodetze-planak kudeatzen du",
       "enableKey": "Gaitu {{provider}} gakoa",
       "test": "Probatu gakoa",
@@ -416,6 +414,7 @@
       "title": "Salaketaren agiria",
       "description": "Bidali duzun salaketaren agiria. Gorde ID hau geroago aipatzeko.",
       "receiptLabel": "Agiria",
+      "copyReceiptId": "Kopiatu agiriaren IDa",
       "appealLabel": "Helegitea",
       "triageReceived": "Jasota",
       "triageOpen": "Berrikusten",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Erakundearen ezarpenak webean",
+      "integrations": "Integrazioak webean",
       "usageDetails": "Erabileraren xehetasunak",
       "providersAndModels": "Hornitzaileak eta ereduak",
       "groups": "Taldeak",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
-      "last30Days": "Azken 30 egunak",
+      "orgLast30Days": "Kide guztiak · Azken 30 egunak",
       "outputTokens": "Irteerako tokenak",
       "requests": "Eskaerak"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Konektatutako zerbitzuak",
     "entrySubtitle": "GitHub, Slack, Linear eta gehiago",
     "subtitle": "Konektatu zure garapen-tresnak eta lan-fluxuak Kilo aplikazioarekin",
-    "emptyHint": "Oraindik ez dago integraziorik konektatuta.",
     "disconnect": "Deskonektatu",
     "disconnectTitle": "{{provider}} deskonektatu?",
     "disconnectMessage": "Kilo aplikazioak ez du gehiago erantzungo {{provider}} zerbitzuan. Edonoiz konekta dezakezu berriro.",

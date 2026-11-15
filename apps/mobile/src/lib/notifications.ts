@@ -75,8 +75,8 @@ import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter
 import { notificationDestinationForData } from './notification-path';
 import {
   isAppOwnedNeedsInputNotification,
-  isNeedsInputNotificationPosted,
-} from './needs-input-notification';
+  readNeedsInputPresentation,
+} from './needs-input-presentation';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
 
@@ -363,8 +363,8 @@ export function setupNotificationHandler() {
       if (
         data?.type === 'cloud_agent_session' &&
         data.category === 'attention' &&
-        isNeedsInputNotificationPosted(data.cliSessionId) &&
-        !isAppOwnedNeedsInputNotification(notification.request.identifier)
+        !isAppOwnedNeedsInputNotification(notification.request.identifier) &&
+        (await readNeedsInputPresentation(data.cliSessionId)) === 'presented'
       ) {
         return suppressed;
       }
@@ -655,10 +655,11 @@ export function checkInitialNotification(): void {
 
 // Single-flight promise so concurrent callers share one channel-creation pass.
 // The promise never rejects: a per-channel failure is reported to Sentry and
-// the remaining channels still get created. A pass that failed any required
-// channel is not cached (see `ensureAndroidNotificationChannels`), so a later
-// start retries before it posts to a channel that may not exist.
-let androidChannelsPromise: Promise<void> | null = null;
+// the remaining channels still get created, and the pass retries once before it
+// settles. A pass that failed both attempts is not cached (see
+// `ensureAndroidNotificationChannels`), so a later start retries before it posts
+// to a channel that may not exist.
+let androidChannelsPromise: Promise<boolean> | null = null;
 
 // The channels the two named kinds replaced. Android keeps an app-created
 // channel until the app deletes it, so a stale one would still appear in the
@@ -705,6 +706,11 @@ export function planAndroidChannelWrite(
   return { bypassDnd: dndAccessGranted !== false };
 }
 
+// The typechecked half of the silent-channel contract: the JSDoc type in the
+// plain-JS list is only a cast, so this binding is what fails if it goes away.
+const silentAndroidChannelIds: readonly AndroidNotificationChannelId[] =
+  SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS;
+
 /** Every channel re-write (create and rename) must pass the same sound policy. */
 function androidChannelConfiguration(
   channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number],
@@ -721,9 +727,7 @@ function androidChannelConfiguration(
     bypassDnd,
     // An absent sound is the system default; an explicit null is silence, and a
     // silent channel must not vibrate either (the default is enabled).
-    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(channel.id)
-      ? { sound: null, enableVibrate: false }
-      : {}),
+    ...(silentAndroidChannelIds.includes(channel.id) ? { sound: null, enableVibrate: false } : {}),
   };
 }
 
@@ -848,25 +852,34 @@ async function createAndroidNotificationChannels(): Promise<boolean> {
 }
 
 /**
- * Create the Android notification channels once. No-op on iOS. Idempotent and
- * single-flight: every call returns the same module-level promise, and a
- * per-channel failure never rejects it (reported to Sentry instead).
+ * Create the Android notification channels once. No-op on iOS. Resolves `true` there.
+ * Idempotent and single-flight: every call returns the same module-level
+ * promise, and a per-channel failure never rejects it (reported to Sentry
+ * instead).
  *
- * A pass that failed a required channel write is not cached: the framework
- * drops a post addressed to a channel the app never created, so the next start
- * must retry the channels before it posts. Channel writes are idempotent, so a
- * retry is safe, and a fully successful pass is cached again.
+ * Resolves `true` when every required channel exists. A failed pass is retried
+ * once before the shared promise settles, so no concurrent poster proceeds
+ * against a half-created set; only then does it resolve `false` and drop the
+ * memo, so the next start runs a fresh pass. A poster must not post on `false` —
+ * the framework silently drops a notification addressed to a channel the app
+ * never created.
  */
 // eslint-disable-next-line promise-function-async -- must return the same module-level promise for single-flight
-export function ensureAndroidNotificationChannels(): Promise<void> {
+export function ensureAndroidNotificationChannels(): Promise<boolean> {
   if (Platform.OS !== 'android') {
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
   androidChannelsPromise ??= (async () => {
-    const allChannelsWritten = await createAndroidNotificationChannels();
-    if (!allChannelsWritten) {
-      androidChannelsPromise = null;
+    if (await createAndroidNotificationChannels()) {
+      return true;
     }
+    // One retry before the shared promise settles, so no concurrent poster
+    // proceeds against a half-created set.
+    if (await createAndroidNotificationChannels()) {
+      return true;
+    }
+    androidChannelsPromise = null;
+    return false;
   })();
   return androidChannelsPromise;
 }

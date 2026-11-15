@@ -344,8 +344,6 @@
       "rowSubtitle": "Izmanto sava nodrošinātāja norēķinus",
       "manageOnWebReason": "Šiem nodrošinātājiem nepieciešami strukturēti akreditācijas dati.",
       "description": "Pieprasījumi, kas veikti ar šīm atslēgām, tiek iekasēti no tava nodrošinātāja konta, nevis no tava Kilo atlikuma.",
-      "enabled": "Tiek izmantota",
-      "disabled": "Izslēgta",
       "managedByPlan": "Pārvalda tavs kodēšanas plāns",
       "enableKey": "Iespējot {{provider}} atslēgu",
       "test": "Pārbaudīt atslēgu",
@@ -416,6 +414,7 @@
       "title": "Ziņojuma apstiprinājums",
       "description": "Apstiprinājums par tevis iesniegto ziņojumu. Saglabā šo ID, lai vēlāk uz to atsauktos.",
       "receiptLabel": "Apstiprinājums",
+      "copyReceiptId": "Kopēt apstiprinājuma ID",
       "appealLabel": "Pārsūdzība",
       "triageReceived": "Saņemts",
       "triageOpen": "Tiek izskatīts",
@@ -3462,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Organizācijas iestatījumi tīmeklī",
+      "integrations": "Integrācijas tīmeklī",
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
@@ -3477,7 +3477,7 @@
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",
-      "last30Days": "Pēdējās 30 dienas",
+      "orgLast30Days": "Visi dalībnieki · Pēdējās 30 dienas",
       "outputTokens": "Izvades tokeni",
       "requests": "Pieprasījumi"
     },
@@ -4480,7 +4480,6 @@
     "sectionTitle": "Pievienotie pakalpojumi",
     "entrySubtitle": "GitHub, Slack, Linear un citi",
     "subtitle": "Savienojiet savus izstrādes rīkus un darbplūsmas ar Kilo",
-    "emptyHint": "Vēl nav pievienota neviena integrācija.",
     "disconnect": "Atvienot",
     "disconnectTitle": "Vai atvienot {{provider}}?",
     "disconnectMessage": "Kilo vairs neatbildēs pakalpojumā {{provider}}. Savienojumu varat atjaunot jebkurā laikā.",

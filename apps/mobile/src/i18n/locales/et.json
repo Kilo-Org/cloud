@@ -344,8 +344,6 @@
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
       "manageOnWebReason": "Need teenusepakkujad vajavad struktureeritud mandaate.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
-      "enabled": "Kasutusel",
-      "disabled": "Välja lülitatud",
       "managedByPlan": "Haldab sinu kodeerimispakett",
       "enableKey": "Luba teenusepakkuja {{provider}} võti",
       "test": "Testi võtit",
@@ -416,6 +414,7 @@
       "title": "Teate kinnitus",
       "description": "Sinu esitatud teate kinnitus. Hoia see ID alles, et saaksid sellele hiljem viidata.",
       "receiptLabel": "Kinnitus",
+      "copyReceiptId": "Kopeeri kinnituse ID",
       "appealLabel": "Vaidlustus",
       "triageReceived": "Vastu võetud",
       "triageOpen": "Ülevaatamisel",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisatsiooni seaded veebis",
+      "integrations": "Integratsioonid veebis",
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
-      "last30Days": "Viimased 30 päeva",
+      "orgLast30Days": "Kõik liikmed · Viimased 30 päeva",
       "outputTokens": "Väljundtokenid",
       "requests": "Päringud"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Ühendatud teenused",
     "entrySubtitle": "GitHub, Slack, Linear ja muud",
     "subtitle": "Ühenda oma arendustööriistad ja töövood Kiloga",
-    "emptyHint": "Ühtegi integratsiooni pole veel ühendatud.",
     "disconnect": "Katkesta ühendus",
     "disconnectTitle": "Kas katkestada ühendus teenusega {{provider}}?",
     "disconnectMessage": "Kilo lõpetab teenuses {{provider}} vastamise. Saad selle igal ajal uuesti ühendada.",

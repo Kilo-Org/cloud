@@ -344,8 +344,6 @@
       "rowSubtitle": "Dùng thanh toán của nhà cung cấp riêng",
       "manageOnWebReason": "Các nhà cung cấp này cần thông tin xác thực có cấu trúc.",
       "description": "Các yêu cầu qua những khóa này sẽ được tính phí vào tài khoản nhà cung cấp của bạn thay vì số dư Kilo.",
-      "enabled": "Đang dùng",
-      "disabled": "Đã tắt",
       "managedByPlan": "Do gói lập trình của bạn quản lý",
       "enableKey": "Bật khóa {{provider}}",
       "test": "Kiểm tra khóa",
@@ -416,6 +414,7 @@
       "title": "Biên nhận báo cáo",
       "description": "Biên nhận cho báo cáo bạn đã gửi. Hãy lưu lại mã này để tra cứu sau.",
       "receiptLabel": "Biên nhận",
+      "copyReceiptId": "Sao chép mã biên nhận",
       "appealLabel": "Kháng nghị",
       "triageReceived": "Đã tiếp nhận",
       "triageOpen": "Đang xem xét",
@@ -3414,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Cài đặt tổ chức trên web",
+      "integrations": "Tích hợp trên web",
       "usageDetails": "Chi tiết sử dụng",
       "providersAndModels": "Nhà cung cấp và mô hình",
       "groups": "Nhóm",
@@ -3429,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
-      "last30Days": "30 Ngày qua",
+      "orgLast30Days": "Tất cả thành viên · 30 Ngày qua",
       "outputTokens": "Token đầu ra",
       "requests": "Yêu cầu"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Dịch vụ đã kết nối",
     "entrySubtitle": "GitHub, Slack, Linear và nhiều dịch vụ khác",
     "subtitle": "Kết nối các công cụ và quy trình phát triển của bạn với Kilo",
-    "emptyHint": "Chưa có tích hợp nào được kết nối.",
     "disconnect": "Ngắt kết nối",
     "disconnectTitle": "Ngắt kết nối {{provider}}?",
     "disconnectMessage": "Kilo sẽ ngừng phản hồi trong {{provider}}. Bạn có thể kết nối lại bất cứ lúc nào.",

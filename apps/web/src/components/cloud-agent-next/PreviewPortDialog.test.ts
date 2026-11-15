@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import React, { act, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, skipToken } from '@tanstack/react-query';
-import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
 import type { PreviewPortDialog as PreviewPortDialogComponent } from './PreviewPortDialog';
 
 type PreviewResult = {

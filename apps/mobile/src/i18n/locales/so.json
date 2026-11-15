@@ -344,8 +344,6 @@
       "rowSubtitle": "Isticmaal biilasha bixiyahaaga",
       "manageOnWebReason": "Bixiyeyaashan waxay u baahan yihiin aqoonsiyo habaysan.",
       "description": "Codsiyada maraya furayaashan waxaa lagu dallacayaa akoonka bixiyahaaga halkii laga jari lahaa hadhaagaaga Kilo.",
-      "enabled": "La isticmaalayo",
-      "disabled": "Waa la damiyay",
       "managedByPlan": "Waxaa maamula qorshahaaga koodhka",
       "enableKey": "Daar furaha {{provider}}",
       "test": "Tijaabi furaha",
@@ -416,6 +414,7 @@
       "title": "Rasiidka warbixinta",
       "description": "Rasiidka warbixinta aad gudbisay. Kaydso aqoonsigan si aad mar dambe ugu tixraacdo.",
       "receiptLabel": "Rasiid",
+      "copyReceiptId": "Koobi aqoonsiga rasiidka",
       "appealLabel": "Rafcaan",
       "triageReceived": "La helay",
       "triageOpen": "Dib-u-eegis ku jira",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Dejinta ururka ee shabakadda",
+      "integrations": "Isku-xidhka ee shabakadda",
       "usageDetails": "Faahfaahinta isticmaalka",
       "providersAndModels": "Bixiyeyaasha iyo moodellada",
       "groups": "Kooxaha",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",
-      "last30Days": "30-Kii maalmood ee la soo dhaafay",
+      "orgLast30Days": "Dhammaan xubnaha · 30-Kii maalmood ee la soo dhaafay",
       "outputTokens": "Halbeegyada qoraalka la soo saaray",
       "requests": "Codsiyada"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Adeegyada ku xidhan",
     "entrySubtitle": "GitHub, Slack, Linear iyo kuwo kale",
     "subtitle": "Ku xidh qalabkaaga horumarinta iyo hababka shaqadaada Kilo",
-    "emptyHint": "Weli wax isku-xidh ah lama samayn.",
     "disconnect": "Ka goo",
     "disconnectTitle": "Ka goo {{provider}}?",
     "disconnectMessage": "Kilo way joojin doontaa ka jawaabista {{provider}}. Waad dib u xidhi kartaa wakhti kasta.",

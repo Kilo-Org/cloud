@@ -234,6 +234,20 @@ function staleness(data: HomeWidgetData): {
   };
 }
 
+/**
+ * The one wake rule: a snapshot has a wake time only when it is not terminal
+ * and counts a scheduled session. The ms form and the ISO form come from one
+ * guard, so presentation, refresh cadence and the timeline cannot disagree
+ * about whether a wake exists or which instant it names.
+ */
+function scheduledWake(
+  snapshot: GlanceableAgentsSnapshot,
+  terminal: boolean
+): { at: number | null; iso: string | null } {
+  if (terminal || snapshot.scheduled <= 0) return { at: null, iso: null };
+  return { at: timestampMs(snapshot.scheduledAt), iso: timestampToIso(snapshot.scheduledAt) };
+}
+
 /** Pure policy: counts survive activity expiry; only explicit privacy/auth clears hide them. */
 export function buildHomeWidgetPresentation(
   data: HomeWidgetData,
@@ -245,8 +259,7 @@ export function buildHomeWidgetPresentation(
   // pushed before details carried the kind omits it, which reads as unknown and
   // keeps the title, so that payload renders as it did.
   const titleKind = details.primaryKind ?? null;
-  const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
-  const scheduledAt = snapshot.scheduled > 0 ? timestampToIso(snapshot.scheduledAt) : null;
+  const wake = scheduledWake(snapshot, terminal);
   return {
     status: terminal
       ? snapshot.status === 'privacy'
@@ -273,9 +286,9 @@ export function buildHomeWidgetPresentation(
       (snapshot.status === 'stale' ||
         snapshot.status === 'expired' ||
         (staleAt !== null && now >= staleAt)),
-    scheduledAt: terminal ? null : scheduledAt,
+    scheduledAt: wake.iso,
     approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
-    awaitingUpdate: !terminal && wake !== null && now >= wake,
+    awaitingUpdate: wake.at !== null && now >= wake.at,
     primaryTitle:
       terminal || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
         ? null
@@ -293,7 +306,7 @@ export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
   const terminal = isTerminalGlanceableStatus(snapshot.status);
   const next = now + (terminal ? QUIET_REFRESH_MS : refreshInterval(snapshot));
-  const wake = terminal || snapshot.scheduled === 0 ? null : timestampMs(snapshot.scheduledAt);
+  const wake = scheduledWake(snapshot, terminal).at;
   // An overdue wake is not proof of running and must not create a busy refresh loop.
   return wake !== null && wake > now ? Math.min(next, wake) : next;
 }
@@ -305,10 +318,10 @@ export function buildHomeWidgetPresentationTimeline(
 ): HomeWidgetTimelineEntry[] {
   const times = [now];
   const { snapshot } = data;
-  if (!isTerminalGlanceableStatus(snapshot.status)) {
-    const { staleAt } = staleness(data);
+  const { terminal, staleAt } = staleness(data);
+  if (!terminal) {
     if (staleAt !== null && staleAt > now) times.push(staleAt);
-    const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
+    const wake = scheduledWake(snapshot, terminal).at;
     if (wake !== null && wake > now && wake !== staleAt) times.push(wake);
   }
   return times

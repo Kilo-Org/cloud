@@ -344,8 +344,6 @@
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
       "manageOnWebReason": "Dawn il-fornituri jeħtieġu kredenzjali strutturati.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
-      "enabled": "Qed tintuża",
-      "disabled": "Mitfija",
       "managedByPlan": "Immaniġġjata mill-pjan tal-ikkowdjar tiegħek",
       "enableKey": "Attiva ċ-ċavetta ta' {{provider}}",
       "test": "Ittestja ċ-ċavetta",
@@ -416,6 +414,7 @@
       "title": "Irċevuta tar-rapport",
       "description": "L-irċevuta għar-rapport li bgħatt. Żomm dan l-id biex tirreferi għalih aktar tard.",
       "receiptLabel": "Irċevuta",
+      "copyReceiptId": "Ikkopja l-id tal-irċevuta",
       "appealLabel": "Appell",
       "triageReceived": "Riċevut",
       "triageOpen": "Qed jiġi rieżaminat",
@@ -3568,6 +3567,7 @@
     },
     "settingsOnWeb": {
       "title": "Issettjar tal-organizzazzjoni fuq il-web",
+      "integrations": "Integrazzjonijiet fuq il-web",
       "usageDetails": "Dettalji tal-użu",
       "providersAndModels": "Fornituri u mudelli",
       "groups": "Gruppi",
@@ -3583,7 +3583,7 @@
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
-      "last30Days": "L-aħħar 30 ġurnata",
+      "orgLast30Days": "Il-membri kollha · L-aħħar 30 ġurnata",
       "outputTokens": "Unitajiet tat-test tar-riżultat",
       "requests": "Talbiet"
     },
@@ -4610,7 +4610,6 @@
     "sectionTitle": "Servizzi konnessi",
     "entrySubtitle": "GitHub, Slack, Linear u aktar",
     "subtitle": "Qabbad l-għodod u l-proċessi tax-xogħol tal-iżvilupp tiegħek ma' Kilo",
-    "emptyHint": "Għad m'hemm l-ebda integrazzjoni konnessa.",
     "disconnect": "Skonnettja",
     "disconnectTitle": "Tiskonnettja {{provider}}?",
     "disconnectMessage": "Kilo se jieqaf jirrispondi f'{{provider}}. Tista' terġa' tikkonnettja fi kwalunkwe ħin.",

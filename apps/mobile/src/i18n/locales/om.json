@@ -344,8 +344,6 @@
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
       "manageOnWebReason": "Dhiyeessitoonni kunneen ragaalee eenyummaa caaseffamoo barbaadu.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
-      "enabled": "Hojiirra jira",
-      "disabled": "Dhaameera",
       "managedByPlan": "Karoora koodii keetiin bulfama",
       "enableKey": "Furtuu {{provider}} dandeessisi",
       "test": "Furtuu qori",
@@ -416,6 +414,7 @@
       "title": "Ragaa gabaasaa",
       "description": "Ragaa gabaasa ati ergiteef. Booda itti wabeeffachuuf ID kana qabadhu.",
       "receiptLabel": "Ragaa",
+      "copyReceiptId": "Ragaa ID waraabi",
       "appealLabel": "Ol'iyyannoo",
       "triageReceived": "Fudhatameera",
       "triageOpen": "Sakatta'amaa jira",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Qindaa'ina dhaabbataa weebii irratti",
+      "integrations": "Walitti hidhamiinsota weebii irratti",
       "usageDetails": "Odeeffannoo itti fayyadamaa",
       "providersAndModels": "Dhiyeessitootaa fi moodeelota",
       "groups": "Gareewwan",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",
-      "last30Days": "Guyyoota 30 dhumaa",
+      "orgLast30Days": "Miseensoota hunda · Guyyoota 30 dhumaa",
       "outputTokens": "Tookanoota bu'aa",
       "requests": "Gaaffiiwwan"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Tajaajilawwan walitti hidhaman",
     "entrySubtitle": "GitHub, Slack, Linear fi kan biroo",
     "subtitle": "Meeshaalee misoomaa fi adeemsa hojii kee Kilo waliin walitti hidhi",
-    "emptyHint": "Hanga ammaatti walitti hidhamiinsi tokkollee hin jiru.",
     "disconnect": "Addaan kuti",
     "disconnectTitle": "{{provider}} addaan kutuu?",
     "disconnectMessage": "Kilo {{provider}} keessatti deebii kennuu ni dhaabata. Yeroo kamiyyuu irra deebitee walitti hidhuu dandeessa.",

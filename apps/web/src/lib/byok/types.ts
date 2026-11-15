@@ -1,9 +1,20 @@
 import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import * as z from 'zod';
 
+// Shared wire constraints for the BYOK procedures.
+/** The id of one stored key, carried by every procedure input and the response. */
+const BYOKKeyIdSchema = z.string().uuid();
+/** The pasted credential of a key that is created or replaced. */
+const BYOKApiKeySchema = z.string().min(1);
+
+// Optional organization ID schema - when not provided, uses the authenticated user's ID
+const OptionalOrganizationIdSchema = z.object({
+  organizationId: z.string().uuid().optional(),
+});
+
 // API response schema (never includes decrypted key)
 export const BYOKApiKeyResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: BYOKKeyIdSchema,
   provider_id: z.string(),
   provider_name: z.string(),
   management_source: z.enum(['user', 'coding_plan']),
@@ -20,42 +31,37 @@ export const BYOKApiKeyResponseSchema = z.object({
 
 export type BYOKApiKeyResponse = z.infer<typeof BYOKApiKeyResponseSchema>;
 
-// Optional organization ID schema - when not provided, uses the authenticated user's ID
-const OptionalOrganizationIdSchema = z.object({
-  organizationId: z.string().uuid().optional(),
-});
-
 // Zod schemas for tRPC validation
 // Note: organizationId is optional - if provided, enforces org owner/billing access
 // If not provided, uses the authenticated user's kilo_user_id
 export const CreateBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   provider_id: UserByokProviderIdSchema,
-  api_key: z.string().min(1),
+  api_key: BYOKApiKeySchema,
 });
 
 export const UpdateBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
-  id: z.string().uuid(),
-  api_key: z.string().min(1),
+  id: BYOKKeyIdSchema,
+  api_key: BYOKApiKeySchema,
 });
 
 export const DeleteBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
-  id: z.string().uuid(),
+  id: BYOKKeyIdSchema,
 });
 
 export const SetBYOKKeyEnabledInputSchema = OptionalOrganizationIdSchema.extend({
-  id: z.string().uuid(),
+  id: BYOKKeyIdSchema,
   is_enabled: z.boolean(),
 });
 
 export const SetBYOKKeyCatalogModeInputSchema = OptionalOrganizationIdSchema.extend({
-  id: z.string().uuid(),
+  id: BYOKKeyIdSchema,
   serve_catalog_models: z.boolean(),
 });
 
 /** Every listed key of the scoped owner, highest priority first. */
 export const ReorderBYOKKeysInputSchema = OptionalOrganizationIdSchema.extend({
   keyIds: z
-    .array(z.string().uuid())
+    .array(BYOKKeyIdSchema)
     .min(1)
     .max(100)
     .refine(ids => new Set(ids).size === ids.length, 'Key ids must be unique'),
@@ -65,7 +71,7 @@ export const ReorderBYOKKeysInputSchema = OptionalOrganizationIdSchema.extend({
 export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 
 export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
-  id: z.string().uuid(),
+  id: BYOKKeyIdSchema,
 });
 
 export const PreviewBYOKRoutingInputSchema = OptionalOrganizationIdSchema.extend({

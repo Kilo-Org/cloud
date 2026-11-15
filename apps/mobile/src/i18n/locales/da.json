@@ -344,8 +344,6 @@
       "rowSubtitle": "Brug din egen udbyderfakturering",
       "manageOnWebReason": "Disse udbydere kræver strukturerede legitimationsoplysninger.",
       "description": "Anmodninger via disse nøgler faktureres til din udbyderkonto i stedet for din Kilo-saldo.",
-      "enabled": "I brug",
-      "disabled": "Slået fra",
       "managedByPlan": "Administreres af dit kodningsabonnement",
       "enableKey": "Aktivér {{provider}}-nøglen",
       "test": "Test nøgle",
@@ -416,6 +414,7 @@
       "title": "Kvittering for anmeldelse",
       "description": "Kvitteringen for den anmeldelse, du har indsendt. Gem dette id, så du kan henvise til det senere.",
       "receiptLabel": "Kvittering",
+      "copyReceiptId": "Kopier kvitterings-id",
       "appealLabel": "Klage",
       "triageReceived": "Modtaget",
       "triageOpen": "Under behandling",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsindstillinger på nettet",
+      "integrations": "Integrationer på nettet",
       "usageDetails": "Forbrugsdetaljer",
       "providersAndModels": "Udbydere og modeller",
       "groups": "Grupper",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",
-      "last30Days": "Seneste 30 dage",
+      "orgLast30Days": "Alle medlemmer · Seneste 30 dage",
       "outputTokens": "Tokens i uddata",
       "requests": "Anmodninger"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Forbundne tjenester",
     "entrySubtitle": "GitHub, Slack, Linear og flere",
     "subtitle": "Forbind dine udviklingsværktøjer og arbejdsgange med Kilo",
-    "emptyHint": "Ingen integrationer er forbundet endnu.",
     "disconnect": "Afbryd forbindelse",
     "disconnectTitle": "Afbryd forbindelsen til {{provider}}?",
     "disconnectMessage": "Kilo holder op med at svare i {{provider}}. Du kan altid oprette forbindelsen igen.",

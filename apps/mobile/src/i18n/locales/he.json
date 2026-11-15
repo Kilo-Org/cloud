@@ -344,8 +344,6 @@
       "rowSubtitle": "שימוש בחיוב דרך הספק שלך",
       "manageOnWebReason": "ספקים אלה דורשים פרטי גישה מובנים.",
       "description": "בקשות שנשלחות באמצעות מפתחות אלה מחויבות בחשבון הספק שלך במקום ביתרת Kilo שלך.",
-      "enabled": "בשימוש",
-      "disabled": "כבוי",
       "managedByPlan": "מנוהל במסגרת תוכנית הקידוד שלך",
       "enableKey": "הפעלת המפתח של {{provider}}",
       "test": "בדיקת המפתח",
@@ -416,6 +414,7 @@
       "title": "אישור דיווח",
       "description": "האישור על הדיווח ששלחת. שמור את המזהה הזה כדי להתייחס אליו בהמשך.",
       "receiptLabel": "אישור",
+      "copyReceiptId": "העתקת מזהה האישור",
       "appealLabel": "ערעור",
       "triageReceived": "התקבל",
       "triageOpen": "בבדיקה",
@@ -3467,6 +3466,7 @@
     },
     "settingsOnWeb": {
       "title": "הגדרות הארגון באתר",
+      "integrations": "אינטגרציות באתר",
       "usageDetails": "פרטי שימוש",
       "providersAndModels": "ספקים ומודלים",
       "groups": "קבוצות",
@@ -3482,7 +3482,7 @@
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",
-      "last30Days": "30 הימים האחרונים",
+      "orgLast30Days": "כל החברים · 30 הימים האחרונים",
       "outputTokens": "טוקני פלט",
       "requests": "בקשות"
     },
@@ -4480,7 +4480,6 @@
     "sectionTitle": "שירותים מחוברים",
     "entrySubtitle": "GitHub, Slack, Linear ועוד",
     "subtitle": "חיבור כלי הפיתוח ותהליכי העבודה שלך ל-Kilo",
-    "emptyHint": "עדיין לא חוברו אינטגרציות.",
     "disconnect": "ניתוק",
     "disconnectTitle": "לנתק את {{provider}}?",
     "disconnectMessage": "Kilo יפסיק להגיב ב-{{provider}}. אפשר להתחבר מחדש בכל עת.",

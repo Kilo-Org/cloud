@@ -344,8 +344,6 @@
       "rowSubtitle": "Yi amfani da biyan kuɗin mai samarwarka",
       "manageOnWebReason": "Waɗannan masu samarwa suna buƙatar takardun shaida masu tsari.",
       "description": "Ana cajin buƙatun da ke bi ta waɗannan maɓallan zuwa asusun mai samarwarka maimakon ragowar kuɗinka na Kilo.",
-      "enabled": "Ana amfani",
-      "disabled": "A kashe",
       "managedByPlan": "Tsarin coding ɗinka ne ke sarrafa shi",
       "enableKey": "Kunna maɓallin {{provider}}",
       "test": "Gwada maɓalli",
@@ -416,6 +414,7 @@
       "title": "Rasidin rahoto",
       "description": "Rasidin rahoton da ka gabatar. Ajiye wannan id don komawa gare shi daga baya.",
       "receiptLabel": "Rasidi",
+      "copyReceiptId": "Kwafi id ɗin rasidi",
       "appealLabel": "Ɗaukaka ƙara",
       "triageReceived": "An karɓa",
       "triageOpen": "Ana bita",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Saitunan ƙungiya a yanar gizo",
+      "integrations": "Haɗe-haɗe a yanar gizo",
       "usageDetails": "Bayanan amfani",
       "providersAndModels": "Masu samar da sabis da samfura",
       "groups": "Rukunoni",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",
-      "last30Days": "Kwanaki 30 da suka gabata",
+      "orgLast30Days": "Membobi duka · Kwanaki 30 da suka gabata",
       "outputTokens": "Guntayen rubutun fitarwa",
       "requests": "Buƙatu"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Ayyukan da aka haɗa",
     "entrySubtitle": "GitHub, Slack, Linear da sauransu",
     "subtitle": "Haɗa kayan aikin haɓaka manhaja da tsarin aikinka da Kilo",
-    "emptyHint": "Babu wani haɗi tukuna.",
     "disconnect": "Cire haɗi",
     "disconnectTitle": "A cire haɗin {{provider}}?",
     "disconnectMessage": "Kilo zai daina amsawa a {{provider}}. Kana iya sake haɗawa a kowane lokaci.",

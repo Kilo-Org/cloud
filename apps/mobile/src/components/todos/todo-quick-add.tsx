@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Plus } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
 
 /**
@@ -18,6 +18,7 @@ import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
 export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Promise<void> }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const inputRef = useRef<TextInput>(null);
   const textRef = useRef('');
   const addingRef = useRef(false);
@@ -52,6 +53,11 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
     }
   }
 
+  // The one disabled condition: the row cannot add without a title, and a
+  // second press while the add is in flight would duplicate it. The mark takes
+  // the ink that reads on the muted fill the disabled Button paints.
+  const addDisabled = !hasText || adding;
+
   return (
     <View className="mx-4 my-2 gap-1">
       <View className="flex-row items-center gap-2 rounded-lg border border-border bg-secondary pr-1">
@@ -74,13 +80,13 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
         />
         <Button
           size="sm"
-          disabled={!hasText || adding}
+          disabled={addDisabled}
           onPress={() => {
             void submit();
           }}
           accessibilityLabel={t('todos.list.add')}
         >
-          <Plus size={16} color={colors.primaryForeground} />
+          <Plus size={16} color={addDisabled ? mutedDisabledInk : colors.primaryForeground} />
           <Text>{t('todos.list.add')}</Text>
         </Button>
       </View>

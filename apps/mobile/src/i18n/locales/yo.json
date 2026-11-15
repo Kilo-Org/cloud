@@ -344,8 +344,6 @@
       "rowSubtitle": "Lo ìsanwó olùpèsè tìrẹ",
       "manageOnWebReason": "Àwọn olùpèsè wọ̀nyí nílò àwọn ìwé-ẹ̀rí ìwọlé tí a ṣètò.",
       "description": "Àwọn ìbéèrè tí ó gba àwọn kọ́kọ́rọ́ wọ̀nyí kọjá ni a ó gba owó wọn lórí àkọọ́lẹ̀ olùpèsè rẹ dípò owó Kilo rẹ tó kù.",
-      "enabled": "Ní lílò",
-      "disabled": "Ti pa á",
       "managedByPlan": "Ètò kóòdù rẹ ló ń ṣàkóso rẹ̀",
       "enableKey": "Mú kọ́kọ́rọ́ {{provider}} ṣiṣẹ́",
       "test": "Dán kọ́kọ́rọ́ wò",
@@ -416,6 +414,7 @@
       "title": "Ìwé ẹ̀rí ìjábọ̀",
       "description": "Ìwé ẹ̀rí fún ìjábọ̀ tí o fi ránṣẹ́. Tọ́jú id yìí láti tọ́ka sí i lẹ́yìn náà.",
       "receiptLabel": "Ìwé ẹ̀rí",
+      "copyReceiptId": "Dákọ ID ìwé ẹ̀rí",
       "appealLabel": "Ẹ̀bẹ̀",
       "triageReceived": "A ti gbà á",
       "triageOpen": "Ó wà lábẹ́ àtúnyẹ̀wò",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ààtò àjọ lórí wẹ́ẹ̀bù",
+      "integrations": "Àwọn ìsopọ̀ lórí wẹ́ẹ̀bù",
       "usageDetails": "Àlàyé ìlò",
       "providersAndModels": "Àwọn olùpèsè àti àwòṣe",
       "groups": "Àwọn ẹgbẹ́",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",
-      "last30Days": "Ọjọ́ 30 tó kọjá",
+      "orgLast30Days": "Gbogbo àwọn ọmọ ẹgbẹ́ · Ọjọ́ 30 tó kọjá",
       "outputTokens": "Àwọn ìpín ọ̀rọ̀ ìjáde",
       "requests": "Àwọn ìbéèrè"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Àwọn iṣẹ́ tí a so pọ̀",
     "entrySubtitle": "GitHub, Slack, Linear àti àwọn mìíràn",
     "subtitle": "So àwọn irinṣẹ́ ìdàgbàsókè àti ìlànà iṣẹ́ rẹ pọ̀ mọ́ Kilo",
-    "emptyHint": "Kò tíì sí ìsopọ̀ kankan.",
     "disconnect": "Já ìsopọ̀",
     "disconnectTitle": "Ṣé o fẹ́ já ìsopọ̀ {{provider}}?",
     "disconnectMessage": "Kilo kò ní dáhùn mọ́ nínú {{provider}}. O lè tún un so pọ̀ nígbàkígbà.",

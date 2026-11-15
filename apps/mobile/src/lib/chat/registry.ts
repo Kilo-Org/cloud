@@ -50,6 +50,7 @@ import {
   moveMcpEnabled,
   setMcpEnabled as persistMcpEnabled,
 } from './kilo-mcp';
+import { releaseNativeModelRound } from './native-round-slot';
 import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
@@ -128,6 +129,23 @@ const questionsIn = (waiting: readonly Waiting[]): readonly Question[] =>
     ...(one.from == null ? {} : { from: one.from }),
   }));
 
+/**
+ * A tool-set change waiting for the chat to be free.
+ *
+ * `seq` identifies one change. A move copies the chat into a new object, so the
+ * acknowledgement must find the installed chat and must not clear a newer
+ * change raised while the move ran. The intent is left in place until the move
+ * that consumes it succeeds, so a failed move keeps it for the retry.
+ */
+type ToolSetIntent = { readonly kind: 'none' } | { readonly kind: 'pending'; readonly seq: number };
+
+let toolSetSeq = 0;
+
+const pendingToolsChange = (): ToolSetIntent => {
+  toolSetSeq += 1;
+  return { kind: 'pending', seq: toolSetSeq };
+};
+
 /** A chat that is open: the session behind it, and what it is doing. */
 type Chat = {
   readonly handle: SessionHandle;
@@ -141,7 +159,7 @@ type Chat = {
    * when it settles. The tool set is frozen for the life of a session, so it is
    * never changed under an answer that is still coming.
    */
-  pendingTools: boolean | undefined;
+  tools: ToolSetIntent;
   /**
    * The session's own total when the chat's usage last took from it. The SDK
    * counts from zero each time a session opens, so a new session starts here
@@ -351,7 +369,7 @@ export async function startChat(
     scope,
     answering: undefined,
     waiting: [],
-    pendingTools: undefined,
+    tools: { kind: 'none' },
     counted: new Map(),
     closing: false,
     ...place,
@@ -696,7 +714,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       scope,
       answering: undefined,
       waiting: [],
-      pendingTools: undefined,
+      tools: { kind: 'none' },
       counted: new Map(),
       closing: false,
       ...place,
@@ -1267,6 +1285,13 @@ async function settle(
     await forgetAsked(sessionId);
   }
   chat.answering = undefined;
+  if (failure !== null) {
+    /* A failed exchange ends without `halt`: it can fail between two tool rounds
+       — the model became unavailable while its tools ran — and the round left
+       waiting can never be answered. It is released here, or every other chat
+       on that model is refused until this one asks again. */
+    await releaseNativeModelRound(sessionId);
+  }
   change(sessionId, {
     turns,
     answering: [],
@@ -1301,16 +1326,16 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
      ones and its scope is closing. There is nothing left to move or to ask, and
      asking would wait on that close from inside the answer it is interrupting. */
   if (chat.closing) {
-    chat.pendingTools = undefined;
+    chat.tools = { kind: 'none' };
     chat.waiting.length = 0;
     return;
   }
   let current = sessionId;
-  if (chat.pendingTools !== undefined) {
-    chat.pendingTools = undefined;
+  if (chat.tools.kind === 'pending') {
     /* The names are computed from the switches as they stand now, so a choice
        made while the answer was arriving — the Kilo switch, a Retry, or the
-       settings group switch — all land on the same recomputation. */
+       settings group switch — all land on the same recomputation. The intent is
+       cleared only once the move lands, and on the chat the move installed. */
     try {
       /* Inside the chat's turn, and skippable: a close that is interrupting this
          very answer holds that turn, so a move queued behind it would wait on
@@ -1323,8 +1348,17 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
         if (live === undefined || live.closing) {
           return landed;
         }
+        const consumed = live.tools;
         try {
           const result = await ontoTools(landed, live);
+          const installed = chats.get(result);
+          if (
+            installed?.tools.kind === 'pending' &&
+            consumed.kind === 'pending' &&
+            installed.tools.seq === consumed.seq
+          ) {
+            installed.tools = { kind: 'none' };
+          }
           settleFlagApplications(result, 'current');
           return result;
         } catch (error) {
@@ -1340,10 +1374,6 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
       /* A backend can change while its answer arrives. Keep the tool change
          and the whole line for an explicit retry or a new, valid target. */
       current = snapshotOf(current).sessionId;
-      const held = chats.get(current);
-      if (held !== undefined) {
-        held.pendingTools = true;
-      }
       change(current, {
         failed: reason(error),
         failureKey: backendFailureKey(error, snapshotOf(current).model),
@@ -1430,7 +1460,7 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
           scope,
           answering: undefined,
           waiting: [],
-          pendingTools: undefined,
+          tools: { kind: 'none' },
           counted: new Map(),
           closing: false,
           ...place,
@@ -1544,8 +1574,8 @@ async function holdsTools(sessionId: string, names: readonly string[]): Promise<
  * names keeps its session.
  */
 async function ontoForUse(sessionId: string, target: ChatTarget, chat: Chat): Promise<string> {
-  const marked = chat.pendingTools !== undefined;
-  chat.pendingTools = undefined;
+  const consumed = chat.tools;
+  const marked = consumed.kind === 'pending';
   const names = targetSupportsTools(target.model)
     ? await chatToolNames(organizationIdOf(chat.org), sessionId, target.model)
     : [];
@@ -1555,10 +1585,23 @@ async function ontoForUse(sessionId: string, target: ChatTarget, chat: Chat): Pr
     stored.length === names.length &&
     stored.every((name, i) => name === names[i]);
   const tools = already || (stored === null && !marked) ? undefined : names;
-  return onto(chat, sessionId, {
+  const moved = await onto(chat, sessionId, {
     ...target,
     ...(tools === undefined ? {} : { tools }),
   });
+  /* The move copies the chat, so the intent is acknowledged on the object it
+     installed — and only when it is the same change: a newer one raised while
+     the move ran must survive to the next use. A move that failed throws
+     before this, leaving the intent for the retry. */
+  const installed = chats.get(moved);
+  if (
+    installed?.tools.kind === 'pending' &&
+    consumed.kind === 'pending' &&
+    installed.tools.seq === consumed.seq
+  ) {
+    installed.tools = { kind: 'none' };
+  }
+  return moved;
 }
 
 /**
@@ -1599,7 +1642,7 @@ async function ontoTools(sessionId: string, place: ChatPlace): Promise<string> {
  */
 export async function refreshChatTools(): Promise<void> {
   for (const chat of chats.values()) {
-    chat.pendingTools = true;
+    chat.tools = pendingToolsChange();
   }
   /* The marking is synchronous, and that is the point: the tap moves nothing.
      The promise is what lets the sheet await the tap finishing before it
@@ -1654,7 +1697,7 @@ async function applyFlag(
   if (chat?.answering !== undefined) {
     /* Never under an answer: the tool set would change between two rounds of
        one question. The settle applies it. */
-    chat.pendingTools ??= true;
+    chat.tools = pendingToolsChange();
     return 'moving';
   }
   await ontoTools(id, place);
@@ -1856,7 +1899,7 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
       return;
     }
     if (live.answering !== undefined) {
-      live.pendingTools ??= true;
+      live.tools = pendingToolsChange();
       return;
     }
     await ontoTools(landed, live);
@@ -1897,6 +1940,10 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
   await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
   change(sessionId, { status: 'idle', answering: [] });
+  /* An answer interrupted while its tools ran leaves an on-device generation
+     waiting for results nothing will supply. It is released here, the one place
+     Stop, a close, a deletion and a sign-out all pass through. */
+  await releaseNativeModelRound(sessionId);
   return true;
 }
 

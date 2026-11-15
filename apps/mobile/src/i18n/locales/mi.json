@@ -344,8 +344,6 @@
       "rowSubtitle": "Whakamahia te pire o tō ake kaiwhakarato",
       "manageOnWebReason": "E hiahia ana ēnei kaiwhakarato ki ngā tohu tuakiri whai hanganga.",
       "description": "Ko ngā tono mā ēnei kī ka pirehia ki tō pūkete kaiwhakarato, kaua ki tō toenga Kilo.",
-      "enabled": "E whakamahia ana",
-      "disabled": "Kua whakawetohia",
       "managedByPlan": "Kei tō mahere waehere e whakahaere",
       "enableKey": "Whakahohea te kī {{provider}}",
       "test": "Whakamātauhia te kī",
@@ -416,6 +414,7 @@
       "title": "Rīhīti pūrongo",
       "description": "Te rīhīti mō te pūrongo i tukuna e koe. Puritia tēnei ID hei tohutoro ā muri ake.",
       "receiptLabel": "Rīhīti",
+      "copyReceiptId": "Tāruatia te rīhīti ID",
       "appealLabel": "Pīra",
       "triageReceived": "Kua tae mai",
       "triageOpen": "Kei te arotakengia",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ngā tautuhinga rōpū i te ipurangi",
+      "integrations": "Ngā Tūhononga i te ipurangi",
       "usageDetails": "Ngā taipitopito whakamahinga",
       "providersAndModels": "Ngā kaiwhakarato me ngā tauira",
       "groups": "Ngā kāhui",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",
-      "last30Days": "Ngā rā e 30 kua hipa",
+      "orgLast30Days": "Ngā mema katoa · Ngā rā e 30 kua hipa",
       "outputTokens": "Ngā tōkena tāputa",
       "requests": "Ngā tono"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Ngā ratonga kua honoa",
     "entrySubtitle": "GitHub, Slack, Linear me ētahi atu",
     "subtitle": "Honoa ō taputapu whakawhanake me ō rerenga mahi ki Kilo",
-    "emptyHint": "Kāore anō kia honoa he tūhononga.",
     "disconnect": "Wetekia",
     "disconnectTitle": "Wetekia a {{provider}}?",
     "disconnectMessage": "Ka mutu tā Kilo whakautu i roto i {{provider}}. Ka taea e koe te hono anō i ngā wā katoa.",

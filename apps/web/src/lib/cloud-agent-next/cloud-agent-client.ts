@@ -67,8 +67,8 @@ import {
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
-} from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
-import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
+} from '@cloud-agent-shared/sandbox-status';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
 import { isTRPCErrorCode } from './cloud-agent-error';
 export type { SendMessagePayload } from './types.js';

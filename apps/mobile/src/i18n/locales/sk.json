@@ -344,8 +344,6 @@
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
       "manageOnWebReason": "Títo poskytovatelia vyžadujú štruktúrované prihlasovacie údaje.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
-      "enabled": "Používa sa",
-      "disabled": "Vypnuté",
       "managedByPlan": "Spravované tvojím plánom pre kódovanie",
       "enableKey": "Povoliť kľúč {{provider}}",
       "test": "Otestovať kľúč",
@@ -416,6 +414,7 @@
       "title": "Potvrdenie o nahlásení",
       "description": "Potvrdenie k nahláseniu, ktoré si odoslal. Uschovaj si toto ID, aby si sa naň mohol neskôr odvolávať.",
       "receiptLabel": "Potvrdenie",
+      "copyReceiptId": "Kopírovať ID potvrdenia",
       "appealLabel": "Odvolanie",
       "triageReceived": "Prijaté",
       "triageOpen": "Posudzuje sa",
@@ -3515,6 +3514,7 @@
     },
     "settingsOnWeb": {
       "title": "Nastavenia organizácie na webe",
+      "integrations": "Integrácie na webe",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelia a modely",
       "groups": "Skupiny",
@@ -3530,7 +3530,7 @@
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",
-      "last30Days": "Posledných 30 dní",
+      "orgLast30Days": "Všetci členovia · Posledných 30 dní",
       "outputTokens": "Výstupné tokeny",
       "requests": "Požiadavky"
     },
@@ -4545,7 +4545,6 @@
     "sectionTitle": "Pripojené služby",
     "entrySubtitle": "GitHub, Slack, Linear a ďalšie",
     "subtitle": "Prepojte svoje vývojárske nástroje a pracovné postupy s Kilo",
-    "emptyHint": "Zatiaľ nie sú pripojené žiadne integrácie.",
     "disconnect": "Odpojiť",
     "disconnectTitle": "Odpojiť {{provider}}?",
     "disconnectMessage": "Kilo prestane reagovať v službe {{provider}}. Kedykoľvek ju môžete znova pripojiť.",

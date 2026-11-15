@@ -344,8 +344,6 @@
       "rowSubtitle": "د خپل چمتو کوونکي بیلینګ وکاروئ",
       "manageOnWebReason": "دا چمتو کوونکي جوړښت لرونکو اعتبارنامو ته اړتیا لري.",
       "description": "د دې کیلیو له لارې د غوښتنو لګښت ستاسو د Kilo بیلانس پر ځای ستاسو د چمتو کوونکي په حساب بیل کېږي.",
-      "enabled": "کارول کېږي",
-      "disabled": "بند دی",
       "managedByPlan": "ستاسو د کوډینګ پلان له لارې اداره کېږي",
       "enableKey": "د {{provider}} کیلي فعاله کړئ",
       "test": "کیلي وازمویئ",
@@ -416,6 +414,7 @@
       "title": "د راپور رسید",
       "description": "د هغه راپور رسید چې تاسو سپارلی دی. دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
       "receiptLabel": "رسید",
+      "copyReceiptId": "د رسید ID کاپي کړئ",
       "appealLabel": "استیناف",
       "triageReceived": "ترلاسه شو",
       "triageOpen": "تر بیاکتنې لاندې",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "په ویب کې د سازمان ترتیبات",
+      "integrations": "په ویب کې ادغامونه",
       "usageDetails": "د کارونې جزئیات",
       "providersAndModels": "وړاندې کوونکي او ماډلونه",
       "groups": "ډلې",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "د ننوتنې ټوکنونه",
-      "last30Days": "وروستۍ ۳۰ ورځې",
+      "orgLast30Days": "ټول غړي · وروستۍ ۳۰ ورځې",
       "outputTokens": "د وتنې ټوکنونه",
       "requests": "غوښتنې"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "نښلول شوي خدمتونه",
     "entrySubtitle": "GitHub، Slack، Linear او نور",
     "subtitle": "خپل پراختیايي وسایل او کاري بهیرونه له Kilo سره ونښلوئ",
-    "emptyHint": "تر اوسه هیڅ ادغام نه دی نښلول شوی.",
     "disconnect": "اړیکه پرې کړئ",
     "disconnectTitle": "له {{provider}} سره اړیکه پرې کړئ؟",
     "disconnectMessage": "Kilo به نور په {{provider}} کې ځواب نه ورکوي. تاسو هر وخت بیا نښلولی شئ.",

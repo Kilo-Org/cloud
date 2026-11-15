@@ -344,8 +344,6 @@
       "rowSubtitle": "O'z provayderingiz orqali to'lash",
       "manageOnWebReason": "Bu provayderlar tuzilgan hisob ma'lumotlarini talab qiladi.",
       "description": "Bu kalitlar orqali yuborilgan so'rovlar uchun to'lov Kilo balansingizdan emas, provayder hisobingizdan olinadi.",
-      "enabled": "Foydalanilmoqda",
-      "disabled": "O'chirilgan",
       "managedByPlan": "Kodlash tarifingiz orqali boshqariladi",
       "enableKey": "{{provider}} kalitini yoqish",
       "test": "Kalitni sinash",
@@ -416,6 +414,7 @@
       "title": "Shikoyat kvitansiyasi",
       "description": "Siz yuborgan shikoyat kvitansiyasi. Keyinchalik unga murojaat qilish uchun ushbu ID ni saqlab qo'ying.",
       "receiptLabel": "Kvitansiya",
+      "copyReceiptId": "Kvitansiya identifikatorini nusxalash",
       "appealLabel": "Apellyatsiya",
       "triageReceived": "Qabul qilindi",
       "triageOpen": "Ko'rib chiqilmoqda",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Veb-saytdagi tashkilot sozlamalari",
+      "integrations": "Veb-saytdagi integratsiyalar",
       "usageDetails": "Foydalanish tafsilotlari",
       "providersAndModels": "Provayderlar va modellar",
       "groups": "Guruhlar",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",
-      "last30Days": "Oxirgi 30 kun",
+      "orgLast30Days": "Barcha a'zolar · Oxirgi 30 kun",
       "outputTokens": "Chiqish tokenlari",
       "requests": "So'rovlar"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Ulangan xizmatlar",
     "entrySubtitle": "GitHub, Slack, Linear va boshqalar",
     "subtitle": "Ishlab chiqish vositalaringiz va ish jarayonlaringizni Kilo bilan ulang",
-    "emptyHint": "Hali hech qanday integratsiya ulanmagan.",
     "disconnect": "Uzish",
     "disconnectTitle": "{{provider}} xizmati uzilsinmi?",
     "disconnectMessage": "Kilo endi {{provider}} xizmatida javob bermaydi. Istalgan vaqtda qayta ulashingiz mumkin.",

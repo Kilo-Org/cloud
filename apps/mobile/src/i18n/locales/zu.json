@@ -344,8 +344,6 @@
       "rowSubtitle": "Sebenzisa ukukhokhisa komhlinzeki wakho",
       "manageOnWebReason": "Laba bahlinzeki badinga imininingwane yokungena ehlelekile.",
       "description": "Izicelo ezenziwa ngalaba khiye zikhokhiswa ku-akhawunti yakho yomhlinzeki esikhundleni sebhalansi yakho ye-Kilo.",
-      "enabled": "Uyasetshenziswa",
-      "disabled": "Uvaliwe",
       "managedByPlan": "Uphethwe uhlelo lwakho lokukhoda",
       "enableKey": "Vula ukhiye we-{{provider}}",
       "test": "Hlola ukhiye",
@@ -416,6 +414,7 @@
       "title": "Irisidi lombiko",
       "description": "Irisidi lombiko owuthumelile. Gcina le-ID ukuze ubhekisele kuwo kamuva.",
       "receiptLabel": "Irisidi",
+      "copyReceiptId": "Kopisha i-ID yerisidi",
       "appealLabel": "Isikhalo",
       "triageReceived": "Wamukelwe",
       "triageOpen": "Uyabuyekezwa",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Izilungiselelo zenhlangano kuwebhu",
+      "integrations": "Ukuhlanganiswa kuwebhu",
       "usageDetails": "Imininingwane yokusetshenziswa",
       "providersAndModels": "Abahlinzeki namamodeli",
       "groups": "Amaqembu",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",
-      "last30Days": "Izinsuku ezingama-30 ezedlule",
+      "orgLast30Days": "Amalungu onke · Izinsuku ezingama-30 ezedlule",
       "outputTokens": "Amathokheni okukhishiwe",
       "requests": "Izicelo"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Amasevisi axhunyiwe",
     "entrySubtitle": "GitHub, Slack, Linear nokunye",
     "subtitle": "Xhuma amathuluzi akho okuthuthukisa nezinqubo zokusebenza ku-Kilo",
-    "emptyHint": "Akukabi khona ukuhlanganiswa okuxhunyiwe.",
     "disconnect": "Nqamula",
     "disconnectTitle": "Nqamula i-{{provider}}?",
     "disconnectMessage": "I-Kilo izoyeka ukuphendula ku-{{provider}}. Ungaphinda uxhume noma nini.",

@@ -82,6 +82,12 @@ function ProviderRow({
  * server's sentence as written. That inline status is the screen's single
  * announcement owner, so no toast repeats it.
  *
+ * The screen refuses a last-method tap itself, without asking the server, and
+ * that sentence retires as soon as the loaded list shows a second method; a
+ * server refusal stands until the screen refuses a later tap itself or the
+ * server answers again, because the server's answer is about the account, not
+ * about the list this render drew.
+ *
  * Adding a method is the web's round trip (the OAuth callback needs the browser
  * session that starts it), so the row opens the connected-accounts page in the
  * in-app browser; the list refreshes when the reader comes back.
@@ -92,13 +98,22 @@ export function LoginMethodsScreen() {
   const queryClient = useQueryClient();
   const { confirm, dialog } = useConfirmDialog();
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
+  // The screen's own refusal, kept apart from a server refusal: it describes the
+  // one-method list the reader tapped on, so a list that later shows two methods
+  // retires it instead of leaving a sentence the reader can check.
+  const [lastMethodRefusal, setLastMethodRefusal] = useState(false);
   useRouteForegroundRefresh([[['user']]]);
 
   const providers = useQuery(trpc.user.getAuthProviders.queryOptions());
+  const methodCount = providers.data?.providers.length ?? 0;
+  // The screen's refusal only holds for the one-method list that produced it.
+  const statusMessage =
+    lastMethodRefusal && methodCount < 2 ? t('profile.signInMethods.lastMethod') : unlinkError;
   const unlink = useMutation(
     trpc.user.unlinkAuthProvider.mutationOptions({
       onSuccess: (_result, input) => {
         setUnlinkError(null);
+        setLastMethodRefusal(false);
         void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
         announcingToast.success(
           t('profile.signInMethods.unlinked', { provider: providerLabel(input.provider) })
@@ -126,6 +141,17 @@ export function LoginMethodsScreen() {
   );
 
   const confirmUnlink = (provider: AuthProviderId) => {
+    // The server refuses the last method, so a confirmation would promise an
+    // outcome this tap cannot deliver.
+    if (methodCount < 2) {
+      setLastMethodRefusal(true);
+      // This tap answers for the list it drew, so an answer to an earlier tap
+      // must not wait behind it: once the refusal retires, that sentence would
+      // sit beside rows it never described.
+      setUnlinkError(null);
+      return;
+    }
+    setLastMethodRefusal(false);
     const label = providerLabel(provider);
     confirm({
       title: t('profile.signInMethods.unlinkTitle', { provider: label }),
@@ -185,7 +211,7 @@ export function LoginMethodsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {body}
-        <AccessibleStatus message={unlinkError} className="text-sm" />
+        <AccessibleStatus message={statusMessage} className="text-sm" />
         <ConfigureRow
           icon={Plus}
           title={t('profile.signInMethods.linkAnother')}

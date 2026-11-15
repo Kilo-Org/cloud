@@ -344,8 +344,6 @@
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
       "manageOnWebReason": "Diese Anbieter benötigen strukturierte Anmeldedaten.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
-      "enabled": "Aktiv",
-      "disabled": "Deaktiviert",
       "managedByPlan": "Von deinem Coding-Plan verwaltet",
       "enableKey": "{{provider}}-Schlüssel aktivieren",
       "test": "Schlüssel testen",
@@ -416,6 +414,7 @@
       "title": "Meldebestätigung",
       "description": "Die Bestätigung für deine eingereichte Meldung. Bewahre diese ID auf, um später darauf Bezug zu nehmen.",
       "receiptLabel": "Bestätigung",
+      "copyReceiptId": "Bestätigungs-ID kopieren",
       "appealLabel": "Einspruch",
       "triageReceived": "Eingegangen",
       "triageOpen": "In Prüfung",
@@ -3414,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisationseinstellungen im Web",
+      "integrations": "Integrationen im Web",
       "usageDetails": "Nutzungsdetails",
       "providersAndModels": "Anbieter und Modelle",
       "groups": "Gruppen",
@@ -3429,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",
-      "last30Days": "Letzte 30 Tage",
+      "orgLast30Days": "Alle Mitglieder · Letzte 30 Tage",
       "outputTokens": "Ausgabe-Tokens",
       "requests": "Anfragen"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Verbundene Dienste",
     "entrySubtitle": "GitHub, Slack, Linear und mehr",
     "subtitle": "Verbinde deine Entwicklungstools und Workflows mit Kilo",
-    "emptyHint": "Noch keine Integrationen verbunden.",
     "disconnect": "Trennen",
     "disconnectTitle": "{{provider}} trennen?",
     "disconnectMessage": "Kilo reagiert dann nicht mehr in {{provider}}. Du kannst die Verbindung jederzeit wiederherstellen.",

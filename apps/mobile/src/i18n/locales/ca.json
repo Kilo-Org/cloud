@@ -344,8 +344,6 @@
       "rowSubtitle": "Utilitza la facturació del teu proveïdor",
       "manageOnWebReason": "Aquests proveïdors necessiten credencials estructurades.",
       "description": "Les sol·licituds fetes amb aquestes claus es facturen al teu compte del proveïdor en lloc del saldo de Kilo.",
-      "enabled": "En ús",
-      "disabled": "Desactivada",
       "managedByPlan": "Gestionada pel teu pla de programació",
       "enableKey": "Activa la clau de {{provider}}",
       "test": "Prova la clau",
@@ -416,6 +414,7 @@
       "title": "Comprovant de la denúncia",
       "description": "El comprovant de la denúncia que has enviat. Conserva aquest identificador per consultar-la més endavant.",
       "receiptLabel": "Comprovant",
+      "copyReceiptId": "Copia l'identificador del comprovant",
       "appealLabel": "Apel·lació",
       "triageReceived": "Rebuda",
       "triageOpen": "En revisió",
@@ -3462,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Configuració de l'organització al web",
+      "integrations": "Integracions al web",
       "usageDetails": "Detalls d'ús",
       "providersAndModels": "Proveïdors i models",
       "groups": "Grups",
@@ -3477,7 +3477,7 @@
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",
-      "last30Days": "Últims 30 dies",
+      "orgLast30Days": "Tots els membres · Últims 30 dies",
       "outputTokens": "Tòkens de sortida",
       "requests": "Sol·licituds"
     },
@@ -4480,7 +4480,6 @@
     "sectionTitle": "Serveis connectats",
     "entrySubtitle": "GitHub, Slack, Linear i més",
     "subtitle": "Connecta les teves eines i fluxos de treball de desenvolupament a Kilo",
-    "emptyHint": "Encara no hi ha cap integració connectada.",
     "disconnect": "Desconnecta",
     "disconnectTitle": "Vols desconnectar {{provider}}?",
     "disconnectMessage": "Kilo deixarà de respondre a {{provider}}. Pots tornar a connectar-lo en qualsevol moment.",

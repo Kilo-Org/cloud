@@ -344,8 +344,6 @@
       "rowSubtitle": "Använd din egen leverantörsfakturering",
       "manageOnWebReason": "Dessa leverantörer kräver strukturerade autentiseringsuppgifter.",
       "description": "Förfrågningar via dessa nycklar faktureras ditt leverantörskonto i stället för ditt Kilo-saldo.",
-      "enabled": "Används",
-      "disabled": "Avstängd",
       "managedByPlan": "Hanteras av din kodningsplan",
       "enableKey": "Aktivera nyckeln för {{provider}}",
       "test": "Testa nyckel",
@@ -416,6 +414,7 @@
       "title": "Kvitto på anmälan",
       "description": "Kvittot för anmälan som du skickade in. Spara detta id för att kunna hänvisa till den senare.",
       "receiptLabel": "Kvitto",
+      "copyReceiptId": "Kopiera kvittoid",
       "appealLabel": "Överklagande",
       "triageReceived": "Mottagen",
       "triageOpen": "Granskas",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsinställningar på webben",
+      "integrations": "Integrationer på webben",
       "usageDetails": "Användningsdetaljer",
       "providersAndModels": "Leverantörer och modeller",
       "groups": "Grupper",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Inmatade token",
-      "last30Days": "Senaste 30 dagarna",
+      "orgLast30Days": "Alla medlemmar · Senaste 30 dagarna",
       "outputTokens": "Utmatade token",
       "requests": "Begäranden"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Anslutna tjänster",
     "entrySubtitle": "GitHub, Slack, Linear med flera",
     "subtitle": "Anslut dina utvecklingsverktyg och arbetsflöden till Kilo",
-    "emptyHint": "Inga integrationer har anslutits än.",
     "disconnect": "Koppla från",
     "disconnectTitle": "Koppla från {{provider}}?",
     "disconnectMessage": "Kilo slutar svara i {{provider}}. Du kan ansluta igen när som helst.",

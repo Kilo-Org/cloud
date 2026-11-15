@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from 'react';
 import { type TextInput } from 'react-native';
 
 import { prLinkDraft } from '@/lib/pr-review/pr-link-draft';
-import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import {
   decidePrLinkOpen,
   type PrLinkOpenState,
@@ -22,10 +21,6 @@ export function usePrLinkField() {
   // programmatic paste.
   const inputRef = useRef<TextInput>(null);
   const textRef = useRef<string>(prLinkDraft.text);
-  // Values written via setNativeProps, so a late matching onChangeText is
-  // treated as a programmatic echo instead of clobbering the ref.
-  // Order-agnostic membership so double-taps and delayed native echoes work.
-  const pendingProgrammaticTextsRef = useRef<string[]>([]);
   const [hasInput, setHasInput] = useState(prLinkDraft.text.length > 0);
   const [linkState, setLinkState] = useState<PrLinkOpenState>(
     selectPrLinkOpenState(prLinkDraft.text)
@@ -39,10 +34,8 @@ export function usePrLinkField() {
   /** Replace the field: native text, ref, draft and derived UI together. */
   const writeField = useCallback(
     (text: string) => {
-      pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
-        pendingProgrammaticTextsRef.current,
-        text
-      );
+      /* The ref first: a synchronous echo of setNativeProps then hits the
+         no-op in `handleFieldChange` instead of moving the ref to it. */
       textRef.current = text;
       prLinkDraft.text = text;
       inputRef.current?.setNativeProps({ text });
@@ -51,14 +44,13 @@ export function usePrLinkField() {
     [updateInputState]
   );
 
-  /** The field's own onChangeText: ref and draft, skipping programmatic echoes. */
+  /** The field's own onChangeText. The ref follows what the field displays, so Open always acts on the shown link. */
   const handleFieldChange = useCallback(
     (value: string) => {
-      const decision = consumePrLinkInputEcho(pendingProgrammaticTextsRef.current, value);
-      pendingProgrammaticTextsRef.current = [...decision.pending];
-      if (decision.kind === 'echo') {
-        // Echo of setNativeProps: textRef already holds the intentional
-        // value from writeField — do not clobber it with a delayed/stale echo.
+      if (value === textRef.current) {
+        /* `writeField` already holds this value: this is its setNativeProps
+           echo, or a person retyping the text that is already shown. Both need
+           no write. */
         return;
       }
       textRef.current = value;
@@ -72,7 +64,7 @@ export function usePrLinkField() {
    * Empty the field after real typing. clear() is the iOS-safe native empty:
    * setNativeProps({ text: '' }) loses the most-recent-event-count race and
    * leaves the typed text visible while React state thinks the field is
-   * empty. No echo is pushed for '' — a non-arriving echo would stale the FIFO.
+   * empty.
    */
   const clearField = useCallback(() => {
     textRef.current = '';

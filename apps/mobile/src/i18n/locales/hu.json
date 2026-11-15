@@ -344,8 +344,6 @@
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
       "manageOnWebReason": "Ezekhez a szolgáltatókhoz strukturált hitelesítő adatok szükségesek.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
-      "enabled": "Használatban",
-      "disabled": "Kikapcsolva",
       "managedByPlan": "A kódolási csomagod kezeli",
       "enableKey": "A(z) {{provider}} kulcs engedélyezése",
       "test": "Kulcs tesztelése",
@@ -416,6 +414,7 @@
       "title": "Bejelentés visszaigazolása",
       "description": "Az általad beküldött bejelentés visszaigazolása. Őrizd meg ezt az azonosítót, hogy később hivatkozhass rá.",
       "receiptLabel": "Visszaigazolás",
+      "copyReceiptId": "Visszaigazolás azonosítójának másolása",
       "appealLabel": "Fellebbezés",
       "triageReceived": "Beérkezett",
       "triageOpen": "Felülvizsgálat alatt",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Szervezeti beállítások a weben",
+      "integrations": "Integrációk a weben",
       "usageDetails": "Használati részletek",
       "providersAndModels": "Szolgáltatók és modellek",
       "groups": "Csoportok",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",
-      "last30Days": "Elmúlt 30 nap",
+      "orgLast30Days": "Összes tag · Elmúlt 30 nap",
       "outputTokens": "Kimeneti tokenek",
       "requests": "Kérések"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Csatlakoztatott szolgáltatások",
     "entrySubtitle": "GitHub, Slack, Linear és még sok más",
     "subtitle": "Csatlakoztasd a fejlesztői eszközeidet és munkafolyamataidat a Kilo-fiókodhoz",
-    "emptyHint": "Még nincs csatlakoztatott integráció.",
     "disconnect": "Leválasztás",
     "disconnectTitle": "{{provider}} leválasztása?",
     "disconnectMessage": "A Kilo többé nem fog válaszolni itt: {{provider}}. Bármikor újra csatlakoztathatod.",

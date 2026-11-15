@@ -344,8 +344,6 @@
       "rowSubtitle": "Úsáid billeáil do sholáthraí féin",
       "manageOnWebReason": "Teastaíonn dintiúir struchtúrtha ó na soláthraithe seo.",
       "description": "Gearrtar iarratais a dhéantar trí na heochracha seo ar do chuntas soláthraí in ionad d'iarmhéid Kilo.",
-      "enabled": "In úsáid",
-      "disabled": "Múchta",
       "managedByPlan": "Á bhainistiú ag do phlean códaithe",
       "enableKey": "Cumasaigh an eochair {{provider}}",
       "test": "Tástáil an eochair",
@@ -416,6 +414,7 @@
       "title": "Admháil tuairisce",
       "description": "An admháil don tuairisc a chuir tú isteach. Coinnigh an t-aitheantas seo chun tagairt di níos déanaí.",
       "receiptLabel": "Admháil",
+      "copyReceiptId": "Cóipeáil aitheantas na hadmhála",
       "appealLabel": "Achomharc",
       "triageReceived": "Faighte",
       "triageOpen": "Á athbhreithniú",
@@ -3568,6 +3567,7 @@
     },
     "settingsOnWeb": {
       "title": "Socruithe eagraíochta ar an ngréasán",
+      "integrations": "Comhtháthuithe ar an ngréasán",
       "usageDetails": "Sonraí úsáide",
       "providersAndModels": "Soláthraithe agus samhlacha",
       "groups": "Grúpaí",
@@ -3583,7 +3583,7 @@
     },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",
-      "last30Days": "Na 30 lá deireanacha",
+      "orgLast30Days": "Na baill go léir · Na 30 lá deireanacha",
       "outputTokens": "Comharthaí aschuir",
       "requests": "Iarratais"
     },
@@ -4610,7 +4610,6 @@
     "sectionTitle": "Seirbhísí ceangailte",
     "entrySubtitle": "GitHub, Slack, Linear agus tuilleadh",
     "subtitle": "Ceangail d'uirlisí forbartha agus do shreafaí oibre le Kilo",
-    "emptyHint": "Níl aon chomhtháthú ceangailte fós.",
     "disconnect": "Dícheangail",
     "disconnectTitle": "An bhfuil fonn ort {{provider}} a dhícheangal?",
     "disconnectMessage": "Stopfaidh Kilo de bheith ag freagairt in {{provider}}. Is féidir leat athcheangal am ar bith.",

@@ -344,8 +344,6 @@
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
       "manageOnWebReason": "Kailangan ng mga provider na ito ng mga structured na credential.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
-      "enabled": "Ginagamit",
-      "disabled": "Naka-off",
       "managedByPlan": "Pinamamahalaan ng iyong coding plan",
       "enableKey": "I-enable ang key ng {{provider}}",
       "test": "Subukan ang key",
@@ -416,6 +414,7 @@
       "title": "Resibo ng ulat",
       "description": "Ang resibo para sa ulat na isinumite mo. Itago ang id na ito para magamit na sanggunian sa ibang pagkakataon.",
       "receiptLabel": "Resibo",
+      "copyReceiptId": "Kopyahin ang id ng resibo",
       "appealLabel": "Apela",
       "triageReceived": "Natanggap",
       "triageOpen": "Sinusuri",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Mga setting ng organisasyon sa web",
+      "integrations": "Mga Integration sa web",
       "usageDetails": "Mga detalye ng paggamit",
       "providersAndModels": "Mga provider at model",
       "groups": "Mga grupo",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
-      "last30Days": "Huling 30 araw",
+      "orgLast30Days": "Lahat ng miyembro · Huling 30 araw",
       "outputTokens": "Mga palabas na token",
       "requests": "Mga kahilingan"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "Mga nakakonektang serbisyo",
     "entrySubtitle": "GitHub, Slack, Linear at iba pa",
     "subtitle": "Ikonekta ang iyong mga development tool at workflow sa Kilo",
-    "emptyHint": "Wala pang nakakonektang integration.",
     "disconnect": "Idiskonekta",
     "disconnectTitle": "Idiskonekta ang {{provider}}?",
     "disconnectMessage": "Hihinto na ang Kilo sa pagtugon sa {{provider}}. Maaari kang kumonekta muli anumang oras.",

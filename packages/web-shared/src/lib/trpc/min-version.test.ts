@@ -12,12 +12,7 @@ jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
 import type { AppHeaderList } from '@kilocode/web-shared/lib/app-headers';
 import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { FAILURE_BACKOFF_MS } from '../cached-fetch';
-import {
-  appUpdateRequiredError,
-  enforceMinimumVersion,
-  isMobileClient,
-  type MinimumVersions,
-} from './min-version';
+import { appUpdateRequiredError, enforceMinimumVersion, type MinimumVersions } from './min-version';
 
 // getMinimumVersions holds a module-level cache, so re-import for a fresh cache.
 let getMinimumVersions: () => Promise<MinimumVersions | null>;
@@ -35,19 +30,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockReadDb.select.mockReturnValue({
     from: jest.fn().mockReturnValue({ limit: limitMock }),
-  });
-});
-
-describe('isMobileClient', () => {
-  test('is false for an absent or non-mobile client', () => {
-    expect(isMobileClient(undefined)).toBe(false);
-    expect(isMobileClient(null)).toBe(false);
-    expect(isMobileClient(headers({}))).toBe(false);
-    expect(isMobileClient(headers({ 'x-kilo-client': 'web' }))).toBe(false);
-  });
-
-  test('is true for a mobile client', () => {
-    expect(isMobileClient(headers({ 'x-kilo-client': 'mobile' }))).toBe(true);
   });
 });
 

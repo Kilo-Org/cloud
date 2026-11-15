@@ -344,8 +344,6 @@
       "rowSubtitle": "તમારા પોતાના પ્રદાતાના બિલિંગનો ઉપયોગ કરો",
       "manageOnWebReason": "આ પ્રદાતાઓને સંરચિત ઓળખપત્રોની જરૂર છે.",
       "description": "આ કી દ્વારા થતી વિનંતીઓનું બિલ તમારા Kilo બેલેન્સને બદલે તમારા પ્રદાતા એકાઉન્ટમાં લાગે છે.",
-      "enabled": "ઉપયોગમાં",
-      "disabled": "બંધ",
       "managedByPlan": "તમારા કોડિંગ પ્લાન દ્વારા સંચાલિત",
       "enableKey": "{{provider}} કી ચાલુ કરો",
       "test": "કી ચકાસો",
@@ -416,6 +414,7 @@
       "title": "રિપોર્ટની રસીદ",
       "description": "તમે સબમિટ કરેલા રિપોર્ટની રસીદ. પછીથી તેનો સંદર્ભ આપવા માટે આ ID સાચવી રાખો.",
       "receiptLabel": "રસીદ",
+      "copyReceiptId": "રસીદ ID કૉપી કરો",
       "appealLabel": "અપીલ",
       "triageReceived": "પ્રાપ્ત થયો",
       "triageOpen": "સમીક્ષા હેઠળ",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "વેબ પર સંસ્થાના સેટિંગ્સ",
+      "integrations": "વેબ પર ઇન્ટિગ્રેશન્સ",
       "usageDetails": "વપરાશની વિગતો",
       "providersAndModels": "પ્રોવાઇડર અને મોડેલ",
       "groups": "ગ્રુપ",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",
-      "last30Days": "છેલ્લા 30 દિવસ",
+      "orgLast30Days": "બધા સભ્યો · છેલ્લા 30 દિવસ",
       "outputTokens": "આઉટપુટ ટોકન",
       "requests": "વિનંતીઓ"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "કનેક્ટ કરેલી સેવાઓ",
     "entrySubtitle": "GitHub, Slack, Linear અને વધુ",
     "subtitle": "તમારા ડેવલપમેન્ટ ટૂલ્સ અને વર્કફ્લોને Kilo સાથે કનેક્ટ કરો",
-    "emptyHint": "હજી સુધી કોઈ ઇન્ટિગ્રેશન કનેક્ટ કરેલું નથી.",
     "disconnect": "ડિસ્કનેક્ટ કરો",
     "disconnectTitle": "{{provider}} ડિસ્કનેક્ટ કરીએ?",
     "disconnectMessage": "Kilo {{provider}}માં જવાબ આપવાનું બંધ કરશે. તમે ગમે ત્યારે ફરીથી કનેક્ટ કરી શકો છો.",

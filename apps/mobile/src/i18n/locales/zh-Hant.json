@@ -344,8 +344,6 @@
       "rowSubtitle": "使用你自己的供應商計費",
       "manageOnWebReason": "這些供應商需要結構化憑證",
       "description": "透過這些金鑰發出的請求會向你的供應商帳戶計費，而不會從你的 Kilo 餘額扣除。",
-      "enabled": "使用中",
-      "disabled": "已關閉",
       "managedByPlan": "由你的程式設計方案管理",
       "enableKey": "啟用 {{provider}} 金鑰",
       "test": "測試金鑰",
@@ -416,6 +414,7 @@
       "title": "檢舉回執",
       "description": "這是你所提交檢舉的回執。請保留此 ID，以便日後查詢。",
       "receiptLabel": "回執",
+      "copyReceiptId": "複製回執 ID",
       "appealLabel": "申訴",
       "triageReceived": "已收到",
       "triageOpen": "審查中",
@@ -3414,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "網頁版組織設定",
+      "integrations": "網頁版整合",
       "usageDetails": "使用詳情",
       "providersAndModels": "供應商與模型",
       "groups": "群組",
@@ -3429,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
-      "last30Days": "最近 30 天",
+      "orgLast30Days": "全體成員 · 最近 30 天",
       "outputTokens": "輸出詞元",
       "requests": "請求"
     },
@@ -4415,7 +4415,6 @@
     "sectionTitle": "已連結的服務",
     "entrySubtitle": "GitHub、Slack、Linear 等",
     "subtitle": "將您的開發工具與工作流程連結至 Kilo",
-    "emptyHint": "尚未連結任何整合。",
     "disconnect": "中斷連結",
     "disconnectTitle": "要中斷與 {{provider}} 的連結嗎？",
     "disconnectMessage": "Kilo 將停止在 {{provider}} 中回應。您可以隨時重新連結。",

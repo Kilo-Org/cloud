@@ -1,5 +1,6 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
@@ -80,11 +81,32 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' })
 const BUTTON = 'Button' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
+let queryClient: QueryClient | undefined = undefined;
 
 async function mount() {
   const view = await renderWithProviders(createElement(LoginMethodsScreen));
   renderer = view.renderer;
+  queryClient = view.queryClient;
   return view.renderer.root;
+}
+
+/**
+ * Re-render the mounted screen under the providers it was mounted with, so the
+ * tree keeps its state. Rendering the screen bare would mount a second tree and
+ * drop exactly the state under test.
+ */
+function rerender() {
+  if (!renderer || !queryClient) {
+    throw new Error('screen is not mounted');
+  }
+  const tree = createElement(
+    QueryClientProvider,
+    { client: queryClient },
+    createElement(LoginMethodsScreen)
+  );
+  act(() => {
+    renderer?.update(tree);
+  });
 }
 
 function unlinkButtons(root: ReactTestRenderer['root']) {
@@ -116,6 +138,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  queryClient = undefined;
 });
 
 describe('LoginMethodsScreen', () => {
@@ -145,6 +168,92 @@ describe('LoginMethodsScreen', () => {
       lastConfirm().onConfirm();
     });
     expect(state.mutate).toHaveBeenCalledWith({ provider: 'github' });
+  });
+
+  it('refuses to ask when a single linked method is the one being unlinked', async () => {
+    state.providers = [{ provider: 'github', email: 'ada@example.test' }];
+    const root = await mount();
+    const [github] = unlinkButtons(root);
+    if (!github) {
+      throw new Error('missing GitHub unlink button');
+    }
+
+    act(() => {
+      (github.props.onPress as () => void)();
+    });
+
+    expect(state.confirm).not.toHaveBeenCalled();
+    const status = root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
+    expect(status.map(node => node.props.message)).toEqual([
+      "You can't unlink your only sign-in method. Link another method first.",
+    ]);
+    expect(state.mutate).not.toHaveBeenCalled();
+
+    // The reader links a second method and the foreground refresh hands this same
+    // mounted tree a two-method list.
+    state.providers = [
+      { provider: 'github', email: 'ada@example.test' },
+      { provider: 'google', email: 'ada@example.test' },
+    ];
+    rerender();
+
+    if (!renderer) {
+      throw new Error('missing mounted tree');
+    }
+    expect(unlinkButtons(renderer.root)).toHaveLength(2);
+    const retired = renderer.root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
+    expect(retired.map(node => node.props.message)).toEqual([null]);
+  });
+
+  it('drops an earlier server answer when a later tap is refused locally', async () => {
+    const root = await mount();
+
+    act(() => {
+      state.mutations[0]?.onError?.(
+        Object.assign(new Error('User does not have a linked github account'), {
+          data: { upstreamCode: 'sign_in_method_not_linked' },
+        }),
+        { provider: 'github' }
+      );
+    });
+    expect(
+      root.findAll(node => Object.is(node.type, 'AccessibleStatus')).map(node => node.props.message)
+    ).toEqual(['GitHub is no longer linked to your account.']);
+
+    // The reload lands a one-method list, so the tap is refused before the server
+    // is asked and that sentence masks the server's earlier answer.
+    state.providers = [{ provider: 'github', email: 'ada@example.test' }];
+    rerender();
+    if (!renderer) {
+      throw new Error('missing mounted tree');
+    }
+    const [github] = unlinkButtons(renderer.root);
+    if (!github) {
+      throw new Error('missing GitHub unlink button');
+    }
+    act(() => {
+      (github.props.onPress as () => void)();
+    });
+    expect(state.confirm).not.toHaveBeenCalled();
+    expect(
+      renderer.root
+        .findAll(node => Object.is(node.type, 'AccessibleStatus'))
+        .map(node => node.props.message)
+    ).toEqual(["You can't unlink your only sign-in method. Link another method first."]);
+
+    // Linking a second method retires the local refusal, and the retired server
+    // answer must not come back in its place.
+    state.providers = [
+      { provider: 'github', email: 'ada@example.test' },
+      { provider: 'google', email: 'ada@example.test' },
+    ];
+    rerender();
+    expect(unlinkButtons(renderer.root)).toHaveLength(2);
+    expect(
+      renderer.root
+        .findAll(node => Object.is(node.type, 'AccessibleStatus'))
+        .map(node => node.props.message)
+    ).toEqual([null]);
   });
 
   it('reports the last-method rule beside the list in the screen language', async () => {

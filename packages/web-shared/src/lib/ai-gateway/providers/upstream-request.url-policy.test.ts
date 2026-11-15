@@ -1,7 +1,12 @@
 import { lookup } from 'node:dns/promises';
 import type { LookupAddress } from 'node:dns';
+import type { Dispatcher } from 'undici';
 import { buildDirectProvider } from './build-direct-provider';
-import { clearUpstreamConnectionCache, lookupPinnedUpstreamAddress } from './upstream-connection';
+import {
+  clearUpstreamConnectionCache,
+  lookupPinnedUpstreamAddress,
+  upstreamDispatcherFor,
+} from './upstream-connection';
 import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
 
@@ -118,11 +123,18 @@ describe('upstreamRequest upstream URL policy', () => {
 
     it('pins the checked address the request dials', async () => {
       lookupMock.mockResolvedValue([{ address: '104.18.2.115', family: 4 }]);
-      mockFetch();
+      const fetchMock = mockFetch();
 
       await send(directProvider('https://llm.example.com/v1'));
 
       expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.2.115', 4]]);
+      const [, init] = fetchMock.mock.calls[0];
+      const dispatcher = (init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)
+        ?.dispatcher;
+      // undici exposes the connect options of an Agent only behind private
+      // symbols, so the pool's identity is the public proof that this request
+      // dials the checked host with the address pinned above.
+      expect(dispatcher).toBe(upstreamDispatcherFor('llm.example.com', ['104.18.2.115']));
     });
 
     it('keeps the first checked address when a second resolution would answer another', async () => {
@@ -230,6 +242,7 @@ describe('upstreamRequest upstream URL policy', () => {
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe('http://localhost:8080/v1/chat/completions');
       expect(init?.redirect).toBe('follow');
+      expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
     }
   );
 });

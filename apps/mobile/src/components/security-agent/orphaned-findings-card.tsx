@@ -15,7 +15,11 @@ import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-/** The delete's own refusal; the mutation hook's toast owns the copy. */
+/**
+ * The adapter's failure type. A refused delete is never filed: the mutation
+ * hook's toast owns the copy and the row renders only its pending phase, so the
+ * admission is released instead of settled.
+ */
 type DeleteRepositoryFailure = { readonly kind: 'delete-failed' };
 
 /**
@@ -60,12 +64,13 @@ export function OrphanedFindingsCard({
         void (async () => {
           try {
             await removeFindings.mutateAsync(repository.repoFullName);
-            // The refetch dropping the row is the delete's own new state.
-            attempt.abandon();
           } catch {
-            // The mutation hook's toast names the failure; the row goes live.
-            attempt.fail({ kind: 'delete-failed' });
+            // The mutation hook's toast names the failure.
           }
+          // The refetch dropping the row is the delete's own new state, and a
+          // refusal has no copy on the row: either way the row goes live again
+          // with nothing left in the store.
+          attempt.abandon();
         })();
       },
     });

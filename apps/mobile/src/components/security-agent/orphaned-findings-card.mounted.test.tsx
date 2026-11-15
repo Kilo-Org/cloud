@@ -5,6 +5,8 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SurfaceFeedbackModule from '@/lib/surface-feedback';
+
 import { i18n } from '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -78,6 +80,25 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
 
+/** The one part of a surface store a case can read from outside the card. */
+type RecordedSnapshot = { readonly states: ReadonlyMap<string, unknown> };
+type RecordedStore = { getSnapshot: () => RecordedSnapshot };
+
+/** Every surface store the adapters created, so a case can see what a settle left. */
+const stores = vi.hoisted(() => ({ all: [] as RecordedStore[] }));
+
+vi.mock('@/lib/surface-feedback', async importOriginal => {
+  const actual = await importOriginal<typeof SurfaceFeedbackModule>();
+  return {
+    ...actual,
+    createSurfaceFeedbackStore: () => {
+      const created: RecordedStore = actual.createSurfaceFeedbackStore();
+      stores.all.push(created);
+      return created;
+    },
+  };
+});
+
 /** The Clear control of one repository row. */
 function clearButton(renderer: TestRenderer.ReactTestRenderer, repoFullName: string) {
   const label = i18n.t('securityAgent.orphanedFindings.clearLabel', { repository: repoFullName });
@@ -115,6 +136,7 @@ async function confirmClear(renderer: TestRenderer.ReactTestRenderer, repoFullNa
 beforeEach(() => {
   world.deletes.length = 0;
   world.confirm.mockReset();
+  stores.all.length = 0;
 });
 
 describe('OrphanedFindingsCard delete phase', () => {
@@ -145,6 +167,28 @@ describe('OrphanedFindingsCard delete phase', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    expect(disabledStates(renderer)).toEqual([false, false]);
+
+    renderer.unmount();
+  });
+
+  it('a failed delete leaves nothing admitted for that repository', async () => {
+    const mounted = await renderWithProviders(
+      createElement(OrphanedFindingsCard, { scope: 'org-1', canManage: true })
+    );
+    const renderer = mounted.renderer;
+
+    await confirmClear(renderer, 'acme/one');
+    await act(async () => {
+      world.deletes[0]?.settle(false);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The mutation hook's toast names the failure and the row is pressable
+    // again, so the store must not keep the refused delete's entry until the
+    // card unmounts.
+    expect(stores.all.map(store => store.getSnapshot().states.size)).toEqual([0]);
     expect(disabledStates(renderer)).toEqual([false, false]);
 
     renderer.unmount();

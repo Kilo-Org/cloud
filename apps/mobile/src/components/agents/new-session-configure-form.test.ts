@@ -133,8 +133,8 @@ vi.mock('@/components/agents/new-session-start-button', () => ({
 // container and reads the keyboard's motion value, which needs the app's
 // KeyboardMotionProvider; the tree assertions only need its position, so the
 // string host keeps them type-exact without the animation stack.
-vi.mock('@/components/agents/new-session-keyboard-lift', () => ({
-  NewSessionKeyboardLift: 'NewSessionKeyboardLift',
+vi.mock('@/components/keyboard-lift-view', () => ({
+  KeyboardLiftView: 'KeyboardLiftView',
 }));
 
 vi.mock('@/components/agents/new-session-cloud-create-error', () => ({
@@ -414,7 +414,7 @@ describe('NewSessionConfigureForm', () => {
     expect(scrollBody).not.toBeNull();
     expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
     expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
-    const lift = findElement(element, 'NewSessionKeyboardLift');
+    const lift = findElement(element, 'KeyboardLiftView');
     expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
 
     // Switching the target to a computer must not surface the stale failure.
@@ -448,7 +448,7 @@ describe('NewSessionConfigureForm', () => {
     // refusal must not take height from the form a second time. The pinned
     // footer is the lift's second child, after the scroll body, and it must be
     // found for the negative assertion to mean anything.
-    const lift = findElementByType(element, 'NewSessionKeyboardLift');
+    const lift = findElementByType(element, 'KeyboardLiftView');
     const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
     expect(lift).not.toBeNull();
     expect(footer).toBeDefined();
@@ -501,7 +501,7 @@ describe('NewSessionConfigureForm', () => {
 
     // The reason rides the lift with Start, not the scroll body above it, so
     // the keyboard cannot hide the explanation and the control together.
-    const lift = findElement(element, 'NewSessionKeyboardLift');
+    const lift = findElement(element, 'KeyboardLiftView');
     expect(findElementByType(lift, 'NewSessionStartButton')).toMatchObject({
       isStartDisabled: true,
       startBlockedReason: copy,

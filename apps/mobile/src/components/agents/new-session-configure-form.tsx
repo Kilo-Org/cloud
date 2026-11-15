@@ -24,7 +24,7 @@ import { NewSessionRepositorySection } from '@/components/agents/new-session-rep
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
-import { NewSessionKeyboardLift } from '@/components/agents/new-session-keyboard-lift';
+import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -481,10 +481,10 @@ export function NewSessionConfigureForm({
   // and never depends on a frame the platform reported late.
   return (
     <View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout}>
-      <NewSessionKeyboardLift height={keyboardHeight}>
+      <KeyboardLiftView className="flex-1 bg-background" height={keyboardHeight}>
         {body}
         {footer}
-      </NewSessionKeyboardLift>
+      </KeyboardLiftView>
     </View>
   );
 }

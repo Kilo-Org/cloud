@@ -1,7 +1,6 @@
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { isolateLtrBidiText } from '@/lib/bidi';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -105,10 +104,7 @@ export function SessionContextMetrics({
   // context window has no honest percentage either, so its slot paints nothing;
   // the ring's bare track, the accessibility label and the context sheet
   // carry the unknown.
-  const costLabel =
-    content.costSlot === 'label' && content.secondary !== null
-      ? isolateLtrBidiText(content.secondary)
-      : null;
+  const costLabel = content.costSlot === 'label' ? content.secondary : null;
 
   const body = (
     <>

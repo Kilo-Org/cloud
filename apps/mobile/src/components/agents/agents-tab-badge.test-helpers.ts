@@ -192,8 +192,9 @@ vi.mock('@/lib/hooks/use-organization-queries', async () => {
   // The billing step's role rule is the shared package's, not this harness's;
   // the memberships here carry no role, so every reader resolves to the copy
   // that names the person who can change the plan.
-  const { canManageOrganizationBilling } =
-    await vi.importActual<typeof OrganizationsModule>('@kilocode/app-shared/organizations');
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
   const orgs = ['org-a', 'org-b'].map(organizationId => ({
     organizationId,
     organizationName: organizationId,

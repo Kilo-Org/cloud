@@ -49,8 +49,9 @@ const trialRole = vi.hoisted(() => ({ role: undefined as string | undefined }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/lib/hooks/use-organization-queries', async () => {
-  const { canManageOrganizationBilling } =
-    await vi.importActual<typeof OrganizationsModule>('@kilocode/app-shared/organizations');
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
   return {
     isMoneyRole: canManageOrganizationBilling,
     useOrgBoundary: () => ({ role: trialRole.role }),

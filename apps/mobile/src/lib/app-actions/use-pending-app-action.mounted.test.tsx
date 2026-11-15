@@ -51,8 +51,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 vi.mock('@/lib/trial-refusal', () => ({
   useBillingAction: () => mocks.billingAction,
   useCanManageBilling: () => mocks.billingAction !== undefined,
-  useTrialRefusalAction: (isRefusal: boolean) =>
-    isRefusal ? mocks.billingAction : undefined,
+  useTrialRefusalAction: (isRefusal: boolean) => (isRefusal ? mocks.billingAction : undefined),
 }));
 
 // This harness keeps the dispatcher active and replaces its UI and create boundaries.

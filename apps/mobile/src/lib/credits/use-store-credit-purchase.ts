@@ -5,8 +5,35 @@ import { ErrorCode, type Purchase } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
+import { isStoreDeadlineError, withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { type StoreCreditProduct } from './store-products';
+import { STORE_TIMEOUT_KEY, STORE_TIMEOUT_PLAY_KEY } from './store-products-loader';
+
+/**
+ * The purchase's outcome as the owner publishes it. `messageKey` is a catalog
+ * key the screen translates; `kind` says which sentence belongs beside it.
+ */
+export type CreditPurchaseFailure =
+  | { readonly kind: 'store-timeout'; readonly messageKey: string }
+  | { readonly kind: 'purchase-refused'; readonly messageKey: string };
+
+/**
+ * What one `purchase` call did. `started: false` with `failure: null` is a
+ * store-side cancel or a Play pending payment: no outcome to publish.
+ */
+export type CreditPurchaseOutcome =
+  | { readonly started: true }
+  | { readonly started: false; readonly failure: CreditPurchaseFailure | null };
+
+/**
+ * The catalog key for a store call that never answered. The same pair the
+ * store-unavailable card shows, chosen from the storefront this device buys
+ * from, so one place decides which store the copy names.
+ */
+export function creditStoreTimeoutKey(storefront: 'app_store' | 'play'): string {
+  return storefront === 'play' ? STORE_TIMEOUT_PLAY_KEY : STORE_TIMEOUT_KEY;
+}
 
 /**
  * Catalog keys, never translated copy: the screen translates them. The keys
@@ -286,7 +313,7 @@ function missingTokenKey(purchase: Purchase): string {
  * outstanding transaction first; only the backend's explicit ownership refusal
  * earns the different-account copy.
  */
-export function isStoreAlreadyOwnedError(error: unknown): boolean {
+function isStoreAlreadyOwnedError(error: unknown): boolean {
   return alreadyOwnedPurchaseErrorSchema.safeParse(error).success;
 }
 
@@ -298,6 +325,10 @@ export function isStoreAlreadyOwnedError(error: unknown): boolean {
  */
 export function isStoreNotReadyError(error: unknown): boolean {
   return notReadyStoreErrorSchema.safeParse(error).success;
+}
+
+export function isStorePendingPurchaseError(error: unknown): boolean {
+  return pendingPurchaseErrorSchema.safeParse(error).success;
 }
 
 /**
@@ -612,12 +643,21 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
   }
 
   return {
-    purchase: async (pack: StoreCreditProduct): Promise<boolean> => {
+    /**
+     * Starts one store purchase. The owner publishes the outcome: a refused
+     * request comes back as a failure the screen renders, never as a toast from
+     * here, so one place decides what the person sees.
+     *
+     * The store call is bounded like every other call in the flow: a store that
+     * never answers must release the row instead of holding it for the life of
+     * the screen.
+     */
+    purchase: async (pack: StoreCreditProduct): Promise<CreditPurchaseOutcome> => {
       const storeProductId = pack.storeProductId;
       if (!storeProductId) {
         // The store priced no such pack; the screen disables the row, so this
         // only guards a stale tap.
-        return false;
+        return { started: false, failure: null };
       }
 
       try {
@@ -632,9 +672,24 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
             : {
                 apple: { appAccountToken: deps.appAccountToken, sku: storeProductId },
               };
-        await deps.requestPurchase({ request, type: 'in-app' });
-        return true;
+        await withStoreDeadline(
+          deps.requestPurchase({ request, type: 'in-app' }),
+          'the purchase request'
+        );
+        return { started: true };
       } catch (error) {
+        if (isStoreDeadlineError(error)) {
+          // The SDK has no cancellation, so the charge may still land. The
+          // owner records the product as unreconciled and reconciles before it
+          // lets the same pack be bought again.
+          return {
+            started: false,
+            failure: {
+              kind: 'store-timeout',
+              messageKey: creditStoreTimeoutKey(deps.storefront),
+            },
+          };
+        }
         if (
           isStoreAlreadyOwnedError(error) &&
           deps.recoverOwnedPurchase &&
@@ -644,13 +699,16 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
           // transaction before saying anything: for a consumable it is usually
           // a charge whose backend completion failed, owned by this same user.
           // A real cross-account refusal surfaces from that completion.
-          return false;
+          return { started: false, failure: null };
         }
         const errorMessageKey = getStoreCreditPurchaseErrorMessageKey(error, deps.storefront);
-        if (errorMessageKey) {
-          deps.showError(errorMessageKey);
-        }
-        return false;
+        return {
+          started: false,
+          failure:
+            errorMessageKey === null
+              ? null
+              : { kind: 'purchase-refused', messageKey: errorMessageKey },
+        };
       }
     },
     handlePurchaseSuccess,

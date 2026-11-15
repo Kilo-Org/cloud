@@ -4231,6 +4231,8 @@
     "noMatchingProductsPlay": "Kāore Google Play i whakahoki i ētahi pākete whiwhinga ōrite.",
     "storeTimedOut": "Kāore te App Store i whakautu i te wā. Whakamātau anō.",
     "storeTimedOutPlay": "Kāore a Google Play i whakautu i te wā. Whakamātau anō.",
+    "unresolvedPurchase": "Tērā pea ka oti tonu tō hokonga o mua, ā, ka tāpirihia ngā whiwhinga o taua hokonga ki tō toenga. Ki te hoko anō koe, ka tīmata he hokonga hou, ā, tērā pea ka tangohia anō he moni i a koe.",
+    "buyAgain": "Hoko anō",
     "purchaseOwnedByAnotherAccount": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei Apple Account. Whakauru ki taua pūkete Kilo hei whakamahi.",
     "purchaseOwnedByAnotherAccountPlay": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei pūkete Google Play. Whakauru ki taua pūkete Kilo hei whakamahi."
   },

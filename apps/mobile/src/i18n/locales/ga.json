@@ -4417,6 +4417,8 @@
     "noMatchingProductsPlay": "Níor thug Google Play aon phacáistí creidmheasa comhoiriúnacha ar ais.",
     "storeTimedOut": "Níor fhreagair an App Store in am. Bain triail as arís.",
     "storeTimedOutPlay": "Níor fhreagair Google Play in am. Bain triail as arís.",
+    "unresolvedPurchase": "D’fhéadfadh do cheannachán roimhe seo dul i gcrích fós agus na creidmheasanna a bhaineann leis a chur le do chothromas. Má cheannaíonn tú arís, cuirtear tús le ceannachán eile agus d’fhéadfaí táille a ghearradh ort arís.",
+    "buyAgain": "Ceannaigh arís",
     "purchaseOwnedByAnotherAccount": "Baineann na creidmheasanna ar an Apple Account seo le cuntas Kilo eile. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid.",
     "purchaseOwnedByAnotherAccountPlay": "Baineann na creidmheasanna ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid."
   },

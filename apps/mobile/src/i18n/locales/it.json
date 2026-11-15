@@ -4293,6 +4293,8 @@
     "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
     "storeTimedOut": "L'App Store non ha risposto in tempo. Riprova.",
     "storeTimedOutPlay": "Google Play non ha risposto in tempo. Riprova.",
+    "unresolvedPurchase": "Il tuo acquisto precedente potrebbe ancora essere completato e aggiungere i relativi crediti al tuo saldo. Acquistando di nuovo avvii un altro acquisto e potresti ricevere un nuovo addebito.",
+    "buyAgain": "Acquista di nuovo",
     "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
     "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
   },

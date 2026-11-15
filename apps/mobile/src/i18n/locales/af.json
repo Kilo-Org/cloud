@@ -4231,6 +4231,8 @@
     "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
     "storeTimedOut": "App Store het nie betyds gereageer nie. Probeer weer.",
     "storeTimedOutPlay": "Google Play het nie betyds gereageer nie. Probeer weer.",
+    "unresolvedPurchase": "Jou vorige aankoop kan steeds voltooi word en die krediete daarvan kan by jou saldo gevoeg word. As jy weer koop, begin jy 'n afsonderlike aankoop waarvoor jy dalk weer moet betaal.",
+    "buyAgain": "Koop weer",
     "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
     "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
   },

@@ -4231,6 +4231,8 @@
     "noMatchingProductsPlay": "Google Play هیچ بسته اعتبار منطبقی برنگرداند.",
     "storeTimedOut": "App Store در زمان مشخص پاسخ نداد. تلاش مجدد",
     "storeTimedOutPlay": "Google Play در زمان مشخص پاسخ نداد. تلاش مجدد",
+    "unresolvedPurchase": "ممکن است خرید قبلی شما بعداً تکمیل شود و اعتبار آن به موجودی شما اضافه شود. خرید دوباره یک خرید جداگانه را آغاز می‌کند و ممکن است دوباره از شما هزینه دریافت شود.",
+    "buyAgain": "خرید دوباره",
     "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
     "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
   },

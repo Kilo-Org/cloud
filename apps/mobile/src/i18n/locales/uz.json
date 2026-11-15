@@ -4231,6 +4231,8 @@
     "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
     "storeTimedOut": "App Store o'z vaqtida javob bermadi. Qayta urinish.",
     "storeTimedOutPlay": "Google Play o'z vaqtida javob bermadi. Qayta urinish.",
+    "unresolvedPurchase": "Avvalgi xaridingiz hali ham yakunlanishi va unga tegishli kreditlar balansingizga qo'shilishi mumkin. Yana sotib olish alohida xaridni boshlaydi va sizdan yana to'lov olinishi mumkin.",
+    "buyAgain": "Yana sotib olish",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
   },

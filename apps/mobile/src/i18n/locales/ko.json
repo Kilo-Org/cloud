@@ -4231,6 +4231,8 @@
     "noMatchingProductsPlay": "Google Play에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
     "storeTimedOut": "App Store에서 제시간에 응답하지 않았습니다. 다시 시도",
     "storeTimedOutPlay": "Google Play에서 제시간에 응답하지 않았습니다. 다시 시도",
+    "unresolvedPurchase": "이전 구매가 나중에 완료되어 해당 크레딧이 잔액에 추가될 수 있습니다. 다시 구매하면 별도의 구매가 시작되어 요금이 한 번 더 청구될 수 있으며, 완료된 구매마다 해당 크레딧이 잔액에 추가됩니다.",
+    "buyAgain": "다시 구매",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
   },

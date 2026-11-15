@@ -4231,6 +4231,8 @@
     "noMatchingProductsPlay": "I-Google Play ayizange ibuyisele amaphakethe amakhredithi ahambisanayo.",
     "storeTimedOut": "I-App Store ayizange iphendle ngasikhathi. Zama futhi.",
     "storeTimedOutPlay": "I-Google Play ayizange iphendle ngasikhathi. Zama futhi.",
+    "unresolvedPurchase": "Ukuthenga kwakho kwangaphambilini kusengaphothulwa bese kwengezwa amakhredithi alokho kuthenga kubhalansi yakho. Ukuthenga futhi kuqala ukuthenga okusha okuhlukile futhi ungase ukhokhiswe futhi.",
+    "buyAgain": "Thenga futhi",
     "purchaseOwnedByAnotherAccount": "Amakhredithi kule Apple Account angeye-akhawunti ye-Kilo ehlukile. Ngena kuleyo akhawunti ye-Kilo ukuze uwasebenzise.",
     "purchaseOwnedByAnotherAccountPlay": "Amakhredithi kule akhawunti ye-Google Play angeye-akhawunti ye-Kilo ehlukile. Ngena kuleyo akhawunti ye-Kilo ukuze uwasebenzise."
   },

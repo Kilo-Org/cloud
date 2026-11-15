@@ -4231,6 +4231,8 @@
     "noMatchingProductsPlay": "Google Play ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
     "storeTimedOut": "App Store ບໍ່ໄດ້ຕອບສະໜອງທັນເວລາ. ລອງອີກຄັ້ງ.",
     "storeTimedOutPlay": "Google Play ບໍ່ໄດ້ຕອບສະໜອງທັນເວລາ. ລອງອີກຄັ້ງ.",
+    "unresolvedPurchase": "ການຊື້ຄັ້ງກ່ອນຂອງທ່ານຍັງອາດຈະສຳເລັດໃນພາຍຫຼັງ ແລະເພີ່ມເຄຣດິດຈາກການຊື້ນັ້ນໃສ່ຍອດຂອງທ່ານ. ການຊື້ອີກຄັ້ງເປັນການເລີ່ມການຊື້ໃໝ່ອີກລາຍການ ແລະທ່ານອາດຖືກຮຽກເກັບເງິນອີກຄັ້ງ.",
+    "buyAgain": "ຊື້ອີກຄັ້ງ",
     "purchaseOwnedByAnotherAccount": "ເຄຣດິດໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ.",
     "purchaseOwnedByAnotherAccountPlay": "ເຄຣດິດໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ."
   },

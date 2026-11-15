@@ -4231,6 +4231,8 @@
     "noMatchingProductsPlay": "Google Play એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
     "storeTimedOut": "App Store એ સમયસર પ્રતિસાદ આપ્યો નથી. ફરી પ્રયત્ન કરો.",
     "storeTimedOutPlay": "Google Play એ સમયસર પ્રતિસાદ આપ્યો નથી. ફરી પ્રયત્ન કરો.",
+    "unresolvedPurchase": "તમારી અગાઉની ખરીદી હજી પણ પૂર્ણ થઈ શકે છે અને તેની ક્રેડિટ તમારા બેલેન્સમાં ઉમેરાઈ શકે છે. ફરી ખરીદવાથી એક અલગ ખરીદી શરૂ થાય છે અને તમારી પાસેથી ફરીથી પૈસા વસૂલાઈ શકે છે.",
+    "buyAgain": "ફરી ખરીદો",
     "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
   },

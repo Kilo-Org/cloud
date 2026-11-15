@@ -165,8 +165,9 @@ describe('buildOverviewRows repositories row count', () => {
 
   /**
    * The singular copy each catalog now carries, and the plural every count
-   * above one still renders. Catalan, Romanian, Welsh, Maltese and Hebrew
-   * select their `two` or `few` category at two, whose value repeats the plural.
+   * above one still renders. Romanian selects its `few` category at two, and
+   * Welsh, Maltese and Hebrew select their `two` category there; each of those
+   * sibling entries repeats the plural wording.
    */
   const catalogs = [
     {

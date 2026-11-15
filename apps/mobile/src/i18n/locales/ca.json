@@ -430,8 +430,8 @@
       "appealConfirm": "Envia l'apel·lació",
       "appealed": "S'ha enviat l'apel·lació",
       "nextStepReceived": "Un moderador revisarà aquesta denúncia. El resultat apareixerà en aquesta pantalla i podràs apel·lar un cop presa la decisió.",
-      "nextStepInReview": "Un moderador està revisant aquesta denúncia. El resultat apareixerà en aquesta pantalla i podràs apel·lar un cop presa la decisió.",
-      "nextStepAppeal": "La teva apel·lació està en revisió. El resultat apareixerà en aquesta pantalla.",
+      "nextStepInReview": "El resultat apareixerà en aquesta pantalla i podràs apel·lar un cop presa la decisió.",
+      "nextStepAppeal": "El resultat de la teva apel·lació apareixerà en aquesta pantalla.",
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
       "viewReceipt": "Mostra el comprovant"
     },

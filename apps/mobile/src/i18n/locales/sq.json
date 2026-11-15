@@ -430,8 +430,8 @@
       "appealConfirm": "Dërgo apelimin",
       "appealed": "Apelimi u dërgua",
       "nextStepReceived": "Një moderator do ta shqyrtojë këtë raport. Rezultati do të shfaqet në këtë ekran dhe mund të apelosh pas një vendimi.",
-      "nextStepInReview": "Një moderator po e shqyrton këtë raport. Rezultati do të shfaqet në këtë ekran dhe mund të apelosh pas një vendimi.",
-      "nextStepAppeal": "Apelimi yt është në shqyrtim. Rezultati i tij do të shfaqet në këtë ekran.",
+      "nextStepInReview": "Rezultati do të shfaqet në këtë ekran dhe mund të apelosh pas një vendimi.",
+      "nextStepAppeal": "Rezultati i apelimit do të shfaqet në këtë ekran.",
       "nextStepFinal": "Vendimi i apelimit është përfundimtar. Nuk mund të dërgohet asnjë apelim tjetër.",
       "viewReceipt": "Shiko dëftesën"
     },

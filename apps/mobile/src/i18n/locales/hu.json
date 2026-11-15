@@ -430,8 +430,8 @@
       "appealConfirm": "Fellebbezés benyújtása",
       "appealed": "Fellebbezés benyújtva",
       "nextStepReceived": "A moderátor felülvizsgálja ezt a bejelentést. Az eredmény ezen a képernyőn jelenik meg, és a döntés után fellebbezhetsz.",
-      "nextStepInReview": "A moderátor jelenleg felülvizsgálja ezt a bejelentést. Az eredmény ezen a képernyőn jelenik meg, és a döntés után fellebbezhetsz.",
-      "nextStepAppeal": "A fellebbezésed felülvizsgálat alatt van. Az eredménye ezen a képernyőn jelenik meg.",
+      "nextStepInReview": "Az eredmény ezen a képernyőn jelenik meg, és a döntés után fellebbezhetsz.",
+      "nextStepAppeal": "A fellebbezés eredménye ezen a képernyőn jelenik meg.",
       "nextStepFinal": "A fellebbezési döntés végleges. További fellebbezés nem nyújtható be.",
       "viewReceipt": "Visszaigazolás megtekintése"
     },

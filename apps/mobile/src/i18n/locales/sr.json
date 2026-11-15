@@ -430,8 +430,8 @@
       "appealConfirm": "Podnesi žalbu",
       "appealed": "Žalba je podneta",
       "nextStepReceived": "Moderator će razmotriti ovu prijavu. Ishod će biti prikazan na ovom ekranu, a žalbu možete podneti nakon odluke.",
-      "nextStepInReview": "Moderator razmatra ovu prijavu. Ishod će biti prikazan na ovom ekranu, a žalbu možete podneti nakon odluke.",
-      "nextStepAppeal": "Vaša žalba se razmatra. Ishod žalbe će biti prikazan na ovom ekranu.",
+      "nextStepInReview": "Ishod će biti prikazan na ovom ekranu, a žalbu možete podneti nakon odluke.",
+      "nextStepAppeal": "Ishod žalbe će biti prikazan na ovom ekranu.",
       "nextStepFinal": "Odluka po žalbi je konačna. Žalba se više ne može podneti.",
       "viewReceipt": "Prikaži potvrdu"
     },

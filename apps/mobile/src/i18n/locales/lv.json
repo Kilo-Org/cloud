@@ -430,8 +430,8 @@
       "appealConfirm": "Iesniegt pārsūdzību",
       "appealed": "Pārsūdzība iesniegta",
       "nextStepReceived": "Šo ziņojumu izskatīs moderators. Rezultāts parādīsies šajā ekrānā, un pēc lēmuma varēsiet iesniegt pārsūdzību.",
-      "nextStepInReview": "Moderators izskata šo ziņojumu. Rezultāts parādīsies šajā ekrānā, un pēc lēmuma varēsiet iesniegt pārsūdzību.",
-      "nextStepAppeal": "Jūsu pārsūdzība tiek izskatīta. Tās rezultāts parādīsies šajā ekrānā.",
+      "nextStepInReview": "Rezultāts parādīsies šajā ekrānā, un pēc lēmuma varēsiet iesniegt pārsūdzību.",
+      "nextStepAppeal": "Pārsūdzības rezultāts parādīsies šajā ekrānā.",
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
       "viewReceipt": "Skatīt apstiprinājumu"
     },

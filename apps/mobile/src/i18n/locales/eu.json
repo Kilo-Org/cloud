@@ -430,8 +430,8 @@
       "appealConfirm": "Aurkeztu helegitea",
       "appealed": "Helegitea aurkeztu da",
       "nextStepReceived": "Moderatzaile batek salaketa hau berrikusiko du. Emaitza pantaila honetan agertuko da, eta erabakia hartu ondoren helegitea aurkez dezakezu.",
-      "nextStepInReview": "Moderatzaile batek salaketa hau berrikusten ari da. Emaitza pantaila honetan agertuko da, eta erabakia hartu ondoren helegitea aurkez dezakezu.",
-      "nextStepAppeal": "Zure helegitea berrikuspenean dago. Bere emaitza pantaila honetan agertuko da.",
+      "nextStepInReview": "Emaitza pantaila honetan agertuko da, eta erabakia hartu ondoren helegitea aurkez dezakezu.",
+      "nextStepAppeal": "Helegitearen emaitza pantaila honetan agertuko da.",
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
       "viewReceipt": "Ikusi agiria"
     },

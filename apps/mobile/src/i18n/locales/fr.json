@@ -430,8 +430,8 @@
       "appealConfirm": "Déposer le recours",
       "appealed": "Recours déposé",
       "nextStepReceived": "Un modérateur examinera ce signalement. Le résultat s'affichera sur cet écran, et vous pourrez déposer un recours après la décision.",
-      "nextStepInReview": "Un modérateur examine ce signalement. Le résultat s'affichera sur cet écran, et vous pourrez déposer un recours après la décision.",
-      "nextStepAppeal": "Votre recours est en cours d'examen. Son résultat s'affichera sur cet écran.",
+      "nextStepInReview": "Le résultat s'affichera sur cet écran, et vous pourrez déposer un recours après la décision.",
+      "nextStepAppeal": "Le résultat du recours s'affichera sur cet écran.",
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
       "viewReceipt": "Voir l'accusé de réception"
     },

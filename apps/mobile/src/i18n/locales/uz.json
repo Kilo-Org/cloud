@@ -430,8 +430,8 @@
       "appealConfirm": "Apellyatsiya yuborish",
       "appealed": "Apellyatsiya yuborildi",
       "nextStepReceived": "Moderator bu shikoyatni ko'rib chiqadi. Natija shu ekranda ko'rinadi va qaror chiqqandan so'ng apellyatsiya berishingiz mumkin.",
-      "nextStepInReview": "Moderator bu shikoyatni ko'rib chiqmoqda. Natija shu ekranda ko'rinadi va qaror chiqqandan so'ng apellyatsiya berishingiz mumkin.",
-      "nextStepAppeal": "Apellyatsiyangiz ko'rib chiqilmoqda. Natijasi shu ekranda ko'rinadi.",
+      "nextStepInReview": "Natija shu ekranda ko'rinadi va qaror chiqqandan so'ng apellyatsiya berishingiz mumkin.",
+      "nextStepAppeal": "Apellyatsiya natijasi shu ekranda ko'rinadi.",
       "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
     },

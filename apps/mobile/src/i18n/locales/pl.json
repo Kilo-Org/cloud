@@ -430,8 +430,8 @@
       "appealConfirm": "Złóż odwołanie",
       "appealed": "Złożono odwołanie",
       "nextStepReceived": "Moderator rozpatrzy to zgłoszenie. Wynik pojawi się na tym ekranie, a od decyzji można się odwołać.",
-      "nextStepInReview": "Moderator rozpatruje to zgłoszenie. Wynik pojawi się na tym ekranie, a od decyzji można się odwołać.",
-      "nextStepAppeal": "Twoje odwołanie jest w trakcie rozpatrywania. Jego wynik pojawi się na tym ekranie.",
+      "nextStepInReview": "Wynik pojawi się na tym ekranie, a od decyzji można się odwołać.",
+      "nextStepAppeal": "Wynik odwołania pojawi się na tym ekranie.",
       "nextStepFinal": "Decyzja w sprawie odwołania jest ostateczna. Nie można złożyć kolejnego odwołania.",
       "viewReceipt": "Wyświetl potwierdzenie"
     },

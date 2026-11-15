@@ -430,8 +430,8 @@
       "appealConfirm": "Enviar recurso",
       "appealed": "Recurso enviado",
       "nextStepReceived": "Um moderador vai analisar esta denúncia. O resultado aparecerá neste ecrã e pode recorrer após a decisão.",
-      "nextStepInReview": "Um moderador está a analisar esta denúncia. O resultado aparecerá neste ecrã e pode recorrer após a decisão.",
-      "nextStepAppeal": "O recurso está em análise. O resultado aparecerá neste ecrã.",
+      "nextStepInReview": "O resultado aparecerá neste ecrã e pode recorrer após a decisão.",
+      "nextStepAppeal": "O resultado do recurso aparecerá neste ecrã.",
       "nextStepFinal": "A decisão do recurso é final. Não é possível apresentar novo recurso.",
       "viewReceipt": "Ver comprovativo"
     },

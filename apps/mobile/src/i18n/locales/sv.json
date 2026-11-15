@@ -430,8 +430,8 @@
       "appealConfirm": "Skicka överklagande",
       "appealed": "Överklagandet har skickats",
       "nextStepReceived": "En moderator kommer att granska den här anmälan. Utfallet visas på den här skärmen, och du kan överklaga efter ett beslut.",
-      "nextStepInReview": "En moderator granskar den här anmälan. Utfallet visas på den här skärmen, och du kan överklaga efter ett beslut.",
-      "nextStepAppeal": "Ditt överklagande granskas. Utfallet visas på den här skärmen.",
+      "nextStepInReview": "Utfallet visas på den här skärmen, och du kan överklaga efter ett beslut.",
+      "nextStepAppeal": "Utfallet av överklagandet visas på den här skärmen.",
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },

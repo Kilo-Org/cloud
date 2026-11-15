@@ -430,8 +430,8 @@
       "appealConfirm": "Bezwaar indienen",
       "appealed": "Bezwaar ingediend",
       "nextStepReceived": "Een moderator gaat deze melding beoordelen. De uitkomst verschijnt op dit scherm en na een besluit kun je bezwaar maken.",
-      "nextStepInReview": "Een moderator beoordeelt deze melding. De uitkomst verschijnt op dit scherm en na een besluit kun je bezwaar maken.",
-      "nextStepAppeal": "Je bezwaar wordt beoordeeld. De uitkomst verschijnt op dit scherm.",
+      "nextStepInReview": "De uitkomst verschijnt op dit scherm en na een besluit kun je bezwaar maken.",
+      "nextStepAppeal": "De uitkomst van je bezwaar verschijnt op dit scherm.",
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
       "viewReceipt": "Ontvangstbewijs bekijken"
     },

@@ -430,8 +430,8 @@
       "appealConfirm": "Esita vaidlustus",
       "appealed": "Vaidlustus on esitatud",
       "nextStepReceived": "Moderaator vaatab selle teate üle. Tulemus kuvatakse sellel ekraanil ja pärast otsust saab vaidlustuse esitada.",
-      "nextStepInReview": "Moderaator vaatab seda teadet praegu üle. Tulemus kuvatakse sellel ekraanil ja pärast otsust saab vaidlustuse esitada.",
-      "nextStepAppeal": "Vaidlustus on ülevaatamisel. Selle tulemus kuvatakse sellel ekraanil.",
+      "nextStepInReview": "Tulemus kuvatakse sellel ekraanil ja pärast otsust saab vaidlustuse esitada.",
+      "nextStepAppeal": "Vaidlustuse tulemus kuvatakse sellel ekraanil.",
       "nextStepFinal": "Vaidlustuse otsus on lõplik. Edasist vaidlustust esitada ei saa.",
       "viewReceipt": "Vaata kinnitust"
     },

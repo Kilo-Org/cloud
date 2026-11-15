@@ -14,8 +14,8 @@ const RECEIPT_ID = '11111111-1111-4111-8111-111111111111';
 // them; a state that states none of them proves the line stayed silent.
 const NEXT_STEP_SENTENCES = [
   'A moderator will review this report. The outcome will appear on this screen, and you can appeal after a decision.',
-  'A moderator is reviewing this report. The outcome will appear on this screen, and you can appeal after a decision.',
-  'Your appeal is in review. Its outcome will appear on this screen.',
+  'The outcome will appear on this screen, and you can appeal after a decision.',
+  'The appeal outcome will appear on this screen.',
   'The appeal decision is final. No further appeal can be filed.',
 ] as const;
 
@@ -236,14 +236,14 @@ describe('ReportReceiptScreen', () => {
     expect(appealButton(root)).toBeUndefined();
   });
 
-  it('states that a moderator is reviewing a report under review', async () => {
+  it('states where the outcome of a report under review appears', async () => {
     state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'open', appealStatus: 'none' };
     const root = await mount();
 
     expect(texts(root)).toContain(NEXT_STEP_SENTENCES[1]);
   });
 
-  it('states that a submitted appeal is in review', async () => {
+  it('states where the outcome of a submitted appeal appears', async () => {
     state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'rejected', appealStatus: 'submitted' };
     const root = await mount();
 

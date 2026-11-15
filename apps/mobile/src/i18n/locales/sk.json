@@ -430,8 +430,8 @@
       "appealConfirm": "Podať odvolanie",
       "appealed": "Odvolanie bolo podané",
       "nextStepReceived": "Toto hlásenie posúdi moderátor. Výsledok sa zobrazí na tejto obrazovke a po rozhodnutí sa môžeš odvolať.",
-      "nextStepInReview": "Toto hlásenie posudzuje moderátor. Výsledok sa zobrazí na tejto obrazovke a po rozhodnutí sa môžeš odvolať.",
-      "nextStepAppeal": "Tvoje odvolanie sa posudzuje. Výsledok odvolania sa zobrazí na tejto obrazovke.",
+      "nextStepInReview": "Výsledok sa zobrazí na tejto obrazovke a po rozhodnutí sa môžeš odvolať.",
+      "nextStepAppeal": "Výsledok odvolania sa zobrazí na tejto obrazovke.",
       "nextStepFinal": "Rozhodnutie o odvolaní je konečné. Ďalšie odvolanie už nie je možné podať.",
       "viewReceipt": "Zobraziť potvrdenie"
     },

@@ -497,8 +497,8 @@
       "appealConfirm": "Submit appeal",
       "appealed": "Appeal submitted",
       "nextStepReceived": "A moderator will review this report. The outcome will appear on this screen, and you can appeal after a decision.",
-      "nextStepInReview": "A moderator is reviewing this report. The outcome will appear on this screen, and you can appeal after a decision.",
-      "nextStepAppeal": "Your appeal is in review. Its outcome will appear on this screen.",
+      "nextStepInReview": "The outcome will appear on this screen, and you can appeal after a decision.",
+      "nextStepAppeal": "The appeal outcome will appear on this screen.",
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
       "viewReceipt": "View receipt"
     },

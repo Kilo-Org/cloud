@@ -430,8 +430,8 @@
       "appealConfirm": "Isumite ang apela",
       "appealed": "Naisumite ang apela",
       "nextStepReceived": "Susuriin ng isang tagasuri ang ulat na ito. Lalabas ang resulta sa screen na ito, at maaari kang mag-apela pagkatapos ng desisyon.",
-      "nextStepInReview": "Sinusuri ng isang tagasuri ang ulat na ito. Lalabas ang resulta sa screen na ito, at maaari kang mag-apela pagkatapos ng desisyon.",
-      "nextStepAppeal": "Sinusuri ang iyong apela. Lalabas ang resulta nito sa screen na ito.",
+      "nextStepInReview": "Lalabas ang resulta sa screen na ito, at maaari kang mag-apela pagkatapos ng desisyon.",
+      "nextStepAppeal": "Lalabas ang resulta ng apela sa screen na ito.",
       "nextStepFinal": "Pinal na ang desisyon sa apela. Hindi na maaaring magsumite ng panibagong apela.",
       "viewReceipt": "Tingnan ang resibo"
     },

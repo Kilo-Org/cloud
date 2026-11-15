@@ -430,8 +430,8 @@
       "appealConfirm": "Ajukan banding",
       "appealed": "Banding diajukan",
       "nextStepReceived": "Moderator akan meninjau laporan ini. Hasilnya akan muncul di layar ini, dan Anda dapat mengajukan banding setelah ada keputusan.",
-      "nextStepInReview": "Moderator sedang meninjau laporan ini. Hasilnya akan muncul di layar ini, dan Anda dapat mengajukan banding setelah ada keputusan.",
-      "nextStepAppeal": "Banding Anda sedang ditinjau. Hasilnya akan muncul di layar ini.",
+      "nextStepInReview": "Hasil laporan ini akan muncul di layar ini, dan Anda dapat mengajukan banding setelah ada keputusan.",
+      "nextStepAppeal": "Hasil banding akan muncul di layar ini.",
       "nextStepFinal": "Keputusan banding bersifat final. Banding lebih lanjut tidak dapat diajukan.",
       "viewReceipt": "Lihat tanda terima"
     },

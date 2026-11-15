@@ -430,8 +430,8 @@
       "appealConfirm": "Serahkan rayuan",
       "appealed": "Rayuan diserahkan",
       "nextStepReceived": "Moderator akan menyemak laporan ini. Hasilnya akan dipaparkan pada skrin ini, dan anda boleh merayu selepas keputusan dibuat.",
-      "nextStepInReview": "Moderator sedang menyemak laporan ini. Hasilnya akan dipaparkan pada skrin ini, dan anda boleh merayu selepas keputusan dibuat.",
-      "nextStepAppeal": "Rayuan anda sedang disemak. Hasilnya akan dipaparkan pada skrin ini.",
+      "nextStepInReview": "Hasil semakan akan dipaparkan pada skrin ini, dan anda boleh merayu selepas keputusan dibuat.",
+      "nextStepAppeal": "Hasil rayuan akan dipaparkan pada skrin ini.",
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
       "viewReceipt": "Lihat resit"
     },

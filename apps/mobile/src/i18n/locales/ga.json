@@ -430,8 +430,8 @@
       "appealConfirm": "Cuir an t-achomharc isteach",
       "appealed": "Cuireadh an t-achomharc isteach",
       "nextStepReceived": "Athbhreithneoidh modhnóir an tuairisc seo. Beidh an toradh le feiceáil ar an scáileán seo, agus is féidir leat achomharc a dhéanamh tar éis an chinnidh.",
-      "nextStepInReview": "Tá modhnóir ag athbhreithniú na tuairisce seo. Beidh an toradh le feiceáil ar an scáileán seo, agus is féidir leat achomharc a dhéanamh tar éis an chinnidh.",
-      "nextStepAppeal": "Tá d'achomharc á athbhreithniú. Beidh a thoradh le feiceáil ar an scáileán seo.",
+      "nextStepInReview": "Beidh an toradh le feiceáil ar an scáileán seo, agus is féidir leat achomharc a dhéanamh tar éis an chinnidh.",
+      "nextStepAppeal": "Beidh toradh an achomhairc le feiceáil ar an scáileán seo.",
       "nextStepFinal": "Tá cinneadh an achomhairc críochnaitheach. Ní féidir aon achomharc breise a chur isteach.",
       "viewReceipt": "Féach ar an admháil"
     },

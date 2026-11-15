@@ -430,8 +430,8 @@
       "appealConfirm": "Wasilisha rufaa",
       "appealed": "Rufaa imewasilishwa",
       "nextStepReceived": "Mkaguzi atakagua ripoti hii. Matokeo yataonekana kwenye skrini hii, na unaweza kukata rufaa baada ya uamuzi.",
-      "nextStepInReview": "Mkaguzi anakagua ripoti hii. Matokeo yataonekana kwenye skrini hii, na unaweza kukata rufaa baada ya uamuzi.",
-      "nextStepAppeal": "Rufaa yako inakaguliwa. Matokeo yake yataonekana kwenye skrini hii.",
+      "nextStepInReview": "Matokeo yataonekana kwenye skrini hii, na unaweza kukata rufaa baada ya uamuzi.",
+      "nextStepAppeal": "Matokeo ya rufaa yataonekana kwenye skrini hii.",
       "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
       "viewReceipt": "Angalia risiti"
     },

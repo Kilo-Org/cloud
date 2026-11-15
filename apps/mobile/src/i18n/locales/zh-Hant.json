@@ -430,8 +430,8 @@
       "appealConfirm": "提交申訴",
       "appealed": "申訴已提交",
       "nextStepReceived": "審查人員將審查此檢舉。結果會顯示於此畫面，決定後即可提出申訴。",
-      "nextStepInReview": "審查人員正在審查此檢舉。結果會顯示於此畫面，決定後即可提出申訴。",
-      "nextStepAppeal": "您的申訴正在審查中。結果會顯示於此畫面。",
+      "nextStepInReview": "結果會顯示於此畫面，決定後即可提出申訴。",
+      "nextStepAppeal": "申訴結果會顯示於此畫面。",
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
       "viewReceipt": "檢視回執"
     },

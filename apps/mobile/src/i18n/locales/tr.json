@@ -430,8 +430,8 @@
       "appealConfirm": "İtirazı gönder",
       "appealed": "İtiraz gönderildi",
       "nextStepReceived": "Bir moderatör bu raporu inceleyecek. Sonuç bu ekranda görünecek ve karar verildikten sonra itiraz edebilirsiniz.",
-      "nextStepInReview": "Bir moderatör bu raporu inceliyor. Sonuç bu ekranda görünecek ve karar verildikten sonra itiraz edebilirsiniz.",
-      "nextStepAppeal": "İtirazınız inceleniyor. Sonucu bu ekranda görünecek.",
+      "nextStepInReview": "Sonuç bu ekranda görünecek ve karar verildikten sonra itiraz edebilirsiniz.",
+      "nextStepAppeal": "İtiraz sonucu bu ekranda görünecek.",
       "nextStepFinal": "İtiraz kararı kesindir. Başka itiraz gönderilemez.",
       "viewReceipt": "Alındıyı görüntüle"
     },

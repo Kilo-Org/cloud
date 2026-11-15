@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { ReasoningEffortSchema } from './reasoning';
+import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 import { addDuplicateKeyIssues } from './duplicate-keys';
@@ -114,10 +114,7 @@ export function linkedAvgCostUsd(
   return summary.avgCostUsd * (blendedUsdPerToken(ownerPricing) / platformBlended);
 }
 /**
- * Reader precedence for candidate variant identity: prefer `variant`; when
- * absent, a valid legacy `reasoningEffort` string may be interpreted as the
- * legacy variant key. New writers emit `variant` only; old writers emitted
- * `reasoningEffort` only. Both non-null is malformed.
+ * Ranked candidate. Variant precedence: {@link refineVariantExclusivity}.
  */
 export const RankedCandidateSchema = z
   .object({
@@ -142,15 +139,7 @@ export const RankedCandidateSchema = z
     // identity than the table's. Custom routers only (ADR 0005).
     stale: z.boolean().optional(),
   })
-  .superRefine((candidate, ctx) => {
-    if (candidate.variant != null && candidate.reasoningEffort != null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['variant'],
-        message: 'Candidate must not set both variant and reasoningEffort; emit variant only',
-      });
-    }
-  });
+  .superRefine((candidate, ctx) => refineVariantExclusivity(candidate, ctx, 'Candidate'));
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 
 export const ReasoningComplexitySchema = z.enum(['low', 'medium', 'high']);

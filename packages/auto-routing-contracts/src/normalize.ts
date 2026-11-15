@@ -638,6 +638,21 @@ const MODALITY_CHILD_ROLES: Record<ModalityRole, Record<string, ModalityRole>> =
   part: { parts: 'part' },
 };
 
+type MediaPartModality = 'image' | 'file';
+
+// Content-part `type` values that carry media rather than text, and the input
+// modality each one requires. The modality walk and the routing token
+// estimator both read this one map, so the estimate excludes exactly the types
+// the capability gate recognizes.
+const MEDIA_PART_MODALITY: Record<string, MediaPartModality | undefined> = {
+  image_url: 'image',
+  image: 'image',
+  input_image: 'image',
+  file: 'file',
+  input_file: 'file',
+  document: 'file',
+};
+
 // The same body reaches this walk as reaches the text walk, with the same
 // unbounded nesting. Its work is already linear in the parsed body, which the
 // request size bounds, and every level costs one node per message, so the
@@ -696,10 +711,9 @@ function collectModalities(
   // OpenAI chat `image_url`, Anthropic `image` / `document`.
   const type = value.type;
   if (typeof type === 'string') {
-    if (type === 'image_url' || type === 'image' || type === 'input_image') {
-      out.add('image');
-    } else if (type === 'file' || type === 'input_file' || type === 'document') {
-      out.add('file');
+    const modality = MEDIA_PART_MODALITY[type];
+    if (modality !== undefined) {
+      out.add(modality);
     }
   }
 
@@ -822,14 +836,7 @@ function sumContentPartTextChars(part: unknown, depth: number): number {
 
   // Media parts: zero contribution regardless of payload size
   if (typeof type === 'string') {
-    if (
-      type === 'image_url' ||
-      type === 'image' ||
-      type === 'input_image' ||
-      type === 'file' ||
-      type === 'input_file' ||
-      type === 'document'
-    ) {
+    if (MEDIA_PART_MODALITY[type] !== undefined) {
       return 0;
     }
 

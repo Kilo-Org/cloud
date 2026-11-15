@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
 import { OwnerTypeSchema } from './owner';
-import { ReasoningEffortSchema } from './reasoning';
+import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
 import {
   CustomRouterClientEntryIdSchema,
   CustomRouterEntryRefSchema,
@@ -120,12 +120,7 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
-/**
- * Reader precedence for decision variant identity: prefer `variant`; when
- * absent, a valid legacy `reasoningEffort` string may be interpreted as the
- * legacy variant key. New writers emit `variant` only; old writers emitted
- * `reasoningEffort` only. Both non-null is malformed.
- */
+/** Variant precedence: {@link refineVariantExclusivity}. */
 export const AutoRoutingDecisionSchema = z
   .object({
     model: z.string(),
@@ -157,13 +152,7 @@ export const AutoRoutingDecisionSchema = z
     fallback: z.boolean().optional(),
   })
   .superRefine((decision, ctx) => {
-    if (decision.variant != null && decision.reasoningEffort != null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['variant'],
-        message: 'Decision must not set both variant and reasoningEffort; emit variant only',
-      });
-    }
+    refineVariantExclusivity(decision, ctx, 'Decision');
     if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
       ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
     }

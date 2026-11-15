@@ -4,7 +4,7 @@
 // step that ends the state; every other role keeps the owner-naming sentence
 // and no step.
 
-import { createElement } from 'react';
+import { createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
@@ -19,6 +19,12 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
   role: 'member' as string | undefined,
+  /** The membership list has not answered yet: the role reads `undefined`. */
+  listLoading: false,
+  /** Close and navigation in the order they ran, so the dismissal is asserted. */
+  events: [] as string[],
+  /** Re-renders the mounted sheet, the frame the settled membership list causes. */
+  settle: null as (() => void) | null,
   reject: vi.fn<(error?: unknown) => Promise<never>>(),
   save: vi.fn<(error?: unknown) => Promise<never>>(),
   push: vi.fn<(href: string) => void>(),
@@ -56,10 +62,10 @@ vi.mock('@/lib/organization-context', () => ({
 }));
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({
-    data: [{ organizationId: 'org_1', role: h.role }],
-    isLoading: false,
+    data: h.listLoading ? undefined : [{ organizationId: 'org_1', role: h.role }],
+    isLoading: h.listLoading,
     isError: false,
-    isFetching: false,
+    isFetching: h.listLoading,
     refetch: vi.fn(),
   }),
 }));
@@ -129,66 +135,145 @@ function statusMessage(root: ReactTestInstance): string | null {
   return (status.props as { message: string | null }).message;
 }
 
-async function saveEditedTitle() {
-  const ui = await renderWithProviders(
-    createElement(ReviewMemoryProposalSheet, {
-      scope: 'org_1',
-      proposal: proposal(),
-      permission: { status: 'ready', canEdit: true, canManage: true },
-      available: true,
-      onClose: vi.fn<() => void>(),
+/** The presented sheet's own node: its `visible` and its dismissal report. */
+function sheet(root: ReactTestInstance) {
+  const node = hosts(root, 'SessionPageSheet')[0];
+  if (!node) {
+    throw new Error('Missing SessionPageSheet');
+  }
+  return node;
+}
+
+/**
+ * The sheet's parent in these tests. In the app the membership list settling
+ * re-renders this subtree; `h.settle` is the handle a test uses to report that
+ * frame.
+ */
+function SheetHarness({ onClose }: Readonly<{ onClose: () => void }>) {
+  const [, setTurn] = useState(0);
+  h.settle = () => {
+    setTurn(turn => turn + 1);
+  };
+  return createElement(ReviewMemoryProposalSheet, {
+    scope: 'org_1',
+    proposal: proposal(),
+    permission: { status: 'ready', canEdit: true, canManage: true },
+    available: true,
+    onClose,
+  });
+}
+
+/** Mount the sheet with a close that records itself, so the order is asserted. */
+function renderSheet() {
+  return renderWithProviders(
+    createElement(SheetHarness, {
+      onClose: () => {
+        h.events.push('close');
+      },
     })
   );
-  const field = hosts(ui.renderer.root, 'FormField').find(
+}
+
+/** A host prop as the callback its component contract promises. */
+function pressHandler(node: ReactTestInstance): () => void {
+  const onPress = node.props.onPress as (() => void) | undefined;
+  if (onPress === undefined) {
+    throw new Error('Missing press handler');
+  }
+  return onPress;
+}
+
+function changeHandler(node: ReactTestInstance): (text: string) => void {
+  const onChangeText = node.props.onChangeText as ((text: string) => void) | undefined;
+  if (onChangeText === undefined) {
+    throw new Error('Missing change handler');
+  }
+  return onChangeText;
+}
+
+function dismissHandler(node: ReactTestInstance): () => void {
+  const onDismiss = node.props.onDismiss as (() => void) | undefined;
+  if (onDismiss === undefined) {
+    throw new Error('Missing dismissal report');
+  }
+  return onDismiss;
+}
+
+async function pressButton(root: ReactTestInstance, label: string) {
+  const button = hosts(root, 'Button').find(node => collectText(node).includes(label));
+  if (!button) {
+    throw new Error(`Missing ${label} button`);
+  }
+  await act(async () => {
+    pressHandler(button)();
+    // The mutation's own rejection settles in a microtask; keeping the flush
+    // inside this act scope is what applies the refused state under it.
+    await Promise.resolve();
+  });
+}
+
+/** Fires the native dismissal report the presented sheet waits for. */
+function reportDismissed(root: ReactTestInstance) {
+  const onDismiss = dismissHandler(sheet(root));
+  act(() => {
+    onDismiss();
+  });
+}
+
+/** A refused save: the draft carries an edit, so it is dirty when it fails. */
+async function refuseSave() {
+  const mounted = await renderSheet();
+  const root = mounted.renderer.root;
+  const field = hosts(root, 'FormField').find(
     node => node.props.label === i18n.t('codeReviewer.reviewMemory.proposalTitle')
   );
   if (!field) {
     throw new Error('Missing title field');
   }
+  const onChangeText = changeHandler(field);
   act(() => {
-    (field.props as { onChangeText: (text: string) => void }).onChangeText('Updated title');
+    onChangeText('Updated title');
   });
-  const save = hosts(ui.renderer.root, 'Button').find(node =>
-    collectText(node).includes(i18n.t('common.save'))
-  );
-  if (!save) {
-    throw new Error('Missing Save button');
-  }
-  await act(() => {
-    (save.props as { onPress: () => void }).onPress();
-  });
-  await waitFor(() => hosts(ui.renderer.root, 'AccessibleStatus').length > 0);
-  return ui.renderer.root;
+  await pressButton(root, i18n.t('common.save'));
+  await waitFor(() => statusMessage(mounted.renderer.root) !== null);
+  return mounted;
+}
+
+/** A refused approve: the draft has no edit, so closing asks nothing. */
+async function refuseApprove() {
+  const mounted = await renderSheet();
+  await pressButton(mounted.renderer.root, i18n.t('common.openPullRequest'));
+  await waitFor(() => statusMessage(mounted.renderer.root) !== null);
+  return mounted;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   h.role = 'member';
+  h.listLoading = false;
+  h.events = [];
+  h.push.mockImplementation(() => {
+    h.events.push('push');
+  });
   h.save.mockImplementation(() => Promise.reject(rejection(ORGANIZATION_TRIAL_EXPIRED_MESSAGE)));
+  h.reject.mockImplementation(() => Promise.reject(rejection(ORGANIZATION_TRIAL_EXPIRED_MESSAGE)));
 });
 
 describe('ReviewMemoryProposalSheet refusal', () => {
   it('offers a billing role the plan copy and the step to the billing screen', async () => {
     h.role = 'billing_manager';
 
-    const root = await saveEditedTitle();
+    const { renderer } = await refuseSave();
 
-    expect(statusMessage(root)).toBe(i18n.t('common.organizationTrialEndedBilling'));
-    const step = billingStep(root);
-    if (!step) {
-      throw new Error('Missing billing step');
-    }
-    act(() => {
-      (step.props as { onPress: () => void }).onPress();
-    });
-    expect(h.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/billing');
+    expect(statusMessage(renderer.root)).toBe(i18n.t('common.organizationTrialEndedBilling'));
+    expect(billingStep(renderer.root)).toBeDefined();
   });
 
   it('keeps the owner-naming copy and adds no step for a member', async () => {
-    const root = await saveEditedTitle();
+    const { renderer } = await refuseSave();
 
-    expect(statusMessage(root)).toBe(i18n.t('common.organizationTrialEnded'));
-    expect(billingStep(root)).toBeUndefined();
+    expect(statusMessage(renderer.root)).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(billingStep(renderer.root)).toBeUndefined();
   });
 
   it('adds no step to a refusal that is not the trial gate, even for a billing role', async () => {
@@ -197,9 +282,61 @@ describe('ReviewMemoryProposalSheet refusal', () => {
       Promise.reject(rejection(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.change_request_in_progress))
     );
 
-    const root = await saveEditedTitle();
+    const { renderer } = await refuseSave();
 
-    expect(statusMessage(root)).toBe(i18n.t('codeReviewer.reviewMemory.changeRequestInProgress'));
-    expect(billingStep(root)).toBeUndefined();
+    expect(statusMessage(renderer.root)).toBe(i18n.t('codeReviewer.reviewMemory.changeRequestInProgress'));
+    expect(billingStep(renderer.root)).toBeUndefined();
+  });
+
+  // The membership list answers after the refusal, which is the ordinary case on
+  // a cold start. The sentence and the step are two readings of one role answer,
+  // so they move together when it settles: the owner-naming sentence never stays
+  // above a Manage billing step.
+  it('derives the sentence and the step from the role that settles after the refusal', async () => {
+    h.listLoading = true;
+    h.role = 'billing_manager';
+
+    const { renderer } = await refuseSave();
+
+    // The refusal landed while the list was still loading, so the role it saw
+    // was unknown and the copy names the person who can change the plan.
+    expect(statusMessage(renderer.root)).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(billingStep(renderer.root)).toBeUndefined();
+
+    // The list settles on a billing role: both readings change in one render.
+    h.listLoading = false;
+    act(() => {
+      h.settle?.();
+    });
+
+    expect(statusMessage(renderer.root)).toBe(i18n.t('common.organizationTrialEndedBilling'));
+    expect(billingStep(renderer.root)).toBeDefined();
+  });
+
+  // The sheet is presented over the route stack rather than being a route, so a
+  // push while it is up lands behind it and the tap looks dead. The step closes
+  // the sheet first and lets its dismissal report run the navigation.
+  it('closes the sheet before the billing route is pushed', async () => {
+    h.role = 'billing_manager';
+
+    const { renderer } = await refuseApprove();
+    const step = billingStep(renderer.root);
+    if (!step) {
+      throw new Error('Missing billing step');
+    }
+
+    act(() => {
+      pressHandler(step)();
+    });
+
+    expect(sheet(renderer.root).props.visible).toBe(false);
+    expect(h.events).toEqual([]);
+
+    reportDismissed(renderer.root);
+
+    expect(h.events).toEqual(['close', 'push']);
+    expect(h.push).toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/(tabs)/(3_profile)/organization/billing')
+    );
   });
 });

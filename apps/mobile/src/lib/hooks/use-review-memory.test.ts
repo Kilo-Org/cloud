@@ -184,7 +184,9 @@ describe('useSetReviewMemoryEnabled', () => {
       action: { label: i18n.t('organization.hub.manageBilling'), onClick: expect.any(Function) },
     });
     lastToastStep()?.action?.onClick();
-    expect(state.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/billing');
+    expect(state.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=org-1'
+    );
   });
 
   it('keeps the owner-naming copy and adds no step for a member', () => {

@@ -23,9 +23,14 @@ import { useCanManageBilling, useTrialRefusalAction } from '@/lib/trial-refusal'
 type ProposalAction = 'save' | 'reject' | 'approve';
 type ProposalFailure = {
   action: ProposalAction;
-  message: string;
-  /** The rejection was the organization subscription gate's trial refusal. */
-  isTrialRefusal: boolean;
+  /**
+   * The rejection as the mutation delivered it. The copy and the step under it
+   * are derived from this and the reader's current role on every render: a
+   * refusal that lands before the membership list settles would otherwise keep
+   * the copy the then-unknown role produced beside a step the settled role
+   * offers.
+   */
+  error: unknown;
 };
 
 export type ProposalEditorInput = Readonly<{
@@ -33,7 +38,12 @@ export type ProposalEditorInput = Readonly<{
   proposal: ReviewMemoryProposal;
   permission: PermissionState;
   available: boolean;
-  onClose: () => void;
+  /**
+   * Dismiss the presented sheet. The sheet stays up until its native dismissal
+   * reports, then calls this; `after` runs at that same point, so a step that
+   * leaves for another route pushes it above a sheet that is already gone.
+   */
+  onClose: (after?: () => void) => void;
 }>;
 
 export function useReviewMemoryProposalEditor({
@@ -77,9 +87,19 @@ export function useReviewMemoryProposalEditor({
     setValid(validProposalDraft(next));
   }, [proposal]);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  // A step that leaves this sheet (the billing step) parks its navigation here
+  // and the sheet runs it from the native dismissal report. The guard's discard
+  // question sits in between, so a dirty draft is never thrown away to reach it.
+  const afterCloseRef = useRef<(() => void) | null>(null);
   const guard = useSheetDismissGuard({
     isDirty: () => !sameProposalDraft(draft.current, baseline.current),
-    onDiscard: onClose,
+    onDiscard: () => {
+      const after = afterCloseRef.current;
+      afterCloseRef.current = null;
+      onCloseRef.current(after ?? undefined);
+    },
   });
 
   // The sheet is a native sheet in its own window, so the route below it is out
@@ -98,8 +118,6 @@ export function useReviewMemoryProposalEditor({
   const [leaveAllowed, setLeaveAllowed] = useState(false);
   const [leaveCount, setLeaveCount] = useState(0);
   const replayRef = useRef<(() => void) | null>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
   usePreventRemove(!leaveAllowed, ({ data, repeat }) => {
     if (!isLeaveAction(data.action.type)) {
       // The replay runs from the effect below, so this sheet is still mounted
@@ -148,7 +166,8 @@ export function useReviewMemoryProposalEditor({
     try {
       if (action === 'reject') {
         await actions.reject(record.id);
-        onClose();
+        afterCloseRef.current = null;
+        onCloseRef.current();
         return;
       }
       const updated =
@@ -163,20 +182,30 @@ export function useReviewMemoryProposalEditor({
       setDirty(false);
       setValid(validProposalDraft(next));
     } catch (error) {
-      setFailure({
-        action,
-        message: knownServerErrorMessage(error, canManageBilling) ?? t('common.somethingWentWrong'),
-        isTrialRefusal: isTrialExpiredRefusal(error),
-      });
+      setFailure({ action, error });
     } finally {
       pendingRef.current = false;
       setPending(null);
     }
   };
 
-  // The step the failure offers: only the trial refusal has one, and the hook
-  // withholds it from a role the server would refuse.
-  const failureAction = useTrialRefusalAction(failure?.isTrialRefusal === true, organizationId);
+  // The refusal's sentence and the step under it are both opaque to the state:
+  // they are derived here, on every render, from the one raw rejection and the
+  // role the membership list currently reports. A refusal that lands before the
+  // list settles therefore gains the billing sentence and the step together, and
+  // a later role change moves both, instead of the sentence freezing the role
+  // the refusal happened to see.
+  const failureMessage =
+    failure === null
+      ? null
+      : (knownServerErrorMessage(failure.error, canManageBilling) ??
+        t('common.somethingWentWrong'));
+  // Only the trial refusal offers a step, and the hook withholds it from a role
+  // the server would refuse.
+  const failureAction = useTrialRefusalAction(
+    failure !== null && isTrialExpiredRefusal(failure.error),
+    organizationId
+  );
 
   return {
     record,
@@ -185,6 +214,7 @@ export function useReviewMemoryProposalEditor({
     dirty,
     valid,
     failure,
+    failureMessage,
     failureAction,
     pending,
     canEdit,
@@ -194,6 +224,19 @@ export function useReviewMemoryProposalEditor({
     dialog: guard.dialog,
     requestClose: () => {
       if (!pendingRef.current) {
+        afterCloseRef.current = null;
+        guard.requestClose();
+      }
+    },
+    /**
+     * The step of a refusal that leaves for another route: the sheet closes
+     * first (asking about a dirty draft), and `after` runs once its native
+     * dismissal reports. Pushing before that would put the route in the stack
+     * behind a sheet that is still presented, where the tap looks dead.
+     */
+    requestCloseThen: (after: () => void) => {
+      if (!pendingRef.current) {
+        afterCloseRef.current = after;
         guard.requestClose();
       }
     },

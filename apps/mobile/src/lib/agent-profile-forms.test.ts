@@ -4,6 +4,9 @@ import {
   addCommand,
   cleanVariableKey,
   isValidVariableKey,
+  MAX_PROFILE_AGENTS,
+  MAX_PROFILE_KILO_COMMANDS,
+  MAX_PROFILE_MCP_SERVERS,
   MAX_SETUP_COMMANDS,
   moveCommand,
   parseSkillFrontmatter,
@@ -242,5 +245,16 @@ describe('setup command list operations', () => {
     expect(moveCommand(commands, 5, -1)).toEqual(commands);
     expect(moveCommand(commands, 0, -1)).not.toBe(commands);
     expect(commands).toEqual(['pnpm install', 'pnpm build', 'pnpm test']);
+  });
+});
+
+describe('profile list caps', () => {
+  // Each value mirrors a server constant the mobile bundle cannot import, so a
+  // server change that lands without this line fails here instead of on a screen.
+  it('mirrors the agent, MCP server, slash command and setup command caps', () => {
+    expect(MAX_PROFILE_AGENTS).toBe(20);
+    expect(MAX_PROFILE_MCP_SERVERS).toBe(20);
+    expect(MAX_PROFILE_KILO_COMMANDS).toBe(50);
+    expect(MAX_SETUP_COMMANDS).toBe(20);
   });
 });

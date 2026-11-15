@@ -119,12 +119,13 @@ function hostOf(url: string): string {
 
 /**
  * The checked address list for `hostname`, or null when the entry is missing or
- * expired. An expired entry is dropped here.
+ * expired. It is a copy, so a caller that stores or edits the list it receives
+ * cannot change what later checks return. An expired entry is dropped here.
  */
 function cachedUpstreamAddresses(hostname: string, now: number): string[] | null {
   const entry = checkedUpstreamAddresses.get(hostname);
   if (entry === undefined) return null;
-  if (entry.expiresAt > now) return entry.addresses;
+  if (entry.expiresAt > now) return [...entry.addresses];
   checkedUpstreamAddresses.delete(hostname);
   return null;
 }

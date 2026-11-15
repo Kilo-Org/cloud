@@ -480,6 +480,20 @@ describe('findUpstreamUrlViolation', () => {
     }
   });
 
+  it('hands out a copy of the checked list, so a caller cannot change the cache', async () => {
+    const resolve = resolvesTo('104.18.2.115');
+
+    const first = await check('https://llm.example.com/a', resolve);
+    expect(first).toEqual(allowedUrl('llm.example.com', ['104.18.2.115']));
+    if (!first.allowed) throw new Error('expected an allowed decision');
+    first.addresses.push('10.1.2.3');
+
+    await expect(check('https://llm.example.com/b', resolve)).resolves.toEqual(
+      allowedUrl('llm.example.com', ['104.18.2.115'])
+    );
+    expect(resolve).toHaveBeenCalledTimes(1);
+  });
+
   it('reuses a checked address list but re-resolves a rejected host', async () => {
     const publicResolve = resolvesTo('104.18.2.115');
     await check('https://llm.example.com/a', publicResolve);

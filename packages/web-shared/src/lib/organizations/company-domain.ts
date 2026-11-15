@@ -45,6 +45,18 @@ export function isValidDomain(domain: string): boolean {
 }
 
 /**
+ * Normalizes an SSO domain: trims, lowercases, and validates it.
+ * Returns the normalized domain, or null if it is not a valid domain.
+ *
+ * Unlike `normalizeCompanyDomain`, this does NOT accept URLs: an SSO domain is
+ * a bare domain (e.g. "acme.com"), and "https://acme.com" is rejected.
+ */
+export function normalizeSsoDomain(domain: string): string | null {
+  const normalized = domain.trim().toLowerCase();
+  return isValidDomain(normalized) ? normalized : null;
+}
+
+/**
  * Zod schema that normalizes and validates a company domain.
  *
  * Input: string (bare domain or full URL)

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ReplyInput } from './reply-input';
 import {
   failureCopy,
@@ -175,6 +176,10 @@ describe('ReplyInput failure copy', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
     expect(failureCopy(renderer)).toBe('Could not reply.');
     expect(replyEnabled(renderer)).toBe(true);
+    // No toast owns this rejection, so it must reach a screen reader through
+    // the announcing status line, not as a silent visual-only line.
+    const announcing = renderer.root.findAll(node => node.type === AccessibleStatus);
+    expect(announcing[0]?.props.message).toBe('Could not reply.');
   });
 
   it('retires a reconnect failure on the next keystroke', async () => {

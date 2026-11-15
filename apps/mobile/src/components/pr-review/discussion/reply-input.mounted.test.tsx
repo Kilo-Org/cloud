@@ -213,6 +213,30 @@ describe('ReplyInput submit', () => {
     expect(clearDraft).toHaveBeenCalledWith('u1', `pr-reply:key@${providerPrRefKey(GITLAB_REF)}`);
   });
 
+  it('posts nothing when the thread unmounts during the Terms read', async () => {
+    const roundTrip = Promise.withResolvers<{ accepted: boolean; currentVersion: string }>();
+    gate.status.mockReturnValueOnce(roundTrip.promise);
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockResolvedValue({});
+    const renderer = await mount(
+      createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
+    );
+    typeBody(renderer, 'hello');
+
+    act(() => {
+      pressReply(renderer);
+    });
+    unmountAll();
+
+    await act(async () => {
+      roundTrip.resolve({ accepted: true, currentVersion: 'v1' });
+      await Promise.resolve();
+    });
+
+    // The gate resolved for a token the unmount invalidated.
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
   it('clears the posted body when a deferred success lands with no replacement draft', async () => {
     const deferred = Promise.withResolvers<unknown>();
     const mutateAsync = vi.fn<() => Promise<unknown>>();
@@ -225,6 +249,13 @@ describe('ReplyInput submit', () => {
       pressReply(renderer);
     });
 
+    // Let the Terms gate resolve and the write start before the unmount.
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
     // The user left without typing again: the durable draft still holds the
     // body that was just posted, so reopening must not re-seed it.
     unmountAll();

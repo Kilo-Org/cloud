@@ -238,11 +238,18 @@ export function ReplyInput({
       attempt.fail({
         kind: 'retryable',
         message: t('prReview.operation.couldNotReply'),
-        announce: 'silent',
+        // A local rejection with no toast owner: the inline box announces it,
+        // like the composer's and the edit sheet's own validations.
+        announce: 'here',
       });
       return;
     }
     const outcome = await ensureTermsAcceptedOutcome();
+    if (!attempt.owns()) {
+      // The thread unmounted while the gate ran: this token no longer owns the
+      // phase, so nothing may be posted.
+      return;
+    }
     if (outcome.kind === 'dismissed') {
       attempt.abandon();
       return;

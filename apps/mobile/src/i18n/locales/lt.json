@@ -4030,11 +4030,11 @@
   "spendAlerts": {
     "subtitle": "Siųsk įspėjimą el. paštu arba push pranešimu atsiskaitymo kontaktams, kai šios srities išlaidos viršija limitą arba pakyla virš įprasto valandinio tempo.",
     "thresholdTitle": "Slenksčio viršijimas",
-    "thresholdSubtitle": "Šios srities einamosios išlaidos per pasirinktą langą viršija tavo limitą",
+    "thresholdSubtitle": "Šios srities išlaidos per pasirinktą laikotarpį viršija tavo limitą",
     "anomalyTitle": "Valandinis šuolis",
     "anomalySubtitle": "Šios srities valandinis tempas gerokai viršija jos pačios p95 bazinį lygį",
     "limitLabel": "Limitas (USD)",
-    "windowLabel": "Langas",
+    "windowLabel": "Laikotarpis",
     "window24h": "24 valandos",
     "window7d": "7 dienos",
     "window30d": "30 dienų",
@@ -4046,10 +4046,10 @@
     "noSpend": "Kol kas jokių išlaidų",
     "spend24h": "Išlaidos per paskutines 24 valandas",
     "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
-    "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
+    "permissionDenied": "Neturi leidimo valdyti išlaidų įspėjimų.",
     "pushOffByCategory": "Išjungta pranešimuose",
     "multiplierMaxError": "Įvesk daugiklį, lygų {{max}} arba mažesnį",
-    "thresholdMaxError": "Įveskite sumą, lygią {{max}} arba mažesnę"
+    "thresholdMaxError": "Įvesk sumą, lygią {{max}} arba mažesnę"
   },
   "profiles": {
     "title": "Profiliai",

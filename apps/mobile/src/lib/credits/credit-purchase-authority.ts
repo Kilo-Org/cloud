@@ -48,6 +48,9 @@ export function settleCreditPurchaseDispatch(record: CreditPurchaseIntent): void
     }
   }
   unsettledDispatches.delete(record);
+  // The settling record has left the pool, so its own mark can go: the members
+  // still waiting keep theirs, and a long session does not grow this set.
+  ambiguousDispatches.delete(record);
 }
 
 /**

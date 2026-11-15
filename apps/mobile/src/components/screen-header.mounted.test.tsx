@@ -180,6 +180,20 @@ function findHeadingEyebrow(root: TestInstance): TestInstance {
   return eyebrow;
 }
 
+/**
+ * The bottom margin the header gives an eyebrow, in dp, read from the style it
+ * passes the `Text` that `Eyebrow` renders: the gap depends on the title's
+ * measured line box and the live font scale, so it cannot be a class string.
+ */
+function eyebrowMargin(node: TestInstance): number {
+  const style = node.props.style as Record<string, unknown> | undefined;
+  const marginBottom = style?.marginBottom;
+  if (typeof marginBottom !== 'number') {
+    throw new TypeError('eyebrow carries no numeric marginBottom');
+  }
+  return marginBottom;
+}
+
 function findTitlePressable(root: TestInstance): TestInstance {
   return root.find(
     node =>
@@ -938,7 +952,7 @@ describe('ScreenHeader mounted', () => {
       // `Text` variant's business. The gap comes from the style the heading's
       // own eyebrow carries, so the reserve keeps the band's height.
       expect(twin.props.className).toBeUndefined();
-      expect(twin.props.style.marginBottom).toBeCloseTo(-9.87, 5);
+      expect(eyebrowMargin(twin)).toBeCloseTo(-9.87, 5);
       banded.unmount();
 
       // The hidden placeholder line, which is what holds the height when the
@@ -949,7 +963,7 @@ describe('ScreenHeader mounted', () => {
       // It still paints nothing and reaches no reader, and it closes the band's
       // empty top space like any other one-line-title eyebrow.
       expect(placeholder.props.className).toBe('opacity-0');
-      expect(placeholder.props.style.marginBottom).toBeCloseTo(-9.87, 5);
+      expect(eyebrowMargin(placeholder)).toBeCloseTo(-9.87, 5);
       inline.unmount();
 
       i18nManager.isRTL = false;
@@ -1458,15 +1472,15 @@ describe('ScreenHeader mounted', () => {
     // band, and no line below it because this header has no subtitle. The twin
     // carries the heading eyebrow's margin itself, which is what keeps the two
     // cells the same height and the caret centred on the title.
-    const eyebrowTwin = column.findAllByType('Eyebrow')[0];
-    expect(eyebrowTwin?.props.className).toBeUndefined();
-    expect(eyebrowTwin?.props.style).toEqual(findHeadingEyebrow(renderer.root).props.style);
-    expect(eyebrowTwin?.props.style.marginBottom).toBeLessThan(0);
-    expect(eyebrowTwin?.children).toEqual(['\u00A0']);
-    expect(eyebrowTwin?.props.numberOfLines).toBe(1);
-    expect(eyebrowTwin?.props['aria-hidden']).toBe(true);
-    expect(eyebrowTwin?.props.accessibilityElementsHidden).toBe(true);
-    expect(eyebrowTwin?.props.importantForAccessibility).toBe('no-hide-descendants');
+    const eyebrowTwin = column.findByType('Eyebrow');
+    expect(eyebrowTwin.props.className).toBeUndefined();
+    expect(eyebrowTwin.props.style).toEqual(findHeadingEyebrow(renderer.root).props.style);
+    expect(eyebrowMargin(eyebrowTwin)).toBeLessThan(0);
+    expect(eyebrowTwin.children).toEqual(['\u00A0']);
+    expect(eyebrowTwin.props.numberOfLines).toBe(1);
+    expect(eyebrowTwin.props['aria-hidden']).toBe(true);
+    expect(eyebrowTwin.props.accessibilityElementsHidden).toBe(true);
+    expect(eyebrowTwin.props.importantForAccessibility).toBe('no-hide-descendants');
     expect(column.findAllByType('Text')).toHaveLength(0);
 
     // The caret is a normal flow child of the band, so its 48dp target lives
@@ -1513,19 +1527,17 @@ describe('ScreenHeader mounted', () => {
 
     for (const props of variants) {
       const renderer = renderHeader(props);
-      const margin = findHeadingEyebrow(renderer.root).props.style?.marginBottom;
+      const margin = eyebrowMargin(findHeadingEyebrow(renderer.root));
       expect(margin).toBeCloseTo(-9.87, 5);
 
       // The leading column's twin carries the same value, so both cells still
       // measure the same height and the caret stays centred on the title.
-      const twin = findLeadingColumn(renderer.root).findAllByType('Eyebrow')[0];
-      expect(twin?.props.style.marginBottom).toBe(margin);
+      expect(eyebrowMargin(findLeadingColumn(renderer.root).findByType('Eyebrow'))).toBe(margin);
 
       if (props.reserveTitleSpace) {
         // The clipped reserve is the second copy the header lays out, and it
         // holds the band's height only, so it must agree too.
-        const reserved = findReservedBand(renderer.root).findAllByType('Eyebrow')[0];
-        expect(reserved?.props.style.marginBottom).toBe(margin);
+        expect(eyebrowMargin(findReservedBand(renderer.root).findByType('Eyebrow'))).toBe(margin);
       }
       renderer.unmount();
     }
@@ -1566,7 +1578,7 @@ describe('ScreenHeader mounted', () => {
     // The clamp: once the title's box fills the band, the negative margin gives
     // way to the plain gap instead of eating the title's own line.
     const renderer = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
-    expect(findHeadingEyebrow(renderer.root).props.style.marginBottom).toBeCloseTo(-1.615, 3);
+    expect(eyebrowMargin(findHeadingEyebrow(renderer.root))).toBeCloseTo(-1.615, 3);
     renderer.unmount();
 
     layout.fontScale = 2;

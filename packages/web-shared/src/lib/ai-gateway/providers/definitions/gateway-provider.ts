@@ -1,0 +1,26 @@
+import type {
+  Provider,
+  ProviderType,
+  TransformRequestContext,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
+
+export function defineGatewayProvider<const Type extends ProviderType, const ApiUrl extends string>(definition: {
+  type: Type;
+  apiUrl: ApiUrl;
+  apiKey: string;
+}) {
+  return {
+    type: definition.type,
+    apiUrl: definition.apiUrl,
+    apiUrlOverrides: {},
+    disableUrlSuffix: false,
+    apiKey: definition.apiKey,
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    responseTransforms: null,
+    async transformRequest(context: TransformRequestContext) {
+      dropThinkingBlocksOnPrefixMismatch(context);
+    },
+  } as const satisfies Provider;
+}

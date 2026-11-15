@@ -344,8 +344,6 @@
       "rowSubtitle": "Përdor faturimin e ofruesit tënd",
       "manageOnWebReason": "Këta ofrues kërkojnë kredenciale të strukturuara.",
       "description": "Kërkesat përmes këtyre çelësave faturohen në llogarinë tënde te ofruesi, në vend të gjendjes tënde në Kilo.",
-      "enabled": "Në përdorim",
-      "disabled": "I çaktivizuar",
       "managedByPlan": "Menaxhohet nga plani yt i kodimit",
       "enableKey": "Aktivizo çelësin e {{provider}}",
       "test": "Testo çelësin",
@@ -416,6 +414,7 @@
       "title": "Dëftesa e raportimit",
       "description": "Dëftesa për raportimin që dërgove. Ruaje këtë ID për t'iu referuar më vonë.",
       "receiptLabel": "Dëftesa",
+      "copyReceiptId": "Kopjo ID-në e dëftesës",
       "appealLabel": "Apelimi",
       "triageReceived": "U mor",
       "triageOpen": "Në shqyrtim",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Cilësimet e organizatës në ueb",
+      "integrations": "Integrimet në ueb",
       "usageDetails": "Detajet e përdorimit",
       "providersAndModels": "Ofruesit dhe modelet",
       "groups": "Grupet",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
-      "last30Days": "30 Ditët e fundit",
+      "orgLast30Days": "Të gjithë anëtarët · 30 Ditët e fundit",
       "outputTokens": "Tokenët dalës",
       "requests": "Kërkesat"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "Shërbimet e lidhura",
     "entrySubtitle": "GitHub, Slack, Linear dhe të tjera",
     "subtitle": "Lidh mjetet dhe proceset e tua të zhvillimit me Kilo",
-    "emptyHint": "Ende nuk ka asnjë integrim të lidhur.",
     "disconnect": "Shkëput",
     "disconnectTitle": "Të shkëputet {{provider}}?",
     "disconnectMessage": "Kilo do të ndalojë së përgjigjuri në {{provider}}. Mund ta lidhësh sërish në çdo kohë.",

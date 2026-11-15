@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- The profile screen composes Credits, Agents, Reviews, Organization, Linked accounts, App, Restore Purchases, and Actions; each section is a small rendered surface that mirrors the shared ConfigureRow/Text-header pattern. Splitting would re-encode the same hooks. */
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
@@ -32,6 +33,7 @@ import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
@@ -64,6 +66,36 @@ import { useTRPC } from '@/lib/trpc';
 // kilo-app Release workflow; never pin it to a version or a per-build copy.
 const CHANGELOG_URL = 'https://github.com/Kilo-Org/cloud/blob/main/apps/mobile/CHANGELOG.md';
 
+type AuthProvider =
+  inferRouterOutputs<MobileRouter>['user']['getAuthProviders']['providers'][number];
+
+/**
+ * What the Linked accounts section shows. One arm at a time, so rows and a load
+ * error can never stand together, and a failed refetch over retained rows is its
+ * own arm instead of claiming the accounts could not be loaded.
+ */
+type LinkedAccountsView =
+  | { readonly kind: 'hidden' }
+  | { readonly kind: 'skeleton' }
+  | { readonly kind: 'error' }
+  | { readonly kind: 'rows'; readonly providers: readonly AuthProvider[] }
+  | { readonly kind: 'rowsStale'; readonly providers: readonly AuthProvider[] };
+
+/** One answer for the Linked accounts section: rows and a load error never coexist. */
+function linkedAccountsView(
+  providers: readonly AuthProvider[] | undefined,
+  failed: boolean
+): LinkedAccountsView {
+  if (providers === undefined) {
+    return failed ? { kind: 'error' } : { kind: 'skeleton' };
+  }
+  if (providers.length === 0) {
+    // A settled empty read keeps the section hidden, as it always has.
+    return failed ? { kind: 'error' } : { kind: 'hidden' };
+  }
+  return failed ? { kind: 'rowsStale', providers } : { kind: 'rows', providers };
+}
+
 export function ProfileScreen() {
   const { signOut, token } = useAuth();
   const router = useRouter();
@@ -80,7 +112,6 @@ export function ProfileScreen() {
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const {
     data,
-    isLoading,
     isError: providersError,
     isFetching: providersFetching,
     refetch: refetchProviders,
@@ -236,6 +267,15 @@ export function ProfileScreen() {
   const showPrivacyChoices = () => {
     router.push('/(app)/consent?mode=review' as Href);
   };
+
+  // One answer per render: the section exists only where it has content, rows
+  // and an error never stand together, and a failed refetch over rows keeps
+  // them with a stale line instead of claiming the accounts could not load.
+  const linkedAccounts = linkedAccountsView(data?.providers, providersError);
+  const listedProviders =
+    linkedAccounts.kind === 'rows' || linkedAccounts.kind === 'rowsStale'
+      ? linkedAccounts.providers
+      : null;
 
   return (
     <View className="flex-1 bg-background">
@@ -455,16 +495,13 @@ export function ProfileScreen() {
             bar (Android `profile-error`, 2026-09-22). The skeleton reserves the
             row's height, so painting a row directly cannot shift the sections
             below — only the skeleton's exit fade remains. */}
-        {(providersError ||
-          (data?.providers.length ?? 0) > 0 ||
-          isLoading ||
-          (!afterIdle && !data)) && (
+        {linkedAccounts.kind === 'hidden' ? null : (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.linkedAccounts')}
             </Text>
 
-            {(isLoading || !afterIdle) && !data && !providersError && (
+            {linkedAccounts.kind === 'skeleton' ? (
               <Animated.View exiting={FadeOut.duration(150)}>
                 {/* Content-shaped skeleton (icon tile + two text bars in the
                     row's own bg-secondary card): a plain block read as an
@@ -482,9 +519,9 @@ export function ProfileScreen() {
                   </View>
                 </View>
               </Animated.View>
-            )}
+            ) : null}
 
-            {providersError && (
+            {linkedAccounts.kind === 'error' ? (
               <QueryError
                 variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
@@ -492,21 +529,41 @@ export function ProfileScreen() {
                 onRetry={() => void refetchProviders()}
                 isRetrying={providersFetching}
               />
-            )}
+            ) : null}
 
-            {data?.providers.map((p, index) => (
-              <View key={`${p.provider}-${p.email}`}>
-                <ConfigureRow
-                  icon={KeyRound}
-                  title={providerLabel(p.provider)}
-                  subtitle={p.email}
-                  subtitleNumberOfLines={1}
-                  hue="moss"
-                  className="rounded-lg bg-secondary px-3"
-                  last={index === data.providers.length - 1}
+            {listedProviders === null
+              ? null
+              : listedProviders.map((p, index) => (
+                  <View key={`${p.provider}-${p.email}`}>
+                    <ConfigureRow
+                      icon={KeyRound}
+                      title={providerLabel(p.provider)}
+                      subtitle={p.email}
+                      subtitleNumberOfLines={1}
+                      hue="moss"
+                      className="rounded-lg bg-secondary px-3"
+                      last={index === listedProviders.length - 1}
+                    />
+                  </View>
+                ))}
+
+            {linkedAccounts.kind === 'rowsStale' ? (
+              <View className="flex-row items-center gap-3">
+                <AccessibleStatus
+                  tone="warn"
+                  className="flex-1 text-xs"
+                  message={t('agents.sessionList.couldNotRefresh')}
                 />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => void refetchProviders()}
+                  loading={providersFetching}
+                >
+                  {t('common.refresh')}
+                </Button>
               </View>
-            ))}
+            ) : null}
           </View>
         )}
 

@@ -344,8 +344,6 @@
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
       "manageOnWebReason": "Ci dostawcy wymagają danych uwierzytelniających w określonym formacie.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
-      "enabled": "W użyciu",
-      "disabled": "Wyłączony",
       "managedByPlan": "Zarządzany przez twój plan kodowania",
       "enableKey": "Włącz klucz {{provider}}",
       "test": "Testuj klucz",
@@ -416,6 +414,7 @@
       "title": "Potwierdzenie zgłoszenia",
       "description": "Potwierdzenie przesłanego przez ciebie zgłoszenia. Zachowaj ten identyfikator, aby móc się do niego później odwołać.",
       "receiptLabel": "Potwierdzenie",
+      "copyReceiptId": "Skopiuj identyfikator potwierdzenia",
       "appealLabel": "Odwołanie",
       "triageReceived": "Otrzymano",
       "triageOpen": "W trakcie rozpatrywania",
@@ -3520,6 +3519,7 @@
     },
     "settingsOnWeb": {
       "title": "Ustawienia organizacji w wersji internetowej",
+      "integrations": "Integracje w wersji internetowej",
       "usageDetails": "Szczegóły użycia",
       "providersAndModels": "Dostawcy i modele",
       "groups": "Grupy",
@@ -3535,7 +3535,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
-      "last30Days": "Ostatnie 30 dni",
+      "orgLast30Days": "Wszyscy członkowie · Ostatnie 30 dni",
       "outputTokens": "Tokeny wyjściowe",
       "requests": "Żądania"
     },
@@ -4542,7 +4542,6 @@
     "sectionTitle": "Połączone usługi",
     "entrySubtitle": "GitHub, Slack, Linear i inne",
     "subtitle": "Połącz swoje narzędzia programistyczne i procesy pracy z Kilo",
-    "emptyHint": "Brak połączonych integracji.",
     "disconnect": "Odłącz",
     "disconnectTitle": "Odłączyć usługę {{provider}}?",
     "disconnectMessage": "Kilo przestanie odpowiadać w usłudze {{provider}}. W każdej chwili możesz połączyć ją ponownie.",

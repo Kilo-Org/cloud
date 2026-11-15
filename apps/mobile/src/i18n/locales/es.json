@@ -344,8 +344,6 @@
       "rowSubtitle": "Usa la facturación de tu propio proveedor",
       "manageOnWebReason": "Estos proveedores necesitan credenciales estructuradas.",
       "description": "Las solicitudes realizadas con estas claves se facturan a tu cuenta del proveedor en lugar de a tu saldo de Kilo.",
-      "enabled": "En uso",
-      "disabled": "Desactivada",
       "managedByPlan": "Gestionada por tu plan de programación",
       "enableKey": "Activar la clave de {{provider}}",
       "test": "Probar clave",
@@ -416,6 +414,7 @@
       "title": "Comprobante de denuncia",
       "description": "El comprobante de la denuncia que enviaste. Guarda este ID para consultarla más adelante.",
       "receiptLabel": "Comprobante",
+      "copyReceiptId": "Copiar ID del comprobante",
       "appealLabel": "Apelación",
       "triageReceived": "Recibida",
       "triageOpen": "En revisión",
@@ -3467,6 +3466,7 @@
     },
     "settingsOnWeb": {
       "title": "Ajustes de la organización en la web",
+      "integrations": "Integraciones en la web",
       "usageDetails": "Detalles de uso",
       "providersAndModels": "Proveedores y modelos",
       "groups": "Grupos",
@@ -3482,7 +3482,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 días",
+      "orgLast30Days": "Todos los miembros · Últimos 30 días",
       "outputTokens": "Tokens de salida",
       "requests": "Solicitudes"
     },
@@ -4477,7 +4477,6 @@
     "sectionTitle": "Servicios conectados",
     "entrySubtitle": "GitHub, Slack, Linear y más",
     "subtitle": "Conecta tus herramientas y flujos de trabajo de desarrollo a Kilo",
-    "emptyHint": "Aún no hay integraciones conectadas.",
     "disconnect": "Desconectar",
     "disconnectTitle": "¿Desconectar {{provider}}?",
     "disconnectMessage": "Kilo dejará de responder en {{provider}}. Puedes volver a conectarlo en cualquier momento.",

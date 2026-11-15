@@ -240,13 +240,40 @@ export function CreditPurchaseScreen() {
               // drops them when initialization fails), so even a priced row
               // cannot complete: keep every row disabled until it reconnects.
               const disabled = purchasing || !connected || !hasStorePrice;
-              const priceLabel = rowCompleting
-                ? t('kiloPass.completingPurchase')
-                : (pack.displayPrice ?? t('credits.priceUnavailable'));
+              // The trailing slot holds the store price only: it keeps its one
+              // line and its full width, so the title yields and a price a user
+              // pays is never truncated.
+              const storePrice = hasStorePrice ? pack.displayPrice : null;
+              // The row's state copy takes its one fixed-height line under the
+              // title, in place of the expiry note, and keeps the full row
+              // width instead of squeezing the title.
+              const completingLabel = rowCompleting ? t('kiloPass.completingPurchase') : null;
+              // A status phrase takes the same line, so the title keeps one
+              // line at the compact width and the row keeps the height of its
+              // priced neighbours. The store-unavailable card above already
+              // names the failure, so no row repeats it there: only the partly
+              // priced state, where the store answered and left this pack out,
+              // needs the row to say it.
+              const statusLabel =
+                !rowCompleting && !hasStorePrice && !storeUnavailable
+                  ? t('credits.priceUnavailable')
+                  : null;
+              // Exactly one state phrase shows: the purchase in flight, or the
+              // reason this row is inactive.
+              const stateLabel = completingLabel ?? statusLabel;
               // The row is one accessible element: the explicit label replaces
               // its children, so the charge and the disabled reason must be in
               // the label itself (the canonical Kilo Pass row does the same).
-              const rowAccessibilityLabel = [packLabel, priceLabel, expiryMessage]
+              // The price the row still shows stays in the label while a
+              // purchase is open, and the state is never dropped, also when the
+              // card above is its only visible statement.
+              const rowAccessibilityLabel = [
+                packLabel,
+                storePrice,
+                stateLabel,
+                storePrice === null && stateLabel === null ? t('credits.priceUnavailable') : null,
+                expiryMessage,
+              ]
                 .filter(Boolean)
                 .join(', ');
 
@@ -266,13 +293,29 @@ export function CreditPurchaseScreen() {
                   }}
                 >
                   <View className="flex-row items-start justify-between gap-4">
-                    <Text className="flex-1 font-semibold text-foreground">{packLabel}</Text>
-                    <Text className="text-base font-semibold text-foreground tabular-nums">
-                      {priceLabel}
+                    <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
+                      {packLabel}
                     </Text>
+                    {storePrice !== null && (
+                      <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
+                        {storePrice}
+                      </Text>
+                    )}
                   </View>
-                  {expiryMessage && (
-                    <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
+                  {/* One fixed-height line under the title holds the row's
+                      state copy: the in-flight label, the row's own status, or
+                      the expiry note. Exactly one of them shows, so no row
+                      changes height when a purchase or the store state
+                      changes, and no row keeps an empty band for copy it does
+                      not state. */}
+                  {(expiryMessage !== undefined || stateLabel !== null) && (
+                    <View className="mt-2 min-h-5 justify-center">
+                      {stateLabel !== null ? (
+                        <Text className="text-sm text-muted-foreground">{stateLabel}</Text>
+                      ) : (
+                        <Text className="text-xs text-muted-foreground">{expiryMessage}</Text>
+                      )}
+                    </View>
                   )}
                 </Pressable>
               );

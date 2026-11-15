@@ -79,24 +79,57 @@ export function sameRaise(a: string | null, b: string | null): boolean {
 }
 
 /**
- * One durable ack entry. `sessionId` is the map key and is added to the
- * persisted form at serialization time.
- *
- * `raiseId` names the raise the user answered (`statusUpdatedAt ?? status`), so
- * the ack can only ever suppress that raise. A null `raiseId` only appears in a
- * blob written before acks carried a raise; hydration drops those.
- * `ackedAt === null` marks a cleared ack (a same-session re-raise replaced
- * the raise and cleared the ack so the badge returns).
+ * What an ack names: the raise the person answered, or only the kind of raise
+ * it was.
  */
-type AttentionEntry = {
+type AckIdentity =
+  | { readonly kind: 'raise'; readonly raiseId: string }
+  | { readonly kind: 'status'; readonly status: string };
+
+/**
+ * True when a raise id dates at or before `ackedAt`. A raise id that is not a
+ * timestamp says nothing about order, so it answers false.
+ */
+function orderedAtOrBefore(raiseId: string | null, ackedAt: number): boolean {
+  if (raiseId === null) {
+    return false;
+  }
+  const at = parseTimestamp(raiseId).getTime();
+  return !Number.isNaN(at) && at <= ackedAt;
+}
+
+/** True when a raise id is not a timestamp, which is what "the status alone" is written as. */
+function isUndatedRaise(raiseId: string | null): boolean {
+  return raiseId === null || Number.isNaN(parseTimestamp(raiseId).getTime());
+}
+
+/**
+ * One durable entry: the answer a person gave, or the raise a re-raise cleared.
+ *
+ * `answered` names what the answer was about. A `raise` identity suppresses
+ * that raise only; a `status` identity names the kind of raise the person
+ * answered when the surface that answered carried no row time.
+ * `expiresAt === null` only appears in a blob written before acks expired, and
+ * those are kept.
+ */
+type AttentionEntry =
+  | {
+      readonly kind: 'acked';
+      readonly answered: AckIdentity;
+      readonly status: string | null;
+      readonly ackedAt: number;
+      readonly expiresAt: number | null;
+    }
+  | { readonly kind: 'cleared'; readonly raiseId: string | null; readonly status: string | null };
+
+/** The flat shape the blob stores, and the shape the old type had. */
+type PersistedAttentionEntry = {
+  sessionId: string;
   raiseId: string | null;
   status: string | null;
   ackedAt: number | null;
   expiresAt: number | null;
 };
-
-/** Serialized shape: one entry per session, `sessionId` included. */
-type PersistedAttentionEntry = AttentionEntry & { sessionId: string };
 
 type AttentionStore = {
   listeners: Set<() => void>;
@@ -140,10 +173,26 @@ async function loadKv(): Promise<AttentionKv | null> {
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 
+/**
+ * The flat entry the blob stores: the shape a reader of an older build wrote
+ * and the one this build reads back.
+ */
+function projectedEntry(entry: AttentionEntry): Omit<PersistedAttentionEntry, 'sessionId'> {
+  if (entry.kind === 'cleared') {
+    return { raiseId: entry.raiseId, status: entry.status, ackedAt: null, expiresAt: null };
+  }
+  return {
+    raiseId: entry.answered.kind === 'raise' ? entry.answered.raiseId : entry.answered.status,
+    status: entry.status,
+    ackedAt: entry.ackedAt,
+    expiresAt: entry.expiresAt,
+  };
+}
+
 function serializeEntries(): string {
   const entries: PersistedAttentionEntry[] = [];
   for (const [sessionId, entry] of store.entries) {
-    entries.push({ sessionId, ...entry });
+    entries.push({ sessionId, ...projectedEntry(entry) });
   }
   return JSON.stringify(entries);
 }
@@ -194,27 +243,38 @@ function applyHydratedEntries(raw: string): boolean {
     return false;
   }
   const now = Date.now();
-  // An ack that names no raise (written before acks carried one) suppresses
-  // nothing: dropping it keeps a raise the user has not answered visible.
-  const fresh = entries.filter(
-    entry => entry.raiseId !== null && (entry.expiresAt === null || entry.expiresAt > now)
-  );
   let applied = false;
-  for (const entry of fresh) {
-    // A mutation that landed after hydration began must win over the stale
-    // persisted entry: a present in-memory entry means this session already
-    // changed this run, so the persisted snapshot is out of date.
-    if (!store.entries.has(entry.sessionId)) {
-      store.entries.set(entry.sessionId, {
-        raiseId: entry.raiseId,
-        status: entry.status,
-        ackedAt: entry.ackedAt,
-        expiresAt: entry.expiresAt,
-      });
+  for (const entry of entries) {
+    const raiseId = entry.raiseId;
+    const live = entry.expiresAt === null || entry.expiresAt > now;
+    /* A mutation that landed after hydration began must win over the stale
+       persisted entry: a present in-memory entry means this session already
+       changed this run, so the persisted snapshot is out of date. An ack that
+       names no raise (written before acks carried one) suppresses nothing. */
+    const fresh = raiseId !== null && !store.entries.has(entry.sessionId);
+    if (fresh && live) {
+      store.entries.set(entry.sessionId, hydratedEntry(entry, raiseId));
       applied = true;
     }
   }
   return applied;
+}
+
+/** The one entry a stored row describes: a cleared raise, or the answer it recorded. */
+function hydratedEntry(entry: PersistedAttentionEntry, raiseId: string): AttentionEntry {
+  if (entry.ackedAt === null) {
+    return { kind: 'cleared', raiseId, status: entry.status };
+  }
+  return {
+    kind: 'acked',
+    /* A row whose raise id is its status was answered from a surface with no
+       row time: it names the kind of raise, not the raise. */
+    answered:
+      raiseId === entry.status ? { kind: 'status', status: raiseId } : { kind: 'raise', raiseId },
+    status: entry.status,
+    ackedAt: entry.ackedAt,
+    expiresAt: entry.expiresAt,
+  };
 }
 
 let hydrationPromise: Promise<void> | null = null;
@@ -310,20 +370,33 @@ export function ackSessionAttention(
   const entry = store.entries.get(sessionId);
   // Only a cleared entry tracks the raise still waiting for an answer; an acked
   // entry's raise was answered already and must not be reused for a new one.
-  const trackedRaise = entry?.ackedAt === null && entry.status === status ? entry.raiseId : null;
+  const trackedRaise = entry?.kind === 'cleared' && entry.status === status ? entry.raiseId : null;
   const raiseId = statusUpdatedAt ?? trackedRaise ?? status;
+  let knownRaise: string | null = null;
+  if (entry !== undefined) {
+    if (entry.kind === 'cleared') {
+      knownRaise = entry.raiseId;
+    } else if (entry.answered.kind === 'raise') {
+      knownRaise = entry.answered.raiseId;
+    } else {
+      knownRaise = entry.answered.status;
+    }
+  }
   if (
-    entry?.raiseId != null &&
-    parseTimestamp(entry.raiseId).getTime() > parseTimestamp(raiseId).getTime()
+    knownRaise !== null &&
+    parseTimestamp(knownRaise).getTime() > parseTimestamp(raiseId).getTime()
   ) {
     return;
   }
-  if (entry && entry.ackedAt !== null && sameRaise(entry.raiseId, raiseId)) {
+  if (entry?.kind === 'acked' && sameRaise(knownRaise, raiseId)) {
     return;
   }
   const now = Date.now();
   store.entries.set(sessionId, {
-    raiseId,
+    kind: 'acked',
+    /* A raise id equal to the status is the status alone: the answer carried no
+       row time, so it names the kind of raise, not the raise. */
+    answered: raiseId === status ? { kind: 'status', status } : { kind: 'raise', raiseId },
     status,
     ackedAt: now,
     expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
@@ -354,7 +427,11 @@ export function reconcileSessionAttention(
   statusUpdatedAt: string | null | undefined
 ): void {
   const existing = store.entries.get(sessionId);
-  if (existing && existing.expiresAt !== null && existing.expiresAt <= Date.now()) {
+  if (
+    existing?.kind === 'acked' &&
+    existing.expiresAt !== null &&
+    existing.expiresAt <= Date.now()
+  ) {
     store.entries.delete(sessionId);
     commit();
     return;
@@ -373,29 +450,33 @@ export function reconcileSessionAttention(
     return;
   }
 
-  if (entry.ackedAt === null) {
+  if (entry.kind === 'cleared') {
     // Cleared ack (re-raise): keep tracking the current raise, still unacked.
     if (!sameRaise(entry.raiseId, raiseId)) {
-      store.entries.set(sessionId, {
-        raiseId,
-        status: status ?? null,
-        ackedAt: null,
-        expiresAt: null,
-      });
+      store.entries.set(sessionId, { kind: 'cleared', raiseId, status: status ?? null });
       commit();
     }
     return;
   }
 
-  if (sameRaise(entry.raiseId, raiseId)) {
+  const answeredRaise =
+    entry.answered.kind === 'raise' ? entry.answered.raiseId : entry.answered.status;
+  if (sameRaise(answeredRaise, raiseId)) {
     return;
   }
 
-  if (entry.raiseId !== null && entry.raiseId === entry.status && entry.status === status) {
-    // Acked with the status alone: the first observation of that status is the
-    // raise the user answered. Learn it, so the next raise is told apart.
+  if (
+    entry.answered.kind === 'status' &&
+    entry.answered.status === status &&
+    (isUndatedRaise(raiseId) || orderedAtOrBefore(raiseId, entry.ackedAt))
+  ) {
+    /* Acked with the status alone: an observation that cannot be ordered after
+       the answer is the raise the user answered. Learn it, so a later dated
+       raise is told apart. An undateable id is the status string in production,
+       so learning it can never steal a later dated raise. */
     store.entries.set(sessionId, {
-      raiseId,
+      kind: 'acked',
+      answered: { kind: 'raise', raiseId: raiseId ?? entry.answered.status },
       status,
       ackedAt: entry.ackedAt,
       expiresAt: entry.expiresAt,
@@ -412,12 +493,7 @@ export function reconcileSessionAttention(
   }
 
   // Different raise: replace the raise and clear the ack so the badge returns.
-  store.entries.set(sessionId, {
-    raiseId,
-    status: status ?? null,
-    ackedAt: null,
-    expiresAt: null,
-  });
+  store.entries.set(sessionId, { kind: 'cleared', raiseId, status: status ?? null });
   commit();
 }
 
@@ -475,22 +551,30 @@ export type AttentionRaise = {
  */
 export function isAttentionAcked(sessionId: string, raise: AttentionRaise): boolean {
   const entry = store.entries.get(sessionId);
-  if (!entry || entry.ackedAt === null) {
+  if (entry?.kind !== 'acked') {
     return false;
   }
-  if (sameRaise(entry.raiseId, raise.raiseId)) {
+  const answeredRaise =
+    entry.answered.kind === 'raise' ? entry.answered.raiseId : entry.answered.status;
+  if (sameRaise(answeredRaise, raise.raiseId)) {
     return true;
   }
   if (raise.raiseId === null || entry.status === null) {
     return false;
   }
-  // The row could not be dated, so it names the acked status rather than a raise.
+  // A reader that cannot date its row names the status it shows: answered for
+  // both variants, which is what the tray, launcher and remote rows read.
   if (raise.raiseId === entry.status) {
     return true;
   }
-  // The ack itself was written from a status-only answer: nothing it holds can
-  // tell two raises of that status apart.
-  return entry.raiseId === entry.status && raise.status === entry.status;
+  // A status-only ack answers a raise of the same kind it cannot order: one
+  // dated at or before the answer. A dated raise after the answer, or one of
+  // another kind, is a raise the person has not answered.
+  return (
+    entry.answered.kind === 'status' &&
+    raise.status === entry.answered.status &&
+    orderedAtOrBefore(raise.raiseId, entry.ackedAt)
+  );
 }
 
 export function shouldShowNeedsInput({
@@ -550,10 +634,13 @@ export function __peekSessionAttentionForTests(
   sessionId: string
 ): { raiseId: string | null } | undefined {
   const entry = store.entries.get(sessionId);
-  return entry ? { raiseId: entry.raiseId } : undefined;
+  return entry === undefined ? undefined : { raiseId: projectedEntry(entry).raiseId };
 }
 
-/** Test-only: peek at the full entry for a session (or undefined). */
-export function __peekSessionAttentionEntryForTests(sessionId: string): AttentionEntry | undefined {
-  return store.entries.get(sessionId);
+/** Test-only: peek at the full entry for a session (or undefined), in the blob's flat shape. */
+export function __peekSessionAttentionEntryForTests(
+  sessionId: string
+): Omit<PersistedAttentionEntry, 'sessionId'> | undefined {
+  const entry = store.entries.get(sessionId);
+  return entry === undefined ? undefined : projectedEntry(entry);
 }

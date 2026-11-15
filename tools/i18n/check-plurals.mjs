@@ -39,12 +39,17 @@
  *
  * Usage: node tools/i18n/check-plurals.mjs [--source-only]
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
-import { declaresPluralFamily, flattenCatalog, missingPluralCategories } from '../lib/catalogs.mjs';
+import {
+  catalogTags,
+  declaresPluralFamily,
+  flattenCatalog,
+  missingPluralCategories,
+} from '../lib/catalogs.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -431,14 +436,6 @@ export function findCountlessFamilies(scan, localesDir = LOCALES_DIR) {
   return countlessFamilies(scan.calls, readEnglishCatalog(localesDir));
 }
 
-/** The locale tags present on disk, without the `.json` extension. */
-function localeTags(localesDir = LOCALES_DIR) {
-  return readdirSync(localesDir)
-    .filter(name => name.endsWith('.json'))
-    .map(name => name.replace(/\.json$/, ''))
-    .sort();
-}
-
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
@@ -464,7 +461,7 @@ function run() {
 
   if (!sourceOnly) {
     let totalKeys = 0;
-    for (const tag of localeTags()) {
+    for (const tag of catalogTags(LOCALES_DIR)) {
       if (tag === 'en') {
         continue;
       }

@@ -4,10 +4,19 @@ import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai
 import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
+  credentialHeaders,
   faviconIcon,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { removeChatCompletionsMessageNames } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+
+const SESSION_HEADER = 'x-opencode-session';
+
+function sessionHeaders(session: string): Record<string, string> {
+  return { [SESSION_HEADER]: session };
+}
 
 export default {
   id: 'opencode-go',
@@ -18,10 +27,15 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   transformRequest(context) {
-    context.extraHeaders['x-opencode-session'] = generateProviderSpecificSessionHash(
-      context.kilo_user_id,
-      context.session_id ?? randomUUID(),
-      context.provider
+    Object.assign(
+      context.extraHeaders,
+      sessionHeaders(
+        generateProviderSpecificSessionHash(
+          context.kilo_user_id,
+          context.session_id ?? randomUUID(),
+          context.provider
+        )
+      )
     );
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
@@ -32,6 +46,12 @@ export default {
       delete context.request.body.user;
       removeChatCompletionsMessageNames(context.request.body);
     }
+  },
+  chatCompletionsHeaders(upstream) {
+    return { ...credentialHeaders(upstream), ...sessionHeaders(randomUUID()) };
+  },
+  getAiSdkProvider(model) {
+    return isMinimaxModel(model) || isQwenModel(model) ? { aiSdkProvider: 'anthropic' } : null;
   },
   models: cachedDirectByokModelList('opencode-go'),
   provider_listing: {

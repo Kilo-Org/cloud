@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { isCacheableMessagesContentBlock } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 function isWhitespaceOnlyText(text: unknown) {
   return typeof text === 'string' && text.trim() === '';
@@ -22,15 +23,6 @@ function findCacheControl(message: Anthropic.MessageParam) {
     .findLast(block => block.cache_control)?.cache_control;
 }
 
-function isCacheableBlock(
-  block: Anthropic.ContentBlockParam
-): block is Exclude<
-  Anthropic.ContentBlockParam,
-  Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam
-> {
-  return block.type !== 'thinking' && block.type !== 'redacted_thinking';
-}
-
 /** Carries a removed message's breakpoint without mutating the retained history. */
 export function preserveCacheControl(
   previousMessage: Anthropic.MessageParam,
@@ -45,7 +37,7 @@ export function preserveCacheControl(
     };
   }
   if (!Array.isArray(previousMessage.content)) return previousMessage;
-  const target = previousMessage.content.findLast(isCacheableBlock);
+  const target = previousMessage.content.findLast(isCacheableMessagesContentBlock);
   if (!target || target.cache_control) return previousMessage;
   return {
     ...previousMessage,

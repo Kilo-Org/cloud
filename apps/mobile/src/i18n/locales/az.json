@@ -344,8 +344,6 @@
       "rowSubtitle": "Öz provayder ödənişindən istifadə et",
       "manageOnWebReason": "Bu provayderlər strukturlaşdırılmış etimadnamələr tələb edir.",
       "description": "Bu açarlarla göndərilən sorğuların haqqı Kilo balansından deyil, provayder hesabından tutulur.",
-      "enabled": "İstifadədədir",
-      "disabled": "Söndürülüb",
       "managedByPlan": "Kodlaşdırma planın tərəfindən idarə olunur",
       "enableKey": "{{provider}} açarını aktivləşdir",
       "test": "Açarı yoxla",
@@ -416,6 +414,7 @@
       "title": "Şikayət qəbzi",
       "description": "Göndərdiyin şikayətin qəbzi. Sonradan ona istinad etmək üçün bu ID-ni saxla.",
       "receiptLabel": "Qəbz",
+      "copyReceiptId": "Qəbz ID-ni kopyala",
       "appealLabel": "Apellyasiya",
       "triageReceived": "Qəbul edildi",
       "triageOpen": "Nəzərdən keçirilir",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Vebdə təşkilat ayarları",
+      "integrations": "Vebdə inteqrasiyalar",
       "usageDetails": "İstifadə təfərrüatları",
       "providersAndModels": "Provayderlər və modellər",
       "groups": "Qruplar",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",
-      "last30Days": "Son 30 gün",
+      "orgLast30Days": "Bütün üzvlər · Son 30 gün",
       "outputTokens": "Çıxış tokenləri",
       "requests": "Sorğular"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "Qoşulmuş xidmətlər",
     "entrySubtitle": "GitHub, Slack, Linear və digərləri",
     "subtitle": "Proqram tərtibatı alətlərinizi və iş proseslərinizi Kilo ilə əlaqələndirin",
-    "emptyHint": "Hələ heç bir inteqrasiya qoşulmayıb.",
     "disconnect": "Bağlantını kəs",
     "disconnectTitle": "{{provider}} bağlantısı kəsilsin?",
     "disconnectMessage": "Kilo {{provider}} daxilində cavab verməyi dayandıracaq. İstənilən vaxt yenidən qoşula bilərsiniz.",

@@ -75,6 +75,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
 vi.mock('@rn-primitives/dialog', () => ({

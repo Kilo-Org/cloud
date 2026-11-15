@@ -243,6 +243,31 @@ function convertProviderSort(
   }
 }
 
+/**
+ * The request-level fields both routing paths forward: the caller's sort
+ * preference, data-handling choices, fallback models and session affinity.
+ */
+function getSharedGatewayOptions(
+  request: GatewayRequest
+): Pick<
+  NonNullable<VercelProviderConfig['gateway']>,
+  | 'sort'
+  | 'zeroDataRetention'
+  | 'disallowPromptTraining'
+  | 'models'
+  | 'sessionId'
+  | 'sessionAffinity'
+> {
+  const provider = request.body.provider;
+  return {
+    sort: convertProviderSort(provider?.sort),
+    zeroDataRetention: provider?.zdr,
+    disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
+    models: request.body.models,
+    ...getSessionAffinityOptions(request),
+  };
+}
+
 export function convertProviderOptions(
   requestToMutate: GatewayRequest,
   vercelInferenceProviders: string[] | null
@@ -270,12 +295,8 @@ export function convertProviderOptions(
     gateway: {
       only,
       order: provider?.order?.map(openRouterToVercelInferenceProviderId),
-      sort: convertProviderSort(provider?.sort),
-      zeroDataRetention: provider?.zdr,
-      disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
-      models: requestToMutate.body.models,
       serviceTier: serviceTier === 'flex' || serviceTier === 'priority' ? serviceTier : undefined,
-      ...getSessionAffinityOptions(requestToMutate),
+      ...getSharedGatewayOptions(requestToMutate),
     },
   };
 }
@@ -384,16 +405,12 @@ export async function applyVercelSettings(
     // https://anaconda.slack.com/archives/C0BQLEKUCV9/p1792652138592319
     // Request-level data handling preferences travel with the request on every routing path,
     // so upstream providers receive the caller's retention and training choices consistently.
+    // `order` and `serviceTier` apply to the managed path only.
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),
-        sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
-        models: requestToMutate.body.models,
-        zeroDataRetention: requestToMutate.body.provider?.zdr,
-        disallowPromptTraining:
-          requestToMutate.body.provider?.data_collection === 'deny' || undefined,
-        ...getSessionAffinityOptions(requestToMutate),
+        ...getSharedGatewayOptions(requestToMutate),
       },
     };
   } else {

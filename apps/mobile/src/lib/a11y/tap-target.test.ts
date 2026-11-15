@@ -25,6 +25,7 @@ import {
   DENSE_ROW_FRAME_DP,
   DENSE_ROW_HIT_SLOP,
   DENSE_ROW_HIT_SLOP_DP,
+  FIELD_CLEAR_BOX_CLASS,
   HEADER_TITLE_TARGET_CLASS,
   ICON_TARGET_BOX_CLASS,
   ICON_TARGET_DP,
@@ -113,6 +114,32 @@ describe('shared tap-target geometry', () => {
     expect(width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     // Centring has no dp value to compile, so it stays a class check.
     expect(COMPACT_CONTROL_BOX_CLASS).toContain('items-center');
+  });
+
+  it('renders the field clear target on its own node instead of a slop into the field', async () => {
+    // The in-field clear control sits inside the field's content box beside its
+    // `TextInput`, so the frame an audit reads is the control's own: `hitSlop`
+    // never widens that frame, and a reach toward the input would take taps the
+    // field should get. The box is the icon target rather than the 44pt design
+    // target, because whole-pixel layout on Android lands a 44pt box under it.
+    // Placement (the call site's logical trailing margin) stays out of this box.
+    expect(await compiledDp(FIELD_CLEAR_BOX_CLASS, 'height')).toBe(ICON_TARGET_DP);
+    expect(await compiledDp(FIELD_CLEAR_BOX_CLASS, 'width')).toBe(ICON_TARGET_DP);
+    // Centring has no dp value to compile, so it stays a class check.
+    expect(FIELD_CLEAR_BOX_CLASS).toContain('items-center');
+    expect(FIELD_CLEAR_BOX_CLASS).toContain('justify-center');
+    // The box is taller than the shared input's 44pt floor, so it cancels the
+    // difference in layout with the field's own `py-2` (7pt a side at the app's
+    // 14pt rem) and the field keeps its height while the box still paints and
+    // hit-tests its whole height inside the field's frame.
+    const cancel = await compiledDp(FIELD_CLEAR_BOX_CLASS, 'marginBlock');
+    expect(cancel).toBe(-7);
+    expect(ICON_TARGET_DP + 2 * cancel).toBeLessThan(TOUCH_TARGET_DP);
+    // One size pair only. A second `h-*`/`w-*` token would set the same
+    // property and leave the real size to the order Tailwind emits its rules
+    // in, so the control's size would no longer be this box.
+    expect(FIELD_CLEAR_BOX_CLASS.match(/(?:^|\s)h-/g)).toHaveLength(1);
+    expect(FIELD_CLEAR_BOX_CLASS.match(/(?:^|\s)w-/g)).toHaveLength(1);
   });
 
   it('renders the icon target box at Android 48dp minimum from whole pixels', async () => {

@@ -344,8 +344,6 @@
       "rowSubtitle": "Kendi sağlayıcı faturalandırmanı kullan",
       "manageOnWebReason": "Bu sağlayıcılar yapılandırılmış kimlik bilgileri gerektirir.",
       "description": "Bu anahtarlar üzerinden yapılan istekler Kilo bakiyen yerine sağlayıcı hesabına faturalandırılır.",
-      "enabled": "Kullanımda",
-      "disabled": "Kapalı",
       "managedByPlan": "Kodlama planın tarafından yönetiliyor",
       "enableKey": "{{provider}} anahtarını etkinleştir",
       "test": "Anahtarı test et",
@@ -416,6 +414,7 @@
       "title": "Bildirim alındısı",
       "description": "Gönderdiğin bildirimin alındısı. Daha sonra başvurmak için bu kimliği sakla.",
       "receiptLabel": "Alındı",
+      "copyReceiptId": "Alındı kimliğini kopyala",
       "appealLabel": "İtiraz",
       "triageReceived": "Alındı",
       "triageOpen": "İnceleniyor",
@@ -3414,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Web'deki kuruluş ayarları",
+      "integrations": "Web'deki entegrasyonlar",
       "usageDetails": "Kullanım ayrıntıları",
       "providersAndModels": "Sağlayıcılar ve modeller",
       "groups": "Gruplar",
@@ -3429,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
-      "last30Days": "Son 30 gün",
+      "orgLast30Days": "Tüm üyeler · Son 30 gün",
       "outputTokens": "Çıktı tokenları",
       "requests": "İstekler"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "Bağlı hizmetler",
     "entrySubtitle": "GitHub, Slack, Linear ve daha fazlası",
     "subtitle": "Geliştirme araçlarınızı ve iş akışlarınızı Kilo'ya bağlayın",
-    "emptyHint": "Henüz bağlı entegrasyon yok.",
     "disconnect": "Bağlantıyı kes",
     "disconnectTitle": "{{provider}} bağlantısı kesilsin mi?",
     "disconnectMessage": "Kilo, {{provider}} üzerinde yanıt vermeyi bırakacak. İstediğiniz zaman yeniden bağlanabilirsiniz.",

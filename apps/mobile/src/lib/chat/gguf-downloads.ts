@@ -27,6 +27,7 @@ import {
   transfersOf,
   transferStart,
 } from './gguf-transfers';
+import { createProgressReporter } from './gguf-transfer-progress';
 import { verifyModel } from './gguf-verify';
 
 /**
@@ -54,7 +55,8 @@ export function ggufDownloads({
   let models: readonly GgufModelRecord[] = [];
   let active: Active | undefined = undefined;
   let failure: GgufDownloadsSnapshot['failure'] = null;
-  let snapshot: GgufDownloadsSnapshot = { models, download: null, failure };
+  let loadFailed = false;
+  let snapshot: GgufDownloadsSnapshot = { models, download: null, failure, loadFailed };
   const listeners = new Set<() => void>();
 
   const publish = () => {
@@ -62,6 +64,7 @@ export function ggufDownloads({
       models,
       download: active === undefined ? null : downloadProgress(active),
       failure,
+      loadFailed,
     };
     for (const listener of listeners) {
       listener();
@@ -156,31 +159,11 @@ export function ggufDownloads({
     await verify(download, download.done + size);
   };
 
-  const onProgress =
-    (download: () => Active | undefined) =>
-    (progress: { readonly bytesWritten: number; readonly totalBytes: number }) => {
-      const current = download();
-      if (current === undefined || active !== current || current.phase !== 'downloading') {
-        return;
-      }
-      // Bytes arriving after a resume mean the server accepted it.
-      current.resuming = false;
-      const { expected } = currentTransfer(current);
-      const firstLength = current.total <= 0 && progress.totalBytes > 0;
-      current.written = progress.bytesWritten;
-      current.total = progress.totalBytes > 0 ? progress.totalBytes : (expected ?? 0);
-      const room = storage.freeBytes();
-      if (
-        firstLength &&
-        expected === undefined &&
-        room < current.total - current.written + STORAGE_HEADROOM_BYTES
-      ) {
-        current.stop = 'space';
-        current.task.cancel();
-        return;
-      }
-      publish();
-    };
+  const onProgress = createProgressReporter({
+    storage,
+    activeDownload: () => active,
+    publish,
+  });
 
   /** A resume the server refused: drop the partial file and download it again from zero. */
   const restart = (download: Active) => {
@@ -228,19 +211,33 @@ export function ggufDownloads({
   };
 
   return {
-    load: () => {
-      const index = storage.readIndex();
-      models = keepStoredModels({
-        storage,
-        index,
-        partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
-      });
-      // Only a list that parsed in full is written back: anything else would lose
-      // an entry, and the next launch would then delete the file it names.
-      if (modelIndexFullyParsed(index)) {
-        save(models);
+    load: (): boolean => {
+      try {
+        const index = storage.readIndex();
+        models = keepStoredModels({
+          storage,
+          index,
+          partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
+        });
+        // Only a list that parsed in full is written back: anything else would lose
+        // an entry, and the next launch would then delete the file it names.
+        if (modelIndexFullyParsed(index)) {
+          save(models);
+        }
+        if (loadFailed) {
+          loadFailed = false;
+        }
+        publish();
+        return true;
+      } catch {
+        // A storage the OS refused (permission, full disk, I/O) is a state the picker
+        // reports, not a crash: this store is read while rendering.
+        if (!loadFailed) {
+          loadFailed = true;
+          publish();
+        }
+        return false;
       }
-      publish();
     },
     snapshot: () => snapshot,
     subscribe: (listener: () => void) => {
@@ -256,6 +253,12 @@ export function ggufDownloads({
       return record === undefined ? undefined : modelFileOf(storage, record);
     },
     start: (source: GgufDownloadSource) => {
+      // A finished download writes the whole list back, so it must not run while the
+      // saved one is unread: that write would drop every model it names, and the next
+      // load would then delete their files.
+      if (loadFailed) {
+        return false;
+      }
       const fileId = source.kind === 'catalog' ? source.model.fileId : source.fileId;
       if (active !== undefined || models.some(model => model.fileId === fileId)) {
         return false;
@@ -325,6 +328,10 @@ export function ggufDownloads({
       publish();
     },
     remove: async (fileId: string) => {
+      // Same list, same rule: a removal rewrites the index it could not read.
+      if (loadFailed) {
+        return;
+      }
       const record = models.find(model => model.fileId === fileId);
       if (record === undefined) {
         return;

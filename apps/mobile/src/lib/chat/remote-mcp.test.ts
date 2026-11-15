@@ -52,6 +52,7 @@ vi.mock('./remote-mcp-store', () => ({
 vi.mock('@/lib/auth/auth-epoch', () => ({ currentAuthEpoch: () => world.epoch }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => world.connectivity,
+  connectionRefusesWrites: () => world.connectivity === 'offline',
 }));
 
 /** The provider an OAuth server is discovered with; its storage is its own module's. */

@@ -344,8 +344,6 @@
       "rowSubtitle": "Ampiasao ny fandoavam-bola amin'ny mpamatsinao",
       "manageOnWebReason": "Mila mari-panamarinana voarafitra ireo mpamatsy ireo.",
       "description": "Ny fangatahana mampiasa ireo lakile ireo dia aloa amin'ny kaontinao ao amin'ny mpamatsy fa tsy amin'ny ambim-bola Kilo anananao.",
-      "enabled": "Ampiasaina",
-      "disabled": "Najanona",
       "managedByPlan": "Tantanin'ny drafitra fandaharana anananao",
       "enableKey": "Alefaso ny lakilen'ny {{provider}}",
       "test": "Andramo ny lakile",
@@ -416,6 +414,7 @@
       "title": "Porofon'ny tatitra",
       "description": "Ny porofon'ny tatitra nalefanao. Tehirizo ity id ity mba hanondroana azy any aoriana.",
       "receiptLabel": "Porofo",
+      "copyReceiptId": "Adikao ny ID amin'ny porofo",
       "appealLabel": "Fampakarana",
       "triageReceived": "Voaray",
       "triageOpen": "Eo am-pandinihana",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Fikirakiran'ny fikambanana amin'ny tranonkala",
+      "integrations": "Fampifandraisana amin'ny tranonkala",
       "usageDetails": "Antsipirian'ny fampiasana",
       "providersAndModels": "Mpamatsy sy modely",
       "groups": "Vondrona",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",
-      "last30Days": "30 Andro farany lasa",
+      "orgLast30Days": "Mpikambana rehetra · 30 Andro farany lasa",
       "outputTokens": "Sombin-tsoratra mivoaka",
       "requests": "Fangatahana"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "Serivisy mifandray",
     "entrySubtitle": "GitHub, Slack, Linear sy ny hafa",
     "subtitle": "Ampifandraiso amin'i Kilo ireo fitaovana sy fomba fiasanao amin'ny fampandrosoana",
-    "emptyHint": "Mbola tsy misy fampifandraisana mifandray.",
     "disconnect": "Esory",
     "disconnectTitle": "Hanapaka ny fifandraisana amin'i {{provider}}?",
     "disconnectMessage": "Tsy hamaly intsony ao amin'i {{provider}} i Kilo. Afaka mampifandray indray ianao amin'ny fotoana rehetra.",

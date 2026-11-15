@@ -33,14 +33,11 @@ export const GatewayConfigSchema = z.object({
 
 export type GatewayConfig = z.infer<typeof GatewayConfigSchema>;
 
-export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
-  vercel_routing_enabled: DEFAULT_VERCEL_ROUTING_ENABLED,
-  vercel_routing_opt_out_models: [],
+export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = GatewayConfigSchema.parse({
   updated_at: null,
   updated_by: null,
   updated_by_email: null,
-  note: null,
-};
+});
 
 /** Schema for parsing the routing settings on the hot path. */
 export const GatewayRoutingConfigSchema = z.object({

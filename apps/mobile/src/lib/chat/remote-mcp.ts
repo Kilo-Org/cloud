@@ -10,7 +10,7 @@ import {
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 
 import { forgetCallResults, rememberCallResult } from './remote-mcp-call-results';
 import { credentialDeps, serverValue } from './remote-mcp-credentials';
@@ -327,7 +327,7 @@ export async function ensureRemoteMcp(
   if (missing.length === 0) {
     return snapshot;
   }
-  if (request.retry !== true && getCommittedConnectivityStatus() === 'offline') {
+  if (request.retry !== true && connectionRefusesWrites()) {
     return failOffline(missing);
   }
   for (const server of missing) {

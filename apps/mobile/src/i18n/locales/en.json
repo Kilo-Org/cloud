@@ -411,8 +411,6 @@
       "rowSubtitle": "Use your own provider billing",
       "manageOnWebReason": "These providers need structured credentials.",
       "description": "Requests through these keys are billed to your provider account instead of your Kilo balance.",
-      "enabled": "In use",
-      "disabled": "Turned off",
       "managedByPlan": "Managed by your coding plan",
       "enableKey": "Enable the {{provider}} key",
       "test": "Test key",
@@ -483,6 +481,7 @@
       "title": "Report receipt",
       "description": "The receipt for the report you submitted. Keep this id to refer to it later.",
       "receiptLabel": "Receipt",
+      "copyReceiptId": "Copy receipt ID",
       "appealLabel": "Appeal",
       "triageReceived": "Received",
       "triageOpen": "In review",
@@ -3489,6 +3488,7 @@
     },
     "settingsOnWeb": {
       "title": "Organization settings on the web",
+      "integrations": "Integrations on the web",
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",
@@ -3504,7 +3504,7 @@
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
-      "last30Days": "Last 30 days",
+      "orgLast30Days": "All members · Last 30 days",
       "outputTokens": "Output Tokens",
       "requests": "Requests"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "Connected services",
     "entrySubtitle": "GitHub, Slack, Linear and more",
     "subtitle": "Connect your development tools and workflows to Kilo",
-    "emptyHint": "No integrations connected yet.",
     "disconnect": "Disconnect",
     "disconnectTitle": "Disconnect {{provider}}?",
     "disconnectMessage": "Kilo will stop responding in {{provider}}. You can reconnect at any time.",

@@ -9,13 +9,6 @@ import {
   agentNotificationKindForGlanceableSnapshot,
   androidChannelIdForAgentKind,
 } from '@kilocode/notifications/schemas';
-import { requestWidgetUpdate } from 'react-native-android-widget';
-
-import { i18n } from '@/i18n';
-import {
-  getHomeWidgetDataForSnapshot,
-  getLastHomeWidgetData,
-} from '@/lib/glanceable/home-widget-data';
 import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 import {
   getGlanceableDelivery,
@@ -29,13 +22,6 @@ import {
   setGlanceableActionApproving,
   setGlanceableActionNotice,
 } from './action-notice';
-import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import {
-  formatGlanceableAgo,
-  formatGlanceableClock,
-  formatGlanceableCount,
-  isWidgetRtl,
-} from './count-format';
 import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
 import {
   end as endLiveUpdate,
@@ -47,7 +33,14 @@ import {
 } from './live-update';
 import { cardAction, cardFor } from './notification-card';
 import { isNotificationPermissionGranted } from './permission';
-import { type AndroidWidgetProps, buildCurrentWidgetProps } from './widget-props';
+import {
+  _resetWidgetRenderForTests,
+  lastWidgetSnapshot,
+  noteWidgetSnapshot,
+  renderWidgetNow,
+  translate,
+  widgetPropsFor,
+} from './widget-render';
 
 // Re-exported because the approve task and the widget suite import them from the
 // sink; the notice state itself lives in `./action-notice`.
@@ -58,11 +51,6 @@ export { setGlanceableActionApproving, setGlanceableActionNotice };
  * translated copy, persists the latest snapshot, and fences pending starts.
  * Ending the ongoing notification never cancels a still-eligible widget expiry.
  */
-function translate(key: string): string {
-  return i18n.t(key);
-}
-
-let lastWidgetSnapshot: GlanceableAgentsSnapshot | null = null;
 let notificationActive = false;
 let revision = 0;
 /**
@@ -132,39 +120,6 @@ function postNotification(
   postedAction = terminalText === undefined ? actionKey(snapshot) : NO_ACTION;
 }
 
-/** The widget props for `snapshot`, with the deadline and staleness checks every redraw runs. */
-function widgetPropsFor(snapshot: GlanceableAgentsSnapshot): AndroidWidgetProps {
-  return buildCurrentWidgetProps(
-    snapshot,
-    translate,
-    formatGlanceableCount,
-    formatGlanceableAgo,
-    formatGlanceableClock,
-    getHomeWidgetDataForSnapshot(snapshot)
-  );
-}
-
-/** A delayed render must check the current snapshot and its deadline, not cached props. */
-export function getCurrentWidgetProps(): AndroidWidgetProps | null {
-  const snapshot = lastWidgetSnapshot ?? getLastHomeWidgetData()?.snapshot ?? null;
-  return snapshot === null ? null : widgetPropsFor(snapshot);
-}
-
-function renderWidgetNow(props: AndroidWidgetProps): void {
-  void requestWidgetUpdate({
-    widgetName: WIDGET_NAME,
-    renderWidget: info =>
-      renderActiveAgentsWidget(getCurrentWidgetProps() ?? props, info, isWidgetRtl()),
-  });
-}
-
-/**
- * The ongoing card exists only while an agent is working or waiting on the
- * user. Idle-only work is not worth a status notification: nothing is
- * happening, and an ongoing card has no opt-in the way a placed home-screen
- * widget does. The widget keeps showing the idle counts; the card ends, and a
- * later startable snapshot raises a new one.
- */
 function hasCurrentWork(snapshot: GlanceableAgentsSnapshot): boolean {
   return (
     (snapshot.status === 'happy' || snapshot.status === 'stale') &&
@@ -232,8 +187,16 @@ async function tryStartOrUpdate(
   if (granted) {
     // Android 8+ drops a post whose channel does not exist yet, and the JS side
     // owns channel creation, so the channel is ensured before the first start.
-    await ensureAndroidNotificationChannels();
+    const channelsReady = await ensureAndroidNotificationChannels();
     if (epoch !== startEpoch || (!carryNotice && !hasCurrentWork(snapshot))) {
+      return;
+    }
+    if (!channelsReady) {
+      // The channel the post needs does not exist, so the framework would drop it.
+      // The start stays owned by this epoch: a teardown that ran while the pass was
+      // outstanding already cleared `pending` and advanced the epoch, and the fence
+      // above would have returned.
+      pending = { snapshot, ctx };
       return;
     }
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
@@ -286,7 +249,7 @@ export async function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext)
  * Approve until an unrelated snapshot arrived. Never starts a card.
  */
 export function refreshPostedCardAction(): void {
-  const snapshot = lastWidgetSnapshot ?? getStoredWidgetSnapshot();
+  const snapshot = lastWidgetSnapshot();
   const changed = snapshot !== null && postedAction !== actionKey(snapshot);
   if (notificationActive && changed && hasCurrentWork(snapshot)) {
     postNotification(snapshot, 'update');
@@ -306,13 +269,18 @@ async function retryPendingStart(): Promise<void> {
   }
   // Same fence as the first start: the channel must exist before the post.
   const epoch = startEpoch;
-  await ensureAndroidNotificationChannels();
+  const channelsReady = await ensureAndroidNotificationChannels();
   if (
     epoch !== startEpoch ||
     pending !== p ||
     !getLiveActivityEnabled() ||
     !hasCurrentWork(p.snapshot)
   ) {
+    return;
+  }
+  if (!channelsReady) {
+    // `pending` already owns `p`; reassigning it would resurrect a start a
+    // teardown cleared. The next foreground retries the pass.
     return;
   }
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/update can post while awaiting the channel
@@ -342,7 +310,7 @@ export const androidSink: GlanceableSink = {
   publish(snapshot) {
     // A zero needs-input snapshot ends the ask the notice belongs to.
     pruneActionNotice(snapshot);
-    lastWidgetSnapshot = snapshot;
+    noteWidgetSnapshot(snapshot);
     // The native card survives a JS restart. Read the durable posted-channel
     // marker before it is overwritten and adopt the kind it recorded, so a
     // needs-input card that is already in the shade does not alert again on the
@@ -411,7 +379,7 @@ export const androidSink: GlanceableSink = {
 
 /** Test-only: drop JS state without touching Android-owned storage or deadlines. */
 export function _resetAndroidSinkForTests(): void {
-  lastWidgetSnapshot = null;
+  _resetWidgetRenderForTests();
   notificationActive = false;
   notificationKind = null;
   storedKindAdopted = false;

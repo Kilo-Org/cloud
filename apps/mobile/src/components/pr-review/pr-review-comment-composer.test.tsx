@@ -12,6 +12,7 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
 import type * as ReactI18next from 'react-i18next';
 import { PrReviewCommentComposer } from './pr-review-comment-composer';
 import { clearDraft } from '@/lib/persist/drafts';
@@ -36,12 +37,14 @@ type ConfirmRequest = {
   onConfirm: () => void;
 };
 
-const { confirmRequests, createCommentMocks } = vi.hoisted(() => ({
+const { confirmRequests, createCommentMocks, surfaceFeedback } = vi.hoisted(() => ({
   confirmRequests: [] as ConfirmRequest[],
   createCommentMocks: {
     mutateAsync: vi.fn<() => Promise<unknown>>(),
-    isPending: false,
-    error: null as Error | null,
+  },
+  surfaceFeedback: {
+    begin: () => ({ abandon: vi.fn(), fail: vi.fn(), owns: () => true, succeed: vi.fn() }),
+    clearWhere: vi.fn(),
   },
 }));
 
@@ -102,16 +105,32 @@ vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
 
 vi.mock('@/components/pr-review/composer-inline-error', () => ({
   ComposerInlineError: 'ComposerInlineError',
-  useComposerInlineError: () => ({
-    inlineError: null,
-    inlineErrorKind: null,
-    inlineErrorIsLocal: false,
-    setInlineError: vi.fn(),
-    setInlineErrorKind: vi.fn(),
-    setInlineErrorIsLocal: vi.fn(),
-    clearBadRequestOnBodyEdit: vi.fn(),
+}));
+
+// The composer reads the connectivity snapshot and its own surface phase
+// through adapters whose real modules reach native code (NetInfo) or need a
+// React dispatcher (useSyncExternalStore); the plain-function mount below
+// stubs the React primitives instead of rendering.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  connectionRefusesWrites: () => false,
+  getCommittedConnectivityStatus: () => 'online',
+  useOfflineBannerState: () => false,
+  useCommittedConnectivityStatus: () => 'online',
+}));
+
+vi.mock('@/lib/hooks/use-surface-feedback', () => ({
+  useSurfaceFeedback: () => ({
+    feedback: { status: 'idle' },
+    failure: null,
+    begin: surfaceFeedback.begin,
+    clearWhere: surfaceFeedback.clearWhere,
   }),
 }));
+
+vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
+  const actual = await importOriginal<typeof ProviderPrRefModule>();
+  return { ...actual, useProviderPrScopeOrNull: () => null };
+});
 
 vi.mock('@/components/pr-review/pr-review-comment-composer-parts', () => ({
   CommentBodyField: 'CommentBodyField',
@@ -166,8 +185,6 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
 vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
   useCreateReviewCommentMutation: () => ({
     mutateAsync: createCommentMocks.mutateAsync,
-    isPending: createCommentMocks.isPending,
-    error: createCommentMocks.error,
   }),
 }));
 
@@ -247,8 +264,6 @@ describe('PrReviewCommentComposer draft clear rules', () => {
   beforeEach(() => {
     confirmRequests.length = 0;
     createCommentMocks.mutateAsync.mockReset();
-    createCommentMocks.isPending = false;
-    createCommentMocks.error = null;
     vi.clearAllMocks();
   });
 
@@ -323,8 +338,6 @@ describe('PrReviewCommentComposer provider arm (s6)', () => {
 
   beforeEach(() => {
     createCommentMocks.mutateAsync.mockReset();
-    createCommentMocks.isPending = false;
-    createCommentMocks.error = null;
     vi.clearAllMocks();
   });
 

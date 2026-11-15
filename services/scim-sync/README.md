@@ -130,10 +130,15 @@ shared cursor for about one budget in aggregate however many of them conflict.
 The window closes only when **the event that opened it applies**, which is what
 says the directory's conflicts are over. Another event of the same directory
 applying leaves it open, because the window belongs to the one event that opened
-it. An applied `dsync.activated` clears both the window and the
-parked-activation record, because binding the organization makes them stale.
-`WORKOS_EVENT_CURSOR` clears both as well, so a replay is measured from the new
-position.
+it. An applied `dsync.activated` clears only the parked-activation record, which
+the binding does make stale; it leaves the window alone, because the window
+records stream time that directory has already spent and belongs to the event
+that spent it. The window is therefore removed by two things only: the event
+that opened it applying, or an operator `WORKOS_EVENT_CURSOR` reset. That reset
+clears the parked-activation record too, so a replay is measured from the new
+position. A window whose opening event parks is never removed automatically, so
+every later conflict of that directory parks at once until the operator resets
+the stream; the reset is the directory's recovery path.
 
 `parked_activations` records a directory whose `dsync.activated` the loop
 parked. No organization is bound for such a directory and no later event binds

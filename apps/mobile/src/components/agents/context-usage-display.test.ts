@@ -291,7 +291,7 @@ describe('getHeaderPillContent', () => {
 describe('getContextSheetContent', () => {
   it('does not invent usage before the first completed model step', () => {
     expect(getContextSheetContent(undefined, null)).toMatchObject({
-      usedTokens: '-',
+      usedTokens: null,
       windowTokens: null,
       capacityKnown: false,
       percentage: null,

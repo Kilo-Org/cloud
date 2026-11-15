@@ -344,8 +344,6 @@
       "rowSubtitle": "Bruk din egen leverandørfakturering",
       "manageOnWebReason": "Disse leverandørene trenger strukturert legitimasjon.",
       "description": "Forespørsler via disse nøklene faktureres leverandørkontoen din i stedet for Kilo-saldoen din.",
-      "enabled": "I bruk",
-      "disabled": "Slått av",
       "managedByPlan": "Administreres av kodeabonnementet ditt",
       "enableKey": "Aktiver {{provider}}-nøkkelen",
       "test": "Test nøkkel",
@@ -416,6 +414,7 @@
       "title": "Rapportkvittering",
       "description": "Kvitteringen for rapporten du sendte inn. Ta vare på denne ID-en slik at du kan vise til den senere.",
       "receiptLabel": "Kvittering",
+      "copyReceiptId": "Kopier kvitterings-ID",
       "appealLabel": "Klage",
       "triageReceived": "Mottatt",
       "triageOpen": "Under behandling",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisasjonsinnstillinger på nettet",
+      "integrations": "Integrasjoner på nettet",
       "usageDetails": "Bruksdetaljer",
       "providersAndModels": "Leverandører og modeller",
       "groups": "Grupper",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",
-      "last30Days": "Siste 30 dager",
+      "orgLast30Days": "Alle medlemmer · Siste 30 dager",
       "outputTokens": "Utdatatokener",
       "requests": "Forespørsler"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "Tilkoblede tjenester",
     "entrySubtitle": "GitHub, Slack, Linear og mer",
     "subtitle": "Koble utviklingsverktøyene og arbeidsflytene dine til Kilo",
-    "emptyHint": "Ingen integrasjoner er koblet til ennå.",
     "disconnect": "Koble fra",
     "disconnectTitle": "Koble fra {{provider}}?",
     "disconnectMessage": "Kilo slutter å svare i {{provider}}. Du kan koble til igjen når som helst.",

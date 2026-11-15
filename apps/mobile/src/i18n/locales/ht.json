@@ -344,8 +344,6 @@
       "rowSubtitle": "Sèvi ak pwòp faktirasyon founisè w",
       "manageOnWebReason": "Founisè sa yo bezwen idantifyan ki estriktire.",
       "description": "Demann ki pase nan kle sa yo ap faktire sou kont founisè w la olye de balans Kilo w la.",
-      "enabled": "Ap itilize",
-      "disabled": "Dezaktive",
       "managedByPlan": "Plan kodaj ou a jere l",
       "enableKey": "Aktive kle {{provider}} an",
       "test": "Teste kle",
@@ -416,6 +414,7 @@
       "title": "Resi rapò",
       "description": "Resi pou rapò ou te soumèt la. Kenbe ID sa a pou w ka itilize l pita.",
       "receiptLabel": "Resi",
+      "copyReceiptId": "Kopye ID resi a",
       "appealLabel": "Apèl",
       "triageReceived": "Resevwa",
       "triageOpen": "Nan revizyon",
@@ -3409,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Paramèt òganizasyon an sou entènèt",
+      "integrations": "Entegrasyon sou entènèt",
       "usageDetails": "Detay itilizasyon",
       "providersAndModels": "Founisè ak modèl",
       "groups": "Gwoup",
@@ -3424,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Jeton antre",
-      "last30Days": "Dènye 30 jou",
+      "orgLast30Days": "Tout manm yo · Dènye 30 jou",
       "outputTokens": "Jeton sòti",
       "requests": "Demann"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "Sèvis ki konekte",
     "entrySubtitle": "GitHub, Slack, Linear ak lòt ankò",
     "subtitle": "Konekte zouti devlopman ak workflow ou yo ak Kilo",
-    "emptyHint": "Pa gen okenn entegrasyon ki konekte ankò.",
     "disconnect": "Dekonekte",
     "disconnectTitle": "Dekonekte {{provider}}?",
     "disconnectMessage": "Kilo p ap reponn nan {{provider}} ankò. Ou ka rekonekte nenpòt ki lè.",

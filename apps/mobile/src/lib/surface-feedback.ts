@@ -37,6 +37,13 @@ export type SurfaceAttempt<Failure extends SurfaceFailure> = {
   fail(failure: Failure): boolean;
   /** No outcome to publish: the entry goes away, the key reads `idle`. */
   abandon(): boolean;
+  /**
+   * Whether this token still owns its key's pending entry, without settling.
+   * `false` means a newer attempt owns the key, the token already settled, or
+   * the surface unmounted (`invalidateAll`). Callers that await before they
+   * start work re-check this so a dismissed attempt writes nothing.
+   */
+  owns(): boolean;
 };
 
 /** The whole store as one subscribable value. */
@@ -47,7 +54,7 @@ export type SurfaceFeedbackSnapshot<Key extends string, Failure extends SurfaceF
   readonly pendingKeys: readonly Key[];
 };
 
-export type SurfaceFeedbackStore<Key extends string, Failure extends SurfaceFailure> = {
+type SurfaceFeedbackStore<Key extends string, Failure extends SurfaceFailure> = {
   /**
    * Admits an attempt synchronously and marks the key `pending`. Returns `null`
    * when the key is already pending: the caller MUST NOT start the work. This is
@@ -135,12 +142,20 @@ export function createSurfaceFeedbackStore<
     }
     nextGeneration += 1;
     const generation = nextGeneration;
+    // A settled entry is replaced, not overwritten in place: deleting it first
+    // puts the new admission at the end of the map, so `pendingKeys` stays in
+    // admission order after a re-admission.
+    entries.delete(key);
     entries.set(key, { phase: 'pending', generation });
     notify();
 
-    function settle(next: StoredPhase<Failure> | null): boolean {
+    function owns(): boolean {
       const owned = entries.get(key);
-      if (owned?.phase !== 'pending' || owned.generation !== generation) {
+      return owned?.phase === 'pending' && owned.generation === generation;
+    }
+
+    function settle(next: StoredPhase<Failure> | null): boolean {
+      if (!owns()) {
         return false;
       }
       if (next === null) {
@@ -156,6 +171,7 @@ export function createSurfaceFeedbackStore<
       succeed: () => settle({ phase: 'succeeded', generation }),
       fail: failure => settle({ phase: 'failed', generation, failure }),
       abandon: () => settle(null),
+      owns,
     };
   }
 

@@ -91,6 +91,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#FFFFFF',
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
 }));
 // The provider gate reads the memberships answer to word the Bitbucket

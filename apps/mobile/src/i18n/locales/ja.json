@@ -344,8 +344,6 @@
       "rowSubtitle": "自分のプロバイダーアカウントで課金",
       "manageOnWebReason": "これらのプロバイダーには構造化された認証情報が必要です",
       "description": "これらのキーを使ったリクエストは、Kiloの残高ではなくプロバイダーのアカウントに請求されます。",
-      "enabled": "使用中",
-      "disabled": "オフ",
       "managedByPlan": "コーディングプランで管理されています",
       "enableKey": "{{provider}}のキーを有効にする",
       "test": "キーをテスト",
@@ -416,6 +414,7 @@
       "title": "通報の受付確認",
       "description": "送信した通報の受付確認です。後で参照できるよう、このIDを保管してください。",
       "receiptLabel": "受付",
+      "copyReceiptId": "受付IDをコピー",
       "appealLabel": "異議申し立て",
       "triageReceived": "受付済み",
       "triageOpen": "審査中",
@@ -3414,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Webでの組織設定",
+      "integrations": "Webでの連携",
       "usageDetails": "使用状況の詳細",
       "providersAndModels": "プロバイダーとモデル",
       "groups": "グループ",
@@ -3429,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "入力トークン",
-      "last30Days": "過去30日間",
+      "orgLast30Days": "全メンバー · 過去30日間",
       "outputTokens": "出力トークン",
       "requests": "リクエスト"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "接続済みのサービス",
     "entrySubtitle": "GitHub、Slack、Linear など",
     "subtitle": "開発ツールやワークフローを Kilo に接続します",
-    "emptyHint": "接続済みの連携はまだありません。",
     "disconnect": "接続を解除",
     "disconnectTitle": "{{provider}} の接続を解除しますか？",
     "disconnectMessage": "Kilo は {{provider}} で応答しなくなります。いつでも再接続できます。",

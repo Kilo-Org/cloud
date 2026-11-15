@@ -19,7 +19,7 @@ import {
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
-export type MutationErrorDisplaySurface = 'composer' | 'submit' | 'edit-comment';
+export type MutationErrorDisplaySurface = 'composer' | 'conversation' | 'submit' | 'edit-comment';
 
 /**
  * The inline-error kinds the display helper can return. `not-found` is the
@@ -83,6 +83,9 @@ function badRequestMessage(surface: MutationErrorDisplaySurface, term?: string):
   if (surface === 'edit-comment') {
     return i18n.t('prReview.discussion.commentEditUnavailable');
   }
+  if (surface === 'conversation') {
+    return i18n.t('prReview.discussion.commentBadRequest');
+  }
   if (surface === 'composer') {
     return i18n.t('prReview.mutationError.commentNotPosted');
   }
@@ -113,7 +116,13 @@ export function mutationErrorDisplay(
     return { kind: 'bad-request', message: i18n.t('common.actionNotRecorded') };
   }
   if (classification.kind === 'forbidden') {
-    return { kind: 'forbidden', message: classification.message };
+    // The conversation surface words its own refusal; every other surface
+    // passes the server's sanitized classification message through.
+    const message =
+      surface === 'conversation'
+        ? i18n.t('prReview.discussion.commentForbidden')
+        : classification.message;
+    return { kind: 'forbidden', message };
   }
   if (classification.kind === 'bad-request') {
     return { kind: 'bad-request', message: badRequestMessage(surface, options?.term) };

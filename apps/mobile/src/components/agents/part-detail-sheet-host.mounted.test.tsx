@@ -615,4 +615,151 @@ describe('PartDetailSheetHost mounted', () => {
       vi.useRealTimers();
     }
   });
+
+  it('opens a part after a dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      const mounted = renderer;
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        (propOf(findByType(mounted.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(-1);
+
+      // The native sheet never reports the finished dismissal. Without the sheet's
+      // deadline the host stays dismissing and every later open only queues.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes when the native close and dismissal report in one act', async () => {
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+    try {
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+
+      // The adapter reports the close and the finished dismissal as one pair, so
+      // the host reduces the close after the report has already been queued.
+      await act(() => {
+        reportSheetSelfDismissal(renderer);
+        reportSheetDismissed(renderer);
+      });
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+      // The host settled: a later tap presents again instead of queueing forever.
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+    } finally {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  });
+
+  it('reopens for a part chosen after a self-dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      const mounted = renderer;
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      const node = findByType(mounted.root, 'BottomSheet')[0];
+      await act(() => {
+        (propOf(node, 'onRequestDismiss') as () => boolean)();
+      });
+
+      // No report follows: the sheet's own deadline ends the dismissal, forwarding
+      // the dismissal before the close.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(findByType(mounted.root, 'BottomSheet')).toHaveLength(0);
+
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(mounted)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it('presents the part queued behind a dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      const mounted = renderer;
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        (propOf(findByType(mounted.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      // The next part is chosen while the dismissal is still outstanding.
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(sheetTitle(mounted)).toBe('bash: echo one');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      // The deadline reports the close before the dismissal: the queued part is not
+      // dismissed again by the close, so it is on screen afterwards.
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(mounted)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
 });

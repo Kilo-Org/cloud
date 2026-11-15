@@ -344,8 +344,6 @@
       "rowSubtitle": "Gunakan penagihan penyedia milikmu sendiri",
       "manageOnWebReason": "Penyedia ini memerlukan kredensial terstruktur.",
       "description": "Permintaan melalui kunci ini ditagihkan ke akun penyediamu, bukan ke saldo Kilo-mu.",
-      "enabled": "Digunakan",
-      "disabled": "Dinonaktifkan",
       "managedByPlan": "Dikelola oleh paket coding-mu",
       "enableKey": "Aktifkan kunci {{provider}}",
       "test": "Uji kunci",
@@ -416,6 +414,7 @@
       "title": "Tanda terima laporan",
       "description": "Tanda terima untuk laporan yang kamu kirim. Simpan ID ini untuk merujuknya nanti.",
       "receiptLabel": "Tanda terima",
+      "copyReceiptId": "Salin ID tanda terima",
       "appealLabel": "Banding",
       "triageReceived": "Diterima",
       "triageOpen": "Sedang ditinjau",
@@ -3414,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Pengaturan organisasi di web",
+      "integrations": "Integrasi di web",
       "usageDetails": "Detail penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Grup",
@@ -3429,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "Token masukan",
-      "last30Days": "30 Hari terakhir",
+      "orgLast30Days": "Semua anggota · 30 Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
     },
@@ -4412,7 +4412,6 @@
     "sectionTitle": "Layanan terhubung",
     "entrySubtitle": "GitHub, Slack, Linear, dan lainnya",
     "subtitle": "Hubungkan alat dan alur kerja pengembangan Anda ke Kilo",
-    "emptyHint": "Belum ada integrasi yang terhubung.",
     "disconnect": "Putuskan",
     "disconnectTitle": "Putuskan {{provider}}?",
     "disconnectMessage": "Kilo tidak akan merespons lagi di {{provider}}. Anda dapat menghubungkannya kembali kapan saja.",

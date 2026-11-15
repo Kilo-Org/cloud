@@ -344,8 +344,6 @@
       "rowSubtitle": "Usa la fatturazione del tuo provider",
       "manageOnWebReason": "Questi provider richiedono credenziali strutturate.",
       "description": "Le richieste effettuate con queste chiavi vengono addebitate sul tuo account del provider anziché sul saldo Kilo.",
-      "enabled": "In uso",
-      "disabled": "Disattivata",
       "managedByPlan": "Gestita dal tuo piano di coding",
       "enableKey": "Attiva la chiave di {{provider}}",
       "test": "Verifica chiave",
@@ -416,6 +414,7 @@
       "title": "Ricevuta della segnalazione",
       "description": "La ricevuta della segnalazione che hai inviato. Conserva questo ID per farvi riferimento in seguito.",
       "receiptLabel": "Ricevuta",
+      "copyReceiptId": "Copia ID ricevuta",
       "appealLabel": "Ricorso",
       "triageReceived": "Ricevuta",
       "triageOpen": "In revisione",
@@ -3467,6 +3466,7 @@
     },
     "settingsOnWeb": {
       "title": "Impostazioni dell'organizzazione sul web",
+      "integrations": "Integrazioni sul web",
       "usageDetails": "Dettagli di utilizzo",
       "providersAndModels": "Provider e modelli",
       "groups": "Gruppi",
@@ -3482,7 +3482,7 @@
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",
-      "last30Days": "Ultimi 30 giorni",
+      "orgLast30Days": "Tutti i membri · Ultimi 30 giorni",
       "outputTokens": "Token in uscita",
       "requests": "Richieste"
     },
@@ -4477,7 +4477,6 @@
     "sectionTitle": "Servizi collegati",
     "entrySubtitle": "GitHub, Slack, Linear e altro",
     "subtitle": "Collega a Kilo i tuoi strumenti e flussi di lavoro di sviluppo",
-    "emptyHint": "Nessuna integrazione collegata.",
     "disconnect": "Scollega",
     "disconnectTitle": "Scollegare {{provider}}?",
     "disconnectMessage": "Kilo smetterà di rispondere in {{provider}}. Puoi ricollegarlo in qualsiasi momento.",

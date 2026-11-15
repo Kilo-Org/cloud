@@ -253,7 +253,11 @@ describe('useIntegrationConnect', () => {
     });
     const [, options] = mocks.toastError.mock.calls.at(-1) as [string, ToastStepOptions];
     options.action?.onClick();
-    expect(mocks.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/billing');
+    // The screen reads its organization from the query, so the step names the
+    // organization whose role it read instead of the persisted selection.
+    expect(mocks.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=org_1'
+    );
   });
 
   it('keeps the owner-naming copy and adds no step for a member', async () => {

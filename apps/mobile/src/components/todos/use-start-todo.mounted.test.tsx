@@ -181,6 +181,16 @@ describe('useStartTodo start now', () => {
       i18n.t('common.organizationTrialEndedBilling'),
       { action: { label: i18n.t('organization.hub.manageBilling'), onClick: expect.any(Function) } }
     );
+    // The role was read for the list's organization, so the step opens that
+    // organization's billing rather than the device's selection.
+    const [, options] = state.toastError.mock.calls.at(-1) as [
+      string,
+      { action: { onClick: () => void } } | undefined,
+    ];
+    options?.action.onClick();
+    expect(state.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=organization-1'
+    );
     expect(state.navigate).not.toHaveBeenCalled();
     expect(mounted().startingTodoId).toBeNull();
   });

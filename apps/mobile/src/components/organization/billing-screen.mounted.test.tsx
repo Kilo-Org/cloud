@@ -3,7 +3,6 @@
 // its siblings. The query layer is mocked so each block's state is driven
 // directly through the screen JSX.
 
-import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -47,31 +46,50 @@ const queries = vi.hoisted(() => ({
 const boundary = vi.hoisted(() => ({
   requireSeats: true,
   seatCount: { used: 3, total: 3 },
+  /** The id the screen asked the boundary for; a route's `?org=` arrives here. */
+  override: undefined as string | undefined,
+  isResolving: false,
+}));
+
+/** The id each billing read was keyed on. */
+const reads = vi.hoisted(() => ({
+  subscription: undefined as string | undefined,
+  seats: undefined as string | undefined,
 }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
-  useOrgBoundary: () => ({
-    organizationId: 'org-1',
-    role: 'owner',
-    org: {
-      id: 'org-1',
-      name: 'Acme',
-      plan: 'enterprise',
-      seatCount: boundary.seatCount,
-      requireSeats: boundary.requireSeats,
-      isTrialExpiredForEnforcement: false,
-      parentOrganizationId: null,
-    },
-    isResolving: false,
-  }),
+  useOrgBoundary: (organizationIdOverride?: string) => {
+    boundary.override = organizationIdOverride;
+    const organizationId = organizationIdOverride ?? 'org-1';
+    return {
+      organizationId,
+      role: 'owner',
+      org: {
+        id: organizationId,
+        name: 'Acme',
+        plan: 'enterprise',
+        seatCount: boundary.seatCount,
+        requireSeats: boundary.requireSeats,
+        isTrialExpiredForEnforcement: false,
+        parentOrganizationId: null,
+      },
+      isResolving: boundary.isResolving,
+    };
+  },
   useOrgParentLink: () => ({ parentLink: null }),
   useOrgKiloPassSummary: () => queries.kiloPass,
 }));
 
 vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
-  useOrgSeatSubscription: () => queries.subscription,
-  useOrgSeats: () => queries.seats,
+  useOrgSeatSubscription: (organizationId?: string) => {
+    reads.subscription = organizationId;
+    return queries.subscription;
+  },
+  useOrgSeats: (organizationId?: string) => {
+    reads.seats = organizationId;
+    return queries.seats;
+  },
   useOrgAutoTopUpConfig: () => queries.autoTopUp,
 }));
 
@@ -144,8 +162,10 @@ vi.mock('@/components/ui/text', async () => {
 
 vi.mock('react-native', () => ({ View: 'View' }));
 
-function mount() {
-  return renderWithProviders(createElement(OrganizationBillingScreen));
+function mount(organizationIdOverride?: string) {
+  return renderWithProviders(
+    <OrganizationBillingScreen organizationIdOverride={organizationIdOverride} />
+  );
 }
 
 type Handler = () => void;
@@ -209,6 +229,10 @@ beforeEach(() => {
   }
   boundary.requireSeats = true;
   boundary.seatCount = { used: 3, total: 3 };
+  boundary.override = undefined;
+  boundary.isResolving = false;
+  reads.subscription = undefined;
+  reads.seats = undefined;
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
 });
@@ -326,6 +350,33 @@ describe('OrganizationBillingScreen manage-on-web links', () => {
     const { renderer, unmount } = await mount();
 
     expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen organization override', () => {
+  // The route carries the organization a refusal step resolved its role
+  // against. Every read and link here is built from the boundary's returned id,
+  // so the override has to reach the boundary or the screen shows another
+  // organization's plan.
+  it('reads and links the organization the route names', async () => {
+    const { renderer, unmount } = await mount('org-2');
+
+    expect(boundary.override).toBe('org-2');
+    expect(reads.subscription).toBe('org-2');
+    expect(reads.seats).toBe('org-2');
+    expect(
+      manageOnWebLink(renderer, 'http://localhost:3000/organizations/org-2/subscriptions')
+    ).toBeDefined();
+    unmount();
+  });
+
+  it('gives the placeholder boundary the same organization while it resolves', async () => {
+    boundary.isResolving = true;
+    const { renderer, unmount } = await mount('org-2');
+
+    const placeholder = renderer.root.findByType('OrganizationBoundary' as never);
+    expect(placeholder.props.organizationIdOverride).toBe('org-2');
     unmount();
   });
 });

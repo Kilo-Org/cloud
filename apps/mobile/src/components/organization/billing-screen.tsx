@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The billing readout composes the plan, seats, auto top-up and Kilo Pass blocks on one screen. */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -90,6 +91,11 @@ function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
   );
 }
 
+type OrganizationBillingScreenProps = Readonly<{
+  /** Explicit org id from the route's `?org=`, replacing the persisted selection for this render. */
+  organizationIdOverride?: string;
+}>;
+
 /**
  * The organization's billing readout: the plan and its subscription state, the
  * seats in use, auto top-up, and the organization's Kilo Pass.
@@ -99,9 +105,11 @@ function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
  * Android and plain text on iOS, the App Store rule `ExternalBillingLink`
  * carries.
  */
-export function OrganizationBillingScreen() {
+export function OrganizationBillingScreen({
+  organizationIdOverride,
+}: OrganizationBillingScreenProps = {}) {
   const { t } = useTranslation();
-  const { organizationId, role, org, isResolving } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary(organizationIdOverride);
   const hasBillingRole = isMoneyRole(role);
   const subscription = useOrgSeatSubscription(organizationId, hasBillingRole);
   const seats = useOrgSeats(organizationId);
@@ -113,7 +121,12 @@ export function OrganizationBillingScreen() {
   );
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.billing.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.billing.title')}
+        organizationIdOverride={organizationIdOverride}
+      />
+    );
   }
 
   if (!hasBillingRole) {

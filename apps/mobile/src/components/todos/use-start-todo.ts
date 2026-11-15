@@ -17,7 +17,7 @@ import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { todoSessionPrompt } from '@/lib/todos/todo-model';
 import { type TodoList } from '@/lib/todos/todo-types';
-import { billingActionFor, ORGANIZATION_BILLING_HREF } from '@/lib/trial-refusal';
+import { billingActionFor, billingHrefFor } from '@/lib/trial-refusal';
 import { useTRPC } from '@/lib/trpc';
 
 type StartableTodo = { id: string; title: string; notes: string | null };
@@ -110,7 +110,7 @@ export function useStartTodo(): StartTodoControls {
           announceTrialRefusal(
             result.message,
             billingActionFor(canManageBilling, t('organization.hub.manageBilling'), () => {
-              router.push(ORGANIZATION_BILLING_HREF);
+              router.push(billingHrefFor(list.organizationId));
             }),
             result.trialRefusal === true
           );

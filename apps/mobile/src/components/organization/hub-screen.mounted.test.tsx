@@ -931,6 +931,28 @@ describe('Organization hub integrations rows', () => {
   });
 });
 
+describe('Organization hub billing row', () => {
+  it('opens the billing screen of the organization the hub shows', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.icon === 'CreditCard');
+    if (row === undefined) {
+      throw new Error('the hub shows the billing row for a billing role');
+    }
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+    // The billing screen reads its organization from the query, so the row
+    // keeps the organization this hub was opened for.
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=org-1'
+    );
+    unmount();
+  });
+});
+
 describe('Organization hub Kilo Pass icon tile', () => {
   /** The tile's own classes: the View that holds the Kilo Pass glyph. */
   function tileClass(root: TestRenderer.ReactTestInstance): string {

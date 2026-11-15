@@ -653,9 +653,12 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       message: i18n.t('common.organizationTrialEndedBilling'),
       action: { label: i18n.t('organization.hub.manageBilling'), onPress: expect.any(Function) },
     });
-    // The step opens the in-app billing screen.
+    // The step opens the in-app billing screen for the organization whose role
+    // the spawn resolved.
     failure?.action?.onPress();
-    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/billing');
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=org-xyz'
+    );
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 

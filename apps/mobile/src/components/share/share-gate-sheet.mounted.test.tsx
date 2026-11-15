@@ -644,9 +644,12 @@ describe('ShareGateSheet organization plan gate', () => {
     const options = toastError.mock.calls.at(-1)?.[1] as
       | { action: { onClick: () => void } }
       | undefined;
-    // The step is reachable from the toast and lands on the billing screen.
+    // The step is reachable from the toast and lands on the billing screen of
+    // the organization whose role the gate read.
     options?.action.onClick();
-    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/billing');
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=org-lapsed'
+    );
     act(() => {
       renderer.unmount();
     });

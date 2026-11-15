@@ -30,7 +30,23 @@ export {
  * Stack. This is the route `hub-screen.tsx` pushes for the Billing row, typed
  * `Href` so a moved route fails typecheck instead of silently doing nothing.
  */
-export const ORGANIZATION_BILLING_HREF = '/(app)/(tabs)/(3_profile)/organization/billing' as Href;
+const ORGANIZATION_BILLING_PATH = '/(app)/(tabs)/(3_profile)/organization/billing';
+
+export const ORGANIZATION_BILLING_HREF = ORGANIZATION_BILLING_PATH as Href;
+
+/**
+ * The billing screen for one organization. The screen reads its organization
+ * from the route's `?org=`, so a caller that resolved a role against an
+ * organization other than the persisted selection (a code-review scope, a
+ * `list.organizationId`) must name it here or the step opens someone else's
+ * billing. No id keeps the selection the screen falls back to.
+ */
+export function billingHrefFor(organizationId?: string | null): Href {
+  if (organizationId == null || organizationId === '') {
+    return ORGANIZATION_BILLING_HREF;
+  }
+  return `${ORGANIZATION_BILLING_PATH}?org=${encodeURIComponent(organizationId)}` as Href;
+}
 
 /** The step a refusal offers under its copy. */
 export type TrialRefusalAction = { label: string; onPress: () => void };
@@ -74,7 +90,7 @@ export function useBillingAction(organizationId?: string | null): TrialRefusalAc
   const router = useRouter();
   const { t } = useTranslation();
   return billingActionFor(canManageBilling, t('organization.hub.manageBilling'), () => {
-    router.push(ORGANIZATION_BILLING_HREF);
+    router.push(billingHrefFor(organizationId));
   });
 }
 

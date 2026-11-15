@@ -14,6 +14,7 @@ import {
   mapPrOperationError,
   PR_OPERATION_AMBIGUOUS_MESSAGE,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+  prOperationNotAdmittedError,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 
@@ -139,5 +140,44 @@ describe('isPrMutationRetryable (operation-key rotation policy)', () => {
       PR_OPERATION_PERSISTENCE_FAILED_MESSAGE
     );
     expect(isPrMutationRetryable(persistenceError)).toBe(false);
+  });
+
+  it('regenerates the key on a stale-head rejection, which the ledger has already settled', () => {
+    // The provider router settles that row as `head_moved` / `already_closed`
+    // with `confirmed_absent`, so the intent is over even though the code is a
+    // CONFLICT; a generic conflict, e.g. a merge already running, is retryable.
+    expect(
+      isPrMutationRetryable(
+        trpcError(
+          'CONFLICT',
+          'The merge request changed since it was loaded. Reload the merge request and try again.'
+        )
+      )
+    ).toBe(false);
+    expect(
+      isPrMutationRetryable(trpcError('CONFLICT', 'The merge request was closed without merging.'))
+    ).toBe(false);
+    expect(isPrMutationRetryable(trpcError('CONFLICT', 'A merge is already running'))).toBe(true);
+  });
+
+  it('regenerates the key on the GitHub router’s settled-merge conflict', () => {
+    // The GitHub reconcile settles the row the same way and throws this one
+    // message (`github-pr-review-router.ts:829`, `:1481-1488`).
+    expect(
+      isPrMutationRetryable(trpcError('CONFLICT', 'GitHub reported a conflict for this PR'))
+    ).toBe(false);
+    // GitHub's own 405/409 text arrives unchanged (`errors.ts:162-163`) and the
+    // same CONFLICT code also carries the live-lease and ambiguous markers, so a
+    // raw conflict must keep its intent.
+    expect(
+      isPrMutationRetryable(
+        trpcError('CONFLICT', 'Head branch was modified. Review and try the merge again.')
+      )
+    ).toBe(true);
+  });
+
+  it('regenerates the key on a refused admission, which no retry can satisfy', () => {
+    const refusal = prOperationNotAdmittedError('Could not merge this pull request.');
+    expect(isPrMutationRetryable(refusal)).toBe(false);
   });
 });

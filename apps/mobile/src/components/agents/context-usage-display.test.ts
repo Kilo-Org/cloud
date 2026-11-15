@@ -14,7 +14,6 @@ import {
   getContextSheetContent,
   getContextTone,
   getHeaderPillContent,
-  getIndeterminateArcFraction,
   getMetricsAccessibilityLabel,
   getRemainingTokens,
   type HeaderPillContent,
@@ -118,21 +117,12 @@ describe('getContextTone', () => {
 });
 
 describe('getArcFraction', () => {
-  it('maps known percentages and leaves unknown capacity indeterminate', () => {
+  it('maps known percentages and leaves unknown capacity undefined', () => {
     expect(getArcFraction(0)).toBe(0);
     expect(getArcFraction(50)).toBe(0.5);
     expect(getArcFraction(100)).toBe(1);
     expect(getArcFraction(125)).toBe(1);
     expect(getArcFraction(undefined)).toBeUndefined();
-  });
-});
-
-describe('getIndeterminateArcFraction', () => {
-  it('returns a stable non-empty neutral arc fraction', () => {
-    const fraction = getIndeterminateArcFraction();
-    expect(fraction).toBeGreaterThan(0);
-    expect(fraction).toBeLessThan(1);
-    expect(getIndeterminateArcFraction()).toBe(fraction);
   });
 });
 

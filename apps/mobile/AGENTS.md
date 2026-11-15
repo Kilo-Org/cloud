@@ -168,6 +168,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Only the per-chat web-search and Kilo MCP flags use the registry's `setChatFlag` (`@/lib/chat/registry`), which persists and applies them in the chat's own operation order and publishes the result through `ChatState`. Other standalone persisted values stay with their owning stores; components must not add a competing optimistic mirror beside either kind.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
+- A UI attempt fences admission and publication, not effects after an await. Recheck resource ownership and auth epoch before closing a form or changing account-bound UI. Retained merge keys retire only when the fingerprint and captured key both still match; at capacity refuse new intents without evicting unresolved ones.
 
 ## React Native Rules
 

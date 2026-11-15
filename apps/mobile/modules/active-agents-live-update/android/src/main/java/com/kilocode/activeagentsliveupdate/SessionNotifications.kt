@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import expo.modules.kotlin.records.Field
@@ -90,7 +89,10 @@ internal object SessionNotifications {
   /** Cancel one session's notification and forget its stored card. */
   fun cancel(context: Context, sessionId: String) {
     manager(context).cancel(TAG, notificationId(sessionId))
-    state(context).edit().remove(KEY_PREFIX + sessionId).apply()
+    state(context)
+      .edit()
+      .remove(KEY_PREFIX + sessionId)
+      .commitOrReport("Cannot forget the cancelled session card")
     alarms(context).cancel(quietIntent(context, sessionId, 0))
   }
 
@@ -115,7 +117,10 @@ internal object SessionNotifications {
     if (timeoutMs > 0) {
       stored.put(FINISHED_UNTIL, nowMs + timeoutMs)
     }
-    state(context).edit().putString(KEY_PREFIX + card.sessionId, stored.toString()).commit()
+    state(context)
+      .edit()
+      .putString(KEY_PREFIX + card.sessionId, stored.toString())
+      .commitOrReport("Cannot persist the followed session card")
     val builder = builder(context, card.shownAt(nowMs))
     if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
       builder.setTimeoutAfter(timeoutMs)
@@ -188,19 +193,14 @@ internal object SessionNotifications {
     context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
   private fun builder(context: Context, card: SessionNotificationCard): Notification.Builder {
-    val icon = smallIconId(context)
+    val icon = CardStyle.icon(context)
     val openIntent = PendingIntent.getActivity(
       context,
       requestCode(card.sessionId, OPEN_OFFSET),
       Intent(Intent.ACTION_VIEW, Uri.parse(card.openUrl)).setPackage(context.packageName),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-    val builder: Notification.Builder = if (Build.VERSION.SDK_INT >= 26) {
-      Notification.Builder(context, CHANNEL_ID)
-    } else {
-      @Suppress("DEPRECATION")
-      Notification.Builder(context)
-    }
+    val builder = CardBuilders.builder(context, CHANNEL_ID)
     builder
       .setSmallIcon(icon)
       .setColor(Color.parseColor(card.color))
@@ -232,18 +232,14 @@ internal object SessionNotifications {
         builder.addAction(ApprovalGate.action(context, icon, label, approveIntent(context, card)))
       }
     }
-    builder.addAction(action(context, icon, card.openLabel, openIntent))
+    builder.addAction(CardBuilders.action(context, icon, card.openLabel, openIntent))
 
-    // API 36.1+ Live Update: promote only when the device reports the
-    // capability. The Android 16 request is an extra, not the newer setter this
-    // compile SDK does not have, and the promoted card must not be colourized.
-    if (card.promotion && promotionCapable(context)) {
-      builder.addExtras(android.os.Bundle().apply { putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true) })
+    // API 36.1+ Live Update: the one gate both Android cards request through.
+    // An incapable or refused device keeps the expanded-only line below.
+    if (card.promotion && PromotionGate.request(context, builder, card.compactText)) {
       if (card.chronometer) {
         builder.setChronometerCountDown(false)
       }
-      builder.setStyle(Notification.ProgressStyle())
-      card.compactText?.let { builder.setShortCriticalText(it) }
     } else {
       // The expanded-only line (the cost so far): the big-text style draws it
       // only when the user expands the card, so the collapsed card never shows
@@ -255,14 +251,6 @@ internal object SessionNotifications {
     }
     return builder
   }
-
-  private fun action(
-    context: Context,
-    icon: Int,
-    label: String,
-    intent: PendingIntent
-  ): Notification.Action =
-    Notification.Action.Builder(Icon.createWithResource(context, icon), label, intent).build()
 
   /** Answer the exact request this card shows, through the presence gate. */
   private fun approveIntent(context: Context, card: SessionNotificationCard): PendingIntent {
@@ -291,16 +279,8 @@ internal object SessionNotifications {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-  private fun smallIconId(context: Context): Int =
-    context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
-
   private fun manager(context: Context): NotificationManager =
     context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-  private fun promotionCapable(context: Context): Boolean =
-    Build.VERSION.SDK_INT >= 36 &&
-      Build.VERSION.SDK_INT_FULL >= 36_001_000 &&
-      manager(context).canPostPromotedNotifications()
 
   /** Stored beside a finished card: the epoch time its window ends. */
   private const val FINISHED_UNTIL = "finishedUntil"
@@ -310,7 +290,6 @@ internal object SessionNotifications {
   private const val APPROVE_OFFSET = 1
   private const val DELETE_OFFSET = 2
   private const val QUIET_OFFSET = 3
-  private const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
 }
 
 /** One followed session's notification, as the JS side maps it. */
@@ -333,7 +312,7 @@ class SessionNotificationCard : Record {
   @Field var quietWhenMs: Double = 0.0
   @Field var quietText: String? = null
   @Field var promotion: Boolean = false
-  @Field var color: String = DEFAULT_COLOR
+  @Field var color: String = CardStyle.PRIMARY_DAY
 
   fun toJson(): JSONObject = JSONObject().apply {
     put("sessionId", sessionId)
@@ -379,7 +358,7 @@ class SessionNotificationCard : Record {
     quietWhenMs = json.optDouble("quietWhenMs", 0.0)
     quietText = optionalString(json, "quietText")
     promotion = json.optBoolean("promotion")
-    color = optionalString(json, "color") ?: DEFAULT_COLOR
+    color = optionalString(json, "color") ?: CardStyle.PRIMARY_DAY
   }
 
   /**
@@ -408,10 +387,5 @@ class SessionNotificationCard : Record {
   private fun optionalString(json: JSONObject, key: String): String? {
     if (json.isNull(key)) return null
     return json.optString(key).ifEmpty { null }
-  }
-
-  private companion object {
-    /** The app's primary colour by day (`global.css`). */
-    const val DEFAULT_COLOR = "#4F5A10"
   }
 }

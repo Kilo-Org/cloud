@@ -3,6 +3,15 @@ import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { type RefObject, useCallback, useEffect, useRef } from 'react';
 
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
+import {
+  claimBlocksResume,
+  claimIsSend,
+  type SessionPositionClaim,
+} from '@/components/agents/use-session-auto-scroll-state';
+import {
+  motionIsMoving,
+  type MotionState,
+} from '@/components/agents/use-session-list-scroll-timeouts';
 import { planResumeScroll } from '@/lib/session-resume';
 
 /**
@@ -59,16 +68,15 @@ type UseSessionListResumeScrollParams<ItemT> = {
   /** The component's coalescing guard for `onLoadOlderMessages` re-fires. */
   isInFlightRef: RefObject<boolean>;
   listRef: RefObject<FlashListRef<ItemT> | null>;
-  isUserScrollingRef: RefObject<boolean>;
-  /** Sticky per-session "the user has grabbed the list" flag from the auto-scroll hook. */
-  userInteractedRef: RefObject<boolean>;
+  /** The live claim on the transcript's position from the auto-scroll hook. */
+  claimRef: RefObject<SessionPositionClaim>;
   /**
-   * True while a send's take-over is the current claim on the position. A send
-   * ends a resume that is still paging for its anchor: the position now belongs
-   * to the send's output, so the resume must not keep pulling older pages under
-   * it.
+   * True while the list is moving under the user. Ownership and motion are
+   * different facts: a send takes the position over without ending the fling it
+   * interrupted, and no scheduled scroll may yank the list mid-fling. The
+   * timeouts hook ends it on every path that ends motion.
    */
-  sendTakeoverRef: RefObject<boolean>;
+  motionRef: RefObject<MotionState>;
   suppressAutoFollow: (ms: number) => void;
   /**
    * Message id a `?at=` deep link wants the transcript to open on. When it is
@@ -97,9 +105,8 @@ type UseSessionListResumeScrollParams<ItemT> = {
  * no-op; the plan runs again when the page lands.
  *
  * A send ends the plan wherever it is: the warm scroll and the retries drop on
- * the sticky take-over flag, and the load-older branch ends the resume on the
- * send's own flag (`sendTakeoverRef`) instead of pulling another page under the
- * output the send owns.
+ * the user's position claim, and the load-older branch ends the resume on a
+ * send's claim instead of pulling another page under the output the send owns.
  */
 export function useSessionListResumeScroll<ItemT>({
   sessionId,
@@ -110,9 +117,8 @@ export function useSessionListResumeScroll<ItemT>({
   onLoadOlderMessages,
   isInFlightRef,
   listRef,
-  isUserScrollingRef,
-  userInteractedRef,
-  sendTakeoverRef,
+  claimRef,
+  motionRef,
   suppressAutoFollow,
   resumeAt,
 }: UseSessionListResumeScrollParams<ItemT>): void {
@@ -152,15 +158,14 @@ export function useSessionListResumeScroll<ItemT>({
             if (latest === null || latest.key !== key) {
               return;
             }
-            // The user has grabbed the transcript: the position is theirs now,
-            // and the rest of the chain is moot — cancel it instead of letting
-            // a later retry yank the list back to the recorded row after they
-            // let go.
-            if (userInteractedRef.current) {
+            // The user has taken the position, or a send has: the rest of the
+            // chain is moot — cancel it instead of letting a later retry yank
+            // the list back to the recorded row.
+            if (claimBlocksResume(claimRef.current)) {
               clearResumeRetries();
               return;
             }
-            if (isUserScrollingRef.current) {
+            if (motionIsMoving(motionRef.current)) {
               return;
             }
             const index = latest.anchorIds.indexOf(latest.resumeAnchor);
@@ -184,7 +189,7 @@ export function useSessionListResumeScroll<ItemT>({
         );
       }
     },
-    [clearResumeRetries, isUserScrollingRef, listRef, suppressAutoFollow, userInteractedRef]
+    [clearResumeRetries, claimRef, motionRef, listRef, suppressAutoFollow]
   );
   useEffect(() => clearResumeRetries, [clearResumeRetries]);
   useEffect(() => {
@@ -215,18 +220,16 @@ export function useSessionListResumeScroll<ItemT>({
     });
     if (plan.kind === 'scroll') {
       resume.done = true;
-      // The user has grabbed the transcript: the position is theirs now, and
-      // this scroll plus its retry chain would yank the list back to the
-      // recorded row after they let go. End the resume, exactly as the retries
-      // do when they see the same flag.
-      if (userInteractedRef.current) {
+      // A drag, a settled user position, or a send has the position: this
+      // scroll plus its retry chain would yank the list back to the recorded
+      // row. End the resume, exactly as the retries do.
+      if (claimBlocksResume(claimRef.current)) {
         return;
       }
-      // An in-flight drag (or momentum fling) must not be yanked either: the
-      // immediate scroll honours the same guard the retries do. When it is
-      // skipped the retry chain below still lands the anchor once the drag
-      // ends, so nothing is lost.
-      if (!isUserScrollingRef.current) {
+      // An in-flight drag (or a fling a send interrupted) must not be yanked
+      // either: the immediate scroll waits for the list to settle. The retry
+      // chain below still lands the anchor once it has, so nothing is lost.
+      if (!motionIsMoving(motionRef.current)) {
         // Arm the suppression before any scroll this plan issues: FlashList's
         // bottom-start events (cold) or this scroll's own 5-step events (warm)
         // read "at the bottom" and would arm the tail follow, whose
@@ -264,7 +267,7 @@ export function useSessionListResumeScroll<ItemT>({
       // A send took the position over while the anchor's page was in flight:
       // the resume ends here, exactly as the scroll and retry paths end it,
       // instead of paging for a position the send's output now owns.
-      if (sendTakeoverRef.current) {
+      if (claimIsSend(claimRef.current)) {
         resume.done = true;
         clearResumeRetries();
         return;
@@ -299,9 +302,8 @@ export function useSessionListResumeScroll<ItemT>({
     onLoadOlderMessages,
     isInFlightRef,
     listRef,
-    isUserScrollingRef,
-    userInteractedRef,
-    sendTakeoverRef,
+    claimRef,
+    motionRef,
     clearResumeRetries,
     scheduleResumeRetries,
     suppressAutoFollow,

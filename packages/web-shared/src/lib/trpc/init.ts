@@ -35,8 +35,8 @@ import {
   appUpdateRequiredError,
   enforceMinimumVersion,
   getMinimumVersions,
-  isMobileClient,
 } from '@kilocode/web-shared/lib/trpc/min-version';
+import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
 import {
   buildTimingLine,
   readClientDimensions,
@@ -183,7 +183,9 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     webSessionPepper: webSessionPepper ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
-    controlPlaneStartedAt: isMobileClient(headersList) ? startedAt : undefined,
+    controlPlaneStartedAt: isMobileClient(headersList?.get(APP_CLIENT_HEADER))
+      ? startedAt
+      : undefined,
     fromDb: opts?.fromDb,
   };
 };
@@ -274,7 +276,7 @@ const auditContextMiddleware = t.middleware(({ path, type, next }) =>
 // Sentry middleware must not capture one event per request during an outage
 // (its capture reaches `beforeSend`, which only drops tRPC 4xx errors).
 const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
-  if (!isMobileClient(ctx.headersList)) return next();
+  if (!isMobileClient(ctx.headersList?.get(APP_CLIENT_HEADER))) return next();
   const minimums = await getMinimumVersions();
   if (!minimums || !enforceMinimumVersion(ctx.headersList, minimums).pass) {
     throw appUpdateRequiredError();

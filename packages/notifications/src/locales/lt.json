@@ -36,15 +36,15 @@
     },
     "securityFindingNew": {
       "title": "Naujas saugumo radinys ({{severity}})",
-      "body": "{{findingTitle}} {{repoFullName}}"
+      "body": "{{findingTitle}} ({{repoFullName}})"
     },
     "securityFindingSlaWarning": {
       "title": "SLA įspėjimas",
-      "body": "{{findingTitle}} {{repoFullName}}"
+      "body": "{{findingTitle}} ({{repoFullName}})"
     },
     "securityFindingSlaBreach": {
       "title": "SLA pažeidimas",
-      "body": "{{findingTitle}} {{repoFullName}}"
+      "body": "{{findingTitle}} ({{repoFullName}})"
     },
     "securityLifecycle": {
       "title": "Kilo",

@@ -1,3 +1,5 @@
+import { firstForwardedHop } from '@kilocode/web-shared/lib/http/forwarded-hop';
+
 /**
  * The caller address the platform labelled the request with: the first hop of
  * `x-vercel-forwarded-for`, then of `x-real-ip`, which the platform sets on a
@@ -18,10 +20,4 @@ export function callerAddressOrNull(headers: Headers): string | null {
  */
 export function callerAddressFromHeaders(headers: Headers): string {
   return callerAddressOrNull(headers) ?? 'unknown';
-}
-
-/** The first entry of a forwarding header, or null when it is absent or empty. */
-function firstForwardedHop(value: string | null): string | null {
-  const hop = value?.split(',')[0]?.trim();
-  return hop ? hop : null;
 }

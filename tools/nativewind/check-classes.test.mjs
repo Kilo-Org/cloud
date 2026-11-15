@@ -23,7 +23,7 @@ import { parseSourceEntry } from '../lib/source-files.mjs';
 // they build one.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
-const SHARED_SCANNERS = ['ast.mjs', 'source-files.mjs'];
+const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'source-files.mjs'];
 
 /**
  * The diagnostics of one file, straight from the checker's own export. A

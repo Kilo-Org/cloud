@@ -25,6 +25,7 @@ import { BriefingNotificationCategoryRow } from '@/components/agent-briefing/bri
 import { IconTile } from '@/components/ui/icon-tile';
 import { Switch } from '@/components/ui/switch';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
+import { createSubmitLock } from '@/lib/submit-lock';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -289,6 +290,12 @@ function CategoryRow({
   );
 }
 
+/**
+ * The master push gate's enable flow: one step at a time, so no second tap can
+ * start the OS permission request or the token registration the first one owns.
+ */
+type EnablePhase = 'requesting-permission' | 'registering-token' | null;
+
 export function NotificationsScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -297,8 +304,11 @@ export function NotificationsScreen() {
   const { token: authToken } = useAuth();
   const isAuthenticated = authToken != null;
 
-  const [isTogglingPermission, setIsTogglingPermission] = useState(false);
-  const [isRegisteringToken, setIsRegisteringToken] = useState(false);
+  const [enablePhase, setEnablePhase] = useState<EnablePhase>(null);
+  // The permission read is a native round trip, and the busy flag renders only
+  // after it: a second tap in that window would request the permission and
+  // register the token twice. Only a synchronous lock closes it.
+  const enableLock = useRef(createSubmitLock());
   // The `setNotificationPreferences` mutation object is shared across every
   // category row, and its `isPending` is a single flag for the whole procedure. Two
   // category flips can therefore be in flight at once, so we track the set of
@@ -540,22 +550,26 @@ export function NotificationsScreen() {
   );
 
   const handleEnableNotifications = useCallback(async () => {
-    const currentStatus = await getNotificationPermissionStatus();
-    if (currentStatus === 'denied') {
-      Alert.alert(
-        t('notifications.disabledTitle'),
-        t('notifications.disabledMessage'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
-        ],
-        // Android back dismisses, which equals the no-op Cancel.
-        { cancelable: true }
-      );
+    const lock = enableLock.current;
+    if (!lock.acquire()) {
       return;
     }
-    setIsTogglingPermission(true);
+    setEnablePhase('requesting-permission');
     try {
+      const currentStatus = await getNotificationPermissionStatus();
+      if (currentStatus === 'denied') {
+        Alert.alert(
+          t('notifications.disabledTitle'),
+          t('notifications.disabledMessage'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+          ],
+          // Android back dismisses, which equals the no-op Cancel.
+          { cancelable: true }
+        );
+        return;
+      }
       const result = await Notifications.requestPermissionsAsync();
       const granted = result.status === Notifications.PermissionStatus.GRANTED || result.granted;
       // Only a live permission request emits an outcome. A pre-granted status
@@ -566,33 +580,30 @@ export function NotificationsScreen() {
         emitNotificationPermissionResponded(granted);
       }
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
-      if (granted) {
-        // Keep `isTogglingPermission` set through token registration so the
-        // master switch stays busy for the whole enable flow. Clearing it here
-        // (before `isRegisteringToken` is set) would briefly re-enable the
-        // switch mid-flow and allow a re-entrant enable/disable.
-        const token = await registerForPushNotifications();
-        if (!token) {
-          toast.error(t('notifications.registrationFailed'));
-          return;
-        }
-        setIsRegisteringToken(true);
-        try {
-          await registerToken.mutateAsync({
-            token,
-            platform: getPlatform(),
-            appVersion: Application.nativeApplicationVersion ?? undefined,
-            // Without this the row is written with a null locale, so every push
-            // to a device enrolled from this screen arrives in English.
-            locale: getResolvedLanguage(),
-          });
-          emitNotificationTokenUpdated('registered');
-        } catch {
-          // registerToken's onError already surfaced the toast; swallow here so
-          // the outer catch does not double-report the same failure.
-        } finally {
-          setIsRegisteringToken(false);
-        }
+      if (!granted) {
+        return;
+      }
+      const token = await registerForPushNotifications();
+      if (!token) {
+        toast.error(t('notifications.registrationFailed'));
+        return;
+      }
+      // The switch stays busy through token registration: the phase never leaves
+      // `requesting-permission` while the token is being written.
+      setEnablePhase('registering-token');
+      try {
+        await registerToken.mutateAsync({
+          token,
+          platform: getPlatform(),
+          appVersion: Application.nativeApplicationVersion ?? undefined,
+          // Without this the row is written with a null locale, so every push
+          // to a device enrolled from this screen arrives in English.
+          locale: getResolvedLanguage(),
+        });
+        emitNotificationTokenUpdated('registered');
+      } catch {
+        // registerToken's onError already surfaced the toast; swallow here so
+        // the outer catch does not double-report the same failure.
       }
     } catch {
       // A failure here comes from requestPermissionsAsync or
@@ -600,7 +611,8 @@ export function NotificationsScreen() {
       // error above), so surface the feedback the previous card also showed.
       toast.error(t('notifications.couldNotEnable'));
     } finally {
-      setIsTogglingPermission(false);
+      setEnablePhase(null);
+      lock.release();
     }
   }, [queryClient, registerToken, t]);
 
@@ -617,7 +629,7 @@ export function NotificationsScreen() {
     );
   }, [t]);
 
-  const isMasterBusy = isTogglingPermission || isRegisteringToken;
+  const isMasterBusy = enablePhase !== null;
   const masterLeading = deriveMasterGateLeadingPresentation({
     permissionLoading,
     permissionError,

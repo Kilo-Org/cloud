@@ -41,7 +41,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
@@ -50,6 +50,7 @@ import {
   flattenCatalog,
   missingPluralCategories,
 } from '../lib/catalogs.mjs';
+import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -107,10 +108,6 @@ export const NO_AGREEMENT = new Map([
   [
     'prReview.discussion.reactionPill',
     'the noun is already a family: "{{emoji}} reaction, {{displayCount}} {{countLabel}}"',
-  ],
-  [
-    'securityAgent.auditReport.severityCount',
-    'bare count before a severity adjective: "{{displayCount}} Critical" has no inflected word',
   ],
   [
     'securityAgent.remediation.attemptHistory',
@@ -511,8 +508,4 @@ function run() {
   );
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly) {
-  run();
-}
+runIfMain(run, import.meta.url);

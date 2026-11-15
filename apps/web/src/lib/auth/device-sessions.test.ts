@@ -170,6 +170,36 @@ describe('device-sessions', () => {
         );
       expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS + 1);
     });
+
+    test('a device-auth sign-in leaves an over-cap app-session set untouched', async () => {
+      // Rows outlive the cap rule, for example sessions created before it
+      // existed, so a device-auth sign-in must not enforce it either.
+      const seeded = await db
+        .insert(device_sessions)
+        .values(
+          Array.from({ length: MAX_LIVE_APP_SESSIONS + 1 }, () => ({
+            kilo_user_id: testUserId,
+            user_agent: 'seeded-agent',
+          }))
+        )
+        .returning({ id: device_sessions.id });
+
+      const deviceAuthSessionId = await createDeviceSession({
+        userId: testUserId,
+        deviceAuthRequestId: '33333333-3333-4333-8333-333333333333',
+      });
+
+      const rows = await db
+        .select({ id: device_sessions.id, revoked_at: device_sessions.revoked_at })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+
+      const live = rows.filter(row => row.revoked_at === null);
+      expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS + 2);
+      expect(live.map(row => row.id)).toEqual(
+        expect.arrayContaining([...seeded.map(row => row.id), deviceAuthSessionId])
+      );
+    });
   });
 
   describe('issueSessionCredentials', () => {

@@ -1,5 +1,5 @@
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
-import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
 
 export type PreviewSessionInput = {
   /** The grouped worktree whose sandbox the preview opens. */

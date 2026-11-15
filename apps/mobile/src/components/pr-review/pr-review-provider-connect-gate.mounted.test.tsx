@@ -98,6 +98,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#FFFFFF',
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));

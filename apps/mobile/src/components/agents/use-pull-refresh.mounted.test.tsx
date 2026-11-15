@@ -1,91 +1,18 @@
-import { act, createElement } from 'react';
-import { TestRenderer } from '@/test/renderer';
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  deferred,
+  flush,
+  hangs,
+  rejects,
+  renderPullRefresh,
+  settlesWith,
+} from './use-pull-refresh.test-helpers';
+import {
   PULL_FEEDBACK_BUDGET_MS,
   PULL_FEEDBACK_MIN_BEAT_MS,
-  type PullRefetch,
-  usePullRefresh,
 } from '@/components/agents/use-pull-refresh';
-
-type Snapshot = {
-  refreshing: boolean;
-  busy: boolean;
-  failed: boolean;
-  startPull: () => void;
-  startRetry: () => void;
-  markSettled: () => void;
-};
-
-function renderPullRefresh(refetch: PullRefetch) {
-  const latest: { current: Snapshot | null } = { current: null };
-  function Probe() {
-    latest.current = usePullRefresh(refetch);
-    return null;
-  }
-  const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
-  act(() => {
-    renderer.current = TestRenderer.create(createElement(Probe));
-  });
-  return {
-    state: () => {
-      if (!latest.current) {
-        throw new Error('probe not rendered');
-      }
-      return latest.current;
-    },
-    unmount: () => {
-      const mounted = renderer.current;
-      if (mounted) {
-        act(() => {
-          mounted.unmount();
-        });
-      }
-    },
-  };
-}
-
-/** A refetch that settles on the next microtask with the given outcome. */
-function settlesWith(accepted: boolean): PullRefetch {
-  return async () => {
-    await Promise.resolve();
-    return accepted;
-  };
-}
-
-/** A refetch that rejects on the next microtask. */
-function rejects(): PullRefetch {
-  return async () => {
-    await Promise.reject(new Error('boom'));
-    return false;
-  };
-}
-
-/** A refetch that never settles — the hung-request shape from device defect e1. */
-function hangs(): PullRefetch {
-  const never = new Promise<never>(() => undefined);
-  return async () => {
-    await never;
-    return true;
-  };
-}
-
-/** A deferred refetch: the caller resolves it through the returned callback. */
-function deferred(resolvers: ((value: boolean) => void)[]): PullRefetch {
-  return async () => {
-    const value = await new Promise<boolean>(resolve => {
-      resolvers.push(resolve);
-    });
-    return value;
-  };
-}
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve();
-  });
-}
 
 describe('usePullRefresh feedback budget', () => {
   beforeEach(() => {
@@ -163,6 +90,33 @@ describe('usePullRefresh feedback budget', () => {
     });
     expect(state().refreshing).toBe(false);
     expect(state().failed).toBe(true);
+    unmount();
+  });
+
+  it('keeps the failure line off after a settle inside the rejection beat', async () => {
+    const { state, unmount } = renderPullRefresh(settlesWith(false));
+    act(() => {
+      state().startPull();
+    });
+    await flush();
+    expect(state().refreshing).toBe(true);
+
+    // A focus return or foreground refresh reports success while the rejected
+    // run still holds its failure through the beat: that run is superseded, so
+    // neither the beat nor the budget may turn the line back on.
+    act(() => {
+      state().markSettled();
+    });
+    expect(state().failed).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(PULL_FEEDBACK_MIN_BEAT_MS);
+    });
+    expect(state().failed).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(PULL_FEEDBACK_BUDGET_MS);
+    });
+    expect(state().failed).toBe(false);
+    expect(state().refreshing).toBe(false);
     unmount();
   });
 

@@ -304,9 +304,14 @@ describe('IntegrationsScreen', () => {
     expect(calls.connect).toHaveBeenCalledWith('github');
   });
 
-  it('says nothing is connected yet when every status is empty', () => {
+  it('states an empty scope once, through each row, with no page-level line', () => {
     const renderer = mount();
-    expect(texts(renderer.root)).toContain('No integrations connected yet.');
+
+    // The rows carry the state, so the page adds no second line that says the
+    // same thing for every row at once.
+    expect(texts(renderer.root)).not.toContain('No integrations connected yet.');
+    expect(rowTitled(renderer.root, 'GitHub').props.subtitle).toBe('Not connected');
+    expect(rowTitled(renderer.root, 'Linear').props.subtitle).toBe('Not connected');
   });
 
   it('reports an ambiguous GitHub organization as web-managed', () => {

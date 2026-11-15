@@ -75,6 +75,11 @@ describe('getFilePartKind', () => {
     expect(getFilePartKind({ mime: 'image/jpeg' })).toBe('image');
   });
 
+  it('classifies video by mime regardless of filename', () => {
+    expect(getFilePartKind({ mime: 'video/mp4', filename: 'clip.mp4' })).toBe('video');
+    expect(getFilePartKind({ mime: 'video/mp4', filename: 'README.md' })).toBe('video');
+  });
+
   it('classifies markdown by .md/.mdx filename when mime is not image', () => {
     expect(getFilePartKind({ mime: 'text/markdown', filename: 'README.md' })).toBe('markdown');
     expect(getFilePartKind({ mime: 'application/octet-stream', filename: 'docs.mdx' })).toBe(
@@ -99,6 +104,10 @@ describe('getFilePartAccessibilityLabel', () => {
 
   it('labels markdown with preview', () => {
     expect(getFilePartAccessibilityLabel('markdown', 'README.md')).toBe('Preview README.md');
+  });
+
+  it('labels video with open', () => {
+    expect(getFilePartAccessibilityLabel('video', 'clip.mp4')).toBe('Open clip.mp4');
   });
 
   it('labels other with open', () => {

@@ -4,15 +4,25 @@
 // a render tree.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { sessionDiffFileToPrReviewFile } from '@/lib/session-changes';
 import { type SessionChangesSnapshot } from '@/lib/session-changes-review';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
+/** A refresh that could not read the capture. The revision names what the attempt described. */
+type RefreshFailure = {
+  readonly kind: 'refresh-failed';
+  readonly message: string;
+  readonly atRevision: number | null;
+};
+
 export function useSessionChangesData(sessionId: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const sessionQuery = useQuery(trpc.cliSessionsV2.get.queryOptions({ session_id: sessionId }));
   const cloudAgentSessionId = sessionQuery.data?.cloud_agent_session_id ?? null;
@@ -69,7 +79,6 @@ export function useSessionChangesData(sessionId: string) {
     enabled: readOnly,
   });
 
-  const [refreshFailed, setRefreshFailed] = useState(false);
   const refreshMutation = useMutation({
     mutationFn: () => {
       if (cloudAgentSessionId === null) {
@@ -95,20 +104,45 @@ export function useSessionChangesData(sessionId: string) {
           queryClient.setQueryData(changesKey, { snapshot: result.snapshot });
         }
       }
-      setRefreshFailed(result.status !== 'refreshed');
-    },
-    onError: () => {
-      setRefreshFailed(true);
     },
   });
-  const refreshing = refreshMutation.isPending;
+
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<RefreshFailure>();
   const refresh = useCallback(() => {
     if (cloudAgentSessionId === null) {
       return;
     }
-    setRefreshFailed(false);
-    refreshMutation.mutate();
-  }, [cloudAgentSessionId, refreshMutation]);
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
+    // The attempt's baseline is the revision it worked against: a response that
+    // installs a fresher saved snapshot describes a capture the reader now has.
+    const atRevision = snapshot?.revision ?? null;
+    void (async () => {
+      try {
+        const result = await refreshMutation.mutateAsync();
+        if (result.status === 'refreshed') {
+          attempt.succeed();
+          return;
+        }
+        attempt.fail({ kind: 'refresh-failed', message: t('common.couldNotRefresh'), atRevision });
+      } catch {
+        attempt.fail({ kind: 'refresh-failed', message: t('common.couldNotRefresh'), atRevision });
+      }
+    })();
+  }, [begin, cloudAgentSessionId, refreshMutation, snapshot?.revision, t]);
+
+  // A capture newer than the one a failed attempt described makes the banner
+  // false. It also runs when a failure is published, so a snapshot installed by
+  // the same response (or one that arrived while the attempt was pending)
+  // retires it without waiting for another capture.
+  useEffect(() => {
+    if (failure === null) {
+      return;
+    }
+    clearWhere(f => (snapshot?.revision ?? 0) > (f.atRevision ?? 0));
+  }, [clearWhere, failure, snapshot?.revision]);
 
   const legacyFiles = useMemo(
     () =>
@@ -130,8 +164,8 @@ export function useSessionChangesData(sessionId: string) {
     snapshot,
     legacyDiffQuery,
     legacyFiles,
-    refreshing,
+    feedback,
+    failure,
     refresh,
-    refreshFailed,
   };
 }

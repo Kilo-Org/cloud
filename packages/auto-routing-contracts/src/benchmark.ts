@@ -9,7 +9,8 @@ import {
   RoutingTableSchema,
   ProductionTokenProfileSchema,
 } from './routing-table';
-import { ReasoningEffortSchema } from './reasoning';
+import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
+import { addDuplicateKeyIssues } from './duplicate-keys';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 import { OwnerTypeSchema } from './owner';
@@ -107,15 +108,7 @@ export const BenchmarkDeciderModelSchema = z
     // Legacy snapshot identity; new benchmark writers emit variant only.
     reasoningEffort: ReasoningEffortSchema.nullable().default(null),
   })
-  .superRefine((model, ctx) => {
-    if (model.variant != null && model.reasoningEffort != null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['variant'],
-        message: 'Decider model must not set both variant and reasoningEffort; emit variant only',
-      });
-    }
-  });
+  .superRefine((model, ctx) => refineVariantExclusivity(model, ctx, 'Decider model'));
 export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
 /** Platform selectors choose models; the current catalog supplies every effort. */
@@ -134,24 +127,6 @@ export const DEFAULT_BENCHMARK_DECIDER_MODEL_IDS: Record<AutoRouter, string> = {
 export const INTERNAL_BOT_USER_ID_PREFIX = 'bot-internal-';
 export const DEFAULT_BENCHMARK_USER_ID = 'bot-internal-benchmark';
 export const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
-
-// Flags each list entry whose (trimmed) id already appeared earlier in the
-// array. Model ids are the D1 primary keys for config_classifier_models /
-// config_decider_models, so duplicates would otherwise reach the DB as an
-// opaque constraint violation (HTTP 500) instead of an actionable 400.
-function addDuplicateModelIssues(ids: string[], path: string, ctx: z.RefinementCtx): void {
-  const seen = new Set<string>();
-  ids.forEach((id, index) => {
-    if (seen.has(id)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [path, index],
-        message: `Duplicate model id: ${id}`,
-      });
-    }
-    seen.add(id);
-  });
-}
 
 // Retired per-config concurrency knobs (maxConcurrency, userMaxConcurrency) are
 // gone from the contract: container lanes come from the shared budget in
@@ -208,13 +183,19 @@ export const BenchmarkConfigSchema = z
       { id: DEFAULT_BENCHMARK_DECIDER_MODEL_IDS[config.router] },
     ],
   }))
+  // Flags each list entry whose (trimmed) id already appeared earlier in the
+  // array. Model ids are the D1 primary keys for config_classifier_models /
+  // config_decider_models, so duplicates would otherwise reach the DB as an
+  // opaque constraint violation (HTTP 500) instead of an actionable 400.
   .superRefine((config, ctx) => {
-    addDuplicateModelIssues(config.classifierModels, 'classifierModels', ctx);
-    addDuplicateModelIssues(
-      config.deciderModels.map(m => m.id),
-      'deciderModels',
-      ctx
-    );
+    addDuplicateKeyIssues(config.classifierModels, ctx, id => id, {
+      pathPrefix: ['classifierModels'],
+      message: id => `Duplicate model id: ${id}`,
+    });
+    addDuplicateKeyIssues(config.deciderModels, ctx, model => model.id, {
+      pathPrefix: ['deciderModels'],
+      message: id => `Duplicate model id: ${id}`,
+    });
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
@@ -400,13 +381,8 @@ export const RefreshBenchmarkProfilesRequestSchema = z.object({
     .min(1)
     .max(100)
     .superRefine((entries, ctx) => {
-      const seen = new Set<string>();
-      entries.forEach((entry, index) => {
-        const key = benchmarkPairKey(entry);
-        if (seen.has(key)) {
-          ctx.addIssue({ code: 'custom', path: [index], message: 'Duplicate benchmark pair.' });
-        }
-        seen.add(key);
+      addDuplicateKeyIssues(entries, ctx, benchmarkPairKey, {
+        message: () => 'Duplicate benchmark pair.',
       });
     }),
 });

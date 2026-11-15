@@ -126,24 +126,43 @@ let loaded = false;
  */
 const BACKGROUND_LISTENER = Symbol.for('kilo.gguf.backgroundListener');
 
-/** The saved list is read on first use rather than at import, so startup does no file work. */
-function ggufStore() {
-  if (!loaded) {
-    loaded = true;
-    downloads.load();
-    const previous = (globalThis as Partial<Record<symbol, { remove: () => void }>>)[
-      BACKGROUND_LISTENER
-    ];
-    previous?.remove();
-    // A background app may be killed for its memory; the context loads again on the next answer.
-    const subscription = AppState.addEventListener('change', state => {
-      if (state === 'background') {
-        void model.release();
-      }
-    });
-    (globalThis as Partial<Record<symbol, { remove: () => void }>>)[BACKGROUND_LISTENER] =
-      subscription;
+/**
+ * The saved list is read on first use rather than at import, so startup does no file work.
+ *
+ * The latch is set only after `load()` succeeded and the background listener is
+ * installed: a read that failed must be retryable, and a listener that was never
+ * installed would let a loaded llama context survive into the background. A failed
+ * read is not retried from the snapshot getter — that runs while rendering — so the
+ * picker's retry calls `retryLoad`.
+ */
+function ensureGgufStore(options: { retry?: boolean } = {}): void {
+  if (loaded) {
+    return;
   }
+  if (downloads.snapshot().loadFailed && options.retry !== true) {
+    return;
+  }
+  if (!downloads.load()) {
+    return;
+  }
+  // A failed attempt installs neither the listener nor the latch, so the previous
+  // instance's listener (fast refresh) stays until a successful attempt replaces it.
+  const subscription = AppState.addEventListener('change', state => {
+    if (state === 'background') {
+      void model.release();
+    }
+  });
+  const previous = (globalThis as Partial<Record<symbol, { remove: () => void }>>)[
+    BACKGROUND_LISTENER
+  ];
+  previous?.remove();
+  (globalThis as Partial<Record<symbol, { remove: () => void }>>)[BACKGROUND_LISTENER] =
+    subscription;
+  loaded = true;
+}
+
+function ggufStore() {
+  ensureGgufStore();
   return downloads;
 }
 
@@ -193,6 +212,10 @@ export const ggufDownloadActions = {
   },
   dismissFailure: () => {
     ggufStore().dismissFailure();
+  },
+  /** Read the saved list again after `snapshot.loadFailed`; the picker's retry. */
+  retryLoad: () => {
+    ensureGgufStore({ retry: true });
   },
   remove: async (fileId: string) => {
     await ggufStore().remove(fileId);

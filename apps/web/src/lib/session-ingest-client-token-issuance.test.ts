@@ -125,6 +125,7 @@ describe('session-ingest client token issuance', () => {
     });
     await expect(shareSession(sessionId, userId)).resolves.toEqual({
       share_token: 'opaque-share-token',
+      public_id: null,
     });
     await expect(unshareSession(sessionId, userId)).resolves.toBeUndefined();
     await expect(deleteSession(sessionId, userId)).resolves.toBeUndefined();

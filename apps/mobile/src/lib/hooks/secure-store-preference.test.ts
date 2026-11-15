@@ -282,6 +282,33 @@ describe('createSecureStorePreference', () => {
     unsubscribe();
   });
 
+  it('does not claim the list was read when a set lands before the initial read', async () => {
+    const pendingRead = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValueOnce(pendingRead.promise);
+    const store = createSecureStorePreference<string[]>({
+      key: 'k',
+      defaultValue: [],
+      parse: raw => (raw === null || raw === '' ? [] : raw.split(',')),
+      serialize: value => value.join(','),
+      mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
+    });
+
+    /* A screen that adds a server before the first read has to be able to tell
+       "the stored list is known" from "the stored list is still on its way". A
+       write landing answers neither, so it must not settle the read. */
+    const unsubscribe = store.subscribe(noopListener);
+    store.set(['local']);
+    await store.whenPersisted();
+    expect(store.getHasLoaded()).toBe(false);
+
+    pendingRead.resolve('disk');
+    await store.whenLoaded();
+
+    expect(store.getHasLoaded()).toBe(true);
+    expect(store.get()).toEqual(['disk', 'local']);
+    unsubscribe();
+  });
+
   it('keeps the default when clear() runs during an in-flight initial load', async () => {
     const pendingReads: ((raw: string | null) => void)[] = [];
     getItemAsync.mockReturnValue(

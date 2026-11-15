@@ -176,9 +176,6 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
         <View className="gap-4">
           <Text className="text-sm text-muted-foreground">{t('integrations.subtitle')}</Text>
           {noteKey ? <Text className="text-xs text-muted-foreground">{t(noteKey)}</Text> : null}
-          {rows.some(row => row.installed) ? null : (
-            <Text className="text-xs text-muted-foreground">{t('integrations.emptyHint')}</Text>
-          )}
           {rows.length > 0 ? (
             <View className="rounded-lg bg-secondary px-3">
               {rows.map((row, index) => (

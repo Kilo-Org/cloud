@@ -4,8 +4,9 @@ import Foundation
 /// should see it.
 ///
 /// Every entry point treats a blank value as absent: the start intent omits the
-/// payload field, and the visible-session publisher clears the on-screen
-/// activity. The rule lives here once, so those answers cannot drift.
+/// payload field, the entity query lists its suggestions, and the visible-session
+/// publisher clears the on-screen activity. The rule lives here once, so those
+/// three answers cannot drift.
 enum KiloAppActionValue {
   /// `value` without its surrounding whitespace and newlines, or nil when
   /// nothing is left.

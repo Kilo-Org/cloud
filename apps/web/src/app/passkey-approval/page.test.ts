@@ -149,6 +149,65 @@ describe('passkey approval page', () => {
     expect(html).toContain('This request belongs to another account');
   });
 
+  it('renders the expired view for a malformed request id without touching the database', async () => {
+    mockSession.mockResolvedValue({ user: null, authFailedResponse: null } as never);
+
+    const html = await renderPage({ request: 'abc' });
+
+    expect(html).toContain('This approval link expired');
+    expect(html).not.toContain('Approve passkey change');
+  });
+
+  it('renders the expired view for a malformed request id even when signed in', async () => {
+    const owner = await insertTestUser();
+    mockSession.mockResolvedValue({
+      user: { id: owner.id, google_user_email: owner.google_user_email } as never,
+      authFailedResponse: null,
+      authenticatedAt: Math.floor(Date.now() / 1000),
+      ssoSourceOrganizationId: ORGANIZATION_ID,
+    } as never);
+
+    const html = await renderPage({ request: '1111-not-a-uuid' });
+
+    expect(html).toContain('This approval link expired');
+    expect(html).not.toContain('Approve passkey change');
+  });
+
+  it('shows a known error code for a malformed request id instead of throwing', async () => {
+    const owner = await insertTestUser();
+    mockSession.mockResolvedValue({
+      user: { id: owner.id, google_user_email: owner.google_user_email } as never,
+      authFailedResponse: null,
+      authenticatedAt: Math.floor(Date.now() / 1000),
+      ssoSourceOrganizationId: ORGANIZATION_ID,
+    } as never);
+
+    const html = await renderPage({ request: 'not-a-uuid', error: 'invalid_request' });
+
+    expect(html).toContain('This approval link is incomplete');
+    expect(html).not.toContain('Approve passkey change');
+  });
+
+  it.each(['__proto__', 'constructor', 'toString', 'not-a-code'])(
+    'ignores an unusable error code (%s) and keeps the pending approval',
+    async code => {
+      const owner = await insertTestUser();
+      const requestId = await startRequest(owner.id);
+      mockSession.mockResolvedValue({
+        user: { id: owner.id, google_user_email: owner.google_user_email } as never,
+        authFailedResponse: null,
+        authenticatedAt: Math.floor(Date.now() / 1000),
+        ssoSourceOrganizationId: ORGANIZATION_ID,
+      } as never);
+
+      const html = await renderPage({ request: requestId, error: code });
+
+      expect(html).toContain('Approve passkey change');
+      expect(html).not.toContain('This approval link is incomplete');
+      expect(html).not.toContain('undefined');
+    }
+  );
+
   it('names the account on the approval itself for the matching reader', async () => {
     const owner = await insertTestUser();
     const requestId = await startRequest(owner.id);

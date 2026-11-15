@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
@@ -165,20 +166,34 @@ function switchAccountHref(requestId: string): string {
   return `/users/sign_in?${params.toString()}`;
 }
 
-const ERROR_HEADINGS: Record<string, string> = {
-  invalid_request: 'This approval link is incomplete',
-  expired: 'This approval link expired',
-  sign_in: 'Sign in to approve',
-  wrong_account: 'This request belongs to another account',
-  stale: 'Sign in again to approve',
-  sso_required: 'Approve through your organization SSO',
-  organization_not_required: 'This change needs a different confirmation',
-};
+/**
+ * A map, not an object literal: a query string such as `error=__proto__` or
+ * `error=constructor` must never reach a prototype property, and a Map has no
+ * inherited keys to fall back to.
+ */
+const ERROR_HEADINGS = new Map<string, string>([
+  ['invalid_request', 'This approval link is incomplete'],
+  ['expired', 'This approval link expired'],
+  ['sign_in', 'Sign in to approve'],
+  ['wrong_account', 'This request belongs to another account'],
+  ['stale', 'Sign in again to approve'],
+  ['sso_required', 'Approve through your organization SSO'],
+  ['organization_not_required', 'This change needs a different confirmation'],
+]);
+
+/**
+ * The request id is a uuid column key. A malformed value must read as an
+ * expired link instead of reaching the query, so an arbitrary string cannot
+ * turn a public URL into a server error.
+ */
+const REQUEST_ID = z.uuid();
 
 export default async function PasskeyManagementApprovePage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const requestId = firstValue(params['request']);
+  const parsedRequestId = REQUEST_ID.safeParse(firstValue(params['request']));
+  const requestId = parsedRequestId.success ? parsedRequestId.data : undefined;
   const errorParam = firstValue(params['error']);
+  const errorHeading = errorParam === undefined ? undefined : ERROR_HEADINGS.get(errorParam);
 
   const auth = await getUserFromSessionForCredentialIssuance();
   const state = requestId
@@ -206,10 +221,10 @@ export default async function PasskeyManagementApprovePage({ searchParams }: Pag
     );
   }
 
-  if (errorParam && ERROR_HEADINGS[errorParam] && state.status !== 'ready') {
+  if (errorHeading && state.status !== 'ready') {
     return (
       <Frame>
-        <Heading>{ERROR_HEADINGS[errorParam]}</Heading>
+        <Heading>{errorHeading}</Heading>
         <Body>Return to the Kilo app and start the change again. This approval was not used.</Body>
       </Frame>
     );

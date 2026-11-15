@@ -1,6 +1,7 @@
 import { createElement, Fragment, type ReactNode } from 'react';
 import { vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 import '@/i18n';
 import TabsLayout from '@/app/(app)/(tabs)/_layout';
 import { AgentSessionListScreen } from './session-list-screen';
@@ -187,12 +188,18 @@ vi.mock('@/lib/auth/auth-context', () => ({
   }),
 }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => organization }));
-vi.mock('@/lib/hooks/use-organization-queries', () => {
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  // The billing step's role rule is the shared package's, not this harness's;
+  // the memberships here carry no role, so every reader resolves to the copy
+  // that names the person who can change the plan.
+  const { canManageOrganizationBilling } =
+    await vi.importActual<typeof OrganizationsModule>('@kilocode/app-shared/organizations');
   const orgs = ['org-a', 'org-b'].map(organizationId => ({
     organizationId,
     organizationName: organizationId,
   }));
   return {
+    isMoneyRole: canManageOrganizationBilling,
     useOrgBoundary: () => ({
       orgs,
       org: orgs.find(org => org.organizationId === organization.organizationId),

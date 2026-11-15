@@ -27,11 +27,33 @@ const mocks = vi.hoisted(() => ({
   resolveRepository: vi.fn(),
   startAgent: vi.fn(),
   toastError: vi.fn(),
+  billingAction: undefined as { label: string; onPress: () => void } | undefined,
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ navigate: mocks.navigate }) }));
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
+
+// The adapter reaches `react-native` for its accessibility announcement. The
+// double forwards the options the way the real adapter does, so a bare copy and
+// a toast carrying a step stay distinguishable.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    error: (msg: string, options?: unknown) =>
+      options === undefined ? mocks.toastError(msg) : mocks.toastError(msg, options),
+    success: vi.fn(),
+    warning: vi.fn(),
+  },
+}));
+
+// The role the hook reads for the step a refusal offers lives behind the
+// organization query chain, which this harness does not mount.
+vi.mock('@/lib/trial-refusal', () => ({
+  useBillingAction: () => mocks.billingAction,
+  useCanManageBilling: () => mocks.billingAction !== undefined,
+  useTrialRefusalAction: (isRefusal: boolean) =>
+    isRefusal ? mocks.billingAction : undefined,
+}));
 
 // This harness keeps the dispatcher active and replaces its UI and create boundaries.
 vi.mock('@/lib/app-actions/confirm-app-action-start', () => ({
@@ -120,6 +142,7 @@ describe('usePendingAppAction', () => {
         },
       })
     );
+    mocks.billingAction = undefined;
     takePendingAppAction();
   });
 
@@ -170,6 +193,29 @@ describe('usePendingAppAction', () => {
     });
     expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith(
       i18n.t('agentChat.session.serviceUnavailable')
+    );
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('offers the plan step with a trial refusal', async () => {
+    const openBilling = vi.fn<() => void>();
+    mocks.billingAction = { label: 'Manage billing', onPress: openBilling };
+    mocks.dispatch.mockResolvedValue({
+      ok: false,
+      action: 'StartAgent',
+      retryable: false,
+      code: 'start-failed',
+      message: i18n.t('common.organizationTrialEndedBilling'),
+      trialRefusal: true,
+    });
+    setPendingAppAction({ action: 'StartAgent', prompt: 'fix the build' });
+    const renderer = mount(SETTLED);
+    await update(renderer, SETTLED);
+
+    expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith(
+      i18n.t('common.organizationTrialEndedBilling'),
+      { action: { label: 'Manage billing', onClick: expect.any(Function) } }
     );
     expect(mocks.navigate).not.toHaveBeenCalled();
     renderer.unmount();

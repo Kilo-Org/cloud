@@ -47,6 +47,24 @@ export function useCanManageBilling(organizationId?: string | null): boolean {
 }
 
 /**
+ * The billing step for a role the caller already resolved, or `undefined` for
+ * a reader the server would refuse. The hooks below are the usual way to read
+ * a role; a surface whose organization id is a press-time value rather than a
+ * render-time one resolves the same predicate from the shared membership list
+ * and builds the step with this, so the step keeps one shape.
+ */
+export function billingActionFor(
+  canManageBilling: boolean,
+  label: string,
+  openBilling: () => void
+): TrialRefusalAction | undefined {
+  if (!canManageBilling) {
+    return undefined;
+  }
+  return { label, onPress: openBilling };
+}
+
+/**
  * The billing step a trial refusal offers, or `undefined` for a reader the
  * server would refuse. Both hooks run on every render: the decision is in the
  * returned value, never in whether a hook was called.
@@ -55,15 +73,9 @@ export function useBillingAction(organizationId?: string | null): TrialRefusalAc
   const canManageBilling = useCanManageBilling(organizationId);
   const router = useRouter();
   const { t } = useTranslation();
-  if (!canManageBilling) {
-    return undefined;
-  }
-  return {
-    label: t('organization.hub.manageBilling'),
-    onPress: () => {
-      router.push(ORGANIZATION_BILLING_HREF);
-    },
-  };
+  return billingActionFor(canManageBilling, t('organization.hub.manageBilling'), () => {
+    router.push(ORGANIZATION_BILLING_HREF);
+  });
 }
 
 /**

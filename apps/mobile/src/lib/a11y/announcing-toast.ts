@@ -20,25 +20,20 @@ type ToastOptions = NonNullable<Parameters<typeof toast.success>[1]>;
 
 // `announceForA11y` trims, drops empty messages, and swallows a native
 // accessibility failure, so the visual toast always renders.
-//
-// The `options` argument is forwarded only when the caller passed one: a
-// `toast.error(title, undefined)` call is not the same assertion as
-// `toast.error(title)`, and the suites that assert a bare copy keep matching
-// only while the adapter adds no second argument of its own.
 
 function success(title: string, options?: ToastOptions): string | number {
   announceForA11y(title);
-  return options === undefined ? toast.success(title) : toast.success(title, options);
+  return toast.success(title, options);
 }
 
 function error(title: string, options?: ToastOptions): string | number {
   announceForA11y(title);
-  return options === undefined ? toast.error(title) : toast.error(title, options);
+  return toast.error(title, options);
 }
 
 function warning(title: string, options?: ToastOptions): string | number {
   announceForA11y(title);
-  return options === undefined ? toast.warning(title) : toast.warning(title, options);
+  return toast.warning(title, options);
 }
 
 export const announcingToast = { success, error, warning };

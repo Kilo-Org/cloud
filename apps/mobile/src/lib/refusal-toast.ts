@@ -3,8 +3,7 @@
 //
 // A `TrialRefusalAction` is an element's callback and spells it `onPress`;
 // sonner spells the toast's `onClick`. One converter keeps every toast surface
-// identical, and a refusal with no step stays on the adapter's bare-copy call:
-// a toast carrying no options is not the same call as one carrying `undefined`.
+// identical, and a refusal with no step stays a bare-copy toast.
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type TrialRefusalAction } from '@/lib/trial-refusal';

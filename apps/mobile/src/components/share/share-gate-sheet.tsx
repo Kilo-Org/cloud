@@ -17,7 +17,6 @@ import { getNewAgentSessionPath } from '@/components/agents/session-list-routes'
 import { DestinationOptionRow } from '@/components/destination-option-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
@@ -25,6 +24,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { resolveRemoteStartPlan } from '@/lib/remote-spawn-admission';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
@@ -353,21 +353,18 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       // gate never runs for it and the session would be created before the
       // model request was refused. Refuse here, before the spawn, in the same
       // words the cloud start path uses for the same organization state, and
-      // with the step that ends it for the reader who may change the plan. A
-      // toast takes sonner's action shape, so the step is reachable from here
-      // like it is from the inline refusal on the new-session form.
+      // with the step that ends it for the reader who may change the plan. The
+      // toast already takes sonner's action shape, so the step is reachable
+      // from here like it is from the inline refusal on the new-session form.
       const plan = resolveRemoteStartPlan({
         organizationId: organizationId ?? null,
         organizations: memberships,
         canManageBilling,
       });
       if (!plan.allowed) {
-        announcingToast.error(
-          plan.toast,
-          billingAction === undefined
-            ? undefined
-            : { action: { label: billingAction.label, onClick: billingAction.onPress } }
-        );
+        // This block only runs for the plan's own refusal, so the step follows
+        // the role the plan already read.
+        announceTrialRefusal(plan.toast, billingAction, true);
         return;
       }
 

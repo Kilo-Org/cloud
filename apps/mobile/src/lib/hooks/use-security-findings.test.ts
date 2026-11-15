@@ -13,8 +13,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
+import type * as ReactI18nextModule from 'react-i18next';
 import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
+import { i18n } from '@/i18n';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { SECURITY_SERVICE_UNAVAILABLE_MESSAGE } from '@/lib/security-agent-ledger';
 import {
   buildSecurityFindingsQueryOptions,
@@ -37,14 +41,26 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
-// The dismissal hook reads the reader's role through the organization query
-// chain, which reaches expo-router and the Expo runtime this pure project has
-// no build for. No test here resolves a role: the mapper takes it as an
-// argument, and these suites assert the wiring around it.
+// The dismissal and analysis hooks read the reader's role through the
+// organization query chain, which reaches expo-router and the Expo runtime this
+// pure project has no build for. The boundary is stubbed and the real
+// `isMoneyRole` rule is applied to whatever role a case sets.
+const trialRole = vi.hoisted(() => ({ role: undefined as string | undefined }));
+
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  isMoneyRole: () => false,
-  useOrgBoundary: () => ({ role: undefined }),
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } =
+    await vi.importActual<typeof OrganizationsModule>('@kilocode/app-shared/organizations');
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: trialRole.role }),
+  };
+});
+// The billing step's label is catalog copy read through `useTranslation`, and
+// this pure suite mounts no renderer for it: the double returns the key.
+vi.mock('react-i18next', async importOriginal => ({
+  ...(await importOriginal<typeof ReactI18nextModule>()),
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 vi.mock('@/lib/query/schedule-cache-maintenance', () => ({ scheduleCacheMaintenance: vi.fn() }));
@@ -70,7 +86,10 @@ vi.mock('@/lib/hooks/use-security-agent-commands', () => ({
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {
-    error: (msg: string) => toastErrorMock(msg),
+    // The real adapter forwards options only when the caller passed one, so a
+    // bare-copy call and a toast carrying a step stay distinguishable.
+    error: (msg: string, options?: unknown) =>
+      options === undefined ? toastErrorMock(msg) : toastErrorMock(msg, options),
     success: vi.fn(),
     warning: vi.fn(),
   },
@@ -168,6 +187,17 @@ vi.mock('@/lib/trpc', () => ({
 
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const FINDING_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+// The catalog sentences for a lapsed organization plan, resolved through i18n
+// so a reworded catalog follows instead of drifting from a fixture: the one
+// that names the person who can fix it, and the one that offers the step
+// instead.
+const TRIAL_ENDED_COPY = i18n.t('common.organizationTrialEnded');
+const TRIAL_ENDED_BILLING_COPY = i18n.t('common.organizationTrialEndedBilling');
+// The step's label, read as the catalog key this suite's translation double
+// returns for it.
+const BILLING_ACTION_LABEL = 'organization.hub.manageBilling';
+
 const DISMISS_VARS = {
   findingId: FINDING_ID,
   reason: 'not_used',
@@ -286,6 +316,8 @@ describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
     orgStartAnalysisMutateMock.mockReset();
     trackCommandMock.mockClear();
     invalidateQueriesMock.mockClear();
+    toastErrorMock.mockReset();
+    trialRole.role = undefined;
   });
 
   it('always sends forceSandbox: true on a personal analysis start', async () => {
@@ -333,6 +365,37 @@ describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
 
     toastErrorMock.mockClear();
     lastCapturedOptions?.onError?.(new Error('Analysis queue is full'));
+    expect(toastErrorMock).toHaveBeenCalledWith('Analysis queue is full');
+  });
+
+  it('offers the plan step with the billing copy to a role that can change the plan', () => {
+    trialRole.role = 'owner';
+    useStartSecurityAnalysis(ORG_ID);
+
+    lastCapturedOptions?.onError?.(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE));
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_BILLING_COPY, {
+      action: { label: BILLING_ACTION_LABEL, onClick: expect.any(Function) },
+    });
+  });
+
+  it('names the owner and offers no step to a reader who cannot change the plan', () => {
+    trialRole.role = 'member';
+    useStartSecurityAnalysis(ORG_ID);
+
+    lastCapturedOptions?.onError?.(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE));
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+  });
+
+  it('keeps an unrelated failure its own copy and offers no step', () => {
+    trialRole.role = 'owner';
+    useStartSecurityAnalysis(ORG_ID);
+
+    lastCapturedOptions?.onError?.(new Error('Analysis queue is full'));
+
+    // A single-argument toast: no step beside a failure that is not the
+    // trial refusal, even for a role that could take one.
     expect(toastErrorMock).toHaveBeenCalledWith('Analysis queue is full');
   });
 });

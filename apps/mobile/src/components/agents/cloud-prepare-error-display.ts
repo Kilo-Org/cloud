@@ -30,10 +30,11 @@ const REPOSITORY_AUTHORIZATION_REFUSAL_MESSAGE =
  * no longer exists: the reader refreshes the selection instead of retrying.
  *
  * `canManageBilling` selects the sentence of the organization trial refusal and
- * defaults to the reader who cannot change the plan. Every caller here reports
- * through a toast that carries no step, so they leave the default: the copy must
- * not offer an action the reader cannot reach from where it is painted. A
- * surface that resolves the role for a refusal it can also act on passes it.
+ * defaults to the reader who cannot change the plan. A caller that reports
+ * through a toast with no step leaves the default, so the copy never offers an
+ * action the reader cannot reach from where it is painted. A caller whose toast
+ * can carry the plan step resolves the role, passes it, and announces the same
+ * refusal through `announceTrialRefusal` so copy and step describe one reader.
  */
 export function cloudPrepareFailureMessage(error: unknown, canManageBilling = false): string {
   const known = knownServerErrorMessage(error, canManageBilling);

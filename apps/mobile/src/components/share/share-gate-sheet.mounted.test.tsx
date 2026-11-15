@@ -620,8 +620,8 @@ describe('ShareGateSheet organization plan gate', () => {
 
     expect(spawnMock).not.toHaveBeenCalled();
     // A reader who cannot change the plan gets the copy that names who can and
-    // no step: the toast carries one argument, exactly as before.
-    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    // no step: the adapter still makes its two-argument call, with no options.
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'), undefined);
     act(() => {
       renderer.unmount();
     });

@@ -64,6 +64,7 @@ function answerOnlyOnAbort(request: Request, onAbort?: () => void): Promise<Resp
 }
 
 const PEER_RESPONSES: Array<() => Promise<Response>> = [
+  async () => new Response('Unauthorized', { status: 401 }),
   async () => new Response('Not Found', { status: 404 }),
   async () => new Response('not json', { status: 200, headers: { 'content-type': 'text/plain' } }),
   async () => admissionResponse({ outcome: 'maybe' }),
@@ -154,26 +155,24 @@ describe('readAnalysisCreditAdmission unreadable answers', () => {
     expect(unavailableMessage(result)).toBe('Cloud Agent credit admission was not accepted');
   });
 
-  it('reports an authorization refusal as a permanent refusal', async () => {
-    for (const status of [401, 403]) {
-      const { env } = createEnv(async () => new Response('refused', { status }));
+  it('reports a 403 answer as a permanent refusal', async () => {
+    const { env } = createEnv(async () => new Response('refused', { status: 403 }));
 
-      const result = await readAnalysisCreditAdmission({ env, authToken: AUTH_TOKEN });
+    const result = await readAnalysisCreditAdmission({ env, authToken: AUTH_TOKEN });
 
-      expect(result).toEqual({
-        outcome: 'refused',
-        message: 'Cloud Agent credit admission was refused',
-      });
-      if (result.outcome !== 'refused') throw new Error('Expected a refused admission');
-      expect(result.message).not.toMatch(/\d/);
-      expect(result.message).not.toContain(AUTH_TOKEN);
-    }
+    expect(result).toEqual({
+      outcome: 'refused',
+      message: 'Cloud Agent credit admission was refused',
+    });
+    if (result.outcome !== 'refused') throw new Error('Expected a refused admission');
+    expect(result.message).not.toMatch(/\d/);
+    expect(result.message).not.toContain(AUTH_TOKEN);
   });
 
-  it('reports every other non-OK status as one retryable message', async () => {
-    // Only the authorization statuses are decided here; the deploy-ordering
-    // window and every other non-OK answer stay unreadable and retryable.
-    const statuses = [404, 429, 500, 503];
+  it('reports every other non-OK status, including 401, as one retryable message', async () => {
+    // A 401 is left unreadable with the other non-OK answers: the peer's
+    // credential verdict can change with its deployment.
+    const statuses = [401, 404, 429, 500, 503];
 
     for (const status of statuses) {
       const { env } = createEnv(async () => new Response('refused', { status }));

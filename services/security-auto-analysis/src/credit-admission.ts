@@ -9,8 +9,8 @@ const PeerAnalysisCreditAdmissionSchema = z.discriminatedUnion('outcome', [
 
 /**
  * The peer's three answers plus `refused`, which this service produces itself
- * from an authorization-status answer so the caller gets a typed outcome
- * instead of matching message text.
+ * from a 403 answer so the caller gets a typed outcome instead of matching
+ * message text.
  */
 export const AnalysisCreditAdmissionSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('admitted') }),
@@ -40,10 +40,14 @@ export const ADMISSION_READ_TIMEOUT_MS = 10_000;
  * existing balance rule decides; nothing is re-derived here and the
  * initiate-time 402 stays authoritative.
  *
- * A `refused` answer is a permanent authorization refusal: the caller must not
- * consume retry attempts for it. Every other non-OK answer stays unreadable and
- * therefore keeps its existing retry classification, so the deploy-ordering
- * window (a peer without this query answers 404) retries instead of failing.
+ * A 403 answer is a refusal of the token's authority scope for this
+ * organization, and it is decided: the caller must not consume retry attempts
+ * for it. A 401 stays unreadable like every other non-OK answer, because the
+ * peer's credential verdict can reflect a verification state that a deployment
+ * changes (secret version skew, token flags) rather than a decision about the
+ * finding, and a single such answer must not settle it. Unreadable answers keep
+ * their existing retry classification, so the deploy-ordering window (a peer
+ * without this query answers 404) retries instead of failing.
  * Neither the token, the request body nor the peer's error body may appear in
  * the result message.
  *
@@ -55,13 +59,10 @@ export const ADMISSION_READ_TIMEOUT_MS = 10_000;
  * and its backoff; a retry inside this module would send a second request
  * within one attempt and keep that policy in two places.
  *
- * A `refused` answer stays permanent on the first answer. It describes a
- * credential the peer would not accept rather than a decision about the payer:
- * a policy denial arrives in-band as `insufficient_credits` with status 200,
- * and the peer has no denial answer in the authorization statuses at all.
- * Repeating the same request inside the same attempt cannot change that
- * credential, and the outcome is recorded with its own failure code instead of
- * spending the finding's remaining attempts.
+ * Nothing else here decides a payer. The peer's payer decision arrives in-band
+ * as `insufficient_credits` on a 200, and a dependency failure throws at the
+ * peer and arrives as 503, so it is already unreadable and keeps its retry
+ * classification.
  *
  * `timeoutMs` exists for tests, which need a short bound to observe the
  * deadline; callers use the default.
@@ -92,12 +93,13 @@ export async function readAnalysisCreditAdmission(params: {
   }
 
   if (!response.ok) {
-    // The status is never part of the message, and an authorization refusal is
-    // the only non-OK answer that is decided here rather than left unreadable.
+    // The status is never part of the message. A 403 refuses the token's
+    // authority scope and is decided here; a 401 is left unreadable because the
+    // peer's credential verdict can change with its deployment.
     logger.warn('Cloud Agent credit admission returned non-OK status', {
       status: response.status,
     });
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 403) {
       return { outcome: 'refused', message: 'Cloud Agent credit admission was refused' };
     }
     return {

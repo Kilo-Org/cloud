@@ -144,6 +144,49 @@ async function enforceLiveAppSessionLimit(
 }
 
 /**
+ * Insert one device session inside the caller's transaction and enforce the
+ * app-session cap when the session counts toward it.
+ *
+ * Runs in that transaction so a sign-in never commits above the cap. Returns
+ * the evicted session ids for post-commit invalidation.
+ */
+async function insertDeviceSession(
+  tx: DrizzleTransaction,
+  params: { userId: string; userAgent?: string; deviceAuthRequestId?: string }
+): Promise<{ sessionId: string; evictedSessionIds: string[] }> {
+  const [session] = await tx
+    .insert(device_sessions)
+    .values({
+      kilo_user_id: params.userId,
+      user_agent: params.userAgent,
+      device_auth_request_id: params.deviceAuthRequestId,
+    })
+    .returning({ id: device_sessions.id });
+
+  if (!session) {
+    throw new Error('Failed to create device session');
+  }
+
+  // A device-auth session is minted by the CLI flow, so it neither counts
+  // toward the app-session cap nor evicts one.
+  const evictedSessionIds =
+    params.deviceAuthRequestId === undefined
+      ? await enforceLiveAppSessionLimit(tx, params.userId)
+      : [];
+
+  return { sessionId: session.id, evictedSessionIds };
+}
+
+/**
+ * Drop the cached auth of evicted sessions. Must run after the transaction commits.
+ */
+function invalidateEvictedSessions(evictedSessionIds: string[]): void {
+  for (const evictedSessionId of evictedSessionIds) {
+    invalidateDeviceSession(evictedSessionId);
+  }
+}
+
+/**
  * Create a new device session.
  * @returns the created session ID.
  */
@@ -152,33 +195,11 @@ export async function createDeviceSession(params: {
   userAgent?: string;
   deviceAuthRequestId?: string;
 }): Promise<string> {
-  const { sessionId, evictedSessionIds } = await db.transaction(async tx => {
-    const [session] = await tx
-      .insert(device_sessions)
-      .values({
-        kilo_user_id: params.userId,
-        user_agent: params.userAgent,
-        device_auth_request_id: params.deviceAuthRequestId,
-      })
-      .returning({ id: device_sessions.id });
+  const { sessionId, evictedSessionIds } = await db.transaction(tx =>
+    insertDeviceSession(tx, params)
+  );
 
-    if (!session) {
-      throw new Error('Failed to create device session');
-    }
-
-    // A device-auth session is minted by the CLI flow, so it neither counts
-    // toward the app-session cap nor evicts one.
-    const evictedSessionIds =
-      params.deviceAuthRequestId === undefined
-        ? await enforceLiveAppSessionLimit(tx, params.userId)
-        : [];
-
-    return { sessionId: session.id, evictedSessionIds };
-  });
-
-  for (const evictedSessionId of evictedSessionIds) {
-    invalidateDeviceSession(evictedSessionId);
-  }
+  invalidateEvictedSessions(evictedSessionIds);
 
   return sessionId;
 }
@@ -485,31 +506,20 @@ export async function createDeviceSessionWithAttestedKey(params: {
   const { credentials, evictedSessionIds } = await db.transaction(async tx => {
     await persistAttestedKey(params.userId, params.verification, tx);
 
-    const [session] = await tx
-      .insert(device_sessions)
-      .values({
-        kilo_user_id: params.userId,
-        user_agent: params.userAgent,
-      })
-      .returning({ id: device_sessions.id });
-
-    if (!session) {
-      throw new Error('Failed to create device session');
-    }
-
-    const evictedSessionIds = await enforceLiveAppSessionLimit(tx, params.userId);
+    const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
+      userId: params.userId,
+      userAgent: params.userAgent,
+    });
 
     const credentials = {
-      ...(await mintSessionCredentials(tx, params.user, session.id)),
-      sessionId: session.id,
+      ...(await mintSessionCredentials(tx, params.user, sessionId)),
+      sessionId,
     };
 
     return { credentials, evictedSessionIds };
   });
 
-  for (const evictedSessionId of evictedSessionIds) {
-    invalidateDeviceSession(evictedSessionId);
-  }
+  invalidateEvictedSessions(evictedSessionIds);
 
   return credentials;
 }

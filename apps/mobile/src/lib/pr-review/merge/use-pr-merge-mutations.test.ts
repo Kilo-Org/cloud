@@ -60,7 +60,7 @@ const hoistedKeys = vi.hoisted(() => ({
 // own persistence is pinned in `use-pr-merge-mutations.mounted.test.tsx`. The
 // hoisted mock above still serves the auto-merge arms.
 const mergeKeys = vi.hoisted(() => ({
-  mergeOperationKey: vi.fn(() => 'retained-merge-key'),
+  mergeOperationKey: vi.fn<() => string | null>(() => 'retained-merge-key'),
   retireMergeOperationKey: vi.fn(),
 }));
 
@@ -323,8 +323,7 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
     // field list must fail here instead of silently rotating in-flight keys.
     expect(mergeKeys.mergeOperationKey).toHaveBeenCalledWith(
-      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
-      'retained-merge-key'
+      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
     );
     expect(mutateMock).toHaveBeenCalledWith(
       expect.objectContaining({ operationKey: 'retained-merge-key' })
@@ -350,6 +349,20 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
       '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
       'retained-merge-key'
     );
+  });
+
+  it('sends nothing when the retained store refuses a new intent (its bound is full)', async () => {
+    mergeKeys.mergeOperationKey.mockReturnValueOnce(null);
+    useMergePullRequestMutation(REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toThrow(
+      i18n.t('prReview.merge.couldNotMerge')
+    );
+
+    // Without a key there is no ledger identity to dedupe the write against, so
+    // the merge must not be sent at all.
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(mergeKeys.retireMergeOperationKey).not.toHaveBeenCalled();
   });
 
   it('keeps the intent when GitHub declines the merge (merged:false is retryable)', async () => {

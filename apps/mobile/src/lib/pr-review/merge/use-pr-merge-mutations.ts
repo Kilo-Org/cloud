@@ -253,6 +253,12 @@ export function useMergePullRequestMutation(ref: ReviewWriteRef) {
     mutationFn: async input => {
       const fingerprint = mergeIntentFingerprint(scope, input);
       const operationKey = mergeOperationKey(fingerprint);
+      if (operationKey === null) {
+        // The store keeps only unresolved intents and never evicts one to make
+        // room, so it refuses a new intent once it is full. Sending anyway would
+        // give the write no ledger identity to dedupe a retry against.
+        throw new Error(i18n.t('prReview.merge.couldNotMerge'));
+      }
       try {
         const result =
           scope.ref.platform === 'github'

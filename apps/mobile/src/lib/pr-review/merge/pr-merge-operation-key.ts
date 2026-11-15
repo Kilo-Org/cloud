@@ -15,12 +15,16 @@ import { createRetainedOperationKeys } from '@/lib/operation-key-store';
 
 const keys = createRetainedOperationKeys(() => Crypto.randomUUID());
 
-/** The key for a merge intent, stable across mounts until the intent retires. */
-export function mergeOperationKey(fingerprint: string): string {
+/**
+ * The key for a merge intent, stable across mounts until the intent retires.
+ * `null` means the store is full of unresolved merge intents and refused this
+ * new one, so the caller must not send the write.
+ */
+export function mergeOperationKey(fingerprint: string): string | null {
   return keys.getKey(fingerprint);
 }
 
-/** Retires one merge intent after an authoritative outcome. */
+/** Retires one merge intent after an authoritative outcome of its own request. */
 export function retireMergeOperationKey(fingerprint: string, operationKey: string): void {
   keys.retireKey(fingerprint, operationKey);
 }

@@ -569,14 +569,17 @@ describe('issueAdmissionChallenge', () => {
     );
   });
 
-  test('refuses a request whose limiter answer is a block', async () => {
+  test('refuses a request whose limiter answer is a block and reports it', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: true, error: 'blocked' });
 
     await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
       ChallengeRateLimitError
     );
     expect(db.insert).not.toHaveBeenCalled();
-    expect(mockCaptureMessage).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'native-admission-challenge' could not be evaluated",
+      { level: 'error', tags: { source: 'native_admission_challenge' } }
+    );
   });
 
   test('refuses any limiter answer that does not permit the caller', async () => {

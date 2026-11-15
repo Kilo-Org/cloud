@@ -184,6 +184,8 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
 - Settle async work by its own request identity, never by a shared attribute such as a product id or a name.
 - When an outcome cannot be tied to one request, keep the safe state and give the person an explicit way out. Never leave a state with no exit.
+- Scope a barrier to the account or identity that created it. Release it only on an authoritative outcome or the person's informed consent.
+- Progress UI ends when its own work ends. It never waits for an outcome to be attributed.
 - Retire retained state only when its identity still matches. At capacity, refuse new entries; never evict an unresolved one.
 - A regression test must fail on the code before the fix. Prove that once before the fix lands.
 

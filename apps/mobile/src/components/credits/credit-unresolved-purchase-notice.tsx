@@ -25,6 +25,14 @@ const WARNING_KEYS = {
   'terminal-refusal': 'credits.unresolvedPurchaseRefused',
 } as const satisfies Record<CreditPurchaseResolution, string>;
 
+/** Every variant the notice can paint, in the order the reserve lays them out. */
+export const CREDIT_PURCHASE_RESOLUTIONS = [
+  'unknown',
+  'found',
+  'not-found',
+  'terminal-refusal',
+] as const satisfies readonly CreditPurchaseResolution[];
+
 type CreditUnresolvedPurchaseNoticeProps = {
   /** What the store holds for the earlier request, which picks the copy. */
   resolution: CreditPurchaseResolution;
@@ -151,22 +159,26 @@ export function CreditUnresolvedPurchaseNotice({
       <View testID="credit-unresolved-purchase-slot">
         <View
           accessibilityElementsHidden
-          className="opacity-0"
+          className="flex-row overflow-hidden opacity-0"
           importantForAccessibility="no-hide-descendants"
           pointerEvents="none"
           testID="credit-unresolved-purchase-reserve"
         >
-          <NoticeCopy
-            announce={false}
-            actionsDisabled={actionsDisabled}
-            buyAgainFirst={buyAgainFirst}
-            onBuyAgain={onBuyAgain}
-            onReconcile={onReconcile}
-            packLabel={packLabel}
-            priceLabel={priceLabel}
-            showBuyAgain
-            warning={t(WARNING_KEYS[resolution])}
-          />
+          {CREDIT_PURCHASE_RESOLUTIONS.map(candidate => (
+            <View key={candidate} className="w-full shrink-0">
+              <NoticeCopy
+                announce={false}
+                actionsDisabled={actionsDisabled}
+                buyAgainFirst={buyAgainFirst}
+                onBuyAgain={onBuyAgain}
+                onReconcile={onReconcile}
+                packLabel={packLabel}
+                priceLabel={priceLabel}
+                showBuyAgain
+                warning={t(WARNING_KEYS[candidate])}
+              />
+            </View>
+          ))}
         </View>
         <View className="absolute inset-0" testID="credit-unresolved-purchase-live">
           <NoticeCopy

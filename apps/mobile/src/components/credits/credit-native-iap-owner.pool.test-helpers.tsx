@@ -44,10 +44,12 @@ export const store = nativeWorld;
 
 vi.mock('expo-crypto', () => {
   let sequence = 0;
-  return { randomUUID: () => {
-    sequence += 1;
-    return `pooled-intent-${String(sequence)}`;
-  } };
+  return {
+    randomUUID: () => {
+      sequence += 1;
+      return `pooled-intent-${String(sequence)}`;
+    },
+  };
 });
 vi.mock('expo-iap', () => ({
   ErrorCode: {
@@ -69,7 +71,9 @@ vi.mock('expo-iap', () => ({
   },
 }));
 vi.mock('react-native', () => ({ Platform: { OS: 'android' } }));
-vi.mock('@/lib/iap/pending-store-purchases', () => ({ fetchPendingStorePurchases: nativeWorld.lookup }));
+vi.mock('@/lib/iap/pending-store-purchases', () => ({
+  fetchPendingStorePurchases: nativeWorld.lookup,
+}));
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: async (scope: string, key: string) => {
     await Promise.resolve();
@@ -81,16 +85,20 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   },
   removeItemIfValue: async (scope: string, key: string, value: string) => {
     await Promise.resolve();
-    return store.storage.get(`${scope}:${key}`) === value && store.storage.delete(`${scope}:${key}`);
+    return (
+      store.storage.get(`${scope}:${key}`) === value && store.storage.delete(`${scope}:${key}`)
+    );
   },
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutateAsync: store.complete }),
-  useQuery: () => ({ data: {
-    appAccountToken: 'pooled-fake-account',
-    products: [{ appleProductId: 'credits.fake.apple', googleProductId: 'credits_fake_play' }],
-  } }),
+  useQuery: () => ({
+    data: {
+      appAccountToken: 'pooled-fake-account',
+      products: [{ appleProductId: 'credits.fake.apple', googleProductId: 'credits_fake_play' }],
+    },
+  }),
   useQueryClient: () => ({ invalidateQueries: store.invalidate }),
 }));
 vi.mock('@/lib/trpc', () => ({
@@ -108,7 +116,11 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 export const pack: StoreCreditProduct = {
-  backend: { amountUsd: 10, appleProductId: 'credits.fake.apple', googleProductId: 'credits_fake_play' },
+  backend: {
+    amountUsd: 10,
+    appleProductId: 'credits.fake.apple',
+    googleProductId: 'credits_fake_play',
+  },
   storeProductId: 'credits_fake_play',
   displayPrice: '$10',
 };
@@ -171,7 +183,9 @@ export async function mountPoolOwner(): Promise<PoolOwner> {
   const handle: Handle = { value: null };
   const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
   await act(async () => {
-    holder.renderer = TestRenderer.create(createElement(CreditNativeIapOwner, null, createElement(Probe, { handle })));
+    holder.renderer = TestRenderer.create(
+      createElement(CreditNativeIapOwner, null, createElement(Probe, { handle }))
+    );
     await Promise.resolve();
   });
   if (!holder.renderer) {
@@ -189,7 +203,9 @@ export function ownerValue(owner: PoolOwner): CreditNativeIapContextValue {
 export async function flushPool(): Promise<void> {
   await act(async () => {
     const turn = Promise.withResolvers<undefined>();
-    setImmediate(() => { turn.resolve(undefined); });
+    setImmediate(() => {
+      turn.resolve(undefined);
+    });
     await turn.promise;
   });
 }

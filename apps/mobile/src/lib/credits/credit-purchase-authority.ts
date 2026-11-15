@@ -1,10 +1,7 @@
 import { z } from 'zod';
 
 import { getItem, setItem } from '@/lib/persist/encrypted-kv';
-import {
-  type CreditPurchaseIntent,
-  ownsCreditPurchaseIntent,
-} from './credit-purchase-intent';
+import { type CreditPurchaseIntent, ownsCreditPurchaseIntent } from './credit-purchase-intent';
 
 const SCOPE = 'credit-purchase';
 const HISTORY_KEY = 'uncertain-native-history';

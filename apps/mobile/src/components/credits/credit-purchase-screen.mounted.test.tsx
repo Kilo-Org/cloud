@@ -1437,6 +1437,35 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('hydration: the pack rows and the status region wait for the admission read', async () => {
+    owner.purchaseHydration = 'loading';
+    owner.hasUnresolvedPurchase = true;
+
+    const { renderer, queryClient, unmount } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await settleCatalog(queryClient);
+
+    // The catalog is answered, yet the final purchase layout stays hidden: a
+    // row shown first could take a charge before admission is known.
+    expect(packRows(renderer)).toHaveLength(0);
+    expect(placeholderShells(renderer)).toHaveLength(4);
+    expect(statusRegion(renderer)).toBeUndefined();
+    expect(testId(renderer.root, 'credit-unresolved-purchase')).toBeUndefined();
+
+    owner.purchaseHydration = 'ready';
+    await act(async () => {
+      redraw(renderer, queryClient);
+      await Promise.resolve();
+    });
+    await waitFor(() => packRows(renderer).length === 4);
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
+    expect(statusRegion(renderer)).toBeDefined();
+    unmount();
+  });
+
   it('hydration failed: the status region retries without a pack and exposes no row', async () => {
     owner.purchaseHydration = 'failed';
 

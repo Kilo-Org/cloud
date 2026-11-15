@@ -1,8 +1,9 @@
-import type {
-  DispatchPushInput,
-  DispatchPushOutcome,
-  InternalDispatchRequest,
-  PerRecipientResult,
+import {
+  genericPushContentForPushData,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+  type InternalDispatchRequest,
+  type PerRecipientResult,
 } from '@kilocode/notifications';
 
 import {
@@ -61,8 +62,13 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         agentBriefing: { localDate: input.localDate, expiresAt: input.expiresAt },
         badge: null,
         push: {
-          title: 'Kilo',
-          body: 'Active agents have an update',
+          // The catalog-backed generic copy for this data type. The channel DO
+          // replaces both fields for `agent_briefing`, so this only has to agree
+          // with `push-copy.ts`, which it does by reading the same source.
+          ...genericPushContentForPushData(
+            { type: 'agent_briefing', url: '/agent-briefing' },
+            'en'
+          ),
           data: { type: 'agent_briefing', url: '/agent-briefing' },
           sound: 'default',
           priority: 'default',

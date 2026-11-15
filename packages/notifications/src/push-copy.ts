@@ -1,21 +1,30 @@
 import { translatePush } from './i18n';
+import en from './locales/en.json';
 import { type PushData } from './push-data';
 
-type GenericBodyCopy = { key: string; fallback: string };
+/**
+ * The catalog key and the English sentence of one generic body. The key is
+ * derived from the catalog itself, so a body `en.json` does not define is a
+ * compile error, and the sentence is written only in `en.json`.
+ */
+type GenericBodyCopy = {
+  key: `generic.body.${keyof typeof en.generic.body}`;
+  fallback: string;
+};
 
 // Both session variants show one body: the session_live_update carrier is
 // data-only (the app draws that notification), and neither variant may show the
 // session title.
 const SESSION_UPDATE_BODY: GenericBodyCopy = {
   key: 'generic.body.cloudAgentSession',
-  fallback: 'Your agent session has an update',
+  fallback: en.generic.body.cloudAgentSession,
 };
 
 // Generic, count-free lock-screen banner copy: the ongoing notification never
 // leaks how many agents are running or which sessions they are.
 const ACTIVE_AGENTS_BODY: GenericBodyCopy = {
   key: 'generic.body.activeAgentsGlanceable',
-  fallback: 'Active agents have an update',
+  fallback: en.generic.body.activeAgentsGlanceable,
 };
 
 /**
@@ -27,33 +36,33 @@ const GENERIC_BODY_BY_TYPE: Record<PushData['type'], GenericBodyCopy> = {
   session_live_update: SESSION_UPDATE_BODY,
   'chat.message': {
     key: 'generic.body.chatMessage',
-    fallback: 'You have a new message',
+    fallback: en.generic.body.chatMessage,
   },
   'instance-lifecycle': {
     key: 'generic.body.instanceLifecycle',
-    fallback: 'Your instance has an update',
+    fallback: en.generic.body.instanceLifecycle,
   },
   'scheduled-action': {
     key: 'generic.body.scheduledAction',
-    fallback: 'A scheduled action has an update',
+    fallback: en.generic.body.scheduledAction,
   },
   low_balance: {
     key: 'generic.body.lowBalance',
-    fallback: 'Your balance needs attention',
+    fallback: en.generic.body.lowBalance,
   },
   spend_alert: {
     key: 'generic.body.spendAlert',
-    fallback: 'Your spend needs attention',
+    fallback: en.generic.body.spendAlert,
   },
   security_finding: {
     key: 'generic.body.securityFinding',
-    fallback: 'A security finding needs attention',
+    fallback: en.generic.body.securityFinding,
   },
   // A status change (analysis finished, remediation queued, …) is not an
   // outstanding finding, so it must not reuse the finding body.
   security_lifecycle: {
     key: 'generic.body.securityUpdate',
-    fallback: 'A security check has an update',
+    fallback: en.generic.body.securityUpdate,
   },
   agent_briefing: ACTIVE_AGENTS_BODY,
   active_agents_glanceable: ACTIVE_AGENTS_BODY,
@@ -77,7 +86,7 @@ export function genericPushContentForPushData(
   // only the body's key and fallback differ.
   const body = GENERIC_BODY_BY_TYPE[data.type];
   return {
-    title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+    title: translatePush(locale, 'generic.title', undefined, en.generic.title),
     body: translatePush(locale, body.key, undefined, body.fallback),
   };
 }

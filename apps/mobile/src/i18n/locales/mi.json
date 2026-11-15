@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Kōwhiria he putunga waehere hei tīmata.",
       "enterPromptToStart": "Tāpirihia he tono hei tīmata.",
       "enterPromptOrFileToStart": "Tāpirihia he tono, he kōnae rānei hei tīmata.",
+      "profileLoadingToStart": "Kei te utaina tonu te kōtaha. Me tatari mō tētahi wā, kātahi ka ngana anō.",
       "connectProviderToStart": "Ka puta mai ngā putunga waehere i tētahi pūkete kua hono GitHub, GitLab, rānei Bitbucket.",
       "promptPlaceholder": "He aha tāu e hiahia ana ki te mahi?",
       "couldNotLoadModels": "Kāore i taea te uta i ngā tauira.",

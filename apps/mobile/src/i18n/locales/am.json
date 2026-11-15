@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "ለመጀመር ማከማቻ ይምረጡ።",
       "enterPromptToStart": "ለመጀመር ትዕዛዝ ያክሉ።",
       "enterPromptOrFileToStart": "ለመጀመር ትዕዛዝ ወይም ፋይል ያክሉ።",
+      "profileLoadingToStart": "መገለጫ አሁንም በመጫን ላይ ነው። አፍታ ይጠብቁ እና እንደገና ይሞክሩ።",
       "connectProviderToStart": "ማከማቻዎች ከተገናኘ GitHub፣ GitLab ወይም Bitbucket መለያ ይመጣሉ።",
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",

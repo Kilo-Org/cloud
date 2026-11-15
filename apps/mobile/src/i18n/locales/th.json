@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "เลือกคลังโค้ดเพื่อเริ่มต้น",
       "enterPromptToStart": "เพิ่มพรอมป์ตเพื่อเริ่มต้น",
       "enterPromptOrFileToStart": "เพิ่มพรอมป์ตหรือไฟล์เพื่อเริ่มต้น",
+      "profileLoadingToStart": "ยังโหลดโปรไฟล์ไม่เสร็จ รอสักครู่แล้วลองอีกครั้ง",
       "connectProviderToStart": "คลังโค้ดจะมาจากบัญชี GitHub, GitLab หรือ Bitbucket ที่เชื่อมต่ออยู่",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",

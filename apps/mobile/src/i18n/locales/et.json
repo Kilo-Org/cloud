@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Alustamiseks vali hoidla.",
       "enterPromptToStart": "Alustamiseks lisa viip.",
       "enterPromptOrFileToStart": "Alustamiseks lisa viip või fail.",
+      "profileLoadingToStart": "Profiili laadimine kestab veel. Oota hetk ja proovi uuesti.",
       "connectProviderToStart": "Hoidlad pärinevad ühendatud GitHubi, GitLabi või Bitbucketi kontost.",
       "promptPlaceholder": "Mille kallal tahaksid töötada?",
       "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",

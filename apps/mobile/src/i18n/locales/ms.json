@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Pilih repositori untuk bermula.",
       "enterPromptToStart": "Tambahkan prompt untuk bermula.",
       "enterPromptOrFileToStart": "Tambahkan prompt atau fail untuk bermula.",
+      "profileLoadingToStart": "Profil masih dimuatkan. Tunggu sebentar dan cuba lagi.",
       "connectProviderToStart": "Repositori datang daripada akaun GitHub, GitLab atau Bitbucket yang disambungkan.",
       "promptPlaceholder": "Apa yang ingin anda usahakan?",
       "couldNotLoadModels": "Tidak dapat memuatkan model.",

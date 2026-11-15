@@ -1660,6 +1660,7 @@
       "selectRepositoryToStart": "Selecciona un repositorio para empezar.",
       "enterPromptToStart": "Añade un prompt para empezar.",
       "enterPromptOrFileToStart": "Añade un prompt o un archivo para empezar.",
+      "profileLoadingToStart": "El perfil aún se está cargando. Espera un momento y vuelve a intentarlo.",
       "connectProviderToStart": "Los repositorios provienen de una cuenta conectada de GitHub, GitLab o Bitbucket.",
       "promptPlaceholder": "¿En qué te gustaría trabajar?",
       "couldNotLoadModels": "No se pudieron cargar los modelos.",

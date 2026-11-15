@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Изберете репозиториум за да започнете.",
       "enterPromptToStart": "Додадете упат за да започнете.",
       "enterPromptOrFileToStart": "Додадете упат или датотека за да започнете.",
+      "profileLoadingToStart": "Профилот сè уште се вчитува. Почекајте еден момент и обидете се повторно.",
       "connectProviderToStart": "Репозиториумите доаѓаат од поврзана сметка на GitHub, GitLab или Bitbucket.",
       "promptPlaceholder": "На што сакаш да работиш?",
       "couldNotLoadModels": "Не успеа вчитувањето на моделите.",

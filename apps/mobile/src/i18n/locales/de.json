@@ -1642,6 +1642,7 @@
       "selectRepositoryToStart": "Wähle ein Repository aus, um zu starten.",
       "enterPromptToStart": "Füge einen Prompt hinzu, um zu starten.",
       "enterPromptOrFileToStart": "Füge einen Prompt oder eine Datei hinzu, um zu starten.",
+      "profileLoadingToStart": "Das Profil wird noch geladen. Warte einen Moment und versuche es dann erneut.",
       "connectProviderToStart": "Repositorys stammen aus einem verbundenen GitHub-, GitLab- oder Bitbucket-Konto.",
       "promptPlaceholder": "Woran möchtest du arbeiten?",
       "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",

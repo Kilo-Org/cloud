@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Válassz egy adattárat az indításhoz.",
       "enterPromptToStart": "Adj hozzá egy promptot az indításhoz.",
       "enterPromptOrFileToStart": "Adj hozzá egy promptot vagy egy fájlt az indításhoz.",
+      "profileLoadingToStart": "A profil betöltése még folyamatban van. Várj egy pillanatot, és próbáld újra.",
       "connectProviderToStart": "Az adattárak egy csatlakoztatott GitHub-, GitLab- vagy Bitbucket-fiókból származnak.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",

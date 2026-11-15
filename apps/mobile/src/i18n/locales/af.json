@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Kies 'n bewaarplek om te begin.",
       "enterPromptToStart": "Voeg 'n opdrag by om te begin.",
       "enterPromptOrFileToStart": "Voeg 'n opdrag of 'n lêer by om te begin.",
+      "profileLoadingToStart": "Profiel laai nog. Wag 'n oomblik en probeer weer.",
       "connectProviderToStart": "Bewaarplekke kom van 'n gekoppelde GitHub-, GitLab- of Bitbucket-rekening af.",
       "promptPlaceholder": "Waaraan wil jy werk?",
       "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",

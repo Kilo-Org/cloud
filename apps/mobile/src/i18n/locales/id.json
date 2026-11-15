@@ -1642,6 +1642,7 @@
       "selectRepositoryToStart": "Pilih repositori untuk memulai.",
       "enterPromptToStart": "Tambahkan prompt untuk memulai.",
       "enterPromptOrFileToStart": "Tambahkan prompt atau file untuk memulai.",
+      "profileLoadingToStart": "Profil masih dimuat. Tunggu sebentar dan coba lagi.",
       "connectProviderToStart": "Repositori berasal dari akun GitHub, GitLab, atau Bitbucket yang terhubung.",
       "promptPlaceholder": "Apa yang ingin kamu kerjakan?",
       "couldNotLoadModels": "Tidak dapat memuat model.",

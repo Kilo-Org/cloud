@@ -2226,6 +2226,7 @@
       "selectRepositoryToStart": "Odaberi repozitorij za početak.",
       "enterPromptToStart": "Dodaj upit za početak.",
       "enterPromptOrFileToStart": "Dodaj upit ili datoteku za početak.",
+      "profileLoadingToStart": "Profil se još učitava. Sačekaj trenutak i pokušaj ponovo.",
       "connectProviderToStart": "Repozitoriji dolaze iz povezanog GitHub, GitLab ili Bitbucket naloga.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",

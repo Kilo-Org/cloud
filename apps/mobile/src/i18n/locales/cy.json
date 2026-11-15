@@ -2349,6 +2349,7 @@
       "selectRepositoryToStart": "Dewiswch ystorfa i ddechrau.",
       "enterPromptToStart": "Ychwanegwch annogiad i ddechrau.",
       "enterPromptOrFileToStart": "Ychwanegwch annogiad neu ffeil i ddechrau.",
+      "profileLoadingToStart": "Mae'r proffil yn dal i lwytho. Arhoswch eiliad a cheisiwch eto.",
       "connectProviderToStart": "Mae ystorfeydd yn dod o gyfrif GitHub, GitLab neu Bitbucket wedi'i gysylltu.",
       "promptPlaceholder": "Ar beth hoffech chi weithio?",
       "couldNotLoadModels": "Methu llwytho'r modelau.",

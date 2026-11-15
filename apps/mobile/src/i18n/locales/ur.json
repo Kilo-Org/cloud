@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
       "enterPromptToStart": "شروع کرنے کے لیے ایک پرومپٹ شامل کریں۔",
       "enterPromptOrFileToStart": "شروع کرنے کے لیے ایک پرومپٹ یا فائل شامل کریں۔",
+      "profileLoadingToStart": "پروفائل ابھی لوڈ ہو رہی ہے۔ ایک لمحہ انتظار کریں اور دوبارہ کوشش کریں۔",
       "connectProviderToStart": "ریپوزٹریاں منسلک GitHub، GitLab یا Bitbucket اکاؤنٹ سے آتی ہیں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",

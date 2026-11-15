@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "بۆ دەستپێکردن کۆگایەک هەڵبژێرە.",
       "enterPromptToStart": "بۆ دەستپێکردن پرۆمپتێک زیاد بکە.",
       "enterPromptOrFileToStart": "بۆ دەستپێکردن پرۆمپتێک یان فایلێک زیاد بکە.",
+      "profileLoadingToStart": "پڕۆفایل هێشتا بار دەکرێت. کەمێک چاوەڕوان بە و دووبارە هەوڵ بدەرەوە.",
       "connectProviderToStart": "کۆگاکان لە هەژمارێکی GitHub، GitLab، یان Bitbucket کە بەستراوەتەوە، دێن.",
       "promptPlaceholder": "حەز دەکەیت لەسەر چی کار بکەیت؟",
       "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن.",

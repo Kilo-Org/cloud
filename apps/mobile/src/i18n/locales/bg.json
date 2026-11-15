@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Избери хранилище, за да започнеш.",
       "enterPromptToStart": "Добави заявка, за да започнеш.",
       "enterPromptOrFileToStart": "Добави заявка или файл, за да започнеш.",
+      "profileLoadingToStart": "Профилът все още се зарежда. Изчакай малко и опитай отново.",
       "connectProviderToStart": "Хранилищата идват от свързан акаунт в GitHub, GitLab или Bitbucket.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",

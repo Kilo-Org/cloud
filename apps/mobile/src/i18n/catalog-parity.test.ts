@@ -38,15 +38,13 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * and the `/` suggestion list's skill-row keys
  * (`agentChat.slashCommands.skillBadge` and
  * `agentChat.slashCommands.useSkillCommand`, added by
- * `slash-command-suggestions.tsx`), and the `credits.*` keys of the Buy
- * credits screen have all landed in every catalog, so the missing-key
- * assertion is strict again.
- *
- * `agentChat.newSession.profileLoadingToStart` is the only tracked absence: the
- * new-session footer names a still-loading profile so a disabled Start is
- * never silent, and only the translation slice may write the other catalogs.
+ * `slash-command-suggestions.tsx`), the `credits.*` keys of the Buy credits
+ * screen, and the new-session footer's still-loading profile message
+ * (`agentChat.newSession.profileLoadingToStart`, so a disabled Start is never
+ * silent) have all landed in every catalog, so the missing-key assertion is
+ * strict again and nothing is pending.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>(['agentChat.newSession.profileLoadingToStart']);
+const PENDING_TRANSLATION_KEYS = new Set<string>();
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Hautatu biltegi bat hasteko.",
       "enterPromptToStart": "Gehitu eskaera bat hasteko.",
       "enterPromptOrFileToStart": "Gehitu eskaera bat edo fitxategi bat hasteko.",
+      "profileLoadingToStart": "Profila oraindik kargatzen ari da. Itxaron une bat eta saiatu berriro.",
       "connectProviderToStart": "Biltegiak konektatuta dagoen GitHub, GitLab edo Bitbucket kontu batetik datoz.",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
       "couldNotLoadModels": "Ezin izan dira modeloak kargatu.",

@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Бастау үшін репозиторий таңдаңыз.",
       "enterPromptToStart": "Бастау үшін сұрау қосыңыз.",
       "enterPromptOrFileToStart": "Бастау үшін сұрау немесе файл қосыңыз.",
+      "profileLoadingToStart": "Профиль әлі жүктелуде. Сәл күте тұрып, қайталап көріңіз.",
       "connectProviderToStart": "Репозиторийлер қосылған GitHub, GitLab немесе Bitbucket тіркелгісінен келеді.",
       "promptPlaceholder": "Немен жұмыс істегіңіз келеді?",
       "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",

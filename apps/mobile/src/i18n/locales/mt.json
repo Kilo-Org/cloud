@@ -2308,6 +2308,7 @@
       "selectRepositoryToStart": "Agħżel repożitorju biex tibda.",
       "enterPromptToStart": "Żid prompt biex tibda.",
       "enterPromptOrFileToStart": "Żid prompt jew fajl biex tibda.",
+      "profileLoadingToStart": "Il-profil għadu qed jitgħabba. Stenna ftit u erġa' pprova.",
       "connectProviderToStart": "Ir-repożitorji jiġu minn kont imqabbad GitHub, GitLab jew Bitbucket.",
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",

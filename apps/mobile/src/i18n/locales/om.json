@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Jalqabuuf kuusaa koodii filadhu.",
       "enterPromptToStart": "Jalqabuuf gaaffii dabaladhu.",
       "enterPromptOrFileToStart": "Jalqabuuf gaaffii ykn faayilii dabaladhu.",
+      "profileLoadingToStart": "Proofaayiliin ammas fe'amaa jira. Yeroo gabaabaa eegii irra deebi'ii yaali.",
       "connectProviderToStart": "Kuusaawwan koodii herrega GitHub, GitLab yookiin Bitbucket walqabate irraa dhufu.",
       "promptPlaceholder": "Maal irratti hojjechuu barbaadda?",
       "couldNotLoadModels": "Moodeloota fe'uu hin danda'amne.",

@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
       "enterPromptToStart": "Lägg till en uppmaning för att starta.",
       "enterPromptOrFileToStart": "Lägg till en uppmaning eller en fil för att starta.",
+      "profileLoadingToStart": "Profilen läses fortfarande in. Vänta ett ögonblick och försök igen.",
       "connectProviderToStart": "Kodarkiv kommer från ett anslutet GitHub-, GitLab- eller Bitbucket-konto.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",

@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Pumili ng imbakan ng code para magsimula.",
       "enterPromptToStart": "Magdagdag ng prompt para magsimula.",
       "enterPromptOrFileToStart": "Magdagdag ng prompt o file para magsimula.",
+      "profileLoadingToStart": "Nilo-load pa ang propayl. Maghintay sandali at subukan ulit.",
       "connectProviderToStart": "Nagmumula ang mga imbakan ng code sa isang konektadong akawnt sa GitHub, GitLab, o Bitbucket.",
       "promptPlaceholder": "Ano ang gusto mong gawin?",
       "couldNotLoadModels": "Hindi ma-load ang mga modelo.",

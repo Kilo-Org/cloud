@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Safidio ny tahirin-kaody hanombohana.",
       "enterPromptToStart": "Ampio baiko hanombohana.",
       "enterPromptOrFileToStart": "Ampio baiko na rakitra hanombohana.",
+      "profileLoadingToStart": "Mbola ampidirina ny mombamomba. Miandrasa kely dia andramo indray.",
       "connectProviderToStart": "Avy amin'ny kaonty GitHub, GitLab na Bitbucket voampifandraisina ny tahirin-kaody.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",

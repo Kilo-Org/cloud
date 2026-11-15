@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Սկսելու համար ընտրեք պահոց։",
       "enterPromptToStart": "Սկսելու համար ավելացրեք հուշում։",
       "enterPromptOrFileToStart": "Սկսելու համար ավելացրեք հուշում կամ ֆայլ։",
+      "profileLoadingToStart": "Պրոֆիլը դեռ բեռնվում է։ Սպասեք մի պահ և նորից փորձեք։",
       "connectProviderToStart": "Պահոցները գալիս են միացված GitHub, GitLab կամ Bitbucket հաշվից։",
       "promptPlaceholder": "Ինչի՞ վրա եք ուզում աշխատել",
       "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",

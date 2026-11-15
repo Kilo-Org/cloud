@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
       "enterPromptToStart": "برای شروع یک پرامپت اضافه کنید.",
       "enterPromptOrFileToStart": "برای شروع یک پرامپت یا فایل اضافه کنید.",
+      "profileLoadingToStart": "پروفایل هنوز در حال بارگذاری است. لحظه‌ای صبر کنید و دوباره تلاش کنید.",
       "connectProviderToStart": "مخزن‌ها از یک حساب GitHub، GitLab یا Bitbucket که اتصالش برقرار است می‌آیند.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",

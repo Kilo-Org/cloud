@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Vælg et kodelager for at starte.",
       "enterPromptToStart": "Tilføj en prompt for at starte.",
       "enterPromptOrFileToStart": "Tilføj en prompt eller en fil for at starte.",
+      "profileLoadingToStart": "Profilen indlæses stadig. Vent et øjeblik, og prøv igen.",
       "connectProviderToStart": "Kodelagre kommer fra en tilknyttet GitHub-, GitLab- eller Bitbucket-konto.",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",

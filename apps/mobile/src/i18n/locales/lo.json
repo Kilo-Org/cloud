@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເລືອກຄັງໂຄດ.",
       "enterPromptToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເພີ່ມຄຳສັ່ງ.",
       "enterPromptOrFileToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເພີ່ມຄຳສັ່ງ ຫຼືໄຟລ໌.",
+      "profileLoadingToStart": "ໂປຣໄຟລ໌ຍັງກຳລັງໂຫຼດ. ລໍຖ້າຈັກໜ້ອຍໜຶ່ງ ແລ້ວລອງໃໝ່.",
       "connectProviderToStart": "ຄັງໂຄດມາຈາກບັນຊີ GitHub, GitLab ຫຼື Bitbucket ທີ່ເຊື່ອມຕໍ່ແລ້ວ.",
       "promptPlaceholder": "ຢາກເຮັດວຽກຫຍັງ?",
       "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",

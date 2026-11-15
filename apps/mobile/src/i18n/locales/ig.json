@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Họrọ ebe nchekwa koodu iji malite.",
       "enterPromptToStart": "Tinye iwu iji malite.",
       "enterPromptOrFileToStart": "Tinye iwu ma ọ bụ faịlụ iji malite.",
+      "profileLoadingToStart": "A ka na-ebudata profaịlụ. Chere ntakịrị ma nwaa ọzọ.",
       "connectProviderToStart": "Ebe nchekwa koodu na-abịa site na akaụntụ GitHub, GitLab, ma ọ bụ Bitbucket ejikọrọ.",
       "promptPlaceholder": "Gịnị ka ị chọrọ ịrụ ọrụ na ya?",
       "couldNotLoadModels": "Enweghị ike ibudata ihe nlereanya.",

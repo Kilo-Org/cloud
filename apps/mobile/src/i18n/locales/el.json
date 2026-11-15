@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Επίλεξε ένα αποθετήριο για να ξεκινήσεις.",
       "enterPromptToStart": "Πρόσθεσε μια οδηγία για να ξεκινήσεις.",
       "enterPromptOrFileToStart": "Πρόσθεσε μια οδηγία ή ένα αρχείο για να ξεκινήσεις.",
+      "profileLoadingToStart": "Το προφίλ φορτώνεται ακόμα. Περίμενε λίγο και προσπάθησε ξανά.",
       "connectProviderToStart": "Τα αποθετήρια προέρχονται από έναν συνδεδεμένο λογαριασμό GitHub, GitLab ή Bitbucket.",
       "promptPlaceholder": "Με τι θέλεις να ασχοληθείς;",
       "couldNotLoadModels": "Δεν ήταν δυνατή η φόρτωση των μοντέλων.",

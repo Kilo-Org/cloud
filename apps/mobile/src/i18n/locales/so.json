@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Dooro kayd si aad u bilowdo.",
       "enterPromptToStart": "Ku dar fariin si aad u bilowdo.",
       "enterPromptOrFileToStart": "Ku dar fariin ama fayl si aad u bilowdo.",
+      "profileLoadingToStart": "Profile-ka weli waa la soo rarayaa. Sug wax yar oo isku day mar kale.",
       "connectProviderToStart": "Kaydadka waxay ka yimaadaan akoon GitHub, GitLab ama Bitbucket oo la xiriiriyay.",
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",

@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
       "enterPromptToStart": "Başlamaq üçün prompt əlavə et.",
       "enterPromptOrFileToStart": "Başlamaq üçün prompt və ya fayl əlavə et.",
+      "profileLoadingToStart": "Profil hələ yüklənir. Bir az gözlə və yenidən cəhd et.",
       "connectProviderToStart": "Repozitoriyalar qoşulmuş GitHub, GitLab və ya Bitbucket hesabından gəlir.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",

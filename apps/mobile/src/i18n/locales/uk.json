@@ -1678,6 +1678,7 @@
       "selectRepositoryToStart": "Виберіть репозиторій, щоб почати.",
       "enterPromptToStart": "Додайте запит, щоб почати.",
       "enterPromptOrFileToStart": "Додайте запит або файл, щоб почати.",
+      "profileLoadingToStart": "Профіль ще завантажується. Зачекайте мить і спробуйте ще раз.",
       "connectProviderToStart": "Репозиторії беруться з підключеного облікового запису GitHub, GitLab або Bitbucket.",
       "promptPlaceholder": "Над чим хочете попрацювати?",
       "couldNotLoadModels": "Не вдалося завантажити моделі.",

@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Valitse koodivarasto aloittaaksesi.",
       "enterPromptToStart": "Lisää kehote aloittaaksesi.",
       "enterPromptOrFileToStart": "Lisää kehote tai tiedosto aloittaaksesi.",
+      "profileLoadingToStart": "Profiilia ladataan vielä. Odota hetki ja yritä uudelleen.",
       "connectProviderToStart": "Koodivarastot tulevat yhdistetystä GitHub-, GitLab- tai Bitbucket-tilistä.",
       "promptPlaceholder": "Mitä haluaisit tehdä?",
       "couldNotLoadModels": "Malleja ei voitu ladata.",

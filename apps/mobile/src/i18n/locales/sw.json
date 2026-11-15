@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Chagua hazina ili kuanza.",
       "enterPromptToStart": "Ongeza maelekezo ili kuanza.",
       "enterPromptOrFileToStart": "Ongeza maelekezo au faili ili kuanza.",
+      "profileLoadingToStart": "Wasifu bado unapakiwa. Subiri kidogo na ujaribu tena.",
       "connectProviderToStart": "Hazina zinatoka kwenye akaunti ya GitHub, GitLab au Bitbucket ambayo imeunganishwa.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",

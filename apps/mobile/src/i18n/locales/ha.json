@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Zaɓi ma'ajiya don farawa.",
       "enterPromptToStart": "Ƙara umarni don farawa.",
       "enterPromptOrFileToStart": "Ƙara umarni ko fayil don farawa.",
+      "profileLoadingToStart": "Har yanzu ana loda bayanin martaba. Jira ɗan lokaci ka sake gwadawa.",
       "connectProviderToStart": "Ma'ajiyoyi kan fito daga asusun GitHub, GitLab, ko Bitbucket da aka haɗa.",
       "promptPlaceholder": "Me kake so ka yi aiki a kai?",
       "couldNotLoadModels": "An kasa loda samfura.",

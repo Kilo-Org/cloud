@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "सुरु गर्नको लागि रिपोजिटरी छान्नुहोस्।",
       "enterPromptToStart": "सुरु गर्नको लागि प्रोम्प्ट थप्नुहोस्।",
       "enterPromptOrFileToStart": "सुरु गर्नको लागि प्रोम्प्ट वा फाइल थप्नुहोस्।",
+      "profileLoadingToStart": "प्रोफाइल अझै लोड हुँदै छ। एकछिन पर्खनुहोस् र फेरि प्रयास गर्नुहोस्।",
       "connectProviderToStart": "रिपोजिटरीहरू जडान भएको GitHub, GitLab वा Bitbucket खाताबाट आउँछन्।",
       "promptPlaceholder": "तपाईं केमा काम गर्न चाहनुहुन्छ?",
       "couldNotLoadModels": "मोडेलहरू लोड गर्न सकिएन।",

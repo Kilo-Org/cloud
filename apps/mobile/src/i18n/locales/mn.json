@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
       "enterPromptToStart": "Эхлэхийн тулд заавар нэмнэ үү.",
       "enterPromptOrFileToStart": "Эхлэхийн тулд заавар эсвэл файл нэмнэ үү.",
+      "profileLoadingToStart": "Профайл ачаалж дуусаагүй байна. Жаахан хүлээгээд дахин оролдоно уу.",
       "connectProviderToStart": "Кодын сан нь холбогдсон GitHub, GitLab эсвэл Bitbucket бүртгэлээс ирдэг.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",

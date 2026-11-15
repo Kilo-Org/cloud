@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "प्रारंभ करण्यासाठी रिपॉझिटरी निवडा.",
       "enterPromptToStart": "प्रारंभ करण्यासाठी प्रॉम्प्ट जोडा.",
       "enterPromptOrFileToStart": "प्रारंभ करण्यासाठी प्रॉम्प्ट किंवा फाइल जोडा.",
+      "profileLoadingToStart": "प्रोफाइल अजूनही लोड होत आहे. क्षणभर थांबा आणि पुन्हा प्रयत्न करा.",
       "connectProviderToStart": "रिपॉझिटरी कनेक्ट झालेल्या GitHub, GitLab किंवा Bitbucket खात्यातून येतात.",
       "promptPlaceholder": "तुम्हाला कशावर काम करायचे आहे?",
       "couldNotLoadModels": "मॉडेल लोड करता आली नाहीत.",

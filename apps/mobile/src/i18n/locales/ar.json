@@ -1714,6 +1714,7 @@
       "selectRepositoryToStart": "اختر مستودعًا للبدء.",
       "enterPromptToStart": "أضِف موجِّهًا للبدء.",
       "enterPromptOrFileToStart": "أضِف موجِّهًا أو ملفًا للبدء.",
+      "profileLoadingToStart": "لا يزال الملف الشخصي قيد التحميل. انتظر لحظة ثم حاول مرة أخرى.",
       "connectProviderToStart": "تأتي المستودعات من حساب مرتبط على GitHub أو GitLab أو Bitbucket.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",

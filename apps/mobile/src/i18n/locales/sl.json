@@ -2267,6 +2267,7 @@
       "selectRepositoryToStart": "Izberi skladišče za začetek.",
       "enterPromptToStart": "Dodaj poziv za začetek.",
       "enterPromptOrFileToStart": "Dodaj poziv ali datoteko za začetek.",
+      "profileLoadingToStart": "Profil se še nalaga. Počakaj trenutek in poskusi znova.",
       "connectProviderToStart": "Skladišča prihajajo iz povezanega računa GitHub, GitLab ali Bitbucket.",
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",

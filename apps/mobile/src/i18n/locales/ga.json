@@ -2308,6 +2308,7 @@
       "selectRepositoryToStart": "Roghnaigh stór chun tosú.",
       "enterPromptToStart": "Cuir leid leis chun tosú.",
       "enterPromptOrFileToStart": "Cuir leid nó comhad leis chun tosú.",
+      "profileLoadingToStart": "Tá an phróifíl fós á lódáil. Fan nóiméad agus triail arís.",
       "connectProviderToStart": "Tagann stórtha ó chuntas GitHub, GitLab nó Bitbucket atá ceangailte.",
       "promptPlaceholder": "Cad ar mhaith leat oibriú air?",
       "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",

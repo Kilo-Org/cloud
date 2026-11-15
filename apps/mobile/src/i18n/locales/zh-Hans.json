@@ -1642,6 +1642,7 @@
       "selectRepositoryToStart": "选择仓库以开始。",
       "enterPromptToStart": "添加提示词以开始。",
       "enterPromptOrFileToStart": "添加提示词或文件以开始。",
+      "profileLoadingToStart": "个人资料仍在加载中。请稍候，然后重试。",
       "connectProviderToStart": "仓库来自已连接的 GitHub、GitLab 或 Bitbucket 账户。",
       "promptPlaceholder": "你想完成什么任务？",
       "couldNotLoadModels": "无法加载模型。",

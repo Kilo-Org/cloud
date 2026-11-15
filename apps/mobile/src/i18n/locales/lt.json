@@ -2267,6 +2267,7 @@
       "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
       "enterPromptToStart": "Norėdami pradėti, pridėkite užklausą.",
       "enterPromptOrFileToStart": "Norėdami pradėti, pridėkite užklausą arba failą.",
+      "profileLoadingToStart": "Profilis dar įkeliamas. Palaukite akimirką ir bandykite dar kartą.",
       "connectProviderToStart": "Saugyklos gaunamos iš susietos GitHub, GitLab arba Bitbucket paskyros.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",

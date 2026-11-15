@@ -1660,6 +1660,7 @@
       "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
       "enterPromptToStart": "הוסף פרומפט כדי להתחיל.",
       "enterPromptOrFileToStart": "הוסף פרומפט או קובץ כדי להתחיל.",
+      "profileLoadingToStart": "הפרופיל עדיין נטען. המתן רגע ונסה שוב.",
       "connectProviderToStart": "מאגרים מגיעים מחשבון מחובר של GitHub, GitLab או Bitbucket.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",

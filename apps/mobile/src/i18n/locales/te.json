@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "ప్రారంభించడానికి రిపోజిటరీని ఎంచుకోండి.",
       "enterPromptToStart": "ప్రారంభించడానికి ఒక ప్రాంప్ట్‌ను జోడించండి.",
       "enterPromptOrFileToStart": "ప్రారంభించడానికి ఒక ప్రాంప్ట్‌ను లేదా ఫైల్‌ను జోడించండి.",
+      "profileLoadingToStart": "ప్రొఫైల్ ఇంకా లోడ్ అవుతోంది. కొంచెం సేపు ఆగి మళ్లీ ప్రయత్నించండి.",
       "connectProviderToStart": "రిపోజిటరీలు కనెక్ట్ అయిన GitHub, GitLab లేదా Bitbucket ఖాతా నుండి వస్తాయి.",
       "promptPlaceholder": "మీరు దేనిపై పని చేయాలనుకుంటున్నారు?",
       "couldNotLoadModels": "మోడళ్లను లోడ్ చేయలేకపోయాము.",

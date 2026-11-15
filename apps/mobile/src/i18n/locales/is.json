@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "Veldu kóðasafn til að byrja.",
       "enterPromptToStart": "Bættu við skipun til að byrja.",
       "enterPromptOrFileToStart": "Bættu við skipun eða skrá til að byrja.",
+      "profileLoadingToStart": "Enn er verið að hlaða prófílnum. Bíddu aðeins og reyndu aftur.",
       "connectProviderToStart": "Kóðasöfn koma frá tengdum reikningi á GitHub, GitLab eða Bitbucket.",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",

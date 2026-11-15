@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "શરૂ કરવા માટે રિપોઝિટરી પસંદ કરો.",
       "enterPromptToStart": "શરૂ કરવા માટે એક પ્રોમ્પ્ટ ઉમેરો.",
       "enterPromptOrFileToStart": "શરૂ કરવા માટે પ્રોમ્પ્ટ કે ફાઇલ ઉમેરો.",
+      "profileLoadingToStart": "પ્રોફાઇલ હજી લોડ થઈ રહી છે. થોડી વાર રાહ જુઓ અને ફરી પ્રયાસ કરો.",
       "connectProviderToStart": "રિપોઝિટરીઓ કનેક્ટ થયું GitHub, GitLab અથવા Bitbucket એકાઉન્ટમાંથી આવે છે.",
       "promptPlaceholder": "તમે શેના પર કામ કરવા માંગો છો?",
       "couldNotLoadModels": "મોડલ લોડ કરી શકાયાં નહીં.",

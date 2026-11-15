@@ -2267,6 +2267,7 @@
       "selectRepositoryToStart": "Vyberte repozitár, aby ste mohli začať.",
       "enterPromptToStart": "Pridajte prompt, aby ste mohli začať.",
       "enterPromptOrFileToStart": "Pridajte prompt alebo súbor, aby ste mohli začať.",
+      "profileLoadingToStart": "Profil sa ešte načítava. Chvíľu počkajte a skúste to znova.",
       "connectProviderToStart": "Repozitáre pochádzajú z pripojeného účtu GitHub, GitLab alebo Bitbucket.",
       "promptPlaceholder": "Na čom chceš pracovať?",
       "couldNotLoadModels": "Modely sa nepodarilo načítať.",

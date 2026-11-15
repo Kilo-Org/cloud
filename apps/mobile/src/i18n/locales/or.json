@@ -2185,6 +2185,7 @@
       "selectRepositoryToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
       "enterPromptToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ ଯୋଗ କରନ୍ତୁ।",
       "enterPromptOrFileToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ କିମ୍ବା ଫାଇଲ୍ ଯୋଗ କରନ୍ତୁ।",
+      "profileLoadingToStart": "ପ୍ରୋଫାଇଲ୍ ଏବେ ବି ଲୋଡ୍ ହେଉଛି। କିଛି ସମୟ ଅପେକ୍ଷା କରନ୍ତୁ ଏବଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "connectProviderToStart": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକ ଏକ ସଂଯୋଜିତ GitHub, GitLab କିମ୍ବା Bitbucket ଆକାଉଣ୍ଟରୁ ଆସନ୍ତି।",
       "promptPlaceholder": "କେଉଁ କାମ କରିବାକୁ ଚାହୁଁଛନ୍ତି?",
       "couldNotLoadModels": "ମଡେଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",

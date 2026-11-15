@@ -1678,6 +1678,7 @@
       "selectRepositoryToStart": "Wybierz repozytorium, aby rozpocząć.",
       "enterPromptToStart": "Dodaj prompt, aby rozpocząć.",
       "enterPromptOrFileToStart": "Dodaj prompt lub plik, aby rozpocząć.",
+      "profileLoadingToStart": "Profil jest nadal wczytywany. Poczekaj chwilę i spróbuj ponownie.",
       "connectProviderToStart": "Repozytoria pochodzą z połączonego konta GitHub, GitLab lub Bitbucket.",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",

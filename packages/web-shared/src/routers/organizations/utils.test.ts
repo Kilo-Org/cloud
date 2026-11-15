@@ -591,6 +591,7 @@ describe('binary support organization access', () => {
       webSessionId: writeSessionId,
       trpcPath,
       trpcType: 'mutation',
+      stepUpClaims: new Set<string>(),
     };
   }
 
@@ -865,17 +866,37 @@ describe('binary support organization access', () => {
     }
   });
 
-  test('one request claims a support write use once even when the resolver runs twice', async () => {
+  test('resolving organization access twice in one request', async () => {
     setSupportEnabled(true);
     const { organization, admin } = await orgAndAdmin();
     await approveWriteGrant(admin.id, organization.id);
-    const writeCtx = await writeCtxWithStepUp(admin, organization.id);
+    const middlewareCtx = await writeCtxWithStepUp(admin, organization.id);
+    const handlerCtx: TRPCContext = { ...middlewareCtx, organizationAccess: undefined };
 
     const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
     try {
-      await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
-      await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
+      await expect(ensureOrganizationAccess(middlewareCtx, organization.id)).resolves.toBe(
+        'admin'
+      );
+      await expect(ensureOrganizationAccess(handlerCtx, organization.id)).resolves.toBe('admin');
       expect(requireFreshSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+  });
+
+  test('resolving organization access in two requests', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await approveWriteGrant(admin.id, organization.id);
+    const firstCtx = await writeCtxWithStepUp(admin, organization.id);
+    const secondCtx = await writeCtxWithStepUp(admin, organization.id);
+
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(ensureOrganizationAccess(firstCtx, organization.id)).resolves.toBe('admin');
+      await expect(ensureOrganizationAccess(secondCtx, organization.id)).resolves.toBe('admin');
+      expect(requireFreshSpy).toHaveBeenCalledTimes(2);
     } finally {
       requireFreshSpy.mockRestore();
     }

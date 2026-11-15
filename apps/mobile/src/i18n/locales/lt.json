@@ -67,7 +67,7 @@
     "discardChangesMessage": "Jūsų pakeitimai bus prarasti.",
     "discardChangesTitle": "Atmesti pakeitimus?",
     "findings": "Problemos",
-    "mergeRequest": "merge request",
+    "mergeRequest": "sujungimo užklausa",
     "notConnected": "Neprijungta",
     "notifications": "Pranešimai",
     "pullRequest": "pakeitimų užklausa",
@@ -617,11 +617,11 @@
     },
     "connectionExpired": "Baigėsi GitHub prieigos galiojimas.",
     "merge": {
-      "merge": "Sujungimas",
+      "merge": "Sujungti",
       "mergeTitle": "Sujungimas",
       "mergeNow": "Sujungti dabar",
-      "mergePullRequest": "Pakeitimų užklausos sujungimas",
-      "mergeTermTitle": "Sujungti {{term}}",
+      "mergePullRequest": "Sujungti pakeitimų užklausą",
+      "mergeTermTitle": "Sujungti: {{term}}",
       "enableAutoMerge": "Įjungti automatinį sujungimą",
       "disableAutoMerge": "Išjungti automatinį sujungimą",
       "autoMergeOn": "Automatinis sujungimas įjungtas",
@@ -641,12 +641,12 @@
       "noEnabledMethods": "Šioje saugykloje neįjungtas nė vienas sujungimo būdas. Paprašyk saugyklos administratoriaus įjungti įprastą sujungimą, įrašų sutraukimą arba perkėlimą į kitą bazę.",
       "confirmTitle": "Sujungti pakeitimų užklausą?",
       "confirmMergeTitle": "Sujungti?",
-      "confirmTitleTerm": "Sujungti {{term}}?",
+      "confirmTitleTerm": "Sujungti: {{term}}?",
       "confirmMessage": "Tavo pakeitimai bus sujungti su bazine šaka.",
       "enableAutoMergeConfirmTitle": "Įjungti automatinį sujungimą?",
       "enableAutoMergeConfirmMessage": "GitHub automatiškai sujungs šią pakeitimų užklausą, kai visi privalomi patikrinimai bus sėkmingi.",
-      "enableAutoMergeConfirmMessageTerm": "Automatinis {{term}} sujungimas įvyks sėkmingai įvykdžius pipeline.",
-      "enableAutoMergeDescriptionTerm": "GitLab automatiškai sujungs {{term}}, kai pipeline bus sėkmingas.",
+      "enableAutoMergeConfirmMessageTerm": "Kai pipeline bus sėkmingas, sujungimas įvyks automatiškai ({{term}}).",
+      "enableAutoMergeDescriptionTerm": "GitLab sujungs automatiškai, kai pipeline bus sėkmingas ({{term}}).",
       "forbidden": "Neturi teisės sujungti šios pakeitimų užklausos.",
       "cannotMerge": "Dabartinės būsenos pakeitimų užklausos negalima sujungti.",
       "couldNotMerge": "Nepavyko sujungti pakeitimų užklausos.",
@@ -657,7 +657,7 @@
       },
       "terminal": {
         "closed": "Ši pakeitimų užklausa uždaryta",
-        "closedMergeRequest": "Šis merge request uždarytas"
+        "closedMergeRequest": "Ši sujungimo užklausa uždaryta"
       },
       "partialSuccessBanner": {
         "body": "Nepavyko ištrinti šakos: {{reason}}.",
@@ -693,8 +693,8 @@
       "providerBlocked": {
         "failingPipeline": "Pipeline nepavyksta paskutiniame commit.",
         "pendingPipeline": "Pipeline vis dar vykdomas paskutiniame commit.",
-        "permission": "Trūksta teisių sujungti {{term}}.",
-        "draft": "Prieš sujungiant pakeisk {{term}} būseną į paruoštą peržiūrai."
+        "permission": "Neturi teisės sujungti ({{term}}).",
+        "draft": "Prieš sujungiant pakeisk būseną į paruoštą peržiūrai ({{term}})."
       },
       "methodLabels": {
         "merge": "Sukurti sujungimo įrašą",
@@ -766,7 +766,7 @@
           "retryable": "Nepavyko užblokuoti šio naudotojo. Patikrink ryšį ir bandyk dar kartą."
         }
       },
-      "accessDeniedMessage": "Neturi teisės peržiūrėti šio PR diskusijos.",
+      "accessDeniedMessage": "Neturi teisės peržiūrėti šio PR diskusiją.",
       "unavailable": "Diskusija nepasiekiama.",
       "unavailableMessage": "Ši pakeitimų užklausa galėjo būti pašalinta.",
       "couldNotLoad": "Nepavyko įkelti diskusijos.",
@@ -801,7 +801,7 @@
         "outdatedOnPath": "Pasenęs komentaras: {{path}}"
       },
       "deletedUser": "ištrintas naudotojas",
-      "replyForbiddenTerm": "Neturi teisės atsakyti į {{term}}.",
+      "replyForbiddenTerm": "Neturi teisės atsakyti šioje diskusijoje ({{term}}).",
       "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}.",
@@ -831,11 +831,11 @@
       "removeFromRecentsTitle": "Pašalinti iš neseniai peržiūrėtų?",
       "removeFromRecentsMessage": "Ši peržiūra bus pašalinta iš neseniai peržiūrėtų sąrašo.",
       "removeRecentAccessibility": "Pašalinti {{repo}} iš neseniai peržiūrėtų užklausų sąrašo",
-      "urlAccessibility": "Įvesk pakeitimų užklausos arba merge request URL",
-      "urlPlaceholder": "Pakeitimų užklausos arba merge request URL",
-      "openAccessibility": "Atidaryti pakeitimų užklausą arba merge request",
+      "urlAccessibility": "Įvesk pakeitimų arba sujungimo užklausos URL",
+      "urlPlaceholder": "Pakeitimų arba sujungimo užklausos URL",
+      "openAccessibility": "Atidaryti pakeitimų užklausą arba sujungimo užklausą",
       "clearLink": "Išvalyti nuorodą",
-      "pasteLink": "Įklijuoti pakeitimų užklausos arba merge request nuorodą",
+      "pasteLink": "Įklijuoti pakeitimų užklausos arba sujungimo užklausos nuorodą",
       "open": "Atidaryti"
     },
     "checks": {
@@ -912,9 +912,9 @@
       "reconnectTitleGitLab": "Prisijungti prie GitLab iš naujo",
       "reconnectTitleBitbucket": "Prisijungti prie Bitbucket iš naujo",
       "reconnectDescription": "Tavo GitHub prieiga atšaukta.",
-      "gitlabDescription": "Peržiūrėti merge requests mobiliajame įrenginyje",
+      "gitlabDescription": "Peržiūrėti sujungimo užklausas mobiliajame įrenginyje",
       "gitlabInstanceMismatchTitle": "GitLab ryšys skirtas kitai instancijai",
-      "gitlabInstanceMismatchDescription": "Tavo GitLab ryšys skirtas {{connected}}, tačiau šis merge request yra {{requested}} instancijoje. Prisijunk prie GitLab toje instancijoje, kad galėtum jį peržiūrėti.",
+      "gitlabInstanceMismatchDescription": "Tavo GitLab ryšys skirtas {{connected}}, tačiau ši sujungimo užklausa yra {{requested}} instancijoje. Prisijunk prie GitLab toje instancijoje, kad galėtum ją peržiūrėti.",
       "checkActiveConnection": "Ryšys aktyvus, bet šio elemento vis tiek nepavyksta įkelti.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
@@ -1034,7 +1034,7 @@
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia.",
     "linkPasteDenied": "Prieiga prie įdėjimo buvo atmesta. Leiskite įdėti ir bandykite dar kartą.",
-    "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
+    "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos arba sujungimo užklausos nuoroda",
     "announce": {
       "commentPosted": "Komentaras paskelbtas",
       "commentUpdated": "Komentaras atnaujintas",
@@ -1044,18 +1044,18 @@
     },
     "mutationError": {
       "commentNotPosted": "Šio komentaro paskelbti negalima. Pasirinkta eilutė galėjo pasikeisti arba PR galėjo būti atnaujintas.",
-      "reviewNotSubmitted": "Dabartinės peržiūros pateikti negalima. PR galėjo pasikeisti arba bandai peržiūrėti savo paties pakeitimų užklausą.",
-      "reviewNotSubmittedTerm": "Šios peržiūros pateikti negalima. {{term}} galėjo pasikeisti arba negali peržiūrėti savo {{term}}.",
+      "reviewNotSubmitted": "Šios peržiūros pateikti negalima. Galbūt PR pasikeitė arba tai tavo pakeitimų užklausa, todėl peržiūrėti negali.",
+      "reviewNotSubmittedTerm": "Šios peržiūros pateikti negalima. Galbūt pasikeitė {{term}} arba tai tavo {{term}}, todėl peržiūrėti negali.",
       "couldNotPostComment": "Nepavyko paskelbti komentaro.",
       "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą.",
-      "rateLimited": "Gauta per daug užklausų. Bandykite vėliau dar kartą.",
-      "conflict": "Tai pasikeitė, kol dirbote. Įkelkite iš naujo ir bandykite dar kartą."
+      "rateLimited": "Gauta per daug užklausų. Bandyk vėliau dar kartą.",
+      "conflict": "Tai pasikeitė, kol dirbai. Įkelk iš naujo ir bandyk dar kartą."
     },
     "operation": {
       "couldNotReply": "Nepavyko atsakyti.",
       "couldNotCompleteAction": "Nepavyko atlikti šio veiksmo.",
       "mergeResultDefaultError": "GitHub neužbaigė sujungimo.",
-      "mergeResultNotCompleted": "Nepavyko sujungti {{term}}. Patikrink būseną ir bandyk dar kartą.",
+      "mergeResultNotCompleted": "Ši {{term}} nebuvo sujungta. Patikrink būseną ir bandyk dar kartą.",
       "ambiguous": "Nepavyko patvirtinti rezultato — prieš bandydamas dar kartą patikrink PR.",
       "forbidden": "Šis veiksmas neleidžiamas."
     },
@@ -1067,18 +1067,18 @@
     },
     "terms": {
       "pullRequest": "Pakeitimų užklausa",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Bendrinti merge request",
+      "mergeRequest": "Sujungimo užklausa",
+      "mergeRequestNumber": "Sujungimo užklausa !{{number}}",
+      "shareMergeRequest": "Bendrinti sujungimo užklausą",
       "viewOnProvider": "Peržiūrėti {{provider}}",
-      "mergeRequestUnavailable": "Merge request nepasiekiamas",
+      "mergeRequestUnavailable": "Sujungimo užklausa nepasiekiama",
       "unavailableDescription": "Ryšys galėjo nutrūkti, o įrašas galėjo būti ištrintas arba nepasiekiamas.",
-      "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šio merge request.",
-      "couldNotLoadMergeRequest": "Nepavyko įkelti merge request.",
-      "discussionAccessDenied": "Neturi teisės peržiūrėti šio merge request diskusijos.",
-      "discussionUnavailableMessage": "Ryšys galėjo nutrūkti, o merge request galėjo būti pašalintas.",
-      "noDiscussionDescription": "Šiame merge request nėra peržiūros gijų ar diskusijos komentarų.",
-      "noFilesChangedDescription": "Šiame merge request nėra failų pakeitimų."
+      "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šios sujungimo užklausos.",
+      "couldNotLoadMergeRequest": "Nepavyko įkelti sujungimo užklausos.",
+      "discussionAccessDenied": "Neturi teisės peržiūrėti šios sujungimo užklausos diskusiją.",
+      "discussionUnavailableMessage": "Ryšys galėjo nutrūkti, o sujungimo užklausa galėjo būti pašalinta.",
+      "noDiscussionDescription": "Šioje sujungimo užklausoje nėra peržiūros gijų ar diskusijos komentarų.",
+      "noFilesChangedDescription": "Šioje sujungimo užklausoje nėra failų pakeitimų."
     }
   },
   "notifications": {

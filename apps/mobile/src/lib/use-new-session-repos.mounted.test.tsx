@@ -28,10 +28,17 @@ type World = {
   query: BranchQueryView;
   calls: QueryOptions[];
   result: RepositoryBranchesState | null;
+  /** Every frame the harness rendered, in order, so a case can inspect the first. */
+  frames: RepositoryBranchesState[];
 };
 
 const world = vi.hoisted(() => {
-  const holder: World = { query: { refetch: () => undefined }, calls: [], result: null };
+  const holder: World = {
+    query: { refetch: () => undefined },
+    calls: [],
+    result: null,
+    frames: [],
+  };
   return holder;
 });
 
@@ -127,6 +134,7 @@ const SETTLE_BOUND_MS = 15_000;
 
 function BranchHarness({ repository }: { repository: NewSessionRepository }) {
   world.result = useRepositoryBranches(repository, undefined);
+  world.frames.push(world.result);
   return null;
 }
 
@@ -160,6 +168,7 @@ function mountBranches(repository: NewSessionRepository) {
 
 beforeEach(() => {
   world.calls.length = 0;
+  world.frames.length = 0;
   world.query = { isPending: true, isFetching: true, refetch: vi.fn(() => undefined) };
 });
 
@@ -214,6 +223,34 @@ describe('branch settle bound scoped to the request', () => {
       vi.advanceTimersByTime(SETTLE_BOUND_MS);
     });
     expect(mounted.result().isRetryableError).toBe(true);
+    mounted.unmount();
+  });
+
+  it('returning to a pending repository from one that asked for nothing renders no expiry frame', () => {
+    vi.useFakeTimers();
+    const mounted = mountBranches(REPOSITORY);
+
+    act(() => {
+      vi.advanceTimersByTime(SETTLE_BOUND_MS);
+    });
+    expect(mounted.result().isRetryableError).toBe(true);
+
+    // A cached repository asks for nothing, so no request starts while it is
+    // selected and the expiry the previous visit armed stays put.
+    world.query = { isPending: false, isFetching: false, refetch: vi.fn(() => undefined) };
+    mounted.rerender(OTHER_REPOSITORY);
+    expect(mounted.result().isRetryableError).toBe(false);
+
+    // The repository is asked about again and its request is out, so no frame of
+    // the switch — not even the first, before the effect runs — may show the
+    // expiry the visit before left behind.
+    world.query = { isPending: true, isFetching: false, refetch: vi.fn(() => undefined) };
+    world.frames.length = 0;
+    mounted.rerender(REPOSITORY);
+    expect(world.frames.length).toBeGreaterThan(0);
+    expect(world.frames.every(frame => frame.isLoading)).toBe(true);
+    expect(world.frames.every(frame => frame.isRetryableError)).toBe(false);
+
     mounted.unmount();
   });
 });

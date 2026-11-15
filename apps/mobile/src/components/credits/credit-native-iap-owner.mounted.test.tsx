@@ -465,7 +465,10 @@ describe('CreditNativeIapOwner', () => {
     mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionDate: Date.now() + 1000 }));
     await flushPromises();
     expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
-    expect(reopened.handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+    // The delivery names this row's product, so the row's progress ends even
+    // though the outcome could not be attributed; the barrier stays.
+    expect(reopened.handle.value?.completingProductId).toBeNull();
+    expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
     expect(reopened.handle.value?.completedPurchaseCount).toBe(1);
   });
 
@@ -563,7 +566,7 @@ describe('CreditNativeIapOwner', () => {
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
   });
 
-  it('does not let uncorrelated old same-product delivery or error settle a request', async () => {
+  it('settles the row but not the barrier for an uncorrelated old same-product delivery', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,
       products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
@@ -577,10 +580,13 @@ describe('CreditNativeIapOwner', () => {
       })
     );
     await flushPromises();
-    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+    // The delivery names this row's product, so its progress ends; the barrier
+    // stays because the credit may not be this request's charge.
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(true);
     mockedIap.handlers?.onPurchaseError({ code: 'user-cancelled', productId: APPLE_PRODUCT_ID });
     await flushPromises();
-    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+    expect(handle.value?.completingProductId).toBeNull();
     expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
   });
 
@@ -775,6 +781,38 @@ describe('CreditNativeIapOwner', () => {
       expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
       expect(handle.value?.hasUnresolvedPurchase).toBe(false);
       expect(handle.value?.completingProductId).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the dispatch pool when a listener-credited request retires, so the next purchase is unambiguous', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockResolvedValue(null);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      expect(await handle.value?.purchase(creditPack)).toBe(true);
+      await flushPromises();
+      mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-first' }));
+      await flushPromises();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.completingProductId).toBeNull();
+
+      // The second purchase needs no consent and its own delivery settles it
+      // without a timer advancing.
+      expect(await handle.value?.purchase(creditPack)).toBe(true);
+      await flushPromises();
+      mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-second' }));
+      await flushPromises();
+
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(2);
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.errorMessageKey).toBeNull();
     } finally {
       vi.useRealTimers();
     }

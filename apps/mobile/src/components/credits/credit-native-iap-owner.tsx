@@ -330,6 +330,10 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       // Every id this record holds was written by an attributable native
       // identify, so completing one of them settles the request that recorded it.
       retireCreditPurchaseIntent(intent);
+      // The request is answered, so it stops competing for later outcomes:
+      // leaving it in the pool would make every later purchase's result
+      // ambiguous for the rest of the process.
+      settleCreditPurchaseDispatch(intent);
       const currentOwner = pendingPurchaseRef.current;
       if (
         !mountedRef.current ||
@@ -721,6 +725,13 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         const completion = await actions.handlePurchaseSuccess(purchase, { notifyErrors: false });
         if (completion.status === 'completed') {
           recoveredPurchaseIdsRef.current.add(id);
+          // The row waiting on this product has its answer even when the
+          // outcome could not be attributed: its progress ends, the barrier
+          // stays and names the credit that landed.
+          const waiter = pendingPurchaseRef.current;
+          if (!owned && waiter !== null && purchase.productId === waiter.intent.productId) {
+            settlePurchaseRow(waiter, completion);
+          }
           // A credit landed in this session, whichever pooled request it
           // belonged to: no wait can still be the row's state, and a barrier
           // that is still up names it credited rather than "will be added".

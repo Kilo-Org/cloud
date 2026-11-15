@@ -344,8 +344,6 @@
       "rowSubtitle": "Gunakan penagihan penyedia milikmu sendiri",
       "manageOnWebReason": "Penyedia ini memerlukan kredensial terstruktur.",
       "description": "Permintaan melalui kunci ini ditagihkan ke akun penyediamu, bukan ke saldo Kilo-mu.",
-      "enabled": "Digunakan",
-      "disabled": "Dinonaktifkan",
       "managedByPlan": "Dikelola oleh paket coding-mu",
       "enableKey": "Aktifkan kunci {{provider}}",
       "test": "Uji kunci",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Tanda terima laporan",
-      "description": "Tanda terima untuk laporan yang kamu kirim. Simpan ID ini untuk merujuknya nanti.",
+      "description": "Simpan ID ini untuk merujuknya nanti.",
       "receiptLabel": "Tanda terima",
+      "copyReceiptId": "Salin ID tanda terima",
       "appealLabel": "Banding",
       "triageReceived": "Diterima",
       "triageOpen": "Sedang ditinjau",
@@ -2366,10 +2365,13 @@
     "couldNotLoadDescription": "Sesi aktifmu tidak dapat ditampilkan sampai data selesai dimuat.",
     "currentDeviceUnidentified": "Perangkat ini tidak dapat diidentifikasi.",
     "kiloApp": "Aplikasi Kilo",
+    "kiloAppAndroid": "Aplikasi Kilo · Android",
+    "kiloAppIos": "Aplikasi Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Tidak ada sesi aktif",
     "noSessionsDescription": "Masuk ke aplikasi Kilo di perangkat lain agar perangkat tersebut muncul di sini.",
-    "onlyKiloAppSignIns": "Hanya sesi masuk melalui aplikasi Kilo yang muncul di sini. Sesi masuk melalui editor dan CLI tidak ditampilkan.",
     "signedIn": "Masuk {{signedIn}} · Terakhir aktif {{lastSeen}}",
+    "signInScopeNote": "Sesi masuk melalui aplikasi Kilo dan Kilo CLI muncul di sini. Sesi masuk melalui editor tidak ditampilkan.",
     "thisDevice": "Perangkat ini",
     "viewProfile": "Lihat profil",
     "signOutThisDevice": "Keluar dari perangkat ini",
@@ -2377,7 +2379,7 @@
     "sessionSignedOut": "Sesi masuk telah diakhiri.",
     "signOutThisDeviceTitle": "Keluar dari perangkat ini?",
     "signOutThisSessionTitle": "Keluar dari sesi ini?",
-    "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Perangkat tersebut masih dapat mengakses API hingga satu jam.",
+    "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Terakhir aktif {{lastSeen}}. Perangkat tersebut masih dapat mengakses API hingga satu jam.",
     "webBrowser": "Peramban web",
     "unknownDevice": "Perangkat tidak dikenal"
   },
@@ -3285,6 +3287,7 @@
       "description": "Organisasi memungkinkan tim Anda berbagi kredit, agen, dan pengaturan.",
       "nameLabel": "Nama organisasi",
       "nameRequired": "Masukkan nama organisasi.",
+      "createdNotListed": "Organisasi telah dibuat. Ia akan segera muncul di alat pilih.",
       "trialNote": "Uji coba Enterprise 14 hari Anda dimulai saat Anda membuatnya. Paket dibeli di web."
     },
     "creditActivity": {
@@ -3343,7 +3346,7 @@
       "sharingUnavailable": "Fitur berbagi tidak tersedia di perangkat ini.",
       "status": {
         "paid": "Lunas",
-        "open": "Buka",
+        "open": "Terbuka",
         "void": "Batal",
         "uncollectible": "Tidak tertagih"
       },
@@ -3410,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Pengaturan organisasi di web",
+      "integrations": "Integrasi di web",
       "usageDetails": "Detail penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Grup",
@@ -3425,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "Token masukan",
-      "last30Days": "30 Hari terakhir",
+      "orgLast30Days": "Semua anggota · 30 Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
     },
@@ -3636,6 +3640,8 @@
       "available": "Alat tersedia: {{count}}",
       "none": "Tidak ada alat tersedia",
       "noneDescription": "Server Kilo tidak mengembalikan alat apa pun.",
+      "notApplied": "Alat Kilo belum ditambahkan ke obrolan ini",
+      "notAppliedDescription": "Pilihan Anda tersimpan. Coba lagi untuk menggunakannya di obrolan ini sekarang.",
       "unreachable": "Tidak dapat menjangkau alat Kilo",
       "unreachableDescription": "Server tidak menjawab. Periksa koneksimu, lalu coba lagi.",
       "unauthorized": "Alat Kilo menolak sesi ini",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Tidak dapat melepaskan ikatan repo",
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Profil ini tidak lagi tersedia. Pilih profil lain.",
       "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau admin organisasi dapat membuat profil organisasi."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Layanan terhubung",
     "entrySubtitle": "GitHub, Slack, Linear, dan lainnya",
     "subtitle": "Hubungkan alat dan alur kerja pengembangan Anda ke Kilo",
-    "emptyHint": "Belum ada integrasi yang terhubung.",
     "disconnect": "Putuskan",
     "disconnectTitle": "Putuskan {{provider}}?",
     "disconnectMessage": "Kilo tidak akan merespons lagi di {{provider}}. Anda dapat menghubungkannya kembali kapan saja.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Kedaluwarsa dalam {{duration}}",
     "neverExpires": "Tidak pernah kedaluwarsa",
     "includesNewMessages": "Pesan baru disertakan.",
-    "excludesNewMessages": "Pesan baru tidak disertakan."
+    "excludesNewMessages": "Pesan baru tidak disertakan.",
+    "superseded": "Tautan ini telah diganti dari perangkat lain, sehingga tidak lagi berfungsi."
   },
   "sharedSession": {
     "title": "Sesi yang dibagikan",

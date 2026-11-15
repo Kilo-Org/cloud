@@ -344,8 +344,6 @@
       "rowSubtitle": "Käytä palveluntarjoajasi omaa laskutusta",
       "manageOnWebReason": "Nämä palveluntarjoajat tarvitsevat jäsennellyt tunnistetiedot.",
       "description": "Näiden avainten kautta tehdyt pyynnöt laskutetaan palveluntarjoajasi tililtä Kilo-saldon sijaan.",
-      "enabled": "Käytössä",
-      "disabled": "Pois käytöstä",
       "managedByPlan": "Hallitaan koodaustilauksesi kautta",
       "enableKey": "Ota palvelun {{provider}} avain käyttöön",
       "test": "Testaa avain",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Ilmoituksen kuitti",
-      "description": "Lähettämäsi ilmoituksen kuitti. Säilytä tämä tunnus, jotta voit viitata siihen myöhemmin.",
+      "description": "Säilytä tämä tunnus, jotta voit viitata siihen myöhemmin.",
       "receiptLabel": "Kuitti",
+      "copyReceiptId": "Kopioi kuitin tunnus",
       "appealLabel": "Valitus",
       "triageReceived": "Vastaanotettu",
       "triageOpen": "Käsittelyssä",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Aktiiviset istuntosi eivät ole käytettävissä, ennen kuin niiden tiedot on ladattu.",
     "currentDeviceUnidentified": "Nykyistä laitetta ei voitu tunnistaa",
     "kiloApp": "Kilo-sovellus",
+    "kiloAppAndroid": "Kilo-sovellus · Android",
+    "kiloAppIos": "Kilo-sovellus · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Ei aktiivisia istuntoja",
     "noSessionsDescription": "Kirjaudu Kilo-sovellukseen toisella laitteella, niin laite näkyy tässä.",
-    "onlyKiloAppSignIns": "Täällä näkyvät vain Kilo-sovelluksen kirjautumiset. Editorin ja CLI:n kirjautumisia ei luetella.",
     "signedIn": "Kirjautunut {{signedIn}} · Viimeksi käytössä {{lastSeen}}",
+    "signInScopeNote": "Täällä näkyvät Kilo-sovelluksen ja Kilo CLI:n kirjautumiset. Editorin kirjautumisia ei luetella.",
     "thisDevice": "Tämä laite",
     "viewProfile": "Näytä profiili",
     "signOutThisDevice": "Kirjaa tämä laite ulos",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "Istunto kirjattiin ulos.",
     "signOutThisDeviceTitle": "Kirjataanko tämä laite ulos?",
     "signOutThisSessionTitle": "Kirjataanko tämä istunto ulos?",
-    "signOutThisSessionMessage": "{{device}} kirjataan ulos. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",
+    "signOutThisSessionMessage": "{{device}} kirjataan ulos. Viimeksi käytössä {{lastSeen}}. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",
     "webBrowser": "Verkkoselain",
     "unknownDevice": "Tuntematon laite"
   },
@@ -3293,6 +3295,7 @@
       "description": "Organisaation avulla tiimisi käyttää yhteisiä krediittejä, agentteja ja asetuksia.",
       "nameLabel": "Organisaation nimi",
       "nameRequired": "Anna organisaation nimi.",
+      "createdNotListed": "Organisaatio on luotu. Se ilmestyy pian valitsimeen.",
       "trialNote": "14 päivän Enterprise-kokeilusi alkaa, kun luot organisaation. Paketit ostetaan verkossa."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisaation asetukset verkossa",
+      "integrations": "Integraatiot verkossa",
       "usageDetails": "Käytön tiedot",
       "providersAndModels": "Palveluntarjoajat ja mallit",
       "groups": "Ryhmät",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
-      "last30Days": "Viimeiset 30 päivää",
+      "orgLast30Days": "Kaikki jäsenet · Viimeiset 30 päivää",
       "outputTokens": "Tulostetokenit",
       "requests": "Pyynnöt"
     },
@@ -3636,6 +3640,8 @@
       "available": "Käytettävissä olevat työkalut: {{count}}",
       "none": "Työkaluja ei ole saatavilla",
       "noneDescription": "Kilo-palvelin ei palauttanut yhtään työkalua.",
+      "notApplied": "Kilo-työkaluja ei lisätty tähän keskusteluun",
+      "notAppliedDescription": "Valintasi on tallennettu. Yritä uudelleen ottaaksesi sen nyt käyttöön tässä keskustelussa.",
       "unreachable": "Kilon työkaluihin ei saatu yhteyttä",
       "unreachableDescription": "Palvelin ei vastannut. Tarkista yhteytesi ja yritä uudelleen.",
       "unauthorized": "Kilon työkalut hylkäsivät tämän istunnon",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Koodivaraston sidontaa ei voitu purkaa",
       "repoValue": "Koodivarasto: {{name}}",
       "profileValue": "Profiili: {{name}}",
+      "profileUnavailable": "Tämä profiili ei ole enää käytettävissä. Valitse toinen.",
       "pickerEmptyDescriptionOrganization": "Luo organisaatioprofiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organisaation omistaja tai ylläpitäjä voi luoda organisaatioprofiilin."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Yhdistetyt palvelut",
     "entrySubtitle": "GitHub, Slack, Linear ja muita",
     "subtitle": "Yhdistä kehitystyökalusi ja työnkulkusi Kiloon",
-    "emptyHint": "Integraatioita ei ole vielä yhdistetty.",
     "disconnect": "Katkaise yhteys",
     "disconnectTitle": "Katkaistaanko yhteys palveluun {{provider}}?",
     "disconnectMessage": "Kilo lakkaa vastaamasta palvelussa {{provider}}. Voit yhdistää uudelleen milloin tahansa.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Vanhenee {{duration}} kuluttua",
     "neverExpires": "Ei vanhene",
     "includesNewMessages": "Uudet viestit sisällytetään.",
-    "excludesNewMessages": "Uusia viestejä ei sisällytetä."
+    "excludesNewMessages": "Uusia viestejä ei sisällytetä.",
+    "superseded": "Tämä linkki on korvattu muualla, joten se ei enää toimi."
   },
   "sharedSession": {
     "title": "Jaettu istunto",

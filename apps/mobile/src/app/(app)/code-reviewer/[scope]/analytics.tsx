@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -17,6 +17,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
@@ -37,9 +38,6 @@ const PERIOD_OPTIONS = [
   { value: '30', labelKey: 'spendAlerts.window30d' },
   { value: '90', labelKey: 'usage.range90d' },
 ] as const;
-
-type PeriodDays = 7 | 30 | 90;
-type AnalyticsPlatform = 'github' | 'gitlab';
 
 const PLATFORM_OPTIONS = (['github', 'gitlab'] as const).map(platform => ({
   value: platform,
@@ -94,8 +92,7 @@ export default function CodeReviewerAnalyticsRoute() {
 function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const [period, setPeriod] = useState<PeriodDays>(30);
-  const [platform, setPlatform] = useState<AnalyticsPlatform>('github');
+  const { platform, period, setPlatform, setPeriod } = useCodeReviewerAnalyticsFilters(scope);
 
   // The organization's own name for the header, and the row a denial titles
   // itself with. The route already rejected the personal scope, so this read

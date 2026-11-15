@@ -344,8 +344,6 @@
       "rowSubtitle": "Používat vlastní fakturaci u poskytovatele",
       "manageOnWebReason": "Tito poskytovatelé vyžadují strukturované přihlašovací údaje.",
       "description": "Požadavky přes tyto klíče se účtují na váš účet u poskytovatele, ne z vašeho zůstatku v Kilo.",
-      "enabled": "Používá se",
-      "disabled": "Vypnuto",
       "managedByPlan": "Spravuje váš programovací tarif",
       "enableKey": "Povolit klíč pro {{provider}}",
       "test": "Otestovat klíč",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Potvrzení o nahlášení",
-      "description": "Potvrzení k nahlášení, které jste odeslali. Uschovejte si toto ID, abyste se na něj mohli později odkázat.",
+      "description": "Uschovejte si toto ID, abyste se na něj mohli později odkázat.",
       "receiptLabel": "Potvrzení",
+      "copyReceiptId": "Kopírovat ID potvrzení",
       "appealLabel": "Odvolání",
       "triageReceived": "Přijato",
       "triageOpen": "Posuzuje se",
@@ -3013,10 +3012,13 @@
     "couldNotLoadDescription": "Dokud se seznam nenačte, vaše aktivní relace nejsou dostupné.",
     "currentDeviceUnidentified": "Aktuální zařízení se nepodařilo rozpoznat.",
     "kiloApp": "Aplikace Kilo",
+    "kiloAppAndroid": "Aplikace Kilo · Android",
+    "kiloAppIos": "Aplikace Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Žádné aktivní relace",
     "noSessionsDescription": "Přihlaste se do aplikace Kilo na jiném zařízení. Pak se zde zobrazí.",
-    "onlyKiloAppSignIns": "Zde se zobrazují pouze přihlášení do aplikace Kilo. Přihlášení v editoru a CLI nejsou uvedena.",
     "signedIn": "Přihlášení: {{signedIn}} · Poslední aktivita: {{lastSeen}}",
+    "signInScopeNote": "Zde se zobrazují přihlášení do aplikace Kilo a do Kilo CLI. Přihlášení v editoru nejsou uvedena.",
     "thisDevice": "Toto zařízení",
     "webBrowser": "Webový prohlížeč",
     "viewProfile": "Zobrazit profil",
@@ -3025,7 +3027,7 @@
     "sessionSignedOut": "Relace byla odhlášena.",
     "signOutThisDeviceTitle": "Odhlásit toto zařízení?",
     "signOutThisSessionTitle": "Odhlásit tuto relaci?",
-    "signOutThisSessionMessage": "Zařízení {{device}} se odhlásí. Přístup k API mu může zůstat ještě až hodinu.",
+    "signOutThisSessionMessage": "Zařízení {{device}} se odhlásí. Poslední aktivita: {{lastSeen}}. Přístup k API mu může zůstat ještě až hodinu.",
     "unknownDevice": "Neznámé zařízení"
   },
   "forceUpdate": {
@@ -3399,6 +3401,7 @@
       "description": "V organizaci sdílíte se svým týmem kredity, agenty a nastavení.",
       "nameLabel": "Název organizace",
       "nameRequired": "Zadejte název organizace.",
+      "createdNotListed": "Organizace byla vytvořena. Brzy se objeví ve výběru.",
       "trialNote": "Po vytvoření organizace začne vaše 14denní zkušební verze plánu Enterprise. Plány se kupují na webu."
     },
     "creditActivity": {
@@ -3511,6 +3514,7 @@
     },
     "settingsOnWeb": {
       "title": "Nastavení organizace na webu",
+      "integrations": "Integrace na webu",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelé a modely",
       "groups": "Skupiny",
@@ -3526,7 +3530,7 @@
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",
-      "last30Days": "Posledních 30 dní",
+      "orgLast30Days": "Všichni členové · Posledních 30 dní",
       "outputTokens": "Výstupní tokeny",
       "requests": "Požadavky"
     },
@@ -3744,6 +3748,8 @@
       "available": "Dostupné nástroje: {{count}}",
       "none": "Nejsou dostupné žádné nástroje",
       "noneDescription": "Server Kilo nevrátil žádné nástroje.",
+      "notApplied": "Nástroje Kilo nebyly přidány do této konverzace",
+      "notAppliedDescription": "Vaše volba je uložena. Chcete-li ji nyní použít v této konverzaci, klepněte na Zkusit znovu.",
       "unreachable": "Nepodařilo se připojit k nástrojům Kilo",
       "unreachableDescription": "Server neodpověděl. Zkontrolujte připojení a zkuste to znovu.",
       "unauthorized": "Nástroje Kilo odmítly tuto relaci",
@@ -4277,6 +4283,7 @@
       "unbindFailed": "Repo se nepodařilo zrušit",
       "repoValue": "Úložiště: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Tento profil už není dostupný. Vyberte jiný.",
       "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizace může vytvořit vlastník organizace nebo správce."
     },
@@ -4538,7 +4545,6 @@
     "sectionTitle": "Připojené služby",
     "entrySubtitle": "GitHub, Slack, Linear a další",
     "subtitle": "Propojte své vývojářské nástroje a pracovní postupy s Kilo",
-    "emptyHint": "Zatím nejsou připojeny žádné integrace.",
     "disconnect": "Odpojit",
     "disconnectTitle": "Odpojit {{provider}}?",
     "disconnectMessage": "Kilo přestane odpovídat v {{provider}}. Kdykoli se můžete znovu připojit.",
@@ -4606,7 +4612,8 @@
     "expiresIn": "Vyprší za {{duration}}",
     "neverExpires": "Nikdy nevyprší",
     "includesNewMessages": "Nové zprávy jsou zahrnuty.",
-    "excludesNewMessages": "Nové zprávy nejsou zahrnuty."
+    "excludesNewMessages": "Nové zprávy nejsou zahrnuty.",
+    "superseded": "Tento odkaz byl nahrazen na jiném zařízení, a proto už nefunguje."
   },
   "sharedSession": {
     "title": "Sdílená relace",

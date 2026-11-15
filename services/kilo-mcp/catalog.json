@@ -8907,7 +8907,7 @@
       "properties": {
         "cloudAgentSessionId": {
           "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         }
       },
       "required": [
@@ -9070,7 +9070,7 @@
       "properties": {
         "cloudAgentSessionId": {
           "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         }
       },
       "required": [
@@ -21153,7 +21153,7 @@
           "properties": {
             "cloudAgentSessionId": {
               "type": "string",
-              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             "organizationId": {
               "type": "string",
@@ -21349,7 +21349,7 @@
           "properties": {
             "cloudAgentSessionId": {
               "type": "string",
-              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             "organizationId": {
               "type": "string",
@@ -37392,13 +37392,13 @@
   "user.listDeviceSessions": {
     "path": "user.listDeviceSessions",
     "kind": "query",
-    "summary": "List the current user's active device sessions with user agent and activity timestamps, marking which one is the current device.",
+    "summary": "List the current user's active device sessions with the client kind and activity timestamps, marking which one is the current device.",
     "inputSchema": {},
     "tags": [
       "user",
       "listdevicesessions"
     ],
-    "searchBlob": "user.listDeviceSessions List the current user's active device sessions with user agent and activity timestamps, marking which one is the current device. user listdevicesessions"
+    "searchBlob": "user.listDeviceSessions List the current user's active device sessions with the client kind and activity timestamps, marking which one is the current device. user listdevicesessions"
   },
   "user.markWelcomeFormCompleted": {
     "path": "user.markWelcomeFormCompleted",

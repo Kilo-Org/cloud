@@ -344,8 +344,6 @@
       "rowSubtitle": "Ampiasao ny fandoavam-bola amin'ny mpamatsinao",
       "manageOnWebReason": "Mila mari-panamarinana voarafitra ireo mpamatsy ireo.",
       "description": "Ny fangatahana mampiasa ireo lakile ireo dia aloa amin'ny kaontinao ao amin'ny mpamatsy fa tsy amin'ny ambim-bola Kilo anananao.",
-      "enabled": "Ampiasaina",
-      "disabled": "Najanona",
       "managedByPlan": "Tantanin'ny drafitra fandaharana anananao",
       "enableKey": "Alefaso ny lakilen'ny {{provider}}",
       "test": "Andramo ny lakile",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Porofon'ny tatitra",
-      "description": "Ny porofon'ny tatitra nalefanao. Tehirizo ity id ity mba hanondroana azy any aoriana.",
+      "description": "Tehirizo ity id ity mba hanondroana azy any aoriana.",
       "receiptLabel": "Porofo",
+      "copyReceiptId": "Adikao ny ID amin'ny porofo",
       "appealLabel": "Fampakarana",
       "triageReceived": "Voaray",
       "triageOpen": "Eo am-pandinihana",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Tsy azo aseho ny fotoam-piasanao mandeha raha tsy voaray ny angona.",
     "currentDeviceUnidentified": "Tsy fantatra ny fitaovana ampiasaina izao.",
     "kiloApp": "Rindranasa Kilo",
+    "kiloAppAndroid": "Rindranasa Kilo · Android",
+    "kiloAppIos": "Rindranasa Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Tsy misy fotoam-piasana mandeha",
     "noSessionsDescription": "Midira amin'ny rindranasa Kilo amin'ny fitaovana hafa, dia hiseho eto izany.",
-    "onlyKiloAppSignIns": "Ny fidirana amin'ny rindranasa Kilo ihany no hita eto. Tsy voatanisa ny fidirana amin'ny mpanova kaody sy ny CLI.",
     "signedIn": "Niditra {{signedIn}} · Hita farany {{lastSeen}}",
+    "signInScopeNote": "Ny fidirana amin'ny rindranasa Kilo sy ny Kilo CLI no hita eto. Tsy voatanisa ny fidirana amin'ny mpanova kaody.",
     "thisDevice": "Ity fitaovana ity",
     "viewProfile": "Jereo ny mombamomba anao",
     "webBrowser": "Mpitety tranonkala",
@@ -2921,7 +2923,7 @@
     "sessionSignedOut": "Nifarana ny fidirana tamin'ity fotoam-piasana ity.",
     "signOutThisDeviceTitle": "Hivoaka amin'ity fitaovana ity ve?",
     "signOutThisSessionTitle": "Hivoaka amin'ity fotoam-piasana ity ve?",
-    "signOutThisSessionMessage": "Havoaka amin'ny kaonty ny {{device}}. Mbola afaka mampiasa ny API hatramin'ny adiny iray izany.",
+    "signOutThisSessionMessage": "Havoaka amin'ny kaonty ny {{device}}. Hita farany {{lastSeen}}. Mbola afaka mampiasa ny API hatramin'ny adiny iray izany.",
     "unknownDevice": "Fitaovana tsy fantatra"
   },
   "forceUpdate": {
@@ -3293,6 +3295,7 @@
       "description": "Mizara kredit, agent ary fikirakirana amin'ny ekipanao ny fikambanana.",
       "nameLabel": "Anaran'ny fikambanana",
       "nameRequired": "Ampidiro ny anaran'ny fikambanana.",
+      "createdNotListed": "Vita ny famoronana ny fikambanana. Ho hita ao amin'ny mpanangona izy io tsy ho ela.",
       "trialNote": "Manomboka rehefa mamorona azy ianao ny fanandramana Enterprise 14 andro. Amin'ny tranonkala no ividianana ny drafitra."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Fikirakiran'ny fikambanana amin'ny tranonkala",
+      "integrations": "Fampifandraisana amin'ny tranonkala",
       "usageDetails": "Antsipirian'ny fampiasana",
       "providersAndModels": "Mpamatsy sy modely",
       "groups": "Vondrona",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",
-      "last30Days": "30 Andro farany lasa",
+      "orgLast30Days": "Mpikambana rehetra · 30 Andro farany lasa",
       "outputTokens": "Sombin-tsoratra mivoaka",
       "requests": "Fangatahana"
     },
@@ -3636,6 +3640,8 @@
       "available": "Fitaovana misy: {{count}}",
       "none": "Tsy misy fitaovana",
       "noneDescription": "Tsy nampodina fitaovana ny mpizara Kilo.",
+      "notApplied": "Tsy nampiana tao amin'ity resaka ity ny fitaovana Kilo",
+      "notAppliedDescription": "Voatahiry ny safidinao. Andramo indray mba hampiasana azy amin'ity resaka ity izao.",
       "unreachable": "Tsy tratra ny fitaovana Kilo",
       "unreachableDescription": "Tsy namaly ny mpizara. Hamarino ny fifandraisanao, dia andramo indray.",
       "unauthorized": "Nandà ity sesiona ity ny fitaovana Kilo",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Tsy afaka namaha ny repo",
       "repoValue": "Tahiry: {{name}}",
       "profileValue": "Mombamomba: {{name}}",
+      "profileUnavailable": "Tsy misy intsony ity mombamomba ity. Misafidiana iray hafa.",
       "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Ny tompon'ny fikambanana na ny mpandrindra dia afaka mamorona mombamomba momba ny fikambanana."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Serivisy mifandray",
     "entrySubtitle": "GitHub, Slack, Linear sy ny hafa",
     "subtitle": "Ampifandraiso amin'i Kilo ireo fitaovana sy fomba fiasanao amin'ny fampandrosoana",
-    "emptyHint": "Mbola tsy misy fampifandraisana mifandray.",
     "disconnect": "Esory",
     "disconnectTitle": "Hanapaka ny fifandraisana amin'i {{provider}}?",
     "disconnectMessage": "Tsy hamaly intsony ao amin'i {{provider}} i Kilo. Afaka mampifandray indray ianao amin'ny fotoana rehetra.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Lany daty afaka {{duration}}",
     "neverExpires": "Tsy lany daty mihitsy",
     "includesNewMessages": "Tafiditra ny hafatra vaovao.",
-    "excludesNewMessages": "Tsy tafiditra ny hafatra vaovao."
+    "excludesNewMessages": "Tsy tafiditra ny hafatra vaovao.",
+    "superseded": "Nosoloina tany an-kafa ity rohy ity, ka tsy miasa intsony."
   },
   "sharedSession": {
     "title": "Fotoam-piasana nozaraina",

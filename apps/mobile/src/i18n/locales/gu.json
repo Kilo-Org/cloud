@@ -344,8 +344,6 @@
       "rowSubtitle": "તમારા પોતાના પ્રદાતાના બિલિંગનો ઉપયોગ કરો",
       "manageOnWebReason": "આ પ્રદાતાઓને સંરચિત ઓળખપત્રોની જરૂર છે.",
       "description": "આ કી દ્વારા થતી વિનંતીઓનું બિલ તમારા Kilo બેલેન્સને બદલે તમારા પ્રદાતા એકાઉન્ટમાં લાગે છે.",
-      "enabled": "ઉપયોગમાં",
-      "disabled": "બંધ",
       "managedByPlan": "તમારા કોડિંગ પ્લાન દ્વારા સંચાલિત",
       "enableKey": "{{provider}} કી ચાલુ કરો",
       "test": "કી ચકાસો",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "રિપોર્ટની રસીદ",
-      "description": "તમે સબમિટ કરેલા રિપોર્ટની રસીદ. પછીથી તેનો સંદર્ભ આપવા માટે આ ID સાચવી રાખો.",
+      "description": "પછીથી તેનો સંદર્ભ આપવા માટે આ ID સાચવી રાખો.",
       "receiptLabel": "રસીદ",
+      "copyReceiptId": "રસીદ ID કૉપી કરો",
       "appealLabel": "અપીલ",
       "triageReceived": "પ્રાપ્ત થયો",
       "triageOpen": "સમીક્ષા હેઠળ",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "આ લોડ ન થાય ત્યાં સુધી તમારા સક્રિય સત્રો ઉપલબ્ધ નથી.",
     "currentDeviceUnidentified": "વર્તમાન ઉપકરણ ઓળખી શકાયું નહીં.",
     "kiloApp": "Kilo એપ",
+    "kiloAppAndroid": "Kilo એપ · Android",
+    "kiloAppIos": "Kilo એપ · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "કોઈ સક્રિય સત્ર નથી",
     "noSessionsDescription": "અન્ય ઉપકરણ પર Kilo એપમાં સાઇન ઇન કરો. તે ઉપકરણ અહીં દેખાશે.",
-    "onlyKiloAppSignIns": "અહીં માત્ર Kilo એપમાં કરેલા સાઇન ઇન દેખાય છે. એડિટર અને CLIમાં કરેલા સાઇન ઇન અહીં દેખાતા નથી.",
     "signedIn": "સાઇન ઇન: {{signedIn}} · છેલ્લે સક્રિય: {{lastSeen}}",
+    "signInScopeNote": "Kilo એપ અને Kilo CLIમાંથી કરેલા સાઇન ઇન અહીં દેખાય છે. એડિટરમાંથી કરેલા સાઇન ઇન સૂચિબદ્ધ નથી.",
     "thisDevice": "આ ઉપકરણ",
     "viewProfile": "પ્રોફાઇલ જુઓ",
     "signOutThisDevice": "આ ઉપકરણમાંથી સાઇન આઉટ કરો",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "સત્રમાંથી સાઇન આઉટ થયું.",
     "signOutThisDeviceTitle": "આ ઉપકરણમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionTitle": "આ સત્રમાંથી સાઇન આઉટ કરવું છે?",
-    "signOutThisSessionMessage": "{{device}}માંથી સાઇન આઉટ થશે. તેનો API ઍક્સેસ એક કલાક સુધી ચાલુ રહી શકે છે.",
+    "signOutThisSessionMessage": "{{device}}માંથી સાઇન આઉટ થશે. છેલ્લે સક્રિય: {{lastSeen}}. તેનો API ઍક્સેસ એક કલાક સુધી ચાલુ રહી શકે છે.",
     "webBrowser": "વેબ બ્રાઉઝર",
     "unknownDevice": "અજાણ્યું ઉપકરણ"
   },
@@ -3293,6 +3295,7 @@
       "description": "સંસ્થા તમારી ટીમ સાથે ક્રેડિટ, એજન્ટ અને સેટિંગ્સ શેર કરે છે.",
       "nameLabel": "સંસ્થાનું નામ",
       "nameRequired": "સંસ્થાનું નામ દાખલ કરો.",
+      "createdNotListed": "સંસ્થા બનાવવામાં આવી. તે થોડી વારમાં પીકરમાં દેખાશે.",
       "trialNote": "સંસ્થા બનાવતાં જ તમારી 14 દિવસની Enterprise ટ્રાયલ શરૂ થાય છે. પ્લાન વેબ પર ખરીદવામાં આવે છે."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "વેબ પર સંસ્થાના સેટિંગ્સ",
+      "integrations": "વેબ પર ઇન્ટિગ્રેશન્સ",
       "usageDetails": "વપરાશની વિગતો",
       "providersAndModels": "પ્રોવાઇડર અને મોડેલ",
       "groups": "ગ્રુપ",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",
-      "last30Days": "છેલ્લા 30 દિવસ",
+      "orgLast30Days": "બધા સભ્યો · છેલ્લા 30 દિવસ",
       "outputTokens": "આઉટપુટ ટોકન",
       "requests": "વિનંતીઓ"
     },
@@ -3636,6 +3640,8 @@
       "available": "ઉપલબ્ધ સાધનો: {{count}}",
       "none": "કોઈ સાધન ઉપલબ્ધ નથી",
       "noneDescription": "Kilo સર્વરે કોઈ સાધન પરત આપ્યું નથી.",
+      "notApplied": "આ ચેટમાં Kilo સાધનો ઉમેરાયા નથી",
+      "notAppliedDescription": "તમારી પસંદગી સાચવવામાં આવી છે. હવે આ ચેટમાં તેનો ઉપયોગ કરવા માટે ફરી પ્રયાસ કરો.",
       "unreachable": "Kilo સાધનો સુધી પહોંચી શકાયું નથી",
       "unreachableDescription": "સર્વરે જવાબ આપ્યો નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
       "unauthorized": "Kilo સાધનોએ આ સત્ર નકાર્યું",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "રિપોઝિટરીનું જોડાણ દૂર કરી શકાયું નથી",
       "repoValue": "રિપોઝિટરી: {{name}}",
       "profileValue": "પ્રોફાઇલ: {{name}}",
+      "profileUnavailable": "આ પ્રોફાઇલ હવે ઉપલબ્ધ નથી. બીજી પસંદ કરો.",
       "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો.",
       "pickerEmptyDescriptionOrganizationReadOnly": "સંસ્થા માલિક અથવા એડમિન સંસ્થા પ્રોફાઇલ બનાવી શકે છે."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "કનેક્ટ કરેલી સેવાઓ",
     "entrySubtitle": "GitHub, Slack, Linear અને વધુ",
     "subtitle": "તમારા ડેવલપમેન્ટ ટૂલ્સ અને વર્કફ્લોને Kilo સાથે કનેક્ટ કરો",
-    "emptyHint": "હજી સુધી કોઈ ઇન્ટિગ્રેશન કનેક્ટ કરેલું નથી.",
     "disconnect": "ડિસ્કનેક્ટ કરો",
     "disconnectTitle": "{{provider}} ડિસ્કનેક્ટ કરીએ?",
     "disconnectMessage": "Kilo {{provider}}માં જવાબ આપવાનું બંધ કરશે. તમે ગમે ત્યારે ફરીથી કનેક્ટ કરી શકો છો.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "{{duration}} માં સમાપ્ત થશે",
     "neverExpires": "ક્યારેય સમાપ્ત થતી નથી",
     "includesNewMessages": "નવા સંદેશા શામેલ છે.",
-    "excludesNewMessages": "નવા સંદેશા શામેલ નથી."
+    "excludesNewMessages": "નવા સંદેશા શામેલ નથી.",
+    "superseded": "આ લિંક અન્યત્ર બદલવામાં આવી છે, તેથી તે હવે કામ કરતી નથી."
   },
   "sharedSession": {
     "title": "શેર કરેલું સત્ર",

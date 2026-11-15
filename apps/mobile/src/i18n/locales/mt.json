@@ -344,8 +344,6 @@
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
       "manageOnWebReason": "Dawn il-fornituri jeħtieġu kredenzjali strutturati.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
-      "enabled": "Qed tintuża",
-      "disabled": "Mitfija",
       "managedByPlan": "Immaniġġjata mill-pjan tal-ikkowdjar tiegħek",
       "enableKey": "Attiva ċ-ċavetta ta' {{provider}}",
       "test": "Ittestja ċ-ċavetta",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Irċevuta tar-rapport",
-      "description": "L-irċevuta għar-rapport li bgħatt. Żomm dan l-id biex tirreferi għalih aktar tard.",
+      "description": "Żomm dan l-id biex tirreferi għalih aktar tard.",
       "receiptLabel": "Irċevuta",
+      "copyReceiptId": "Ikkopja l-id tal-irċevuta",
       "appealLabel": "Appell",
       "triageReceived": "Riċevut",
       "triageOpen": "Qed jiġi rieżaminat",
@@ -3065,10 +3064,13 @@
     "couldNotLoadDescription": "Is-sessjonijiet attivi tiegħek ma jkunux disponibbli sakemm titgħabba d-dejta.",
     "currentDeviceUnidentified": "L-apparat attwali ma setax jiġi identifikat.",
     "kiloApp": "Applikazzjoni ta' Kilo",
+    "kiloAppAndroid": "Applikazzjoni ta' Kilo · Android",
+    "kiloAppIos": "Applikazzjoni ta' Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "L-ebda sessjoni attiva",
     "noSessionsDescription": "Idħol bl-applikazzjoni ta' Kilo fuq apparat ieħor u s-sessjoni tidher hawn.",
-    "onlyKiloAppSignIns": "Hawn jidhru biss is-sessjonijiet tal-applikazzjoni ta' Kilo. Is-sessjonijiet tal-editur u tal-CLI mhumiex elenkati.",
     "signedIn": "Dħul: {{signedIn}} · L-aħħar attività: {{lastSeen}}",
+    "signInScopeNote": "Hawn jidhru s-sessjonijiet tal-applikazzjoni ta' Kilo u tal-Kilo CLI. Is-sessjonijiet tal-editur mhumiex elenkati.",
     "thisDevice": "Dan l-apparat",
     "viewProfile": "Ara l-profil",
     "webBrowser": "Brawżer tal-web",
@@ -3077,7 +3079,7 @@
     "sessionSignedOut": "Il-ħruġ mill-kont f'din is-sessjoni tlesta.",
     "signOutThisDeviceTitle": "Toħroġ mill-kont fuq dan l-apparat?",
     "signOutThisSessionTitle": "Toħroġ mill-kont f'din is-sessjoni?",
-    "signOutThisSessionMessage": "Se toħroġ mill-kont fuq {{device}}. L-apparat jista' jibqa' jaċċessa l-API sa siegħa.",
+    "signOutThisSessionMessage": "Se toħroġ mill-kont fuq {{device}}. L-aħħar attività: {{lastSeen}}. L-apparat jista' jibqa' jaċċessa l-API sa siegħa.",
     "unknownDevice": "Apparat mhux magħruf"
   },
   "forceUpdate": {
@@ -3452,6 +3454,7 @@
       "description": "Organizzazzjoni taqsam il-krediti, l-aġenti u l-issettjar mat-tim tiegħek.",
       "nameLabel": "Isem l-organizzazzjoni",
       "nameRequired": "Daħħal isem għall-organizzazzjoni.",
+      "createdNotListed": "L-organizzazzjoni nħolqot. Dalwaqt se tidher fil-picker.",
       "trialNote": "Il-prova Enterprise tiegħek ta' 14-il jum tibda meta toħloqha. Il-pjanijiet jinxtraw fuq il-web."
     },
     "creditActivity": {
@@ -3497,7 +3500,7 @@
       "sharingUnavailable": "Il-qsim mhux disponibbli fuq dan l-apparat.",
       "status": {
         "paid": "Imħallsa",
-        "open": "Ftuħ",
+        "open": "Miftuħa",
         "void": "Annullata",
         "uncollectible": "Ma tistax tinġabar"
       },
@@ -3564,6 +3567,7 @@
     },
     "settingsOnWeb": {
       "title": "Issettjar tal-organizzazzjoni fuq il-web",
+      "integrations": "Integrazzjonijiet fuq il-web",
       "usageDetails": "Dettalji tal-użu",
       "providersAndModels": "Fornituri u mudelli",
       "groups": "Gruppi",
@@ -3579,7 +3583,7 @@
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
-      "last30Days": "L-aħħar 30 ġurnata",
+      "orgLast30Days": "Il-membri kollha · L-aħħar 30 ġurnata",
       "outputTokens": "Unitajiet tat-test tar-riżultat",
       "requests": "Talbiet"
     },
@@ -3798,6 +3802,8 @@
       "available": "Għodod disponibbli: {{count}}",
       "none": "L-ebda għodda disponibbli",
       "noneDescription": "Is-server Kilo ma bagħat lura l-ebda għodda.",
+      "notApplied": "L-għodod Kilo ma ġewx miżjuda ma' dan il-chat",
+      "notAppliedDescription": "L-għażla tiegħek ġiet salvata. Erġa' pprova biex tużaha f'dan il-chat issa.",
       "unreachable": "Ma setax jintlaħaq l-għodod Kilo",
       "unreachableDescription": "Is-server ma weġibx. Iċċekkja l-konnessjoni tiegħek, imbagħad erġa' pprova.",
       "unauthorized": "L-għodod Kilo rrifjutaw din is-sessjoni",
@@ -4338,6 +4344,7 @@
       "unbindFailed": "Ma setgħetx tħoll repo",
       "repoValue": "Repożitorju: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Dan il-profil m'għadux disponibbli. Agħżel ieħor.",
       "pickerEmptyDescriptionOrganization": "Oħloq profil ta' organizzazzjoni biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Sid jew amministratur ta' organizzazzjoni jista' joħloq profil ta' organizzazzjoni."
     },
@@ -4603,7 +4610,6 @@
     "sectionTitle": "Servizzi konnessi",
     "entrySubtitle": "GitHub, Slack, Linear u aktar",
     "subtitle": "Qabbad l-għodod u l-proċessi tax-xogħol tal-iżvilupp tiegħek ma' Kilo",
-    "emptyHint": "Għad m'hemm l-ebda integrazzjoni konnessa.",
     "disconnect": "Skonnettja",
     "disconnectTitle": "Tiskonnettja {{provider}}?",
     "disconnectMessage": "Kilo se jieqaf jirrispondi f'{{provider}}. Tista' terġa' tikkonnettja fi kwalunkwe ħin.",
@@ -4671,7 +4677,8 @@
     "expiresIn": "Jiskadi fi {{duration}}",
     "neverExpires": "Qatt ma jiskadi",
     "includesNewMessages": "Il-messaġġi l-ġodda huma inklużi.",
-    "excludesNewMessages": "Il-messaġġi l-ġodda huma esklużi."
+    "excludesNewMessages": "Il-messaġġi l-ġodda huma esklużi.",
+    "superseded": "Dan il-link ġie sostitwit minn post ieħor, għalhekk m'għadux jaħdem."
   },
   "sharedSession": {
     "title": "Sessjoni kondiviża",

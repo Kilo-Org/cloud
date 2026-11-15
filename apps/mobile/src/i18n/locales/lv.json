@@ -344,8 +344,6 @@
       "rowSubtitle": "Izmanto sava nodrošinātāja norēķinus",
       "manageOnWebReason": "Šiem nodrošinātājiem nepieciešami strukturēti akreditācijas dati.",
       "description": "Pieprasījumi, kas veikti ar šīm atslēgām, tiek iekasēti no tava nodrošinātāja konta, nevis no tava Kilo atlikuma.",
-      "enabled": "Tiek izmantota",
-      "disabled": "Izslēgta",
       "managedByPlan": "Pārvalda tavs kodēšanas plāns",
       "enableKey": "Iespējot {{provider}} atslēgu",
       "test": "Pārbaudīt atslēgu",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Ziņojuma apstiprinājums",
-      "description": "Apstiprinājums par tevis iesniegto ziņojumu. Saglabā šo ID, lai vēlāk uz to atsauktos.",
+      "description": "Saglabā šo ID, lai vēlāk uz to atsauktos.",
       "receiptLabel": "Apstiprinājums",
+      "copyReceiptId": "Kopēt apstiprinājuma ID",
       "appealLabel": "Pārsūdzība",
       "triageReceived": "Saņemts",
       "triageOpen": "Tiek izskatīts",
@@ -2961,10 +2960,13 @@
     "couldNotLoadDescription": "Tavas aktīvās sesijas būs pieejamas pēc datu ielādes.",
     "currentDeviceUnidentified": "Neizdevās identificēt pašreizējo ierīci.",
     "kiloApp": "Kilo lietotne",
+    "kiloAppAndroid": "Kilo lietotne · Android",
+    "kiloAppIos": "Kilo lietotne · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
-    "onlyKiloAppSignIns": "Šeit ir redzamas tikai Kilo lietotnes sesijas. Redaktora un CLI sesijas nav iekļautas.",
     "signedIn": "Pierakstīšanās: {{signedIn}} · Pēdējā aktivitāte: {{lastSeen}}",
+    "signInScopeNote": "Šeit ir redzamas Kilo lietotnes un Kilo CLI sesijas. Redaktora sesijas nav iekļautas.",
     "thisDevice": "Šī ierīce",
     "viewProfile": "Skatīt profilu",
     "webBrowser": "Tīmekļa pārlūks",
@@ -2973,7 +2975,7 @@
     "sessionSignedOut": "Sesija ir beigta.",
     "signOutThisDeviceTitle": "Izrakstīties šajā ierīcē?",
     "signOutThisSessionTitle": "Beigt šo sesiju?",
-    "signOutThisSessionMessage": "Ierīcē „{{device}}” tiks veikta izrakstīšanās. Tai vēl līdz stundai var saglabāties piekļuve API.",
+    "signOutThisSessionMessage": "Tiks veikta izrakstīšanās no „{{device}}”. Pēdējā aktivitāte: {{lastSeen}}. Piekļuve API tai vēl līdz stundai var saglabāties.",
     "unknownDevice": "Nezināma ierīce"
   },
   "forceUpdate": {
@@ -3346,6 +3348,7 @@
       "description": "Organizācija koplieto kredītus, aģentus un iestatījumus ar jūsu komandu.",
       "nameLabel": "Organizācijas nosaukums",
       "nameRequired": "Ievadiet organizācijas nosaukumu.",
+      "createdNotListed": "Organizācija izveidota. Tā drīzumā parādīsies atlasītājā.",
       "trialNote": "Jūsu 14 dienu Enterprise izmēģinājums sāksies, kad izveidosiet organizāciju. Plāni tiek iegādāti tīmeklī."
     },
     "creditActivity": {
@@ -3391,7 +3394,7 @@
       "sharingUnavailable": "Kopīgošana šajā ierīcē nav pieejama.",
       "status": {
         "paid": "Apmaksāts",
-        "open": "Atvērt",
+        "open": "Atvērts",
         "void": "Anulēts",
         "uncollectible": "Nepiedzenams"
       },
@@ -3458,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Organizācijas iestatījumi tīmeklī",
+      "integrations": "Integrācijas tīmeklī",
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
@@ -3473,7 +3477,7 @@
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",
-      "last30Days": "Pēdējās 30 dienas",
+      "orgLast30Days": "Visi dalībnieki · Pēdējās 30 dienas",
       "outputTokens": "Izvades tokeni",
       "requests": "Pieprasījumi"
     },
@@ -3690,6 +3694,8 @@
       "available": "Pieejamie rīki: {{count}}",
       "none": "Nav pieejamu rīku",
       "noneDescription": "Kilo serveris neatgrieza nevienu rīku.",
+      "notApplied": "Kilo rīki netika pievienoti šai tērzēšanai",
+      "notAppliedDescription": "Jūsu izvēle ir saglabāta. Mēģiniet vēlreiz, lai to tagad izmantotu šajā tērzēšanā.",
       "unreachable": "Neizdevās sasniegt Kilo rīkus",
       "unreachableDescription": "Serveris neatbildēja. Pārbaudi savienojumu un mēģini vēlreiz.",
       "unauthorized": "Kilo rīki atteica šo sesiju",
@@ -4216,6 +4222,7 @@
       "unbindFailed": "Nevarēja atsaistīt repo",
       "repoValue": "Repozitorijs: {{name}}",
       "profileValue": "Profils: {{name}}",
+      "profileUnavailable": "Šis profils vairs nav pieejams. Izvēlieties citu.",
       "pickerEmptyDescriptionOrganization": "Izveidojiet organizācijas profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organizācijas īpašnieks vai administrators var izveidot organizācijas profilu."
     },
@@ -4473,7 +4480,6 @@
     "sectionTitle": "Pievienotie pakalpojumi",
     "entrySubtitle": "GitHub, Slack, Linear un citi",
     "subtitle": "Savienojiet savus izstrādes rīkus un darbplūsmas ar Kilo",
-    "emptyHint": "Vēl nav pievienota neviena integrācija.",
     "disconnect": "Atvienot",
     "disconnectTitle": "Vai atvienot {{provider}}?",
     "disconnectMessage": "Kilo vairs neatbildēs pakalpojumā {{provider}}. Savienojumu varat atjaunot jebkurā laikā.",
@@ -4541,7 +4547,8 @@
     "expiresIn": "Derīga vēl {{duration}}",
     "neverExpires": "Derīga bez termiņa",
     "includesNewMessages": "Jauni ziņojumi tiek iekļauti.",
-    "excludesNewMessages": "Jauni ziņojumi netiek iekļauti."
+    "excludesNewMessages": "Jauni ziņojumi netiek iekļauti.",
+    "superseded": "Šī saite tika aizstāta citur, tāpēc tā vairs nedarbojas."
   },
   "sharedSession": {
     "title": "Kopīgota sesija",

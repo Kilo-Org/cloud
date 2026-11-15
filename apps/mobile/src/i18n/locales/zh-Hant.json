@@ -344,8 +344,6 @@
       "rowSubtitle": "使用你自己的供應商計費",
       "manageOnWebReason": "這些供應商需要結構化憑證",
       "description": "透過這些金鑰發出的請求會向你的供應商帳戶計費，而不會從你的 Kilo 餘額扣除。",
-      "enabled": "使用中",
-      "disabled": "已關閉",
       "managedByPlan": "由你的程式設計方案管理",
       "enableKey": "啟用 {{provider}} 金鑰",
       "test": "測試金鑰",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "檢舉回執",
-      "description": "這是你所提交檢舉的回執。請保留此 ID，以便日後查詢。",
+      "description": "請保留此 ID，以便日後查詢。",
       "receiptLabel": "回執",
+      "copyReceiptId": "複製回執 ID",
       "appealLabel": "申訴",
       "triageReceived": "已收到",
       "triageOpen": "審查中",
@@ -2366,10 +2365,13 @@
     "couldNotLoadDescription": "載入完成前，無法查看目前登入的工作階段。",
     "currentDeviceUnidentified": "無法辨識目前的裝置。",
     "kiloApp": "Kilo 應用程式",
+    "kiloAppAndroid": "Kilo 應用程式 · Android",
+    "kiloAppIos": "Kilo 應用程式 · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "沒有已登入的工作階段",
     "noSessionsDescription": "在其他裝置上登入 Kilo 應用程式後，該裝置就會顯示在這裡。",
-    "onlyKiloAppSignIns": "這裡只會顯示 Kilo 應用程式的登入工作階段，不會列出編輯器與 CLI 的登入工作階段。",
     "signedIn": "登入時間：{{signedIn}} · 最後上線：{{lastSeen}}",
+    "signInScopeNote": "這裡會顯示來自 Kilo 應用程式與 Kilo CLI 的登入。編輯器的登入不會列出。",
     "thisDevice": "此裝置",
     "webBrowser": "網頁瀏覽器",
     "viewProfile": "檢視個人資料",
@@ -2378,7 +2380,7 @@
     "sessionSignedOut": "工作階段已登出。",
     "signOutThisDeviceTitle": "登出此裝置？",
     "signOutThisSessionTitle": "登出此工作階段？",
-    "signOutThisSessionMessage": "{{device}} 將登出，但最長仍可存取 API 一小時。",
+    "signOutThisSessionMessage": "{{device}} 將登出，最後上線：{{lastSeen}}。最長仍可存取 API 一小時。",
     "unknownDevice": "未知裝置"
   },
   "forceUpdate": {
@@ -3285,6 +3287,7 @@
       "description": "組織可讓你與團隊共用點數、代理和設定。",
       "nameLabel": "組織名稱",
       "nameRequired": "請輸入組織名稱。",
+      "createdNotListed": "組織已建立。它很快就會顯示在選擇器中。",
       "trialNote": "建立組織後，即會開始 14 天的 Enterprise 試用。套餐需在網頁上購買。"
     },
     "creditActivity": {
@@ -3343,7 +3346,7 @@
       "sharingUnavailable": "此裝置無法使用分享功能。",
       "status": {
         "paid": "已付款",
-        "open": "開啟",
+        "open": "待付款",
         "void": "已作廢",
         "uncollectible": "無法收款"
       },
@@ -3410,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "網頁版組織設定",
+      "integrations": "網頁版整合",
       "usageDetails": "使用詳情",
       "providersAndModels": "供應商與模型",
       "groups": "群組",
@@ -3425,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
-      "last30Days": "最近 30 天",
+      "orgLast30Days": "全體成員 · 最近 30 天",
       "outputTokens": "輸出詞元",
       "requests": "請求"
     },
@@ -3636,6 +3640,8 @@
       "available": "可用工具：{{count}}",
       "none": "沒有可用工具",
       "noneDescription": "Kilo 伺服器未傳回任何工具。",
+      "notApplied": "Kilo 工具尚未加入此對話",
+      "notAppliedDescription": "您的選擇已儲存。再試一次，即可立即在此對話中使用。",
       "unreachable": "無法連接 Kilo 工具",
       "unreachableDescription": "伺服器沒有回應。請檢查網路連線，然後重試。",
       "unauthorized": "Kilo 工具拒絕了此工作階段",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "無法解除倉庫綁定",
       "repoValue": "存儲庫: {{name}}",
       "profileValue": "個人資料: {{name}}",
+      "profileUnavailable": "此個人資料已無法使用。請選擇其他個人資料。",
       "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。",
       "pickerEmptyDescriptionOrganizationReadOnly": "組織擁有者或管理員可以建立組織設定檔。"
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "已連結的服務",
     "entrySubtitle": "GitHub、Slack、Linear 等",
     "subtitle": "將您的開發工具與工作流程連結至 Kilo",
-    "emptyHint": "尚未連結任何整合。",
     "disconnect": "中斷連結",
     "disconnectTitle": "要中斷與 {{provider}} 的連結嗎？",
     "disconnectMessage": "Kilo 將停止在 {{provider}} 中回應。您可以隨時重新連結。",
@@ -4476,7 +4482,8 @@
     "expiresIn": "{{duration}}後到期",
     "neverExpires": "永不過期",
     "includesNewMessages": "包含新訊息。",
-    "excludesNewMessages": "不包含新訊息。"
+    "excludesNewMessages": "不包含新訊息。",
+    "superseded": "此連結已在其他裝置上被取代，因此已失效。"
   },
   "sharedSession": {
     "title": "已分享的工作階段",

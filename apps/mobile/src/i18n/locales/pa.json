@@ -344,8 +344,6 @@
       "rowSubtitle": "ਆਪਣੇ ਪ੍ਰਦਾਤਾ ਦੀ ਬਿਲਿੰਗ ਵਰਤੋ",
       "manageOnWebReason": "ਇਹਨਾਂ ਪ੍ਰਦਾਤਾਵਾਂ ਨੂੰ ਢਾਂਚਾਗਤ ਕ੍ਰੈਡੈਂਸ਼ੀਅਲਾਂ ਦੀ ਲੋੜ ਹੈ।",
       "description": "ਇਨ੍ਹਾਂ ਕੁੰਜੀਆਂ ਰਾਹੀਂ ਕੀਤੀਆਂ ਬੇਨਤੀਆਂ ਦਾ ਬਿੱਲ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਦੀ ਬਜਾਏ ਤੁਹਾਡੇ ਪ੍ਰਦਾਤਾ ਖਾਤੇ ਵਿੱਚ ਜਾਂਦਾ ਹੈ।",
-      "enabled": "ਵਰਤੋਂ ਵਿੱਚ",
-      "disabled": "ਬੰਦ ਹੈ",
       "managedByPlan": "ਤੁਹਾਡੇ ਕੋਡਿੰਗ ਪਲਾਨ ਵੱਲੋਂ ਪ੍ਰਬੰਧਿਤ",
       "enableKey": "{{provider}} ਕੁੰਜੀ ਚਾਲੂ ਕਰੋ",
       "test": "ਕੁੰਜੀ ਦੀ ਜਾਂਚ ਕਰੋ",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "ਰਿਪੋਰਟ ਦੀ ਰਸੀਦ",
-      "description": "ਤੁਹਾਡੇ ਵੱਲੋਂ ਦਰਜ ਕੀਤੀ ਰਿਪੋਰਟ ਦੀ ਰਸੀਦ। ਬਾਅਦ ਵਿੱਚ ਇਸ ਦਾ ਹਵਾਲਾ ਦੇਣ ਲਈ ਇਹ ID ਸੰਭਾਲ ਕੇ ਰੱਖੋ।",
+      "description": "ਬਾਅਦ ਵਿੱਚ ਇਸ ਦਾ ਹਵਾਲਾ ਦੇਣ ਲਈ ਇਹ ID ਸੰਭਾਲ ਕੇ ਰੱਖੋ।",
       "receiptLabel": "ਰਸੀਦ",
+      "copyReceiptId": "ਰਸੀਦ ਦੀ ID ਕਾਪੀ ਕਰੋ",
       "appealLabel": "ਅਪੀਲ",
       "triageReceived": "ਪ੍ਰਾਪਤ ਹੋਈ",
       "triageOpen": "ਸਮੀਖਿਆ ਅਧੀਨ",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "ਜਦੋਂ ਤੱਕ ਇਹ ਲੋਡ ਨਹੀਂ ਹੁੰਦਾ, ਤੁਹਾਡੇ ਸਰਗਰਮ ਸੈਸ਼ਨ ਉਪਲਬਧ ਨਹੀਂ ਹੋਣਗੇ।",
     "currentDeviceUnidentified": "ਮੌਜੂਦਾ ਡਿਵਾਈਸ ਦੀ ਪਛਾਣ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
     "kiloApp": "Kilo ਐਪ",
+    "kiloAppAndroid": "Kilo ਐਪ · Android",
+    "kiloAppIos": "Kilo ਐਪ · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "ਕੋਈ ਸਰਗਰਮ ਸੈਸ਼ਨ ਨਹੀਂ",
     "noSessionsDescription": "ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ 'ਤੇ Kilo ਐਪ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ। ਉਸ ਦਾ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗਾ।",
-    "onlyKiloAppSignIns": "ਇੱਥੇ ਸਿਰਫ਼ Kilo ਐਪ ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ। ਐਡੀਟਰ ਅਤੇ CLI ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਇਸ ਸੂਚੀ ਵਿੱਚ ਨਹੀਂ ਹਨ।",
     "signedIn": "ਸਾਈਨ ਇਨ ਕੀਤਾ: {{signedIn}} · ਆਖ਼ਰੀ ਵਾਰ ਵੇਖਿਆ: {{lastSeen}}",
+    "signInScopeNote": "ਇੱਥੇ Kilo ਐਪ ਅਤੇ Kilo CLI ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ। ਐਡੀਟਰ ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਇਸ ਸੂਚੀ ਵਿੱਚ ਨਹੀਂ ਹਨ।",
     "thisDevice": "ਇਹ ਡਿਵਾਈਸ",
     "viewProfile": "ਪ੍ਰੋਫਾਈਲ ਵੇਖੋ",
     "signOutThisDevice": "ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "ਸੈਸ਼ਨ ਸਾਈਨ ਆਉਟ ਹੋ ਗਿਆ।",
     "signOutThisDeviceTitle": "ਕੀ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
     "signOutThisSessionTitle": "ਕੀ ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
-    "signOutThisSessionMessage": "{{device}} ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰ ਦਿੱਤਾ ਜਾਵੇਗਾ। ਇਸ ਤੋਂ ਬਾਅਦ ਵੀ ਇਸ ਦੀ API ਤੱਕ ਪਹੁੰਚ ਇੱਕ ਘੰਟੇ ਤੱਕ ਬਣੀ ਰਹਿ ਸਕਦੀ ਹੈ।",
+    "signOutThisSessionMessage": "{{device}} ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰ ਦਿੱਤਾ ਜਾਵੇਗਾ। ਆਖ਼ਰੀ ਵਾਰ ਵੇਖਿਆ: {{lastSeen}}। ਇਸ ਤੋਂ ਬਾਅਦ ਵੀ ਇਸ ਦੀ API ਤੱਕ ਪਹੁੰਚ ਇੱਕ ਘੰਟੇ ਤੱਕ ਬਣੀ ਰਹਿ ਸਕਦੀ ਹੈ।",
     "webBrowser": "ਵੈੱਬ ਬ੍ਰਾਊਜ਼ਰ",
     "unknownDevice": "ਅਣਜਾਣ ਡਿਵਾਈਸ"
   },
@@ -3293,6 +3295,7 @@
       "description": "ਸੰਸਥਾ ਤੁਹਾਡੀ ਟੀਮ ਨਾਲ ਕ੍ਰੈਡਿਟ, ਏਜੰਟ ਅਤੇ ਸੈਟਿੰਗਾਂ ਸਾਂਝੀਆਂ ਕਰਦੀ ਹੈ।",
       "nameLabel": "ਸੰਸਥਾ ਦਾ ਨਾਮ",
       "nameRequired": "ਸੰਸਥਾ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।",
+      "createdNotListed": "ਸੰਸਥਾ ਬਣਾ ਦਿੱਤੀ ਗਈ। ਇਹ ਥੋੜ੍ਹੀ ਦੇਰ ਵਿੱਚ ਚੋਣਕਾਰ ਵਿੱਚ ਦਿਖਾਈ ਦੇਵੇਗੀ।",
       "trialNote": "ਸੰਸਥਾ ਬਣਾਉਂਦੇ ਹੀ ਤੁਹਾਡਾ 14-ਦਿਨਾਂ ਦਾ Enterprise ਟ੍ਰਾਇਲ ਸ਼ੁਰੂ ਹੋ ਜਾਂਦਾ ਹੈ। ਪਲਾਨ ਵੈੱਬ 'ਤੇ ਖਰੀਦੇ ਜਾਂਦੇ ਹਨ।"
     },
     "creditActivity": {
@@ -3338,7 +3341,7 @@
       "sharingUnavailable": "ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਸਾਂਝਾ ਕਰਨ ਦੀ ਸਹੂਲਤ ਨਹੀਂ ਹੈ।",
       "status": {
         "paid": "ਭੁਗਤਾਨ ਹੋ ਗਿਆ",
-        "open": "ਖੋਲ੍ਹੋ",
+        "open": "ਖੁੱਲ੍ਹਿਆ",
         "void": "ਰੱਦ",
         "uncollectible": "ਵਸੂਲੀ ਅਸੰਭਵ"
       },
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "ਵੈੱਬ 'ਤੇ ਸੰਸਥਾ ਦੀਆਂ ਸੈਟਿੰਗਾਂ",
+      "integrations": "ਵੈੱਬ 'ਤੇ ਇੰਟੀਗ੍ਰੇਸ਼ਨ",
       "usageDetails": "ਵਰਤੋਂ ਦੇ ਵੇਰਵੇ",
       "providersAndModels": "ਪ੍ਰੋਵਾਈਡਰ ਅਤੇ ਮਾਡਲ",
       "groups": "ਗਰੁੱਪ",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "ਇਨਪੁੱਟ ਟੋਕਨ",
-      "last30Days": "ਪਿਛਲੇ 30 ਦਿਨ",
+      "orgLast30Days": "ਸਾਰੇ ਮੈਂਬਰ · ਪਿਛਲੇ 30 ਦਿਨ",
       "outputTokens": "ਆਉਟਪੁੱਟ ਟੋਕਨ",
       "requests": "ਬੇਨਤੀਆਂ"
     },
@@ -3636,6 +3640,8 @@
       "available": "ਉਪਲਬਧ ਟੂਲ: {{count}}",
       "none": "ਕੋਈ ਟੂਲ ਉਪਲਬਧ ਨਹੀਂ",
       "noneDescription": "Kilo ਸਰਵਰ ਨੇ ਕੋਈ ਟੂਲ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
+      "notApplied": "ਇਸ ਚੈਟ ਵਿੱਚ Kilo ਟੂਲ ਨਹੀਂ ਜੋੜੇ ਗਏ",
+      "notAppliedDescription": "ਤੁਹਾਡੀ ਚੋਣ ਸੰਭਾਲ ਲਈ ਗਈ ਹੈ। ਇਸਨੂੰ ਹੁਣ ਇਸ ਚੈਟ ਵਿੱਚ ਵਰਤਣ ਲਈ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "unreachable": "Kilo ਟੂਲ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ",
       "unreachableDescription": "ਸਰਵਰ ਨੇ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "unauthorized": "Kilo ਟੂਲ ਨੇ ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਅਸਵੀਕਾਰ ਕੀਤਾ",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "ਰੈਪੋ ਨੂੰ ਅਨਬਾਈਂਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
       "repoValue": "ਰਿਪੋਜ਼ਟਰੀ: {{name}}",
       "profileValue": "ਪ੍ਰੋਫਾਈਲ: {{name}}",
+      "profileUnavailable": "ਇਹ ਪ੍ਰੋਫਾਈਲ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਚੁਣੋ।",
       "pickerEmptyDescriptionOrganization": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।",
       "pickerEmptyDescriptionOrganizationReadOnly": "ਸੰਗਠਨ ਦਾ ਮਾਲਕ ਜਾਂ ਪ੍ਰਬੰਧਕ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾ ਸਕਦਾ ਹੈ।"
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "ਕਨੈਕਟ ਕੀਤੀਆਂ ਸੇਵਾਵਾਂ",
     "entrySubtitle": "GitHub, Slack, Linear ਅਤੇ ਹੋਰ",
     "subtitle": "ਆਪਣੇ ਡਿਵੈਲਪਮੈਂਟ ਟੂਲ ਅਤੇ ਵਰਕਫ਼ਲੋ ਨੂੰ Kilo ਨਾਲ ਕਨੈਕਟ ਕਰੋ",
-    "emptyHint": "ਹਾਲੇ ਕੋਈ ਇੰਟੀਗ੍ਰੇਸ਼ਨ ਕਨੈਕਟ ਨਹੀਂ ਹੈ।",
     "disconnect": "ਡਿਸਕਨੈਕਟ ਕਰੋ",
     "disconnectTitle": "ਕੀ {{provider}} ਨੂੰ ਡਿਸਕਨੈਕਟ ਕਰਨਾ ਹੈ?",
     "disconnectMessage": "Kilo {{provider}} ਵਿੱਚ ਜਵਾਬ ਦੇਣਾ ਬੰਦ ਕਰ ਦੇਵੇਗਾ। ਤੁਸੀਂ ਕਿਸੇ ਵੀ ਸਮੇਂ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹੋ।",
@@ -4476,7 +4482,8 @@
     "expiresIn": "{{duration}} ਵਿੱਚ ਮਿਆਦ ਖਤਮ",
     "neverExpires": "ਮਿਆਦ ਕਦੇ ਖਤਮ ਨਹੀਂ ਹੁੰਦੀ",
     "includesNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਹਨ।",
-    "excludesNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ।"
+    "excludesNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ।",
+    "superseded": "ਇਹ ਲਿੰਕ ਕਿਸੇ ਹੋਰ ਥਾਂ ਤੋਂ ਬਦਲ ਦਿੱਤਾ ਗਿਆ ਸੀ, ਇਸ ਲਈ ਇਹ ਹੁਣ ਕੰਮ ਨਹੀਂ ਕਰਦਾ।"
   },
   "sharedSession": {
     "title": "ਸਾਂਝਾ ਕੀਤਾ ਸੈਸ਼ਨ",

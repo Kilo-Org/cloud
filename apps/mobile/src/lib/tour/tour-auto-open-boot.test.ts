@@ -1,24 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { isTourAutoOpenAttemptSpent, spendTourAutoOpenAttempt } from './tour-auto-open-boot';
-
-describe('tour auto-open boot marker', () => {
-  it('is unspent at process start', () => {
-    expect(isTourAutoOpenAttemptSpent()).toBe(false);
-  });
-
-  it('is spent after the attempt is spent', () => {
-    spendTourAutoOpenAttempt();
-    expect(isTourAutoOpenAttemptSpent()).toBe(true);
-  });
-
-  it('stays spent after a second call, so a warm entry never re-arms it', () => {
-    spendTourAutoOpenAttempt();
-    spendTourAutoOpenAttempt();
-    expect(isTourAutoOpenAttemptSpent()).toBe(true);
-  });
-});
-
 // The launch-account binding is module state, so each case starts from a fresh
 // module to model one cold boot.
 describe('tour auto-open launch account binding', () => {

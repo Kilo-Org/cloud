@@ -344,8 +344,6 @@
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
       "manageOnWebReason": "Dhiyeessitoonni kunneen ragaalee eenyummaa caaseffamoo barbaadu.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
-      "enabled": "Hojiirra jira",
-      "disabled": "Dhaameera",
       "managedByPlan": "Karoora koodii keetiin bulfama",
       "enableKey": "Furtuu {{provider}} dandeessisi",
       "test": "Furtuu qori",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Ragaa gabaasaa",
-      "description": "Ragaa gabaasa ati ergiteef. Booda itti wabeeffachuuf ID kana qabadhu.",
+      "description": "Booda itti wabeeffachuuf ID kana qabadhu.",
       "receiptLabel": "Ragaa",
+      "copyReceiptId": "Ragaa ID waraabi",
       "appealLabel": "Ol'iyyannoo",
       "triageReceived": "Fudhatameera",
       "triageOpen": "Sakatta'amaa jira",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Hanga kun fe'amutti turtiiwwan kee hojiirra jiran hin argaman.",
     "currentDeviceUnidentified": "Meeshaa ammaa adda baasuu hin danda'amne.",
     "kiloApp": "Appilikeeshinii Kilo",
+    "kiloAppAndroid": "Appilikeeshinii Kilo · Android",
+    "kiloAppIos": "Appilikeeshinii Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Turtiiwwan hojiirra jiran hin jiran",
     "noSessionsDescription": "Meeshaa biraa irratti appilikeeshinii Kilo tiin seeni; meeshaan sun asitti mul'ata.",
-    "onlyKiloAppSignIns": "Seensawwan appilikeeshinii Kilo qofa asitti mul'atu. Seensawwan gulaalaa fi CLI hin tarreeffaman.",
     "signedIn": "Yeroo seene {{signedIn}} · Dhumarratti kan mul'ate {{lastSeen}}",
+    "signInScopeNote": "Seensawwan appilikeeshinii Kilo fi Kilo CLI asitti mul'atu. Seensawwan gulaalaa hin tarreeffaman.",
     "thisDevice": "Meeshaa kana",
     "viewProfile": "Piroofaayilii ilaali",
     "signOutThisDevice": "Meeshaa kana herrega keessaa baasi",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "Turtiin herrega keessaa baafameera.",
     "signOutThisDeviceTitle": "Meeshaa kana herrega keessaa baastaa?",
     "signOutThisSessionTitle": "Turtii kana herrega keessaa baastaa?",
-    "signOutThisSessionMessage": "{{device}} herrega keessaa baafama. Hanga sa'aatii tokkootti API fayyadamuu itti fufuu danda'a.",
+    "signOutThisSessionMessage": "{{device}} herrega keessaa baafama. Dhumarratti kan mul'ate {{lastSeen}}. Hanga sa'aatii tokkootti API fayyadamuu itti fufuu danda'a.",
     "webBrowser": "Biraawzarii weebii",
     "unknownDevice": "Meeshaa hin beekamne"
   },
@@ -3293,6 +3295,7 @@
       "description": "Dhaabbanni kreeditii, eejentootaa fi qindaa'ina garee kee waliin qooda.",
       "nameLabel": "Maqaa dhaabbataa",
       "nameRequired": "Maqaa dhaabbataa galchi.",
+      "createdNotListed": "Dhaabbanni uumame. Dhiyootti picker keessatti ni mul'ata.",
       "trialNote": "Yaaliin Enterprise guyyaa 14 kee yeroo dhaabbata uumtu jalqaba. Karoorri weebii irratti bitama."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Qindaa'ina dhaabbataa weebii irratti",
+      "integrations": "Walitti hidhamiinsota weebii irratti",
       "usageDetails": "Odeeffannoo itti fayyadamaa",
       "providersAndModels": "Dhiyeessitootaa fi moodeelota",
       "groups": "Gareewwan",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",
-      "last30Days": "Guyyoota 30 dhumaa",
+      "orgLast30Days": "Miseensoota hunda · Guyyoota 30 dhumaa",
       "outputTokens": "Tookanoota bu'aa",
       "requests": "Gaaffiiwwan"
     },
@@ -3636,6 +3640,8 @@
       "available": "Meeshaalee jiran: {{count}}",
       "none": "Meeshaalee hin jiran",
       "noneDescription": "Sarvariin Kilo meeshaa tokkollee hin deebisne.",
+      "notApplied": "Meeshaaleen Kilo marii kanatti hin dabalamne",
+      "notAppliedDescription": "Filannoon kee olkaa'ameera. Amma marii kana keessatti itti fayyadamuuf irra deebi'ii yaali.",
       "unreachable": "Meeshaalee Kilo bira ga'uun hin danda'amne",
       "unreachableDescription": "Sarvariin hin deebisne. Walqunnamtii kee ilaali, sana booda ammas yaali.",
       "unauthorized": "Meeshaaleen Kilo marii kana didaniiru",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Repo hiikuu hin dandeenye",
       "repoValue": "Kuusaa: {{name}}",
       "profileValue": "Profaayilii: {{name}}",
+      "profileUnavailable": "Profaayiliin kun kana booda hin argamu. Kan biraa filadhu.",
       "pickerEmptyDescriptionOrganization": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii dhaabbataa uumi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Abbaan dhaabbataa yookiin bulchaan dhaabbataa piroofaayilii dhaabbataa uumuu danda'a."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Tajaajilawwan walitti hidhaman",
     "entrySubtitle": "GitHub, Slack, Linear fi kan biroo",
     "subtitle": "Meeshaalee misoomaa fi adeemsa hojii kee Kilo waliin walitti hidhi",
-    "emptyHint": "Hanga ammaatti walitti hidhamiinsi tokkollee hin jiru.",
     "disconnect": "Addaan kuti",
     "disconnectTitle": "{{provider}} addaan kutuu?",
     "disconnectMessage": "Kilo {{provider}} keessatti deebii kennuu ni dhaabata. Yeroo kamiyyuu irra deebitee walitti hidhuu dandeessa.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Yeroon isaa {{duration}} keessatti xumurama",
     "neverExpires": "Yeroon isaa gonkumaa hin xumuramu",
     "includesNewMessages": "Ergaawwan haaraan ni dabalamu.",
-    "excludesNewMessages": "Ergaawwan haaraan hin dabalaman."
+    "excludesNewMessages": "Ergaawwan haaraan hin dabalaman.",
+    "superseded": "Liinkiin kun bakka biraatti bakka buufameera, kanaaf kana booda hin hojjetu."
   },
   "sharedSession": {
     "title": "Seshinii qoodame",

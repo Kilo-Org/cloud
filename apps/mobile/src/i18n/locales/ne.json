@@ -344,8 +344,6 @@
       "rowSubtitle": "आफ्नै प्रदायक बिलिङ प्रयोग गर्नुहोस्",
       "manageOnWebReason": "यी प्रदायकहरूलाई संरचित प्रमाणपत्रहरू चाहिन्छ।",
       "description": "यी कुञ्जीहरूमार्फत गरिएका अनुरोधहरूको बिल तपाईंको Kilo मौज्दातको सट्टा तपाईंको प्रदायक खातामा लाग्छ।",
-      "enabled": "प्रयोगमा",
-      "disabled": "बन्द गरिएको",
       "managedByPlan": "तपाईंको कोडिङ योजनाद्वारा व्यवस्थित",
       "enableKey": "{{provider}} कुञ्जी सक्षम गर्नुहोस्",
       "test": "कुञ्जी परीक्षण गर्नुहोस्",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "रिपोर्टको रसिद",
-      "description": "तपाईंले पेश गर्नुभएको रिपोर्टको रसिद। पछि सन्दर्भका लागि यो ID राख्नुहोस्।",
+      "description": "पछि सन्दर्भका लागि यो ID राख्नुहोस्।",
       "receiptLabel": "रसिद",
+      "copyReceiptId": "रसिद ID कपी गर्नुहोस्",
       "appealLabel": "पुनरावेदन",
       "triageReceived": "प्राप्त भयो",
       "triageOpen": "समीक्षामा",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "यो लोड नभएसम्म तपाईंका सक्रिय सत्रहरू अनुपलब्ध छन्।",
     "currentDeviceUnidentified": "हालको यन्त्र पहिचान गर्न सकिएन।",
     "kiloApp": "Kilo एप",
+    "kiloAppAndroid": "Kilo एप · Android",
+    "kiloAppIos": "Kilo एप · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "कुनै सक्रिय सत्र छैन",
     "noSessionsDescription": "अर्को यन्त्रमा Kilo एपबाट साइन इन गर्नुहोस्। त्यसपछि त्यो यन्त्र यहाँ देखिनेछ।",
-    "onlyKiloAppSignIns": "यहाँ केवल Kilo एप साइन-इनहरू देखिन्छन्। एडिटर र CLI साइन-इनहरू सूचीबद्ध छैनन्।",
     "signedIn": "साइन इन: {{signedIn}} · अन्तिम पटक देखिएको: {{lastSeen}}",
+    "signInScopeNote": "यहाँ Kilo एप र Kilo CLI का साइन-इनहरू देखिन्छन्। एडिटरका साइन-इनहरू सूचीबद्ध छैनन्।",
     "thisDevice": "यो यन्त्र",
     "viewProfile": "प्रोफाइल हेर्नुहोस्",
     "signOutThisDevice": "यो यन्त्रबाट साइन आउट गर्नुहोस्",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "सत्रबाट साइन आउट गरियो।",
     "signOutThisDeviceTitle": "यो यन्त्रबाट साइन आउट गर्ने?",
     "signOutThisSessionTitle": "यो सत्रबाट साइन आउट गर्ने?",
-    "signOutThisSessionMessage": "{{device}} बाट साइन आउट गरिनेछ। त्यसपछि पनि यो यन्त्रसँग एक घण्टासम्म API पहुँच रहन सक्छ।",
+    "signOutThisSessionMessage": "{{device}} बाट साइन आउट गरिनेछ। अन्तिम पटक देखिएको: {{lastSeen}}। त्यसपछि पनि यो यन्त्रसँग एक घण्टासम्म API पहुँच रहन सक्छ।",
     "webBrowser": "वेब ब्राउजर",
     "unknownDevice": "अज्ञात यन्त्र"
   },
@@ -3293,6 +3295,7 @@
       "description": "संस्थाले तपाईंको टोलीसँग क्रेडिट, एजेन्ट र सेटिङहरू साझा गर्छ।",
       "nameLabel": "संस्थाको नाम",
       "nameRequired": "संस्थाको नाम लेख्नुहोस्।",
+      "createdNotListed": "संस्था बनाइयो। यो केही बेरमा पिकरमा देखिनेछ।",
       "trialNote": "संस्था बनाएपछि तपाईंको १४-दिने Enterprise ट्रायल सुरु हुन्छ। प्लानहरू वेबमा किनिन्छन्।"
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "वेबमा संस्थाका सेटिङहरू",
+      "integrations": "वेबमा एकीकरणहरू",
       "usageDetails": "प्रयोग विवरण",
       "providersAndModels": "प्रदायक र मोडेलहरू",
       "groups": "समूहहरू",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकनहरू",
-      "last30Days": "पछिल्ला 30 दिन",
+      "orgLast30Days": "सबै सदस्यहरू · पछिल्ला 30 दिन",
       "outputTokens": "आउटपुट टोकनहरू",
       "requests": "अनुरोधहरू"
     },
@@ -3636,6 +3640,8 @@
       "available": "उपलब्ध उपकरण: {{count}}",
       "none": "कुनै उपकरण उपलब्ध छैन",
       "noneDescription": "Kilo सर्भरले कुनै उपकरण फर्काएन।",
+      "notApplied": "यो कुराकानीमा Kilo उपकरणहरू थपिएका छैनन्",
+      "notAppliedDescription": "तपाईंको छनोट सुरक्षित गरिएको छ। यसलाई अहिले यो कुराकानीमा प्रयोग गर्न फेरि प्रयास गर्नुहोस्।",
       "unreachable": "Kilo उपकरणसम्म पुग्न सकिएन",
       "unreachableDescription": "सर्भरले जवाफ दिएन। आफ्नो जडान जाँच्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
       "unauthorized": "Kilo उपकरणले यो सत्र अस्वीकार गरे",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "रिपो अनबाइन्ड गर्न सकेन",
       "repoValue": "भण्डार: {{name}}",
       "profileValue": "प्रोफाइल: {{name}}",
+      "profileUnavailable": "यो प्रोफाइल अब उपलब्ध छैन। अर्को छान्नुहोस्।",
       "pickerEmptyDescriptionOrganization": "वातावरण चरहरू, सेटअप आदेशहरू, र सत्रहरूमा सीपहरू पुन: प्रयोग गर्न संगठन प्रोफाइल सिर्जना गर्नुहोस्।",
       "pickerEmptyDescriptionOrganizationReadOnly": "संगठनको मालिक वा प्रशासकले संगठन प्रोफाइल सिर्जना गर्न सक्छ।"
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "जोडिएका सेवाहरू",
     "entrySubtitle": "GitHub, Slack, Linear र अन्य",
     "subtitle": "आफ्ना विकास उपकरण र कार्यप्रवाहहरूलाई Kilo सँग जोड्नुहोस्",
-    "emptyHint": "अहिलेसम्म कुनै एकीकरण जोडिएको छैन।",
     "disconnect": "विच्छेद गर्नुहोस्",
     "disconnectTitle": "{{provider}} विच्छेद गर्ने हो?",
     "disconnectMessage": "Kilo ले {{provider}} मा जवाफ दिन बन्द गर्नेछ। तपाईं जुनसुकै बेला पुनः जोड्न सक्नुहुन्छ।",
@@ -4476,7 +4482,8 @@
     "expiresIn": "{{duration}} मा म्याद सकिन्छ",
     "neverExpires": "म्याद कहिल्यै सकिँदैन",
     "includesNewMessages": "नयाँ सन्देशहरू समावेश छन्।",
-    "excludesNewMessages": "नयाँ सन्देशहरू समावेश छैनन्।"
+    "excludesNewMessages": "नयाँ सन्देशहरू समावेश छैनन्।",
+    "superseded": "यो लिङ्क अन्यत्रबाट बदलिएको छ, त्यसैले यसले अब काम गर्दैन।"
   },
   "sharedSession": {
     "title": "सेयर गरिएको सत्र",

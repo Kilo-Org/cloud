@@ -344,8 +344,6 @@
       "rowSubtitle": "Folosește facturarea propriului furnizor",
       "manageOnWebReason": "Acești furnizori necesită date de autentificare structurate.",
       "description": "Solicitările făcute cu aceste chei sunt facturate în contul tău de furnizor, nu din soldul Kilo.",
-      "enabled": "În uz",
-      "disabled": "Dezactivată",
       "managedByPlan": "Gestionată de planul tău de coding",
       "enableKey": "Activează cheia {{provider}}",
       "test": "Testează cheia",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Confirmarea raportării",
-      "description": "Confirmarea de primire pentru raportul trimis. Păstrează acest ID pentru a-l putea menționa ulterior.",
+      "description": "Păstrează acest ID pentru a-l putea menționa ulterior.",
       "receiptLabel": "Confirmare",
+      "copyReceiptId": "Copiază ID-ul confirmării",
       "appealLabel": "Contestație",
       "triageReceived": "Primit",
       "triageOpen": "În analiză",
@@ -2961,9 +2960,12 @@
     "couldNotLoadDescription": "Sesiunile tale active nu pot fi afișate până la încărcarea datelor.",
     "currentDeviceUnidentified": "Nu s-a putut identifica dispozitivul curent.",
     "kiloApp": "Aplicația Kilo",
+    "kiloAppAndroid": "Aplicația Kilo · Android",
+    "kiloAppIos": "Aplicația Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Nicio sesiune activă",
     "noSessionsDescription": "Autentifică-te în aplicația Kilo pe alt dispozitiv, iar sesiunea va apărea aici.",
-    "onlyKiloAppSignIns": "Doar autentificările din aplicația Kilo apar aici. Autentificările din editor și CLI nu sunt listate.",
+    "signInScopeNote": "Aici apar autentificările din aplicația Kilo și din Kilo CLI. Autentificările din editor nu sunt listate.",
     "signedIn": "Autentificare: {{signedIn}} · Ultima activitate: {{lastSeen}}",
     "thisDevice": "Acest dispozitiv",
     "viewProfile": "Vezi profilul",
@@ -2972,7 +2974,7 @@
     "sessionSignedOut": "Sesiune deconectată.",
     "signOutThisDeviceTitle": "Deconectezi acest dispozitiv?",
     "signOutThisSessionTitle": "Deconectezi această sesiune?",
-    "signOutThisSessionMessage": "{{device}} va fi deconectat. Accesul la API poate rămâne activ încă cel mult o oră.",
+    "signOutThisSessionMessage": "{{device}} va fi deconectat. Ultima activitate: {{lastSeen}}. Accesul la API poate rămâne activ încă cel mult o oră.",
     "webBrowser": "Browser web",
     "unknownDevice": "Dispozitiv necunoscut"
   },
@@ -3346,6 +3348,7 @@
       "description": "O organizație partajează creditele, agenții și setările cu echipa ta.",
       "nameLabel": "Numele organizației",
       "nameRequired": "Introdu numele organizației.",
+      "createdNotListed": "Organizația a fost creată. Va apărea în selector în curând.",
       "trialNote": "Perioada de probă Enterprise de 14 zile începe când o creezi. Planurile se cumpără pe web."
     },
     "creditActivity": {
@@ -3391,7 +3394,7 @@
       "sharingUnavailable": "Partajarea nu este disponibilă pe acest dispozitiv.",
       "status": {
         "paid": "Plătită",
-        "open": "Deschidere",
+        "open": "Deschisă",
         "void": "Anulată",
         "uncollectible": "Neîncasabilă"
       },
@@ -3458,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Setările organizației pe web",
+      "integrations": "Integrări pe web",
       "usageDetails": "Detalii de utilizare",
       "providersAndModels": "Furnizori și modele",
       "groups": "Grupuri",
@@ -3473,7 +3477,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
-      "last30Days": "Ultimele 30 de zile",
+      "orgLast30Days": "Toți membrii · Ultimele 30 de zile",
       "outputTokens": "Tokenuri de ieșire",
       "requests": "Cereri"
     },
@@ -3690,6 +3694,8 @@
       "available": "Instrumente disponibile: {{count}}",
       "none": "Niciun instrument disponibil",
       "noneDescription": "Serverul Kilo nu a returnat niciun instrument.",
+      "notApplied": "Instrumentele Kilo nu au fost adăugate în acest chat",
+      "notAppliedDescription": "Alegerea ta este salvată. Reîncearcă pentru a o folosi acum în acest chat.",
       "unreachable": "Nu s-a putut contacta instrumentele Kilo",
       "unreachableDescription": "Serverul nu a răspuns. Verifică conexiunea și încearcă din nou.",
       "unauthorized": "Instrumentele Kilo au refuzat această sesiune",
@@ -4216,6 +4222,7 @@
       "unbindFailed": "Nu s-a putut dezlega repo",
       "repoValue": "Depozitul: {{name}}",
       "profileValue": "Profilul: {{name}}",
+      "profileUnavailable": "Acest profil nu mai este disponibil. Alege altul.",
       "pickerEmptyDescriptionOrganization": "Creați un profil de organizație pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Un proprietar sau un administrator al organizației poate crea un profil de organizație."
     },
@@ -4473,7 +4480,6 @@
     "sectionTitle": "Servicii conectate",
     "entrySubtitle": "GitHub, Slack, Linear și altele",
     "subtitle": "Conectează-ți instrumentele și fluxurile de lucru pentru dezvoltare la Kilo",
-    "emptyHint": "Nicio integrare conectată încă.",
     "disconnect": "Deconectează",
     "disconnectTitle": "Deconectezi {{provider}}?",
     "disconnectMessage": "Kilo nu va mai răspunde în {{provider}}. Te poți reconecta oricând.",
@@ -4541,7 +4547,8 @@
     "expiresIn": "Expiră în {{duration}}",
     "neverExpires": "Nu expiră niciodată",
     "includesNewMessages": "Mesajele noi sunt incluse.",
-    "excludesNewMessages": "Mesajele noi nu sunt incluse."
+    "excludesNewMessages": "Mesajele noi nu sunt incluse.",
+    "superseded": "Acest link a fost înlocuit de pe alt dispozitiv, așa că nu mai funcționează."
   },
   "sharedSession": {
     "title": "Sesiune partajată",

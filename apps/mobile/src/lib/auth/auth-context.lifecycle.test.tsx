@@ -480,6 +480,7 @@ vi.mock('@/lib/storage-keys', () => ({
   LAST_ROUTE_KEY: 'last-route',
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   LOGIN_EMAIL_DRAFT_KEY: 'login-email-draft',
+  LOGIN_DRAFT_RECORD_KEY: 'login-draft-record',
   LOGIN_SSO_RECOVERY_DRAFT_KEY: 'login-sso-recovery-draft',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
@@ -837,8 +838,8 @@ describe('sign-out teardown ordering', () => {
     // The mount loads auth-context from a fresh module registry, so the drafts
     // module the provider closes over is the one imported after it.
     const drafts = await import('@/lib/login-draft');
-    drafts.setLoginEmailDraft('typed@example.com');
-    drafts.setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
+    drafts.beginLoginEmail('typed@example.com');
+    drafts.holdSsoRecovery({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
 
     await act(async () => {
       await ctx.signIn('signed-in-token');
@@ -855,8 +856,8 @@ describe('sign-out teardown ordering', () => {
   it('keeps the sign-in form drafts when the credential write fails', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const drafts = await import('@/lib/login-draft');
-    drafts.setLoginEmailDraft('typed@example.com');
-    drafts.setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
+    drafts.beginLoginEmail('typed@example.com');
+    drafts.holdSsoRecovery({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
     hoisted.secureStore.setItemAsync.mockRejectedValueOnce(new Error('keychain unavailable'));
 
     await act(async () => {
@@ -868,6 +869,87 @@ describe('sign-out teardown ordering', () => {
       email: 'typed@example.com',
       ssoRecovery: { email: 'typed@example.com', ssoOrganizationId: 'org-1' },
     });
+
+    unmount();
+  });
+
+  it('completes the sign-in when the draft retirement cannot be written, and retires it on sign-out', async () => {
+    const { ctx, getCtx, unmount } = await mountAndGetContext();
+    const drafts = await import('@/lib/login-draft');
+    const recordKey = 'login-draft-record';
+    const stored = new Map<string, string>();
+    let refusesRetirement = true;
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(stored.get(key) ?? null)
+    );
+    hoisted.secureStore.setItemAsync.mockImplementation((key: string, value: string) => {
+      if (key === recordKey && refusesRetirement) {
+        return Promise.reject(new Error('keychain unavailable'));
+      }
+      stored.set(key, value);
+      return Promise.resolve();
+    });
+
+    drafts.beginLoginEmail('typed@example.com');
+    refusesRetirement = false;
+    await drafts.persistLoginDrafts();
+    // (a) The keychain refuses the tombstone, and the person is signed in anyway.
+    refusesRetirement = true;
+    await act(async () => {
+      await ctx.signIn('signed-in-token');
+    });
+    expect(getCtx().token).toBe('signed-in-token');
+
+    // (b) Sign-out retries the obligation, still before the login screen draws,
+    // and its success retires the record the previous attempt wrote.
+    refusesRetirement = false;
+    await act(async () => {
+      await ctx.signOut();
+    });
+    expect(JSON.parse(stored.get(recordKey) ?? '{}')).toEqual({ version: 2, state: 'retired' });
+    await expect(drafts.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+
+    unmount();
+  });
+
+  it('still signs in when the retirement fails both at sign-in and at sign-out', async () => {
+    const { ctx, getCtx, unmount } = await mountAndGetContext();
+    const drafts = await import('@/lib/login-draft');
+    const recordKey = 'login-draft-record';
+    const stored = new Map<string, string>();
+    let refusesWrites = false;
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(stored.get(key) ?? null)
+    );
+    hoisted.secureStore.setItemAsync.mockImplementation((key: string, value: string) => {
+      if (key === recordKey && refusesWrites) {
+        return Promise.reject(new Error('keychain unavailable'));
+      }
+      stored.set(key, value);
+      return Promise.resolve();
+    });
+
+    drafts.beginLoginEmail('typed@example.com');
+    await drafts.persistLoginDrafts();
+    refusesWrites = true;
+
+    // (c) Both retirements fail. This process still shows the signed-out screen
+    // with nothing restored, because its own memory is retired; the held record
+    // survives on disk, which is the window the report states.
+    await act(async () => {
+      await ctx.signIn('signed-in-token');
+    });
+    expect(getCtx().token).toBe('signed-in-token');
+    await act(async () => {
+      await ctx.signOut();
+    });
+    // The keychain kept refusing, so the record is still the held copy.
+    expect(JSON.parse(stored.get(recordKey) ?? '{}')).toEqual({
+      version: 2,
+      state: 'held',
+      email: 'typed@example.com',
+    });
+    await expect(drafts.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
 
     unmount();
   });
@@ -1887,8 +1969,10 @@ describe('bootstrap and foreground race fencing', () => {
     // Hold the terminal clear open so the epoch can move inside it: this is the
     // window where the refresh still returns refused for the session that
     // owned it.
+    const clearStarted = Promise.withResolvers<undefined>();
     const { promise: clearGate, resolve: releaseClear } = Promise.withResolvers<undefined>();
     hoisted.secureStore.deleteItemAsync.mockImplementationOnce(async () => {
+      clearStarted.resolve(undefined);
       await clearGate;
     });
 
@@ -1900,16 +1984,9 @@ describe('bootstrap and foreground race fencing', () => {
     // Wait until the clear is in flight, then move the epoch: a newer session
     // now owns the tree while the old refresh is still inside its clear.
     const authEpoch = await import('@/lib/auth/auth-epoch');
-    let flushes = 0;
-    while (hoisted.secureStore.deleteItemAsync.mock.calls.length === 0 && flushes < 50) {
-      flushes += 1;
-      // eslint-disable-next-line no-await-in-loop -- sequential flush until the clear is in flight
-      await act(async () => {
-        await new Promise<void>(resolve => {
-          void setTimeout(resolve, 0);
-        });
-      });
-    }
+    await act(async () => {
+      await clearStarted.promise;
+    });
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalled();
     expect(fetchSpy).toHaveBeenCalled();
 

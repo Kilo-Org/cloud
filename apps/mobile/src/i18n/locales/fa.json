@@ -344,8 +344,6 @@
       "rowSubtitle": "استفاده از صورت‌حساب ارائه‌دهنده خودتان",
       "manageOnWebReason": "این ارائه‌دهندگان به اطلاعات اعتبارسنجی ساختاریافته نیاز دارند.",
       "description": "هزینه درخواست‌هایی که با این کلیدها ارسال می‌شوند به جای موجودی Kilo، از حساب ارائه‌دهنده شما کسر می‌شود.",
-      "enabled": "در حال استفاده",
-      "disabled": "خاموش",
       "managedByPlan": "مدیریت‌شده توسط طرح کدنویسی شما",
       "enableKey": "فعال کردن کلید {{provider}}",
       "test": "آزمایش کلید",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "رسید گزارش",
-      "description": "رسید گزارشی که ارسال کرده‌اید. این شناسه را نگه دارید تا بعداً به آن ارجاع دهید.",
+      "description": "این شناسه را نگه دارید تا بعداً به آن ارجاع دهید.",
       "receiptLabel": "رسید",
+      "copyReceiptId": "کپی شناسهٔ رسید",
       "appealLabel": "درخواست تجدیدنظر",
       "triageReceived": "دریافت شد",
       "triageOpen": "در حال بررسی",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "تا زمانی که بارگذاری کامل شود، نشست‌های فعال شما در دسترس نیستند.",
     "currentDeviceUnidentified": "شناسایی دستگاه فعلی ممکن نشد.",
     "kiloApp": "برنامه Kilo",
+    "kiloAppAndroid": "برنامه Kilo · Android",
+    "kiloAppIos": "برنامه Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "هیچ نشست فعالی وجود ندارد",
     "noSessionsDescription": "با برنامه Kilo در دستگاه دیگری وارد شوید تا در اینجا نمایش داده شود.",
-    "onlyKiloAppSignIns": "فقط ورودهای برنامه Kilo در اینجا ظاهر می‌شوند. ورودهای ویرایشگر و CLI فهرست نمی‌شوند.",
     "signedIn": "ورود در {{signedIn}} · آخرین بازدید {{lastSeen}}",
+    "signInScopeNote": "ورودهای برنامه Kilo و Kilo CLI در اینجا ظاهر می‌شوند. ورودهای ویرایشگر فهرست نمی‌شوند.",
     "thisDevice": "این دستگاه",
     "viewProfile": "مشاهدهٔ پروفایل",
     "signOutThisDevice": "خروج از این دستگاه",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "خروج از نشست انجام شد.",
     "signOutThisDeviceTitle": "از حساب خود در این دستگاه خارج می‌شوید؟",
     "signOutThisSessionTitle": "از این نشست خارج می‌شوید؟",
-    "signOutThisSessionMessage": "دستگاه {{device}} از حساب خارج می‌شود، اما ممکن است تا یک ساعت به API دسترسی داشته باشد.",
+    "signOutThisSessionMessage": "دستگاه {{device}} از حساب خارج می‌شود. آخرین بازدید {{lastSeen}}. ممکن است تا یک ساعت به API دسترسی داشته باشد.",
     "webBrowser": "مرورگر وب",
     "unknownDevice": "دستگاه ناشناخته"
   },
@@ -3293,6 +3295,7 @@
       "description": "سازمان، اعتبارها، عامل‌ها و تنظیمات را با تیم شما به اشتراک می‌گذارد.",
       "nameLabel": "نام سازمان",
       "nameRequired": "نام سازمان را وارد کنید.",
+      "createdNotListed": "سازمان ایجاد شد. به‌زودی در انتخابگر ظاهر می‌شود.",
       "trialNote": "دورهٔ آزمایشی ۱۴ روزهٔ Enterprise شما با ایجاد سازمان شروع می‌شود. طرح‌ها از طریق وب خریداری می‌شوند."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "تنظیمات سازمان در وب",
+      "integrations": "یکپارچه‌سازی‌ها در وب",
       "usageDetails": "جزئیات مصرف",
       "providersAndModels": "ارائه‌دهندگان و مدل‌ها",
       "groups": "گروه‌ها",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "توکن‌های ورودی",
-      "last30Days": "۳۰ روز گذشته",
+      "orgLast30Days": "همه اعضا · ۳۰ روز گذشته",
       "outputTokens": "توکن‌های خروجی",
       "requests": "درخواست‌ها"
     },
@@ -3636,6 +3640,8 @@
       "available": "ابزارهای موجود: {{count}}",
       "none": "هیچ ابزاری موجود نیست",
       "noneDescription": "سرور Kilo هیچ ابزاری برنگرداند.",
+      "notApplied": "ابزارهای Kilo به این گفتگو اضافه نشدند",
+      "notAppliedDescription": "انتخاب شما ذخیره شده است. برای استفاده از آن در این گفتگو، اکنون تلاش مجدد کنید.",
       "unreachable": "دسترسی به ابزارهای Kilo ممکن نشد",
       "unreachableDescription": "سرور پاسخ نداد. اتصالت را بررسی کن و دوباره تلاش کن.",
       "unauthorized": "ابزارهای Kilo این نشست را رد کردند",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Repo لغو پیوند نشد",
       "repoValue": "مخزن: {{name}}",
       "profileValue": "پروفایل: {{name}}",
+      "profileUnavailable": "این پروفایل دیگر در دسترس نیست. پروفایل دیگری انتخاب کنید.",
       "pickerEmptyDescriptionOrganization": "یک نمایه سازمانی برای استفاده مجدد از متغیرهای محیطی، دستورات راه‌اندازی و مهارت‌ها در جلسات ایجاد کنید.",
       "pickerEmptyDescriptionOrganizationReadOnly": "مالک یا مدیر سازمان می‌تواند یک نمایه سازمانی ایجاد کند."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "سرویس‌های متصل",
     "entrySubtitle": "GitHub، Slack، Linear و موارد دیگر",
     "subtitle": "ابزارها و گردش‌کارهای توسعهٔ خود را به Kilo متصل کنید",
-    "emptyHint": "هنوز هیچ یکپارچه‌سازی متصل نشده است.",
     "disconnect": "قطع اتصال",
     "disconnectTitle": "اتصال {{provider}} قطع شود؟",
     "disconnectMessage": "Kilo دیگر در {{provider}} پاسخ نمی‌دهد. هر زمان بخواهید می‌توانید دوباره متصل شوید.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "انقضا در {{duration}}",
     "neverExpires": "بدون انقضا",
     "includesNewMessages": "پیام‌های جدید گنجانده می‌شوند.",
-    "excludesNewMessages": "پیام‌های جدید گنجانده نمی‌شوند."
+    "excludesNewMessages": "پیام‌های جدید گنجانده نمی‌شوند.",
+    "superseded": "این پیوند در جای دیگری جایگزین شده است و دیگر کار نمی‌کند."
   },
   "sharedSession": {
     "title": "نشست اشتراک‌گذاشته‌شده",

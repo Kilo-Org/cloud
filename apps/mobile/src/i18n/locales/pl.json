@@ -344,8 +344,6 @@
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
       "manageOnWebReason": "Ci dostawcy wymagają danych uwierzytelniających w określonym formacie.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
-      "enabled": "W użyciu",
-      "disabled": "Wyłączony",
       "managedByPlan": "Zarządzany przez twój plan kodowania",
       "enableKey": "Włącz klucz {{provider}}",
       "test": "Testuj klucz",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Potwierdzenie zgłoszenia",
-      "description": "Potwierdzenie przesłanego przez ciebie zgłoszenia. Zachowaj ten identyfikator, aby móc się do niego później odwołać.",
+      "description": "Zachowaj ten identyfikator, aby móc się do niego później odwołać.",
       "receiptLabel": "Potwierdzenie",
+      "copyReceiptId": "Skopiuj identyfikator potwierdzenia",
       "appealLabel": "Odwołanie",
       "triageReceived": "Otrzymano",
       "triageOpen": "W trakcie rozpatrywania",
@@ -2424,9 +2423,12 @@
     "couldNotLoadDescription": "Lista aktywnych sesji będzie dostępna po wczytaniu danych.",
     "currentDeviceUnidentified": "Nie udało się rozpoznać tego urządzenia.",
     "kiloApp": "Aplikacja Kilo",
+    "kiloAppAndroid": "Aplikacja Kilo · Android",
+    "kiloAppIos": "Aplikacja Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Brak aktywnych sesji",
     "noSessionsDescription": "Zaloguj się w aplikacji Kilo na innym urządzeniu, a zobaczysz je tutaj.",
-    "onlyKiloAppSignIns": "Lista obejmuje tylko logowania w aplikacji Kilo. Nie obejmuje logowań w edytorze ani CLI.",
+    "signInScopeNote": "Na tej liście pojawiają się logowania w aplikacji Kilo i w Kilo CLI. Logowania w edytorze nie są uwzględniane.",
     "signedIn": "Logowanie: {{signedIn}} · Ostatnia aktywność: {{lastSeen}}",
     "thisDevice": "To urządzenie",
     "viewProfile": "Wyświetl profil",
@@ -2435,7 +2437,7 @@
     "sessionSignedOut": "Zakończono sesję logowania.",
     "signOutThisDeviceTitle": "Wylogować to urządzenie?",
     "signOutThisSessionTitle": "Zakończyć tę sesję logowania?",
-    "signOutThisSessionMessage": "Urządzenie {{device}} zostanie wylogowane. Może nadal mieć dostęp do API przez maksymalnie godzinę.",
+    "signOutThisSessionMessage": "Urządzenie {{device}} zostanie wylogowane. Ostatnia aktywność: {{lastSeen}}. Może nadal mieć dostęp do API przez maksymalnie godzinę.",
     "webBrowser": "Przeglądarka internetowa",
     "unknownDevice": "Nieznane urządzenie"
   },
@@ -3391,6 +3393,7 @@
       "description": "Organizacja udostępnia Twojemu zespołowi wspólne kredyty, agentów i ustawienia.",
       "nameLabel": "Nazwa organizacji",
       "nameRequired": "Wpisz nazwę organizacji.",
+      "createdNotListed": "Organizacja została utworzona. Wkrótce pojawi się w selektorze.",
       "trialNote": "Po utworzeniu organizacji rozpocznie się 14-dniowy okres próbny planu Enterprise. Plany kupuje się w wersji internetowej."
     },
     "creditActivity": {
@@ -3516,6 +3519,7 @@
     },
     "settingsOnWeb": {
       "title": "Ustawienia organizacji w wersji internetowej",
+      "integrations": "Integracje w wersji internetowej",
       "usageDetails": "Szczegóły użycia",
       "providersAndModels": "Dostawcy i modele",
       "groups": "Grupy",
@@ -3531,7 +3535,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
-      "last30Days": "Ostatnie 30 dni",
+      "orgLast30Days": "Wszyscy członkowie · Ostatnie 30 dni",
       "outputTokens": "Tokeny wyjściowe",
       "requests": "Żądania"
     },
@@ -3744,6 +3748,8 @@
       "available": "Dostępne narzędzia: {{count}}",
       "none": "Brak dostępnych narzędzi",
       "noneDescription": "Serwer Kilo nie zwrócił żadnych narzędzi.",
+      "notApplied": "Narzędzia Kilo nie zostały dodane do tego czatu",
+      "notAppliedDescription": "Twój wybór został zapisany. Spróbuj ponownie, aby zastosować go teraz w tym czacie.",
       "unreachable": "Nie udało się połączyć z narzędziami Kilo",
       "unreachableDescription": "Serwer nie odpowiedział. Sprawdź połączenie i spróbuj ponownie.",
       "unauthorized": "Narzędzia Kilo odrzuciły tę sesję",
@@ -4277,6 +4283,7 @@
       "unbindFailed": "Nie można odłączyć repozytorium",
       "repoValue": "Repozytorium: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Ten profil nie jest już dostępny. Wybierz inny.",
       "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Właściciel lub administrator organizacji może utworzyć profil organizacji."
     },
@@ -4538,7 +4545,6 @@
     "sectionTitle": "Połączone usługi",
     "entrySubtitle": "GitHub, Slack, Linear i inne",
     "subtitle": "Połącz swoje narzędzia programistyczne i procesy pracy z Kilo",
-    "emptyHint": "Brak połączonych integracji.",
     "disconnect": "Odłącz",
     "disconnectTitle": "Odłączyć usługę {{provider}}?",
     "disconnectMessage": "Kilo przestanie odpowiadać w usłudze {{provider}}. W każdej chwili możesz połączyć ją ponownie.",
@@ -4606,7 +4612,8 @@
     "expiresIn": "Wygasa za {{duration}}",
     "neverExpires": "Nie wygasa",
     "includesNewMessages": "Nowe wiadomości są uwzględniane.",
-    "excludesNewMessages": "Nowe wiadomości nie są uwzględniane."
+    "excludesNewMessages": "Nowe wiadomości nie są uwzględniane.",
+    "superseded": "Ten link został zastąpiony na innym urządzeniu, więc już nie działa."
   },
   "sharedSession": {
     "title": "Udostępniona sesja",

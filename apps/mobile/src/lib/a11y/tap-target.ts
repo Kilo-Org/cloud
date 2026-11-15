@@ -186,6 +186,30 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
 
 /**
+ * The box an in-field clear control renders at the end of a search field.
+ *
+ * The control sits inside the field's content box next to its `TextInput`, so
+ * this box carries the target on its own node rather than through `hitSlop`:
+ * `hitSlop` grows the touch region but not the frame a control-size audit
+ * reads, and a reach toward the input would take taps the field itself should
+ * get. The box is {@link ICON_TARGET_DP}, not the 44pt design target, because
+ * Android lays a control out in whole physical pixels and a 44pt box measures
+ * under the target there; this is the reason {@link COMPACT_CONTROL_HIT_SLOP_DP}
+ * reaches past 44pt instead of onto it.
+ *
+ * A box taller than the shared single-line `Input`'s `min-h-[44px]` would grow
+ * the field, so it cancels the difference in layout: `-my-[7px]` is 7pt a side
+ * at NativeWind's 14pt rem, so the box contributes 48 - 14 = 34pt to the row's
+ * cross size — under the input's floor, which therefore keeps setting the
+ * field's height. The margin does not move the border box: the row centres that
+ * box against the input's 44pt content area, so it overhangs the content area
+ * by `(48 - 44) / 2 = 2pt` each side and still paints and hit-tests its whole
+ * height inside the field's 7pt `py-2` padding, with 5pt to spare before the
+ * field's own edge. The same shape as `LINE_ACTION_BOX_CLASS` on a line of copy.
+ */
+export const FIELD_CLEAR_BOX_CLASS = 'h-[48px] w-[48px] -my-[7px] items-center justify-center';
+
+/**
  * Per-side `hitSlop` of the shared `Button`'s compact size (`sm`), whose
  * `min-h-[36px]` frame stays the visual height. 5, not 4: a 36dp frame at
  * density 420 renders 35.81dp, and 4 per side then lands on 43.81dp — under

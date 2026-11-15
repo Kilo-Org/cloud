@@ -344,8 +344,6 @@
       "rowSubtitle": "Whakamahia te pire o tō ake kaiwhakarato",
       "manageOnWebReason": "E hiahia ana ēnei kaiwhakarato ki ngā tohu tuakiri whai hanganga.",
       "description": "Ko ngā tono mā ēnei kī ka pirehia ki tō pūkete kaiwhakarato, kaua ki tō toenga Kilo.",
-      "enabled": "E whakamahia ana",
-      "disabled": "Kua whakawetohia",
       "managedByPlan": "Kei tō mahere waehere e whakahaere",
       "enableKey": "Whakahohea te kī {{provider}}",
       "test": "Whakamātauhia te kī",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Rīhīti pūrongo",
-      "description": "Te rīhīti mō te pūrongo i tukuna e koe. Puritia tēnei ID hei tohutoro ā muri ake.",
+      "description": "Puritia tēnei ID hei tohutoro ā muri ake.",
       "receiptLabel": "Rīhīti",
+      "copyReceiptId": "Tāruatia te rīhīti ID",
       "appealLabel": "Pīra",
       "triageReceived": "Kua tae mai",
       "triageOpen": "Kei te arotakengia",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Kāore ō wātū hohe e wātea kia oti rā anō te uta.",
     "currentDeviceUnidentified": "Kāore i taea te tautohu i te pūrere o nāianei.",
     "kiloApp": "Taupānga Kilo",
+    "kiloAppAndroid": "Taupānga Kilo · Android",
+    "kiloAppIos": "Taupānga Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Kāore he wātū hohe",
     "noSessionsDescription": "Takiuru mā te taupānga Kilo ki tētahi atu pūrere, ka puta taua pūrere ki konei.",
-    "onlyKiloAppSignIns": "Ko ngā takiuru ki te taupānga Kilo anake ka puta ki konei. Kāore ngā takiuru ki te ētita me te CLI e rārangitia.",
     "signedIn": "I takiuru i te {{signedIn}} · I kitea whakamutungatia i te {{lastSeen}}",
+    "signInScopeNote": "Ka puta ki konei ngā takiuru mā te taupānga Kilo me te Kilo CLI. Kāore ngā takiuru mā te ētita e rārangitia.",
     "thisDevice": "Tēnei pūrere",
     "viewProfile": "Tirohia te kōtaha",
     "webBrowser": "Pūtirotiro tukutuku",
@@ -2921,7 +2923,7 @@
     "sessionSignedOut": "Kua takiputaina te wātū.",
     "signOutThisDeviceTitle": "Takiputa i tēnei pūrere?",
     "signOutThisSessionTitle": "Takiputa i tēnei wātū?",
-    "signOutThisSessionMessage": "Ka takiputaina a {{device}}. Ka taea tonu e taua pūrere te uru ki te API mō te kotahi hāora te mōrahi.",
+    "signOutThisSessionMessage": "Ka takiputaina a {{device}}. I kitea whakamutungatia i te {{lastSeen}}. Ka taea tonu e taua pūrere te uru ki te API mō te kotahi hāora te mōrahi.",
     "unknownDevice": "Pūrere kāore e mōhiotia"
   },
   "forceUpdate": {
@@ -3293,6 +3295,7 @@
       "description": "Ka tiritiri tētahi rōpū i ngā whiwhinga, i ngā māngai me ngā tautuhinga ki tō tīma.",
       "nameLabel": "Te ingoa o te rōpū",
       "nameRequired": "Tāurutia he ingoa rōpū.",
+      "createdNotListed": "Kua waihangatia te rōpū. Ka puta ākuanei ki te kaikokoti.",
       "trialNote": "Ka tīmata tō whakamātautau Enterprise 14-rā ina waihangatia e koe. Ka hokona ngā mahere i te ipurangi."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ngā tautuhinga rōpū i te ipurangi",
+      "integrations": "Ngā Tūhononga i te ipurangi",
       "usageDetails": "Ngā taipitopito whakamahinga",
       "providersAndModels": "Ngā kaiwhakarato me ngā tauira",
       "groups": "Ngā kāhui",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",
-      "last30Days": "Ngā rā e 30 kua hipa",
+      "orgLast30Days": "Ngā mema katoa · Ngā rā e 30 kua hipa",
       "outputTokens": "Ngā tōkena tāputa",
       "requests": "Ngā tono"
     },
@@ -3636,6 +3640,8 @@
       "available": "Ngā taputapu e wātea ana: {{count}}",
       "none": "Kāore he taputapu e wātea ana",
       "noneDescription": "Kāore te tūmau Kilo i whakahoki taputapu.",
+      "notApplied": "Kāore ngā taputapu Kilo i tāpirihia ki tēnei kōrerorero",
+      "notAppliedDescription": "Kua tiakina tō kōwhiringa. Whakamātau anō hei whakamahi i taua kōwhiringa i tēnei kōrerorero ināianei.",
       "unreachable": "Kāore i taea te toro atu ki ngā taputapu Kilo",
       "unreachableDescription": "Kāore te tūmau i whakautu. Tirohia tō hononga, kātahi whakamātauria anō.",
       "unauthorized": "I whakakore ngā taputapu Kilo i tēnei wātū",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Kaore i taea te wete i te repo",
       "repoValue": "Rokiroki: {{name}}",
       "profileValue": "Kōtaha: {{name}}",
+      "profileUnavailable": "Kua kore tēnei kōtaha e wātea. Kōwhiria tētahi atu.",
       "pickerEmptyDescriptionOrganization": "Waihangatia he kōtaha umanga hei whakamahi ano i nga taurangi taiao, nga whakahau tatūnga, me nga pukenga puta noa i nga waahi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Ka taea e te rangatira o te umanga, te kaiwhakahaere ranei, te waihanga i tetahi kōtaha umanga."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Ngā ratonga kua honoa",
     "entrySubtitle": "GitHub, Slack, Linear me ētahi atu",
     "subtitle": "Honoa ō taputapu whakawhanake me ō rerenga mahi ki Kilo",
-    "emptyHint": "Kāore anō kia honoa he tūhononga.",
     "disconnect": "Wetekia",
     "disconnectTitle": "Wetekia a {{provider}}?",
     "disconnectMessage": "Ka mutu tā Kilo whakautu i roto i {{provider}}. Ka taea e koe te hono anō i ngā wā katoa.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Ka pau i roto i {{duration}}",
     "neverExpires": "Kore rawa e pau",
     "includesNewMessages": "Kua whakaurua ngā karere hou.",
-    "excludesNewMessages": "Kāore i whakaurua ngā karere hou."
+    "excludesNewMessages": "Kāore i whakaurua ngā karere hou.",
+    "superseded": "Kua whakakapia tēnei hono i wāhi kē, nō reira kua kore e mahi."
   },
   "sharedSession": {
     "title": "Wātū kua tiria",

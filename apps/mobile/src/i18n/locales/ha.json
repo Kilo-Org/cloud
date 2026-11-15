@@ -344,8 +344,6 @@
       "rowSubtitle": "Yi amfani da biyan kuɗin mai samarwarka",
       "manageOnWebReason": "Waɗannan masu samarwa suna buƙatar takardun shaida masu tsari.",
       "description": "Ana cajin buƙatun da ke bi ta waɗannan maɓallan zuwa asusun mai samarwarka maimakon ragowar kuɗinka na Kilo.",
-      "enabled": "Ana amfani",
-      "disabled": "A kashe",
       "managedByPlan": "Tsarin coding ɗinka ne ke sarrafa shi",
       "enableKey": "Kunna maɓallin {{provider}}",
       "test": "Gwada maɓalli",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Rasidin rahoto",
-      "description": "Rasidin rahoton da ka gabatar. Ajiye wannan id don komawa gare shi daga baya.",
+      "description": "Ajiye wannan id don komawa gare shi daga baya.",
       "receiptLabel": "Rasidi",
+      "copyReceiptId": "Kwafi id ɗin rasidi",
       "appealLabel": "Ɗaukaka ƙara",
       "triageReceived": "An karɓa",
       "triageOpen": "Ana bita",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Ba za a iya nuna zamanninka da ke aiki ba har sai an loda waɗannan bayanan.",
     "currentDeviceUnidentified": "An kasa gano na'urar da ake amfani da ita.",
     "kiloApp": "Manhajar Kilo",
+    "kiloAppAndroid": "Manhajar Kilo · Android",
+    "kiloAppIos": "Manhajar Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Babu zamannin da ke aiki",
     "noSessionsDescription": "Shiga ta manhajar Kilo a wata na'ura, kuma za ta bayyana a nan.",
-    "onlyKiloAppSignIns": "Shiga ta manhajar Kilo kawai ake nunawa a nan. Ba a nuna shiga ta editan lambar shiri ko CLI ba.",
     "signedIn": "An shiga {{signedIn}} · An gani na ƙarshe {{lastSeen}}",
+    "signInScopeNote": "Shiga ta manhajar Kilo da ta Kilo CLI ake nunawa a nan. Ba a nuna shiga ta editan lambar shiri ba.",
     "thisDevice": "Wannan na'ura",
     "viewProfile": "Duba bayanan martaba",
     "signOutThisDevice": "Fita daga wannan na'urar",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "An fita daga zaman.",
     "signOutThisDeviceTitle": "Fita daga wannan na'urar?",
     "signOutThisSessionTitle": "Fita daga wannan zaman?",
-    "signOutThisSessionMessage": "Za a fitar da {{device}}. Za ta iya ci gaba da samun damar amfani da API har na awa ɗaya.",
+    "signOutThisSessionMessage": "Za a fitar da {{device}}. An gani na ƙarshe {{lastSeen}}. Za ta iya ci gaba da samun damar amfani da API har na awa ɗaya.",
     "webBrowser": "Burauzar yanar gizo",
     "unknownDevice": "Na'ura da ba a sani ba"
   },
@@ -3293,6 +3295,7 @@
       "description": "Ƙungiya na raba kiredit, wakilai da saituna da tawagarka.",
       "nameLabel": "Sunan ƙungiya",
       "nameRequired": "Shigar da sunan ƙungiya.",
+      "createdNotListed": "An ƙirƙiri ƙungiya. Za ta bayyana a cikin mai ɗaukar hoto nan ba da daɗewa ba.",
       "trialNote": "Gwajin Enterprise na kwanaki 14 zai fara da zarar ka ƙirƙira ta. Ana sayen tsare-tsare a yanar gizo."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Saitunan ƙungiya a yanar gizo",
+      "integrations": "Haɗe-haɗe a yanar gizo",
       "usageDetails": "Bayanan amfani",
       "providersAndModels": "Masu samar da sabis da samfura",
       "groups": "Rukunoni",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",
-      "last30Days": "Kwanaki 30 da suka gabata",
+      "orgLast30Days": "Membobi duka · Kwanaki 30 da suka gabata",
       "outputTokens": "Guntayen rubutun fitarwa",
       "requests": "Buƙatu"
     },
@@ -3636,6 +3640,8 @@
       "available": "Kayan aiki da suke akwai: {{count}}",
       "none": "Babu kayan aiki da suke akwai",
       "noneDescription": "Uwar garken Kilo bai mayar da wani kayan aiki ba.",
+      "notApplied": "Ba a ƙara kayan aikin Kilo zuwa wannan tattaunawa ba",
+      "notAppliedDescription": "An adana zaɓinka. Sake gwadawa don amfani da shi a cikin wannan tattaunawa yanzu.",
       "unreachable": "Ba a iya isa kayan aikin Kilo ba",
       "unreachableDescription": "Uwar garken ba ta amsa ba. Duba haɗin ka, sannan ka sake gwadawa.",
       "unauthorized": "Kayan aikin Kilo sun ƙi wannan zaman",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "An kasa kwance repo",
       "repoValue": "Wurin ajiya: {{name}}",
       "profileValue": "Bayanin martaba: {{name}}",
+      "profileUnavailable": "Wannan bayanin martaba ba ya samuwa kuma. Zaɓi wani.",
       "pickerEmptyDescriptionOrganization": "Ƙirƙirar bayanin martaban ƙungiya don sake amfani da masu canjin yanayi, umarnin saitin, da ƙwarewa a cikin zaman.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Ma'abucin ƙungiya ko mai gudanarwa na iya ƙirƙirar bayanin martaban ƙungiya."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Ayyukan da aka haɗa",
     "entrySubtitle": "GitHub, Slack, Linear da sauransu",
     "subtitle": "Haɗa kayan aikin haɓaka manhaja da tsarin aikinka da Kilo",
-    "emptyHint": "Babu wani haɗi tukuna.",
     "disconnect": "Cire haɗi",
     "disconnectTitle": "A cire haɗin {{provider}}?",
     "disconnectMessage": "Kilo zai daina amsawa a {{provider}}. Kana iya sake haɗawa a kowane lokaci.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Za ta ƙare cikin {{duration}}",
     "neverExpires": "Ba za ta taɓa ƙarewa ba",
     "includesNewMessages": "An haɗa da sababbin saƙonni.",
-    "excludesNewMessages": "Ba a haɗa da sababbin saƙonni ba."
+    "excludesNewMessages": "Ba a haɗa da sababbin saƙonni ba.",
+    "superseded": "An maye gurbin wannan hanyar haɗin a wani wuri, don haka ta daina aiki."
   },
   "sharedSession": {
     "title": "Zaman da aka raba",

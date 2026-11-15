@@ -344,8 +344,6 @@
       "rowSubtitle": "Usa a faturação do teu próprio fornecedor",
       "manageOnWebReason": "Estes fornecedores precisam de credenciais estruturadas.",
       "description": "Os pedidos feitos com estas chaves são faturados na tua conta do fornecedor em vez de no teu saldo Kilo.",
-      "enabled": "Em uso",
-      "disabled": "Desativada",
       "managedByPlan": "Gerida pelo teu plano de programação",
       "enableKey": "Ativar a chave de {{provider}}",
       "test": "Testar chave",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Comprovativo de denúncia",
-      "description": "O comprovativo da denúncia que enviaste. Guarda este ID para lhe fazeres referência mais tarde.",
+      "description": "Guarda este ID para lhe fazeres referência mais tarde.",
       "receiptLabel": "Comprovativo",
+      "copyReceiptId": "Copiar ID do comprovativo",
       "appealLabel": "Recurso",
       "triageReceived": "Recebida",
       "triageOpen": "Em análise",
@@ -2967,9 +2966,12 @@
     "couldNotLoadDescription": "As suas sessões ativas só ficam disponíveis após o carregamento.",
     "currentDeviceUnidentified": "Não foi possível identificar o dispositivo atual.",
     "kiloApp": "Aplicação Kilo",
+    "kiloAppAndroid": "Aplicação Kilo · Android",
+    "kiloAppIos": "Aplicação Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Sem sessões ativas",
     "noSessionsDescription": "Inicie sessão na aplicação Kilo noutro dispositivo. A sessão aparecerá aqui.",
-    "onlyKiloAppSignIns": "Apenas os inícios de sessão na aplicação Kilo aparecem aqui. Os inícios de sessão no editor e na CLI não são listados.",
+    "signInScopeNote": "Aqui aparecem os inícios de sessão na aplicação Kilo e na Kilo CLI. Os inícios de sessão no editor não são listados.",
     "signedIn": "Início de sessão: {{signedIn}} · Última atividade: {{lastSeen}}",
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
@@ -2978,7 +2980,7 @@
     "sessionSignedOut": "Sessão terminada.",
     "signOutThisDeviceTitle": "Terminar sessão neste dispositivo?",
     "signOutThisSessionTitle": "Terminar esta sessão?",
-    "signOutThisSessionMessage": "A sessão em {{device}} será terminada. O dispositivo pode manter o acesso à API durante até uma hora.",
+    "signOutThisSessionMessage": "A sessão em {{device}} será terminada. Última atividade: {{lastSeen}}. O dispositivo pode manter o acesso à API durante até uma hora.",
     "webBrowser": "Navegador web",
     "unknownDevice": "Dispositivo desconhecido"
   },
@@ -3352,6 +3354,7 @@
       "description": "Uma organização partilha créditos, agentes e definições com a sua equipa.",
       "nameLabel": "Nome da organização",
       "nameRequired": "Introduza um nome para a organização.",
+      "createdNotListed": "Organização criada. Aparecerá no seletor em breve.",
       "trialNote": "O seu período experimental Enterprise de 14 dias começa quando a criar. Os planos são adquiridos na Web."
     },
     "creditActivity": {
@@ -3397,7 +3400,7 @@
       "sharingUnavailable": "A partilha não está disponível neste dispositivo.",
       "status": {
         "paid": "Paga",
-        "open": "Abrir",
+        "open": "Em aberto",
         "void": "Anulada",
         "uncollectible": "Incobrável"
       },
@@ -3464,6 +3467,7 @@
     },
     "settingsOnWeb": {
       "title": "Definições da organização na Web",
+      "integrations": "Integrações na Web",
       "usageDetails": "Detalhes de utilização",
       "providersAndModels": "Fornecedores e modelos",
       "groups": "Grupos",
@@ -3479,7 +3483,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 dias",
+      "orgLast30Days": "Todos os membros · Últimos 30 dias",
       "outputTokens": "Tokens de saída",
       "requests": "Pedidos"
     },
@@ -3696,6 +3700,8 @@
       "available": "Ferramentas disponíveis: {{count}}",
       "none": "Nenhuma ferramenta disponível",
       "noneDescription": "O servidor do Kilo não devolveu nenhuma ferramenta.",
+      "notApplied": "As ferramentas do Kilo não foram adicionadas a esta conversa",
+      "notAppliedDescription": "A sua escolha está guardada. Toque em Tentar novamente para a usar agora nesta conversa.",
       "unreachable": "Não foi possível contactar as ferramentas do Kilo",
       "unreachableDescription": "O servidor não respondeu. Verifica a tua ligação e tenta novamente.",
       "unauthorized": "As ferramentas do Kilo recusaram esta sessão",
@@ -4222,6 +4228,7 @@
       "unbindFailed": "Não foi possível desvincular o repositório",
       "repoValue": "Repositório: {{name}}",
       "profileValue": "Perfil: {{name}}",
+      "profileUnavailable": "Este perfil já não está disponível. Escolha outro.",
       "pickerEmptyDescriptionOrganization": "Crie um perfil de organização para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Um proprietário ou administrador da organização pode criar um perfil de organização."
     },
@@ -4479,7 +4486,6 @@
     "sectionTitle": "Serviços conectados",
     "entrySubtitle": "GitHub, Slack, Linear e mais",
     "subtitle": "Conecte suas ferramentas e fluxos de trabalho de desenvolvimento ao Kilo",
-    "emptyHint": "Nenhuma integração conectada ainda.",
     "disconnect": "Desconectar",
     "disconnectTitle": "Desconectar {{provider}}?",
     "disconnectMessage": "O Kilo deixará de responder no {{provider}}. Você pode reconectar a qualquer momento.",
@@ -4547,7 +4553,8 @@
     "expiresIn": "Expira dentro de {{duration}}",
     "neverExpires": "Nunca expira",
     "includesNewMessages": "As novas mensagens estão incluídas.",
-    "excludesNewMessages": "As novas mensagens estão excluídas."
+    "excludesNewMessages": "As novas mensagens estão excluídas.",
+    "superseded": "Este link foi substituído noutro dispositivo, por isso deixou de funcionar."
   },
   "sharedSession": {
     "title": "Sessão partilhada",

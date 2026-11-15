@@ -344,8 +344,6 @@
       "rowSubtitle": "Erabili zure hornitzailearen fakturazioa",
       "manageOnWebReason": "Hornitzaile hauek egiturazko kredentzialak behar dituzte.",
       "description": "Gako hauen bidezko eskaerak zure hornitzaile-kontuan fakturatzen dira, ez zure Kilo saldoan.",
-      "enabled": "Erabiltzen",
-      "disabled": "Desaktibatuta",
       "managedByPlan": "Zure kodetze-planak kudeatzen du",
       "enableKey": "Gaitu {{provider}} gakoa",
       "test": "Probatu gakoa",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Salaketaren agiria",
-      "description": "Bidali duzun salaketaren agiria. Gorde ID hau geroago aipatzeko.",
+      "description": "Gorde ID hau geroago aipatzeko.",
       "receiptLabel": "Agiria",
+      "copyReceiptId": "Kopiatu agiriaren IDa",
       "appealLabel": "Helegitea",
       "triageReceived": "Jasota",
       "triageOpen": "Berrikusten",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Zure saio aktiboak ez daude erabilgarri hau kargatu arte.",
     "currentDeviceUnidentified": "Ezin izan da uneko gailua identifikatu.",
     "kiloApp": "Kilo aplikazioa",
+    "kiloAppAndroid": "Kilo aplikazioa · Android",
+    "kiloAppIos": "Kilo aplikazioa · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Ez dago saio aktiborik",
     "noSessionsDescription": "Hasi saioa Kilo aplikazioarekin beste gailu batean, eta hemen agertuko da.",
-    "onlyKiloAppSignIns": "Kilo aplikazioko saio-hasierak bakarrik agertzen dira hemen. Editoreko eta CLIko saio-hasierak ez daude zerrendatuta.",
     "signedIn": "Saio-hasiera: {{signedIn}} · Azken jarduera: {{lastSeen}}",
+    "signInScopeNote": "Hemen Kilo aplikazioko eta Kilo CLIko saio-hasierak agertzen dira. Editoreko saio-hasierak ez daude zerrendatuta.",
     "thisDevice": "Gailu hau",
     "viewProfile": "Ikusi profila",
     "signOutThisDevice": "Itxi saioa gailu honetan",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "Saioa itxi da.",
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",
-    "signOutThisSessionMessage": "Gailu honetako saioa itxiko da: {{device}}. Gailuak APIrako sarbidea mantendu dezake, gehienez ordubetez.",
+    "signOutThisSessionMessage": "{{device}} gailuaren saioa itxiko da. Azken jarduera: {{lastSeen}}. Gailuak APIrako sarbidea mantendu dezake, gehienez ordubetez.",
     "webBrowser": "Web-nabigatzailea",
     "unknownDevice": "Gailu ezezaguna"
   },
@@ -3293,6 +3295,7 @@
       "description": "Erakunde batek kredituak, agenteak eta ezarpenak partekatzen ditu zure taldearekin.",
       "nameLabel": "Erakundearen izena",
       "nameRequired": "Idatzi erakundearen izen bat.",
+      "createdNotListed": "Erakundea sortu da. Laster agertuko da hautatzailean.",
       "trialNote": "Zure 14 eguneko Enterprise proba erakundea sortzean hasiko da. Planak webean erosten dira."
     },
     "creditActivity": {
@@ -3338,7 +3341,7 @@
       "sharingUnavailable": "Gailu honetan ezin da partekatu.",
       "status": {
         "paid": "Ordainduta",
-        "open": "Ireki",
+        "open": "Irekia",
         "void": "Baliogabetuta",
         "uncollectible": "Kobratu ezina"
       },
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Erakundearen ezarpenak webean",
+      "integrations": "Integrazioak webean",
       "usageDetails": "Erabileraren xehetasunak",
       "providersAndModels": "Hornitzaileak eta ereduak",
       "groups": "Taldeak",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
-      "last30Days": "Azken 30 egunak",
+      "orgLast30Days": "Kide guztiak · Azken 30 egunak",
       "outputTokens": "Irteerako tokenak",
       "requests": "Eskaerak"
     },
@@ -3636,6 +3640,8 @@
       "available": "Erabilgarri dauden tresnak: {{count}}",
       "none": "Ez dago tresnarik erabilgarri",
       "noneDescription": "Kilo zerbitzariak ez du tresnarik itzuli.",
+      "notApplied": "Kilo tresnak ez dira txat honetan gehitu",
+      "notAppliedDescription": "Zure aukera gordeta dago. Saiatu berriro orain txat honetan erabiltzeko.",
       "unreachable": "Ezin izan da Kiloren tresnetara iritsi",
       "unreachableDescription": "Zerbitzariak ez du erantzun. Egiaztatu konexioa eta saiatu berriro.",
       "unauthorized": "Kiloren tresnek txat saio hau baztertu dute",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Ezin izan da biltegia deslotu",
       "repoValue": "Biltegia: {{name}}",
       "profileValue": "Profila: {{name}}",
+      "profileUnavailable": "Profil hau jada ez dago erabilgarri. Aukeratu beste bat.",
       "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Erakundearen jabe batek edo administratzaile batek sor dezake erakunde-profil bat."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Konektatutako zerbitzuak",
     "entrySubtitle": "GitHub, Slack, Linear eta gehiago",
     "subtitle": "Konektatu zure garapen-tresnak eta lan-fluxuak Kilo aplikazioarekin",
-    "emptyHint": "Oraindik ez dago integraziorik konektatuta.",
     "disconnect": "Deskonektatu",
     "disconnectTitle": "{{provider}} deskonektatu?",
     "disconnectMessage": "Kilo aplikazioak ez du gehiago erantzungo {{provider}} zerbitzuan. Edonoiz konekta dezakezu berriro.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "{{duration}} barru iraungiko da",
     "neverExpires": "Ez da inoiz iraungiko",
     "includesNewMessages": "Mezu berriak barne daude.",
-    "excludesNewMessages": "Mezu berriak kanpoan daude."
+    "excludesNewMessages": "Mezu berriak kanpoan daude.",
+    "superseded": "Esteka hau beste nonbait ordeztu da, beraz, jada ez du funtzionatzen."
   },
   "sharedSession": {
     "title": "Partekatutako saioa",

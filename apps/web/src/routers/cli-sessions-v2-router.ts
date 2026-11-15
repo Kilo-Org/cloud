@@ -52,21 +52,18 @@ import {
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
-  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
   WORKSPACE_REQUIRES_ROOT_SESSION,
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
   projectKnownCloudAgentPath,
-  validateKiloSdkMessagesCursor,
+  getSessionMessagesPageInputSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
-import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
+import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
@@ -589,35 +586,6 @@ function worktreeMembershipCondition(userId: string, organizationId: string | nu
 
 const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
-
-/**
- * Input for the paginated `getSessionMessagesPage` endpoint. Mirrors the
- * worker-bound contract in `@kilocode/session-ingest-contracts` so tRPC-level
- * input validation matches the worker's access-checked RPC and HTTP route.
- * The `limit` default is applied here so the procedure body always sees a
- * positive page size and the client receives a bounded request.
- */
-const GetSessionMessagesPageInputSchema = z
-  .object({
-    session_id: sessionIdField,
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
-  })
-  .superRefine((params, ctx) => {
-    if (params.cursor === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid message cursor',
-      });
-    }
-  });
 
 /**
  * Verify the user owns the session and still has access to its organization.
@@ -2140,7 +2108,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * retryable from non-retryable failures without inferring retry semantics.
    */
   getSessionMessagesPage: baseProcedure
-    .input(GetSessionMessagesPageInputSchema)
+    .input(getSessionMessagesPageInputSchema)
     .query(async ({ ctx, input }) => {
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
@@ -3132,7 +3100,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     try {
       const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
-      return { share_token: result.share_token };
+      /* Both the token and the capability: the app compares the capability it
+         created with the one a later read reports, so a client can tell its own
+         link from one made elsewhere. */
+      return { share_token: result.share_token, public_id: result.public_id };
     } catch (error) {
       if (error instanceof SessionShareTooLargeError) {
         throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });

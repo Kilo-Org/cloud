@@ -344,8 +344,6 @@
       "rowSubtitle": "Usa la facturación de tu propio proveedor",
       "manageOnWebReason": "Estos proveedores necesitan credenciales estructuradas.",
       "description": "Las solicitudes realizadas con estas claves se facturan a tu cuenta del proveedor en lugar de a tu saldo de Kilo.",
-      "enabled": "En uso",
-      "disabled": "Desactivada",
       "managedByPlan": "Gestionada por tu plan de programación",
       "enableKey": "Activar la clave de {{provider}}",
       "test": "Probar clave",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Comprobante de denuncia",
-      "description": "El comprobante de la denuncia que enviaste. Guarda este ID para consultarla más adelante.",
+      "description": "Guarda este ID para consultarla más adelante.",
       "receiptLabel": "Comprobante",
+      "copyReceiptId": "Copiar ID del comprobante",
       "appealLabel": "Apelación",
       "triageReceived": "Recibida",
       "triageOpen": "En revisión",
@@ -2395,10 +2394,13 @@
     "couldNotLoadDescription": "No puedes consultar tus sesiones activas hasta que se carguen los datos.",
     "currentDeviceUnidentified": "No se pudo identificar el dispositivo actual.",
     "kiloApp": "Aplicación de Kilo",
+    "kiloAppAndroid": "Aplicación de Kilo · Android",
+    "kiloAppIos": "Aplicación de Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "No hay sesiones activas",
     "noSessionsDescription": "Inicia sesión en la aplicación de Kilo desde otro dispositivo y aparecerá aquí.",
-    "onlyKiloAppSignIns": "Aquí solo aparecen las sesiones iniciadas en la aplicación de Kilo, no las iniciadas en el editor ni en la CLI.",
     "signedIn": "Inicio de sesión: {{signedIn}} · Última actividad: {{lastSeen}}",
+    "signInScopeNote": "Aquí aparecen los inicios de sesión de la aplicación de Kilo y de la CLI de Kilo. Los inicios de sesión del editor no se muestran.",
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
     "signOutThisDevice": "Cerrar sesión en este dispositivo",
@@ -2406,7 +2408,7 @@
     "sessionSignedOut": "Sesión cerrada.",
     "signOutThisDeviceTitle": "¿Cerrar sesión en este dispositivo?",
     "signOutThisSessionTitle": "¿Cerrar esta sesión?",
-    "signOutThisSessionMessage": "Se cerrará la sesión en {{device}}. El dispositivo puede conservar el acceso a la API durante una hora como máximo.",
+    "signOutThisSessionMessage": "Se cerrará la sesión en {{device}}. Última actividad: {{lastSeen}}. El dispositivo puede conservar el acceso a la API durante una hora como máximo.",
     "webBrowser": "Navegador web",
     "unknownDevice": "Dispositivo desconocido"
   },
@@ -3338,6 +3340,7 @@
       "description": "Una organización comparte créditos, agentes y ajustes con tu equipo.",
       "nameLabel": "Nombre de la organización",
       "nameRequired": "Introduce un nombre para la organización.",
+      "createdNotListed": "Organización creada. Aparecerá en el selector en breve.",
       "trialNote": "Tu prueba de 14 días de Enterprise empieza al crearla. Los planes se compran en la web."
     },
     "creditActivity": {
@@ -3396,7 +3399,7 @@
       "sharingUnavailable": "No se puede compartir contenido en este dispositivo.",
       "status": {
         "paid": "Pagada",
-        "open": "Apertura",
+        "open": "Abierta",
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
@@ -3463,6 +3466,7 @@
     },
     "settingsOnWeb": {
       "title": "Ajustes de la organización en la web",
+      "integrations": "Integraciones en la web",
       "usageDetails": "Detalles de uso",
       "providersAndModels": "Proveedores y modelos",
       "groups": "Grupos",
@@ -3478,7 +3482,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "last30Days": "Últimos 30 días",
+      "orgLast30Days": "Todos los miembros · Últimos 30 días",
       "outputTokens": "Tokens de salida",
       "requests": "Solicitudes"
     },
@@ -3690,6 +3694,8 @@
       "available": "Herramientas disponibles: {{count}}",
       "none": "No hay herramientas disponibles",
       "noneDescription": "El servidor de Kilo no devolvió ninguna herramienta.",
+      "notApplied": "No se añadieron las herramientas de Kilo a este chat",
+      "notAppliedDescription": "Su elección se ha guardado. Pulse Reintentar para aplicarla ahora en este chat.",
       "unreachable": "No se pudo contactar con las herramientas de Kilo",
       "unreachableDescription": "El servidor no respondió. Comprueba tu conexión y vuelve a intentarlo.",
       "unauthorized": "Las herramientas de Kilo rechazaron esta sesión",
@@ -4216,6 +4222,7 @@
       "unbindFailed": "No se pudo desvincular el repositorio",
       "repoValue": "Repositorio: {{name}}",
       "profileValue": "Perfil: {{name}}",
+      "profileUnavailable": "Este perfil ya no está disponible. Elija otro.",
       "pickerEmptyDescriptionOrganization": "Cree un perfil de organización para reutilizar variables de entorno, comandos de configuración y habilidades en todas las sesiones.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Un propietario o administrador de la organización puede crear un perfil de organización."
     },
@@ -4473,7 +4480,6 @@
     "sectionTitle": "Servicios conectados",
     "entrySubtitle": "GitHub, Slack, Linear y más",
     "subtitle": "Conecta tus herramientas y flujos de trabajo de desarrollo a Kilo",
-    "emptyHint": "Aún no hay integraciones conectadas.",
     "disconnect": "Desconectar",
     "disconnectTitle": "¿Desconectar {{provider}}?",
     "disconnectMessage": "Kilo dejará de responder en {{provider}}. Puedes volver a conectarlo en cualquier momento.",
@@ -4541,7 +4547,8 @@
     "expiresIn": "Caduca en {{duration}}",
     "neverExpires": "No caduca nunca",
     "includesNewMessages": "Se incluyen los mensajes nuevos.",
-    "excludesNewMessages": "Se excluyen los mensajes nuevos."
+    "excludesNewMessages": "Se excluyen los mensajes nuevos.",
+    "superseded": "Este enlace se reemplazó desde otro dispositivo y ya no funciona."
   },
   "sharedSession": {
     "title": "Sesión compartida",

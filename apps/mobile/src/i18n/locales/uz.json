@@ -344,8 +344,6 @@
       "rowSubtitle": "O'z provayderingiz orqali to'lash",
       "manageOnWebReason": "Bu provayderlar tuzilgan hisob ma'lumotlarini talab qiladi.",
       "description": "Bu kalitlar orqali yuborilgan so'rovlar uchun to'lov Kilo balansingizdan emas, provayder hisobingizdan olinadi.",
-      "enabled": "Foydalanilmoqda",
-      "disabled": "O'chirilgan",
       "managedByPlan": "Kodlash tarifingiz orqali boshqariladi",
       "enableKey": "{{provider}} kalitini yoqish",
       "test": "Kalitni sinash",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Shikoyat kvitansiyasi",
-      "description": "Siz yuborgan shikoyat kvitansiyasi. Keyinchalik unga murojaat qilish uchun ushbu ID ni saqlab qo'ying.",
+      "description": "Keyinchalik unga murojaat qilish uchun ushbu ID ni saqlab qo'ying.",
       "receiptLabel": "Kvitansiya",
+      "copyReceiptId": "Kvitansiya identifikatorini nusxalash",
       "appealLabel": "Apellyatsiya",
       "triageReceived": "Qabul qilindi",
       "triageOpen": "Ko'rib chiqilmoqda",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Ma'lumotlar yuklanmaguncha faol sessiyalaringizni ko'rsatib bo'lmaydi.",
     "currentDeviceUnidentified": "Joriy qurilmani aniqlab bo'lmadi.",
     "kiloApp": "Kilo ilovasi",
+    "kiloAppAndroid": "Kilo ilovasi · Android",
+    "kiloAppIos": "Kilo ilovasi · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Faol sessiyalar yo'q",
     "noSessionsDescription": "Boshqa qurilmadagi Kilo ilovasida tizimga kiring. Shunda u shu yerda ko'rinadi.",
-    "onlyKiloAppSignIns": "Bu yerda faqat Kilo ilovasidagi sessiyalar ko'rsatiladi. Muharrir va CLI orqali kirilgan sessiyalar ko'rsatilmaydi.",
     "signedIn": "Kirilgan vaqt: {{signedIn}} · Oxirgi faollik: {{lastSeen}}",
+    "signInScopeNote": "Bu yerda Kilo ilovasi va Kilo CLI orqali kirilgan sessiyalar ko'rsatiladi. Muharrir orqali kirilgan sessiyalar ko'rsatilmaydi.",
     "thisDevice": "Bu qurilma",
     "webBrowser": "Veb-brauzer",
     "viewProfile": "Profilni ko'rish",
@@ -2921,7 +2923,7 @@
     "sessionSignedOut": "Sessiyadan chiqildi.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
-    "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",
+    "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Oxirgi faollik: {{lastSeen}}. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",
     "unknownDevice": "Noma'lum qurilma"
   },
   "forceUpdate": {
@@ -3293,6 +3295,7 @@
       "description": "Tashkilotda kreditlar, agentlar va sozlamalar jamoangiz bilan umumiy bo'ladi.",
       "nameLabel": "Tashkilot nomi",
       "nameRequired": "Tashkilot nomini kiriting.",
+      "createdNotListed": "Tashkilot yaratildi. U tez orada tanlovchida paydo bo'ladi.",
       "trialNote": "14 kunlik Enterprise sinov muddati tashkilot yaratilganda boshlanadi. Tariflar veb-saytda sotib olinadi."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Veb-saytdagi tashkilot sozlamalari",
+      "integrations": "Veb-saytdagi integratsiyalar",
       "usageDetails": "Foydalanish tafsilotlari",
       "providersAndModels": "Provayderlar va modellar",
       "groups": "Guruhlar",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",
-      "last30Days": "Oxirgi 30 kun",
+      "orgLast30Days": "Barcha a'zolar · Oxirgi 30 kun",
       "outputTokens": "Chiqish tokenlari",
       "requests": "So'rovlar"
     },
@@ -3636,6 +3640,8 @@
       "available": "Mavjud vositalar: {{count}}",
       "none": "Mavjud vosita yo'q",
       "noneDescription": "Kilo serveri hech qanday vosita qaytarmadi.",
+      "notApplied": "Bu suhbatga Kilo vositalari qoʻshilmadi",
+      "notAppliedDescription": "Tanlovingiz saqlandi. Uni hozir shu suhbatda ishlatish uchun “Qayta urinish”ni bosing.",
       "unreachable": "Kilo vositalariga yetib bo'lmadi",
       "unreachableDescription": "Server javob bermadi. Ulanishni tekshirib, qayta urinib ko'ring.",
       "unauthorized": "Kilo vositalari bu sessiyani rad etdi",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Reponi ajratib boʻlmadi",
       "repoValue": "Repozitoriy: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Bu profil endi mavjud emas. Boshqasini tanlang.",
       "pickerEmptyDescriptionOrganization": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun tashkilot profili yarating.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Tashkilot profili tashkilot egasi yoki administratori tomonidan yaratilishi mumkin."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Ulangan xizmatlar",
     "entrySubtitle": "GitHub, Slack, Linear va boshqalar",
     "subtitle": "Ishlab chiqish vositalaringiz va ish jarayonlaringizni Kilo bilan ulang",
-    "emptyHint": "Hali hech qanday integratsiya ulanmagan.",
     "disconnect": "Uzish",
     "disconnectTitle": "{{provider}} xizmati uzilsinmi?",
     "disconnectMessage": "Kilo endi {{provider}} xizmatida javob bermaydi. Istalgan vaqtda qayta ulashingiz mumkin.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Tugashiga {{duration}} qoldi",
     "neverExpires": "Muddati tugamaydi",
     "includesNewMessages": "Yangi xabarlar qoʻshiladi.",
-    "excludesNewMessages": "Yangi xabarlar qoʻshilmaydi."
+    "excludesNewMessages": "Yangi xabarlar qoʻshilmaydi.",
+    "superseded": "Bu havola boshqa joyda almashtirilgani uchun endi ishlamaydi."
   },
   "sharedSession": {
     "title": "Ulashilgan seans",

@@ -344,8 +344,6 @@
       "rowSubtitle": "Isticmaal biilasha bixiyahaaga",
       "manageOnWebReason": "Bixiyeyaashan waxay u baahan yihiin aqoonsiyo habaysan.",
       "description": "Codsiyada maraya furayaashan waxaa lagu dallacayaa akoonka bixiyahaaga halkii laga jari lahaa hadhaagaaga Kilo.",
-      "enabled": "La isticmaalayo",
-      "disabled": "Waa la damiyay",
       "managedByPlan": "Waxaa maamula qorshahaaga koodhka",
       "enableKey": "Daar furaha {{provider}}",
       "test": "Tijaabi furaha",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Rasiidka warbixinta",
-      "description": "Rasiidka warbixinta aad gudbisay. Kaydso aqoonsigan si aad mar dambe ugu tixraacdo.",
+      "description": "Kaydso aqoonsigan si aad mar dambe ugu tixraacdo.",
       "receiptLabel": "Rasiid",
+      "copyReceiptId": "Koobi aqoonsiga rasiidka",
       "appealLabel": "Rafcaan",
       "triageReceived": "La helay",
       "triageOpen": "Dib-u-eegis ku jira",
@@ -2909,9 +2908,12 @@
     "couldNotLoadDescription": "Kalfadhiyadaada firfircoon lama heli karo ilaa xogtan la soo shubo.",
     "currentDeviceUnidentified": "Aaladda hadda la isticmaalayo lama aqoonsan karin.",
     "kiloApp": "Barnaamijka Kilo",
+    "kiloAppAndroid": "Barnaamijka Kilo · Android",
+    "kiloAppIos": "Barnaamijka Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Ma jiraan kalfadhiyo firfircoon",
     "noSessionsDescription": "Ka soo gal barnaamijka Kilo aalad kale, waxayna halkan ka soo muuqan doontaa.",
-    "onlyKiloAppSignIns": "Halkan waxaa ka muuqda oo keliya gelitaanka barnaamijka Kilo. Gelitaanka tifaftiraha iyo CLI kuma jiraan liiska.",
+    "signInScopeNote": "Halkan waxaa ka muuqda gelitaanka barnaamijka Kilo iyo Kilo CLI. Gelitaanka tifaftiraha liiska kuma jiro.",
     "signedIn": "La soo galay {{signedIn}} · Ugu dambayn la arkay {{lastSeen}}",
     "thisDevice": "Aaladdan",
     "viewProfile": "Eeg bogga shakhsiga",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "Kalfadhiga waa laga baxay.",
     "signOutThisDeviceTitle": "Ma ka saaraysaa aaladdan akoonka?",
     "signOutThisSessionTitle": "Ma ka baxaysaa kalfadhigan?",
-    "signOutThisSessionMessage": "{{device}} waa laga saarayaa akoonka. Gelitaanka API wuxuu sii shaqayn karaa ilaa saacad.",
+    "signOutThisSessionMessage": "{{device}} waa laga saarayaa akoonka. Ugu dambayn la arkay {{lastSeen}}. Gelitaanka API wuxuu sii shaqayn karaa ilaa saacad.",
     "webBrowser": "Biraawsarka internetka",
     "unknownDevice": "Qalab aan la aqoon"
   },
@@ -3293,6 +3295,7 @@
       "description": "Ururku wuxuu kooxdaada la wadaagaa kredit, wakiillo iyo dejin.",
       "nameLabel": "Magaca ururka",
       "nameRequired": "Geli magaca ururka.",
+      "createdNotListed": "Ururka waa la sameeyay. Wuxuu dhawaan ka soo muuqan doonaa dooriyaha.",
       "trialNote": "Tijaabadaada Enterprise ee 14-ka maalmood waxay bilaabataa marka aad samayso. Qorshayaasha waxaa laga iibsadaa shabakadda."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Dejinta ururka ee shabakadda",
+      "integrations": "Isku-xidhka ee shabakadda",
       "usageDetails": "Faahfaahinta isticmaalka",
       "providersAndModels": "Bixiyeyaasha iyo moodellada",
       "groups": "Kooxaha",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",
-      "last30Days": "30-Kii maalmood ee la soo dhaafay",
+      "orgLast30Days": "Dhammaan xubnaha · 30-Kii maalmood ee la soo dhaafay",
       "outputTokens": "Halbeegyada qoraalka la soo saaray",
       "requests": "Codsiyada"
     },
@@ -3636,6 +3640,8 @@
       "available": "Qalabka la heli karo: {{count}}",
       "none": "Ma jiro qalab la heli karo",
       "noneDescription": "Serverka Kilo ma soo celin wax qalab ah.",
+      "notApplied": "Qalabka Kilo laguma darin sheekaysigan",
+      "notAppliedDescription": "Doorashadaada waa la kaydiyay. Mar kale isku day si aad hadda ugu isticmaasho sheekaysigan.",
       "unreachable": "Lama gaari karin qalabka Kilo",
       "unreachableDescription": "Serverku ma jawaabin. Hubi xiriirkaaga, kadib isku day mar kale.",
       "unauthorized": "Qalabka Kilo wuu diiday sheekaysigan",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Waa la furi waayay repo",
       "repoValue": "Kaydka: {{name}}",
       "profileValue": "Astaanta: {{name}}",
+      "profileUnavailable": "Astaantan hadda lama heli karo. Dooro mid kale.",
       "pickerEmptyDescriptionOrganization": "Abuur profile urur si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Milkiilaha ururka ama maamulaha ayaa abuuri kara profile urur."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Adeegyada ku xidhan",
     "entrySubtitle": "GitHub, Slack, Linear iyo kuwo kale",
     "subtitle": "Ku xidh qalabkaaga horumarinta iyo hababka shaqadaada Kilo",
-    "emptyHint": "Weli wax isku-xidh ah lama samayn.",
     "disconnect": "Ka goo",
     "disconnectTitle": "Ka goo {{provider}}?",
     "disconnectMessage": "Kilo way joojin doontaa ka jawaabista {{provider}}. Waad dib u xidhi kartaa wakhti kasta.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Wuxuu dhacayaa {{duration}} gudahood",
     "neverExpires": "Marnaba ma dhaco",
     "includesNewMessages": "Fariimaha cusub waa lagu daray.",
-    "excludesNewMessages": "Fariimaha cusub lagama darin."
+    "excludesNewMessages": "Fariimaha cusub lagama darin.",
+    "superseded": "Xiriirkan meel kale ayaa lagu beddelay, sidaas darteed hadda ma shaqaynayo."
   },
   "sharedSession": {
     "title": "Fadhi la wadaagay",

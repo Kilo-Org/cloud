@@ -411,8 +411,6 @@
       "rowSubtitle": "Use your own provider billing",
       "manageOnWebReason": "These providers need structured credentials.",
       "description": "Requests through these keys are billed to your provider account instead of your Kilo balance.",
-      "enabled": "In use",
-      "disabled": "Turned off",
       "managedByPlan": "Managed by your coding plan",
       "enableKey": "Enable the {{provider}} key",
       "test": "Test key",
@@ -481,8 +479,9 @@
     },
     "reportReceipt": {
       "title": "Report receipt",
-      "description": "The receipt for the report you submitted. Keep this id to refer to it later.",
+      "description": "Keep this id to refer to it later.",
       "receiptLabel": "Receipt",
+      "copyReceiptId": "Copy receipt ID",
       "appealLabel": "Appeal",
       "triageReceived": "Received",
       "triageOpen": "In review",
@@ -2976,10 +2975,13 @@
     "couldNotLoadDescription": "Your active sessions are unavailable until this loads.",
     "currentDeviceUnidentified": "Current device could not be identified",
     "kiloApp": "Kilo app",
+    "kiloAppAndroid": "Kilo app · Android",
+    "kiloAppIos": "Kilo app · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "No active sessions",
     "noSessionsDescription": "Sign in with the Kilo app on another device and it will show up here.",
-    "onlyKiloAppSignIns": "Only Kilo app sign-ins appear here. Editor and CLI sign-ins are not listed.",
     "signedIn": "Signed in {{signedIn}} · Last seen {{lastSeen}}",
+    "signInScopeNote": "Sign-ins from the Kilo app and the Kilo CLI appear here. Editor sign-ins are not listed.",
     "thisDevice": "This device",
     "viewProfile": "View profile",
     "signOutThisDevice": "Sign out this device",
@@ -2987,7 +2989,7 @@
     "sessionSignedOut": "Session signed out.",
     "signOutThisDeviceTitle": "Sign out this device?",
     "signOutThisSessionTitle": "Sign out this session?",
-    "signOutThisSessionMessage": "{{device}} will be signed out. It can keep API access for up to an hour.",
+    "signOutThisSessionMessage": "{{device}} will be signed out. Last seen {{lastSeen}}. It can keep API access for up to an hour.",
     "webBrowser": "Web browser",
     "unknownDevice": "Unknown device"
   },
@@ -3373,6 +3375,7 @@
       "description": "An organization shares credits, agents and settings with your team.",
       "nameLabel": "Organization name",
       "nameRequired": "Enter an organization name.",
+      "createdNotListed": "Organization created. It will appear in the picker shortly.",
       "trialNote": "Your 14-day Enterprise trial starts when you create it. Plans are bought on the web."
     },
     "creditActivity": {
@@ -3485,6 +3488,7 @@
     },
     "settingsOnWeb": {
       "title": "Organization settings on the web",
+      "integrations": "Integrations on the web",
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",
@@ -3500,7 +3504,7 @@
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
-      "last30Days": "Last 30 days",
+      "orgLast30Days": "All members · Last 30 days",
       "outputTokens": "Output Tokens",
       "requests": "Requests"
     },
@@ -3876,6 +3880,8 @@
       "available": "Tools available: {{count}}",
       "none": "No tools available",
       "noneDescription": "The Kilo server answered with no tools.",
+      "notApplied": "Kilo tools were not added to this chat",
+      "notAppliedDescription": "Your choice is saved. Retry to use it in this chat now.",
       "unreachable": "Couldn't reach Kilo tools",
       "unreachableDescription": "The server did not answer. Check your connection, then try again.",
       "unauthorized": "Kilo tools refused this session",
@@ -4222,6 +4228,7 @@
       "unbindFailed": "Couldn't unbind repo",
       "repoValue": "Repository: {{name}}",
       "profileValue": "Profile: {{name}}",
+      "profileUnavailable": "This profile is no longer available. Choose another one.",
       "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions.",
       "pickerEmptyDescriptionOrganizationReadOnly": "An organization owner or admin can create an organization profile."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Connected services",
     "entrySubtitle": "GitHub, Slack, Linear and more",
     "subtitle": "Connect your development tools and workflows to Kilo",
-    "emptyHint": "No integrations connected yet.",
     "disconnect": "Disconnect",
     "disconnectTitle": "Disconnect {{provider}}?",
     "disconnectMessage": "Kilo will stop responding in {{provider}}. You can reconnect at any time.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Expires in {{duration}}",
     "neverExpires": "Never expires",
     "includesNewMessages": "New messages are included.",
-    "excludesNewMessages": "New messages are excluded."
+    "excludesNewMessages": "New messages are excluded.",
+    "superseded": "This link was replaced somewhere else, so it no longer works."
   },
   "sharedSession": {
     "title": "Shared session",

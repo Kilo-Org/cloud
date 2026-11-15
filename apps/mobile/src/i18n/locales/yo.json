@@ -344,8 +344,6 @@
       "rowSubtitle": "Lo ìsanwó olùpèsè tìrẹ",
       "manageOnWebReason": "Àwọn olùpèsè wọ̀nyí nílò àwọn ìwé-ẹ̀rí ìwọlé tí a ṣètò.",
       "description": "Àwọn ìbéèrè tí ó gba àwọn kọ́kọ́rọ́ wọ̀nyí kọjá ni a ó gba owó wọn lórí àkọọ́lẹ̀ olùpèsè rẹ dípò owó Kilo rẹ tó kù.",
-      "enabled": "Ní lílò",
-      "disabled": "Ti pa á",
       "managedByPlan": "Ètò kóòdù rẹ ló ń ṣàkóso rẹ̀",
       "enableKey": "Mú kọ́kọ́rọ́ {{provider}} ṣiṣẹ́",
       "test": "Dán kọ́kọ́rọ́ wò",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Ìwé ẹ̀rí ìjábọ̀",
-      "description": "Ìwé ẹ̀rí fún ìjábọ̀ tí o fi ránṣẹ́. Tọ́jú id yìí láti tọ́ka sí i lẹ́yìn náà.",
+      "description": "Tọ́jú id yìí láti tọ́ka sí i lẹ́yìn náà.",
       "receiptLabel": "Ìwé ẹ̀rí",
+      "copyReceiptId": "Dákọ ID ìwé ẹ̀rí",
       "appealLabel": "Ẹ̀bẹ̀",
       "triageReceived": "A ti gbà á",
       "triageOpen": "Ó wà lábẹ́ àtúnyẹ̀wò",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Àwọn ìgbà ìwọlé rẹ tó ń ṣiṣẹ́ kò ní wà lárọ̀ọ́wọ́tó títí a ó fi gbé èyí wọlé.",
     "currentDeviceUnidentified": "A kò lè dá ẹ̀rọ lọ́wọ́lọ́wọ́ mọ̀.",
     "kiloApp": "Ohun èlò Kilo",
+    "kiloAppAndroid": "Ohun èlò Kilo · Android",
+    "kiloAppIos": "Ohun èlò Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Kò sí ìgbà ìwọlé tó ń ṣiṣẹ́",
     "noSessionsDescription": "Wọlé pẹ̀lú ohun èlò Kilo lórí ẹ̀rọ mìíràn, ẹ̀rọ náà yóò sì hàn níbí.",
-    "onlyKiloAppSignIns": "Àwọn ìwọlé ohun èlò Kilo nìkan ló hàn níbí. Àwọn ìwọlé olóòtú kóòdù àti CLI kò sí nínú àkójọ yìí.",
     "signedIn": "Wọlé {{signedIn}} · A rí i gbẹ̀yìn {{lastSeen}}",
+    "signInScopeNote": "Àwọn ìwọlé láti ohun èlò Kilo àti Kilo CLI ló hàn níbí. Àwọn ìwọlé olóòtú kóòdù kò sí nínú àkójọ yìí.",
     "thisDevice": "Ẹ̀rọ yìí",
     "webBrowser": "Aṣàwákiri ayélujára",
     "viewProfile": "Wo prófáìlì",
@@ -2921,7 +2923,7 @@
     "sessionSignedOut": "A ti jáde kúrò nínú ìgbà ìwọlé náà.",
     "signOutThisDeviceTitle": "Jáde lórí ẹ̀rọ yìí?",
     "signOutThisSessionTitle": "Jáde kúrò nínú ìgbà ìwọlé yìí?",
-    "signOutThisSessionMessage": "A ó mú {{device}} jáde. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan.",
+    "signOutThisSessionMessage": "A ó mú {{device}} jáde. A rí i gbẹ̀yìn {{lastSeen}}. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan.",
     "unknownDevice": "Ẹ̀rọ àìmọ̀"
   },
   "forceUpdate": {
@@ -3293,6 +3295,7 @@
       "description": "Àjọ kan máa ń pín kírẹ́dìtì, àwọn aṣojú àti ààtò pẹ̀lú ẹgbẹ́ rẹ.",
       "nameLabel": "Orúkọ àjọ",
       "nameRequired": "Tẹ orúkọ àjọ kan sí i.",
+      "createdNotListed": "A ti ṣẹ̀dá àjọ. Yóò hàn nínú oluka láìpẹ́.",
       "trialNote": "Ìdánwò Enterprise ọlọ́jọ́ 14 rẹ yóò bẹ̀rẹ̀ nígbà tí o bá ṣẹ̀dá rẹ̀. Orí wẹ́ẹ̀bù ni a ti ń ra àwọn ètò."
     },
     "creditActivity": {
@@ -3338,7 +3341,7 @@
       "sharingUnavailable": "Pípín kò ṣeé ṣe lórí ẹ̀rọ yìí.",
       "status": {
         "paid": "A ti san",
-        "open": "Ṣí",
+        "open": "A kò tíì san",
         "void": "A ti fagilé",
         "uncollectible": "Kò ṣeé gbà"
       },
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ààtò àjọ lórí wẹ́ẹ̀bù",
+      "integrations": "Àwọn ìsopọ̀ lórí wẹ́ẹ̀bù",
       "usageDetails": "Àlàyé ìlò",
       "providersAndModels": "Àwọn olùpèsè àti àwòṣe",
       "groups": "Àwọn ẹgbẹ́",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",
-      "last30Days": "Ọjọ́ 30 tó kọjá",
+      "orgLast30Days": "Gbogbo àwọn ọmọ ẹgbẹ́ · Ọjọ́ 30 tó kọjá",
       "outputTokens": "Àwọn ìpín ọ̀rọ̀ ìjáde",
       "requests": "Àwọn ìbéèrè"
     },
@@ -3636,6 +3640,8 @@
       "available": "Àwọn irinṣẹ́ tó wà: {{count}}",
       "none": "Kò sí irinṣẹ́ kankan",
       "noneDescription": "Sáfà Kilo kò dá irinṣẹ́ kankan padà.",
+      "notApplied": "A kò fi àwọn irinṣẹ́ Kilo kún ìjíròrò yìí",
+      "notAppliedDescription": "A ti fi àṣàyàn rẹ pamọ́. Tún gbìyànjú láti lò ó nínú ìjíròrò yìí ní báyìí.",
       "unreachable": "A kò lè dé àwọn irinṣẹ́ Kilo",
       "unreachableDescription": "Sáfà kò dáhùn. Ṣàyẹ̀wò ìsopọ̀ rẹ, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
       "unauthorized": "Àwọn irinṣẹ́ Kilo kọ̀ ìpàdé yìí",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Ko le yọkuro repo",
       "repoValue": "Ibi ipamọ: {{name}}",
       "profileValue": "Profaili: {{name}}",
+      "profileUnavailable": "Profaili yìí kò sí mọ́. Yan òmíràn.",
       "pickerEmptyDescriptionOrganization": "Ṣẹda profaili ajọ kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Olukilani ajọ tabi olùṣàkoso ajọ le ṣẹda profaili ajọ kan."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Àwọn iṣẹ́ tí a so pọ̀",
     "entrySubtitle": "GitHub, Slack, Linear àti àwọn mìíràn",
     "subtitle": "So àwọn irinṣẹ́ ìdàgbàsókè àti ìlànà iṣẹ́ rẹ pọ̀ mọ́ Kilo",
-    "emptyHint": "Kò tíì sí ìsopọ̀ kankan.",
     "disconnect": "Já ìsopọ̀",
     "disconnectTitle": "Ṣé o fẹ́ já ìsopọ̀ {{provider}}?",
     "disconnectMessage": "Kilo kò ní dáhùn mọ́ nínú {{provider}}. O lè tún un so pọ̀ nígbàkígbà.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Yóò dópin lẹ́yìn {{duration}}",
     "neverExpires": "Kò ní dópin láé",
     "includesNewMessages": "A fi àwọn ìfiránṣẹ́ tuntun kún un.",
-    "excludesNewMessages": "A kò fi àwọn ìfiránṣẹ́ tuntun kún un."
+    "excludesNewMessages": "A kò fi àwọn ìfiránṣẹ́ tuntun kún un.",
+    "superseded": "A ti rọ́pò ìjápọ̀ yìí ní ibòmíràn, nítorí náà kò ṣiṣẹ́ mọ́."
   },
   "sharedSession": {
     "title": "Ìgbà iṣẹ́ tí a pín",

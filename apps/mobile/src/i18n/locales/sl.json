@@ -344,8 +344,6 @@
       "rowSubtitle": "Uporabi lastno obračunavanje pri ponudniku",
       "manageOnWebReason": "Ti ponudniki potrebujejo strukturirane poverilnice.",
       "description": "Zahteve prek teh ključev se zaračunajo tvojemu računu pri ponudniku namesto stanju v Kilo.",
-      "enabled": "V uporabi",
-      "disabled": "Izklopljeno",
       "managedByPlan": "Upravlja ga tvoj paket za kodiranje",
       "enableKey": "Omogoči ključ za {{provider}}",
       "test": "Preizkusi ključ",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Potrdilo o prijavi",
-      "description": "Potrdilo za oddano prijavo. Shrani ta ID za poznejše sklicevanje.",
+      "description": "Shrani ta ID za poznejše sklicevanje.",
       "receiptLabel": "Potrdilo",
+      "copyReceiptId": "Kopiraj ID potrdila",
       "appealLabel": "Pritožba",
       "triageReceived": "Prejeto",
       "triageOpen": "V pregledu",
@@ -3013,9 +3012,12 @@
     "couldNotLoadDescription": "Aktivnih sej ni mogoče prikazati, dokler se podatki ne naložijo.",
     "currentDeviceUnidentified": "Trenutne naprave ni bilo mogoče prepoznati.",
     "kiloApp": "Aplikacija Kilo",
+    "kiloAppAndroid": "Aplikacija Kilo · Android",
+    "kiloAppIos": "Aplikacija Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Ni aktivnih sej",
     "noSessionsDescription": "Prijavi se v aplikacijo Kilo na drugi napravi, da se ta prikaže tukaj.",
-    "onlyKiloAppSignIns": "Tukaj se prikažejo samo prijave z aplikacijo Kilo. Prijave z urejevalnikom in CLI niso navedene.",
+    "signInScopeNote": "Tukaj se prikažejo prijave z aplikacijo Kilo in Kilo CLI. Prijave z urejevalnikom niso navedene.",
     "signedIn": "Prijava: {{signedIn}} · Zadnja dejavnost: {{lastSeen}}",
     "thisDevice": "Ta naprava",
     "viewProfile": "Prikaži profil",
@@ -3024,7 +3026,7 @@
     "sessionSignedOut": "Seja je odjavljena.",
     "signOutThisDeviceTitle": "Želiš odjaviti to napravo?",
     "signOutThisSessionTitle": "Želiš odjaviti to sejo?",
-    "signOutThisSessionMessage": "Naprava {{device}} bo odjavljena. Dostop do API lahko ohrani še največ eno uro.",
+    "signOutThisSessionMessage": "Naprava {{device}} bo odjavljena. Zadnja dejavnost: {{lastSeen}}. Dostop do API lahko ohrani še največ eno uro.",
     "webBrowser": "Spletni brskalnik",
     "unknownDevice": "Neznana naprava"
   },
@@ -3399,6 +3401,7 @@
       "description": "V organizaciji si z ekipo delite kredite, agente in nastavitve.",
       "nameLabel": "Ime organizacije",
       "nameRequired": "Vnesite ime organizacije.",
+      "createdNotListed": "Organizacija je ustvarjena. Kmalu bo prikazana v izbirniku.",
       "trialNote": "Ko jo ustvarite, se začne vaš 14-dnevni preizkus načrta Enterprise. Načrte kupite na spletu."
     },
     "creditActivity": {
@@ -3511,6 +3514,7 @@
     },
     "settingsOnWeb": {
       "title": "Nastavitve organizacije na spletu",
+      "integrations": "Integracije na spletu",
       "usageDetails": "Podrobnosti porabe",
       "providersAndModels": "Ponudniki in modeli",
       "groups": "Skupine",
@@ -3526,7 +3530,7 @@
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",
-      "last30Days": "Zadnjih 30 dni",
+      "orgLast30Days": "Vsi člani · Zadnjih 30 dni",
       "outputTokens": "Izhodni žetoni",
       "requests": "Zahteve"
     },
@@ -3744,6 +3748,8 @@
       "available": "Razpoložljiva orodja: {{count}}",
       "none": "Ni razpoložljivih orodij",
       "noneDescription": "Strežnik Kilo ni vrnil nobenega orodja.",
+      "notApplied": "Orodja Kilo niso bila dodana v ta klepet",
+      "notAppliedDescription": "Izbira je shranjena. Poskusi znova, da jo zdaj uporabiš v tem klepetu.",
       "unreachable": "Ni bilo mogoče doseči orodij Kilo",
       "unreachableDescription": "Strežnik ni odgovoril. Preveri povezavo in poskusi znova.",
       "unauthorized": "Orodja Kilo so zavrnila to sejo",
@@ -4277,6 +4283,7 @@
       "unbindFailed": "Ni bilo mogoče razvezati repoja",
       "repoValue": "Repozitorij: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Ta profil ni več na voljo. Izberi drugega.",
       "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijski profil lahko ustvari lastnik organizacije ali skrbnik."
     },
@@ -4538,7 +4545,6 @@
     "sectionTitle": "Povezane storitve",
     "entrySubtitle": "GitHub, Slack, Linear in drugo",
     "subtitle": "Povežite svoja razvojna orodja in delovne tokove s Kilo",
-    "emptyHint": "Povezana ni še nobena integracija.",
     "disconnect": "Prekini povezavo",
     "disconnectTitle": "Želite prekiniti povezavo s storitvijo {{provider}}?",
     "disconnectMessage": "Kilo se v storitvi {{provider}} ne bo več odzival. Znova se lahko povežete kadar koli.",
@@ -4606,7 +4612,8 @@
     "expiresIn": "Poteče čez {{duration}}",
     "neverExpires": "Nikoli ne poteče",
     "includesNewMessages": "Nova sporočila so vključena.",
-    "excludesNewMessages": "Nova sporočila niso vključena."
+    "excludesNewMessages": "Nova sporočila niso vključena.",
+    "superseded": "Ta povezava je bila zamenjana drugje, zato ne deluje več."
   },
   "sharedSession": {
     "title": "Deljena seja",

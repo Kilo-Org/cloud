@@ -175,7 +175,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             setAutoRemediationEnabled(true);
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: auto-remediation stays off.
+      { cancelable: true }
     );
   };
 

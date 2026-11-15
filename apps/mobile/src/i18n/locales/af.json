@@ -344,8 +344,6 @@
       "rowSubtitle": "Gebruik jou eie verskaffer se fakturering",
       "manageOnWebReason": "Hierdie verskaffers benodig gestruktureerde geloofsbriewe.",
       "description": "Versoeke via hierdie sleutels word aan jou verskafferrekening gefaktureer in plaas van van jou Kilo-saldo afgetrek.",
-      "enabled": "In gebruik",
-      "disabled": "Afgeskakel",
       "managedByPlan": "Bestuur deur jou koderingsplan",
       "enableKey": "Aktiveer die {{provider}}-sleutel",
       "test": "Toets sleutel",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Ontvangsbewys vir verslag",
-      "description": "Die ontvangsbewys vir die verslag wat jy ingedien het. Hou hierdie ID om later daarna te verwys.",
+      "description": "Hou hierdie ID om later daarna te verwys.",
       "receiptLabel": "Ontvangsbewys",
+      "copyReceiptId": "Kopieer ontvangsbewys-ID",
       "appealLabel": "Appèl",
       "triageReceived": "Ontvang",
       "triageOpen": "Word hersien",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Jou aktiewe sessies is nie beskikbaar voordat die data gelaai is nie.",
     "currentDeviceUnidentified": "Die huidige toestel kon nie geïdentifiseer word nie.",
     "kiloApp": "Kilo-toep",
+    "kiloAppAndroid": "Kilo-toep · Android",
+    "kiloAppIos": "Kilo-toep · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Geen aktiewe sessies nie",
     "noSessionsDescription": "Teken op 'n ander toestel met die Kilo-toep in en dit sal hier verskyn.",
-    "onlyKiloAppSignIns": "Slegs sessies wat met die Kilo-toep begin is, verskyn hier. Redigeerder- en CLI-sessies word nie gelys nie.",
     "signedIn": "Ingeteken {{signedIn}} · Laas gesien {{lastSeen}}",
+    "signInScopeNote": "Sessies wat met die Kilo-toep en die Kilo CLI begin is, verskyn hier. Redigeerder-sessies word nie gelys nie.",
     "thisDevice": "Hierdie toestel",
     "webBrowser": "Webblaaier",
     "viewProfile": "Bekyk profiel",
@@ -2921,7 +2923,7 @@
     "sessionSignedOut": "Sessie uitgeteken.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",
-    "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Dit kan nog tot 'n uur lank API-toegang behou.",
+    "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Laas gesien {{lastSeen}}. Dit kan nog tot 'n uur lank API-toegang behou.",
     "unknownDevice": "Onbekende toestel"
   },
   "forceUpdate": {
@@ -3293,6 +3295,7 @@
       "description": "'n Organisasie deel krediete, agente en instellings met jou span.",
       "nameLabel": "Organisasienaam",
       "nameRequired": "Voer 'n organisasienaam in.",
+      "createdNotListed": "Organisasie geskep. Dit sal binnekort in die kieser verskyn.",
       "trialNote": "Jou 14-dae Enterprise-proeftydperk begin wanneer jy dit skep. Planne word op die web gekoop."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisasie-instellings op die web",
+      "integrations": "Integrasies op die web",
       "usageDetails": "Gebruiksbesonderhede",
       "providersAndModels": "Verskaffers en modelle",
       "groups": "Groepe",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Invoertekens",
-      "last30Days": "Laaste 30 dae",
+      "orgLast30Days": "Alle lede · Laaste 30 dae",
       "outputTokens": "Uitsettekens",
       "requests": "Versoeke"
     },
@@ -3636,6 +3640,8 @@
       "available": "Nutsmiddels beskikbaar: {{count}}",
       "none": "Geen nutsmiddels beskikbaar nie",
       "noneDescription": "Die Kilo-bediener het geen nutsmiddels teruggegee nie.",
+      "notApplied": "Kilo-nutsmiddels is nie by hierdie klets gevoeg nie",
+      "notAppliedDescription": "Jou keuse is gestoor. Probeer weer om dit nou in hierdie klets te gebruik.",
       "unreachable": "Kon nie Kilo-nutsmiddels bereik nie",
       "unreachableDescription": "Die bediener het nie geantwoord nie. Kontroleer jou verbinding en probeer weer.",
       "unauthorized": "Kilo-nutsmiddels het hierdie sessie geweier",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Kon nie repo ontbind nie",
       "repoValue": "Bewaarplek: {{name}}",
       "profileValue": "Profiel: {{name}}",
+      "profileUnavailable": "Hierdie profiel is nie meer beskikbaar nie. Kies 'n ander een.",
       "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Die eienaar of admin van 'n organisasie kan 'n organisasieprofiel skep."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Gekoppelde dienste",
     "entrySubtitle": "GitHub, Slack, Linear en meer",
     "subtitle": "Koppel jou ontwikkelingsgereedskap en werkvloeie aan Kilo",
-    "emptyHint": "Nog geen integrasies gekoppel nie.",
     "disconnect": "Ontkoppel",
     "disconnectTitle": "Ontkoppel {{provider}}?",
     "disconnectMessage": "Kilo sal ophou om in {{provider}} te reageer. Jy kan enige tyd weer koppel.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Verval oor {{duration}}",
     "neverExpires": "Verval nooit",
     "includesNewMessages": "Nuwe boodskappe is ingesluit.",
-    "excludesNewMessages": "Nuwe boodskappe is uitgesluit."
+    "excludesNewMessages": "Nuwe boodskappe is uitgesluit.",
+    "superseded": "Hierdie skakel is elders vervang en werk dus nie meer nie."
   },
   "sharedSession": {
     "title": "Gedeelde sessie",

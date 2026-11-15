@@ -44,6 +44,11 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import {
+  getCodeReviewerAnalyticsSelection,
+  setCodeReviewerAnalyticsPeriod,
+  setCodeReviewerAnalyticsPlatform,
+} from '@/lib/hooks/use-code-reviewer-analytics-filters';
+import {
   conversationRetentionKey,
   retainConversationAcrossMounts,
 } from '@/lib/pr-review/discussion/conversation-retention';
@@ -97,6 +102,7 @@ const mocks = vi.hoisted(() => ({
   clearFilePartCache: vi.fn(),
   clearMarkdownImageConfirmMemory: vi.fn(),
   clearSessionAutoApprove: vi.fn(),
+  clearUserSessionTitles: vi.fn(),
   clearToolCardImageCache: vi.fn(),
   clearRemoteMcpServers: vi.fn(),
   clearSettingsToolsEnabled: vi.fn(),
@@ -129,6 +135,11 @@ vi.mock('@/components/agents/markdown-image-confirm', () => ({
 }));
 vi.mock('@/components/agents/session-auto-approve', () => ({
   clearSessionAutoApprove: mocks.clearSessionAutoApprove,
+}));
+// The per-session rename titles are account-scoped memory; the boundary's call is
+// observed through this spy, and the store's own suite pins what it clears.
+vi.mock('@/components/agents/session-detail-rename-state', () => ({
+  clearUserSessionTitles: mocks.clearUserSessionTitles,
 }));
 // Partial on purpose: the mirror's manifest reads `extensionForMime` from this
 // module, and `clearArtifactMirror` never calls it.
@@ -195,6 +206,7 @@ const SESSION_MEMBERS = [
   mocks.clearFilePartCache,
   mocks.clearClipboardImages,
   mocks.clearSessionAutoApprove,
+  mocks.clearUserSessionTitles,
   mocks.forgetRemoteMcp,
   mocks.clearRemoteMcpServers,
   mocks.clearChatBackends,
@@ -525,6 +537,24 @@ describe('clearSessionScopedState', () => {
     clearSessionScopedState();
 
     expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(false);
+  });
+
+  // The analytics filters store stays real as well: the next account must not
+  // open an organization on the previous account's platform and period.
+  it('drops the per-organization analytics selection on sign-out', () => {
+    setCodeReviewerAnalyticsPlatform('session-scoped-analytics-org', 'gitlab');
+    setCodeReviewerAnalyticsPeriod('session-scoped-analytics-org', 90);
+    expect(getCodeReviewerAnalyticsSelection('session-scoped-analytics-org')).toEqual({
+      platform: 'gitlab',
+      period: 90,
+    });
+
+    clearSessionScopedState();
+
+    expect(getCodeReviewerAnalyticsSelection('session-scoped-analytics-org')).toEqual({
+      platform: 'github',
+      period: 30,
+    });
   });
 
   it('drops the typed profile form drafts, including their secrets', () => {

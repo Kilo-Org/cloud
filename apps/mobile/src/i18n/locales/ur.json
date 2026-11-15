@@ -344,8 +344,6 @@
       "rowSubtitle": "اپنے فراہم کنندہ کی بلنگ استعمال کریں",
       "manageOnWebReason": "ان فراہم کنندگان کو منظم اسناد درکار ہیں۔",
       "description": "ان کلیدوں کے ذریعے کی گئی درخواستوں کا بل آپ کے Kilo بیلنس کے بجائے آپ کے فراہم کنندہ اکاؤنٹ پر آتا ہے۔",
-      "enabled": "زیر استعمال",
-      "disabled": "بند ہے",
       "managedByPlan": "آپ کے کوڈنگ پلان کے زیر انتظام",
       "enableKey": "{{provider}} کلید فعال کریں",
       "test": "کلید آزمائیں",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "رپورٹ کی رسید",
-      "description": "آپ کی جمع کرائی گئی رپورٹ کی رسید۔ بعد میں حوالے کے لیے یہ آئی ڈی محفوظ رکھیں۔",
+      "description": "بعد میں حوالے کے لیے یہ آئی ڈی محفوظ رکھیں۔",
       "receiptLabel": "رسید",
+      "copyReceiptId": "رسید کی آئی ڈی کاپی کریں",
       "appealLabel": "اپیل",
       "triageReceived": "موصول ہو گئی",
       "triageOpen": "زیرِ جائزہ",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "آپ کے فعال سیشن اس وقت تک دستیاب نہیں ہیں جب تک یہ لوڈ نہ ہو۔",
     "currentDeviceUnidentified": "موجودہ ڈیوائس کی شناخت نہیں ہو سکی۔",
     "kiloApp": "Kilo ایپ",
+    "kiloAppAndroid": "Kilo ایپ · Android",
+    "kiloAppIos": "Kilo ایپ · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "کوئی فعال سیشن نہیں",
     "noSessionsDescription": "کسی دوسری ڈیوائس پر Kilo ایپ سے سائن ان کریں۔ اس کا سیشن یہاں نظر آئے گا۔",
-    "onlyKiloAppSignIns": "صرف Kilo ایپ کے سائن ان یہاں ظاہر ہوتے ہیں۔ ایڈیٹر اور CLI سائن ان درج نہیں ہیں۔",
     "signedIn": "سائن ان: {{signedIn}} · آخری سرگرمی: {{lastSeen}}",
+    "signInScopeNote": "یہاں Kilo ایپ اور Kilo CLI کے سائن ان ظاہر ہوتے ہیں۔ ایڈیٹر کے سائن ان درج نہیں ہوتے۔",
     "thisDevice": "یہ ڈیوائس",
     "webBrowser": "ویب براؤزر",
     "viewProfile": "پروفائل دیکھیں",
@@ -2921,7 +2923,7 @@
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
-    "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔",
+    "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ آخری سرگرمی: {{lastSeen}}۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔",
     "unknownDevice": "نامعلوم ڈیوائس"
   },
   "forceUpdate": {
@@ -3293,6 +3295,7 @@
       "description": "تنظیم آپ کی ٹیم کے ساتھ کریڈٹس، ایجنٹس اور سیٹنگز شیئر کرتی ہے۔",
       "nameLabel": "تنظیم کا نام",
       "nameRequired": "تنظیم کا نام درج کریں۔",
+      "createdNotListed": "تنظیم بن گئی۔ یہ جلد ہی چننے والے میں نظر آئے گی۔",
       "trialNote": "تنظیم بناتے ہی آپ کا 14 دن کا انٹرپرائز ٹرائل شروع ہو جائے گا۔ پلانز ویب پر خریدے جاتے ہیں۔"
     },
     "creditActivity": {
@@ -3338,7 +3341,7 @@
       "sharingUnavailable": "اس ڈیوائس پر شیئر کرنے کی سہولت دستیاب نہیں ہے۔",
       "status": {
         "paid": "ادا شدہ",
-        "open": "کھولیں",
+        "open": "کھلا",
         "void": "منسوخ",
         "uncollectible": "ناقابل وصول"
       },
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "ویب پر تنظیم کی سیٹنگز",
+      "integrations": "ویب پر انٹیگریشنز",
       "usageDetails": "استعمال کی تفصیلات",
       "providersAndModels": "فراہم کنندگان اور ماڈلز",
       "groups": "گروپس",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",
-      "last30Days": "پچھلے 30 دن",
+      "orgLast30Days": "تمام اراکین · پچھلے 30 دن",
       "outputTokens": "آؤٹ پٹ ٹوکن",
       "requests": "درخواستیں"
     },
@@ -3636,6 +3640,8 @@
       "available": "دستیاب ٹولز: {{count}}",
       "none": "کوئی ٹول دستیاب نہیں",
       "noneDescription": "Kilo سرور نے کوئی ٹول واپس نہیں کیا۔",
+      "notApplied": "اس چیٹ میں Kilo ٹولز شامل نہیں کیے گئے",
+      "notAppliedDescription": "آپ کا انتخاب محفوظ ہے۔ اسے ابھی اس چیٹ میں استعمال کرنے کے لیے دوبارہ کوشش کریں۔",
       "unreachable": "Kilo ٹولز تک نہیں پہنچ سکا",
       "unreachableDescription": "سرور نے جواب نہیں دیا۔ اپنا کنکشن چیک کریں، پھر دوبارہ کوشش کریں۔",
       "unauthorized": "Kilo ٹولز نے یہ سیشن مسترد کر دیا",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "ریپو کو بند نہیں کیا جا سکا",
       "repoValue": "ذخیرہ: {{name}}",
       "profileValue": "پروفائل: {{name}}",
+      "profileUnavailable": "یہ پروفائل اب دستیاب نہیں ہے۔ کوئی دوسرا پروفائل منتخب کریں۔",
       "pickerEmptyDescriptionOrganization": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک تنظیمی پروفائل بنائیں۔",
       "pickerEmptyDescriptionOrganizationReadOnly": "تنظیم کا مالک یا ایڈمن تنظیمی پروفائل بنا سکتا ہے۔"
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "منسلک سروسز",
     "entrySubtitle": "GitHub، Slack، Linear اور مزید",
     "subtitle": "اپنے ڈیولپمنٹ ٹولز اور ورک فلوز کو Kilo سے منسلک کریں",
-    "emptyHint": "ابھی تک کوئی انٹیگریشن منسلک نہیں ہے۔",
     "disconnect": "منقطع کریں",
     "disconnectTitle": "{{provider}} کو منقطع کریں؟",
     "disconnectMessage": "Kilo اب {{provider}} میں جواب نہیں دے گا۔ آپ کسی بھی وقت دوبارہ منسلک کر سکتے ہیں۔",
@@ -4476,7 +4482,8 @@
     "expiresIn": "میعاد {{duration}} میں ختم ہوگی",
     "neverExpires": "میعاد کبھی ختم نہیں ہوگی",
     "includesNewMessages": "نئے پیغامات شامل ہیں۔",
-    "excludesNewMessages": "نئے پیغامات شامل نہیں ہیں۔"
+    "excludesNewMessages": "نئے پیغامات شامل نہیں ہیں۔",
+    "superseded": "یہ لنک کہیں اور سے بدل دیا گیا ہے، اس لیے اب یہ کام نہیں کرتا۔"
   },
   "sharedSession": {
     "title": "شیئر کردہ سیشن",

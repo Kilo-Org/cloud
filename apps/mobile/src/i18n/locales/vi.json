@@ -344,8 +344,6 @@
       "rowSubtitle": "Dùng thanh toán của nhà cung cấp riêng",
       "manageOnWebReason": "Các nhà cung cấp này cần thông tin xác thực có cấu trúc.",
       "description": "Các yêu cầu qua những khóa này sẽ được tính phí vào tài khoản nhà cung cấp của bạn thay vì số dư Kilo.",
-      "enabled": "Đang dùng",
-      "disabled": "Đã tắt",
       "managedByPlan": "Do gói lập trình của bạn quản lý",
       "enableKey": "Bật khóa {{provider}}",
       "test": "Kiểm tra khóa",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Biên nhận báo cáo",
-      "description": "Biên nhận cho báo cáo bạn đã gửi. Hãy lưu lại mã này để tra cứu sau.",
+      "description": "Hãy lưu lại mã này để tra cứu sau.",
       "receiptLabel": "Biên nhận",
+      "copyReceiptId": "Sao chép mã biên nhận",
       "appealLabel": "Kháng nghị",
       "triageReceived": "Đã tiếp nhận",
       "triageOpen": "Đang xem xét",
@@ -2366,10 +2365,13 @@
     "couldNotLoadDescription": "Bạn chưa thể xem các phiên đang hoạt động cho đến khi tải xong dữ liệu.",
     "currentDeviceUnidentified": "Không thể xác định thiết bị hiện tại.",
     "kiloApp": "Ứng dụng Kilo",
+    "kiloAppAndroid": "Ứng dụng Kilo · Android",
+    "kiloAppIos": "Ứng dụng Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Không có phiên đang hoạt động",
     "noSessionsDescription": "Đăng nhập vào ứng dụng Kilo trên thiết bị khác để thiết bị đó xuất hiện tại đây.",
-    "onlyKiloAppSignIns": "Chỉ các phiên đăng nhập qua ứng dụng Kilo xuất hiện tại đây. Các phiên đăng nhập qua trình soạn thảo mã và CLI không được liệt kê.",
     "signedIn": "Đăng nhập lúc {{signedIn}} · Hoạt động gần nhất {{lastSeen}}",
+    "signInScopeNote": "Các phiên đăng nhập qua ứng dụng Kilo và Kilo CLI xuất hiện tại đây. Các phiên đăng nhập qua trình soạn thảo mã không được liệt kê.",
     "thisDevice": "Thiết bị này",
     "webBrowser": "Trình duyệt web",
     "viewProfile": "Xem hồ sơ",
@@ -2378,7 +2380,7 @@
     "sessionSignedOut": "Đã đăng xuất phiên.",
     "signOutThisDeviceTitle": "Đăng xuất khỏi thiết bị này?",
     "signOutThisSessionTitle": "Đăng xuất phiên này?",
-    "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",
+    "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Hoạt động gần nhất {{lastSeen}}. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",
     "unknownDevice": "Thiết bị không xác định"
   },
   "forceUpdate": {
@@ -3285,6 +3287,7 @@
       "description": "Tổ chức giúp bạn chia sẻ tín dụng, tác nhân và cài đặt với nhóm của mình.",
       "nameLabel": "Tên tổ chức",
       "nameRequired": "Nhập tên tổ chức.",
+      "createdNotListed": "Đã tạo tổ chức. Tổ chức sẽ sớm xuất hiện trong bộ chọn.",
       "trialNote": "Bản dùng thử Enterprise 14 ngày sẽ bắt đầu khi bạn tạo tổ chức. Bạn mua gói trên web."
     },
     "creditActivity": {
@@ -3410,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Cài đặt tổ chức trên web",
+      "integrations": "Tích hợp trên web",
       "usageDetails": "Chi tiết sử dụng",
       "providersAndModels": "Nhà cung cấp và mô hình",
       "groups": "Nhóm",
@@ -3425,7 +3429,7 @@
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
-      "last30Days": "30 Ngày qua",
+      "orgLast30Days": "Tất cả thành viên · 30 Ngày qua",
       "outputTokens": "Token đầu ra",
       "requests": "Yêu cầu"
     },
@@ -3636,6 +3640,8 @@
       "available": "Công cụ khả dụng: {{count}}",
       "none": "Không có công cụ nào khả dụng",
       "noneDescription": "Máy chủ Kilo không trả về công cụ nào.",
+      "notApplied": "Công cụ Kilo chưa được thêm vào cuộc trò chuyện này",
+      "notAppliedDescription": "Lựa chọn của bạn đã được lưu. Thử lại để áp dụng ngay trong cuộc trò chuyện này.",
       "unreachable": "Không thể kết nối với công cụ Kilo",
       "unreachableDescription": "Máy chủ không phản hồi. Kiểm tra kết nối của bạn, rồi thử lại.",
       "unauthorized": "Công cụ Kilo đã từ chối phiên này",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Không thể hủy liên kết repo",
       "repoValue": "Kho lưu trữ: {{name}}",
       "profileValue": "Hồ sơ: {{name}}",
+      "profileUnavailable": "Hồ sơ này không còn khả dụng. Hãy chọn hồ sơ khác.",
       "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Chủ sở hữu hoặc quản trị viên của tổ chức có thể tạo hồ sơ tổ chức."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Dịch vụ đã kết nối",
     "entrySubtitle": "GitHub, Slack, Linear và nhiều dịch vụ khác",
     "subtitle": "Kết nối các công cụ và quy trình phát triển của bạn với Kilo",
-    "emptyHint": "Chưa có tích hợp nào được kết nối.",
     "disconnect": "Ngắt kết nối",
     "disconnectTitle": "Ngắt kết nối {{provider}}?",
     "disconnectMessage": "Kilo sẽ ngừng phản hồi trong {{provider}}. Bạn có thể kết nối lại bất cứ lúc nào.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Hết hạn sau {{duration}}",
     "neverExpires": "Không bao giờ hết hạn",
     "includesNewMessages": "Bao gồm cả tin nhắn mới.",
-    "excludesNewMessages": "Không bao gồm tin nhắn mới."
+    "excludesNewMessages": "Không bao gồm tin nhắn mới.",
+    "superseded": "Liên kết này đã được thay thế trên thiết bị khác nên không còn hoạt động."
   },
   "sharedSession": {
     "title": "Phiên được chia sẻ",

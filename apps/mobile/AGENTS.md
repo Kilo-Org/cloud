@@ -164,7 +164,8 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
-- Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
+- Optimistic updates come in two kinds, and each has exactly one owner. A value that lives in the TanStack query cache is owned by its mutation: snapshot in `onMutate`, roll back in `onError` only when `isLatestMutationGeneration` says this mutation still owns the key, reconcile in `onSettled`. Never add a second optimistic owner over the same query-backed value.
+- Only the per-chat web-search and Kilo MCP flags use the registry's `setChatFlag` (`@/lib/chat/registry`), which persists and applies them in the chat's own operation order and publishes the result through `ChatState`. Other standalone persisted values stay with their owning stores; components must not add a competing optimistic mirror beside either kind.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
 
@@ -294,6 +295,12 @@ Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux servi
 The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds the registry (the conversations that are running), the layers (the plugins they run on) and the store (the list and its CRUD). The SDK saves one conversation; this app owns the list, the ordering, the titles, the deleting and the scoping.
 
 **A conversation can move, and the screen follows the state rather than a return value.** Switching models clones the conversation onto a new session, and the mover is not always the screen: a question typed on another model while an answer was arriving moves the chat from inside the registry. So the chat that was left points at the one it became, and `useChat` follows that.
+
+A chat flag is one `ChatFlag` on `ChatState` (`@/lib/chat/chat-flag`): read it and write it through `setChatFlag`, never with a `useState` mirror beside it. A refused persist rejects and restores the stored choice, including its application status and Retry when that choice is behind. `retryChatFlag` applies that saved choice again without another persist. Both flags and every move share the chat's registry turn.
+
+Resolve a queued operation's session inside its turn, because an earlier move can rename it. Keep send startup in that turn through assigning `chat.answering`; a tool retry rechecks the live chat inside its turn and defers while an answer streams. Closing skips only waiting skippable tickets, never a queued reopen. A skipped caller may settle early, but its queue tail still waits for its predecessor.
+
+Sign-out and account switch cancel only the old account's chat flags: drop waiting flag tickets and abandon a pending flag persist, whose captured `AbortSignal` fences the SQL write and later application/publication. Every non-flag operation, session move and runtime close is still awaited, with no teardown deadline. Once a flag begins moving a session, finish that move and its metadata migration before teardown continues. A deferred flag stays `moving` until its move publishes `current` or `behind`.
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 

@@ -23,7 +23,12 @@ import { pendingLinkOptions } from '@/lib/auth/pending-link';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
-import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
+import {
+  beginLoginEmail,
+  holdLoginEmail,
+  holdSsoRecovery,
+  type SsoRecoveryDraft,
+} from '@/lib/login-draft';
 import { cn } from '@/lib/utils';
 
 /** The two links the legal sentence exposes as custom accessibility actions. */
@@ -200,14 +205,14 @@ export function IdleAuth({
   // change event re-seeds the draft).
   useEffect(() => {
     if (initialEmail) {
-      setLoginEmailDraft(initialEmail);
+      holdLoginEmail(initialEmail);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot seed on mount
   }, []);
 
   // Keep the module-level draft in sync so an RTL reload can persist it.
   useEffect(() => {
-    setSsoRecoveryDraft(ssoRecovery);
+    holdSsoRecovery(ssoRecovery);
   }, [ssoRecovery]);
 
   const handleSendCode = async (email: string) => {
@@ -448,7 +453,7 @@ export function IdleAuth({
           emailRef.current = value;
           // Clear the validation message as soon as the user starts fixing it.
           clearEmailError();
-          setLoginEmailDraft(value);
+          beginLoginEmail(value);
         }}
         // The field block grows when it renders a message under the input, and
         // the input's own frame says where that message starts.

@@ -103,6 +103,7 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import {
+  applyConsumedPendingDeepLink,
   captureLaunchDeepLink,
   clearPendingDeepLink,
   consumePendingDeepLink,
@@ -1066,22 +1067,17 @@ function RootLayoutNav({
     if (pendingDeepLink === null || !isShellReady || !navigationReady) {
       return;
     }
-    const pending = consumePendingDeepLink();
-    if (!pending) {
-      return;
-    }
-    // Switch to the destination's organization before navigating, in the same
-    // effect body with nothing awaited between: the route reads the new
-    // organization on its first render instead of fetching the old scope and
-    // showing an empty list. A destination with no organization (Personal)
-    // leaves the selection unchanged.
-    if (pending.organizationId !== null) {
-      setOrganizationId(pending.organizationId);
-    }
-    const navigation = resolvePendingNavigation(pending.href);
-    if (navigation) {
-      router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
-    }
+    // The shared step switches to the destination's organization before
+    // navigating, in the same effect body with nothing awaited between: the
+    // route reads the new organization on its first render instead of fetching
+    // the old scope and showing an empty list. A destination with no
+    // organization (Personal) leaves the selection unchanged.
+    applyConsumedPendingDeepLink(consumePendingDeepLink(), setOrganizationId, href => {
+      const navigation = resolvePendingNavigation(href);
+      if (navigation) {
+        router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
+      }
+    });
   }, [pendingDeepLink, isShellReady, navigationReady, router, setOrganizationId]);
 
   useEffect(() => {

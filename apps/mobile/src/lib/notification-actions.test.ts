@@ -22,7 +22,7 @@ import {
   isNeedsInputActionIdentifier,
   registerNeedsInputCategories,
 } from './notification-actions';
-import { notificationIdentifierForSession } from './needs-input-notification';
+import { notificationIdentifierForSession } from './needs-input-presentation';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 const mocks = vi.hoisted(() => ({

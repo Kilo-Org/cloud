@@ -344,8 +344,6 @@
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
       "manageOnWebReason": "Need teenusepakkujad vajavad struktureeritud mandaate.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
-      "enabled": "Kasutusel",
-      "disabled": "Välja lülitatud",
       "managedByPlan": "Haldab sinu kodeerimispakett",
       "enableKey": "Luba teenusepakkuja {{provider}} võti",
       "test": "Testi võtit",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Teate kinnitus",
-      "description": "Sinu esitatud teate kinnitus. Hoia see ID alles, et saaksid sellele hiljem viidata.",
+      "description": "Hoia see ID alles, et saaksid sellele hiljem viidata.",
       "receiptLabel": "Kinnitus",
+      "copyReceiptId": "Kopeeri kinnituse ID",
       "appealLabel": "Vaidlustus",
       "triageReceived": "Vastu võetud",
       "triageOpen": "Ülevaatamisel",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "Sinu aktiivsed seansid on saadaval alles pärast andmete laadimist.",
     "currentDeviceUnidentified": "Praegust seadet ei õnnestunud tuvastada.",
     "kiloApp": "Kilo rakendus",
+    "kiloAppAndroid": "Kilo rakendus · Android",
+    "kiloAppIos": "Kilo rakendus · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Aktiivseid seansse pole",
     "noSessionsDescription": "Logi teises seadmes Kilo rakendusse sisse ja see seade ilmub siia.",
-    "onlyKiloAppSignIns": "Siin kuvatakse ainult Kilo rakendusse sisselogimised. Redaktori ja CLI kaudu sisselogimisi ei kuvata.",
     "signedIn": "Sisse logitud {{signedIn}} · Viimati nähtud {{lastSeen}}",
+    "signInScopeNote": "Siin kuvatakse Kilo rakenduse ja Kilo CLI kaudu sisselogimised. Redaktori kaudu sisselogimisi ei kuvata.",
     "thisDevice": "See seade",
     "viewProfile": "Vaata profiili",
     "signOutThisDevice": "Logi sellest seadmest välja",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "Seansist on välja logitud.",
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",
-    "signOutThisSessionMessage": "{{device}} logitakse välja. Seadme juurdepääs API-le võib säilida veel kuni tund aega.",
+    "signOutThisSessionMessage": "{{device}} logitakse välja. Viimati nähtud {{lastSeen}}. Seadme juurdepääs API-le võib säilida veel kuni tund aega.",
     "webBrowser": "Veebibrauser",
     "unknownDevice": "Tundmatu seade"
   },
@@ -3293,6 +3295,7 @@
       "description": "Organisatsioon jagab krediiti, agente ja seadeid sinu meeskonnaga.",
       "nameLabel": "Organisatsiooni nimi",
       "nameRequired": "Sisesta organisatsiooni nimi.",
+      "createdNotListed": "Organisatsioon on loodud. See ilmub peagi valijasse.",
       "trialNote": "Sinu 14-päevane Enterprise'i prooviperiood algab organisatsiooni loomisel. Plaane saab osta veebis."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisatsiooni seaded veebis",
+      "integrations": "Integratsioonid veebis",
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
-      "last30Days": "Viimased 30 päeva",
+      "orgLast30Days": "Kõik liikmed · Viimased 30 päeva",
       "outputTokens": "Väljundtokenid",
       "requests": "Päringud"
     },
@@ -3636,6 +3640,8 @@
       "available": "Saadaolevad tööriistad: {{count}}",
       "none": "Tööriistu pole saadaval",
       "noneDescription": "Kilo server ei tagastanud ühtegi tööriista.",
+      "notApplied": "Kilo tööriistu ei lisatud sellesse vestlusse",
+      "notAppliedDescription": "Sinu valik on salvestatud. Proovi uuesti, et seda kohe selles vestluses kasutada.",
       "unreachable": "Kilo tööriistadeni ei õnnestunud jõuda",
       "unreachableDescription": "Server ei vastanud. Kontrolli ühendust ja proovi uuesti.",
       "unauthorized": "Kilo tööriistad keeldusid sellest seansist",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Repot ei saanud lahti siduda",
       "repoValue": "Hoidla: {{name}}",
       "profileValue": "Profiil: {{name}}",
+      "profileUnavailable": "See profiil pole enam saadaval. Vali mõni teine.",
       "pickerEmptyDescriptionOrganization": "Loo organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organisatsiooni omanik või administraator saab organisatsiooniprofiili luua."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Ühendatud teenused",
     "entrySubtitle": "GitHub, Slack, Linear ja muud",
     "subtitle": "Ühenda oma arendustööriistad ja töövood Kiloga",
-    "emptyHint": "Ühtegi integratsiooni pole veel ühendatud.",
     "disconnect": "Katkesta ühendus",
     "disconnectTitle": "Kas katkestada ühendus teenusega {{provider}}?",
     "disconnectMessage": "Kilo lõpetab teenuses {{provider}} vastamise. Saad selle igal ajal uuesti ühendada.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "Kehtib veel {{duration}}",
     "neverExpires": "Ei aegu",
     "includesNewMessages": "Uued sõnumid on kaasatud.",
-    "excludesNewMessages": "Uued sõnumid ei ole kaasatud."
+    "excludesNewMessages": "Uued sõnumid ei ole kaasatud.",
+    "superseded": "See link asendati mujal, mistõttu see enam ei tööta."
   },
   "sharedSession": {
     "title": "Jagatud seanss",

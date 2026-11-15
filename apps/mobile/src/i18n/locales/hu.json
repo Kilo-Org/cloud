@@ -344,8 +344,6 @@
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
       "manageOnWebReason": "Ezekhez a szolgáltatókhoz strukturált hitelesítő adatok szükségesek.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
-      "enabled": "Használatban",
-      "disabled": "Kikapcsolva",
       "managedByPlan": "A kódolási csomagod kezeli",
       "enableKey": "A(z) {{provider}} kulcs engedélyezése",
       "test": "Kulcs tesztelése",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Bejelentés visszaigazolása",
-      "description": "Az általad beküldött bejelentés visszaigazolása. Őrizd meg ezt az azonosítót, hogy később hivatkozhass rá.",
+      "description": "Őrizd meg ezt az azonosítót, hogy később hivatkozhass rá.",
       "receiptLabel": "Visszaigazolás",
+      "copyReceiptId": "Visszaigazolás azonosítójának másolása",
       "appealLabel": "Fellebbezés",
       "triageReceived": "Beérkezett",
       "triageOpen": "Felülvizsgálat alatt",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "A betöltés befejezéséig az aktív munkameneteid nem érhetők el.",
     "currentDeviceUnidentified": "Nem sikerült azonosítani az aktuális eszközt.",
     "kiloApp": "Kilo alkalmazás",
+    "kiloAppAndroid": "Kilo alkalmazás · Android",
+    "kiloAppIos": "Kilo alkalmazás · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Nincs aktív munkamenet",
     "noSessionsDescription": "Jelentkezz be a Kilo alkalmazásba egy másik eszközön, és az eszköz itt is megjelenik.",
-    "onlyKiloAppSignIns": "Itt csak a Kilo alkalmazásba történő bejelentkezések jelennek meg. A szerkesztőbe és a CLI-be történő bejelentkezéseket nem soroljuk fel.",
     "signedIn": "Bejelentkezés: {{signedIn}} · Utolsó aktivitás: {{lastSeen}}",
+    "signInScopeNote": "Itt a Kilo alkalmazásba és a Kilo CLI-be történő bejelentkezések jelennek meg. A szerkesztőbe történő bejelentkezéseket nem soroljuk fel.",
     "thisDevice": "Ez az eszköz",
     "viewProfile": "Profil megtekintése",
     "signOutThisDevice": "Kijelentkezés erről az eszközről",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "Sikeres kijelentkezés a munkamenetből.",
     "signOutThisDeviceTitle": "Kijelentkezel erről az eszközről?",
     "signOutThisSessionTitle": "Kijelentkezel ebből a munkamenetből?",
-    "signOutThisSessionMessage": "Az eszköz ({{device}}) ki lesz jelentkeztetve. Az API-hozzáférése még legfeljebb egy óráig megmaradhat.",
+    "signOutThisSessionMessage": "{{device}} ki lesz jelentkeztetve. Utolsó aktivitás: {{lastSeen}}. Az API-hozzáférése még legfeljebb egy óráig megmaradhat.",
     "webBrowser": "Webböngésző",
     "unknownDevice": "Ismeretlen eszköz"
   },
@@ -3293,6 +3295,7 @@
       "description": "A szervezetben a csapatod közösen használja a krediteket, az ügynököket és a beállításokat.",
       "nameLabel": "Szervezet neve",
       "nameRequired": "Add meg a szervezet nevét.",
+      "createdNotListed": "A szervezet létrejött. Hamarosan megjelenik a választóban.",
       "trialNote": "A 14 napos Enterprise próbaidőszak a létrehozáskor indul. Csomagot a weben lehet vásárolni."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Szervezeti beállítások a weben",
+      "integrations": "Integrációk a weben",
       "usageDetails": "Használati részletek",
       "providersAndModels": "Szolgáltatók és modellek",
       "groups": "Csoportok",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",
-      "last30Days": "Elmúlt 30 nap",
+      "orgLast30Days": "Összes tag · Elmúlt 30 nap",
       "outputTokens": "Kimeneti tokenek",
       "requests": "Kérések"
     },
@@ -3636,6 +3640,8 @@
       "available": "Elérhető eszközök: {{count}}",
       "none": "Nincsenek elérhető eszközök",
       "noneDescription": "A Kilo-kiszolgáló nem adott vissza eszközöket.",
+      "notApplied": "A Kilo-eszközök nem lettek hozzáadva ehhez a csevegéshez",
+      "notAppliedDescription": "A választását mentettük. Az „Újrapróbálkozás” gombbal most alkalmazhatja ebben a csevegésben.",
       "unreachable": "Nem sikerült elérni a Kilo-eszközöket",
       "unreachableDescription": "A kiszolgáló nem válaszolt. Ellenőrizd a kapcsolatot, majd próbáld újra.",
       "unauthorized": "A Kilo-eszközök elutasították ezt a munkamenetet",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "Nem sikerült feloldani az adattár kötését",
       "repoValue": "Adattár: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Ez a profil már nem érhető el. Válasszon másikat.",
       "pickerEmptyDescriptionOrganization": "Hozzon létre egy szervezeti profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Szervezeti profilt a szervezet tulajdonosa vagy rendszergazdája hozhat létre."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "Csatlakoztatott szolgáltatások",
     "entrySubtitle": "GitHub, Slack, Linear és még sok más",
     "subtitle": "Csatlakoztasd a fejlesztői eszközeidet és munkafolyamataidat a Kilo-fiókodhoz",
-    "emptyHint": "Még nincs csatlakoztatott integráció.",
     "disconnect": "Leválasztás",
     "disconnectTitle": "{{provider}} leválasztása?",
     "disconnectMessage": "A Kilo többé nem fog válaszolni itt: {{provider}}. Bármikor újra csatlakoztathatod.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "{{duration}} múlva lejár",
     "neverExpires": "Nem jár le",
     "includesNewMessages": "Az új üzenetek is benne vannak.",
-    "excludesNewMessages": "Az új üzenetek nincsenek benne."
+    "excludesNewMessages": "Az új üzenetek nincsenek benne.",
+    "superseded": "Ezt a linket máshol lecserélték, ezért már nem működik."
   },
   "sharedSession": {
     "title": "Megosztott munkamenet",

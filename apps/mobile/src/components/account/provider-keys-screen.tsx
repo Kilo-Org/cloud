@@ -20,7 +20,6 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
-import { i18n } from '@/i18n';
 
 type ProviderKey = inferRouterOutputs<MobileRouter>['byok']['list'][number];
 
@@ -37,17 +36,6 @@ const SKELETON_ROWS = [0, 1];
  * action below never moves when the skeletons are replaced by the settled state.
  */
 const BODY_BAND_CLASS = 'min-h-[220px]';
-
-/**
- * The row's second line. A key the coding plan installed says so instead of
- * reporting the switch, because the switch cannot move for it.
- */
-function keyStateLabel(managed: boolean, enabled: boolean): string {
-  if (managed) {
-    return i18n.t('profile.providerKeys.managedByPlan');
-  }
-  return i18n.t(enabled ? 'profile.providerKeys.enabled' : 'profile.providerKeys.disabled');
-}
 
 function ProviderKeyRow({
   providerKey,
@@ -80,9 +68,15 @@ function ProviderKeyRow({
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
             {providerKey.provider_name}
           </Text>
-          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-            {keyStateLabel(managed, providerKey.is_enabled)}
-          </Text>
+          {/*
+            Only a managed row keeps a line: its switch is disabled, so it cannot
+            carry the state and the row has to name the plan instead.
+          */}
+          {managed ? (
+            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+              {t('profile.providerKeys.managedByPlan')}
+            </Text>
+          ) : null}
         </View>
         <Switch
           value={providerKey.is_enabled}

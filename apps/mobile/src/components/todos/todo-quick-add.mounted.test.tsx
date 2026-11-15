@@ -67,10 +67,15 @@ vi.mock('@/components/ui/accessible-status', async () => {
 });
 vi.mock('@/components/ui/icons', () => ({ Plus: 'Plus' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#ffffff',
   useThemeColors: () => ({ primaryForeground: '#ffffff' }),
 }));
 
-type InputProps = { value: string; onChangeText: (text: string) => void };
+type InputProps = {
+  value: string;
+  onChangeText: (text: string) => void;
+  onSubmitEditing?: () => void;
+};
 type ButtonProps = { disabled: boolean; onPress: () => void };
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -132,6 +137,18 @@ afterEach(() => {
 });
 
 describe('To-do quick add', () => {
+  it('stays silent when Done is pressed on an empty field', async () => {
+    await act(async () => {
+      inputField().onSubmitEditing?.();
+      await Promise.resolve();
+    });
+
+    // Nothing was attempted, so neither the add nor a connection failure is
+    // reported; the line stays clear for the retry that has something to send.
+    expect(state.onAdd).not.toHaveBeenCalled();
+    expect(errorLine()).toBeNull();
+  });
+
   it('clears the field only once the add is confirmed', async () => {
     const pending = Promise.withResolvers<undefined>();
     state.onAdd.mockReturnValueOnce(pending.promise);
@@ -190,6 +207,18 @@ describe('To-do quick add', () => {
 
     expect(state.onAdd).toHaveBeenCalledExactlyOnceWith('First task');
     expect(inputField().value).toBe('Second task');
+  });
+
+  it('clears the failed-add line on the next keystroke', async () => {
+    state.onAdd.mockRejectedValueOnce(new Error('offline'));
+    type('Buy milk');
+    await pressAdd();
+    expect(errorLine()).toBe(i18n.t('todos.list.addFailed'));
+
+    type('Buy milk and eggs');
+
+    expect(errorLine()).toBeNull();
+    expect(addButton().disabled).toBe(false);
   });
 
   it('sends one add when pressed again while the first is in flight', async () => {

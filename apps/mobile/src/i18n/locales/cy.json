@@ -344,8 +344,6 @@
       "rowSubtitle": "Defnyddio bilio eich darparwr eich hun",
       "manageOnWebReason": "Mae angen manylion adnabod strwythuredig ar y darparwyr hyn.",
       "description": "Codir tâl am geisiadau drwy'r allweddi hyn ar eich cyfrif darparwr yn lle eich balans Kilo.",
-      "enabled": "Yn cael ei defnyddio",
-      "disabled": "Wedi'i diffodd",
       "managedByPlan": "Wedi'i rheoli gan eich cynllun codio",
       "enableKey": "Galluogi allwedd {{provider}}",
       "test": "Profi'r allwedd",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Derbynneb adroddiad",
-      "description": "Y dderbynneb ar gyfer yr adroddiad a gyflwynoch. Cadwch y rhif adnabod hwn i gyfeirio ato'n nes ymlaen.",
+      "description": "Cadwch y rhif adnabod hwn i gyfeirio ato'n nes ymlaen.",
       "receiptLabel": "Derbynneb",
+      "copyReceiptId": "Copïo rhif adnabod y dderbynneb",
       "appealLabel": "Apêl",
       "triageReceived": "Wedi'i dderbyn",
       "triageOpen": "Wrthi'n cael ei adolygu",
@@ -3117,10 +3116,13 @@
     "couldNotLoadDescription": "Nid yw eich sesiynau gweithredol ar gael nes bod y data hwn wedi llwytho.",
     "currentDeviceUnidentified": "Methu adnabod y ddyfais gyfredol.",
     "kiloApp": "Ap Kilo",
+    "kiloAppAndroid": "Ap Kilo · Android",
+    "kiloAppIos": "Ap Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "Dim sesiynau gweithredol",
     "noSessionsDescription": "Mewngofnodwch i ap Kilo ar ddyfais arall a bydd y sesiwn yn ymddangos yma.",
-    "onlyKiloAppSignIns": "Dim ond sesiynau ap Kilo sy'n ymddangos yma. Nid yw sesiynau'r golygydd na'r CLI wedi'u rhestru.",
     "signedIn": "Wedi mewngofnodi {{signedIn}} · Gwelwyd ddiwethaf {{lastSeen}}",
+    "signInScopeNote": "Mae sesiynau ap Kilo a Kilo CLI yn ymddangos yma. Nid yw sesiynau'r golygydd wedi'u rhestru.",
     "thisDevice": "Y ddyfais hon",
     "viewProfile": "Gweld y proffil",
     "signOutThisDevice": "Allgofnodi'r ddyfais hon",
@@ -3128,7 +3130,7 @@
     "sessionSignedOut": "Allgofnodwyd y sesiwn.",
     "signOutThisDeviceTitle": "Allgofnodi'r ddyfais hon?",
     "signOutThisSessionTitle": "Allgofnodi'r sesiwn hon?",
-    "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gall gadw mynediad at yr API am hyd at awr.",
+    "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gwelwyd ddiwethaf {{lastSeen}}. Gall gadw mynediad at yr API am hyd at awr.",
     "webBrowser": "Porwr gwe",
     "unknownDevice": "Dyfais anhysbys"
   },
@@ -3505,6 +3507,7 @@
       "description": "Mae sefydliad yn rhannu credydau, asiantau a gosodiadau gyda'ch tîm.",
       "nameLabel": "Enw'r sefydliad",
       "nameRequired": "Rhowch enw ar gyfer y sefydliad.",
+      "createdNotListed": "Crëwyd y sefydliad. Bydd yn ymddangos yn y codwr cyn bo hir.",
       "trialNote": "Mae eich treial Enterprise 14 diwrnod yn dechrau pan fyddwch yn ei greu. Caiff cynlluniau eu prynu ar y we."
     },
     "creditActivity": {
@@ -3550,7 +3553,7 @@
       "sharingUnavailable": "Nid yw rhannu ar gael ar y ddyfais hon.",
       "status": {
         "paid": "Wedi'i thalu",
-        "open": "Agor",
+        "open": "Ar agor",
         "void": "Wedi'i dirymu",
         "uncollectible": "Anghasgladwy"
       },
@@ -3617,6 +3620,7 @@
     },
     "settingsOnWeb": {
       "title": "Gosodiadau'r sefydliad ar y we",
+      "integrations": "Integreiddiadau ar y we",
       "usageDetails": "Manylion defnydd",
       "providersAndModels": "Darparwyr a modelau",
       "groups": "Grwpiau",
@@ -3632,7 +3636,7 @@
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
-      "last30Days": "Y 30 diwrnod diwethaf",
+      "orgLast30Days": "Holl aelodau · Y 30 diwrnod diwethaf",
       "outputTokens": "Tocynnau allbwn",
       "requests": "Ceisiadau"
     },
@@ -3852,6 +3856,8 @@
       "available": "Offer ar gael: {{count}}",
       "none": "Dim offer ar gael",
       "noneDescription": "Ni chyflwynodd gweinydd Kilo unrhyw offer.",
+      "notApplied": "Ni ychwanegwyd offer Kilo at y sgwrs hon",
+      "notAppliedDescription": "Mae eich dewis wedi'i gadw. Rhoi cynnig eto i'w ddefnyddio yn y sgwrs hon nawr.",
       "unreachable": "Ni ellid cyrraedd offer Kilo",
       "unreachableDescription": "Ni wnaeth y gweinydd ateb. Gwiriwch eich cysylltiad, yna ceisiwch eto.",
       "unauthorized": "Gwrthododd offer Kilo y sesiwn hon",
@@ -4399,6 +4405,7 @@
       "unbindFailed": "Ni fu modd dadrwymo repo",
       "repoValue": "Ystorfa: {{name}}",
       "profileValue": "Proffil: {{name}}",
+      "profileUnavailable": "Nid yw'r proffil hwn ar gael mwyach. Dewiswch un arall.",
       "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Gall perchennog sefydliad neu weinyddwr greu proffil sefydliad."
     },
@@ -4668,7 +4675,6 @@
     "sectionTitle": "Gwasanaethau cysylltiedig",
     "entrySubtitle": "GitHub, Slack, Linear a mwy",
     "subtitle": "Cysylltwch eich offer datblygu a'ch llifoedd gwaith â Kilo",
-    "emptyHint": "Does dim integreiddiadau wedi'u cysylltu eto.",
     "disconnect": "Datgysylltu",
     "disconnectTitle": "Datgysylltu {{provider}}?",
     "disconnectMessage": "Bydd Kilo yn peidio ag ymateb yn {{provider}}. Gallwch ailgysylltu unrhyw bryd.",
@@ -4736,7 +4742,8 @@
     "expiresIn": "Yn dod i ben ymhen {{duration}}",
     "neverExpires": "Byth yn dod i ben",
     "includesNewMessages": "Mae negeseuon newydd wedi'u cynnwys.",
-    "excludesNewMessages": "Nid yw negeseuon newydd wedi'u cynnwys."
+    "excludesNewMessages": "Nid yw negeseuon newydd wedi'u cynnwys.",
+    "superseded": "Disodlwyd y ddolen hon mewn man arall, felly nid yw'n gweithio mwyach."
   },
   "sharedSession": {
     "title": "Sesiwn a rannwyd",

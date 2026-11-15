@@ -134,6 +134,9 @@ describe('ProfileScreen Organization section', () => {
     expect(
       findConfigureRows(root, i18n.t('organization.boundary.selectOrganization'))
     ).toHaveLength(0);
+    // The error branch renders its retry where the rows would be, so no Create
+    // organization row paints beside it and the section offers the retry alone.
+    expect(findConfigureRows(root, i18n.t('organization.create.title'))).toHaveLength(0);
 
     const callsBeforeRetry = organizationsQueryFn.mock.calls.length;
     act(() => {
@@ -145,25 +148,57 @@ describe('ProfileScreen Organization section', () => {
     unmount();
   });
 
-  it('leaves the Organization section hidden in Personal context without memberships', async () => {
+  it('offers Create organization when the memberships read settles empty', async () => {
     organizationState.organizationId = null;
     providersQueryFn.mockResolvedValue({ providers: [] });
     organizationsQueryFn.mockResolvedValue([]);
 
     const { renderer, unmount } = await mountProfile();
+    const root = renderer.root;
 
     flushIdle();
     await waitFor(
       () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
     );
-    await waitFor(() => nodeCount(renderer.root, 'Skeleton') === 0);
+    await waitFor(() => nodeCount(root, 'Skeleton') === 0);
 
-    // Accounts without an organization keep the hub's own boundary; Profile
-    // gains no control for them.
-    expect(nodeCountWithChildren(renderer.root, 'Text', i18n.t('common.organization'))).toBe(0);
+    // A settled read that lists no memberships still keeps the section: Create
+    // organization is the only entry to that flow, so an account without one
+    // has to be offered it here. The account-picker row is dropped instead of
+    // opening a list that holds Personal and nothing else.
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(1);
+    expect(findConfigureRows(root, i18n.t('organization.create.title'))).toHaveLength(1);
     expect(
-      findConfigureRows(renderer.root, i18n.t('organization.boundary.selectOrganization'))
+      findConfigureRows(root, i18n.t('organization.boundary.selectOrganization'))
     ).toHaveLength(0);
+
+    const row = findConfigureRows(root, i18n.t('organization.create.title'))[0];
+    act(() => {
+      (row?.props as { onPress?: () => void } | undefined)?.onPress?.();
+    });
+
+    // The row reaches the shared route builder's href, so the create flow opens
+    // from Profile itself rather than sending the user through the hub.
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/create');
+
+    unmount();
+  });
+
+  it('keeps the Organization section hidden before the memberships read settles', async () => {
+    organizationState.organizationId = null;
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockReturnValue(new Promise<never>(() => undefined));
+
+    const { renderer, unmount } = await mountProfile();
+    const root = renderer.root;
+
+    flushIdle();
+
+    // A read that has not settled yet is not a read that found nothing: the
+    // section stays hidden so no empty state paints and then flips once the
+    // list arrives.
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(0);
+    expect(findConfigureRows(root, i18n.t('organization.create.title'))).toHaveLength(0);
 
     unmount();
   });

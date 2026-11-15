@@ -344,8 +344,6 @@
       "rowSubtitle": "שימוש בחיוב דרך הספק שלך",
       "manageOnWebReason": "ספקים אלה דורשים פרטי גישה מובנים.",
       "description": "בקשות שנשלחות באמצעות מפתחות אלה מחויבות בחשבון הספק שלך במקום ביתרת Kilo שלך.",
-      "enabled": "בשימוש",
-      "disabled": "כבוי",
       "managedByPlan": "מנוהל במסגרת תוכנית הקידוד שלך",
       "enableKey": "הפעלת המפתח של {{provider}}",
       "test": "בדיקת המפתח",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "אישור דיווח",
-      "description": "האישור על הדיווח ששלחת. שמור את המזהה הזה כדי להתייחס אליו בהמשך.",
+      "description": "שמור את המזהה הזה כדי להתייחס אליו בהמשך.",
       "receiptLabel": "אישור",
+      "copyReceiptId": "העתקת מזהה האישור",
       "appealLabel": "ערעור",
       "triageReceived": "התקבל",
       "triageOpen": "בבדיקה",
@@ -2395,10 +2394,13 @@
     "couldNotLoadDescription": "לא ניתן להציג את החיבורים הפעילים שלך עד לסיום הטעינה.",
     "currentDeviceUnidentified": "לא ניתן היה לזהות את המכשיר הנוכחי.",
     "kiloApp": "אפליקציית Kilo",
+    "kiloAppAndroid": "אפליקציית Kilo · Android",
+    "kiloAppIos": "אפליקציית Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "אין חיבורים פעילים",
     "noSessionsDescription": "היכנס לאפליקציית Kilo במכשיר אחר, והמכשיר יופיע כאן.",
-    "onlyKiloAppSignIns": "כאן מופיעים רק חיבורים לאפליקציית Kilo. חיבורים דרך העורך או ה-CLI אינם מופיעים ברשימה.",
     "signedIn": "מועד הכניסה: {{signedIn}} · פעילות אחרונה: {{lastSeen}}",
+    "signInScopeNote": "כאן מופיעים חיבורים מאפליקציית Kilo ומ-Kilo CLI. חיבורים דרך העורך אינם מופיעים ברשימה.",
     "thisDevice": "המכשיר הזה",
     "viewProfile": "הצגת הפרופיל",
     "signOutThisDevice": "ניתוק המכשיר הזה מהחשבון",
@@ -2406,7 +2408,7 @@
     "sessionSignedOut": "החיבור נותק.",
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",
-    "signOutThisSessionMessage": "{{device}} ינותק מהחשבון. הגישה שלו ל-API יכולה להישאר פעילה למשך עד שעה.",
+    "signOutThisSessionMessage": "{{device}} ינותק מהחשבון. פעילות אחרונה: {{lastSeen}}. הגישה שלו ל-API יכולה להישאר פעילה למשך עד שעה.",
     "webBrowser": "דפדפן",
     "unknownDevice": "מכשיר לא ידוע"
   },
@@ -3338,6 +3340,7 @@
       "description": "ארגון מאפשר לשתף קרדיטים, סוכנים והגדרות עם הצוות שלך.",
       "nameLabel": "שם הארגון",
       "nameRequired": "יש להזין שם לארגון.",
+      "createdNotListed": "הארגון נוצר. הוא יופיע בבוחר בקרוב.",
       "trialNote": "תקופת הניסיון של Enterprise ל-14 יום מתחילה עם יצירת הארגון. רכישת תוכניות מתבצעת באתר."
     },
     "creditActivity": {
@@ -3463,6 +3466,7 @@
     },
     "settingsOnWeb": {
       "title": "הגדרות הארגון באתר",
+      "integrations": "אינטגרציות באתר",
       "usageDetails": "פרטי שימוש",
       "providersAndModels": "ספקים ומודלים",
       "groups": "קבוצות",
@@ -3478,7 +3482,7 @@
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",
-      "last30Days": "30 הימים האחרונים",
+      "orgLast30Days": "כל החברים · 30 הימים האחרונים",
       "outputTokens": "טוקני פלט",
       "requests": "בקשות"
     },
@@ -3690,6 +3694,8 @@
       "available": "כלים זמינים: {{count}}",
       "none": "אין כלים זמינים",
       "noneDescription": "השרת של Kilo לא החזיר כלים.",
+      "notApplied": "כלי Kilo לא נוספו לשיחה הזו",
+      "notAppliedDescription": "הבחירה שלך נשמרה. לחץ על ניסיון חוזר כדי להשתמש בה עכשיו בשיחה הזו.",
       "unreachable": "לא ניתן היה להגיע לכלי Kilo",
       "unreachableDescription": "השרת לא הגיב. בדוק את החיבור שלך ונסה שוב.",
       "unauthorized": "כלי Kilo דחו את ההפעלה הזו",
@@ -4216,6 +4222,7 @@
       "unbindFailed": "לא ניתן היה לבטל את קשירת המאגר",
       "repoValue": "מאגר: {{name}}",
       "profileValue": "פרופיל: {{name}}",
+      "profileUnavailable": "הפרופיל הזה כבר לא זמין. בחר פרופיל אחר.",
       "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
       "pickerEmptyDescriptionOrganizationReadOnly": "בעלים של ארגון או מנהל יכולים ליצור פרופיל ארגוני."
     },
@@ -4473,7 +4480,6 @@
     "sectionTitle": "שירותים מחוברים",
     "entrySubtitle": "GitHub, Slack, Linear ועוד",
     "subtitle": "חיבור כלי הפיתוח ותהליכי העבודה שלך ל-Kilo",
-    "emptyHint": "עדיין לא חוברו אינטגרציות.",
     "disconnect": "ניתוק",
     "disconnectTitle": "לנתק את {{provider}}?",
     "disconnectMessage": "Kilo יפסיק להגיב ב-{{provider}}. אפשר להתחבר מחדש בכל עת.",
@@ -4541,7 +4547,8 @@
     "expiresIn": "התוקף יפוג בעוד {{duration}}",
     "neverExpires": "ללא תפוגה",
     "includesNewMessages": "הודעות חדשות נכללות.",
-    "excludesNewMessages": "הודעות חדשות אינן נכללות."
+    "excludesNewMessages": "הודעות חדשות אינן נכללות.",
+    "superseded": "הקישור הזה הוחלף במכשיר אחר, ולכן הוא כבר לא עובד."
   },
   "sharedSession": {
     "title": "סשן משותף",

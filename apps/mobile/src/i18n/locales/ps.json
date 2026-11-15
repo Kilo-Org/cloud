@@ -344,8 +344,6 @@
       "rowSubtitle": "د خپل چمتو کوونکي بیلینګ وکاروئ",
       "manageOnWebReason": "دا چمتو کوونکي جوړښت لرونکو اعتبارنامو ته اړتیا لري.",
       "description": "د دې کیلیو له لارې د غوښتنو لګښت ستاسو د Kilo بیلانس پر ځای ستاسو د چمتو کوونکي په حساب بیل کېږي.",
-      "enabled": "کارول کېږي",
-      "disabled": "بند دی",
       "managedByPlan": "ستاسو د کوډینګ پلان له لارې اداره کېږي",
       "enableKey": "د {{provider}} کیلي فعاله کړئ",
       "test": "کیلي وازمویئ",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "د راپور رسید",
-      "description": "د هغه راپور رسید چې تاسو سپارلی دی. دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
+      "description": "دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
       "receiptLabel": "رسید",
+      "copyReceiptId": "د رسید ID کاپي کړئ",
       "appealLabel": "استیناف",
       "triageReceived": "ترلاسه شو",
       "triageOpen": "تر بیاکتنې لاندې",
@@ -2909,9 +2908,12 @@
     "couldNotLoadDescription": "تر بارېدو پورې ستاسو فعالې ناستې د لاسرسي وړ نه دي.",
     "currentDeviceUnidentified": "اوسنۍ وسیله ونه پېژندل شوه.",
     "kiloApp": "د Kilo اپلیکیشن",
+    "kiloAppAndroid": "د Kilo اپلیکیشن · Android",
+    "kiloAppIos": "د Kilo اپلیکیشن · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "هېڅ فعاله ناسته نشته",
     "noSessionsDescription": "په بله وسیله کې د Kilo اپلیکیشن ته ننوځئ، ناسته به یې دلته ښکاره شي.",
-    "onlyKiloAppSignIns": "دلته یوازې د Kilo اپلیکیشن ننوتنې ښکاري. د کوډ سمونګر او CLI ننوتنې په لېست کې نه راځي.",
+    "signInScopeNote": "دلته د Kilo اپلیکیشن او Kilo CLI ننوتنې ښکاري. د کوډ سمونګر ننوتنې په لېست کې نه راځي.",
     "signedIn": "د ننوتلو وخت: {{signedIn}} · وروستی لیدل شوی وخت: {{lastSeen}}",
     "thisDevice": "دا وسیله",
     "viewProfile": "پروفایل وګورئ",
@@ -2920,7 +2922,7 @@
     "sessionSignedOut": "له ناستې ووتل شو.",
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",
-    "signOutThisSessionMessage": "حساب به له {{device}} څخه وایستل شي. وسیله تر یوه ساعت پورې API ته لاسرسی ساتلی شي.",
+    "signOutThisSessionMessage": "حساب به له {{device}} څخه وایستل شي. وروستی لیدل شوی وخت: {{lastSeen}}. وسیله تر یوه ساعت پورې API ته لاسرسی ساتلی شي.",
     "webBrowser": "وېب براوزر",
     "unknownDevice": "نامعلومه وسیله"
   },
@@ -3293,6 +3295,7 @@
       "description": "سازمان کریډیټونه، اېجنټان او ترتیبات ستاسو له ټیم سره شریکوي.",
       "nameLabel": "د سازمان نوم",
       "nameRequired": "د سازمان نوم ولیکئ.",
+      "createdNotListed": "سازمان جوړ شو. ژر به په غوره کونکي کې ښکاره شي.",
       "trialNote": "کله چې یې جوړ کړئ، ستاسو ۱۴ ورځنۍ Enterprise ازمیښتي موده پیلېږي. پلانونه په ویب کې اخیستل کېږي."
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "په ویب کې د سازمان ترتیبات",
+      "integrations": "په ویب کې ادغامونه",
       "usageDetails": "د کارونې جزئیات",
       "providersAndModels": "وړاندې کوونکي او ماډلونه",
       "groups": "ډلې",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "د ننوتنې ټوکنونه",
-      "last30Days": "وروستۍ ۳۰ ورځې",
+      "orgLast30Days": "ټول غړي · وروستۍ ۳۰ ورځې",
       "outputTokens": "د وتنې ټوکنونه",
       "requests": "غوښتنې"
     },
@@ -3636,6 +3640,8 @@
       "available": "د لاسرسي وړ وسیلې: {{count}}",
       "none": "هیڅ وسیله نشته",
       "noneDescription": "د Kilo سرور هیڅ وسیله بیرته ورنکړه.",
+      "notApplied": "د Kilo وسیلې دې خبرو اترو ته نه دي ورزیاتې شوې",
+      "notAppliedDescription": "ستاسو انتخاب خوندي شوی دی. په دې خبرو اترو کې یې اوس د کارولو لپاره بیا هڅه وکړئ.",
       "unreachable": "د Kilo وسیلو ته رسیدل ممکن نه شو",
       "unreachableDescription": "سرور ځواب ورنکړ. خپل اتصال وګورئ او بیا هڅه وکړئ.",
       "unauthorized": "د Kilo وسیلو دا ناسته رد کړه",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "د زېرمتون تړاو لیرې نشو کړای",
       "repoValue": "زېرمتون: {{name}}",
       "profileValue": "پروفایل: {{name}}",
+      "profileUnavailable": "دا پروفایل نور شتون نه لري. بل پروفایل غوره کړئ.",
       "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ.",
       "pickerEmptyDescriptionOrganizationReadOnly": "د سازمان خاوند یا مدیر کولی شي د سازمان پروفایل رامینځته کړي."
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "نښلول شوي خدمتونه",
     "entrySubtitle": "GitHub، Slack، Linear او نور",
     "subtitle": "خپل پراختیايي وسایل او کاري بهیرونه له Kilo سره ونښلوئ",
-    "emptyHint": "تر اوسه هیڅ ادغام نه دی نښلول شوی.",
     "disconnect": "اړیکه پرې کړئ",
     "disconnectTitle": "له {{provider}} سره اړیکه پرې کړئ؟",
     "disconnectMessage": "Kilo به نور په {{provider}} کې ځواب نه ورکوي. تاسو هر وخت بیا نښلولی شئ.",
@@ -4476,7 +4482,8 @@
     "expiresIn": "په {{duration}} کې پای ته رسېږي",
     "neverExpires": "هېڅکله نه ختمېږي",
     "includesNewMessages": "نوي پیغامونه شامل دي.",
-    "excludesNewMessages": "نوي پیغامونه شامل نه دي."
+    "excludesNewMessages": "نوي پیغامونه شامل نه دي.",
+    "superseded": "دا لینک په بل ځای کې بدل شوی دی، نو نور کار نه کوي."
   },
   "sharedSession": {
     "title": "شریکه شوې ناسته",

@@ -344,8 +344,6 @@
       "rowSubtitle": "Utilitza la facturació del teu proveïdor",
       "manageOnWebReason": "Aquests proveïdors necessiten credencials estructurades.",
       "description": "Les sol·licituds fetes amb aquestes claus es facturen al teu compte del proveïdor en lloc del saldo de Kilo.",
-      "enabled": "En ús",
-      "disabled": "Desactivada",
       "managedByPlan": "Gestionada pel teu pla de programació",
       "enableKey": "Activa la clau de {{provider}}",
       "test": "Prova la clau",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "Comprovant de la denúncia",
-      "description": "El comprovant de la denúncia que has enviat. Conserva aquest identificador per consultar-la més endavant.",
+      "description": "Conserva aquest identificador per consultar-la més endavant.",
       "receiptLabel": "Comprovant",
+      "copyReceiptId": "Copia l'identificador del comprovant",
       "appealLabel": "Apel·lació",
       "triageReceived": "Rebuda",
       "triageOpen": "En revisió",
@@ -2961,10 +2960,13 @@
     "couldNotLoadDescription": "Les teves sessions actives no estaran disponibles fins que s'hagin carregat les dades.",
     "currentDeviceUnidentified": "No s'ha pogut identificar el dispositiu actual.",
     "kiloApp": "Aplicació de Kilo",
+    "kiloAppAndroid": "Aplicació de Kilo · Android",
+    "kiloAppIos": "Aplicació de Kilo · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "No hi ha sessions actives",
     "noSessionsDescription": "Inicia la sessió a l'aplicació de Kilo en un altre dispositiu i apareixerà aquí.",
-    "onlyKiloAppSignIns": "Aquí només apareixen els inicis de sessió de l'aplicació de Kilo. No es mostren els de l'editor ni els del CLI.",
     "signedIn": "Inici de sessió: {{signedIn}} · Última activitat: {{lastSeen}}",
+    "signInScopeNote": "Aquí apareixen els inicis de sessió de l'aplicació de Kilo i del Kilo CLI. No es mostren els de l'editor.",
     "thisDevice": "Aquest dispositiu",
     "webBrowser": "Navegador web",
     "viewProfile": "Mostra el perfil",
@@ -2973,7 +2975,7 @@
     "sessionSignedOut": "Sessió tancada.",
     "signOutThisDeviceTitle": "Vols tancar la sessió d'aquest dispositiu?",
     "signOutThisSessionTitle": "Vols tancar aquesta sessió?",
-    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Pot mantenir l'accés a l'API fins a una hora.",
+    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Última activitat: {{lastSeen}}. Pot mantenir l'accés a l'API fins a una hora.",
     "unknownDevice": "Dispositiu desconegut"
   },
   "forceUpdate": {
@@ -3346,6 +3348,7 @@
       "description": "Una organització comparteix crèdits, agents i configuració amb el teu equip.",
       "nameLabel": "Nom de l'organització",
       "nameRequired": "Introdueix un nom per a l'organització.",
+      "createdNotListed": "Organització creada. Apareixerà aviat al selector.",
       "trialNote": "La prova d'Enterprise de 14 dies comença quan la creïs. Els plans es compren al web."
     },
     "creditActivity": {
@@ -3391,7 +3394,7 @@
       "sharingUnavailable": "Aquest dispositiu no permet compartir contingut.",
       "status": {
         "paid": "Pagada",
-        "open": "Obertura",
+        "open": "Oberta",
         "void": "Anul·lada",
         "uncollectible": "Incobrable"
       },
@@ -3458,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Configuració de l'organització al web",
+      "integrations": "Integracions al web",
       "usageDetails": "Detalls d'ús",
       "providersAndModels": "Proveïdors i models",
       "groups": "Grups",
@@ -3473,7 +3477,7 @@
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",
-      "last30Days": "Últims 30 dies",
+      "orgLast30Days": "Tots els membres · Últims 30 dies",
       "outputTokens": "Tòkens de sortida",
       "requests": "Sol·licituds"
     },
@@ -3690,6 +3694,8 @@
       "available": "Eines disponibles: {{count}}",
       "none": "Cap eina disponible",
       "noneDescription": "El servidor de Kilo no ha retornat cap eina.",
+      "notApplied": "No s'han afegit les eines de Kilo a aquest xat",
+      "notAppliedDescription": "La teva elecció s'ha desat. Torna-ho a provar per fer-la servir ara en aquest xat.",
       "unreachable": "No s'ha pogut contactar amb les eines de Kilo",
       "unreachableDescription": "El servidor no ha respost. Comprova la connexió i torna-ho a provar.",
       "unauthorized": "Les eines de Kilo han rebutjat aquesta sessió",
@@ -4216,6 +4222,7 @@
       "unbindFailed": "No s'ha pogut desenllaçar el repo",
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Perfil: {{name}}",
+      "profileUnavailable": "Aquest perfil ja no està disponible. Tria'n un altre.",
       "pickerEmptyDescriptionOrganization": "Creeu un perfil d'organització per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Un propietari o administrador de l'organització pot crear un perfil d'organització."
     },
@@ -4473,7 +4480,6 @@
     "sectionTitle": "Serveis connectats",
     "entrySubtitle": "GitHub, Slack, Linear i més",
     "subtitle": "Connecta les teves eines i fluxos de treball de desenvolupament a Kilo",
-    "emptyHint": "Encara no hi ha cap integració connectada.",
     "disconnect": "Desconnecta",
     "disconnectTitle": "Vols desconnectar {{provider}}?",
     "disconnectMessage": "Kilo deixarà de respondre a {{provider}}. Pots tornar a connectar-lo en qualsevol moment.",
@@ -4541,7 +4547,8 @@
     "expiresIn": "Caduca d'aquí a {{duration}}",
     "neverExpires": "No caduca mai",
     "includesNewMessages": "Els missatges nous s'hi inclouen.",
-    "excludesNewMessages": "Els missatges nous no s'hi inclouen."
+    "excludesNewMessages": "Els missatges nous no s'hi inclouen.",
+    "superseded": "Aquest enllaç s'ha substituït des d'un altre dispositiu i ja no funciona."
   },
   "sharedSession": {
     "title": "Sessió compartida",

@@ -1310,10 +1310,40 @@ export function validateKiloSdkMessagesCursor(cursor: string): boolean {
   }
 }
 
+/** Optional opaque continuation cursor, capped so an oversized value never reaches the decoder. */
+const optionalMessageCursorField = z
+  .string()
+  .min(1)
+  .max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH)
+  .optional();
+
+/** Bounded positive page size with the shared default, for schemas that always bound the read. */
+const boundedMessageHistoryLimitField = z
+  .number()
+  .int()
+  .positive()
+  .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+  .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE);
+
+/** Adds `<field> is not a valid message cursor` when a present cursor does not decode. */
+function refineMessageCursor(
+  cursor: string | undefined,
+  field: 'before' | 'cursor',
+  ctx: z.RefinementCtx
+): void {
+  if (cursor === undefined) return;
+  if (validateKiloSdkMessagesCursor(cursor)) return;
+  ctx.addIssue({
+    code: 'custom',
+    path: [field],
+    message: `${field} is not a valid message cursor`,
+  });
+}
+
 export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
   .extend({
     limit: z.number().int().nonnegative().max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE).optional(),
-    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+    before: optionalMessageCursorField,
   })
   .superRefine((params, ctx) => {
     if (params.before !== undefined && (params.limit === undefined || params.limit === 0)) {
@@ -1324,13 +1354,7 @@ export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessi
       });
       return;
     }
-    if (params.before !== undefined && !validateKiloSdkMessagesCursor(params.before)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before is not a valid message cursor',
-      });
-    }
+    refineMessageCursor(params.before, 'before', ctx);
   });
 export type GetCloudAgentRootSessionMessagesParams = z.input<
   typeof getCloudAgentRootSessionMessagesSchema
@@ -1366,30 +1390,37 @@ export const getSessionMessagesSchema = z
   .object({
     kiloUserId: z.string().min(1),
     kiloSessionId: storedSessionIdSchema,
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+    limit: boundedMessageHistoryLimitField,
+    before: optionalMessageCursorField,
   })
-  .superRefine((params, ctx) => {
-    if (params.before === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.before)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before is not a valid message cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) => refineMessageCursor(params.before, 'before', ctx));
 export type GetSessionMessagesParams = z.input<typeof getSessionMessagesSchema>;
 export type AuthorizedSessionMessages = {
   kiloSessionId: string;
   history: KiloSdkMessageHistory | null;
 };
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
+
+/**
+ * tRPC wire input for `cliSessionsV2.getSessionMessagesPage`, the paginated
+ * access-checked history call the mobile client and the web app both make
+ * against the web router (which forwards the page read to this contract's
+ * worker RPC). Sharing the schema keeps tRPC-level validation identical to
+ * the worker's own bounded reader.
+ *
+ * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and defaults
+ * to `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE` when omitted, so the request is
+ * always bounded before it reaches the session store. `cursor` is the opaque
+ * continuation cursor validated by `validateKiloSdkMessagesCursor`; a caller
+ * receives one from a previous page and passes it back to walk older history.
+ */
+export const getSessionMessagesPageInputSchema = z
+  .object({
+    session_id: z.string().min(1),
+    limit: boundedMessageHistoryLimitField,
+    cursor: optionalMessageCursorField,
+  })
+  .superRefine((params, ctx) => refineMessageCursor(params.cursor, 'cursor', ctx));
 
 export type SessionIngestRpcMethods = {
   publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;

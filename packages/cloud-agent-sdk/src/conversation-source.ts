@@ -5,6 +5,7 @@ import {
   kilo2PartId,
 } from '@kilocode/session-ingest-contracts';
 import { normalize, type ChatEvent, type NormalizedEvent } from './normalizer';
+import { setBounded } from './bounded-map';
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import {
   readKilo2ContentLayout,
@@ -15,16 +16,6 @@ import {
 import type { SessionSnapshot } from './types';
 
 const MAX_TRACKED_MESSAGES = 2048;
-
-/** Sets `key` as the newest entry, evicting the oldest past the bound. */
-function remember<V>(map: Map<string, V>, key: string, value: V) {
-  map.delete(key);
-  map.set(key, value);
-  if (map.size > MAX_TRACKED_MESSAGES) {
-    const oldest = map.keys().next().value;
-    if (oldest !== undefined) map.delete(oldest);
-  }
-}
 
 export type ConversationSource = { version: 'v1' } | { version: 'v2' };
 
@@ -72,7 +63,7 @@ export function createConversationSourceReader() {
     const starts = reasoningStarts.get(messageId) ?? new Map<string, number>();
     for (const part of parts)
       if (part.type === 'reasoning' && !starts.has(part.id)) starts.set(part.id, part.time.start);
-    if (starts.size) remember(reasoningStarts, messageId, starts);
+    if (starts.size) setBounded(reasoningStarts, messageId, starts, MAX_TRACKED_MESSAGES);
   }
   function positionOf(messageId: string, kind: string, ordinal: number): number {
     const layout = layouts.get(messageId) ?? {
@@ -85,7 +76,7 @@ export function createConversationSourceReader() {
       position = layout.next++;
       layout.positions.set(`${kind}:${ordinal}`, position);
     }
-    remember(layouts, messageId, layout);
+    setBounded(layouts, messageId, layout, MAX_TRACKED_MESSAGES);
     return position;
   }
   function readV2(type: string, properties: unknown): NormalizedEvent[] {
@@ -95,12 +86,12 @@ export function createConversationSourceReader() {
       const { source, message, parentID } = parsed.data;
       if (message.time.completed !== undefined) {
         completed.add(message.id);
-        if (completed.size > 2048) {
+        if (completed.size > MAX_TRACKED_MESSAGES) {
           const oldest = completed.values().next().value;
           if (oldest) completed.delete(oldest);
         }
       }
-      remember(layouts, message.id, readKilo2ContentLayout(message));
+      setBounded(layouts, message.id, readKilo2ContentLayout(message), MAX_TRACKED_MESSAGES);
       const display = readKilo2Messages(source.session, [message])[0];
       if (!display) return [];
       observeReasoning(message.id, display.parts);
@@ -156,7 +147,7 @@ export function createConversationSourceReader() {
       const starts = reasoningStarts.get(data.data.assistantMessageID) ?? new Map<string, number>();
       const start = starts.get(id) ?? event.created ?? 0;
       starts.set(id, start);
-      remember(reasoningStarts, data.data.assistantMessageID, starts);
+      setBounded(reasoningStarts, data.data.assistantMessageID, starts, MAX_TRACKED_MESSAGES);
       reasoningTime = {
         start,
         ...(event.type.endsWith('.ended') ? { end: event.created ?? start } : {}),
@@ -190,7 +181,7 @@ export function createConversationSourceReader() {
             if (!layout.positions.has(item)) layout.positions.set(item, position);
           layout.next = Math.max(layout.next, live.next);
         }
-        remember(layouts, message.info.id, layout);
+        setBounded(layouts, message.info.id, layout, MAX_TRACKED_MESSAGES);
       }
     },
     /** Select the native reader at the SDK boundary. Renderers receive display events. */

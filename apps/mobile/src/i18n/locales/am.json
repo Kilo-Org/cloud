@@ -344,8 +344,6 @@
       "rowSubtitle": "የራስዎን የአቅራቢ ክፍያ ይጠቀሙ",
       "manageOnWebReason": "እነዚህ አቅራቢዎች የተዋቀሩ የማረጋገጫ መረጃዎችን ይፈልጋሉ።",
       "description": "በእነዚህ ቁልፎች የሚላኩ ጥያቄዎች ከKilo ቀሪ ሂሳብዎ ይልቅ በአቅራቢ መለያዎ ይከፈላሉ።",
-      "enabled": "በጥቅም ላይ",
-      "disabled": "ጠፍቷል",
       "managedByPlan": "በኮዲንግ ዕቅድዎ የሚተዳደር",
       "enableKey": "የ{{provider}} ቁልፍን አንቃ",
       "test": "ቁልፉን ሞክር",
@@ -414,8 +412,9 @@
     },
     "reportReceipt": {
       "title": "የሪፖርት ደረሰኝ",
-      "description": "ላስገቡት ሪፖርት የተሰጠ ደረሰኝ። በኋላ ለመጥቀስ ይህን መለያ ቁጥር ያስቀምጡ።",
+      "description": "በኋላ ለመጥቀስ ይህን መለያ ቁጥር ያስቀምጡ።",
       "receiptLabel": "ደረሰኝ",
+      "copyReceiptId": "የደረሰኙን መለያ ቁጥር ይቅዱ",
       "appealLabel": "ይግባኝ",
       "triageReceived": "ደርሷል",
       "triageOpen": "በግምገማ ላይ",
@@ -2909,10 +2908,13 @@
     "couldNotLoadDescription": "ይህ እስኪጫን ድረስ ንቁ ክፍለ ጊዜዎችዎ አይገኙም።",
     "currentDeviceUnidentified": "የአሁኑን መሣሪያ መለየት አልተቻለም።",
     "kiloApp": "የKilo መተግበሪያ",
+    "kiloAppAndroid": "የKilo መተግበሪያ · Android",
+    "kiloAppIos": "የKilo መተግበሪያ · iOS",
+    "kiloCli": "Kilo CLI",
     "noSessions": "ንቁ ክፍለ ጊዜዎች የሉም",
     "noSessionsDescription": "በሌላ መሣሪያ ላይ በKilo መተግበሪያ ይግቡ፤ እዚህ ይታያል።",
-    "onlyKiloAppSignIns": "የKilo መተግበሪያ መግቢያዎች ብቻ እዚህ ይታያሉ። የአርታዒ እና የCLI መግቢያዎች አይዘረዘሩም።",
     "signedIn": "የገቡበት ጊዜ፦ {{signedIn}} · ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}",
+    "signInScopeNote": "የKilo መተግበሪያ እና የKilo CLI መግቢያዎች እዚህ ይታያሉ። የአርታዒ መግቢያዎች አይዘረዘሩም።",
     "thisDevice": "ይህ መሣሪያ",
     "webBrowser": "የድር አሳሽ",
     "viewProfile": "መገለጫ ይመልከቱ",
@@ -2921,7 +2923,7 @@
     "sessionSignedOut": "ከክፍለ ጊዜው ወጥተዋል።",
     "signOutThisDeviceTitle": "ከዚህ መሣሪያ መውጣት ይፈልጋሉ?",
     "signOutThisSessionTitle": "ከዚህ ክፍለ ጊዜ መውጣት ይፈልጋሉ?",
-    "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።",
+    "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።",
     "unknownDevice": "ያልታወቀ መሣሪያ"
   },
   "forceUpdate": {
@@ -3293,6 +3295,7 @@
       "description": "ድርጅት ክሬዲቶችን፣ ኤጀንቶችን እና ቅንብሮችን ከቡድንዎ ጋር ያጋራል።",
       "nameLabel": "የድርጅት ስም",
       "nameRequired": "የድርጅት ስም ያስገቡ።",
+      "createdNotListed": "ድርጅት ተፈጥሯል። በቃሚው ውስጥ በቅርቡ ይታያል።",
       "trialNote": "የ14 ቀን የEnterprise ሙከራዎ ድርጅቱን ሲፈጥሩ ይጀምራል። ዕቅዶች የሚገዙት በድር ላይ ነው።"
     },
     "creditActivity": {
@@ -3405,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "በድር ላይ ያሉ የድርጅት ቅንብሮች",
+      "integrations": "በድር ላይ ውህደቶች",
       "usageDetails": "የአጠቃቀም ዝርዝሮች",
       "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
       "groups": "ቡድኖች",
@@ -3420,7 +3424,7 @@
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
-      "last30Days": "ያለፉት 30 ቀናት",
+      "orgLast30Days": "ሁሉም አባላት · ያለፉት 30 ቀናት",
       "outputTokens": "የውጤት ቶከኖች",
       "requests": "ጥያቄዎች"
     },
@@ -3636,6 +3640,8 @@
       "available": "የሚገኙ መሳሪያዎች፦ {{count}}",
       "none": "ምንም መሳሪያ አይገኝም",
       "noneDescription": "የKilo ሰርቨር ምንም መሳሪያ አልመለሰም።",
+      "notApplied": "የKilo መሳሪያዎች ወደዚህ ውይይት አልተጨመሩም",
+      "notAppliedDescription": "ምርጫዎ ተቀምጧል። አሁን በዚህ ውይይት ለመጠቀም እንደገና ሞክር።",
       "unreachable": "የKilo መሳሪያዎችን ማግኘት አልተቻለም",
       "unreachableDescription": "ሰርቨሩ አልመለሰም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
       "unauthorized": "የKilo መሳሪያዎች ይህን ክፍለ ጊዜ አልተቀበሉም",
@@ -4155,6 +4161,7 @@
       "unbindFailed": "ሪፖን ማላቀቅ አልተቻለም",
       "repoValue": "ማከማቻ: {{name}}",
       "profileValue": "መገለጫ: {{name}}",
+      "profileUnavailable": "ይህ መገለጫ ከእንግዲህ ወዲህ አይገኝም። ሌላ ይምረጡ።",
       "pickerEmptyDescriptionOrganization": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም የድርጅት መገለጫ ይፍጠሩ።",
       "pickerEmptyDescriptionOrganizationReadOnly": "የድርጅት ባለቤት ወይም አስተዳዳሪ የድርጅት መገለጫ መፍጠር ይችላል።"
     },
@@ -4408,7 +4415,6 @@
     "sectionTitle": "የተገናኙ አገልግሎቶች",
     "entrySubtitle": "GitHub፣ Slack፣ Linear እና ሌሎችም",
     "subtitle": "የልማት መሣሪያዎችዎን እና የሥራ ሂደቶችዎን ከKilo ጋር ያገናኙ",
-    "emptyHint": "እስካሁን ምንም የተገናኘ ውህደት የለም።",
     "disconnect": "ግንኙነት አቋርጥ",
     "disconnectTitle": "የ{{provider}} ግንኙነት ይቋረጥ?",
     "disconnectMessage": "Kilo በ{{provider}} ውስጥ ምላሽ መስጠት ያቆማል። በማንኛውም ጊዜ እንደገና ማገናኘት ይችላሉ።",
@@ -4476,7 +4482,8 @@
     "expiresIn": "በ{{duration}} ውስጥ ያበቃል",
     "neverExpires": "በጭራሽ አያበቃም",
     "includesNewMessages": "አዲስ መልዕክቶች ተካትተዋል።",
-    "excludesNewMessages": "አዲስ መልዕክቶች አልተካተቱም።"
+    "excludesNewMessages": "አዲስ መልዕክቶች አልተካተቱም።",
+    "superseded": "ይህ ሊንክ በሌላ ቦታ ተተክቷል፣ ስለዚህ ከእንግዲህ ወዲህ አይሰራም።"
   },
   "sharedSession": {
     "title": "የተጋራ ክፍለ ጊዜ",

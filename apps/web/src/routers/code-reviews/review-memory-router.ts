@@ -14,6 +14,7 @@ import {
   listProposalsPage,
   listRepositoriesWithRecentFeedback,
   rejectProposal,
+  ReviewMemoryInvalidCursorError,
   ReviewMemoryProposalConflictError,
   updateProposal,
   type ReviewMemoryOwner,
@@ -95,14 +96,21 @@ export const reviewMemoryRouter = createTRPCRouter({
     .input(ProposalListInputSchema.extend({ cursor: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const owner = await ownerFromInput(ctx, input);
-      return await listProposalsPage({
-        owner,
-        platform: input.platform,
-        repoFullName: input.repoFullName,
-        statuses: input.statuses,
-        limit: input.limit,
-        cursor: input.cursor,
-      });
+      try {
+        return await listProposalsPage({
+          owner,
+          platform: input.platform,
+          repoFullName: input.repoFullName,
+          statuses: input.statuses,
+          limit: input.limit,
+          cursor: input.cursor,
+        });
+      } catch (error) {
+        if (error instanceof ReviewMemoryInvalidCursorError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+        }
+        throw error;
+      }
     }),
 
   setEnabled: baseProcedure

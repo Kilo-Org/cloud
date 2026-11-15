@@ -129,6 +129,12 @@ export type Sampled = {
   blockedBy?: 'loading-placeholder';
   /** Milliseconds this capture spent waiting for the placeholder to clear. */
   loadingWaitMs?: number;
+  /**
+   * Milliseconds between the retained samples, read from their own timestamps.
+   * The shift rule converts sample distance with it, because the app's cadence is
+   * the interval it was asked for plus the dump it runs between ticks.
+   */
+  intervalMs?: number;
   alignment?: CaptureAlignment;
 };
 
@@ -158,10 +164,28 @@ export function loadingPlaceholder(tree: LayoutTree): boolean {
   });
 }
 
+/**
+ * The cadence to ask the in-app sampler for, given what one of its dumps costs.
+ *
+ * The dump walks and serializes the whole document on the app's own JS thread, so
+ * an interval shorter than the dump it schedules starves the screen it measures:
+ * the app spends every slice producing samples and the work the screen still owes
+ * (a late navigation, late data) cannot run, so it lands after sampling stops. The
+ * capture bracket then reads two different screens and concludes nothing. Twice
+ * the measured cost leaves the app a slice between dumps; the floor is the default
+ * cadence, never something shorter.
+ */
+export function inAppSampleInterval(dumpMs: number): number {
+  return Math.max(IN_APP_SAMPLE_INTERVAL_MS, Math.ceil(dumpMs * 2));
+}
+
 /** One sampling window, sized for the settle it spans. */
-function startSampling(ctx: { probe: Pick<ProbeClient, 'startSampling'>; observeMs: number }) {
+function startSampling(
+  ctx: { probe: Pick<ProbeClient, 'startSampling'>; observeMs: number },
+  intervalMs = IN_APP_SAMPLE_INTERVAL_MS
+) {
   return ctx.probe.startSampling(
-    IN_APP_SAMPLE_INTERVAL_MS,
+    intervalMs,
     ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
   );
 }
@@ -317,7 +341,12 @@ export function screenFindings(args: {
     });
   }
   if (args.sampled !== undefined) {
-    findings.push(...checkShift(args.sampled.timeline.map(normalize), IN_APP_SAMPLE_INTERVAL_MS));
+    findings.push(
+      ...checkShift(
+        args.sampled.timeline.map(normalize),
+        args.sampled.intervalMs ?? IN_APP_SAMPLE_INTERVAL_MS
+      )
+    );
     if (!args.sampled.settled) {
       findings.push(
         unsettledFinding({
@@ -481,10 +510,19 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // about ten seconds unsampled never mounted at all, and the run recorded
   // placeholder frames for the whole budget. Those frames are not the screen
   // either way — the settle below is what the rules read.
-  await ctx.probe.startSampling(
-    IN_APP_SAMPLE_INTERVAL_MS,
-    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
-  );
+  // The cadence is asked of this screen rather than assumed: one dump is measured
+  // on the probe that will sample, and an interval shorter than that cost is what
+  // starves the thread and lets pending work escape the sampling window.
+  const measuredFrom = ctx.clock.now();
+  await ctx.probe.dump();
+  const dumpMs = ctx.clock.now() - measuredFrom;
+  const samplingMs = inAppSampleInterval(dumpMs);
+  if (samplingMs > IN_APP_SAMPLE_INTERVAL_MS) {
+    ctx.log(
+      `design-gate: ${target.id} one in-app dump costs ${dumpMs}ms; sampling every ${samplingMs}ms`
+    );
+  }
+  await startSampling(ctx, samplingMs);
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
   if (!opened(settled.dump)) {
@@ -494,7 +532,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     await ctx.probe.stopSampling();
     await ctx.probe.openLink(target.link);
     await waitForPlaceholder();
-    await startSampling(ctx);
+    await startSampling(ctx, samplingMs);
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
@@ -502,6 +540,15 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   if (truncated) {
     ctx.log(
       `design-gate: ${target.id} retained only the newest layouts; older samples were dropped`
+    );
+  }
+  // The samples report the cadence they were produced at, which the app's own
+  // tick cost extends beyond the interval it was asked for. Say so when that
+  // spacing is far enough from the constant that the shift timings would move.
+  const spacingMs = sampleInterval(samples);
+  if (Math.abs(spacingMs - IN_APP_SAMPLE_INTERVAL_MS) > IN_APP_SAMPLE_INTERVAL_MS * 0.25) {
+    ctx.log(
+      `design-gate: ${target.id} samples are ${Math.round(spacingMs)}ms apart; the shift rule reads that spacing`
     );
   }
   const files = captureFiles(ctx.out, cell, target.id);
@@ -537,6 +584,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     ...settled,
     dump,
     timeline: expandSamples(samples),
+    intervalMs: spacingMs,
     alignment,
     // A screen that still paints its loading placeholder is never the settled
     // screen the target describes, whatever the settle loop saw before it. The
@@ -561,6 +609,35 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
 
 export function expandSamples(samples: readonly ProbeSample[]): ProbeDump[] {
   return samples.flatMap(sample => Array.from({ length: sample.repeat }, () => sample.dump));
+}
+
+/**
+ * The spacing the retained samples report, read from their own timestamps.
+ *
+ * The app samples itself on its own JS thread, so the distance between two
+ * samples is the interval it was asked for plus the cost of the dump between
+ * ticks, and both vary with the screen. A shift converts sample distance into
+ * milliseconds with the spacing that produced those samples, never with a
+ * constant: a change that arrives two samples after the rest says how long the
+ * screen took, and the constant is only the answer when no sample carries a
+ * spacing of its own.
+ */
+export function sampleInterval(samples: readonly ProbeSample[]): number {
+  const times = samples.map(sample => sample.t).sort((a, b) => a - b);
+  const spacings: number[] = [];
+  for (let index = 1; index < times.length; index += 1) {
+    const earlier = times[index - 1];
+    const later = times[index];
+    if (earlier !== undefined && later !== undefined && later > earlier) {
+      spacings.push(later - earlier);
+    }
+  }
+  if (spacings.length === 0) return IN_APP_SAMPLE_INTERVAL_MS;
+  spacings.sort((a, b) => a - b);
+  const middle = Math.floor(spacings.length / 2);
+  const upper = spacings[middle] ?? IN_APP_SAMPLE_INTERVAL_MS;
+  if (spacings.length % 2 === 1) return upper;
+  return ((spacings[middle - 1] ?? upper) + upper) / 2;
 }
 
 type LanguageTarget = { preference: string; resolved: string; rtl?: boolean };

@@ -5,10 +5,13 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  IN_APP_SAMPLE_INTERVAL_MS,
   InfraError,
+  inAppSampleInterval,
   linkPath,
   loadingPlaceholder,
   runMatrix,
+  sampleInterval,
   sampleUntilSettled,
   screenFindings,
   screenIdentity,
@@ -18,7 +21,7 @@ import {
   type Clock,
   type Device,
 } from './capture';
-import type { ProbeClient } from './cdp';
+import type { ProbeClient, ProbeSample } from './cdp';
 import { matrixCells } from './matrix';
 import { normalize, type ProbeDump } from './tree';
 
@@ -1060,4 +1063,94 @@ test('a focused-screen transition is retained when route, text and geometry stay
   assert.ok(!outcome.findings.some(finding => finding.rule === 'env-mismatch'));
   const screen = outcome.cells[0]?.screens[0];
   assert.equal(screen?.env.screen, '(app)/(tabs)/settings');
+});
+
+test('the in-app sampling cadence follows the cost of one measured dump', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  // The in-app sampler walks and serializes the whole document on the app's own
+  // JS thread, so one dump is what a tick costs the screen it measures.
+  const dumpMs = 600;
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    await ctx.clock.sleep(dumpMs);
+    return originalDump();
+  };
+  const intervals: number[] = [];
+  probe.startSampling = async intervalMs => {
+    intervals.push(intervalMs);
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.deepEqual(intervals, [inAppSampleInterval(dumpMs)]);
+  assert.ok((intervals[0] ?? 0) > IN_APP_SAMPLE_INTERVAL_MS);
+  assert.deepEqual(
+    logs.filter(line => line.includes('in-app dump')),
+    ['design-gate: home one in-app dump costs 600ms; sampling every 1200ms']
+  );
+});
+
+test('a dump that costs less than the floor keeps the default sampling cadence', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    await ctx.clock.sleep(40);
+    return originalDump();
+  };
+  const intervals: number[] = [];
+  probe.startSampling = async intervalMs => {
+    intervals.push(intervalMs);
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.deepEqual(intervals, [IN_APP_SAMPLE_INTERVAL_MS]);
+  assert.deepEqual(
+    logs.filter(line => line.includes('in-app dump')),
+    []
+  );
+});
+
+function sampleAt(t: number, dump: ProbeDump = dumpWith()): ProbeSample {
+  return { t, repeat: 1, dump };
+}
+
+test('sampleInterval reads the spacing the retained samples carry', () => {
+  // Fewer than two samples carry no spacing of their own.
+  assert.equal(sampleInterval([]), IN_APP_SAMPLE_INTERVAL_MS);
+  assert.equal(sampleInterval([sampleAt(0)]), IN_APP_SAMPLE_INTERVAL_MS);
+  assert.equal(sampleInterval([sampleAt(0), sampleAt(850), sampleAt(1_700)]), 850);
+  // An uneven capture is timed with its middle spacing, not with its longest.
+  assert.equal(sampleInterval([sampleAt(0), sampleAt(300), sampleAt(1_200), sampleAt(2_100)]), 900);
+});
+
+test('a late arrival is timed with the spacing its samples report', () => {
+  const early = dumpWith({ y: 50 });
+  const late = dumpWith({ y: 80 });
+  const shifts = (intervalMs?: number) =>
+    screenFindings({
+      cell: 'base',
+      target: 'home',
+      dump: late,
+      tree: normalize(late),
+      sampled: {
+        dump: late,
+        timeline: [early, early, late, late],
+        settled: true,
+        elapsedMs: 2_000,
+        ...(intervalMs === undefined ? {} : { intervalMs }),
+      },
+    }).filter(finding => finding.rule === 'layout-shift');
+  // Two samples after the rest is two sample spacings, whatever they measured.
+  const measured = shifts(850)[0];
+  assert.equal(measured?.severity, 'error');
+  assert.match(measured?.message ?? '', /within 1700 ms after settling/u);
+  // Without a spacing of its own, the rule still falls back to the constant.
+  assert.match(shifts(undefined)[0]?.message ?? '', /within 500 ms after settling/u);
 });

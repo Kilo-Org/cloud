@@ -259,6 +259,14 @@ describe('ReportReceiptScreen', () => {
     expect(appealButton(root)).toBeUndefined();
   });
 
+  it('states that a declined appeal decision is final', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'rejected' };
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[3]);
+    expect(appealButton(root)).toBeUndefined();
+  });
+
   it('says nothing beyond the appeal button when the appeal is the next step', async () => {
     state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'none' };
     const root = await mount();
@@ -273,6 +281,9 @@ describe('ReportReceiptScreen', () => {
     state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'escalated', appealStatus: 'none' };
     const root = await mount();
 
+    // The unknown status still renders through the row's fallback, so the silence
+    // below is asserted on a screen that painted its content.
+    expect(texts(root)).toContain('escalated');
     for (const sentence of NEXT_STEP_SENTENCES) {
       expect(texts(root)).not.toContain(sentence);
     }

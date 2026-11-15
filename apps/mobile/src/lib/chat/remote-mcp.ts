@@ -285,7 +285,12 @@ async function ensurePass(
 ): Promise<readonly RemoteMcpServerState[]> {
   if (inFlight?.key === key) {
     await inFlight.promise;
-    if (request.retry !== true) {
+    /* The config, the account or the place can change while this ask waits, and
+       a change installs its own pass under the new key. A pass started here
+       would belong to the old key yet capture the new generation, so it would
+       publish over the pass the new key is running: answer with what the state
+       holds for the new key instead. */
+    if (key !== cacheKey || request.retry !== true) {
       return snapshot;
     }
     return ensurePass(key, request);

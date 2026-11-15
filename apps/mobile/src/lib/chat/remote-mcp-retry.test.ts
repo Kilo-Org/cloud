@@ -59,4 +59,40 @@ describe('admitting a Retry after it waited on a running pass', () => {
     retryGate.resolve(undefined);
     await Promise.all([automatic, firstRetry, secondRetry]);
   });
+
+  it('answers a Retry whose key changed while it waited instead of opening a stale pass', async () => {
+    world.servers = [server({ id: 'alpha' }), server({ id: 'beta' })];
+    const firstPass = Promise.withResolvers<undefined>();
+    const secondPass = Promise.withResolvers<undefined>();
+    let call = 0;
+    discovery.answer = () => {
+      call += 1;
+      if (call <= 2) {
+        return whenReleased(firstPass.promise, [tool('mcp_alpha_read')]);
+      }
+      if (call <= 4) {
+        return whenReleased(secondPass.promise, [tool('mcp_alpha_write')]);
+      }
+      return Effect.succeed([tool('mcp_stale_read')]);
+    };
+
+    const automatic = ensureRemoteMcp(place);
+    const retry = ensureRemoteMcp(place, { retry: true });
+    /* The account changes while the Retry waits, so the new key runs its own
+       pass; the Retry's key no longer owns one. */
+    world.epoch += 1;
+    const next = ensureRemoteMcp(place);
+
+    firstPass.resolve(undefined);
+    await automatic;
+    await flush();
+
+    // The Retry is answered by the pass the new key runs: a pass started under
+    // the old key would discover beside it and publish over its answer.
+    expect(world.calls).toHaveLength(4);
+
+    secondPass.resolve(undefined);
+    await Promise.all([retry, next]);
+    expect(world.calls).toHaveLength(4);
+  });
 });

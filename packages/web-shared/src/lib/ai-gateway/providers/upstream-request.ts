@@ -196,7 +196,13 @@ function findUpstreamAddressUnverified(error: unknown): UpstreamAddressUnverifie
   let current: unknown = error;
   for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth += 1) {
     if (current instanceof UpstreamAddressUnverifiedError) return current;
-    current = 'cause' in current ? current.cause : undefined;
+    try {
+      current = 'cause' in current ? current.cause : undefined;
+    } catch {
+      // A cause that a wrapped error refuses to read is not a refusal; the fetch
+      // failure handling below then reports the error it already reports.
+      return undefined;
+    }
   }
   return undefined;
 }

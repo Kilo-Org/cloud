@@ -524,6 +524,14 @@
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
       "viewReceipt": "View receipt"
     },
+    "reportReceipts": {
+      "title": "Reports",
+      "rowSubtitle": "Reports you filed and their outcomes",
+      "emptyTitle": "No reports yet",
+      "emptyDescription": "Reports you file from a comment or an AI response appear here.",
+      "couldNotLoad": "Could not load your reports",
+      "capped": "Showing your most recent reports."
+    },
     "changelog": "What's New"
   },
   "preferences": {

@@ -457,6 +457,14 @@
       "nextStepFinal": "A decisão do recurso é definitiva. Não é possível enviar outro recurso.",
       "viewReceipt": "Ver comprovante"
     },
+    "reportReceipts": {
+      "title": "Denúncias",
+      "rowSubtitle": "Denúncias que você registrou e os resultados delas",
+      "emptyTitle": "Nenhuma denúncia ainda",
+      "emptyDescription": "Denúncias que você registra a partir de um comentário ou de uma resposta de IA aparecem aqui.",
+      "couldNotLoad": "Não foi possível carregar suas denúncias",
+      "capped": "Mostrando suas denúncias mais recentes."
+    },
     "changelog": "Novidades"
   },
   "notifications": {

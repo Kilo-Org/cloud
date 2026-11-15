@@ -457,6 +457,14 @@
       "nextStepFinal": "Rozhodnutí o odvolání je konečné. Další odvolání již nelze podat.",
       "viewReceipt": "Zobrazit potvrzení"
     },
+    "reportReceipts": {
+      "title": "Nahlášení",
+      "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
+      "emptyTitle": "Zatím žádná nahlášení",
+      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
+      "capped": "Zobrazují se vaše nejnovější nahlášení."
+    },
     "changelog": "Co je nového"
   },
   "preferences": {

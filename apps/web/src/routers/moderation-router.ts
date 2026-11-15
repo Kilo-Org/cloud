@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as z from 'zod';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
@@ -99,6 +99,107 @@ async function getOwnedReport(receiptId: string, userId: string) {
   return row;
 }
 
+const REPORT_RECEIPTS_DEFAULT_PAGE_SIZE = 30;
+const REPORT_RECEIPTS_MAX_PAGE_SIZE = 50;
+
+/**
+ * Cursor for one page of report receipts: the last row's `(created_at, id)`
+ * verbatim, in the same `created_at|id` shape the notification history uses.
+ * `created_at` is a timestamptz returned as text with microsecond precision, so
+ * it travels through the cursor untouched: normalizing it through
+ * `new Date(...).toISOString()` would truncate microseconds and silently skip
+ * rows that share a millisecond.
+ */
+const REPORT_RECEIPT_CURSOR_SEPARATOR = '|';
+const REPORT_RECEIPT_ROW_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function encodeReportReceiptCursor(row: { created_at: string; id: string }): string {
+  return `${row.created_at}${REPORT_RECEIPT_CURSOR_SEPARATOR}${row.id}`;
+}
+
+function decodeReportReceiptCursor(cursor: string): { createdAt: string; id: string } | null {
+  const separatorIndex = cursor.indexOf(REPORT_RECEIPT_CURSOR_SEPARATOR);
+  if (separatorIndex <= 0) return null;
+  const createdAt = cursor.slice(0, separatorIndex);
+  const id = cursor.slice(separatorIndex + 1);
+  if (!REPORT_RECEIPT_ROW_ID_PATTERN.test(id)) return null;
+  if (Number.isNaN(new Date(createdAt).getTime())) return null;
+  return { createdAt, id };
+}
+
+/**
+ * Newest-first, keyset-paginated page of the caller's own report receipts.
+ *
+ * Owner scoping lives in the WHERE clause instead of a post-fetch check, so a
+ * receipt that belongs to someone else can never appear in the result set, not
+ * even transiently. The keyset compares `(created_at, id)` against the last row
+ * rather than using an offset, so a page stays stable while new reports arrive:
+ * a report created after the first page was read lands ahead of the cursor and
+ * never shifts the rows a client is paging through.
+ */
+async function listOwnedReports(input: {
+  userId: string;
+  cursor?: string;
+  limit?: number;
+}): Promise<{
+  items: {
+    receiptId: string;
+    triageStatus: string;
+    appealStatus: string;
+    createdAt: string;
+  }[];
+  nextCursor: string | null;
+}> {
+  const limit = Math.min(
+    Math.max(1, input.limit ?? REPORT_RECEIPTS_DEFAULT_PAGE_SIZE),
+    REPORT_RECEIPTS_MAX_PAGE_SIZE
+  );
+
+  const conditions = [eq(content_moderation_reports.kilo_user_id, input.userId)];
+  if (input.cursor !== undefined) {
+    const cursor = decodeReportReceiptCursor(input.cursor);
+    if (!cursor) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid report receipt cursor.' });
+    }
+    const cursorPredicate = or(
+      lt(content_moderation_reports.created_at, cursor.createdAt),
+      and(
+        eq(content_moderation_reports.created_at, cursor.createdAt),
+        lt(content_moderation_reports.id, cursor.id)
+      )
+    );
+    if (cursorPredicate) conditions.push(cursorPredicate);
+  }
+
+  const rows = await db
+    .select({
+      id: content_moderation_reports.id,
+      receipt_id: content_moderation_reports.receipt_id,
+      triage_status: content_moderation_reports.triage_status,
+      appeal_status: content_moderation_reports.appeal_status,
+      created_at: content_moderation_reports.created_at,
+    })
+    .from(content_moderation_reports)
+    .where(and(...conditions))
+    .orderBy(desc(content_moderation_reports.created_at), desc(content_moderation_reports.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const last = page.at(-1);
+
+  return {
+    items: page.map(row => ({
+      receiptId: row.receipt_id,
+      triageStatus: row.triage_status,
+      appealStatus: row.appeal_status,
+      createdAt: row.created_at,
+    })),
+    nextCursor: hasMore && last ? encodeReportReceiptCursor(last) : null,
+  };
+}
+
 export const moderationRouter = createTRPCRouter({
   reportContent: baseProcedure.input(ReportContentInput).mutation(async ({ ctx, input }) => {
     const [row] = await db
@@ -150,6 +251,18 @@ export const moderationRouter = createTRPCRouter({
       appealStatus: row.appeal_status,
     };
   }),
+
+  listReportReceipts: baseProcedure
+    .input(
+      z.object({
+        /** Opaque cursor from a previous page's `nextCursor`. */
+        cursor: z.string().min(1).max(512).optional(),
+        limit: z.number().int().min(1).max(REPORT_RECEIPTS_MAX_PAGE_SIZE).optional(),
+      })
+    )
+    .query(({ ctx, input }) =>
+      listOwnedReports({ userId: ctx.user.id, cursor: input.cursor, limit: input.limit })
+    ),
 
   appealReport: baseProcedure.input(AppealInput).mutation(async ({ ctx, input }) => {
     const row = await getOwnedReport(input.receiptId, ctx.user.id);

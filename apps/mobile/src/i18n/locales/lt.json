@@ -457,6 +457,14 @@
       "nextStepFinal": "Sprendimas dėl apskundimo yra galutinis. Kito apskundimo pateikti negalima.",
       "viewReceipt": "Peržiūrėti patvirtinimą"
     },
+    "reportReceipts": {
+      "title": "Pranešimai",
+      "rowSubtitle": "Jūsų pateikti pranešimai ir jų rezultatai",
+      "emptyTitle": "Kol kas pranešimų nėra",
+      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro arba AI atsakymo, rodomi čia.",
+      "couldNotLoad": "Nepavyko įkelti jūsų pranešimų",
+      "capped": "Rodomi naujausi jūsų pranešimai."
+    },
     "changelog": "Kas naujo"
   },
   "preferences": {

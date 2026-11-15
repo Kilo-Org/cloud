@@ -457,6 +457,14 @@
       "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
     },
+    "reportReceipts": {
+      "title": "Shikoyatlar",
+      "rowSubtitle": "Yuborgan shikoyatlaringiz va ularning natijalari",
+      "emptyTitle": "Hozircha shikoyatlar yo'q",
+      "emptyDescription": "Izoh yoki AI javobidan yuborgan shikoyatlaringiz shu yerda ko'rinadi.",
+      "couldNotLoad": "Shikoyatlaringizni yuklab bo'lmadi",
+      "capped": "Eng so'nggi shikoyatlaringiz ko'rsatilmoqda."
+    },
     "changelog": "Yangiliklar"
   },
   "preferences": {

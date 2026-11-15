@@ -457,6 +457,14 @@
       "nextStepFinal": "Quyết định kháng nghị là cuối cùng. Bạn không thể gửi thêm kháng nghị nào nữa.",
       "viewReceipt": "Xem biên nhận"
     },
+    "reportReceipts": {
+      "title": "Báo cáo",
+      "rowSubtitle": "Các báo cáo bạn đã gửi và kết quả của chúng",
+      "emptyTitle": "Chưa có báo cáo nào",
+      "emptyDescription": "Các báo cáo bạn gửi từ bình luận hoặc phản hồi của AI sẽ xuất hiện ở đây.",
+      "couldNotLoad": "Không thể tải báo cáo của bạn",
+      "capped": "Đang hiển thị các báo cáo gần đây nhất của bạn."
+    },
     "changelog": "Có gì mới"
   },
   "preferences": {

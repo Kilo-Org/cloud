@@ -457,6 +457,14 @@
       "nextStepFinal": "이의 제기 결정은 최종입니다. 더 이상 이의를 제기할 수 없습니다.",
       "viewReceipt": "접수증 보기"
     },
+    "reportReceipts": {
+      "title": "신고 내역",
+      "rowSubtitle": "접수한 신고와 그 결과",
+      "emptyTitle": "아직 신고 내역이 없습니다",
+      "emptyDescription": "댓글이나 AI 응답에서 접수한 신고가 여기에 표시됩니다.",
+      "couldNotLoad": "신고 내역을 불러올 수 없습니다",
+      "capped": "최근 신고 내역만 표시됩니다."
+    },
     "changelog": "새로운 기능"
   },
   "preferences": {

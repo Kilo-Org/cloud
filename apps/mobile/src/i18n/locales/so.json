@@ -457,6 +457,14 @@
       "nextStepFinal": "Go'aanka rafcaanku waa kama dambays. Rafcaan kale lama gudbin karo.",
       "viewReceipt": "Eeg rasiidka"
     },
+    "reportReceipts": {
+      "title": "Warbixinno",
+      "rowSubtitle": "Warbixinno aad gudbisay iyo natiijooyinkooda",
+      "emptyTitle": "Weli warbixinno ma jiraan",
+      "emptyDescription": "Warbixinno aad ka gudbiso faallo ama jawaabta AI ayaa halkan ka muuqdaan.",
+      "couldNotLoad": "Warbixinnadaada lama soo kicin karin",
+      "capped": "Waxaa la muujinayaa warbixinnadaada ugu dambeeyay."
+    },
     "changelog": "Waxyaabaha cusub"
   },
   "preferences": {

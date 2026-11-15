@@ -457,6 +457,14 @@
       "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
       "viewReceipt": "Näytä kuitti"
     },
+    "reportReceipts": {
+      "title": "Ilmoitukset",
+      "rowSubtitle": "Tekemäsi ilmoitukset ja niiden lopputulokset",
+      "emptyTitle": "Ei vielä ilmoituksia",
+      "emptyDescription": "Kommentista tai tekoälyvastauksesta tekemäsi ilmoitukset näkyvät tässä.",
+      "couldNotLoad": "Ilmoituksiasi ei voitu ladata",
+      "capped": "Näytetään uusimmat ilmoituksesi."
+    },
     "changelog": "Mitä uutta"
   },
   "preferences": {

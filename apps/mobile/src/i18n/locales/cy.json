@@ -457,6 +457,14 @@
       "nextStepFinal": "Mae penderfyniad yr apêl yn derfynol. Ni ellir cyflwyno apêl bellach.",
       "viewReceipt": "Gweld y dderbynneb"
     },
+    "reportReceipts": {
+      "title": "Adroddiadau",
+      "rowSubtitle": "Yr adroddiadau rydych wedi'u cyflwyno a'u canlyniadau",
+      "emptyTitle": "Dim adroddiadau eto",
+      "emptyDescription": "Bydd adroddiadau rydych yn eu cyflwyno o sylw neu o ymateb AI yn ymddangos yma.",
+      "couldNotLoad": "Methu llwytho eich adroddiadau",
+      "capped": "Yn dangos eich adroddiadau diweddaraf."
+    },
     "changelog": "Beth sy'n newydd"
   },
   "preferences": {

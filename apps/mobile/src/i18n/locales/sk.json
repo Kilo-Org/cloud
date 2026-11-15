@@ -457,6 +457,14 @@
       "nextStepFinal": "Rozhodnutie o odvolaní je konečné. Ďalšie odvolanie už nie je možné podať.",
       "viewReceipt": "Zobraziť potvrdenie"
     },
+    "reportReceipts": {
+      "title": "Nahlásenia",
+      "rowSubtitle": "Nahlásenia, ktoré si podal, a ich výsledky",
+      "emptyTitle": "Zatiaľ žiadne nahlásenia",
+      "emptyDescription": "Nahlásenia, ktoré podáš z komentára alebo z odpovede AI, sa zobrazia tu.",
+      "couldNotLoad": "Nepodarilo sa načítať tvoje nahlásenia",
+      "capped": "Zobrazujú sa tvoje najnovšie nahlásenia."
+    },
     "changelog": "Čo je nové"
   },
   "preferences": {

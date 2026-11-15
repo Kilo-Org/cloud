@@ -21,27 +21,13 @@ import {
   STATE_ACTION_CLASS,
 } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { APPEAL_KEYS, statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import { i18n } from '@/i18n';
 
 const ACCOUNT_ROUTE = '/(app)/(tabs)/(3_profile)/account' as Href;
 
 const ReceiptParamSchema = z.object({ 'receipt-id': z.uuid() });
-
-const TRIAGE_KEYS = {
-  received: 'profile.reportReceipt.triageReceived',
-  open: 'profile.reportReceipt.triageOpen',
-  actioned: 'profile.reportReceipt.triageActioned',
-  rejected: 'profile.reportReceipt.triageRejected',
-} as const;
-
-const APPEAL_KEYS = {
-  none: 'profile.reportReceipt.appealNone',
-  submitted: 'profile.reportReceipt.appealSubmitted',
-  accepted: 'profile.reportReceipt.appealAccepted',
-  rejected: 'profile.reportReceipt.appealRejected',
-} as const;
 
 const NEXT_STEP_KEYS = {
   received: 'profile.reportReceipt.nextStepReceived',
@@ -72,16 +58,6 @@ function nextStepKey(triageStatus: string, appealStatus: string): string | null 
     return NEXT_STEP_KEYS.inReview;
   }
   return null;
-}
-
-/**
- * Translates a status the server reports, through the key its dictionary holds.
- * An unrecognised status is shown as the server sent it, so a status added on the
- * server is readable rather than blank.
- */
-function statusLabel(dictionary: Readonly<Record<string, string>>, status: string): string {
-  const key = dictionary[status];
-  return key === undefined ? status : i18n.t(key);
 }
 
 /**

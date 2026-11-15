@@ -457,6 +457,14 @@
       "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
       "viewReceipt": "Angalia risiti"
     },
+    "reportReceipts": {
+      "title": "Ripoti",
+      "rowSubtitle": "Ripoti ulizowasilisha na matokeo yake",
+      "emptyTitle": "Hakuna ripoti bado",
+      "emptyDescription": "Ripoti unazowasilisha kutoka kwa maoni au jibu la AI zinaonekana hapa.",
+      "couldNotLoad": "Imeshindwa kupakia ripoti zako",
+      "capped": "Inaonyesha ripoti zako za hivi karibuni."
+    },
     "changelog": "Mapya"
   },
   "preferences": {

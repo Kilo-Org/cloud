@@ -457,6 +457,14 @@
       "nextStepFinal": "Ko te whakatau mō te pīra he whakatau whakamutunga. Kāore e taea tētahi atu pīra te tuku.",
       "viewReceipt": "Tirohia te rīhīti"
     },
+    "reportReceipts": {
+      "title": "Ngā pūrongo",
+      "rowSubtitle": "Ngā pūrongo i tukuna e koe me ō rātou otinga",
+      "emptyTitle": "Kāore anō he pūrongo",
+      "emptyDescription": "Ka puta ki konei ngā pūrongo ka tukuna e koe mai i tētahi kōrero, mai i tētahi whakautu AI rānei.",
+      "couldNotLoad": "Kāore i taea te uta i ō pūrongo",
+      "capped": "E whakaatu ana i ō pūrongo hou rawa."
+    },
     "changelog": "Ngā mea hou"
   },
   "preferences": {

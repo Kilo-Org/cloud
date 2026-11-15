@@ -457,6 +457,14 @@
       "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
       "viewReceipt": "查看回执"
     },
+    "reportReceipts": {
+      "title": "举报记录",
+      "rowSubtitle": "你提交的举报及其处理结果",
+      "emptyTitle": "暂无举报",
+      "emptyDescription": "你从评论或 AI 回复中提交的举报将显示在这里。",
+      "couldNotLoad": "无法加载你的举报",
+      "capped": "仅显示你最近的举报。"
+    },
     "changelog": "更新内容"
   },
   "preferences": {

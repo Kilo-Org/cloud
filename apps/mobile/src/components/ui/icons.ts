@@ -56,6 +56,7 @@ export { default as FilePlus } from 'lucide-react-native/icons/file-plus';
 export { default as FileSearch } from 'lucide-react-native/icons/file-search';
 export { default as FileSliders } from 'lucide-react-native/icons/file-sliders';
 export { default as FileText } from 'lucide-react-native/icons/file-text';
+export { default as Flag } from 'lucide-react-native/icons/flag';
 export { default as FolderGit2 } from 'lucide-react-native/icons/folder-git-2';
 export { default as FolderOpen } from 'lucide-react-native/icons/folder-open';
 export { default as Gauge } from 'lucide-react-native/icons/gauge';

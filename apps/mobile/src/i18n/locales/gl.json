@@ -457,6 +457,14 @@
       "nextStepFinal": "A decisión do recurso é definitiva. Non se pode presentar ningún recurso máis.",
       "viewReceipt": "Ver xustificante"
     },
+    "reportReceipts": {
+      "title": "Denuncias",
+      "rowSubtitle": "Denuncias que presentaches e os seus resultados",
+      "emptyTitle": "Aínda non hai denuncias",
+      "emptyDescription": "As denuncias que presentes desde un comentario ou unha resposta da IA aparecerán aquí.",
+      "couldNotLoad": "Non se puideron cargar as túas denuncias",
+      "capped": "Mostrando as túas denuncias máis recentes."
+    },
     "changelog": "Novidades"
   },
   "preferences": {

@@ -457,6 +457,14 @@
       "nextStepFinal": "La decisión de la apelación es definitiva. No se puede presentar otra apelación.",
       "viewReceipt": "Ver comprobante"
     },
+    "reportReceipts": {
+      "title": "Denuncias",
+      "rowSubtitle": "Denuncias que has presentado y sus resultados",
+      "emptyTitle": "Aún no hay denuncias",
+      "emptyDescription": "Las denuncias que presentes desde un comentario o una respuesta de IA aparecerán aquí.",
+      "couldNotLoad": "No se pudieron cargar tus denuncias",
+      "capped": "Se muestran tus denuncias más recientes."
+    },
     "changelog": "Novedades"
   },
   "preferences": {

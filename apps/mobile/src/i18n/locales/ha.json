@@ -457,6 +457,14 @@
       "nextStepFinal": "Hukuncin ɗaukaka ƙara ya zama na ƙarshe. Ba za a iya gabatar da wata ɗaukaka ƙara ba.",
       "viewReceipt": "Duba rasidi"
     },
+    "reportReceipts": {
+      "title": "Rahotanni",
+      "rowSubtitle": "Rahotannin da ka gabatar da sakamakonsu",
+      "emptyTitle": "Babu rahotanni tukuna",
+      "emptyDescription": "Rahotannin da ka gabatar daga sharhi ko amsar AI suna bayyana a nan.",
+      "couldNotLoad": "Ba a iya loda rahotanninka ba",
+      "capped": "Ana nuna rahotanninka na baya-bayan nan."
+    },
     "changelog": "Sabbin abubuwa"
   },
   "preferences": {

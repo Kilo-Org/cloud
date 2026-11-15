@@ -457,6 +457,14 @@
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
+    "reportReceipts": {
+      "title": "Meldingen",
+      "rowSubtitle": "Meldingen die je hebt ingediend en hun uitkomsten",
+      "emptyTitle": "Nog geen meldingen",
+      "emptyDescription": "Meldingen die je vanuit een reactie of een AI-antwoord indient, verschijnen hier.",
+      "couldNotLoad": "Kon je meldingen niet laden",
+      "capped": "Je ziet je meest recente meldingen."
+    },
     "changelog": "Nieuw in deze versie"
   },
   "preferences": {

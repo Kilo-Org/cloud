@@ -457,6 +457,14 @@
       "nextStepFinal": "Murteen ol'iyyannoo kan dhumaa dha. Ol'iyyannoon biraa ergamuu hin danda'u.",
       "viewReceipt": "Ragaa ilaali"
     },
+    "reportReceipts": {
+      "title": "Gabaasoota",
+      "rowSubtitle": "Gabaasoota ati galmeessite fi bu'aawwan isaanii",
+      "emptyTitle": "Gabaasni ammas hin jiru",
+      "emptyDescription": "Gabaasni yaada irraa yookaan deebii AI irraa ati galmeessitu asitti mul'ata.",
+      "couldNotLoad": "Gabaasoota kee fe'uu hin dandeenye",
+      "capped": "Gabaasoota kee haaraa agarsiisaa jira."
+    },
     "changelog": "Waan haaraa"
   },
   "preferences": {

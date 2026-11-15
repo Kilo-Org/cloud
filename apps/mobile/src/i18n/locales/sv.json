@@ -457,6 +457,14 @@
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },
+    "reportReceipts": {
+      "title": "Anmälningar",
+      "rowSubtitle": "Anmälningar du skickat in och deras utfall",
+      "emptyTitle": "Inga anmälningar än",
+      "emptyDescription": "Anmälningar du skickar in från en kommentar eller ett AI-svar visas här.",
+      "couldNotLoad": "Det gick inte att läsa in dina anmälningar",
+      "capped": "Visar dina senaste anmälningar."
+    },
     "changelog": "Nyheter"
   },
   "preferences": {

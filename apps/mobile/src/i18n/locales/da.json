@@ -457,6 +457,14 @@
       "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
       "viewReceipt": "Se kvittering"
     },
+    "reportReceipts": {
+      "title": "Anmeldelser",
+      "rowSubtitle": "Dine indsendte anmeldelser og deres resultater",
+      "emptyTitle": "Ingen anmeldelser endnu",
+      "emptyDescription": "Anmeldelser, du indsender fra en kommentar eller et AI-svar, vises her.",
+      "couldNotLoad": "Kunne ikke indlæse dine anmeldelser",
+      "capped": "Viser dine seneste anmeldelser."
+    },
     "changelog": "Nyheder"
   },
   "preferences": {

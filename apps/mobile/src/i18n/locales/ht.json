@@ -457,6 +457,14 @@
       "nextStepFinal": "Desizyon apèl la final. Ou pa ka soumèt okenn lòt apèl.",
       "viewReceipt": "Wè resi a"
     },
+    "reportReceipts": {
+      "title": "Rapò",
+      "rowSubtitle": "Rapò ou te soumèt ak rezilta yo",
+      "emptyTitle": "Poko gen rapò",
+      "emptyDescription": "Rapò ou soumèt soti nan yon kòmantè oswa nan yon repons AI ap parèt isit la.",
+      "couldNotLoad": "Nou pa t ka chaje rapò ou",
+      "capped": "Ap montre rapò ou ki pi resan yo."
+    },
     "changelog": "Sa ki nouvo"
   },
   "preferences": {

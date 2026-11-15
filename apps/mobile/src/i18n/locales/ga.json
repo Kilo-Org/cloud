@@ -457,6 +457,14 @@
       "nextStepFinal": "Tá cinneadh an achomhairc críochnaitheach. Ní féidir aon achomharc breise a chur isteach.",
       "viewReceipt": "Féach ar an admháil"
     },
+    "reportReceipts": {
+      "title": "Tuairiscí",
+      "rowSubtitle": "Na tuairiscí a chuir tú isteach agus a dtorthaí",
+      "emptyTitle": "Níl aon tuairiscí ann fós",
+      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht nó ó fhreagra AI.",
+      "couldNotLoad": "Níorbh fhéidir do chuid tuairiscí a lódáil",
+      "capped": "Ag taispeáint do chuid tuairiscí is déanaí."
+    },
     "changelog": "Na rudaí nua"
   },
   "preferences": {

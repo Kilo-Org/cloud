@@ -457,6 +457,14 @@
       "nextStepFinal": "Apellyasiya qərarı qətidir. Artıq apellyasiya vermək mümkün deyil.",
       "viewReceipt": "Qəbzə bax"
     },
+    "reportReceipts": {
+      "title": "Şikayətlər",
+      "rowSubtitle": "Göndərdiyiniz şikayətlər və onların nəticələri",
+      "emptyTitle": "Hələ şikayət yoxdur",
+      "emptyDescription": "Şərhdən və ya AI cavabından göndərdiyiniz şikayətlər burada görünəcək.",
+      "couldNotLoad": "Şikayətləriniz yüklənə bilmədi",
+      "capped": "Ən son şikayətləriniz göstərilir."
+    },
     "changelog": "Yeniliklər"
   },
   "preferences": {

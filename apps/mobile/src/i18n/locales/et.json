@@ -457,6 +457,14 @@
       "nextStepFinal": "Vaidlustuse otsus on lõplik. Edasist vaidlustust esitada ei saa.",
       "viewReceipt": "Vaata kinnitust"
     },
+    "reportReceipts": {
+      "title": "Teated",
+      "rowSubtitle": "Sinu esitatud teated ja nende tulemused",
+      "emptyTitle": "Teateid veel pole",
+      "emptyDescription": "Siia ilmuvad teated, mille esitad kommentaari või AI vastuse kohta.",
+      "couldNotLoad": "Sinu teateid ei õnnestunud laadida",
+      "capped": "Kuvatakse sinu viimased teated."
+    },
     "changelog": "Mis on uut"
   },
   "preferences": {

@@ -457,6 +457,14 @@
       "nextStepFinal": "Decyzja w sprawie odwołania jest ostateczna. Nie można złożyć kolejnego odwołania.",
       "viewReceipt": "Wyświetl potwierdzenie"
     },
+    "reportReceipts": {
+      "title": "Zgłoszenia",
+      "rowSubtitle": "Zgłoszenia, które złożyłeś, i ich wyniki",
+      "emptyTitle": "Nie masz jeszcze zgłoszeń",
+      "emptyDescription": "Zgłoszenia złożone z komentarza lub odpowiedzi AI pojawiają się tutaj.",
+      "couldNotLoad": "Nie udało się wczytać twoich zgłoszeń",
+      "capped": "Wyświetlane są twoje najnowsze zgłoszenia."
+    },
     "changelog": "Co nowego"
   },
   "preferences": {

@@ -457,6 +457,14 @@
       "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
       "viewReceipt": "Skoða kvittun"
     },
+    "reportReceipts": {
+      "title": "Tilkynningar",
+      "rowSubtitle": "Tilkynningar sem þú sendir inn og niðurstöður þeirra",
+      "emptyTitle": "Engar tilkynningar ennþá",
+      "emptyDescription": "Tilkynningar sem þú sendir inn úr athugasemd eða svari frá gervigreind birtast hér.",
+      "couldNotLoad": "Ekki tókst að hlaða tilkynningunum þínum",
+      "capped": "Sýni nýjustu tilkynningarnar þínar."
+    },
     "changelog": "Nýjungar"
   },
   "preferences": {

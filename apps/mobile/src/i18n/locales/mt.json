@@ -457,6 +457,14 @@
       "nextStepFinal": "Id-deċiżjoni tal-appell hija finali. Ma jistax jiġi ppreżentat appell ieħor.",
       "viewReceipt": "Ara l-irċevuta"
     },
+    "reportReceipts": {
+      "title": "Rapporti",
+      "rowSubtitle": "Rapporti li ppreżentajt u l-eżiti tagħhom",
+      "emptyTitle": "Għad m'hemmx rapporti",
+      "emptyDescription": "Rapporti li tippreżenta minn kumment jew minn risposta tal-AI jidhru hawn.",
+      "couldNotLoad": "Ir-rapporti tiegħek ma setgħux jitgħabbew",
+      "capped": "Qed jintwerew l-aktar rapporti reċenti tiegħek."
+    },
     "changelog": "X'hemm ġdid"
   },
   "preferences": {

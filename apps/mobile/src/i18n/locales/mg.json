@@ -457,6 +457,14 @@
       "nextStepFinal": "Farany ny fanapahan-kevitra momba ny fampakarana. Tsy misy fampakarana hafa azo alefa intsony.",
       "viewReceipt": "Jereo ny porofo"
     },
+    "reportReceipts": {
+      "title": "Tatitra",
+      "rowSubtitle": "Ny tatitra nampidirinao sy ny vokany",
+      "emptyTitle": "Mbola tsy misy tatitra",
+      "emptyDescription": "Ny tatitra ampidirinao avy amin'ny fanehoan-kevitra na ny valin'ny AI dia miseho eto.",
+      "couldNotLoad": "Tsy afaka naka ny tatitrao",
+      "capped": "Mampiseho ny tatitrao farany indrindra."
+    },
     "changelog": "Ny vaovao"
   },
   "preferences": {

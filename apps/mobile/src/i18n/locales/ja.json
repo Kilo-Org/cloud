@@ -457,6 +457,14 @@
       "nextStepFinal": "異議申し立ての決定は確定しました。これ以上異議を申し立てることはできません。",
       "viewReceipt": "受付確認を表示"
     },
+    "reportReceipts": {
+      "title": "通報一覧",
+      "rowSubtitle": "通報した内容とその結果",
+      "emptyTitle": "通報はまだありません",
+      "emptyDescription": "コメントまたはAIの回答から通報した内容がここに表示されます。",
+      "couldNotLoad": "通報を読み込めませんでした",
+      "capped": "最新の通報を表示しています。"
+    },
     "changelog": "新着情報"
   },
   "preferences": {

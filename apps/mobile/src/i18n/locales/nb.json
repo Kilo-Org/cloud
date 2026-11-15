@@ -457,6 +457,14 @@
       "nextStepFinal": "Klageavgjørelsen er endelig. Du kan ikke klage på nytt.",
       "viewReceipt": "Vis kvittering"
     },
+    "reportReceipts": {
+      "title": "Rapporter",
+      "rowSubtitle": "Rapporter du har sendt inn, og resultatene deres",
+      "emptyTitle": "Ingen rapporter ennå",
+      "emptyDescription": "Rapporter du sender inn fra en kommentar eller en AI-respons, vises her.",
+      "couldNotLoad": "Kunne ikke laste inn rapportene dine",
+      "capped": "Viser de nyeste rapportene dine."
+    },
     "changelog": "Nyheter"
   },
   "preferences": {

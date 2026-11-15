@@ -457,6 +457,14 @@
       "nextStepFinal": "החלטת הערעור סופית. לא ניתן להגיש ערעור נוסף.",
       "viewReceipt": "הצגת האישור"
     },
+    "reportReceipts": {
+      "title": "דיווחים",
+      "rowSubtitle": "דיווחים שהגשת והתוצאות שלהם",
+      "emptyTitle": "אין עדיין דיווחים",
+      "emptyDescription": "דיווחים שתגיש מתגובה או מתשובת AI יופיעו כאן.",
+      "couldNotLoad": "לא ניתן לטעון את הדיווחים שלך",
+      "capped": "מוצגים הדיווחים האחרונים שלך."
+    },
     "changelog": "מה חדש"
   },
   "preferences": {

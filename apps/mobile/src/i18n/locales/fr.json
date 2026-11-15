@@ -457,6 +457,14 @@
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
       "viewReceipt": "Voir l'accusé de réception"
     },
+    "reportReceipts": {
+      "title": "Signalements",
+      "rowSubtitle": "Signalements que vous avez déposés et leurs résultats",
+      "emptyTitle": "Aucun signalement pour l'instant",
+      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire ou d'une réponse de l'IA apparaissent ici.",
+      "couldNotLoad": "Impossible de charger vos signalements",
+      "capped": "Affichage de vos signalements les plus récents."
+    },
     "changelog": "Nouveautés"
   },
   "notifications": {

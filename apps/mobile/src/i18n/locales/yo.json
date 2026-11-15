@@ -457,6 +457,14 @@
       "nextStepFinal": "Ìpinnu ẹ̀bẹ̀ yìí ti di ìparí. A kò lè fi ẹ̀bẹ̀ mìíràn ránṣẹ́ mọ́.",
       "viewReceipt": "Wo ìwé ẹ̀rí"
     },
+    "reportReceipts": {
+      "title": "Àwọn ìjábọ̀",
+      "rowSubtitle": "Àwọn ìjábọ̀ tí o fi ránṣẹ́ àti àbájáde wọn",
+      "emptyTitle": "Kò tíì sí ìjábọ̀ kankan",
+      "emptyDescription": "Àwọn ìjábọ̀ tí o bá fi ránṣẹ́ láti inú ọ̀rọ̀ kan tàbí ìdáhùn AI yóò hàn níbí.",
+      "couldNotLoad": "A kò lè gbé àwọn ìjábọ̀ rẹ wá",
+      "capped": "À ń fi àwọn ìjábọ̀ rẹ tó ṣẹ̀ṣẹ̀ wá hàn."
+    },
     "changelog": "Àwọn ohun tuntun"
   },
   "preferences": {

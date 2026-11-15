@@ -457,6 +457,14 @@
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
       "viewReceipt": "Lihat resit"
     },
+    "reportReceipts": {
+      "title": "Laporan",
+      "rowSubtitle": "Laporan yang anda failkan dan hasilnya",
+      "emptyTitle": "Belum ada laporan",
+      "emptyDescription": "Laporan yang anda failkan daripada ulasan atau respons AI akan dipaparkan di sini.",
+      "couldNotLoad": "Tidak dapat memuatkan laporan anda",
+      "capped": "Memaparkan laporan terkini anda."
+    },
     "changelog": "Yang baharu"
   },
   "preferences": {

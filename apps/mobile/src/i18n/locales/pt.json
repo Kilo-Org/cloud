@@ -457,6 +457,14 @@
       "nextStepFinal": "A decisão do recurso é final. Não é possível apresentar novo recurso.",
       "viewReceipt": "Ver comprovativo"
     },
+    "reportReceipts": {
+      "title": "Denúncias",
+      "rowSubtitle": "As denúncias que fizeste e os respetivos resultados",
+      "emptyTitle": "Ainda não há denúncias",
+      "emptyDescription": "As denúncias que fizeres a partir de um comentário ou de uma resposta de IA aparecem aqui.",
+      "couldNotLoad": "Não foi possível carregar as tuas denúncias",
+      "capped": "A mostrar as tuas denúncias mais recentes."
+    },
     "changelog": "Novidades"
   },
   "preferences": {

@@ -457,6 +457,14 @@
       "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
       "viewReceipt": "Vezi confirmarea"
     },
+    "reportReceipts": {
+      "title": "Raportări",
+      "rowSubtitle": "Raportările trimise de tine și rezultatele lor",
+      "emptyTitle": "Nicio raportare încă",
+      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu sau dintr-un răspuns AI apar aici.",
+      "couldNotLoad": "Nu am putut încărca raportările tale",
+      "capped": "Sunt afișate cele mai recente raportări ale tale."
+    },
     "changelog": "Noutăți"
   },
   "preferences": {

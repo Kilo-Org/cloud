@@ -457,6 +457,14 @@
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
       "viewReceipt": "Skatīt apstiprinājumu"
     },
+    "reportReceipts": {
+      "title": "Ziņojumi",
+      "rowSubtitle": "Jūsu iesniegtie ziņojumi un to rezultāti",
+      "emptyTitle": "Vēl nav ziņojumu",
+      "emptyDescription": "Šeit parādīsies ziņojumi, kurus iesniedzat no komentāra vai AI atbildes.",
+      "couldNotLoad": "Neizdevās ielādēt jūsu ziņojumus",
+      "capped": "Tiek rādīti jūsu jaunākie ziņojumi."
+    },
     "changelog": "Kas jauns"
   },
   "preferences": {

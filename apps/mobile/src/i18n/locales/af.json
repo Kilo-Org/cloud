@@ -457,6 +457,14 @@
       "nextStepFinal": "Die appèlbesluit is finaal. Geen verdere appèl kan ingedien word nie.",
       "viewReceipt": "Bekyk ontvangsbewys"
     },
+    "reportReceipts": {
+      "title": "Verslae",
+      "rowSubtitle": "Verslae wat jy ingedien het en die uitkomste daarvan",
+      "emptyTitle": "Nog geen verslae nie",
+      "emptyDescription": "Verslae wat jy van 'n kommentaar of 'n KI-antwoord indien, verskyn hier.",
+      "couldNotLoad": "Kon nie jou verslae laai nie",
+      "capped": "Wys jou mees onlangse verslae."
+    },
     "changelog": "Wat is nuut"
   },
   "preferences": {

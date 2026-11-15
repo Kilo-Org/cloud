@@ -457,6 +457,14 @@
       "nextStepFinal": "Vendimi i apelimit është përfundimtar. Nuk mund të dërgohet asnjë apelim tjetër.",
       "viewReceipt": "Shiko dëftesën"
     },
+    "reportReceipts": {
+      "title": "Raportet",
+      "rowSubtitle": "Raportet që ke paraqitur dhe rezultatet e tyre",
+      "emptyTitle": "Nuk ka raporte ende",
+      "emptyDescription": "Raportet që paraqit nga një koment ose një përgjigje AI shfaqen këtu.",
+      "couldNotLoad": "Raportet e tua nuk mund të ngarkoheshin",
+      "capped": "Po shfaqen raportet e tua më të fundit."
+    },
     "changelog": "Çfarë ka të re"
   },
   "preferences": {

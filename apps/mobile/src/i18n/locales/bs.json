@@ -457,6 +457,14 @@
       "nextStepFinal": "Odluka o žalbi je konačna. Žalba se više ne može podnijeti.",
       "viewReceipt": "Prikaži potvrdu"
     },
+    "reportReceipts": {
+      "title": "Prijave",
+      "rowSubtitle": "Prijave koje ste podnijeli i njihovi ishodi",
+      "emptyTitle": "Još nema prijava",
+      "emptyDescription": "Prijave koje podnesete iz komentara ili AI odgovora pojavit će se ovdje.",
+      "couldNotLoad": "Nije moguće učitati vaše prijave",
+      "capped": "Prikazane su vaše najnovije prijave."
+    },
     "changelog": "Šta je novo"
   },
   "preferences": {

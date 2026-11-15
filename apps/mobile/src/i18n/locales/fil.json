@@ -457,6 +457,14 @@
       "nextStepFinal": "Pinal na ang desisyon sa apela. Hindi na maaaring magsumite ng panibagong apela.",
       "viewReceipt": "Tingnan ang resibo"
     },
+    "reportReceipts": {
+      "title": "Mga ulat",
+      "rowSubtitle": "Mga ulat na isinumite mo at ang mga resulta nito",
+      "emptyTitle": "Wala pang ulat",
+      "emptyDescription": "Lalabas dito ang mga ulat na isusumite mo mula sa isang komento o tugon ng AI.",
+      "couldNotLoad": "Hindi ma-load ang mga ulat mo",
+      "capped": "Ipinapakita ang mga pinakabago mong ulat."
+    },
     "changelog": "Mga bago"
   },
   "preferences": {

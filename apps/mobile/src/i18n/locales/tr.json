@@ -457,6 +457,14 @@
       "nextStepFinal": "İtiraz kararı kesindir. Başka itiraz gönderilemez.",
       "viewReceipt": "Alındıyı görüntüle"
     },
+    "reportReceipts": {
+      "title": "Raporlar",
+      "rowSubtitle": "Gönderdiğiniz raporlar ve sonuçları",
+      "emptyTitle": "Henüz rapor yok",
+      "emptyDescription": "Bir yorumdan veya bir yapay zeka yanıtından gönderdiğiniz raporlar burada görünür.",
+      "couldNotLoad": "Raporlarınız yüklenemedi",
+      "capped": "En son raporlarınız gösteriliyor."
+    },
     "changelog": "Yenilikler"
   },
   "preferences": {

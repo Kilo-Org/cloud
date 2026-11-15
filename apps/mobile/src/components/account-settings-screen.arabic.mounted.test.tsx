@@ -29,6 +29,7 @@ vi.mock('@/components/ui/icons', () => ({
   Ban: 'Ban',
   Cpu: 'Cpu',
   FileText: 'FileText',
+  Flag: 'Flag',
   Globe: 'Globe',
   KeyRound: 'KeyRound',
   Lock: 'Lock',

@@ -457,6 +457,14 @@
       "nextStepFinal": "Odločitev o pritožbi je dokončna. Pritožbe ni več mogoče oddati.",
       "viewReceipt": "Prikaži potrdilo"
     },
+    "reportReceipts": {
+      "title": "Prijave",
+      "rowSubtitle": "Prijave, ki si jih oddal, in njihovi izidi",
+      "emptyTitle": "Ni še nobene prijave",
+      "emptyDescription": "Prijave, ki jih oddaš iz komentarja ali odgovora AI, se prikažejo tukaj.",
+      "couldNotLoad": "Tvojih prijav ni bilo mogoče naložiti",
+      "capped": "Prikazane so tvoje najnovejše prijave."
+    },
     "changelog": "Kaj je novega"
   },
   "preferences": {

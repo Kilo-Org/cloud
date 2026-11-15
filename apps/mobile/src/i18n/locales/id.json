@@ -457,6 +457,14 @@
       "nextStepFinal": "Keputusan banding bersifat final. Banding lebih lanjut tidak dapat diajukan.",
       "viewReceipt": "Lihat tanda terima"
     },
+    "reportReceipts": {
+      "title": "Laporan",
+      "rowSubtitle": "Laporan yang Anda ajukan dan hasilnya",
+      "emptyTitle": "Belum ada laporan",
+      "emptyDescription": "Laporan yang Anda ajukan dari komentar atau respons AI akan muncul di sini.",
+      "couldNotLoad": "Tidak dapat memuat laporan Anda",
+      "capped": "Menampilkan laporan terbaru Anda."
+    },
     "changelog": "Yang baru"
   },
   "preferences": {

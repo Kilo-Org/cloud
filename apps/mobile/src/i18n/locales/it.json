@@ -457,6 +457,14 @@
       "nextStepFinal": "La decisione sul ricorso è definitiva. Non è possibile presentare altri ricorsi.",
       "viewReceipt": "Visualizza ricevuta"
     },
+    "reportReceipts": {
+      "title": "Segnalazioni",
+      "rowSubtitle": "Le segnalazioni che hai inviato e i loro esiti",
+      "emptyTitle": "Ancora nessuna segnalazione",
+      "emptyDescription": "Le segnalazioni che invii da un commento o da una risposta AI compaiono qui.",
+      "couldNotLoad": "Impossibile caricare le tue segnalazioni",
+      "capped": "Vengono mostrate le tue segnalazioni più recenti."
+    },
     "changelog": "Novità"
   },
   "notifications": {

@@ -457,6 +457,14 @@
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
       "viewReceipt": "Mostra el comprovant"
     },
+    "reportReceipts": {
+      "title": "Denúncies",
+      "rowSubtitle": "Les denúncies que has presentat i els seus resultats",
+      "emptyTitle": "Encara no hi ha denúncies",
+      "emptyDescription": "Les denúncies que presentis des d'un comentari o d'una resposta d'IA apareixeran aquí.",
+      "couldNotLoad": "No s'han pogut carregar les teves denúncies",
+      "capped": "Es mostren les teves denúncies més recents."
+    },
     "changelog": "Novetats"
   },
   "preferences": {

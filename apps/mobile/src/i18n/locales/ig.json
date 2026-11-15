@@ -457,6 +457,14 @@
       "nextStepFinal": "Mkpebi mkpegharị a bụ nke ikpeazụ. Enweghị ike iziga mkpegharị ọzọ.",
       "viewReceipt": "Lee akwụkwọ nnata"
     },
+    "reportReceipts": {
+      "title": "Akụkọ",
+      "rowSubtitle": "Akụkọ ndị i debara na nsonaazụ ha",
+      "emptyTitle": "Enweghị akụkọ ruo ugbu a",
+      "emptyDescription": "Akụkọ ị na-edeba site na nkọwa ma ọ bụ nzaghachi AI na-apụta ebe a.",
+      "couldNotLoad": "Enweghị ike ibudata akụkọ gị",
+      "capped": "Na-egosi akụkọ gị ndị kacha ọhụrụ."
+    },
     "changelog": "Ihe ọhụrụ"
   },
   "preferences": {

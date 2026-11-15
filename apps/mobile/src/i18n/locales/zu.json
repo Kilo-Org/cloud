@@ -457,6 +457,14 @@
       "nextStepFinal": "Isinqumo sesikhalo siyisinqumo sokugcina. Akukho esinye isikhalo esingafakwa.",
       "viewReceipt": "Buka irisidi"
     },
+    "reportReceipts": {
+      "title": "Imibiko",
+      "rowSubtitle": "Imibiko oyifakile kanye nemiphumela yayo",
+      "emptyTitle": "Ayikho imibiko okwamanje",
+      "emptyDescription": "Imibiko oyifaka kusukela kumazwana noma empendulweni ye-AI ivela lapha.",
+      "couldNotLoad": "Akukwazekanga ukulayisha imibiko yakho",
+      "capped": "Kuboniswa imibiko yakho yamuva kakhulu."
+    },
     "changelog": "Okusha"
   },
   "preferences": {

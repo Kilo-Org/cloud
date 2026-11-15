@@ -457,6 +457,14 @@
       "nextStepFinal": "A fellebbezési döntés végleges. További fellebbezés nem nyújtható be.",
       "viewReceipt": "Visszaigazolás megtekintése"
     },
+    "reportReceipts": {
+      "title": "Bejelentések",
+      "rowSubtitle": "A benyújtott bejelentéseid és eredményeik",
+      "emptyTitle": "Még nincsenek bejelentések",
+      "emptyDescription": "A hozzászólásból vagy AI-válaszból benyújtott bejelentések itt jelennek meg.",
+      "couldNotLoad": "Nem sikerült betölteni a bejelentéseidet",
+      "capped": "A legutóbbi bejelentéseid láthatók."
+    },
     "changelog": "Újdonságok"
   },
   "preferences": {

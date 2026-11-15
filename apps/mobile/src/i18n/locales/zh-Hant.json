@@ -457,6 +457,14 @@
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
       "viewReceipt": "檢視回執"
     },
+    "reportReceipts": {
+      "title": "檢舉記錄",
+      "rowSubtitle": "你提交的檢舉及其結果",
+      "emptyTitle": "尚無檢舉記錄",
+      "emptyDescription": "你從留言或 AI 回應提交的檢舉會顯示在這裡。",
+      "couldNotLoad": "無法載入你的檢舉",
+      "capped": "僅顯示你最近的檢舉。"
+    },
     "changelog": "最新消息"
   },
   "preferences": {

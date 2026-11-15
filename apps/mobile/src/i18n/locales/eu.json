@@ -457,6 +457,14 @@
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
       "viewReceipt": "Ikusi agiria"
     },
+    "reportReceipts": {
+      "title": "Salaketak",
+      "rowSubtitle": "Aurkeztu zenituen salaketak eta horien emaitzak",
+      "emptyTitle": "Oraindik ez dago salaketarik",
+      "emptyDescription": "Iruzkin batetik edo AI baten erantzun batetik aurkezten dituzun salaketak hemen agertzen dira.",
+      "couldNotLoad": "Ezin izan dira zure salaketak kargatu",
+      "capped": "Zure azken salaketak erakusten ari gara."
+    },
     "changelog": "Berritasunak"
   },
   "preferences": {

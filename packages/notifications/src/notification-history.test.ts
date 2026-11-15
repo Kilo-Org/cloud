@@ -85,4 +85,12 @@ describe('notificationHistoryEntryForPushData', () => {
       expect(notificationHistoryEntryForPushData({ type: kind } as PushData)).toBeNull();
     }
   });
+
+  it('returns null for a kind the rules table does not know', () => {
+    // A payload reaches the worker unparsed, so a kind outside the union can
+    // arrive at runtime; it must be skipped, never made to throw. The double
+    // cast builds that unreachable-in-types payload on purpose.
+    const payload = { type: 'future_kind' } as unknown as PushData;
+    expect(notificationHistoryEntryForPushData(payload)).toBeNull();
+  });
 });

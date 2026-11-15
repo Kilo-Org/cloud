@@ -20,9 +20,9 @@ import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { redirect } from 'next/navigation';
-import { device_sessions, type Organization, type User } from '@kilocode/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import type { Organization, User } from '@kilocode/db/schema';
 import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
+import { liveDeviceSessionCondition } from '@kilocode/web-shared/lib/auth/device-session-condition';
 import {
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
@@ -786,11 +786,7 @@ async function readActiveDeviceSession(
   kiloUserId: string
 ): Promise<boolean> {
   const session = await db.query.device_sessions.findFirst({
-    where: and(
-      eq(device_sessions.id, deviceSessionId),
-      eq(device_sessions.kilo_user_id, kiloUserId),
-      isNull(device_sessions.revoked_at)
-    ),
+    where: liveDeviceSessionCondition({ deviceSessionId, userId: kiloUserId }),
     columns: { id: true },
   });
   return session !== undefined;

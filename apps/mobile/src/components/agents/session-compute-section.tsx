@@ -3,7 +3,14 @@ import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatClockTime, formatCurrency, formatDate, formatDuration } from '@/lib/format';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import {
+  formatClockTime,
+  formatCurrency,
+  formatDate,
+  formatDuration,
+  formatPrefixedUsd,
+} from '@/lib/format';
 import { useComputeRates } from '@/lib/hooks/use-session-compute';
 import {
   computeHourlyUsdFromCentsPerSecond,
@@ -27,7 +34,12 @@ type SessionComputeSectionProps = {
 function formatComputeAmount(microdollars: number): string {
   return (
     formatSessionTotalCost(microdollars) ??
-    formatCurrency(microdollars / 1_000_000, i18n.language, 4)
+    isolateLtrBidiText(
+      formatPrefixedUsd(microdollars / 1_000_000, i18n.language, {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      })
+    )
   );
 }
 

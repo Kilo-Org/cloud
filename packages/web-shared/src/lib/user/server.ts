@@ -206,6 +206,7 @@ type GetAuthResponse =
       webSessionId?: undefined;
       webSessionPepper?: undefined;
       authenticatedAt?: undefined;
+      ssoSourceOrganizationId?: undefined;
     }
   | {
       user: User;
@@ -227,6 +228,13 @@ type GetAuthResponse =
       webSessionPepper?: string | null;
       /** Unix seconds when the browser session signed in. */
       authenticatedAt?: number;
+      /**
+       * The WorkOS organization this browser session authenticated through,
+       * recorded only when the session signed in through SSO. Server-only: it
+       * is the provenance a management approval checks against the
+       * organization the account's domain currently requires.
+       */
+      ssoSourceOrganizationId?: string;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -236,39 +244,34 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // so the same request lands in one inventory entry whichever way it resolves.
   const surface = opts.stepUpSurface ?? 'rest';
 
+  const authViaToken = authViaTokenFromHeaders(headersList);
+  const credential = deriveCredentialKind({
+    authViaToken,
+    tokenSource: result.tokenSource ?? null,
+    internalApiUse: result.internalApiUse,
+    delegatedWorkload: result.cloudAgentAuthority !== undefined,
+  });
+
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
   if (opts.adminOnly === true && result.user) {
+    const route = routeFromHeaders(headersList);
+    const method = methodFromHeaders(headersList, opts.requestMethod);
     emitAdminAccessEvent({
       surface,
       kind: 'admin_guard',
       user: result.user,
-      authViaToken: authViaTokenFromHeaders(headersList),
+      authViaToken,
       tokenSource: result.tokenSource ?? null,
-      credential: deriveCredentialKind({
-        authViaToken: authViaTokenFromHeaders(headersList),
-        tokenSource: result.tokenSource ?? null,
-        internalApiUse: result.internalApiUse,
-        delegatedWorkload: result.cloudAgentAuthority !== undefined,
-      }),
-      route: routeFromHeaders(headersList),
-      method: methodFromHeaders(headersList, opts.requestMethod),
+      credential,
+      route,
+      method,
       userAgentProduct: userAgentProductFromHeaders(headersList),
       ip: clientIpFromHeaders(headersList),
     });
-  }
 
-  if (opts.adminOnly === true && result.user) {
-    const credential = deriveCredentialKind({
-      authViaToken: authViaTokenFromHeaders(headersList),
-      tokenSource: result.tokenSource ?? null,
-      internalApiUse: result.internalApiUse,
-      delegatedWorkload: result.cloudAgentAuthority !== undefined,
-    });
     if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
-      const route = routeFromHeaders(headersList);
-      const method = methodFromHeaders(headersList, opts.requestMethod);
       const { actionClass, inventoryId } = actionClassForRoute({
         surface,
         route: route ?? '',
@@ -320,13 +323,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     }
   }
 
-  if (opts.adminOnly === true && authViaTokenFromHeaders(headersList)) {
-    const credential = deriveCredentialKind({
-      authViaToken: true,
-      tokenSource: result.tokenSource ?? null,
-      internalApiUse: result.internalApiUse,
-      delegatedWorkload: result.cloudAgentAuthority !== undefined,
-    });
+  if (opts.adminOnly === true && authViaToken) {
     const route = routeFromHeaders(headersList);
     const method = methodFromHeaders(headersList, opts.requestMethod);
     const { actionClass, inventoryId } = actionClassForRoute({
@@ -352,15 +349,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   }
 
   if (result.user) {
-    return {
-      ...result,
-      credential: deriveCredentialKind({
-        authViaToken: authViaTokenFromHeaders(headersList),
-        tokenSource: result.tokenSource ?? null,
-        internalApiUse: result.internalApiUse,
-        delegatedWorkload: result.cloudAgentAuthority !== undefined,
-      }),
-    };
+    return { ...result, credential };
   }
   return result;
 }
@@ -461,7 +450,7 @@ async function resolveUserFromAuth(
   // also val.town and other blessed API users who are given their own custom JWTs use this path
   if (authViaTokenFromHeaders(headersList)) {
     const rawAuthorization = headersList.get('Authorization');
-    const bearer = rawAuthorization?.match(/^Bearer (.+)$/i)?.[1];
+    const bearer = extractBearerToken(rawAuthorization);
     let decoded: ReturnType<typeof jwt.decode>;
     try {
       decoded = bearer ? jwt.decode(bearer) : null;
@@ -477,7 +466,7 @@ async function resolveUserFromAuth(
       opts.expectedAudience ?? KILO_API_AUDIENCE
     );
     const runtimeProxyAttestationVerified =
-      bearer !== undefined &&
+      bearer !== null &&
       runtimeAuthorization.success &&
       attestationAudience.success &&
       typeof decodedPayload?.kiloUserId === 'string'
@@ -602,6 +591,7 @@ async function resolveUserFromSession(
       id: session.webSessionId,
       pepper: session.webSessionPepper,
       authenticatedAt: session.authenticatedAt,
+      ssoSourceOrganizationId: session.ssoSourceOrganizationId,
     },
   });
 }
@@ -676,7 +666,12 @@ type UserAuthorizationRequest = {
   tokenSource?: string;
   deviceSessionId?: string;
   cloudAgentAuthority?: CloudAgentAuthority;
-  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number };
+  webSession?: {
+    id?: string;
+    pepper?: string | null;
+    authenticatedAt?: number;
+    ssoSourceOrganizationId?: string;
+  };
 };
 
 async function validateUserAuthorization({
@@ -778,6 +773,7 @@ async function validateUserAuthorization({
     webSessionId: webSession?.id,
     webSessionPepper: webSession?.pepper,
     authenticatedAt: webSession?.authenticatedAt,
+    ssoSourceOrganizationId: webSession?.ssoSourceOrganizationId,
   };
 }
 

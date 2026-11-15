@@ -36,9 +36,11 @@ export function RepoToggleRow({
       className={className}
       // The lock is decorative, so privacy reaches the name instead: a
       // screen-reader user must be able to tell a private repository from a
-      // public one before picking scope. Public rows keep the plain name.
+      // public one before picking scope. Every row names itself explicitly
+      // because a recycled list cell keeps the name of the row it replaced, so
+      // a row that sets none can announce a different repository.
       accessibleName={
-        repo.private ? t('common.privateRepositoryA11y', { name: repo.fullName }) : undefined
+        repo.private ? t('common.privateRepositoryA11y', { name: repo.fullName }) : repo.fullName
       }
     >
       <View className="flex-1 flex-row items-center gap-2 pr-3">

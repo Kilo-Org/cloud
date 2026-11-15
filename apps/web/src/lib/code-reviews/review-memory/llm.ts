@@ -120,6 +120,32 @@ export function createReviewMemoryGatewayProvider(input: {
   });
 }
 
+/**
+ * The one place that prepares a review-memory LLM call for an owner: resolve the
+ * actor, then the model, then mint a provider from that actor. Callers supply only
+ * their own user-agent label.
+ */
+export async function createReviewMemoryGatewayForOwner(input: {
+  owner: ReviewMemoryOwner;
+  platform: ReviewMemoryPlatform;
+  userAgent: string;
+}): Promise<{
+  modelSlug: string;
+  provider: ReturnType<typeof createReviewMemoryGatewayProvider>;
+}> {
+  const actor = await resolveReviewMemoryActor(input.owner);
+  const { modelSlug } = await resolveReviewMemoryModel({
+    owner: input.owner,
+    platform: input.platform,
+  });
+  const provider = createReviewMemoryGatewayProvider({
+    owner: input.owner,
+    actor,
+    userAgent: input.userAgent,
+  });
+  return { modelSlug, provider };
+}
+
 export async function generateReviewMemoryStructuredOutput<OUTPUT>(
   input: GenerateReviewMemoryStructuredOutputInput<OUTPUT>
 ): Promise<{

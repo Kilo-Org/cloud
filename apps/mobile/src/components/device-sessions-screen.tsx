@@ -40,7 +40,7 @@ type SessionRowProps = {
 function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const colors = useThemeColors();
   const { t, i18n } = useTranslation();
-  const device = deviceSessionLabel(session.user_agent);
+  const device = deviceSessionLabel(session);
   const signedIn = formatDate(parseTimestamp(session.created_at), i18n.language);
   const lastSeen = formatDate(parseTimestamp(session.last_seen_at), i18n.language);
 
@@ -102,7 +102,7 @@ export function DeviceSessionsScreen() {
   const router = useRouter();
   const { signOut, token } = useAuth();
   const trpc = useTRPC();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
 
   const { data, isPending, isError, isFetching, refetch } = useQuery({
@@ -149,7 +149,8 @@ export function DeviceSessionsScreen() {
     confirm({
       title: t('deviceSessions.signOutThisSessionTitle'),
       message: t('deviceSessions.signOutThisSessionMessage', {
-        device: isolateBidiText(deviceSessionLabel(session.user_agent)),
+        device: isolateBidiText(deviceSessionLabel(session)),
+        lastSeen: formatDate(parseTimestamp(session.last_seen_at), i18n.language),
       }),
       confirmLabel: t('common.signOut'),
       onConfirm: () => {
@@ -235,7 +236,7 @@ export function DeviceSessionsScreen() {
               </Text>
             )}
             <Text variant="muted" className="text-xs">
-              {t('deviceSessions.onlyKiloAppSignIns')}
+              {t('deviceSessions.signInScopeNote')}
             </Text>
           </View>
         )}

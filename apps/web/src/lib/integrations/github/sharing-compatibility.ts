@@ -3,6 +3,7 @@ import 'server-only';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
 import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
+import { ownerCondition } from '@/lib/integrations/db/predicates';
 import { platform_integrations } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -19,9 +20,7 @@ export async function assertGitHubAutomationCanBeEnabled(
     .from(platform_integrations)
     .where(
       and(
-        owner.type === 'org'
-          ? eq(platform_integrations.owned_by_organization_id, owner.id)
-          : eq(platform_integrations.owned_by_user_id, owner.id),
+        ownerCondition(owner),
         eq(platform_integrations.platform, 'github'),
         platformIntegrationHealthSql()
       )

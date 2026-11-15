@@ -1,5 +1,5 @@
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
-import { type CodeReviewActionRequiredReason } from '@kilocode/app-shared/code-reviews';
+import { type CodeReviewActionRequiredReason } from '@kilocode/app-shared/code-review';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';

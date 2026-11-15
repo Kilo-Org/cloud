@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AdvancedConfigPanel } from './advanced-config-panel';
+import { SaveProfileSheet } from './save-profile-sheet';
 import { type ProfileSelectorProfile } from './profile-selector-model';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -199,6 +200,21 @@ function mount(
     throw new Error('the panel did not render');
   }
   return renderer;
+}
+
+/**
+ * A captured callback prop. Renderer props are untyped, so the value enters as
+ * `unknown` and is narrowed once before the test calls through it.
+ */
+function isVoidHandler(value: unknown): value is () => void {
+  return typeof value === 'function';
+}
+
+function invokeHandler(handler: unknown): void {
+  if (!isVoidHandler(handler)) {
+    throw new TypeError('expected a handler prop');
+  }
+  act(handler);
 }
 
 function press(node: TestRenderer.ReactTestInstance | undefined) {
@@ -663,5 +679,29 @@ describe('AdvancedConfigPanel', () => {
 
     expect(field(renderer, 'Profile name')).toBeTruthy();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('a late onClose from a closed save sheet leaves the reopened sheet open', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+    addVariable(renderer, 'API_KEY', 'abc');
+
+    press(buttonByText(renderer, 'Save as Profile'));
+    const firstSheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
+    if (!firstSheet) {
+      throw new TypeError('the first sheet was not mounted');
+    }
+    const firstClose: unknown = firstSheet.props.onClose;
+
+    // The person dismisses it, then opens it again.
+    invokeHandler(firstClose);
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
+    press(buttonByText(renderer, 'Save as Profile'));
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
+
+    // A settlement from the closed sheet arrives late: it must not close the
+    // sheet that replaced it.
+    invokeHandler(firstClose);
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
   });
 });

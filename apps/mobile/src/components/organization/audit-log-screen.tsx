@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { auditActionLabel } from '@/components/organization/audit-log-action-label';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { canViewOrgAuditLog } from '@/components/organization/organization-settings-rows';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -50,15 +51,25 @@ function formatAuditTime(createdAt: string): string {
 }
 
 const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
+  const { t } = useTranslation();
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
   const meta = actor ? `${actor} · ${time}` : time;
+  // The server's message for the creation action is "Organization <name>
+  // created", which only restates the event name already shown above it. Every
+  // row of this log belongs to this organization, so the row shows neither that
+  // English sentence nor a name a later rename would change.
+  const showsDetail = entry.action !== 'organization.created';
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium text-foreground">{entry.message}</Text>
-      <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-        {entry.action}
+      <Text className="text-sm font-medium text-foreground">
+        {auditActionLabel(t, entry.action)}
       </Text>
+      {showsDetail ? (
+        <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+          {entry.message}
+        </Text>
+      ) : null}
       {meta.length === 0 ? null : (
         <Text className="text-xs text-muted-foreground" numberOfLines={1}>
           {meta}
@@ -84,7 +95,9 @@ export function OrganizationAuditLogScreen() {
   const paddingBottom = useTabBarBottomPadding();
 
   // `AuditLogRow` is memoized at module scope, so one identity across data
-  // updates keeps every unchanged row from re-rendering.
+  // updates keeps every unchanged row from re-rendering. The row reads `t`
+  // itself instead of taking it as a prop: `useTranslation` subscribes each row
+  // to a language change, which a prop that never changes could not.
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<OrgAuditLogEntry>) => <AuditLogRow entry={item} />,
     []

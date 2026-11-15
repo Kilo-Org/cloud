@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "アクティブなエージェントに更新があります"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "タスクが完了しました"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "失敗: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "中断: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

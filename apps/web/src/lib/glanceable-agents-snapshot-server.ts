@@ -22,7 +22,7 @@ import {
 import { and, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 import { type ActiveSession, listActiveSessions } from '@/lib/active-sessions-list';
-import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-internal-api';
 import { sessionAssociatedPr } from '@/lib/session-associated-pr';
 
 type HomeWidgetScope = { userId: string; organizationId: string | null };

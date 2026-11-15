@@ -36,6 +36,7 @@ vi.mock('expo-router', () => ({
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
     mutedForeground: '#000',
     primaryForeground: '#fff',

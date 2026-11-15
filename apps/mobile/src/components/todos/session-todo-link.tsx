@@ -22,6 +22,8 @@ import { type TodoCandidate } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
+import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
+
 /** `To-do: <title>` under the session header while the session belongs to a to-do. */
 export function SessionTodoChip({ sessionId }: Readonly<{ sessionId: string }>) {
   const { t } = useTranslation();
@@ -97,7 +99,7 @@ function SessionTodoCandidatesSheet({
   let body: ReactNode = null;
   if (candidates.isPending) {
     body = (
-      <View className="items-center py-8">
+      <View className={cn('items-center', TODO_SHEET_STATE_BODY_CLASS)}>
         <ActivityIndicator />
       </View>
     );
@@ -111,7 +113,9 @@ function SessionTodoCandidatesSheet({
     );
   } else if (groups.length === 0) {
     body = (
-      <Text className="px-5 py-8 text-center text-sm text-muted-foreground">
+      <Text
+        className={cn(TODO_SHEET_STATE_BODY_CLASS, 'text-center text-sm text-muted-foreground')}
+      >
         {t('todos.candidates.empty')}
       </Text>
     );

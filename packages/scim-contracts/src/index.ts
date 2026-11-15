@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 
 /**
  * Request and response contracts for the internal directory-sync endpoints.
@@ -21,6 +22,10 @@ import { z } from 'zod';
  * Every route is keyed on a WorkOS identifier and is an idempotent upsert, so
  * replaying an event is a no-op. That matters: the Worker commits its cursor per
  * event, and a crash mid-page replays the last one.
+ *
+ * An organization name must carry a visible character, so a directory pushing a
+ * name of only zero-width or control characters gets the same 400 an empty name
+ * gets instead of a blank name in the app.
  */
 
 /** A WorkOS identifier. Opaque to us; only non-emptiness is ours to check. */
@@ -38,7 +43,7 @@ export const DirectoryOrganizationUpsertSchema = z.strictObject({
   /** `data.organization_id` — matched against `organizations.external_org_id`. */
   workOSOrganizationId: workOSId,
   /** `data.name` — used only when creating. */
-  name: z.string().min(1).max(255),
+  name: z.string().min(1).max(255).refine(hasVisibleText, 'Organization name is required'),
   /**
    * `data.domains[].domain` — the domains the organization has captured in
    * WorkOS, which our administrators gate on intake. The first one that is not
@@ -62,7 +67,7 @@ export const DirectorySubOrganizationUpsertSchema = z.strictObject({
   /** `data.idp_id` — survives a disconnect/reconnect that mints a new group id. */
   directoryIdpId: workOSId,
   /** `data.name`. Applied on update as well as create: groups get renamed. */
-  name: z.string().min(1).max(255),
+  name: z.string().min(1).max(255).refine(hasVisibleText, 'Organization name is required'),
 });
 
 export type DirectorySubOrganizationUpsert = z.infer<typeof DirectorySubOrganizationUpsertSchema>;

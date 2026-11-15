@@ -125,8 +125,9 @@ export function createSecureStorePreference<T>(options: {
     if (epoch !== writeEpoch) {
       return;
     }
+    /* Only the read settles `hasLoaded`: a write landing says what the disk now
+       holds, not that the list it was merged into has been read. */
     value = next;
-    hasLoaded = true;
     emit();
   };
 
@@ -268,7 +269,6 @@ export function createSecureStorePreference<T>(options: {
       requested = next;
       dirty = true;
       cleared = false;
-      hasLoaded = true;
       void drainWrites();
     },
     /** Resolves once every requested value has been written or dropped. */

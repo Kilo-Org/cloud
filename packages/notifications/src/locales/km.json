@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ភ្នាក់ងារសកម្មមានការធ្វើបច្ចុប្បន្នភាព"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "បានបញ្ចប់ភារកិច្ច"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "បានបរាជ័យ: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ត្រូវបានរំខាន: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

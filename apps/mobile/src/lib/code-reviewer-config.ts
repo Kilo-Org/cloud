@@ -1,9 +1,9 @@
 import {
+  type CodeReviewActionRequiredState,
   type CodeReviewConfigPatch,
   type CodeReviewPlatform,
   type RepositoryModelOverrideInput,
 } from '@kilocode/app-shared/code-review';
-import { type CodeReviewActionRequiredState } from '@kilocode/app-shared/code-reviews';
 
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { kiloCommandCreateInputSchema } from '../contracts/kilo-commands';
+import { MAX_SKILL_DESCRIPTION_LENGTH } from '../contracts/skills';
 import { collectImportItems, parseLocalConfigArchive, type ImportPreview } from './index';
 import { buildRepresentativeImportArchive, buildStoredZip, buildZip } from './test-fixtures';
 import {
@@ -188,6 +189,32 @@ describe('parseLocalConfigArchive', () => {
     // row per nested file key.
     expect(preview.issues.filter(candidate => candidate.category === 'skills')).toHaveLength(1);
     expect(preview.config.skills).toEqual([]);
+  });
+
+  test('reports an over-long skill description with its own issue code', () => {
+    const preview = parseFiles({
+      'skills/deploy/SKILL.md': `---\nname: deploy\ndescription: ${'d'.repeat(MAX_SKILL_DESCRIPTION_LENGTH + 1)}\n---\nDeploy.`,
+    });
+
+    expect(preview.hasErrors).toBe(true);
+    expect(preview.issues).toHaveLength(1);
+    expect(preview.issues[0]).toMatchObject({
+      code: 'skill-description-invalid',
+      field: 'description',
+      category: 'skills',
+    });
+    expect(preview.issues[0]?.message).toContain('2000');
+    expect(preview.config.skills).toEqual([]);
+  });
+
+  test('imports the description of a +++ delimited SKILL.md', () => {
+    const rawMarkdown = '+++\nname: deploy\ndescription: Deploy services\n+++\nDeploy.';
+    const preview = parseFiles({ 'skills/deploy/SKILL.md': rawMarkdown });
+
+    expect(preview.issues).toEqual([]);
+    expect(preview.config.skills).toEqual([
+      { name: 'deploy', description: 'Deploy services', rawMarkdown, files: {} },
+    ]);
   });
 
   test('describes a schema failure without naming an internal contract', () => {

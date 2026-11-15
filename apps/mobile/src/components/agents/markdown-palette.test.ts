@@ -9,6 +9,7 @@ const colors = {
   primary: '#4F5A10',
   primaryForeground: '#FFFFFF',
   primaryDisabled: '#6F6A61',
+  primaryDisabledAction: '#6F6A61',
   secondary: '#F0EEE6',
   secondaryForeground: '#14130F',
   secondaryFill: '#F0EEE6',

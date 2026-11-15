@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type * as TrpcClientModule from '@trpc/client';
 import type * as CloudAgentClientModule from './cloud-agent-client';
 import {
@@ -98,20 +98,12 @@ beforeEach(() => {
   mockCaptureException.mockClear();
 });
 
-// Load the real `closeCloudAgentOrgStreams` (the module mock above does not
-// expose it) so the test exercises the actual fetch call, not a stub.
+// Load the real service classes the module mock above does not expose, so the
+// remaining tests exercise the actual tRPC client, not a stub.
 const realCloudAgentClientModule =
   jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
-const {
-  closeCloudAgentOrgStreams,
-  CloudAgentNextClient,
-  createSkippedBalanceCheckCloudAgentNextClient,
-  readCloudAgentWidgetApprovalKey,
-  getVercelComputeEnrollment,
-  getVercelComputeEnrollmentForUser,
-  getVercelRuntimeIdentity,
-  cleanupVercelSnapshotBuild,
-} = realCloudAgentClientModule;
+const { CloudAgentNextClient, createSkippedBalanceCheckCloudAgentNextClient } =
+  realCloudAgentClientModule;
 
 describe('CloudAgentNextClient DO session history', () => {
   const input = {
@@ -1129,6 +1121,67 @@ describe('CloudAgentNextClient.deleteSession', () => {
   });
 });
 
+describe('CloudAgentNextClient.deleteSession visible failures', () => {
+  const sessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+  function failure(data: { code?: string; httpStatus?: number }, message = 'delete refused') {
+    const { TRPCClientError } = jest.requireActual<typeof TrpcClientModule>('@trpc/client');
+    const error = new TRPCClientError(message, {
+      result: { error: { code: -32000, message, data } },
+    });
+    mockCreateTRPCClient.mockReturnValueOnce({
+      deleteSession: {
+        mutate: jest.fn(async () => {
+          throw error;
+        }),
+      },
+    });
+    return error;
+  }
+
+  it.each([
+    'NOT_FOUND',
+    'CONFLICT',
+    'FORBIDDEN',
+    'UNAUTHORIZED',
+    'PRECONDITION_FAILED',
+    'BAD_REQUEST',
+  ])('rethrows the worker %s code so the caller can report it', async code => {
+    const error = failure({ code });
+    await expect(new CloudAgentNextClient('auth-token').deleteSession(sessionId)).rejects.toBe(
+      error
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('rethrows a bare 404 status with no code', async () => {
+    const error = failure({ httpStatus: 404 });
+    await expect(new CloudAgentNextClient('auth-token').deleteSession(sessionId)).rejects.toBe(
+      error
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it.each(['PAYMENT_REQUIRED', 'SERVICE_UNAVAILABLE', 'TOO_MANY_REQUESTS'])(
+    'swallows the worker %s code into an unsuccessful result',
+    async code => {
+      failure({ code });
+      await expect(
+        new CloudAgentNextClient('auth-token').deleteSession(sessionId)
+      ).resolves.toEqual({ success: false });
+      expect(mockCaptureException).toHaveBeenCalled();
+    }
+  );
+
+  it('swallows a non-404 status with no code', async () => {
+    failure({ httpStatus: 500 });
+    await expect(new CloudAgentNextClient('auth-token').deleteSession(sessionId)).resolves.toEqual({
+      success: false,
+    });
+    expect(mockCaptureException).toHaveBeenCalled();
+  });
+});
+
 describe('CloudAgentNextClient.deleteWorktree', () => {
   const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
   const deletedSessionIds = ['ses_12345678901234567890123456', 'ses_abcdefghijklmnopqrstuvwxyz'];
@@ -1471,252 +1524,5 @@ describe('CloudAgentNextClient.getPendingInteractions', () => {
     await expect(client.getPendingInteractions(cloudAgentSessionId)).resolves.toEqual(pending);
     expect(query).toHaveBeenCalledWith({ cloudAgentSessionId });
     expect(captureException).not.toHaveBeenCalled();
-  });
-});
-
-describe('closeCloudAgentOrgStreams', () => {
-  const originalFetch = global.fetch;
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it('POSTs to the close endpoint with the internal key header and body', async () => {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(new Response(null, { status: 204 }));
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await closeCloudAgentOrgStreams('usr_1', 'org_1');
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://cloud-agent-next/internal/streams/close',
-      expect.objectContaining({
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': 'test-secret',
-        },
-        body: JSON.stringify({ userId: 'usr_1', organizationId: 'org_1' }),
-      })
-    );
-  });
-
-  it('throws when the close endpoint returns a non-OK response', async () => {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(
-        new Response('boom', { status: 500, statusText: 'Internal Server Error' })
-      );
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await expect(closeCloudAgentOrgStreams('usr_1', 'org_1')).rejects.toThrow(
-      'Cloud Agent stream close failed: 500 Internal Server Error - boom'
-    );
-  });
-});
-
-describe('readCloudAgentWidgetApprovalKey', () => {
-  const originalFetch = global.fetch;
-  const input = {
-    userId: 'usr_1',
-    organizationId: null,
-    kiloSessionId: 'ses_0123456789abcdefghijklmnop',
-    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
-  };
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  function respond(response: Response) {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(response);
-    global.fetch = fetchMock as unknown as typeof fetch;
-    return fetchMock;
-  }
-
-  it('POSTs the exact owned scope with the internal key and returns the binding and command', async () => {
-    const key = 'b'.repeat(64);
-    const fetchMock = respond(
-      new Response(JSON.stringify({ approvalKey: key, command: 'pnpm test' }))
-    );
-
-    await expect(readCloudAgentWidgetApprovalKey(input)).resolves.toEqual({
-      approvalKey: key,
-      command: 'pnpm test',
-    });
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://cloud-agent-next/internal/widgets/approval-key',
-      expect.objectContaining({
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-internal-api-key': 'test-secret' },
-        body: JSON.stringify(input),
-      })
-    );
-  });
-
-  it('reads a newer Worker answer without a command as no command', async () => {
-    const key = 'b'.repeat(64);
-    respond(new Response(JSON.stringify({ approvalKey: key })));
-
-    await expect(readCloudAgentWidgetApprovalKey(input)).resolves.toEqual({
-      approvalKey: key,
-      command: null,
-    });
-  });
-
-  it('rejects a response that is not a lowercase SHA-256 binding', async () => {
-    respond(new Response(JSON.stringify({ approvalKey: 'per_raw_permission' })));
-    await expect(readCloudAgentWidgetApprovalKey(input)).rejects.toThrow();
-  });
-
-  it('throws on a refused read without echoing the body', async () => {
-    respond(new Response('Session access denied ses_private', { status: 403 }));
-    await expect(readCloudAgentWidgetApprovalKey(input)).rejects.toThrow(
-      /^Cloud Agent widget approval key failed: 403$/
-    );
-  });
-});
-
-describe('getVercelComputeEnrollment', () => {
-  const originalFetch = global.fetch;
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it.each([true, false])('returns the authenticated Worker enrollment value %s', async enrolled => {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(Response.json({ enrolled }));
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await expect(getVercelComputeEnrollment('org/with-path')).resolves.toBe(enrolled);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://cloud-agent-next/internal/byoc/vercel-enrollment/org%2Fwith-path',
-      expect.objectContaining({
-        headers: { 'x-internal-api-key': 'test-secret' },
-        cache: 'no-store',
-      })
-    );
-  });
-
-  it('fails closed when the Worker response is malformed', async () => {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(Response.json({ enrolled: 'true' }));
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await expect(getVercelComputeEnrollment('org_1')).rejects.toThrow(
-      'Cloud Agent Vercel compute enrollment could not be verified'
-    );
-  });
-
-  it('does not expose upstream response details when enrollment cannot be verified', async () => {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(new Response('sensitive upstream details', { status: 502 }));
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await expect(getVercelComputeEnrollment('org_1')).rejects.toThrow(
-      'Cloud Agent Vercel compute enrollment could not be verified'
-    );
-  });
-
-  it('encodes OAuth user ids on the personal enrollment endpoint', async () => {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(Response.json({ enrolled: true }));
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await expect(getVercelComputeEnrollmentForUser('oauth/provider/user id')).resolves.toBe(true);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://cloud-agent-next/internal/byoc/vercel-enrollment/user/oauth%2Fprovider%2Fuser%20id',
-      expect.objectContaining({
-        headers: { 'x-internal-api-key': 'test-secret' },
-        cache: 'no-store',
-      })
-    );
-  });
-});
-
-describe('getVercelRuntimeIdentity', () => {
-  const originalFetch = global.fetch;
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it('returns the Worker runtime identity', async () => {
-    const identity = {
-      wrapperVersion: '2.4.0',
-      releasedAt: '2026-09-08',
-      digest: 'digest-1',
-    };
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(Response.json(identity));
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await expect(getVercelRuntimeIdentity()).resolves.toEqual(identity);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://cloud-agent-next/internal/byoc/vercel-runtime-identity',
-      expect.objectContaining({
-        headers: { 'x-internal-api-key': 'test-secret' },
-        cache: 'no-store',
-      })
-    );
-  });
-});
-
-describe('cleanupVercelSnapshotBuild', () => {
-  const originalFetch = global.fetch;
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it('sends the persisted snapshot identifier to the authenticated cleanup endpoint', async () => {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(new Response(null, { status: 204 }));
-    global.fetch = fetchMock as unknown as typeof fetch;
-    const input = {
-      organizationId: 'org_1',
-      credentialId: 'credential_1',
-      buildGeneration: 'generation_1',
-      snapshotId: 'snap_existing',
-    };
-
-    await cleanupVercelSnapshotBuild(input);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://cloud-agent-next/internal/byoc/vercel-snapshot-build/cleanup',
-      expect.objectContaining({
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': 'test-secret',
-        },
-        body: JSON.stringify(input),
-      })
-    );
-  });
-
-  it('fails safely when cleanup is rejected', async () => {
-    const fetchMock = jest
-      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(new Response('sensitive provider details', { status: 502 }));
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await expect(
-      cleanupVercelSnapshotBuild({
-        organizationId: 'org_1',
-        credentialId: 'credential_1',
-        buildGeneration: 'generation_1',
-      })
-    ).rejects.toThrow('Cloud Agent Vercel compute cleanup could not be completed');
   });
 });

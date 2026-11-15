@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { type Tool } from '@kilocode/harness-sdk';
 
 import { dateTimeFormat } from '@/lib/intl-cache';
+import { discoveryOf, type RemoteMcpDiscovery, remoteServerToolsFor } from './remote-mcp-state';
+import { tool as offeredTool, server } from './remote-mcp.test-helpers';
 import {
   type ChatToolSetInput,
   chatToolsFor,
@@ -88,15 +90,25 @@ describe('the names a chat is opened with', () => {
     ]);
   });
 
-  it('names only the servers that are enabled, because s4 already dropped the rest', () => {
-    /* A disabled server contributes nothing to the list it is read from, so the
-       builder adds exactly what it is given and no name of a server that is
-       off reaches the model. */
-    expect(toolNamesFor(input({ remoteNames: ['mcp_notes_list'] }))).toEqual([
-      'time',
-      ...SETTINGS_TOOL_NAMES,
-      'mcp_notes_list',
+  it('holds no name of a disabled server, because the list it reads is built from the enabled ones', () => {
+    /* The names arrive from `remoteServerToolsFor`, so the case supplies the
+       servers and their discoveries rather than the names: a disabled server is
+       stored with a discovery of its own and still reaches the model with no
+       name at all. */
+    const notes = server({ id: 'notes' });
+    const calendar = server({ id: 'calendar', enabled: false });
+    const discovered = new Map<string, RemoteMcpDiscovery>([
+      ['notes', discoveryOf('notes', [offeredTool('mcp_notes_list')])],
+      ['calendar', discoveryOf('calendar', [offeredTool('mcp_calendar_today')])],
     ]);
+
+    const remoteNames = remoteServerToolsFor([notes, calendar], discovered).map(
+      entry => entry.definition.name
+    );
+    const names = toolNamesFor(input({ remoteNames }));
+
+    expect(names).toEqual(['time', ...SETTINGS_TOOL_NAMES, 'mcp_notes_list']);
+    expect(names).not.toContain('mcp_calendar_today');
   });
 
   it('keeps one order, so the cached prefix does not move under an unchanged chat', () => {
@@ -113,7 +125,6 @@ describe('the names a chat is opened with', () => {
       'mcp_notes_list',
       'mcp_calendar_today',
     ]);
-    expect(toolNamesFor(full)).toEqual(toolNamesFor(full));
   });
 });
 
@@ -157,8 +168,15 @@ describe('the tools behind those names', () => {
 });
 
 describe('the zone local time is reported in', () => {
-  it('is the one the device is set to', () => {
-    expect(deviceZone()).toBe('Europe/Amsterdam');
+  it('is the one the formatter resolved, not the one the device is set to', () => {
+    /* The module stub answers Europe/Amsterdam for every call, so a case that
+       reads it cannot tell a reported zone from a fixed one. This call answers
+       a different zone, which only a report of the resolved zone can return. */
+    vi.mocked(dateTimeFormat).mockReturnValueOnce({
+      resolvedOptions: () => ({ timeZone: 'Asia/Tokyo' }),
+    } as unknown as Intl.DateTimeFormat);
+
+    expect(deviceZone()).toBe('Asia/Tokyo');
   });
 
   it('is none when the runtime cannot name one, so the answer stays UTC', () => {

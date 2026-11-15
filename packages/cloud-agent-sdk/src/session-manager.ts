@@ -1,5 +1,7 @@
 import type { ToolDisplayMode } from './tool-detail-marker';
+import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
+import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
@@ -31,6 +33,7 @@ import {
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
+  REMOTE_SESSION_ORGANIZATION_MISMATCH,
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
@@ -563,6 +566,7 @@ type SessionManagerAtoms = {
   activePermission: W<StandalonePermission | null>;
   /** Every pending question, oldest first. `activeQuestion` is the head. */
   pendingQuestions: W<readonly StandaloneQuestion[]>;
+  backgroundActivity: W<BackgroundActivityState>;
   /** Every pending permission, oldest first. `activePermission` is the head. */
   pendingPermissions: W<readonly StandalonePermission[]>;
   /**
@@ -733,6 +737,7 @@ type SessionManager = {
   setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
   retryRemoteModels(): void;
   retryRemoteCommands(): void;
+  retryBackgroundActivity(): void;
   createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId>;
   exitRemoteSession(): Promise<void>;
   interrupt(): Promise<void>;
@@ -837,9 +842,9 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
   if (r.success) {
     if (isSelectedModelUnavailable(r.data.message))
       return { message: SELECTED_MODEL_UNAVAILABLE_ERROR, code: 'selected-model-unavailable' };
-    const code = r.data.data?.code ?? r.data.shape?.code;
-    const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
-    if (code === 'PAYMENT_REQUIRED' || http === 402)
+    const fields = readCloudAgentErrorFields(err);
+    const { code, httpStatus } = fields;
+    if (code === 'PAYMENT_REQUIRED' || httpStatus === 402)
       return {
         message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
         code: 'insufficient-credits',
@@ -851,17 +856,19 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         message: 'Service is unavailable right now. Please try again.',
         code: 'service-unavailable',
       };
-    if (code === 'CONFLICT' || http === 409)
+    if (code === 'CONFLICT' || httpStatus === 409)
       return {
         message: 'Previous task is still finishing up. Please wait a moment.',
         code: 'previous-task-in-progress',
       };
-    if (code === 'SERVICE_UNAVAILABLE' || http === 503)
+    if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503)
       return {
         message: 'Service is temporarily unavailable. Please retry in a moment.',
         code: 'service-temporarily-unavailable',
       };
-    if (code !== undefined || http !== undefined) {
+    // The numeric JSON-RPC `shape.code` is a server answer, not a code, so it
+    // reaches this branch through `answeredByServer`.
+    if (code !== undefined || httpStatus !== undefined || fields.answeredByServer) {
       const reason = serverErrorReason(r.data.message);
       return {
         message: GENERIC_ERROR,
@@ -1206,6 +1213,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const permissionAtom = atom<PermissionState | null>(null);
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const pendingQuestionsAtom = atom<readonly StandaloneQuestion[]>([]);
+  const backgroundActivityAtom = atom<BackgroundActivityState>({ status: 'inactive' });
   const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
   const unreadablePermissionsAtom = atom<readonly UnreadablePermissionState[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
@@ -1745,6 +1753,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
     store.set(pendingQuestionsAtom, []);
+    store.set(backgroundActivityAtom, { status: 'inactive' });
     store.set(pendingPermissionsAtom, []);
     store.set(unreadablePermissionsAtom, []);
     store.set(suggestionAtom, null);
@@ -3335,8 +3344,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   function denySessionOpen(open: SessionOpen, error: unknown): boolean {
-    const parsed = errorShapeSchema.safeParse(error);
-    const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
+    const { code } = readCloudAgentErrorFields(error);
     if (code !== 'NOT_FOUND' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') return false;
     if (code === 'NOT_FOUND' && takeSpawnedRetry(open.kiloSessionId)) {
       open.denied = true;
@@ -3577,6 +3585,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       },
       onEvent: event => {
+        if (event.type === 'background.activity') {
+          store.set(backgroundActivityAtom, event.state);
+          return;
+        }
         if (
           event.type === 'cloud.message.queued' ||
           event.type === 'cloud.message.sent' ||
@@ -4133,15 +4145,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // that carries a code or an HTTP status is the server's own verdict on
       // this send, whatever `formatErrorDetail` labels it, so no row will ever
       // confirm it; so is a failure no transport could have delivered.
-      const shape = errorShapeSchema.safeParse(err);
-      const answeredByServer =
-        shape.success &&
-        (shape.data.data?.code !== undefined ||
-          shape.data.data?.httpStatus !== undefined ||
-          shape.data.shape?.code !== undefined ||
-          shape.data.shape?.data?.httpStatus !== undefined);
+      const serverAnswered = readCloudAgentErrorFields(err).answeredByServer;
       const outcomeUnknown =
-        !answeredByServer &&
+        !serverAnswered &&
         (detail.code === 'connection-failed' ||
           detail.code === 'connection-lost' ||
           detail.code === 'generic-error');
@@ -4456,18 +4462,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.retryRemoteCommands();
   }
 
+  /**
+   * Create a session beside the active one. The organization and the other
+   * inheritance fields come from the active session's own row; a caller may
+   * repeat that organization but not change it.
+   */
   async function createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId> {
     if (!currentSession || activeSessionType !== 'remote') {
       throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
     }
-    // Inheritance from the active session (Decision 6). Explicit caller fields
-    // win when provided (e.g. tests); otherwise store-derived values apply. Only
-    // the active session's own row supplies an organization, and a caller that
-    // names its own organization needs no row.
     const fetched = store.get(fetchedSessionDataAtom);
-    const scopeSupplied = input?.orgId !== undefined;
-    if (!scopeSupplied && fetched?.kiloSessionId !== activeSessionId) {
+    if (fetched?.kiloSessionId !== activeSessionId) {
       throw new Error(REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED);
+    }
+    if (input?.orgId !== undefined && input.orgId !== fetched?.organizationId) {
+      throw new Error(REMOTE_SESSION_ORGANIZATION_MISMATCH);
     }
     const selection = store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
     const inherited = computeCreateRemoteSessionInheritance({
@@ -4580,6 +4589,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     setCloudAgentModelOverride,
     retryRemoteModels,
     retryRemoteCommands,
+    retryBackgroundActivity: () => currentSession?.retryBackgroundActivity?.(),
     createRemoteSession,
     exitRemoteSession,
     interrupt,
@@ -4633,6 +4643,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       permission: permissionAtom,
       activePermission: activePermissionAtom,
       pendingQuestions: pendingQuestionsAtom,
+      backgroundActivity: backgroundActivityAtom,
       pendingPermissions: pendingPermissionsAtom,
       unreadablePermissions: unreadablePermissionsAtom,
       suggestion: suggestionAtom,

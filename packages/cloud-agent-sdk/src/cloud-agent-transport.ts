@@ -6,6 +6,8 @@
  * service-state notifications are batched until bootstrap completes.
  */
 import type { ToolDisplayMode } from './tool-detail-marker';
+import { createBackgroundActivityReader } from './background-activity';
+import { setBounded } from './bounded-map';
 import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { isChatEvent, type NormalizedEvent } from './normalizer';
@@ -142,16 +144,6 @@ function snapshotReadFailureMessage(error: unknown): string {
 const MAX_EVENT_VERSIONS = 2048;
 const MAX_SESSION_INFO_VERSIONS = 1024;
 
-/** Records `cursor` as the newest version of `key`, evicting the least recently set key. */
-function rememberVersion<K>(versions: Map<K, number>, key: K, cursor: number, max: number): void {
-  versions.delete(key);
-  versions.set(key, cursor);
-  if (versions.size > max) {
-    const oldest = versions.keys().next().value;
-    if (oldest !== undefined) versions.delete(oldest);
-  }
-}
-
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
   const websocketBaseUrl = config.websocketBaseUrl;
   const workspaceSession = config.sessionId.startsWith('workspace_');
@@ -179,6 +171,15 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     let snapshotRetryTimer: ReturnType<typeof setTimeout> | null = null;
     let snapshotFailureReported = false;
     let initialSnapshotRead = config.initialSnapshotRead;
+    let backgroundEnabled = false;
+    const readActivity = config.api.getBackgroundActivity;
+    const background = readActivity
+      ? createBackgroundActivityReader({
+          sessionID: config.kiloSessionId,
+          read: signal => readActivity({ sessionId: config.sessionId, signal }),
+          publish: state => sink.onServiceEvent({ type: 'background.activity', state }),
+        })
+      : undefined;
 
     function cancelSnapshotRetry(): void {
       clearTimeout(snapshotRetryTimer ?? undefined);
@@ -194,6 +195,31 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       event: NormalizedEvent,
       sourceVersion: 'v1' | 'v2'
     ): void {
+      if (event.type === 'background.invalidated') {
+        background?.invalidate();
+        return;
+      }
+      if (
+        backgroundEnabled &&
+        (event.type.startsWith('question.') ||
+          event.type.startsWith('permission.') ||
+          event.type === 'session.status')
+      )
+        background?.invalidate();
+      if (event.type === 'cloud.status') {
+        if (
+          backgroundEnabled &&
+          (event.cloudStatus.type === 'preparing' || event.cloudStatus.type === 'error')
+        )
+          background?.stop();
+        else if (event.cloudStatus.type === 'ready' && backgroundEnabled) background?.start();
+      }
+      if (
+        event.type === 'message.part.updated' &&
+        event.part.type === 'tool' &&
+        event.part.tool.startsWith('background_')
+      )
+        background?.invalidate();
       if (event.type === 'bootstrap.complete') {
         finishReplay();
         return;
@@ -267,12 +293,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           if (raw.cursor === undefined) return;
           const previous = sessionInfoVersions.get(event.info.id);
           if (previous !== undefined && raw.cursor <= previous) return;
-          rememberVersion(
-            sessionInfoVersions,
-            event.info.id,
-            raw.cursor,
-            MAX_SESSION_INFO_VERSIONS
-          );
+          setBounded(sessionInfoVersions, event.info.id, raw.cursor, MAX_SESSION_INFO_VERSIONS);
         }
         sink.onServiceEvent(event);
       }
@@ -379,6 +400,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     }
 
     function replayInitialPage(page: SessionSnapshotPage): void {
+      if (page.sourceVersion === 'v2') backgroundEnabled = true;
       // Seed lastEventId from the page's event-log watermark. A present
       // watermark sets the cursor to 0 so the WebSocket connect uses
       // `fromId=0` — the DO replays every stored event, closing the gap when
@@ -406,12 +428,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       const infoCursor = sessionInfoVersions.get(page.info.id);
       if (!version || infoCursor === undefined || version.cursor >= infoCursor) {
         if (version)
-          rememberVersion(
-            sessionInfoVersions,
-            page.info.id,
-            version.cursor,
-            MAX_SESSION_INFO_VERSIONS
-          );
+          setBounded(sessionInfoVersions, page.info.id, version.cursor, MAX_SESSION_INFO_VERSIONS);
         replaySnapshotPage(sink, page, version);
       } else {
         replayStoredMessages(page.messages, event => sink.onChatEvent(event), version);
@@ -584,7 +601,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
               if (previous !== undefined && raw.cursor <= previous) return;
               // Bootstrap ancillary rows need not be cursor-ordered; transcript row guards
               // reject stale payloads even after this recent-event cache evicts them.
-              rememberVersion(eventVersions, raw.eventId, raw.cursor, MAX_EVENT_VERSIONS);
+              setBounded(eventVersions, raw.eventId, raw.cursor, MAX_EVENT_VERSIONS);
             }
           }
           // Track high-water mark for reconnect fromId only. Do not filter
@@ -601,15 +618,21 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           }
 
           const batch = sources.read(raw);
+          if (batch.source.version === 'v2' && !backgroundEnabled) {
+            backgroundEnabled = true;
+            background?.start();
+          }
           for (const event of batch.events) deliverEvent(raw, event, batch.source.version);
         },
         onConnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
           startReplay();
+          if (backgroundEnabled) background?.start();
         },
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
           startReplay();
+          if (backgroundEnabled) background?.start();
           if (workspaceSession) return;
           // With a replay cursor the socket itself re-delivers everything
           // missed while dead — replaying a (possibly stale) snapshot on top
@@ -631,13 +654,16 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           });
         },
         onDisconnected: () => {
-          if (expectedGeneration !== lifecycleGeneration || !replaying) return;
+          if (expectedGeneration !== lifecycleGeneration) return;
+          if (backgroundEnabled) background?.stop();
+          if (!replaying) return;
           sink.onServiceEvent(stoppedEvent);
           cancelReplay();
           stoppedReceived = true;
         },
         onUnexpectedDisconnect: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
+          if (backgroundEnabled) background?.stop();
           if (stoppedReceived && !replaying) return;
           sink.onServiceEvent(stoppedEvent);
           cancelReplay();
@@ -677,6 +703,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
 
     return {
       connect() {
+        if (backgroundEnabled) background?.stop();
         closeConnection('destroy');
         cancelSnapshotRetry();
         lifecycleGeneration += 1;
@@ -697,6 +724,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       },
 
       disconnect() {
+        if (backgroundEnabled) background?.stop();
         cancelReplay();
         cancelSnapshotRetry();
         lifecycleGeneration += 1;
@@ -704,6 +732,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       },
 
       destroy() {
+        if (backgroundEnabled) background?.stop();
         cancelReplay();
         cancelSnapshotRetry();
         lifecycleGeneration += 1;
@@ -745,6 +774,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           config.api.respondToPermission({ sessionId: config.sessionId, ...payload })
         ),
       observeProjected: messages => sources.observeProjected(messages),
+      retryBackgroundActivity: () => background?.retry(),
     };
   };
 }

@@ -111,7 +111,11 @@ export async function restoreFollowedSessionCards(
       endCard(activity, 'immediate');
     } else if (scope !== undefined && cardScopes.isSessionCardScopeCurrent(scope, ctx)) {
       kept.push(sessionId);
-      registerSessionActivityToken(activity.getId(), activity, { sessionId, ...scope });
+      registerSessionActivityToken(activity.getId(), activity, {
+        sessionId,
+        userId: scope.userId,
+        organizationId: scope.organizationId,
+      });
     } else {
       // A card no record names (an earlier build kept none), or one followed
       // under another account or organization: it is out of scope.

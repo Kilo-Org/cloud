@@ -8,6 +8,7 @@ import {
   InstructionFormSheet,
   type InstructionFormSubmission,
 } from '@/components/profiles/instruction-form-sheet';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -21,12 +22,13 @@ import { Text } from '@/components/ui/text';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_INSTRUCTIONS } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import {
   type AgentProfileInstructionRow,
   useAgentProfileInstructions,
 } from '@/lib/hooks/use-agent-profiles';
 import { useAgentProfileInstructionMutations } from '@/lib/hooks/use-agent-profile-instruction-mutations';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -131,7 +133,8 @@ export function ProfileInstructionsScreen({
   const profileQuery = useAgentProfileInstructions(profileId, organizationId);
   const { createInstruction, updateInstruction, deleteInstruction, setInstructionEnabled } =
     useAgentProfileInstructionMutations(organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
 
   const instructions = profileQuery.data ?? NO_INSTRUCTIONS;
   const atInstructionCap = instructions.length >= MAX_PROFILE_INSTRUCTIONS;
@@ -211,9 +214,11 @@ export function ProfileInstructionsScreen({
 
   const confirmDelete = (instruction: InstructionTarget) => {
     confirm({
-      title: t('common.delete'),
-      message: instruction.name,
-      confirmLabel: t('common.delete'),
+      // A file name is read position by position, so it keeps its own
+      // left-to-right direction inside a right-to-left sentence.
+      title: t('profiles.instructionDeleteTitle', { name: isolateLtrBidiText(instruction.name) }),
+      message: t('profiles.instructionDeleteMessage'),
+      confirmLabel: t('profiles.instructionDeleteConfirm'),
       onConfirm: () => {
         void runDelete(instruction.id);
       },
@@ -241,11 +246,11 @@ export function ProfileInstructionsScreen({
         description={t('profiles.instructionsEmptyDescription')}
         placement="top"
         action={
-          canManage ? (
+          <ProfileManageSlot permission={permission}>
             <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.addInstruction')}</Text>
             </Button>
-          ) : null
+          </ProfileManageSlot>
         }
       />
     );
@@ -288,20 +293,18 @@ export function ProfileInstructionsScreen({
             }
           />
         ))}
-        {canManage ? (
-          <>
-            <Button onPress={handleStartAdd}>
-              <Text>{t('profiles.addInstruction')}</Text>
-            </Button>
-            {atInstructionCap ? (
-              <AccessibleStatus
-                message={t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS })}
-                tone="warn"
-                className="text-sm"
-              />
-            ) : null}
-          </>
-        ) : null}
+        <ProfileManageSlot permission={permission}>
+          <Button onPress={handleStartAdd}>
+            <Text>{t('profiles.addInstruction')}</Text>
+          </Button>
+          {atInstructionCap ? (
+            <AccessibleStatus
+              message={t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+        </ProfileManageSlot>
       </>
     );
   }

@@ -24,6 +24,7 @@ import {
 } from '@kilocode/db/schema';
 import {
   activeOrganizationJoinCondition,
+  hasOrganizationAccess,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,
   parentOrganizationMembershipJoinCondition,
@@ -317,6 +318,23 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     params: CreateSessionForCloudAgentParams
   ): Promise<CreateSessionForCloudAgentResult> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
+
+    // The row and its worktree both carry this organization, so the create
+    // confirms the acting user may act for it before any attribution. The
+    // check runs before the clone so a refused create leaves no destination
+    // work behind.
+    if (parsed.organizationId !== undefined) {
+      const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+      if (
+        !(await hasOrganizationAccess(db, {
+          kiloUserId: parsed.kiloUserId,
+          organizationId: parsed.organizationId,
+        }))
+      ) {
+        return { status: 'rejected', code: 'organization_access_denied' };
+      }
+    }
+
     const inputGitUrl = parsed.gitUrl === undefined ? undefined : normalizeGitUrl(parsed.gitUrl);
 
     // Require available ingest storage before any clone or row write, so the

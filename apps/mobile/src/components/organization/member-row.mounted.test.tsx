@@ -66,6 +66,7 @@ async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {
     <MemberRow
       member={member}
       canManage
+      canManageLimit
       callerRole="owner"
       enableUsageLimits
       isSalesDemo={false}
@@ -154,6 +155,43 @@ describe('MemberRow menu', () => {
     ]);
     expect(menu.options[2]?.destructive).toBe(true);
     expect(menu.options[0]?.destructive).toBeUndefined();
+  });
+
+  it('offers an admin the daily limit alone on an owner row', async () => {
+    const owner = { ...member, role: 'owner' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: owner, canManage: false, canManageLimit: true });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+
+    expect(actionsMenu().visible).toBe(true);
+    expect(actionsMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.setDailyUsageLimit'),
+    ]);
+  });
+
+  it('offers a member-row manager every action in order', async () => {
+    const renderer = await renderRow({ canManage: true, canManageLimit: true });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+
+    expect(actionsMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.changeRole'),
+      i18n.t('organization.members.setDailyUsageLimit'),
+      i18n.t('organization.members.removeMember'),
+    ]);
+  });
+
+  it('renders no menu when the caller may run no action', async () => {
+    const renderer = await renderRow({ canManage: false, canManageLimit: false });
+
+    expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(
+      renderer.root.findAllByType('Text').map(node => node.props.children as unknown)
+    ).toContain('Member E2E');
   });
 
   it('hides the daily-limit option when usage limits are off', async () => {

@@ -16,6 +16,7 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: { isRTL: false },
+  Keyboard: { dismiss: vi.fn() },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -24,7 +25,7 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: vi.fn() }),
+  useRouter: () => ({ back: routerMock.back }),
   useLocalSearchParams: () => ({}),
   useFocusEffect: (effect: EffectCallback) => {
     useEffect(effect, [effect]);
@@ -58,14 +59,20 @@ const rows: RepoOption[] = [
 
 const sections: RepoPickerSection[] = [{ key: 'github', titleKey: 'common.github', repos: rows }];
 
+const slotBridge = vi.hoisted(() => ({ onSelect: vi.fn<(repo: string) => void>() }));
+
+const routerMock = vi.hoisted(() => ({ back: vi.fn<() => void>() }));
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  slotBridge.onSelect.mockReset();
+  routerMock.back.mockReset();
   repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
     repositories: rows,
     sections,
     organizationId: 'org-1',
     currentValue: '',
-    onSelect: vi.fn<() => void>(),
+    onSelect: slotBridge.onSelect,
   });
 });
 
@@ -97,6 +104,28 @@ async function search(renderer: ReactTestRenderer, query: string) {
     await Promise.resolve();
   });
 }
+
+describe('repository picker dismissal burst', () => {
+  it('a second tap on one repository row inside the dismissal burst selects and pops once', async () => {
+    const renderer = await mount();
+    const row = rowFor(renderer, SIBLING_NAME);
+    const press = row.props.onPress as () => void;
+
+    act(() => {
+      press();
+      // The sheet is still mounted for the tap that lands on the row it just
+      // covered: the selection must not run twice.
+      press();
+    });
+
+    expect(slotBridge.onSelect).toHaveBeenCalledTimes(1);
+    // The row hands the picker its own key, which is what the slot consumes.
+    expect(slotBridge.onSelect).toHaveBeenCalledWith(`github:${SIBLING_NAME}`);
+    // One pop: the second tap must not close the screen beneath the picker.
+    expect(routerMock.back).toHaveBeenCalledTimes(1);
+    expect(repoPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
+  });
+});
 
 describe('repository picker row layout', () => {
   it('keeps the whole name in a middle-ellipsized box inside a provider section', async () => {

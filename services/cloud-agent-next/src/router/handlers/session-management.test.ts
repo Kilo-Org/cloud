@@ -63,6 +63,15 @@ function setup(createdOnPlatform: string | undefined = 'slack', id = sessionId) 
     lifecycle: { timestamp: 1, version: 1 },
   });
   const stub = {
+    kiloRequest: vi.fn().mockResolvedValue({
+      ok: true,
+      result: {
+        sessionID: kiloSessionId,
+        jobs: [],
+        sessions: [{ id: kiloSessionId }],
+        waits: [],
+      },
+    }),
     getMetadata: vi.fn().mockResolvedValue(metadata),
     getSession: vi.fn().mockResolvedValue({
       type: 'found',
@@ -107,6 +116,50 @@ beforeEach(() => {
   vi.clearAllMocks();
   access.mockResolvedValue({ kiloSessionId, organizationId: null });
   getPgDb.mockReturnValue(database().db);
+});
+
+describe('background activity authorization', () => {
+  it('reads only the registered session through the named operation', async () => {
+    const harness = setup();
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).resolves.toMatchObject({ sessionID: kiloSessionId, jobs: [] });
+    expect(access).toHaveBeenCalledWith(
+      expect.objectContaining({ kiloUserId: userId, cloudAgentSessionId: sessionId })
+    );
+    expect(harness.stub.kiloRequest).toHaveBeenCalledWith({ name: 'session.background' });
+  });
+  it('does not read a foreign chat or accept a native session selector', async () => {
+    const harness = setup();
+    access.mockRejectedValueOnce(new Error('denied'));
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toThrow('denied');
+    expect(harness.stub.kiloRequest).not.toHaveBeenCalled();
+    await expect(
+      harness.caller.getBackgroundActivity({
+        cloudAgentSessionId: sessionId,
+        sessionID: 'ses_sibling',
+      } as never)
+    ).rejects.toThrow();
+  });
+  it('does not present an unavailable runtime as an empty inventory', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'not_ready', message: 'No runtime', retryable: true },
+    });
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toThrow('unavailable');
+  });
+  it('reports an invalid native inventory as unavailable rather than an internal error', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: { jobs: 'invalid' } });
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
 });
 
 describe('getSession runtime agents', () => {

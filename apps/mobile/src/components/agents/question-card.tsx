@@ -19,8 +19,23 @@ import {
 } from '@/components/agents/blocking-card-state';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import {
+  answerLabels,
+  isAnswered,
+  isCustomSelected,
+  MULTI_NONE,
+  type MultiAnswer,
+  pressSingleChoice,
+  pressSingleCustom,
+  SINGLE_NONE,
+  type SingleAnswer,
+  toggleMultiChoice,
+  toggleMultiCustom,
+  typeMultiCustom,
+  typeSingleCustom,
+} from './question-card-answer';
 
 // Types matching the SDK's QuestionState structure
 type QuestionOption = {
@@ -71,15 +86,19 @@ export function QuestionCard({
   pendingCount = 1,
 }: Readonly<QuestionCardProps>) {
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
-  const [customSelected, setCustomSelected] = useState<Record<number, boolean>>({});
+  const [singleAnswers, setSingleAnswers] = useState<Record<number, SingleAnswer>>({});
+  const [multiAnswers, setMultiAnswers] = useState<Record<number, MultiAnswer>>({});
   const customInputs = useRef<Record<number, string>>({});
   const customInputRefs = useRef<Record<number, TextInput | null>>({});
-  // Unread; setting it forces a re-render on every keystroke so
-  // `allQuestionsAnswered` (derived from the customInputs ref) stays in sync.
-  const [, setCustomHasText] = useState<Record<number, boolean>>({});
+  // Derived from the custom text ref so Send and the progress line follow every
+  // keystroke without the ref itself being read during render.
+  const [customHasText, setCustomHasText] = useState<Record<number, boolean>>({});
+  // Bumped when a transition drops the custom answer, so the uncontrolled field
+  // remounts empty. Typing never bumps it, so focus survives an edit.
+  const [customReset, setCustomReset] = useState<Record<number, number>>({});
 
   // Accessibility presentation is derived from the shared FSM so the
   // selection logic and CTA flags stay covered by pure-logic tests.
@@ -105,69 +124,84 @@ export function QuestionCard({
     [requestId]
   );
 
+  function answerOf(question: QuestionInfo, index: number): SingleAnswer | MultiAnswer {
+    return question.multiple
+      ? (multiAnswers[index] ?? MULTI_NONE)
+      : (singleAnswers[index] ?? SINGLE_NONE);
+  }
+
+  function clearCustomAnswer(index: number) {
+    customInputs.current[index] = '';
+    setCustomHasText(prev => ({ ...prev, [index]: false }));
+    setCustomReset(prev => ({ ...prev, [index]: (prev[index] ?? 0) + 1 }));
+  }
+
   function toggleOption(questionIndex: number, optionIndex: number, multiple: boolean | undefined) {
-    setSelectedOptions(prev => {
-      const prevSet = prev[questionIndex];
-      const current = prevSet ? new Set(prevSet) : new Set<number>();
-      if (multiple) {
-        if (current.has(optionIndex)) {
-          current.delete(optionIndex);
-        } else {
-          current.add(optionIndex);
-        }
-      } else {
-        current.clear();
-        current.add(optionIndex);
-      }
-      return { ...prev, [questionIndex]: current };
-    });
-    // Single select: deselect custom when a preset option is picked
-    if (!multiple) {
-      setCustomSelected(prev => ({ ...prev, [questionIndex]: false }));
+    if (multiple) {
+      setMultiAnswers(prev => ({
+        ...prev,
+        [questionIndex]: toggleMultiChoice(prev[questionIndex] ?? MULTI_NONE, optionIndex),
+      }));
+      return;
+    }
+    const current = singleAnswers[questionIndex] ?? SINGLE_NONE;
+    setSingleAnswers(prev => ({
+      ...prev,
+      [questionIndex]: pressSingleChoice(prev[questionIndex] ?? SINGLE_NONE, optionIndex),
+    }));
+    // A preset press replaces the custom answer, so the field's text goes too:
+    // text the card would not submit may not stay on screen.
+    if (isCustomSelected(current)) {
+      clearCustomAnswer(questionIndex);
     }
   }
 
   function selectCustomOption(questionIndex: number, multiple: boolean | undefined) {
-    if (customSelected[questionIndex]) {
-      // Multiple choice: re-activating the checked custom answer unchecks it
-      // and clears its text so the checkbox and input stay consistent.
-      // Single choice behaves like a radio and stays selected.
-      if (multiple) {
-        customInputRefs.current[questionIndex]?.clear();
-        handleCustomTextChange(questionIndex, '');
+    if (multiple) {
+      const current = multiAnswers[questionIndex] ?? MULTI_NONE;
+      const next = toggleMultiCustom(current);
+      setMultiAnswers(prev => ({ ...prev, [questionIndex]: next }));
+      // Re-activating the checked custom answer unchecks it; its text goes with
+      // it so the checkbox and the field stay consistent.
+      if (isCustomSelected(current)) {
+        clearCustomAnswer(questionIndex);
       }
       return;
     }
-    if (!multiple) {
-      // Single select: deselect preset options when custom is chosen.
-      setSelectedOptions(p => ({ ...p, [questionIndex]: new Set<number>() }));
-    }
-    setCustomSelected(prev => ({ ...prev, [questionIndex]: true }));
+    // A single-choice radio stays selected on a re-press, keeping its text.
+    setSingleAnswers(prev => ({
+      ...prev,
+      [questionIndex]: pressSingleCustom(prev[questionIndex] ?? SINGLE_NONE),
+    }));
   }
 
   function handleCustomTextChange(questionIndex: number, text: string) {
     customInputs.current[questionIndex] = text;
     const hasText = text.trim().length > 0;
-    // Force a re-render on every keystroke so `allQuestionsAnswered` (derived
-    // from the customInputs ref) stays in sync.
     setCustomHasText(prev => ({ ...prev, [questionIndex]: hasText }));
-    // Auto-select custom when the user starts typing; clearing the text
-    // unchecks it so it never reads as selected with no content.
-    if (hasText && !customSelected[questionIndex]) {
-      selectCustomOption(questionIndex, questions[questionIndex]?.multiple);
-    } else if (!hasText && customSelected[questionIndex]) {
-      setCustomSelected(prev => ({ ...prev, [questionIndex]: false }));
+    // Typing selects the custom answer; clearing the text unchecks it so it
+    // never reads as selected with no content.
+    if (questions[questionIndex]?.multiple) {
+      setMultiAnswers(prev => ({
+        ...prev,
+        [questionIndex]: typeMultiCustom(prev[questionIndex] ?? MULTI_NONE, hasText),
+      }));
+      return;
     }
+    setSingleAnswers(prev => ({
+      ...prev,
+      [questionIndex]: typeSingleCustom(prev[questionIndex] ?? SINGLE_NONE, hasText),
+    }));
   }
 
   function buildAnswers(): string[][] {
-    return questions.map((q, qIndex) => {
-      const labels = [...(selectedOptions[qIndex] ?? [])].map(
-        oIndex => q.options[oIndex]?.label ?? ''
-      );
-      const customText = customSelected[qIndex] ? (customInputs.current[qIndex] ?? '').trim() : '';
-      return customText ? [...labels, customText] : labels;
-    });
+    return questions.map((question, index) =>
+      answerLabels(
+        answerOf(question, index),
+        customHasText[index] ? (customInputs.current[index] ?? '') : '',
+        question.options
+      )
+    );
   }
 
   function handleSubmit() {
@@ -189,8 +223,15 @@ export function QuestionCard({
     onReject();
   }
 
-  const answeredCount = buildAnswers().reduce(
-    (count, answer) => count + (answer.length > 0 ? 1 : 0),
+  const answeredCount = questions.reduce(
+    (count, question, index) =>
+      count +
+      (isAnswered(
+        answerOf(question, index),
+        customHasText[index] ? (customInputs.current[index] ?? '') : ''
+      )
+        ? 1
+        : 0),
     0
   );
   const allQuestionsAnswered = answeredCount === questions.length;
@@ -198,8 +239,10 @@ export function QuestionCard({
   const isInert = presentation.state === 'non-retryable';
   const interactionDisabled = isSubmitting || isInert;
   const submitDisabled = !allQuestionsAnswered || interactionDisabled;
+  // The spinner only shows while submitting, and every button that carries it
+  // is disabled then, so it sits on the muted fill a disabled primary paints.
   const submittingSpinner = isSubmitting ? (
-    <ActivityIndicator size="small" color={colors.primaryForeground} />
+    <ActivityIndicator size="small" color={mutedDisabledInk} />
   ) : null;
 
   return (
@@ -222,7 +265,8 @@ export function QuestionCard({
       <ScrollView className="max-h-96 shrink" keyboardShouldPersistTaps="handled">
         <View className="gap-4 p-4">
           {questions.map((question, qIndex) => {
-            const isCustomActive = customSelected[qIndex] ?? false;
+            const answer = answerOf(question, qIndex);
+            const isCustomActive = isCustomSelected(answer);
             return (
               <View key={qIndex} className="gap-2">
                 <Text className="text-sm font-medium text-foreground">{question.question}</Text>
@@ -233,7 +277,11 @@ export function QuestionCard({
                 )}
                 <View className="gap-1">
                   {question.options.map((option, oIndex) => {
-                    const isSelected = selectedOptions[qIndex]?.has(oIndex) ?? false;
+                    const isSelected =
+                      answer.kind === 'one'
+                        ? answer.choice === oIndex
+                        : (answer.kind === 'presets' || answer.kind === 'presets-and-custom') &&
+                          answer.chosen.has(oIndex);
                     // The description is content, not an action hint: TalkBack
                     // (Android) reads the node's hint text, never the tooltip
                     // React Native fills from `accessibilityHint`, so a hint
@@ -338,6 +386,7 @@ export function QuestionCard({
                         ) : null}
                       </Pressable>
                       <Input
+                        key={`custom-${qIndex}-${customReset[qIndex] ?? 0}`}
                         ref={node => {
                           customInputRefs.current[qIndex] = node;
                         }}

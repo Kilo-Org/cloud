@@ -27,6 +27,8 @@ export const GLANCEABLE_SNAPSHOT_KEY = 'glanceable-snapshot';
 /** The previous release wrote the scope key beside the snapshot; this is read only. */
 export const GLANCEABLE_LEGACY_SCOPE_KEY = 'glanceable-scope-key';
 export const SESSION_CARD_SCOPE_KEY = 'glanceable-session-card-scopes';
+/** The tokens each followed session's row was written with, so an unfollow can name its row. */
+export const SESSION_TOKEN_IDENTITY_KEY = 'glanceable-session-token-identities';
 
 /** Every item the widget store owns, so the upgrade covers all of them. */
 const WIDGET_STORE_KEYS = [
@@ -34,6 +36,7 @@ const WIDGET_STORE_KEYS = [
   GLANCEABLE_SNAPSHOT_KEY,
   GLANCEABLE_LEGACY_SCOPE_KEY,
   SESSION_CARD_SCOPE_KEY,
+  SESSION_TOKEN_IDENTITY_KEY,
   // The two identity hints are written by `lib/auth/account-metadata-write` with
   // this store's class; the upgrade owns that class for every item, so it
   // upgrades them too.

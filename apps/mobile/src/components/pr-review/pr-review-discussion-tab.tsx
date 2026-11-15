@@ -101,12 +101,12 @@ import {
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -141,6 +141,18 @@ const CONVERSATION_COMMENT_PATH =
 // comment's body, so the sheet opens as the READ surface and Save is the
 // UPDATE surface.
 const COMMENT_EDIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-edit' as const;
+
+/**
+ * The not-found message names the object in the reader's own provider terms, so
+ * a merge request is never called a pull request or the reverse. GitHub keeps
+ * the terminal copy; the two provider scopes name the connection, because both
+ * fold a connection failure into the same NOT_FOUND a removed item produces.
+ */
+const DISCUSSION_UNAVAILABLE_MESSAGE = {
+  github: 'prReview.discussion.unavailableMessage',
+  gitlab: 'prReview.terms.discussionUnavailableMessage',
+  bitbucket: 'prReview.pullRequestDiscussionUnavailableMessage',
+} as const satisfies Record<ProviderPrPlatform, string>;
 
 export function PrReviewDiscussionTab({
   owner,
@@ -380,7 +392,7 @@ export function PrReviewDiscussionTab({
         // no failure feedback from a confirmed delete (ux2 spot check).
         // The row stays, nothing is pending, and the same row action
         // retries once the banner clears.
-        if (getCommittedConnectivityStatus() === 'offline') {
+        if (connectionRefusesWrites()) {
           announcingToast.error(t('prReview.discussion.commentDeleteFailed'));
           return;
         }
@@ -448,16 +460,13 @@ export function PrReviewDiscussionTab({
     // merge request produces, so provider scopes offer the read retry and the
     // connection check instead of a dead end (GitHub keeps the terminal copy).
     const isProviderScope = ref.platform !== 'github';
+    const unavailableMessage = t(DISCUSSION_UNAVAILABLE_MESSAGE[ref.platform]);
     return (
       <>
         <QueryError
           variant="not-found"
           title={t('prReview.discussion.unavailable')}
-          message={
-            isMergeRequest
-              ? t('prReview.terms.discussionUnavailableMessage')
-              : t('prReview.discussion.unavailableMessage')
-          }
+          message={unavailableMessage}
           action={
             isProviderScope ? (
               <PrReviewUnavailableActions

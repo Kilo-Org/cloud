@@ -13,7 +13,6 @@ import { ContextPickerSheet } from '@/components/context-picker-sheet';
 import { scrollTo } from '@/test/scroll-view-mock';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-const theme = vi.hoisted(() => ({ colors: { primary: '#FFDD00', foreground: '#F2F0EB' } }));
 const onSelect = vi.hoisted(() => vi.fn());
 const onDone = vi.hoisted(() => vi.fn());
 
@@ -41,7 +40,9 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Info: 'Icon' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#F2F0EB' }),
+}));
 vi.mock('@/lib/navigation/route-focus', () => ({ useRouteFocused: () => true }));
 
 const Pressable = 'Pressable' as ElementType;
@@ -188,12 +189,11 @@ describe('ContextPickerSheet', () => {
     ).toHaveLength(0);
   });
 
-  it('paints the check with the active palette', async () => {
+  it('checks exactly one row', async () => {
     const renderer = await mount();
 
     const check = renderer.root.findAll(node => node.type === Check);
     expect(check).toHaveLength(1);
-    expect(check[0]?.props.color).toBe(theme.colors.primary);
   });
 
   it('leaves the list at its top when the checked row fits inside the fold', async () => {

@@ -126,7 +126,8 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { getBalanceForOrganizationUser } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
+import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
+import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
@@ -583,7 +584,9 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
           kilocodeOrganizationId: organizationId,
-          clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
+          clientProvenance: isMobileClient(ctx.headersList?.get(APP_CLIENT_HEADER))
+            ? 'mobile'
+            : 'browser',
         });
       } catch (error) {
         // Both dispatch paths route a worker's answer through the same helper,
@@ -1338,6 +1341,30 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         limit: input.limit,
         toolDisplay: input.toolDisplay,
       });
+    }),
+
+  getBackgroundActivity: organizationMemberProcedure
+    .input(
+      z
+        .object({
+          cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/),
+          organizationId: z.string().uuid(),
+        })
+        .strict()
+    )
+    .output(backgroundActivityInventorySchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const token = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return createCloudAgentNextClient(token).getBackgroundActivity(input.cloudAgentSessionId);
     }),
 
   /** Complete stored details for an expanded tool preview; authorized on every read. */

@@ -20,16 +20,10 @@ const hoisted = vi.hoisted(() => {
   };
   const holder: { options?: Record<string, unknown> } = {};
 
-  let sealedState = false;
   const storage = {
-    sealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = true;
-    }),
-    unsealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = false;
-    }),
+    sealPostHogStorage: vi.fn(),
+    unsealPostHogStorage: vi.fn(),
     purgePostHogPersistence: vi.fn(),
-    isPostHogStorageSealed: vi.fn().mockImplementation(() => sealedState),
     // oxlint-disable-next-line consistent-type-assertions
     posthogCustomStorage: {} as Record<string, unknown>,
   };
@@ -86,7 +80,6 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   sealPostHogStorage: hoisted.storage.sealPostHogStorage,
   unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
   purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
-  isPostHogStorageSealed: hoisted.storage.isPostHogStorageSealed,
   posthogCustomStorage: hoisted.storage.posthogCustomStorage,
 }));
 
@@ -997,7 +990,6 @@ describe('cold start keeps SDK storage', () => {
 
     // A seal is what lets the purge delete the files the SDK reads at init.
     expect(hoisted.storage.sealPostHogStorage).not.toHaveBeenCalled();
-    expect(hoisted.storage.isPostHogStorageSealed()).toBe(false);
     expect(hoisted.holder.options?.customStorage).toBe(hoisted.storage.posthogCustomStorage);
     expect(mod.ctrl.allowsOptional()).toBe(true);
 

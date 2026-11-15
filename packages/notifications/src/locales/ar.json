@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "اكتملت المهمة"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "فشل: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "تمت المقاطعة: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

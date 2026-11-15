@@ -52,6 +52,7 @@ export type ImportIssueCode =
   | 'skill-name-invalid'
   | 'skill-markdown-invalid'
   | 'skill-files-invalid'
+  | 'skill-description-invalid'
   | 'instruction-invalid';
 
 export type ImportIssue = {

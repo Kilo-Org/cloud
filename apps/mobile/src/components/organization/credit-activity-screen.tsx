@@ -18,6 +18,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import {
   type CreditTransaction,
@@ -110,11 +111,13 @@ const CreditRow = memo(function CreditRow({
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            {t('organization.creditActivity.expiresUtc', {
-              date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language, {
-                timeZone: 'UTC',
-              }),
-            })}
+            {keepZoneWithDate(
+              t('organization.creditActivity.expiresUtc', {
+                date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language, {
+                  timeZone: 'UTC',
+                }),
+              })
+            )}
           </Text>
         )}
       </View>

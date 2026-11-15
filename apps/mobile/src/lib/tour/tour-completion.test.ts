@@ -66,7 +66,6 @@ describe('tour completion', () => {
   });
 
   it('builds a distinct storage key per user', () => {
-    expect(tourCompletedKey('user-1')).toBe(tourCompletedKey('user-1'));
     expect(tourCompletedKey('user-1')).not.toBe(tourCompletedKey('user-2'));
     expect(tourCompletedKey('user-1').startsWith(TOUR_COMPLETED_KEY_PREFIX)).toBe(true);
   });

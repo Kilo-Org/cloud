@@ -7,15 +7,18 @@ import {
   findOne,
   mountScreen,
   queryErrorProps,
+  rerenderScreen,
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
+import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
   back: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
+  dismissAll: vi.fn(),
   refetch: vi.fn(),
   query: {
     data: undefined as TestProfileDetail | undefined,
@@ -36,7 +39,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => 'online',
@@ -44,7 +47,12 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
+  useRouter: () => ({
+    back: h.back,
+    push: h.push,
+    replace: h.replace,
+    dismissAll: h.dismissAll,
+  }),
   usePreventRemove: () => undefined,
 }));
 vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => h.back }));
@@ -196,6 +204,134 @@ describe('ProfileOverviewScreen terminal error states', () => {
     expect(props.title).toBe("Couldn't load profiles");
     expect(props.onRetry).toBeDefined();
     expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
+
+    unmount();
+  });
+
+  // The tab keeps this stack across tab switches, so a route that showed a
+  // working profile and then loses it leaves nothing to read and nothing to
+  // press. The screen returns the tab to its Profile root instead.
+  it('gone after rendering: a deleted profile returns the Profile tab to its root', async () => {
+    Object.assign(h.query, { data: testProfile(), isPending: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
+
+    Object.assign(h.query, {
+      isError: true,
+      error: { data: { code: 'NOT_FOUND', httpStatus: 404 } },
+    });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    expect(queryErrorProps(renderer.root).variant).toBe('not-found');
+    expect(h.dismissAll).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('gone on arrival: a cached profile the first read refuses keeps the terminal view', async () => {
+    Object.assign(h.query, {
+      data: testProfile(),
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'NOT_FOUND', httpStatus: 404 } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The profile never painted, so the reader must still see why the route is
+    // empty, and Back stays the way out.
+    expect(queryErrorProps(renderer.root).variant).toBe('not-found');
+    expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
+    expect(h.dismissAll).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('permission after rendering: the refusal keeps its screen so the reason stays readable', async () => {
+    Object.assign(h.query, { data: testProfile(), isPending: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
+
+    Object.assign(h.query, {
+      isError: true,
+      error: { data: { code: 'FORBIDDEN', httpStatus: 403 } },
+    });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    // A permission answer is about the reader's access, not a deletion: the
+    // screen states it, so leaving would discard the only explanation.
+    expect(queryErrorProps(renderer.root).variant).toBe('permission');
+    expect(h.dismissAll).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('retryable after rendering: the stack stays for the Retry and the cached editor', async () => {
+    Object.assign(h.query, { data: testProfile(), isPending: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+
+    Object.assign(h.query, { isError: true, error: new Error('aborted') });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    expect(queryErrorProps(renderer.root).onRetry).toBeDefined();
+    expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
+    expect(h.dismissAll).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('app stack: a rendered profile that is then refused keeps the terminal view', async () => {
+    Object.assign(h.query, { data: testProfile(), isPending: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen(undefined, 'app');
+
+    Object.assign(h.query, {
+      isError: true,
+      error: { data: { code: 'NOT_FOUND', httpStatus: 404 } },
+    });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient, { stack: 'app' });
+      await Promise.resolve();
+    });
+
+    expect(queryErrorProps(renderer.root).variant).toBe('not-found');
+    expect(h.dismissAll).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('other profile: an instance that served another profile keeps the refusal', async () => {
+    Object.assign(h.query, { data: testProfile(), isPending: false });
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
+
+    // The navigator reuses this instance when it opens the same route name with
+    // other params, so it now serves a profile it never painted.
+    Object.assign(h.query, {
+      data: testProfile({ id: 'profile-2', name: 'Second profile' }),
+      isError: true,
+      error: { data: { code: 'NOT_FOUND', httpStatus: 404 } },
+    });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient, { profileId: 'profile-2' });
+      await Promise.resolve();
+    });
+
+    expect(queryErrorProps(renderer.root).variant).toBe('not-found');
+    expect(h.dismissAll).not.toHaveBeenCalled();
 
     unmount();
   });

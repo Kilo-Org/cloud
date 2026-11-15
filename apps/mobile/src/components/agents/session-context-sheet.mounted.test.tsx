@@ -229,6 +229,13 @@ describe('SessionContextSheet auto-approve row', () => {
       expect(switchBefore.props.disabled).toBe(state === 'unavailable');
       expect(renderedTexts(renderer.root)).toContain('-');
       expect(renderedTexts(renderer.root)).not.toContain('1,000');
+      // A lone placeholder, not a broken "- tokens" row: the USED row paints no
+      // unit copy until a usage report arrives. The harness's `t` replaces the
+      // key without interpolating, so the copy is compared by key.
+      expect(renderedTexts(renderer.root)).not.toContain(i18n.t('agentChat.contextUsage.tokens'));
+      expect(renderedTexts(renderer.root)).not.toContain(
+        i18n.t('agentChat.contextUsage.ofWindowTokens')
+      );
       const labels = [
         i18n.t('common.model'),
         i18n.t('agentChat.contextUsage.provider'),
@@ -251,6 +258,10 @@ describe('SessionContextSheet auto-approve row', () => {
       });
       expect(switchNode(renderer.root)).toBe(switchBefore);
       expect(renderedTexts(renderer.root)).toContain('1,000');
+      // The unit comes back with the value once usage reports a window.
+      expect(renderedTexts(renderer.root)).toContain(
+        i18n.t('agentChat.contextUsage.ofWindowTokens')
+      );
       for (const label of labels) {
         expect(renderedTexts(renderer.root)).toContain(label);
       }
@@ -672,6 +683,21 @@ describe('SessionContextSheet copy row touch targets', () => {
       await unmount(renderer);
     }
   );
+});
+
+describe('SessionContextSheet view changes row touch target', () => {
+  it('renders the view changes row on the shared full target', async () => {
+    // It kept a 44 dp frame between two 48 dp copy rows, so one action list
+    // used two row heights — visible the moment a row gets a pressed fill.
+    const renderer = await mountSheet();
+    const target = findByType(renderer.root, 'Pressable').find(
+      node => node.props.testID === 'session-context-sheet-view-changes'
+    );
+    expect(target?.props.accessibilityRole).toBe('button');
+    expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+    expect(target?.props.className).not.toContain('min-h-[44px]');
+    await unmount(renderer);
+  });
 });
 
 describe('SessionContextSheet connection row', () => {

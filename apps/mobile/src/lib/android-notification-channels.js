@@ -1,3 +1,4 @@
+// @ts-check
 /** The Android notification channels the app creates silent: no sound and no
  *  vibration. The channel writer (src/lib/notifications.ts) reads this list,
  *  and scripts/assert-expo-config.mjs reads the same list to keep the FCM

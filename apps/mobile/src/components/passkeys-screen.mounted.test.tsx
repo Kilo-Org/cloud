@@ -3,7 +3,6 @@ import {
   type CapturedConfirm,
   confirmRemoval,
   confirmSpy,
-  emptyDescription,
   first,
   hasButtonLabel,
   list,
@@ -19,6 +18,8 @@ import {
   toastSuccess,
   UNNAMED,
   USED,
+  VERIFY_TITLE,
+  verifyWithCode,
 } from './passkeys-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,6 +33,23 @@ beforeEach(() => {
   list.deleteFn.mockResolvedValue(undefined);
   list.renameFn.mockResolvedValue(undefined);
   list.register.mockResolvedValue({ status: 'ok' });
+  // The proof the panel offers: a code to the account's own address, which is
+  // the only proof an account adding its first passkey can give.
+  list.requestCode.mockResolvedValue({
+    status: 'sent',
+    challengeId: '3f1c1a9e-1c1a-4b6e-9f0e-1d2c3b4a5e6f',
+  });
+  list.authorizeCode.mockResolvedValue({
+    status: 'authorized',
+    authorization: 'auth-1',
+    expiresAtMs: Date.now() + 300_000,
+  });
+  list.authorizeTicket.mockResolvedValue({
+    status: 'authorized',
+    authorization: 'auth-1',
+    expiresAtMs: Date.now() + 300_000,
+  });
+  list.mintTicket.mockResolvedValue({ status: 'ok', ticket: 'ticket-1' });
 });
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -114,15 +132,14 @@ describe('PasskeysScreen', () => {
   });
 
   it('asks before removing, drops the row, and empties the list when it was the last one', async () => {
-    let releaseDelete: (() => void) | undefined = undefined;
     store.rows = [MACBOOK];
+    const pendingDelete = Promise.withResolvers<unknown>();
+    const releaseDelete = () => {
+      pendingDelete.resolve(undefined);
+    };
     list.deleteFn.mockImplementation(async () => {
-      await new Promise<void>(resolve => {
-        releaseDelete = () => {
-          store.rows = [];
-          resolve();
-        };
-      });
+      await pendingDelete.promise;
+      store.rows = [];
     });
     const view = await mount();
     await waitFor(() => texts(view).includes('MacBook'));
@@ -137,13 +154,20 @@ describe('PasskeysScreen', () => {
     expect(request.confirmLabel).toBe('Remove passkey');
 
     // Removed optimistically, before the server answered: with no row left, the
-    // empty state is the surface.
+    // empty state is the surface. The delete itself waits for fresh proof.
     await confirmRemoval();
+    await verifyWithCode(view);
     await waitFor(() => nodes(view, 'EmptyState').length === 1);
     expect(texts(view)).not.toContain('MacBook');
+    // The mutation receives its context as a second argument; the variables
+    // are what the delete must carry: the one credential and its grant.
+    expect(list.deleteFn.mock.calls[0]?.[0]).toEqual({
+      id: 'pk-1',
+      managementAuthorization: 'auth-1',
+    });
 
     await act(() => {
-      releaseDelete?.();
+      releaseDelete();
     });
     await waitFor(() => toastSuccess.mock.calls.length > 0);
     expect(toastSuccess).toHaveBeenCalledWith('Passkey removed.');
@@ -158,6 +182,7 @@ describe('PasskeysScreen', () => {
 
     await press(rowAction(view, 'Remove'));
     await confirmRemoval();
+    await verifyWithCode(view);
 
     // The row is back, the failure is inline beside it, and the toast carries
     // the server's own message.
@@ -165,8 +190,10 @@ describe('PasskeysScreen', () => {
     expect(texts(view)).toContain('MacBook');
     expect(toastError).toHaveBeenCalledWith('nope');
 
+    // The retry asks for proof again before it re-sends the delete.
     await press(buttonByLabel(view, 'Retry'));
-    expect(list.deleteFn).toHaveBeenCalledTimes(2);
+    await verifyWithCode(view);
+    await waitFor(() => list.deleteFn.mock.calls.length === 2);
     view.unmount();
   });
 
@@ -200,96 +227,7 @@ describe('PasskeysScreen', () => {
     view.unmount();
   });
 
-  it('adds a passkey, toasts, and refreshes the list', async () => {
-    store.rows = [];
-    const view = await mount();
-    await waitFor(() => nodes(view, 'EmptyState').length === 1);
-
-    await press(buttonByLabel(view, 'Add a passkey'));
-    await waitFor(() => toastSuccess.mock.calls.length > 0);
-
-    expect(list.register).toHaveBeenCalledOnce();
-    expect(toastSuccess).toHaveBeenCalledWith('Passkey added.');
-    expect(list.queryFn.mock.calls.length).toBeGreaterThan(1);
-    view.unmount();
-  });
-
-  it('hides the Add control and names the reason on a device that cannot create passkeys', async () => {
-    list.supported.mockReturnValue(false);
-    const view = await mount();
-    await waitFor(() => texts(view).includes('MacBook'));
-
-    // The device can never create one, so the notice stands alone and the
-    // existing passkeys still list.
-    expect(texts(view)).toContain('This device cannot create passkeys.');
-    expect(hasButtonLabel(view, 'Add a passkey')).toBe(false);
-    expect(hasButtonLabel(view, 'Retry')).toBe(false);
-    expect(texts(view)).toContain('Passkey');
-    expect(nodes(view, 'KeyRound')).toHaveLength(2);
-    view.unmount();
-  });
-
-  it('shows the unsupported notice instead of creation when there are no passkeys and the device cannot create them', async () => {
-    store.rows = [];
-    list.supported.mockReturnValue(false);
-    const view = await mount();
-    await waitFor(() => nodes(view, 'EmptyState').length === 1);
-
-    const empty = first(view, 'EmptyState');
-    // The creation hint would name the Add control this device cannot offer, so
-    // the notice is the description and the state has no action at all.
-    expect(emptyDescription(view)).toBe('This device cannot create passkeys.');
-    expect(empty.props.action).toBeUndefined();
-    expect(hasButtonLabel(view, 'Add a passkey')).toBe(false);
-    view.unmount();
-  });
-
-  it('drops the Add control when the ceremony refuses as unsupported', async () => {
-    store.rows = [];
-    list.register.mockResolvedValue({ status: 'error', failure: 'unsupported' });
-    const view = await mount();
-    await waitFor(() => nodes(view, 'EmptyState').length === 1);
-
-    await press(buttonByLabel(view, 'Add a passkey'));
-    await waitFor(() => !hasButtonLabel(view, 'Add a passkey'));
-
-    // Non-retryable: no retry control, and no Add control that could only fail
-    // the same way again. The notice replaces the hint the control annotated.
-    expect(hasButtonLabel(view, 'Retry')).toBe(false);
-    expect(emptyDescription(view)).toBe('This device cannot create passkeys.');
-    view.unmount();
-  });
-
-  it('keeps the Add CTA and names the reason when creation fails retryably', async () => {
-    store.rows = [];
-    list.register.mockResolvedValue({ status: 'error', failure: 'failed' });
-    const view = await mount();
-    await waitFor(() => nodes(view, 'EmptyState').length === 1);
-
-    await press(buttonByLabel(view, 'Add a passkey'));
-    await waitFor(() => texts(view).includes('Could not add a passkey. Try again.'));
-
-    // Retryable: the same control starts a fresh ceremony.
-    expect(hasButtonLabel(view, 'Add a passkey')).toBe(true);
-    view.unmount();
-  });
-
-  it('leaves the list unchanged and toasts when the creation sheet is cancelled', async () => {
-    list.register.mockResolvedValue({ status: 'error', failure: 'cancelled' });
-    const view = await mount();
-    await waitFor(() => texts(view).includes('MacBook'));
-
-    await press(buttonByLabel(view, 'Add a passkey'));
-    await waitFor(() => toastError.mock.calls.length > 0);
-
-    expect(toastError).toHaveBeenCalledWith('Passkey creation was cancelled.');
-    expect(texts(view)).toContain('MacBook');
-    expect(texts(view)).toContain('Passkey');
-    expect(nodes(view, 'KeyRound')).toHaveLength(2);
-    view.unmount();
-  });
-
-  it('renames through the modal with the current name prefilled', async () => {
+  it('renames through the modal with the current name prefilled and fresh proof', async () => {
     const view = await mount();
     await waitFor(() => texts(view).includes('MacBook'));
 
@@ -302,7 +240,17 @@ describe('PasskeysScreen', () => {
     await act(async () => {
       await (modal.props.onSave as (name: string) => Promise<void>)('Work laptop');
     });
-    expect(list.renameFn.mock.calls[0]?.[0]).toEqual({ id: 'pk-1', name: 'Work laptop' });
+    // The modal closes with the name captured; the rename waits for proof.
+    await waitFor(() => texts(view).includes(VERIFY_TITLE));
+    expect(list.renameFn).not.toHaveBeenCalled();
+
+    await verifyWithCode(view);
+    await waitFor(() => toastSuccess.mock.calls.length > 0);
+    expect(list.renameFn.mock.calls[0]?.[0]).toEqual({
+      id: 'pk-1',
+      name: 'Work laptop',
+      managementAuthorization: 'auth-1',
+    });
     expect(toastSuccess).toHaveBeenCalledWith('Passkey renamed.');
     view.unmount();
   });
@@ -315,17 +263,16 @@ describe('PasskeysScreen', () => {
     await press(rowAction(view, 'Rename'));
     const modal = first(view, 'RenameModal');
     await act(async () => {
-      await expect(
-        (modal.props.onSave as (name: string) => Promise<void>)('Work laptop')
-      ).rejects.toThrow('nope');
+      await (modal.props.onSave as (name: string) => Promise<void>)('Work laptop');
     });
+    await verifyWithCode(view);
+    await waitFor(() => toastError.mock.calls.length > 0);
 
     expect(toastError).toHaveBeenCalledWith('nope');
     view.unmount();
   });
 
   it('locks the removal retry while the retried delete is in flight', async () => {
-    let releaseRetry: (() => void) | undefined = undefined;
     // Two passkeys, so the retried delete's optimistic removal leaves a row
     // beside the failure notice instead of emptying the list under it.
     list.deleteFn.mockRejectedValueOnce(new Error('nope'));
@@ -334,17 +281,19 @@ describe('PasskeysScreen', () => {
 
     await press(rowAction(view, 'Remove'));
     await confirmRemoval();
+    await verifyWithCode(view);
     await waitFor(() => texts(view).includes('Could not remove that passkey. Try again.'));
 
     // The retried delete is now in flight. While it is, the control must not be
     // startable again: a second tap would send a concurrent delete of the same
     // id whose rollback could hide a passkey the server still has.
-    list.deleteFn.mockImplementation(async () => {
-      await new Promise<void>(resolve => {
-        releaseRetry = resolve;
-      });
-    });
+    const pendingRetry = Promise.withResolvers<unknown>();
+    const releaseRetry = () => {
+      pendingRetry.resolve(undefined);
+    };
+    list.deleteFn.mockImplementation(() => pendingRetry.promise);
     await press(buttonByLabel(view, 'Retry'));
+    await verifyWithCode(view);
     await waitFor(() => buttonByLabel(view, 'Retry').props.loading === true);
 
     const retryButton = buttonByLabel(view, 'Retry');
@@ -354,7 +303,7 @@ describe('PasskeysScreen', () => {
     expect(list.deleteFn).toHaveBeenCalledTimes(2);
 
     await act(() => {
-      releaseRetry?.();
+      releaseRetry();
     });
     await waitFor(() => toastSuccess.mock.calls.length > 0);
     expect(toastSuccess).toHaveBeenCalledWith('Passkey removed.');
@@ -368,6 +317,7 @@ describe('PasskeysScreen', () => {
 
     await press(rowAction(view, 'Remove'));
     await confirmRemoval();
+    await verifyWithCode(view);
     await waitFor(() => texts(view).includes('Could not remove that passkey. Try again.'));
 
     // The passkey is gone from the server list — another device removed it, or

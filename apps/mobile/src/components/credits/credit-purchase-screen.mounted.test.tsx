@@ -733,9 +733,9 @@ describe('CreditPurchaseScreen', () => {
     );
     expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
     // A disabled row recedes by its own labels rather than its whole surface:
-    // it keeps its shell and drops `opacity-50`, its pack title and its price
-    // keep the muted ink and are dimmed, while its one note line keeps that
-    // same ink at full strength so the expiry is still read.
+    // it dims its title and price and leaves the secondary line at full muted
+    // ink, so the line stays lighter than the title and stays readable, and
+    // the row keeps its shell.
     expect(
       classNamesOf(rows).every(
         classes => classes.includes(PACK_ROW_SHELL) && !classes.includes('opacity-50')
@@ -757,7 +757,11 @@ describe('CreditPurchaseScreen', () => {
           headTexts.length > 0 &&
           headTexts.every(text => {
             const className = classNameOf(text);
-            return className.includes('text-muted-foreground') && className.includes('opacity-60');
+            return (
+              className.includes('text-foreground') &&
+              className.includes('opacity-70') &&
+              !className.includes('text-muted-foreground')
+            );
           }) &&
           lineTexts.length === 1 &&
           lineTexts.every(text => {
@@ -765,7 +769,7 @@ describe('CreditPurchaseScreen', () => {
             return (
               className.includes('text-xs') &&
               className.includes('text-muted-foreground') &&
-              !className.includes('opacity-60')
+              !className.includes('opacity-70')
             );
           })
         );

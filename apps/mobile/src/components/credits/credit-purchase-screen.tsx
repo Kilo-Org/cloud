@@ -241,13 +241,14 @@ export function CreditPurchaseScreen() {
               // cannot complete: keep every row disabled until it reconnects.
               const disabled = purchasing || !connected || !hasStorePrice;
               // A disabled row recedes by its own labels, not by its whole
-              // surface: WCAG leaves an inactive control's label out of its
-              // contrast rule, so the title and the price are muted and then
-              // dimmed, while the expiry note under them states when the
-              // credits expire and keeps the muted ink at full strength.
-              // Halving the whole row put that note at 2.2:1 on the dark card
-              // and 2.1:1 on the light one.
-              const labelClass = disabled ? 'text-muted-foreground opacity-60' : 'text-foreground';
+              // surface: the title and the price keep the ink they are read in
+              // and are dimmed, so they still outweigh the secondary line
+              // under them, which keeps the muted ink at full strength and
+              // states when the credits expire. Halving the whole row instead
+              // put that line at 2.2:1 on the dark card and 2.1:1 on the light
+              // one, and muting the title without dimming the line under it
+              // left the secondary line reading stronger than the title.
+              const labelClass = disabled ? 'text-foreground opacity-70' : 'text-foreground';
               // The trailing slot holds the store price only: it keeps its one
               // line and its full width, so the title yields and a price a user
               // pays is never truncated.
@@ -287,10 +288,9 @@ export function CreditPurchaseScreen() {
 
               return (
                 // A disabled row dims its own labels, not its whole surface:
-                // the title and the price keep the muted ink and are dimmed,
-                // while the expiry note under them keeps that ink at full
-                // strength, because halving the row landed the already-muted
-                // note at 2.2:1 on the dark card and 2.1:1 on the light one.
+                // the title and the price keep their ink and are dimmed, while
+                // the one line under them keeps the muted ink at full
+                // strength, so it stays lighter than the title and stays read.
                 // The row's shell, border, padding, accessibility label and
                 // accessibilityState do not change.
                 <Pressable
@@ -325,9 +325,7 @@ export function CreditPurchaseScreen() {
                   {(expiryMessage !== undefined || stateLabel !== null) && (
                     <View className="mt-2 min-h-5 justify-center">
                       {stateLabel !== null ? (
-                        <Text className="text-sm text-muted-foreground opacity-60">
-                          {stateLabel}
-                        </Text>
+                        <Text className="text-sm text-muted-foreground">{stateLabel}</Text>
                       ) : (
                         <Text className="text-xs text-muted-foreground">{expiryMessage}</Text>
                       )}

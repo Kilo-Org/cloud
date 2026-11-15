@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "شروع کرنے کے لیے ایک پرومپٹ شامل کریں۔",
       "enterPromptOrFileToStart": "شروع کرنے کے لیے ایک پرومپٹ یا فائل شامل کریں۔",
       "profileLoadingToStart": "پروفائل ابھی لوڈ ہو رہی ہے۔ ایک لمحہ انتظار کریں اور دوبارہ کوشش کریں۔",
+      "attachmentUploadingToStart": "ایک منسلکہ ابھی اپ لوڈ ہو رہا ہے۔ اس کے بغیر شروع کرنے کے لیے اسے ہٹائیں۔",
+      "modelMissingToStart": "شروع کرنے کے لیے ایک ماڈل منتخب کریں۔",
+      "staleRepositoryToStart": "منتخب کردہ ریپوزٹری اب دستیاب نہیں ہے۔ شروع کرنے کے لیے دوبارہ ریپوزٹری منتخب کریں۔",
       "connectProviderToStart": "ریپوزٹریاں منسلک GitHub، GitLab یا Bitbucket اکاؤنٹ سے آتی ہیں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "فائل منسلک کریں",
-      "removeOrRetryFailed": "پہلے وہ منسلک فائلیں ہٹائیں جن کا اپ لوڈ ناکام ہوا ہے یا انہیں دوبارہ اپ لوڈ کریں۔",
+      "removeFailedAttachments": "وہ منسلک فائلیں ہٹائیں جن کا اپ لوڈ ناکام ہوا ہے۔",
       "attachmentsWithSlashCommands": "سلیش کمانڈز کے ساتھ منسلک فائلیں نہیں بھیجی جا سکتیں۔",
       "photoMetadataNotRemoved": "ایک منسلک فائل سے تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔",
       "waitForUploads": "منسلک فائلوں کا اپ لوڈ مکمل ہونے کا انتظار کریں۔",

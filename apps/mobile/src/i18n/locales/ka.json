@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "დასაწყებად დაამატეთ პრომპტი.",
       "enterPromptOrFileToStart": "დასაწყებად დაამატეთ პრომპტი ან ფაილი.",
       "profileLoadingToStart": "პროფილი ჯერ კიდევ იტვირთება. ცოტა ხანს დაელოდეთ და ხელახლა სცადეთ.",
+      "attachmentUploadingToStart": "დანართი ჯერ კიდევ იტვირთება. მის გარეშე დასაწყებად წაშალეთ იგი.",
+      "modelMissingToStart": "დასაწყებად აირჩიეთ მოდელი.",
+      "staleRepositoryToStart": "არჩეული რეპოზიტორია აღარ არის ხელმისაწვდომი. დასაწყებად ხელახლა აირჩიეთ რეპოზიტორია.",
       "connectProviderToStart": "რეპოზიტორიები მოდის GitHub-ის, GitLab-ის ან Bitbucket-ის დაკავშირებული ანგარიშიდან.",
       "promptPlaceholder": "რაზე გსურთ მუშაობა?",
       "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "დანართის დამატება",
-      "removeOrRetryFailed": "ჯერ ამოიღეთ ის დანართები, რომლებიც ვერ აიტვირთა, ან სცადეთ მათი ხელახლა ატვირთვა.",
+      "removeFailedAttachments": "წაშალეთ დანართები, რომლებიც ვერ აიტვირთა.",
       "attachmentsWithSlashCommands": "დანართების გაგზავნა სლეშ-ბრძანებებთან ერთად შეუძლებელია.",
       "photoMetadataNotRemoved": "დანართიდან ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა.",
       "waitForUploads": "დაელოდეთ დანართების ატვირთვის დასრულებას.",

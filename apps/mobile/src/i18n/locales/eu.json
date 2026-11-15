@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Gehitu eskaera bat hasteko.",
       "enterPromptOrFileToStart": "Gehitu eskaera bat edo fitxategi bat hasteko.",
       "profileLoadingToStart": "Profila oraindik kargatzen ari da. Itxaron une bat eta saiatu berriro.",
+      "attachmentUploadingToStart": "Eranskin bat oraindik igotzen ari da. Kendu ezazu hura gabe hasteko.",
+      "modelMissingToStart": "Hautatu modelo bat hasteko.",
+      "staleRepositoryToStart": "Hautatutako biltegia ez dago erabilgarri orain. Hautatu berriro biltegi bat hasteko.",
       "connectProviderToStart": "Biltegiak konektatuta dagoen GitHub, GitLab edo Bitbucket kontu batetik datoz.",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
       "couldNotLoadModels": "Ezin izan dira modeloak kargatu.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Gehitu eranskina",
-      "removeOrRetryFailed": "Lehenik, kendu huts egin duten eranskinak edo saiatu berriro igotzen.",
+      "removeFailedAttachments": "Kendu igotzea huts egin duten eranskinak.",
       "attachmentsWithSlashCommands": "Eranskinak ezin dira bidali barra-komandoekin.",
       "photoMetadataNotRemoved": "Ezin izan dira eranskin bateko argazkiaren metadatuak kendu.",
       "waitForUploads": "Itxaron eranskinak igotzen amaitu arte.",

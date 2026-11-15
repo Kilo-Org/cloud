@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Ku dar fariin si aad u bilowdo.",
       "enterPromptOrFileToStart": "Ku dar fariin ama fayl si aad u bilowdo.",
       "profileLoadingToStart": "Profile-ka weli waa la soo rarayaa. Sug wax yar oo isku day mar kale.",
+      "attachmentUploadingToStart": "Lifaaq ayaa weli la soo gudbinayaa. Ka saar si aad ugu bilowdo la'aantiis.",
+      "modelMissingToStart": "Dooro moodel si aad u bilowdo.",
+      "staleRepositoryToStart": "Kaydka la doortay hadda lama heli karo. Dooro kayd mar kale si aad u bilowdo.",
       "connectProviderToStart": "Kaydadka waxay ka yimaadaan akoon GitHub, GitLab ama Bitbucket oo la xiriiriyay.",
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Ku dar lifaaq",
-      "removeOrRetryFailed": "Marka hore ka saar lifaaqyada fashilmay ama mar kale isku day inaad gudbiso.",
+      "removeFailedAttachments": "Ka saar lifaaqyada fashilmay in la soo gudbiyo.",
       "attachmentsWithSlashCommands": "Lifaaqyo lama raacin karo amarrada / ku bilaabma.",
       "photoMetadataNotRemoved": "Xogta dheeraadka ah ee sawirka lagama saari karin lifaaq.",
       "waitForUploads": "Sug inta gudbinta lifaaqyadu dhammaanayso.",

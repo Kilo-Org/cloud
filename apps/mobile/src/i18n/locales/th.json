@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "เพิ่มพรอมป์ตเพื่อเริ่มต้น",
       "enterPromptOrFileToStart": "เพิ่มพรอมป์ตหรือไฟล์เพื่อเริ่มต้น",
       "profileLoadingToStart": "ยังโหลดโปรไฟล์ไม่เสร็จ รอสักครู่แล้วลองอีกครั้ง",
+      "attachmentUploadingToStart": "ไฟล์แนบยังอัปโหลดไม่เสร็จ ลบออกเพื่อเริ่มต้นโดยไม่ใช้ไฟล์นี้",
+      "modelMissingToStart": "เลือกโมเดลเพื่อเริ่มต้น",
+      "staleRepositoryToStart": "คลังโค้ดที่เลือกไม่พร้อมใช้งานแล้ว เลือกคลังโค้ดอีกครั้งเพื่อเริ่มต้น",
       "connectProviderToStart": "คลังโค้ดจะมาจากบัญชี GitHub, GitLab หรือ Bitbucket ที่เชื่อมต่ออยู่",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "เพิ่มไฟล์แนบ",
-      "removeOrRetryFailed": "นำไฟล์แนบที่อัปโหลดไม่สำเร็จออก หรือลองอัปโหลดอีกครั้งก่อน",
+      "removeFailedAttachments": "นำไฟล์แนบที่อัปโหลดไม่สำเร็จออก",
       "attachmentsWithSlashCommands": "ไม่สามารถส่งไฟล์แนบพร้อมคำสั่งที่ขึ้นต้นด้วย / ได้",
       "photoMetadataNotRemoved": "ไม่สามารถลบข้อมูลเมตาของรูปภาพออกจากไฟล์แนบได้",
       "waitForUploads": "รอให้ไฟล์แนบอัปโหลดเสร็จ",

@@ -2230,6 +2230,9 @@
       "enterPromptToStart": "Afegeix un prompt per començar.",
       "enterPromptOrFileToStart": "Afegeix un prompt o un fitxer per començar.",
       "profileLoadingToStart": "El perfil encara s'està carregant. Espera un moment i torna-ho a provar.",
+      "attachmentUploadingToStart": "Encara s'està penjant un fitxer adjunt. Treu-lo per començar sense ell.",
+      "modelMissingToStart": "Selecciona un model per començar.",
+      "staleRepositoryToStart": "El repositori seleccionat ja no està disponible. Torna a seleccionar un repositori per començar.",
       "connectProviderToStart": "Els repositoris provenen d'un compte connectat de GitHub, GitLab o Bitbucket.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
@@ -2792,7 +2795,7 @@
     },
     "composer": {
       "addAttachment": "Afegeix un fitxer adjunt",
-      "removeOrRetryFailed": "Primer, treu els fitxers adjunts que han fallat o torna a provar de penjar-los.",
+      "removeFailedAttachments": "Treu els fitxers adjunts que no s'han pogut penjar.",
       "attachmentsWithSlashCommands": "No es poden enviar fitxers adjunts amb ordres amb barra.",
       "photoMetadataNotRemoved": "No s'han pogut eliminar les metadades de la foto d'un fitxer adjunt.",
       "waitForUploads": "Espera que s'acabin de penjar els fitxers adjunts.",

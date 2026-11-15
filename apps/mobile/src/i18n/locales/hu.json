@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Adj hozzá egy promptot az indításhoz.",
       "enterPromptOrFileToStart": "Adj hozzá egy promptot vagy egy fájlt az indításhoz.",
       "profileLoadingToStart": "A profil betöltése még folyamatban van. Várj egy pillanatot, és próbáld újra.",
+      "attachmentUploadingToStart": "Egy csatolmány feltöltése még folyamatban van. Távolítsd el, hogy nélküle indíts.",
+      "modelMissingToStart": "Válassz egy modellt az indításhoz.",
+      "staleRepositoryToStart": "A kiválasztott adattár már nem érhető el. Válassz újra adattárat az indításhoz.",
       "connectProviderToStart": "Az adattárak egy csatlakoztatott GitHub-, GitLab- vagy Bitbucket-fiókból származnak.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Csatolmány hozzáadása",
-      "removeOrRetryFailed": "Előbb távolítsd el a sikertelenül feltöltött csatolmányokat, vagy próbáld újra feltölteni őket.",
+      "removeFailedAttachments": "Távolítsd el a sikertelenül feltöltött csatolmányokat.",
       "attachmentsWithSlashCommands": "A csatolmányokat nem lehet perjeles parancsokkal küldeni.",
       "photoMetadataNotRemoved": "Nem sikerült eltávolítani a fénykép metaadatait az egyik csatolmányból.",
       "waitForUploads": "Várd meg, amíg a csatolmányok feltöltődnek.",

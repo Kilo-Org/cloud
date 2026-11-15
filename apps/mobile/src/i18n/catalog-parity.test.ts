@@ -39,8 +39,11 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * (`agentChat.slashCommands.skillBadge` and
  * `agentChat.slashCommands.useSkillCommand`, added by
  * `slash-command-suggestions.tsx`), the `credits.*` keys of the Buy credits
- * screen, and the new-session footer's still-loading profile message
- * (`agentChat.newSession.profileLoadingToStart`, so a disabled Start is never
+ * screen, and the new-session footer's reasons that hold Start
+ * (`agentChat.newSession.profileLoadingToStart`,
+ * `agentChat.newSession.attachmentUploadingToStart`,
+ * `agentChat.newSession.modelMissingToStart`,
+ * `agentChat.newSession.staleRepositoryToStart`, so a disabled Start is never
  * silent) have all landed in every catalog, so the missing-key assertion is
  * strict again and nothing is pending.
  */

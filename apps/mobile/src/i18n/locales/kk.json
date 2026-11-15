@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Бастау үшін сұрау қосыңыз.",
       "enterPromptOrFileToStart": "Бастау үшін сұрау немесе файл қосыңыз.",
       "profileLoadingToStart": "Профиль әлі жүктелуде. Сәл күте тұрып, қайталап көріңіз.",
+      "attachmentUploadingToStart": "Тіркеме әлі жүктелуде. Онсыз бастау үшін оны алып тастаңыз.",
+      "modelMissingToStart": "Бастау үшін модель таңдаңыз.",
+      "staleRepositoryToStart": "Таңдалған репозиторий енді қолжетімсіз. Бастау үшін репозиторийді қайта таңдаңыз.",
       "connectProviderToStart": "Репозиторийлер қосылған GitHub, GitLab немесе Bitbucket тіркелгісінен келеді.",
       "promptPlaceholder": "Немен жұмыс істегіңіз келеді?",
       "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Тіркеме қосу",
-      "removeOrRetryFailed": "Алдымен жүктелмеген тіркемелерді алып тастаңыз немесе қайта жүктеп салыңыз.",
+      "removeFailedAttachments": "Жүктелмеген тіркемелерді алып тастаңыз.",
       "attachmentsWithSlashCommands": "Тіркемелерді слеш-пәрмендермен бірге жіберуге болмайды.",
       "photoMetadataNotRemoved": "Тіркемеден фотосурет метадеректерін алып тастау мүмкін болмады.",
       "waitForUploads": "Тіркемелерді жүктеп салу аяқталғанша күтіңіз.",

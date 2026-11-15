@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Lägg till en uppmaning för att starta.",
       "enterPromptOrFileToStart": "Lägg till en uppmaning eller en fil för att starta.",
       "profileLoadingToStart": "Profilen läses fortfarande in. Vänta ett ögonblick och försök igen.",
+      "attachmentUploadingToStart": "En bilaga laddas fortfarande upp. Ta bort den för att starta utan den.",
+      "modelMissingToStart": "Välj en modell för att starta.",
+      "staleRepositoryToStart": "Det valda kodarkivet är inte längre tillgängligt. Välj ett kodarkiv igen för att starta.",
       "connectProviderToStart": "Kodarkiv kommer från ett anslutet GitHub-, GitLab- eller Bitbucket-konto.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Bifoga fil",
-      "removeOrRetryFailed": "Ta först bort bilagorna som inte kunde laddas upp, eller försök ladda upp dem igen.",
+      "removeFailedAttachments": "Ta bort bilagorna som inte kunde laddas upp.",
       "attachmentsWithSlashCommands": "Bilagor kan inte skickas med snedstreckskommandon.",
       "photoMetadataNotRemoved": "Fotometadata kunde inte tas bort från en bilaga.",
       "waitForUploads": "Vänta tills bilagorna har laddats upp.",

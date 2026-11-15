@@ -1721,6 +1721,9 @@
       "enterPromptToStart": "أضِف موجِّهًا للبدء.",
       "enterPromptOrFileToStart": "أضِف موجِّهًا أو ملفًا للبدء.",
       "profileLoadingToStart": "لا يزال الملف الشخصي قيد التحميل. انتظر لحظة ثم حاول مرة أخرى.",
+      "attachmentUploadingToStart": "لا يزال أحد المرفقات قيد الرفع. أزِل هذا المرفق لتبدأ من دونه.",
+      "modelMissingToStart": "اختر نموذجًا للبدء.",
+      "staleRepositoryToStart": "المستودع المحدد لم يعد متاحًا. اختر مستودعًا مرة أخرى للبدء.",
       "connectProviderToStart": "تأتي المستودعات من حساب مرتبط على GitHub أو GitLab أو Bitbucket.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",
@@ -2304,7 +2307,7 @@
     },
     "composer": {
       "addAttachment": "إضافة مرفق",
-      "removeOrRetryFailed": "أزل المرفقات التي تعذّر رفعها أو أعد محاولة رفعها أولًا.",
+      "removeFailedAttachments": "أزل المرفقات التي تعذّر رفعها.",
       "attachmentsWithSlashCommands": "لا يمكن إرسال المرفقات مع أوامر الشرطة المائلة.",
       "photoMetadataNotRemoved": "تعذّر إزالة بيانات الصورة الوصفية من مرفق.",
       "waitForUploads": "انتظر حتى ينتهي رفع المرفقات.",

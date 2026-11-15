@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Engade un prompt para comezar.",
       "enterPromptOrFileToStart": "Engade un prompt ou un ficheiro para comezar.",
       "profileLoadingToStart": "O perfil aínda se está cargando. Espera un momento e téntao de novo.",
+      "attachmentUploadingToStart": "Aínda se está subindo un anexo. Elimínao para comezar sen el.",
+      "modelMissingToStart": "Selecciona un modelo para comezar.",
+      "staleRepositoryToStart": "O repositorio seleccionado xa non está dispoñible. Selecciona de novo un repositorio para comezar.",
       "connectProviderToStart": "Os repositorios veñen dunha conta conectada de GitHub, GitLab ou Bitbucket.",
       "promptPlaceholder": "En que che gustaría traballar?",
       "couldNotLoadModels": "Non se puideron cargar os modelos.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Engadir un anexo",
-      "removeOrRetryFailed": "Elimina os anexos que non se puideron subir ou tenta subilos de novo antes de continuar.",
+      "removeFailedAttachments": "Elimina os anexos que non se puideron subir.",
       "attachmentsWithSlashCommands": "Non se poden enviar anexos con comandos de barra.",
       "photoMetadataNotRemoved": "Non se puideron eliminar os metadatos da foto dun anexo.",
       "waitForUploads": "Agarda a que remate a subida dos anexos.",

@@ -1645,6 +1645,9 @@
       "enterPromptToStart": "開始するにはプロンプトを追加してください。",
       "enterPromptOrFileToStart": "開始するにはプロンプトまたはファイルを追加してください。",
       "profileLoadingToStart": "プロフィールを読み込み中です。しばらく待ってから、もう一度お試しください。",
+      "attachmentUploadingToStart": "添付ファイルをアップロード中です。これを使わずに開始するには削除してください。",
+      "modelMissingToStart": "開始するにはモデルを選択してください。",
+      "staleRepositoryToStart": "選択したリポジトリは利用できなくなりました。開始するにはリポジトリをもう一度選択してください。",
       "connectProviderToStart": "リポジトリは、連携済みのGitHub、GitLab、またはBitbucketアカウントから取得されます。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
@@ -2200,7 +2203,7 @@
     },
     "composer": {
       "addAttachment": "添付ファイルを追加",
-      "removeOrRetryFailed": "先に、アップロードに失敗した添付ファイルを削除するか、アップロードを再試行してください。",
+      "removeFailedAttachments": "アップロードに失敗した添付ファイルを削除してください。",
       "attachmentsWithSlashCommands": "添付ファイルはスラッシュコマンドと一緒に送信できません。",
       "photoMetadataNotRemoved": "添付ファイルから写真のメタデータを削除できませんでした。",
       "waitForUploads": "添付ファイルのアップロードが完了するまでお待ちください。",

@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਾਂਪਟ ਜੋੜੋ।",
       "enterPromptOrFileToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਾਂਪਟ ਜਾਂ ਫਾਈਲ ਜੋੜੋ।",
       "profileLoadingToStart": "ਪ੍ਰੋਫਾਈਲ ਅਜੇ ਵੀ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ। ਇੱਕ ਪਲ ਰੁਕੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "attachmentUploadingToStart": "ਇੱਕ ਅਟੈਚਮੈਂਟ ਅਜੇ ਵੀ ਅੱਪਲੋਡ ਹੋ ਰਹੀ ਹੈ। ਇਸ ਤੋਂ ਬਿਨਾਂ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇਸਨੂੰ ਹਟਾਓ।",
+      "modelMissingToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਮਾਡਲ ਚੁਣੋ।",
+      "staleRepositoryToStart": "ਚੁਣੀ ਗਈ ਰਿਪੋਜ਼ਟਰੀ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਦੁਬਾਰਾ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
       "connectProviderToStart": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਇੱਕ ਕਨੈਕਟ ਹੋਏ GitHub, GitLab ਜਾਂ Bitbucket ਖਾਤੇ ਤੋਂ ਆਉਂਦੀਆਂ ਹਨ।",
       "promptPlaceholder": "ਤੁਸੀਂ ਕਿਸ 'ਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੋਗੇ?",
       "couldNotLoadModels": "ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "ਫਾਈਲ ਨੱਥੀ ਕਰੋ",
-      "removeOrRetryFailed": "ਪਹਿਲਾਂ ਅੱਪਲੋਡ ਨਾ ਹੋਈਆਂ ਅਟੈਚਮੈਂਟਾਂ ਹਟਾਓ ਜਾਂ ਉਨ੍ਹਾਂ ਨੂੰ ਮੁੜ ਅੱਪਲੋਡ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "removeFailedAttachments": "ਅੱਪਲੋਡ ਨਾ ਹੋਈਆਂ ਅਟੈਚਮੈਂਟਾਂ ਹਟਾਓ।",
       "attachmentsWithSlashCommands": "ਸਲੈਸ਼ ਕਮਾਂਡਾਂ ਨਾਲ ਅਟੈਚਮੈਂਟਾਂ ਨਹੀਂ ਭੇਜੀਆਂ ਜਾ ਸਕਦੀਆਂ।",
       "photoMetadataNotRemoved": "ਇੱਕ ਅਟੈਚਮੈਂਟ ਤੋਂ ਫੋਟੋ ਦਾ ਮੈਟਾਡੇਟਾ ਨਹੀਂ ਹਟਾਇਆ ਜਾ ਸਕਿਆ।",
       "waitForUploads": "ਅਟੈਚਮੈਂਟਾਂ ਦੇ ਅੱਪਲੋਡ ਮੁਕੰਮਲ ਹੋਣ ਦੀ ਉਡੀਕ ਕਰੋ।",

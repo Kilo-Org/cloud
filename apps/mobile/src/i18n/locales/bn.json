@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "শুরু করতে একটি প্রম্পট যোগ করুন।",
       "enterPromptOrFileToStart": "শুরু করতে একটি প্রম্পট বা ফাইল যোগ করুন।",
       "profileLoadingToStart": "প্রোফাইল এখনও লোড হচ্ছে। এক মুহূর্ত অপেক্ষা করুন এবং আবার চেষ্টা করুন।",
+      "attachmentUploadingToStart": "একটি সংযুক্তি এখনও আপলোড হচ্ছে। এটি ছাড়া শুরু করতে এটি সরান।",
+      "modelMissingToStart": "শুরু করতে একটি মডেল বেছে নিন।",
+      "staleRepositoryToStart": "নির্বাচিত রিপোজিটরিটি আর উপলব্ধ নেই। শুরু করতে আবার একটি রিপোজিটরি বেছে নিন।",
       "connectProviderToStart": "রিপোজিটরি আসে একটি সংযুক্ত GitHub, GitLab বা Bitbucket অ্যাকাউন্ট থেকে।",
       "promptPlaceholder": "আপনি কী নিয়ে কাজ করতে চান?",
       "couldNotLoadModels": "মডেল লোড করা যায়নি।",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "সংযুক্তি যোগ করুন",
-      "removeOrRetryFailed": "যেসব সংযুক্তি আপলোড হয়নি, সেগুলো আগে সরান বা আবার আপলোড করার চেষ্টা করুন।",
+      "removeFailedAttachments": "যেসব সংযুক্তি আপলোড হয়নি, সেগুলো সরান।",
       "attachmentsWithSlashCommands": "স্ল্যাশ কমান্ডের সাথে সংযুক্তি পাঠানো যাবে না।",
       "photoMetadataNotRemoved": "একটি সংযুক্তি থেকে ছবির মেটাডেটা সরানো যায়নি।",
       "waitForUploads": "সংযুক্তিগুলোর আপলোড শেষ হওয়া পর্যন্ত অপেক্ষা করুন।",

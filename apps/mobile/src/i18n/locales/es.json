@@ -1664,6 +1664,9 @@
       "enterPromptToStart": "Añade un prompt para empezar.",
       "enterPromptOrFileToStart": "Añade un prompt o un archivo para empezar.",
       "profileLoadingToStart": "El perfil aún se está cargando. Espera un momento y vuelve a intentarlo.",
+      "attachmentUploadingToStart": "Todavía se está subiendo un archivo adjunto. Quítalo para empezar sin él.",
+      "modelMissingToStart": "Elige un modelo para empezar.",
+      "staleRepositoryToStart": "El repositorio seleccionado ya no está disponible. Vuelve a elegir un repositorio para empezar.",
       "connectProviderToStart": "Los repositorios provienen de una cuenta conectada de GitHub, GitLab o Bitbucket.",
       "promptPlaceholder": "¿En qué te gustaría trabajar?",
       "couldNotLoadModels": "No se pudieron cargar los modelos.",
@@ -2226,7 +2229,7 @@
     },
     "composer": {
       "addAttachment": "Añadir adjunto",
-      "removeOrRetryFailed": "Primero quita los archivos adjuntos que no se han podido subir o vuelve a intentar subirlos.",
+      "removeFailedAttachments": "Quita los archivos adjuntos que no se han podido subir.",
       "attachmentsWithSlashCommands": "No se pueden enviar archivos adjuntos con comandos de barra.",
       "photoMetadataNotRemoved": "No se pudieron eliminar los metadatos de una foto adjunta.",
       "waitForUploads": "Espera a que termine la subida de los archivos adjuntos.",

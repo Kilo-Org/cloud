@@ -2314,6 +2314,9 @@
       "enterPromptToStart": "Żid prompt biex tibda.",
       "enterPromptOrFileToStart": "Żid prompt jew fajl biex tibda.",
       "profileLoadingToStart": "Il-profil għadu qed jitgħabba. Stenna ftit u erġa' pprova.",
+      "attachmentUploadingToStart": "Anness għadu qed jitgħabba. Neħħih biex tibda mingħajru.",
+      "modelMissingToStart": "Agħżel mudell biex tibda.",
+      "staleRepositoryToStart": "Ir-repożitorju magħżul m'għadux disponibbli. Erġa' agħżel repożitorju biex tibda.",
       "connectProviderToStart": "Ir-repożitorji jiġu minn kont imqabbad GitHub, GitLab jew Bitbucket.",
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",
@@ -2890,7 +2893,7 @@
     },
     "composer": {
       "addAttachment": "Żid anness",
-      "removeOrRetryFailed": "L-ewwel neħħi l-annessi li ma ttellgħux jew erġa' pprova ttellagħhom.",
+      "removeFailedAttachments": "Neħħi l-annessi li ma ttellgħux.",
       "attachmentsWithSlashCommands": "L-annessi ma jistgħux jintbagħtu ma' kmandi li jibdew b'/.",
       "photoMetadataNotRemoved": "Il-metadata tar-ritratt ma setgħetx titneħħa minn anness.",
       "waitForUploads": "Stenna sakemm l-annessi jittellgħu kollha.",

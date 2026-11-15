@@ -2272,6 +2272,9 @@
       "enterPromptToStart": "Přidejte výzvu, abyste mohli začít.",
       "enterPromptOrFileToStart": "Přidejte výzvu nebo soubor, abyste mohli začít.",
       "profileLoadingToStart": "Profil se stále načítá. Chvíli počkejte a zkuste to znovu.",
+      "attachmentUploadingToStart": "Příloha se stále nahrává. Odeberte ji, abyste mohli začít bez ní.",
+      "modelMissingToStart": "Vyberte model, abyste mohli začít.",
+      "staleRepositoryToStart": "Vybraný repozitář už není dostupný. Vyberte repozitář znovu, abyste mohli začít.",
       "connectProviderToStart": "Repozitáře pocházejí z připojeného účtu GitHub, GitLab nebo Bitbucket.",
       "promptPlaceholder": "Na čem chcete pracovat?",
       "couldNotLoadModels": "Modely se nepodařilo načíst.",
@@ -2841,7 +2844,7 @@
     },
     "composer": {
       "addAttachment": "Přidat přílohu",
-      "removeOrRetryFailed": "Nejprve odeberte přílohy, které se nepodařilo nahrát, nebo je zkuste nahrát znovu.",
+      "removeFailedAttachments": "Odeberte přílohy, které se nepodařilo nahrát.",
       "attachmentsWithSlashCommands": "Přílohy nelze odesílat s příkazy s lomítkem.",
       "photoMetadataNotRemoved": "Z přílohy se nepodařilo odebrat metadata fotky.",
       "waitForUploads": "Počkejte, až se dokončí nahrávání příloh.",

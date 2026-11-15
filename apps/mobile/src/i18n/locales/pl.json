@@ -1683,6 +1683,9 @@
       "enterPromptToStart": "Dodaj prompt, aby rozpocząć.",
       "enterPromptOrFileToStart": "Dodaj prompt lub plik, aby rozpocząć.",
       "profileLoadingToStart": "Profil jest nadal wczytywany. Poczekaj chwilę i spróbuj ponownie.",
+      "attachmentUploadingToStart": "Załącznik wciąż się przesyła. Usuń go, aby rozpocząć bez niego.",
+      "modelMissingToStart": "Wybierz model, aby rozpocząć.",
+      "staleRepositoryToStart": "Wybrane repozytorium nie jest już dostępne. Wybierz repozytorium ponownie, aby rozpocząć.",
       "connectProviderToStart": "Repozytoria pochodzą z połączonego konta GitHub, GitLab lub Bitbucket.",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",
@@ -2252,7 +2255,7 @@
     },
     "composer": {
       "addAttachment": "Dodaj załącznik",
-      "removeOrRetryFailed": "Najpierw usuń załączniki, których nie udało się przesłać, lub prześlij je ponownie.",
+      "removeFailedAttachments": "Usuń załączniki, których nie udało się przesłać.",
       "attachmentsWithSlashCommands": "Nie można wysyłać załączników z poleceniami z ukośnikiem.",
       "photoMetadataNotRemoved": "Nie udało się usunąć metadanych zdjęcia z załącznika.",
       "waitForUploads": "Poczekaj na zakończenie przesyłania załączników.",

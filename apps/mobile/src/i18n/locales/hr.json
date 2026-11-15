@@ -2230,6 +2230,9 @@
       "enterPromptToStart": "Dodaj upit za početak.",
       "enterPromptOrFileToStart": "Dodaj upit ili datoteku za početak.",
       "profileLoadingToStart": "Profil se još učitava. Pričekaj trenutak i pokušaj ponovno.",
+      "attachmentUploadingToStart": "Privitak se još prenosi. Ukloni ga da započneš bez njega.",
+      "modelMissingToStart": "Odaberi model za početak.",
+      "staleRepositoryToStart": "Odabrani repozitorij više nije dostupan. Ponovno odaberi repozitorij za početak.",
       "connectProviderToStart": "Repozitoriji dolaze s povezanog GitHub, GitLab ili Bitbucket računa.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
@@ -2792,7 +2795,7 @@
     },
     "composer": {
       "addAttachment": "Dodaj privitak",
-      "removeOrRetryFailed": "Najprije ukloni privitke čiji prijenos nije uspio ili ih pokušaj ponovno prenijeti.",
+      "removeFailedAttachments": "Ukloni privitke čiji prijenos nije uspio.",
       "attachmentsWithSlashCommands": "Privitci se ne mogu slati uz naredbe s kosom crtom.",
       "photoMetadataNotRemoved": "Nije moguće ukloniti metapodatke fotografije iz privitka.",
       "waitForUploads": "Pričekaj da završi prijenos privitaka.",

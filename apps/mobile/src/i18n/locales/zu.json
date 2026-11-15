@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Engeza umyalelo ukuze uqale.",
       "enterPromptOrFileToStart": "Engeza umyalelo noma ifayela ukuze uqale.",
       "profileLoadingToStart": "Iphrofayili isalayishwa. Linda isikhashana bese uzama futhi.",
+      "attachmentUploadingToStart": "Okunamathiselwe kusalayishwa. Kususe ukuze uqale ngaphandle kwakho.",
+      "modelMissingToStart": "Khetha imodeli ukuze uqale.",
+      "staleRepositoryToStart": "Inqolobane yekhodi ekhethiwe ayisatholakali. Khetha inqolobane yekhodi futhi ukuze uqale.",
       "connectProviderToStart": "Izinqolobane zekhodi zivela ku-akhawunti exhunyiwe ye-GitHub, ye-GitLab, noma ye-Bitbucket.",
       "promptPlaceholder": "Ungathanda ukusebenza ngani?",
       "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Engeza okunamathiselwe",
-      "removeOrRetryFailed": "Qala ngokususa okunamathiselwe okuhlulekile ukulayishwa, noma uzame ukukulayisha futhi.",
+      "removeFailedAttachments": "Susa okunamathiselwe okuhlulekile ukulayishwa.",
       "attachmentsWithSlashCommands": "Okunamathiselwe akukwazi ukuthunyelwa nemiyalo eqala ngo-/.",
       "photoMetadataNotRemoved": "Asikwazanga ukususa imininingwane yesithombe kokunamathiselwe.",
       "waitForUploads": "Linda kuze kuphele ukulayishwa kokunamathiselwe.",

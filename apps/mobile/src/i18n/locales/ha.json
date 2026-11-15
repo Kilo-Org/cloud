@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Ƙara umarni don farawa.",
       "enterPromptOrFileToStart": "Ƙara umarni ko fayil don farawa.",
       "profileLoadingToStart": "Har yanzu ana loda bayanin martaba. Jira ɗan lokaci ka sake gwadawa.",
+      "attachmentUploadingToStart": "Ana ci gaba da ɗora wani haɗe. Cire shi don farawa ba tare da shi ba.",
+      "modelMissingToStart": "Zaɓi samfuri don farawa.",
+      "staleRepositoryToStart": "Ma'ajiyar da aka zaɓa ba ta wanzuwa kuma. Sake zaɓar ma'ajiya don farawa.",
       "connectProviderToStart": "Ma'ajiyoyi kan fito daga asusun GitHub, GitLab, ko Bitbucket da aka haɗa.",
       "promptPlaceholder": "Me kake so ka yi aiki a kai?",
       "couldNotLoadModels": "An kasa loda samfura.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Haɗa fayil",
-      "removeOrRetryFailed": "Da farko, cire haɗe-haɗen da aka kasa ɗorawa ko ka sake gwada ɗora su.",
+      "removeFailedAttachments": "Cire haɗe-haɗen da aka kasa ɗorawa.",
       "attachmentsWithSlashCommands": "Ba za a iya aika haɗe-haɗe tare da umarnin / ba.",
       "photoMetadataNotRemoved": "An kasa cire ƙarin bayanan hoto daga haɗe-haɗen.",
       "waitForUploads": "Jira a gama ɗora haɗe-haɗen.",

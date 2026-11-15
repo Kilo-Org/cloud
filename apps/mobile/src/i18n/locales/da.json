@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Tilføj en prompt for at starte.",
       "enterPromptOrFileToStart": "Tilføj en prompt eller en fil for at starte.",
       "profileLoadingToStart": "Profilen indlæses stadig. Vent et øjeblik, og prøv igen.",
+      "attachmentUploadingToStart": "Der uploades stadig en vedhæftet fil. Fjern den for at starte uden den.",
+      "modelMissingToStart": "Vælg en model for at starte.",
+      "staleRepositoryToStart": "Det valgte kodelager er ikke længere tilgængeligt. Vælg et kodelager igen for at starte.",
       "connectProviderToStart": "Kodelagre kommer fra en tilknyttet GitHub-, GitLab- eller Bitbucket-konto.",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Vedhæft fil",
-      "removeOrRetryFailed": "Fjern først de filer, der ikke kunne uploades, eller prøv at uploade dem igen.",
+      "removeFailedAttachments": "Fjern de filer, der ikke kunne uploades.",
       "attachmentsWithSlashCommands": "Vedhæftede filer kan ikke sendes sammen med skråstregskommandoer.",
       "photoMetadataNotRemoved": "Kunne ikke fjerne billedmetadata fra en vedhæftet fil.",
       "waitForUploads": "Vent, til alle vedhæftede filer er uploadet.",

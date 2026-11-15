@@ -1645,6 +1645,9 @@
       "enterPromptToStart": "Thêm một lời nhắc để bắt đầu.",
       "enterPromptOrFileToStart": "Thêm một lời nhắc hoặc tệp để bắt đầu.",
       "profileLoadingToStart": "Hồ sơ vẫn đang tải. Chờ một chút rồi thử lại.",
+      "attachmentUploadingToStart": "Một tệp đính kèm vẫn đang tải lên. Gỡ nó để bắt đầu mà không có nó.",
+      "modelMissingToStart": "Chọn một mô hình để bắt đầu.",
+      "staleRepositoryToStart": "Kho mã đã chọn không còn khả dụng. Chọn lại một kho mã để bắt đầu.",
       "connectProviderToStart": "Kho mã đến từ một tài khoản GitHub, GitLab hoặc Bitbucket đã kết nối.",
       "promptPlaceholder": "Bạn muốn làm gì?",
       "couldNotLoadModels": "Không thể tải danh sách mô hình.",
@@ -2200,7 +2203,7 @@
     },
     "composer": {
       "addAttachment": "Thêm tệp đính kèm",
-      "removeOrRetryFailed": "Trước tiên, hãy gỡ các tệp đính kèm chưa tải lên được hoặc thử tải lên lại.",
+      "removeFailedAttachments": "Gỡ các tệp đính kèm chưa tải lên được.",
       "attachmentsWithSlashCommands": "Không thể gửi tệp đính kèm cùng lệnh dấu gạch chéo.",
       "photoMetadataNotRemoved": "Không thể xóa siêu dữ liệu ảnh khỏi tệp đính kèm.",
       "waitForUploads": "Chờ các tệp đính kèm tải lên xong.",

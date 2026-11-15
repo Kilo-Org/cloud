@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Shto një kërkesë për të filluar.",
       "enterPromptOrFileToStart": "Shto një kërkesë ose një skedar për të filluar.",
       "profileLoadingToStart": "Profili po ngarkohet ende. Prit një moment dhe provo përsëri.",
+      "attachmentUploadingToStart": "Një bashkëngjitje po ngarkohet ende. Hiqe për të filluar pa të.",
+      "modelMissingToStart": "Zgjidh një model për të filluar.",
+      "staleRepositoryToStart": "Depoja e zgjedhur nuk është më e disponueshme. Zgjidh përsëri një depo për të filluar.",
       "connectProviderToStart": "Depot vijnë nga një llogari e lidhur e GitHub, GitLab ose Bitbucket.",
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Shto bashkëngjitje",
-      "removeOrRetryFailed": "Fillimisht hiq bashkëngjitjet që nuk u ngarkuan ose provo t'i ngarkosh përsëri.",
+      "removeFailedAttachments": "Hiq bashkëngjitjet që nuk u ngarkuan.",
       "attachmentsWithSlashCommands": "Bashkëngjitjet nuk mund të dërgohen me komandat me /.",
       "photoMetadataNotRemoved": "Metadatat e fotos nuk mund të hiqeshin nga një bashkëngjitje.",
       "waitForUploads": "Prit derisa të përfundojë ngarkimi i bashkëngjitjeve.",

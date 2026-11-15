@@ -2188,6 +2188,9 @@
       "enterPromptToStart": "Tinye iwu iji malite.",
       "enterPromptOrFileToStart": "Tinye iwu ma ọ bụ faịlụ iji malite.",
       "profileLoadingToStart": "A ka na-ebudata profaịlụ. Chere ntakịrị ma nwaa ọzọ.",
+      "attachmentUploadingToStart": "A ka na-ebugote otu ihe mgbakwunye. Wepụ ya ka i malite na-enweghị ya.",
+      "modelMissingToStart": "Họrọ ihe nlereanya iji malite.",
+      "staleRepositoryToStart": "Ebe nchekwa koodu ahọpụtara adịkwaghị. Họrọ ebe nchekwa koodu ọzọ iji malite.",
       "connectProviderToStart": "Ebe nchekwa koodu na-abịa site na akaụntụ GitHub, GitLab, ma ọ bụ Bitbucket ejikọrọ.",
       "promptPlaceholder": "Gịnị ka ị chọrọ ịrụ ọrụ na ya?",
       "couldNotLoadModels": "Enweghị ike ibudata ihe nlereanya.",
@@ -2743,7 +2746,7 @@
     },
     "composer": {
       "addAttachment": "Tinye ihe mgbakwunye",
-      "removeOrRetryFailed": "Buru ụzọ wepụ faịlụ mgbakwunye ndị ebugoteghị ma ọ bụ nwaa ibugote ha ọzọ.",
+      "removeFailedAttachments": "Wepụ faịlụ mgbakwunye ndị ebugoteghị.",
       "attachmentsWithSlashCommands": "Enweghị ike iziga faịlụ mgbakwunye na iwu ndị na-amalite na /.",
       "photoMetadataNotRemoved": "Enweghị ike iwepụ nkọwa data foto n'otu faịlụ mgbakwunye.",
       "waitForUploads": "Chere ka faịlụ mgbakwunye mechaa ibugote.",

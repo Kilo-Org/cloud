@@ -1,1 +1,0 @@
-CREATE INDEX "idx_session_step_up_proofs_user_session_binding" ON "session_step_up_proofs" USING btree ("kilo_user_id","session_id_hash","action_binding_hash");

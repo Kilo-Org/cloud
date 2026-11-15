@@ -190,17 +190,15 @@ export function NewSessionConfigureForm({
   // takes as room of its own.
   const containerY = Math.max(0, windowHeight - containerHeight);
   // The fit reads the same space the keyboard occupies: the container's top as
-  // the window places it, and its height. The fit takes no vertical offset,
-  // because the container ends at the window's own bottom edge, so the
-  // keyboard's height alone is the overlap to clear — exactly what the lift
-  // reserves. The footer's own bottom padding covers the platform inset for the
-  // button.
+  // the window places it, and its height. Its offset is the reduction the lift
+  // applies, so the frame reserves exactly the band the lift takes and never
+  // more; the footer's own bottom padding covers the rest of the inset.
   const frame = {
     containerY,
     containerHeight,
     footerHeight,
     windowHeight,
-    keyboardVerticalOffset: 0,
+    keyboardVerticalOffset: -bottom,
   };
   // Fit against the keyboard's destination, not each intermediate viewport.
   // The prompt interpolates to that whole-line fit on the UI thread.

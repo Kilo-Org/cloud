@@ -134,10 +134,9 @@ function NoticeCopy({
 /**
  * The notice for a purchase the store has not settled.
  *
- * The card's height is fixed by a reserved copy of every resolution variant,
- * painted over by the live one. The reserve is what a reader never sees: it
- * keeps the card's final size from the first frame, so the retry, the consent
- * target and the store's answer add no space and move nothing else on screen.
+ * One card: the store-wait line when there is one, then the resolution's copy,
+ * an optional consent target and its two actions. The card sits in its own slot
+ * after the pack rows, so its own height changes move nothing above it.
  */
 export function CreditUnresolvedPurchaseNotice({
   resolution,

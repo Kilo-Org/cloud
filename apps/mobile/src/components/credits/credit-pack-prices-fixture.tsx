@@ -7,6 +7,7 @@ import {
   joinStoreCreditProducts,
   type StoreCreditProductListing,
 } from '@/lib/credits/store-products';
+import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { creditStoreProductsKey } from '@/lib/credits/use-store-credit-products';
 import { TRPCProvider, useTRPC } from '@/lib/trpc';
@@ -27,7 +28,9 @@ import {
 // money-safety surfaces with inert exits: `unresolved` restores an earlier
 // charge on a current SKU, `legacy-unresolved` restores a retired Play SKU whose
 // replacement is the consent target, `refused-unresolved` restores a charge the
-// backend will never credit, and `failed` shows the inline error beside it.
+// backend will never credit, `waiting` and `pending` show the store-wait and
+// pending-payment copy on the pack's row and in the card, and `failed` shows the
+// inline error beside it, in the storefront's own wording.
 
 export type CreditPackPricesFixtureState =
   | 'priced'
@@ -36,6 +39,8 @@ export type CreditPackPricesFixtureState =
   | 'unresolved'
   | 'legacy-unresolved'
   | 'refused-unresolved'
+  | 'waiting'
+  | 'pending'
   | 'failed';
 
 const FIXTURE_STATES = [
@@ -45,6 +50,8 @@ const FIXTURE_STATES = [
   'unresolved',
   'legacy-unresolved',
   'refused-unresolved',
+  'waiting',
+  'pending',
   'failed',
 ] as const satisfies readonly CreditPackPricesFixtureState[];
 
@@ -53,6 +60,19 @@ export function isCreditPackPricesFixtureState(
 ): value is CreditPackPricesFixtureState {
   return value !== undefined && FIXTURE_STATES.some(state => state === value);
 }
+
+/** Which store wait each state paints, if any. */
+const WAIT_KIND_BY_STATE = {
+  priced: null,
+  'partly-priced': null,
+  completing: null,
+  unresolved: null,
+  'legacy-unresolved': null,
+  'refused-unresolved': null,
+  waiting: 'store',
+  pending: 'pending',
+  failed: null,
+} as const satisfies Record<CreditPackPricesFixtureState, 'store' | 'pending' | null>;
 
 /** Store prices in the shape the German Play store returns for these packs. */
 const PLAY_PRICES = ['10,99 €', '54,99 €', '109,99 €', '549,99 €'] as const;
@@ -222,6 +242,8 @@ function FixtureSession({ state }: { state: CreditPackPricesFixtureState }) {
 }
 
 export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixtureState }) {
+  const waitKind = WAIT_KIND_BY_STATE[state];
+
   const store = useMemo<CreditNativeIapContextValue>(() => {
     const fixtureListings = listings(state);
     // An earlier charge the emulator cannot produce. `legacy-unresolved` keeps a
@@ -271,12 +293,21 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
       // The completing state keeps the first pack's purchase open, which is the
       // only way to render its in-flight label without a store.
       completingProductId: state === 'completing' ? (fixtureListings[0]?.id ?? null) : null,
-      purchaseWait: null,
-      errorMessageKey: state === 'failed' ? 'credits.storeTimedOut' : null,
+      purchaseWait:
+        waitKind === null
+          ? null
+          : { productId: fixtureListings[0]?.id ?? '', kind: waitKind },
+      // The loader's own wording for a store that missed the deadline, which
+      // differs per storefront: the fixture must not show App Store copy on
+      // Android.
+      errorMessageKey:
+        state === 'failed'
+          ? getStoreUnavailableCopyKeys(getCreditStorefront()).timeoutBodyKey
+          : null,
       completedPurchaseCount: 0,
       clearError: () => undefined,
     };
-  }, [state]);
+  }, [state, waitKind]);
 
   return (
     <CreditNativeIapContext.Provider value={store}>

@@ -12,6 +12,7 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -765,6 +766,142 @@ describe('binary support organization access', () => {
       code: 'FORBIDDEN',
       cause: expect.objectContaining({ code: 'MFA_REQUIRED' }),
     });
+  });
+
+  async function approveWriteGrant(actorKiloUserId: string, organizationId: string) {
+    const approver = await insertTestUser({ is_admin: true });
+    return insertGrant({
+      actorKiloUserId,
+      organizationId,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+  }
+
+  /**
+   * What the `adminProcedure` middleware leaves on the context once it has
+   * claimed and spent one operation proof for the exact tRPC route.
+   */
+  function freshUpstreamState(): NonNullable<TRPCContext['adminStepUpState']> {
+    return {
+      status: 'fresh',
+      method: 'webauthn_uv',
+      verifiedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+    };
+  }
+
+  function writeCtxFor(
+    user: User,
+    adminStepUpState?: TRPCContext['adminStepUpState'],
+    trpcPath = 'organizations.settings.updateDefaultModel'
+  ): TRPCContext {
+    return {
+      user,
+      credential: 'session',
+      webSessionId: writeSessionId,
+      trpcPath,
+      trpcType: 'mutation',
+      ...(adminStepUpState ? { adminStepUpState } : {}),
+    };
+  }
+
+  test('a fresh upstream step-up is reused instead of claiming a second proof', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const grant = await approveWriteGrant(admin.id, organization.id);
+
+    // No operation proof is minted here: the upstream middleware already spent
+    // one, so a second claim would demand a prompt the caller cannot answer.
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(
+        ensureOrganizationAccess(writeCtxFor(admin, freshUpstreamState()), organization.id)
+      ).resolves.toBe('admin');
+      expect(requireFreshSpy).not.toHaveBeenCalled();
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+
+    const [use] = await db
+      .select()
+      .from(support_access_grant_events)
+      .where(
+        and(
+          eq(support_access_grant_events.grant_id, grant.id),
+          eq(support_access_grant_events.event_type, 'used_write')
+        )
+      );
+    expect(use).toMatchObject({
+      organization_id: organization.id,
+      action_class: 'support_write',
+      performed_by_kilo_user_id: admin.id,
+    });
+  });
+
+  test('without an upstream state the write use claims a proof bound to the organization', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await approveWriteGrant(admin.id, organization.id);
+    const writeCtx = await writeCtxWithStepUp(admin, organization.id);
+
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
+      expect(requireFreshSpy).toHaveBeenCalledTimes(1);
+      expect(requireFreshSpy).toHaveBeenCalledWith({
+        userId: admin.id,
+        action: 'support_write_use',
+        actionClass: 'support_write',
+        organizationId: organization.id,
+        credential: 'session',
+        webSessionId: writeSessionId,
+        route: 'organizations.settings.updateDefaultModel',
+        method: 'mutation',
+        surface: 'trpc',
+      });
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+  });
+
+  test('a support write use is still refused while step-up is switched off', async () => {
+    setSupportEnabled(true);
+    delete process.env.ADMIN_STEP_UP_ENABLED;
+    const { organization, admin } = await orgAndAdmin();
+    await approveWriteGrant(admin.id, organization.id);
+    const writeCtx = await writeCtxWithStepUp(admin, organization.id);
+
+    await expect(ensureOrganizationAccess(writeCtx, organization.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Step-up must be enabled for this support access change',
+      cause: expect.objectContaining({
+        code: 'MFA_REQUIRED',
+        actionClass: 'support_write',
+        purpose: 'operation',
+        maxAgeSeconds: 300,
+      }),
+    });
+  });
+
+  test('a read grant request never claims a write proof', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).resolves.toBe(
+        'member'
+      );
+      expect(requireFreshSpy).not.toHaveBeenCalled();
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
   });
 
   test('ON write use rejects an expired proof as MFA_EXPIRED', async () => {

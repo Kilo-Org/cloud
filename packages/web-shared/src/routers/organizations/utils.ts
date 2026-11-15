@@ -4,7 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
-import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import { requireSupportWriteUseStepUp } from '@kilocode/web-shared/lib/admin/support-step-up';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
@@ -220,6 +220,7 @@ export type OrganizationAccessContext = Pick<
   | 'trpcPath'
   | 'trpcType'
   | 'webSessionId'
+  | 'adminStepUpState'
 > & {
   auditSurface?: 'trpc' | 'rest' | 'server-component';
   auditMethod?: string;
@@ -435,11 +436,10 @@ export async function resolveOrganizationAccess(
         ? findSupportAllowEntry({ surface, key, actionClass: 'support_write' })
         : undefined;
       if (entry?.stepUp === 'fresh') {
-        await supportStepUpPort.requireFresh({
+        await requireSupportWriteUseStepUp({
           userId: ctx.user.id,
-          action: 'support_write_use',
-          actionClass: 'support_write',
           organizationId,
+          upstreamStepUpState: ctx.adminStepUpState,
           credential: ctx.credential,
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,

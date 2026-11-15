@@ -2164,7 +2164,7 @@
       "exitSession": "Baigti sesiją",
       "restartExitFailed": "Pradėta nauja sesija. Ankstesnė sesija vis dar atidaryta.",
       "exitNotSupported": "Šios sesijos negalima baigti nuotoliniu būdu.",
-      "exitUnavailable": "Šios sesijos negalima baigti nuotoliniu būdu.",
+      "exitUnavailable": "Nuotolinis šios sesijos baigimas nepasiekiamas.",
       "exitNeedsNewerCli": "Norint nuotoliniu būdu vykdyti komandas su pasviruoju brūkšniu, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "sessionConnection": {

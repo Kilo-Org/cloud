@@ -256,6 +256,7 @@ import {
   removeItemIfValue,
   resetEncryptedKvOpenForTests,
   setItem,
+  setItemWithSignal,
   validateItemKey,
   validateScope,
 } from './encrypted-kv';
@@ -738,6 +739,20 @@ describe('database key validation', () => {
       await expect(getItem('s', 'a')).resolves.toBe('x');
     }
   );
+});
+
+describe('cancelled writes after the database await', () => {
+  it.each(['write', 'delete'])('does not execute an aborted %s', async operation => {
+    await setItem('s', 'key', 'original');
+    const controller = new AbortController();
+    const pending =
+      operation === 'write'
+        ? setItemWithSignal('s', 'key', { value: 'replacement', signal: controller.signal })
+        : removeItem('s', 'key', controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toThrow('cancelled');
+    await expect(getItem('s', 'key')).resolves.toBe('original');
+  });
 });
 
 describe('kv behavior', () => {

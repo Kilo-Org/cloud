@@ -1042,7 +1042,10 @@ api.post('/session/:sessionId/share', bodyLimit({ maxSize: 1024 }), async c => {
     ).catch(() => undefined);
   }
 
-  return c.json({ success: true, share_token: shareToken }, 200);
+  /* The capability it just wrote, not only the token: the app compares it with
+     the one a later read reports, which is what says the link it is showing is
+     still the live one. */
+  return c.json({ success: true, share_token: shareToken, public_id: publicId }, 200);
 });
 
 api.post('/session/:sessionId/unshare', async c => {

@@ -168,6 +168,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - The per-chat web search and Kilo MCP choices belong to the chat registry. Change them only through `setChatFlag` and `retryChatFlag` in `@/lib/chat/registry`. Other stored values stay with the store that owns them; a component must not keep its own optimistic copy beside it.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
+- A UI attempt fences admission and publication, not effects after an await. Recheck resource ownership and auth epoch before closing a form or changing account-bound UI. Retained merge keys retire only when the fingerprint and captured key both still match; at capacity refuse new intents without evicting unresolved ones.
 
 ## State Machines
 
@@ -311,6 +312,12 @@ Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux servi
 The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds the registry (the conversations that are running), the layers (the plugins they run on) and the store (the list and its CRUD). The SDK saves one conversation; this app owns the list, the ordering, the titles, the deleting and the scoping.
 
 **A conversation can move, and the screen follows the state rather than a return value.** Switching models clones the conversation onto a new session, and the mover is not always the screen: a question typed on another model while an answer was arriving moves the chat from inside the registry. So the chat that was left points at the one it became, and `useChat` follows that.
+
+A chat flag is one `ChatFlag` on `ChatState` (`@/lib/chat/chat-flag`): read it and write it through `setChatFlag`, never with a `useState` mirror beside it. A refused persist rejects and restores the stored choice, including its application status and Retry when that choice is behind. `retryChatFlag` applies that saved choice again without another persist. Both flags and every move share the chat's registry turn.
+
+Resolve a queued operation's session inside its turn, because an earlier move can rename it. Keep send startup in that turn through assigning `chat.answering`; a tool retry rechecks the live chat inside its turn and defers while an answer streams. Closing skips only waiting skippable tickets, never a queued reopen. A skipped caller may settle early, but its queue tail still waits for its predecessor.
+
+Sign-out and account switch cancel only the old account's chat flags: drop waiting flag tickets and abandon a pending flag persist, whose captured `AbortSignal` fences the SQL write and later application/publication. Every non-flag operation, session move and runtime close is still awaited, with no teardown deadline. Once a flag begins moving a session, finish that move and its metadata migration before teardown continues. A deferred flag stays `moving` until its move publishes `current` or `behind`.
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 

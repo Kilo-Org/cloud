@@ -408,6 +408,10 @@ const ShareResponseSchema = z
   .object({
     success: z.literal(true),
     share_token: z.string().min(1),
+    /* The capability the worker wrote. Optional because a worker older than this
+       client answers with the token alone; the caller then keeps today's
+       behaviour, which is showing the link without rotation detection. */
+    public_id: z.string().min(1).optional(),
   })
   .strict();
 
@@ -435,13 +439,16 @@ export class SessionShareTooLargeError extends Error {
  * Calls POST /session/:sessionId/share, which rotates the public capability.
  * Each call issues a fresh share generation and invalidates the previous link.
  *
- * @returns The opaque JWT used to construct the /s/{share_token} share URL.
+ * @returns The opaque JWT used to construct the /s/{share_token} share URL, and
+ *   the capability the worker created, which is what tells this link from a
+ *   later one. `public_id` is null only while a worker older than this client
+ *   answers.
  */
 export async function shareSession(
   sessionId: string,
   userId: string,
   options: Partial<SessionShareOptions> = {}
-): Promise<{ share_token: string }> {
+): Promise<{ share_token: string; public_id: string | null }> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
@@ -479,7 +486,7 @@ export async function shareSession(
   }
 
   const body = ShareResponseSchema.parse(await response.json());
-  return { share_token: body.share_token };
+  return { share_token: body.share_token, public_id: body.public_id ?? null };
 }
 
 /**

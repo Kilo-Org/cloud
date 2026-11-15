@@ -32,9 +32,16 @@ type SheetDismissGuard = {
  */
 export function useSheetDismissGuard({
   isDirty,
+  isRunning,
   onDiscard,
 }: Readonly<{
   isDirty: () => boolean;
+  /**
+   * Whether the sheet's own request is in flight. A dismissal during a run
+   * closes without asking: the request already left, so there are no unsaved
+   * edits to discard, and the run's surface announces its outcome.
+   */
+  isRunning?: () => boolean;
   /** Drop the edits and close. Runs only once the user confirms. */
   onDiscard: () => void;
 }>): SheetDismissGuard {
@@ -43,6 +50,8 @@ export function useSheetDismissGuard({
 
   const isDirtyRef = useRef(isDirty);
   isDirtyRef.current = isDirty;
+  const isRunningRef = useRef(isRunning);
+  isRunningRef.current = isRunning;
   const onDiscardRef = useRef(onDiscard);
   onDiscardRef.current = onDiscard;
 
@@ -59,7 +68,7 @@ export function useSheetDismissGuard({
   }, [confirm, t]);
 
   const requestClose = useCallback(() => {
-    if (isDirtyRef.current()) {
+    if (isDirtyRef.current() && isRunningRef.current?.() !== true) {
       confirmDiscard();
       return;
     }
@@ -67,7 +76,7 @@ export function useSheetDismissGuard({
   }, [confirmDiscard]);
 
   const requestDismiss = useCallback(() => {
-    if (!isDirtyRef.current()) {
+    if (!isDirtyRef.current() || isRunningRef.current?.() === true) {
       return true;
     }
     confirmDiscard();

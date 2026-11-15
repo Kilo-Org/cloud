@@ -1,5 +1,5 @@
 import { type ResolvedSession } from '@kilocode/cloud-agent-sdk';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -27,6 +27,8 @@ type ResolveSessionConfigSelectionOptions = {
 };
 
 type UseSessionConfigSyncOptions = ResolveSessionConfigSelectionOptions & {
+  /** The session this composer is for, so a pick never leaks into another one. */
+  sessionId: string;
   /**
    * Mode chosen at spawn, threaded from the route. Seeds the initial mode only:
    * a stored `fetchedData.mode`, a live `sessionConfig.mode`, and a later user
@@ -34,6 +36,15 @@ type UseSessionConfigSyncOptions = ResolveSessionConfigSelectionOptions & {
    */
   spawnedMode?: string;
 };
+
+/**
+ * Who owns the composer's mode. A mode the person picked outlives the session
+ * row that lands after it; the pick names its session, so it never leaks into
+ * another.
+ */
+type ModeChoice =
+  | { readonly kind: 'session'; readonly mode: AgentMode }
+  | { readonly kind: 'picked'; readonly sessionId: string; readonly mode: AgentMode };
 
 type UseSessionConfigSyncResult = {
   currentMode: AgentMode;
@@ -92,6 +103,7 @@ export function useSessionConfigSync({
   selectedModel,
   selectedVariant,
   cloudAgentModelOverride = null,
+  sessionId,
   spawnedMode,
 }: UseSessionConfigSyncOptions): UseSessionConfigSyncResult {
   const initialSelection = resolveSessionConfigSelection({
@@ -103,18 +115,34 @@ export function useSessionConfigSync({
     selectedVariant,
     cloudAgentModelOverride,
   });
-  const [currentMode, setCurrentMode] = useState<AgentMode>(() =>
-    normalizeAgentMode(fetchedData?.mode ?? spawnedMode)
-  );
+  const [modeChoice, setModeChoice] = useState<ModeChoice>(() => ({
+    kind: 'session',
+    mode: normalizeAgentMode(fetchedData?.mode ?? spawnedMode),
+  }));
   const [currentModel, setCurrentModel] = useState(initialSelection.model);
   const [currentVariant, setCurrentVariant] = useState(initialSelection.variant);
 
   useEffect(() => {
     const mode = sessionConfig?.mode ?? fetchedData?.mode;
     if (mode) {
-      setCurrentMode(normalizeAgentMode(mode));
+      /* A row that lands after a pick may not replace it: the pick is the person
+         answering, and the row is about the session as it was before they did.
+         The pick names its session, so another session's row replaces the seed
+         rather than a choice made in a different chat. */
+      setModeChoice(held =>
+        held.kind === 'picked' && held.sessionId === sessionId
+          ? held
+          : { kind: 'session', mode: normalizeAgentMode(mode) }
+      );
     }
-  }, [sessionConfig?.mode, fetchedData?.mode]);
+  }, [sessionConfig?.mode, fetchedData?.mode, sessionId]);
+
+  const setCurrentMode = useCallback(
+    (mode: AgentMode) => {
+      setModeChoice({ kind: 'picked', sessionId, mode });
+    },
+    [sessionId]
+  );
 
   useEffect(() => {
     const selection = resolveSessionConfigSelection({
@@ -150,7 +178,7 @@ export function useSessionConfigSync({
   ]);
 
   return {
-    currentMode,
+    currentMode: modeChoice.mode,
     currentModel,
     currentVariant,
     setCurrentMode,

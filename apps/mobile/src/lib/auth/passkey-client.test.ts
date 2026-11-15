@@ -23,6 +23,9 @@ const {
 
 const mockPostAuth = vi.mocked(postAuth);
 
+/** The fresh proof every native registration now presents. */
+const authorization = { managementAuthorization: 'auth-1' };
+
 function fakeApi(supported = true) {
   return {
     isSupported: () => supported,
@@ -485,7 +488,7 @@ describe('signInWithPasskey', () => {
 
 describe('registerPasskey', () => {
   it('reports unsupported without a native module instead of throwing', async () => {
-    const result = await registerPasskey(null);
+    const result = await registerPasskey(authorization, null);
     expect(result).toEqual({ status: 'error', failure: 'unsupported' });
     expect(mockPostAuth).not.toHaveBeenCalled();
   });
@@ -497,13 +500,13 @@ describe('registerPasskey', () => {
       .mockResolvedValueOnce(optionsResponse)
       .mockResolvedValueOnce({ ok: true, data: { credentialId: 'cred-2' } });
 
-    const result = await registerPasskey(api);
+    const result = await registerPasskey(authorization, api);
 
     expect(api.create).toHaveBeenCalledWith({ challenge: 'chal' });
     expect(mockPostAuth).toHaveBeenNthCalledWith(
       1,
       '/api/auth/passkey/register',
-      { action: 'options' },
+      { action: 'options', managementAuthorization: 'auth-1' },
       { Authorization: 'Bearer session-token' }
     );
     expect(mockPostAuth).toHaveBeenNthCalledWith(
@@ -513,6 +516,7 @@ describe('registerPasskey', () => {
         action: 'verify',
         challengeId: 'c0000000-0000-4000-8000-000000000001',
         response: attestation,
+        managementAuthorization: 'auth-1',
       },
       { Authorization: 'Bearer session-token' }
     );
@@ -529,13 +533,13 @@ describe('registerPasskey', () => {
       .mockResolvedValueOnce(optionsResponse)
       .mockResolvedValueOnce({ ok: true, data: { credentialId: 'cred-2' } });
 
-    await registerPasskey(api);
+    await registerPasskey(authorization, api);
 
     expect(getAuthTokenForRequest).toHaveBeenCalled();
     expect(mockPostAuth).toHaveBeenNthCalledWith(
       1,
       '/api/auth/passkey/register',
-      { action: 'options' },
+      { action: 'options', managementAuthorization: 'auth-1' },
       { Authorization: 'Bearer stored-token' }
     );
   });
@@ -548,12 +552,12 @@ describe('registerPasskey', () => {
       .mockResolvedValueOnce(optionsResponse)
       .mockResolvedValueOnce({ ok: true, data: { credentialId: 'cred-2' } });
 
-    await registerPasskey(api);
+    await registerPasskey(authorization, api);
 
     expect(mockPostAuth).toHaveBeenNthCalledWith(
       1,
       '/api/auth/passkey/register',
-      { action: 'options' },
+      { action: 'options', managementAuthorization: 'auth-1' },
       {}
     );
   });
@@ -563,7 +567,7 @@ describe('registerPasskey', () => {
     api.create.mockRejectedValue({ name: 'UserCancelledException' });
     mockPostAuth.mockResolvedValueOnce(optionsResponse);
 
-    const result = await registerPasskey(api);
+    const result = await registerPasskey(authorization, api);
 
     expect(result).toEqual({ status: 'error', failure: 'cancelled' });
   });
@@ -573,7 +577,7 @@ describe('registerPasskey', () => {
     api.create.mockRejectedValue({ message: 'DomError: NotAllowedError - refused' });
     mockPostAuth.mockResolvedValueOnce(optionsResponse);
 
-    const result = await registerPasskey(api);
+    const result = await registerPasskey(authorization, api);
 
     expect(result).toEqual({ status: 'error', failure: 'failed' });
   });
@@ -582,13 +586,13 @@ describe('registerPasskey', () => {
     const api = fakeApi();
     mockPostAuth.mockResolvedValueOnce(refused());
 
-    const result = await registerPasskey(api);
+    const result = await registerPasskey(authorization, api);
 
     expect(result).toEqual({ status: 'error', failure: 'failed' });
     expect(api.create).not.toHaveBeenCalled();
   });
 
-  it('reports an options refusal the route never accepts as unavailable', async () => {
+  it('reports an options refusal with no code as a session that ended', async () => {
     const api = fakeApi();
     mockPostAuth.mockResolvedValueOnce({
       ok: false,
@@ -597,11 +601,10 @@ describe('registerPasskey', () => {
       httpStatus: 401,
     });
 
-    const result = await registerPasskey(api);
+    const result = await registerPasskey(authorization, api);
 
-    // The options step answers 401 only for a session it will not accept, so
-    // the status alone decides it even when the body carries no known code.
-    expect(result).toEqual({ status: 'error', failure: 'unavailable' });
+    // The route answers 401 without a code only for a bearer it will not accept.
+    expect(result).toEqual({ status: 'error', failure: 'session-ended' });
     expect(api.create).not.toHaveBeenCalled();
   });
 
@@ -615,7 +618,7 @@ describe('registerPasskey', () => {
       httpStatus: 401,
     });
 
-    const result = await registerPasskey(api);
+    const result = await registerPasskey(authorization, api);
 
     // Verify also answers 401 for the challenge itself; a fresh ceremony mints
     // a new one, so this refusal must stay retryable.
@@ -631,7 +634,7 @@ describe('registerPasskey', () => {
       httpStatus: 429,
     });
 
-    const result = await registerPasskey(api);
+    const result = await registerPasskey(authorization, api);
 
     expect(result).toEqual({ status: 'error', failure: 'failed' });
   });
@@ -643,29 +646,51 @@ describe('registerPasskey', () => {
       .mockResolvedValueOnce(optionsResponse)
       .mockResolvedValueOnce(refused('VERIFICATION_FAILED'));
 
-    const result = await registerPasskey(api);
+    const result = await registerPasskey(authorization, api);
 
     expect(result).toEqual({ status: 'error', failure: 'failed' });
   });
 
-  it.each(['Unauthorized', 'REAUTH_REQUIRED'] as const)(
-    'reports %s as unavailable rather than a retryable failure',
-    async code => {
-      const optionsApi = fakeApi();
-      mockPostAuth.mockResolvedValueOnce(refused(code));
-      expect(await registerPasskey(optionsApi)).toEqual({
-        status: 'error',
-        failure: 'unavailable',
-      });
-      expect(optionsApi.create).not.toHaveBeenCalled();
+  it.each([
+    ['Unauthorized', 'session-ended'],
+    ['REAUTH_REQUIRED', 'management-required'],
+  ] as const)('maps a %s refusal from either step to %s', async (code, failure) => {
+    const optionsApi = fakeApi();
+    mockPostAuth.mockResolvedValueOnce(refused(code));
+    expect(await registerPasskey(authorization, optionsApi)).toEqual({
+      status: 'error',
+      failure,
+    });
+    expect(optionsApi.create).not.toHaveBeenCalled();
 
-      const verifyApi = fakeApi();
-      verifyApi.create.mockResolvedValue(attestation);
-      mockPostAuth.mockResolvedValueOnce(optionsResponse).mockResolvedValueOnce(refused(code));
-      expect(await registerPasskey(verifyApi)).toEqual({
-        status: 'error',
-        failure: 'unavailable',
-      });
-    }
-  );
+    const verifyApi = fakeApi();
+    verifyApi.create.mockResolvedValue(attestation);
+    mockPostAuth.mockResolvedValueOnce(optionsResponse).mockResolvedValueOnce(refused(code));
+    expect(await registerPasskey(authorization, verifyApi)).toEqual({
+      status: 'error',
+      failure,
+    });
+  });
+
+  it.each([
+    ['PASSKEY_MANAGEMENT_REQUIRED', 'management-required'],
+    ['PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID', 'authorization-invalid'],
+    ['PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED', 'device-unsupported'],
+  ] as const)('maps a %s refusal from either step to %s', async (code, failure) => {
+    const optionsApi = fakeApi();
+    mockPostAuth.mockResolvedValueOnce(refused(code));
+    expect(await registerPasskey(authorization, optionsApi)).toEqual({
+      status: 'error',
+      failure,
+    });
+    expect(optionsApi.create).not.toHaveBeenCalled();
+
+    const verifyApi = fakeApi();
+    verifyApi.create.mockResolvedValue(attestation);
+    mockPostAuth.mockResolvedValueOnce(optionsResponse).mockResolvedValueOnce(refused(code));
+    expect(await registerPasskey(authorization, verifyApi)).toEqual({
+      status: 'error',
+      failure,
+    });
+  });
 });

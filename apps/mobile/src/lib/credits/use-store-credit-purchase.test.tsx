@@ -316,7 +316,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
       invalidateAfterCompletion,
     });
 
-    expect(await actions.handlePurchaseSuccess(purchase)).toBe(true);
+    expect(await actions.handlePurchaseSuccess(purchase)).toEqual({ status: 'completed' });
 
     expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: true });
@@ -338,7 +338,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
       finishTransaction,
     });
 
-    expect(await actions.handlePurchaseSuccess(purchase)).toBe(true);
+    expect(await actions.handlePurchaseSuccess(purchase)).toEqual({ status: 'completed' });
 
     expect(completePlayPurchase).toHaveBeenCalledWith({
       productId: GOOGLE_PRODUCT_ID,
@@ -376,7 +376,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
       },
     });
 
-    expect(await actions.handlePurchaseSuccess(pending)).toBe(false);
+    expect(await actions.handlePurchaseSuccess(pending)).toEqual({ status: 'pending' });
     expect(completePlayPurchase).not.toHaveBeenCalled();
     expect(finishTransaction).not.toHaveBeenCalled();
     expect(onPurchaseCompleted).not.toHaveBeenCalled();
@@ -385,7 +385,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
     // The store approves the same transaction and re-delivers it as purchased:
     // exactly one grant, one finish and one announcement.
     const approved = { ...pending, purchaseState: 'purchased' as const };
-    expect(await actions.handlePurchaseSuccess(approved)).toBe(true);
+    expect(await actions.handlePurchaseSuccess(approved)).toEqual({ status: 'completed' });
     expect(completePlayPurchase).toHaveBeenCalledTimes(1);
     expect(finishTransaction).toHaveBeenCalledTimes(1);
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
@@ -435,12 +435,15 @@ describe('createStoreCreditPurchaseActions completion', () => {
       },
     });
 
-    expect(await actions.handlePurchaseSuccess(purchase)).toBe(false);
+    expect(await actions.handlePurchaseSuccess(purchase)).toEqual({
+      status: 'retryable-refusal',
+      messageKey: null,
+    });
     expect(showError).not.toHaveBeenCalled();
     expect(finishTransaction).not.toHaveBeenCalled();
 
     // The store finishes the charge and the same token now verifies.
-    expect(await actions.handlePurchaseSuccess(purchase)).toBe(true);
+    expect(await actions.handlePurchaseSuccess(purchase)).toEqual({ status: 'completed' });
     expect(completePlayPurchase).toHaveBeenCalledTimes(2);
     expect(finishTransaction).toHaveBeenCalledTimes(1);
   });
@@ -456,7 +459,10 @@ describe('createStoreCreditPurchaseActions completion', () => {
       },
     });
 
-    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(false);
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toEqual({
+      status: 'retryable-refusal',
+      messageKey: CREDIT_PURCHASE_FAILED_KEY,
+    });
 
     expect(finishTransaction).not.toHaveBeenCalled();
     expect(showError).toHaveBeenCalledWith(CREDIT_PURCHASE_FAILED_KEY);
@@ -474,7 +480,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
     // The backend already granted the credits, so a finish failure must not
     // read as a failed purchase: the store re-delivers the transaction and
     // recovery finishes it on the next launch.
-    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(true);
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toEqual({ status: 'completed' });
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
   });
 
@@ -487,7 +493,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
       },
     });
 
-    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(true);
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toEqual({ status: 'completed' });
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
   });
 
@@ -512,8 +518,8 @@ describe('createStoreCreditPurchaseActions completion', () => {
     const secondDelivery = actions.handlePurchaseSuccess(purchase);
     backendCompletionGate.resolve(undefined);
 
-    await expect(firstDelivery).resolves.toBe(true);
-    await expect(secondDelivery).resolves.toBe(true);
+    await expect(firstDelivery).resolves.toEqual({ status: 'completed' });
+    await expect(secondDelivery).resolves.toEqual({ status: 'completed' });
 
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
@@ -542,7 +548,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
     backendCompletionGate.resolve(undefined);
 
     await expect(recovery).resolves.toEqual([purchase]);
-    await expect(liveDelivery).resolves.toBe(true);
+    await expect(liveDelivery).resolves.toEqual({ status: 'completed' });
 
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
@@ -567,7 +573,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
     const recovery = actions.recoverPurchases([purchase]);
     backendCompletionGate.resolve(undefined);
 
-    await expect(liveDelivery).resolves.toBe(true);
+    await expect(liveDelivery).resolves.toEqual({ status: 'completed' });
     await expect(recovery).resolves.toEqual([purchase]);
 
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
@@ -604,8 +610,11 @@ describe('createStoreCreditPurchaseActions completion', () => {
     const accountBCompletion = actionsForAccountB.handlePurchaseSuccess(purchase);
     backendCompletionGate.resolve(undefined);
 
-    await expect(accountACompletion).resolves.toBe(true);
-    await expect(accountBCompletion).resolves.toBe(false);
+    await expect(accountACompletion).resolves.toEqual({ status: 'completed' });
+    await expect(accountBCompletion).resolves.toEqual({
+      status: 'retryable-refusal',
+      messageKey: CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_KEY,
+    });
 
     expect(completeForAccountA).toHaveBeenCalledTimes(1);
     expect(completeForAccountB).toHaveBeenCalledTimes(1);
@@ -627,8 +636,8 @@ describe('createStoreCreditPurchaseActions completion', () => {
     const second = actions.handlePurchaseSuccess(purchase);
     backendCompletionGate.resolve(undefined);
 
-    await expect(first).resolves.toBe(true);
-    await expect(second).resolves.toBe(true);
+    await expect(first).resolves.toEqual({ status: 'completed' });
+    await expect(second).resolves.toEqual({ status: 'completed' });
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
   });
 
@@ -657,7 +666,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
       },
     });
 
-    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(false);
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toEqual({ status: 'stale' });
     expect(completeAppStorePurchase).not.toHaveBeenCalled();
     expect(showError).not.toHaveBeenCalled();
   });
@@ -719,7 +728,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
     signedInAccount = 'account-b';
     backendGate.resolve(undefined);
 
-    await expect(completion).resolves.toBe(true);
+    await expect(completion).resolves.toEqual({ status: 'completed' });
     expect(onPurchaseCompleted).not.toHaveBeenCalled();
     expect(invalidateAfterCompletion).not.toHaveBeenCalled();
     // The store transaction is still finished: the store holds it for this
@@ -740,13 +749,87 @@ describe('createStoreCreditPurchaseActions completion', () => {
       },
     });
 
-    expect(await actions.handlePurchaseSuccess(createPurchase({ purchaseToken: null }))).toBe(
-      false
-    );
+    expect(await actions.handlePurchaseSuccess(createPurchase({ purchaseToken: null }))).toEqual({
+      status: 'retryable-refusal',
+      messageKey: 'kiloPass.purchaseMissingSignedTransaction',
+    });
 
     expect(completeAppStorePurchase).not.toHaveBeenCalled();
     expect(finishTransaction).not.toHaveBeenCalled();
     expect(showError).toHaveBeenCalledWith('kiloPass.purchaseMissingSignedTransaction');
+  });
+
+  it('reports a refunded receipt as a terminal refusal and never finishes it', async () => {
+    const purchase = createPurchase();
+    const completeAppStorePurchase = vi.fn().mockRejectedValue({
+      data: { code: 'BAD_REQUEST', message: STORE_PURCHASE_REFUNDED_MESSAGE },
+    });
+    const finishTransaction = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase,
+      finishTransaction,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.handlePurchaseSuccess(purchase)).toEqual({
+      status: 'terminal-refusal',
+      messageKey: CREDIT_PURCHASE_FAILED_KEY,
+    });
+    expect(finishTransaction).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledWith(CREDIT_PURCHASE_FAILED_KEY);
+  });
+
+  it('keeps a remembered terminal refusal on re-delivery without posting it again', async () => {
+    const purchase = createPurchase();
+    const completeAppStorePurchase = vi.fn().mockRejectedValue({
+      data: { code: 'BAD_REQUEST', message: STORE_PURCHASE_REFUNDED_MESSAGE },
+    });
+    const actions = createActions({ completeAppStorePurchase });
+
+    expect(await actions.handlePurchaseSuccess(purchase)).toEqual({
+      status: 'terminal-refusal',
+      messageKey: CREDIT_PURCHASE_FAILED_KEY,
+    });
+    // The store re-delivers the receipt it cannot finish. The refusal is
+    // remembered, so the backend is not asked again and the caller still learns
+    // this purchase can never complete.
+    expect(await actions.handlePurchaseSuccess(purchase)).toEqual({
+      status: 'terminal-refusal',
+      messageKey: CREDIT_PURCHASE_FAILED_KEY,
+    });
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('names pending, retryable refusal and stale outcomes apart', async () => {
+    const completeAppStorePurchase = vi.fn().mockRejectedValueOnce({
+      data: { code: 'CONFLICT', message: STORE_PURCHASE_PENDING_MESSAGE },
+    });
+    let accountCurrent = true;
+    const actions = createActions({
+      completeAppStorePurchase,
+      isAccountCurrent: () => accountCurrent,
+    });
+
+    // The store has not finished the charge: nothing is posted, nothing is said.
+    expect(
+      await actions.handlePurchaseSuccess(createPurchase({ purchaseState: 'pending' }))
+    ).toEqual({ status: 'pending' });
+    // The backend says the charge is not finished yet: retryable, silent.
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toEqual({
+      status: 'retryable-refusal',
+      messageKey: null,
+    });
+
+    // The account changed before the receipt could be posted: the outcome is not
+    // this account's, so it is neither a failure nor a retry.
+    accountCurrent = false;
+    expect(
+      await actions.handlePurchaseSuccess(createPurchase({ transactionId: 'tx-stale' }))
+    ).toEqual({ status: 'stale' });
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
   });
 });
 

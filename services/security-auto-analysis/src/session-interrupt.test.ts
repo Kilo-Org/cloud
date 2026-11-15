@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
+import {
+  SESSION_CLEANUP_TIMEOUT_MS,
+  SESSION_INTERRUPT_TIMEOUT_MS,
+  interruptAnalysisCloudAgentSession,
+} from './session-interrupt.js';
 
 const AUTH_TOKEN = 'control-token';
 const CLOUD_AGENT_SESSION_ID = 'agent-session-1';
@@ -48,6 +52,10 @@ function answerOnlyOnAbort(request: Request, onAbort?: () => void): Promise<Resp
 }
 
 describe('interruptAnalysisCloudAgentSession', () => {
+  it('offers a shorter bound for a cleanup whose outcome is decided', () => {
+    expect(SESSION_CLEANUP_TIMEOUT_MS).toBeLessThan(SESSION_INTERRUPT_TIMEOUT_MS);
+  });
+
   it('ends the call when a peer that never answers hits the interrupt deadline', async () => {
     let aborted = false;
     const { env, requests } = createEnv(async request =>

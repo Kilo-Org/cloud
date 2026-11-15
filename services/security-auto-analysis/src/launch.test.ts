@@ -16,6 +16,7 @@ import {
   startSecurityAnalysis,
 } from './launch.js';
 import { generateControlToken, generateTriageToken } from './token.js';
+import { SESSION_CLEANUP_TIMEOUT_MS, SESSION_INTERRUPT_TIMEOUT_MS } from './session-interrupt.js';
 import { triageSecurityFinding } from './triage.js';
 
 vi.mock('./db/queries.js', () => ({
@@ -816,6 +817,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
         return promise;
       });
 
+    const startedAt = Date.now();
     await expect(
       startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
     ).resolves.toEqual({
@@ -823,6 +825,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       error: 'initiate unavailable',
       failureNeedsLifecycleTransition: true,
     });
+    const elapsedMs = Date.now() - startedAt;
 
     const interrupts = requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession');
     expect(interrupts).toHaveLength(1);
@@ -830,9 +833,12 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     if (!(interrupt instanceof Request)) throw new Error('Expected interrupt request');
     await expect(interrupt.json()).resolves.toEqual({ sessionId: 'agent-session-hang' });
     expect(interrupt.signal.aborted).toBe(true);
-    // The production deadline is SESSION_INTERRUPT_TIMEOUT_MS, so this case
-    // must outlive it to observe the settlement.
-  }, 15_000);
+    // The cleanup carries SESSION_CLEANUP_TIMEOUT_MS rather than the restart
+    // path's SESSION_INTERRUPT_TIMEOUT_MS, so the settlement is observable
+    // inside the shorter bound.
+    expect(elapsedMs).toBeGreaterThanOrEqual(SESSION_CLEANUP_TIMEOUT_MS - 50);
+    expect(elapsedMs).toBeLessThan(SESSION_INTERRUPT_TIMEOUT_MS);
+  }, 8_000);
 
   it('does not interrupt the prepared session when the start succeeds', async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);

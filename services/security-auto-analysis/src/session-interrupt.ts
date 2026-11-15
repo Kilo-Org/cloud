@@ -9,6 +9,15 @@ import { logger } from './logger.js';
 export const SESSION_INTERRUPT_TIMEOUT_MS = 10_000;
 
 /**
+ * Bound on the interrupt a failed start performs after its own outcome is
+ * decided. The queue consumer holds its message until the start returns, so a
+ * peer that accepts this call and never answers must be released sooner than
+ * the restart path allows: the cleanup has nothing left to decide, and a lost
+ * session only ends on its own timeout.
+ */
+export const SESSION_CLEANUP_TIMEOUT_MS = 5_000;
+
+/**
  * Best-effort `interruptSession` call for one Cloud Agent analysis session.
  *
  * Callers use it when a run is replaced, or when a prepared session will not be
@@ -16,8 +25,10 @@ export const SESSION_INTERRUPT_TIMEOUT_MS = 10_000;
  * decided; a failed or timed-out interrupt only leaves the session to end on
  * its own timeout.
  *
- * `timeoutMs` exists for tests, which need a short bound to observe the
- * deadline; callers use the default.
+ * `timeoutMs` selects the bound for this call. Callers whose outcome is already
+ * decided may pass a shorter one, such as `SESSION_CLEANUP_TIMEOUT_MS`; the
+ * restart path keeps the default. Tests pass a short value to observe the
+ * deadline.
  */
 export async function interruptAnalysisCloudAgentSession(params: {
   env: CloudflareEnv;

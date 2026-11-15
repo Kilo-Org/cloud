@@ -18,7 +18,10 @@ import { logger } from './logger.js';
 import { generateControlToken, generateTriageToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
 import { readAnalysisCreditAdmission } from './credit-admission.js';
-import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
+import {
+  SESSION_CLEANUP_TIMEOUT_MS,
+  interruptAnalysisCloudAgentSession,
+} from './session-interrupt.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
 import type { AnalysisMode, AutoAnalysisFailureCode, SecurityFindingAnalysis } from './types.js';
 
@@ -445,13 +448,16 @@ export async function startSecurityAnalysis(
   } finally {
     // An attempt that does not start interrupts exactly the session it
     // prepared; no other attempt's session is touched, so a superseded or
-    // newer attempt belonging to another claim keeps running.
+    // newer attempt belonging to another claim keeps running. The start outcome
+    // is already decided here, so the cleanup uses the shorter bound instead of
+    // the restart path's deadline and cannot hold the queue consumer message.
     if (preparedAttempt && controlToken) {
       await interruptAnalysisCloudAgentSession({
         env: params.env,
         authToken: controlToken,
         cloudAgentSessionId: preparedAttempt.cloudAgentSessionId,
         findingId: params.findingId,
+        timeoutMs: SESSION_CLEANUP_TIMEOUT_MS,
       });
     }
   }

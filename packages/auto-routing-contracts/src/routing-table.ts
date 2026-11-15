@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
+import { addDuplicateKeyIssues } from './duplicate-keys';
 
 /** Maximum models in one benchmark profile registration request. */
 export const MAX_POOL_ENTRIES = 10;
@@ -24,28 +25,15 @@ export function benchmarkPairKey(entry: BenchmarkPair): string {
   return JSON.stringify([entry.model, entry.variant]);
 }
 
-function addDuplicatePoolEntryIssues(entries: PoolEntry[], ctx: z.RefinementCtx): void {
-  const seen = new Set<string>();
-  entries.forEach((entry, index) => {
-    const key = poolEntryKey(entry);
-    if (seen.has(key)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [index],
-        message: `Duplicate pool entry: ${key}`,
-      });
-    }
-    seen.add(key);
-  });
-}
-
 /** The unique models of one benchmark profile registration request. */
 export const EfficientModelPoolSchema = z
   .array(PoolEntrySchema)
   .min(1)
   .max(MAX_POOL_ENTRIES)
   .superRefine((entries, ctx) => {
-    addDuplicatePoolEntryIssues(entries, ctx);
+    addDuplicateKeyIssues(entries, ctx, poolEntryKey, {
+      message: key => `Duplicate pool entry: ${key}`,
+    });
   });
 export type EfficientModelPool = z.infer<typeof EfficientModelPoolSchema>;
 

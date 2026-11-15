@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import { OwnerTypeSchema, type OwnerType } from './owner';
 import { ClassifierSubtaskTypeSchema, ClassifierTaskTypeSchema } from './taxonomy';
+import { addDuplicateKeyIssues } from './duplicate-keys';
 
 // ADR 0005: docs/adr/0005-custom-auto-routers.md
 
@@ -183,13 +184,8 @@ export const CustomRouterEntriesSchema = z
   .min(1)
   .max(MAX_CUSTOM_ROUTER_ENTRIES)
   .superRefine((entries, ctx) => {
-    const seen = new Set<string>();
-    entries.forEach((entry, index) => {
-      const key = customRouterEntryKey(entry);
-      if (seen.has(key)) {
-        ctx.addIssue({ code: 'custom', path: [index], message: `Duplicate entry ${key}` });
-      }
-      seen.add(key);
+    addDuplicateKeyIssues(entries, ctx, customRouterEntryKey, {
+      message: key => `Duplicate entry ${key}`,
     });
   });
 

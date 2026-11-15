@@ -35,14 +35,6 @@ export function currentCreditPurchaseIntent(): CreditPurchaseIntent | null {
 }
 
 /**
- * The request this account may inherit, or null when it belongs to another.
- *
- * Two different non-empty tokens are an account change: the record is dropped
- * and never inherited, so no screen shows another account's barrier and no
- * retry posts its receipts under this token. An empty token is the catalogue
- * still answering and inherits nothing it can contradict.
- */
-/**
  * The request this account may inherit, and whether this call dropped one that
  * belonged to another account.
  *

@@ -730,6 +730,28 @@ describe('CreditNativeIapOwner', () => {
     }
   });
 
+  it('credits a delivery that arrives only through the listener and retires its barrier', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    // The store answers no purchase on the request promise (iOS returns null)
+    // and delivers the charge through the purchase listener instead.
+    mockedIap.requestPurchase.mockResolvedValueOnce(null);
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+    expect(handle.value?.errorMessageKey).toBeNull();
+  });
+
   it("consents to the pack a row tap selects, not the earlier request's id", async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

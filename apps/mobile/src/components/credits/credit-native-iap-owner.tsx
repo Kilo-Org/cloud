@@ -508,8 +508,15 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             settleCreditPurchaseDispatch(record.intent);
             throw error;
           }
+          const nativePurchases = Array.isArray(delivered) ? delivered : [delivered];
+          // A result that carries no purchase (iOS answers null, Play answers an
+          // empty array) is not this request's outcome: its delivery is still
+          // coming through the listener, so it stays the pool's waiting member
+          // and can be attributed then.
+          const carriesPurchase = nativePurchases.some(
+            recovered => recovered !== null && recovered !== undefined
+          );
           try {
-            const nativePurchases = Array.isArray(delivered) ? delivered : [delivered];
             const purchase = nativePurchases.length === 1 ? nativePurchases[0] : null;
             if (
               !purchase ||
@@ -557,8 +564,11 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             return delivered;
           } finally {
             // The pooled promise settled, so this request stops competing for
-            // later outcomes: the next dispatch is unambiguous again.
-            settleCreditPurchaseDispatch(record.intent);
+            // later outcomes — unless it carried nothing that settles it: then
+            // the request is still waiting for the listener's delivery.
+            if (carriesPurchase) {
+              settleCreditPurchaseDispatch(record.intent);
+            }
           }
         },
         completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
@@ -634,8 +644,23 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         }
         // A recorded transaction identifies this request. Identifying it is not
         // completing it: only a credited completion retires the request.
-        const owned = intent !== null && matchesCreditPurchaseIntent(intent, purchase);
-        if (owned) {
+        //
+        // The SDK answers the promise, the listener, or neither (a `null`
+        // request result on iOS; an empty array on Play) — so a delivery is also
+        // this request's own outcome when it names the only dispatched request's
+        // product and no other request is waiting.
+        const waiting = pendingPurchaseRef.current;
+        const attributableOwner =
+          reconciliation === null &&
+          waiting !== null &&
+          purchase.productId === waiting.intent.productId &&
+          canAttributeNativePurchaseOutcome(waiting.intent)
+            ? waiting
+            : null;
+        const owned =
+          (intent !== null && matchesCreditPurchaseIntent(intent, purchase)) ||
+          attributableOwner !== null;
+        if (owned && intent !== null) {
           identifyCreditPurchaseTransaction(intent, purchase);
           if (!isCurrentAuthEpoch(authEpochRef.current)) {
             return undefined;

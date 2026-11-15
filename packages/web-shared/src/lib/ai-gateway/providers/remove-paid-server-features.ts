@@ -3,6 +3,7 @@ import type {
   OpenRouterPlugin,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 // Plugins OpenRouter does not bill separately. Every other plugin id, including
 // ids added later, is removed.
@@ -14,10 +15,6 @@ const FREE_PDF_PARSER_PLUGIN = {
   id: 'file-parser',
   pdf: { engine: 'cloudflare-ai' },
 } satisfies OpenRouterPlugin;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function isFreePlugin(plugin: unknown): plugin is OpenRouterPlugin {
   return isRecord(plugin) && typeof plugin.id === 'string' && FREE_PLUGIN_IDS.has(plugin.id);

@@ -19,6 +19,7 @@ import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -317,6 +318,13 @@ export function ProfileCommandsScreen({
       <>
         {commands.map((command, index) => renderCommandRow(command, index))}
         <ProfileManageSlot permission={permission}>
+          {commands.length >= MAX_SETUP_COMMANDS ? (
+            <AccessibleStatus
+              message={t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
           <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
             <Text>{t('profiles.addCommand')}</Text>
           </Button>

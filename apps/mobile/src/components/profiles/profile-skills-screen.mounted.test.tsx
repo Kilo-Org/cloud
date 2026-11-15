@@ -388,7 +388,7 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('refuses a create at the skill cap inside the sheet, without a request', async () => {
+  it('names the skill cap above a disabled add, without a request', async () => {
     h.query.data = testSkills(
       Array.from({ length: MAX_PROFILE_SKILLS }, (_, index) =>
         testSkill({ id: `skill-${index}`, name: `skill-${index}` })
@@ -399,22 +399,39 @@ describe('ProfileSkillsScreen', () => {
     const { renderer, unmount } = await mountScreen();
     const limitCopy = i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS });
 
-    // The list names the cap under the add control, before any authoring.
+    // The list names the cap above the add control, before any authoring.
     expect(String(lineWith(renderer.root, limitCopy).props.className)).toContain('text-warn');
-
-    pressAddButton(renderer.root);
-    changeText(renderer.root, 'Skill name', 'one-more');
-    changeText(renderer.root, 'Skill content', 'Body');
-    pressSheetDone(renderer.root);
-
-    expect(h.mutations.createCustomSkill.mutateAsync).not.toHaveBeenCalled();
-    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
-      i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
+    const footer = renderer.root.findAll(
+      node =>
+        node.type === 'Button' || (node.type === 'Text' && node.props.children === limitCopy)
     );
-    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
-    expect(findField(renderer.root, 'Skill name').props.disabled).toBe(false);
+    const noticeIndex = footer.findIndex(
+      node => node.type === 'Text' && node.props.children === limitCopy
+    );
+    const addIndex = footer.findIndex(node => node.type === 'Button');
+    expect(noticeIndex).toBeGreaterThanOrEqual(0);
+    expect(noticeIndex).toBeLessThan(addIndex);
+
+    // At the cap the add control is disabled: no sheet opens from it, so no
+    // request leaves with a create the server would refuse.
+    expect(footer[addIndex]?.props.disabled).toBe(true);
+    expect(h.mutations.createCustomSkill.mutateAsync).not.toHaveBeenCalled();
 
     unmount();
+
+    // One row below the cap the same control is offered and says nothing.
+    h.query.data = testSkills(
+      Array.from({ length: MAX_PROFILE_SKILLS - 1 }, (_, index) =>
+        testSkill({ id: `skill-${index}`, name: `skill-${index}` })
+      )
+    );
+    const belowCap = await mountScreen();
+    expect(findOne(belowCap.renderer.root, 'Button').props.disabled).toBe(false);
+    expect(findAll(belowCap.renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      limitCopy
+    );
+
+    belowCap.unmount();
   });
 
   it('names the cap when the server refuses a create the list did not predict', async () => {

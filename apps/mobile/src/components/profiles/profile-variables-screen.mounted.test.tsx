@@ -181,21 +181,41 @@ describe('ProfileVariablesScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
     const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
-    expect(
-      findAll(renderer.root, 'Text')
-        .map(node => node.props.children)
-        .includes(limitCopy)
-    ).toBe(true);
 
-    pressButton(renderer.root, 'Add variable');
-    changeText(renderer.root, 'Key', 'NEW_VAR');
-    changeText(renderer.root, 'Value', 'v');
-    pressButton(renderer.root, 'Save');
+    // The limit sits above the add control, inside the same slot it fills.
+    const footer = renderer.root.findAll(
+      node =>
+        node.type === 'Button' || (node.type === 'Text' && node.props.children === limitCopy)
+    );
+    const noticeIndex = footer.findIndex(
+      node => node.type === 'Text' && node.props.children === limitCopy
+    );
+    const addIndex = footer.findIndex(node => node.type === 'Button');
+    expect(noticeIndex).toBeGreaterThanOrEqual(0);
+    expect(noticeIndex).toBeLessThan(addIndex);
 
+    // At the limit the add control is disabled: the form cannot open from it,
+    // so no new key reaches the server.
+    expect(footer[addIndex]?.props.disabled).toBe(true);
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
-    expect(h.error).toHaveBeenCalledWith(limitCopy);
 
     unmount();
+
+    // One row below the limit the same control is offered and says nothing.
+    h.query.data = testVars(
+      Array.from({ length: MAX_PROFILE_VARS - 1 }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      }))
+    );
+    const belowLimit = await mountScreen();
+    expect(findOne(belowLimit.renderer.root, 'Button').props.disabled).toBe(false);
+    expect(
+      findAll(belowLimit.renderer.root, 'Text').map(node => node.props.children)
+    ).not.toContain(limitCopy);
+
+    belowLimit.unmount();
   });
 
   const atVariableLimit = (): TestVars =>

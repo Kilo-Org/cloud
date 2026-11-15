@@ -17,6 +17,8 @@ import {
   testCommands,
   type TestCommands,
 } from '@/components/profiles/profile-commands-screen.test-helpers';
+import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
+import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -624,5 +626,37 @@ describe('ProfileCommandsScreen', () => {
     ]);
 
     unmount();
+  });
+
+  it('names the setup command cap above the disabled add control', async () => {
+    h.query.data = testCommands(
+      Array.from({ length: MAX_SETUP_COMMANDS }, (_, index) => `cmd ${String(index)}`)
+    );
+    h.query.isPending = false;
+
+    const atCap = await mountScreen();
+    const capCopy = i18n.t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS });
+    const footer = atCap.renderer.root.findAll(
+      node =>
+        node.type === 'Button' || (node.type === 'Text' && node.props.children === capCopy)
+    );
+    // The notice holds the slot's first line, above the add control.
+    expect(footer).toHaveLength(2);
+    expect(footer[0]?.type).toBe('Text');
+    expect(footer[1]?.type).toBe('Button');
+    expect(String(footer[0]?.props.className)).toContain('text-warn');
+    expect(footer[1]?.props.disabled).toBe(true);
+    atCap.unmount();
+
+    // One row below the cap the same control is offered and says nothing.
+    h.query.data = testCommands(
+      Array.from({ length: MAX_SETUP_COMMANDS - 1 }, (_, index) => `cmd ${String(index)}`)
+    );
+    const belowCap = await mountScreen();
+    expect(findAll(belowCap.renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      capCopy
+    );
+    expect(findAll(belowCap.renderer.root, 'Button')[0]?.props.disabled).toBe(false);
+    belowCap.unmount();
   });
 });

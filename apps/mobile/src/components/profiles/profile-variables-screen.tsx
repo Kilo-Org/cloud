@@ -248,20 +248,19 @@ export function ProfileVariablesScreen({
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
 
         <ProfileManageSlot permission={permission}>
+          {showAdd && atVariableCap ? (
+            <AccessibleStatus
+              message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
           {showAdd ? (
-            <Button onPress={startAdd}>
+            <Button disabled={atVariableCap} onPress={startAdd}>
               <Text>{t('profiles.addVariable')}</Text>
             </Button>
           ) : null}
         </ProfileManageSlot>
-
-        {atVariableCap && canManage ? (
-          <AccessibleStatus
-            message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
-            tone="warn"
-            className="text-sm"
-          />
-        ) : null}
       </>
     );
   }

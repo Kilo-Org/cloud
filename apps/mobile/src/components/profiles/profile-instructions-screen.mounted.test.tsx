@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { ProfileInstructionsScreen } from '@/components/profiles/profile-instructions-screen';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { MAX_PROFILE_INSTRUCTIONS } from '@/lib/agent-profile-forms';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -278,5 +279,40 @@ describe('ProfileInstructionsScreen delete confirmation', () => {
     );
 
     unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen instruction cap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+  });
+
+  it('names the cap above the disabled add control', async () => {
+    const capCopy = i18n.t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS });
+    h.query.data = Array.from({ length: MAX_PROFILE_INSTRUCTIONS }, (_, index) =>
+      testInstruction({ id: `inst-${index}`, name: `instruction-${index}` })
+    );
+
+    const atCap = await mountScreen();
+    const footer = atCap.renderer.root.findAll(
+      node => node.type === 'AccessibleStatus' || node.type === 'Button'
+    );
+    expect(footer.map(node => node.type)).toEqual(['AccessibleStatus', 'Button']);
+    expect(footer[0]?.props.message).toBe(capCopy);
+    expect(footer[0]?.props.tone).toBe('warn');
+    expect(footer[1]?.props.disabled).toBe(true);
+    atCap.unmount();
+
+    // One row below the cap the same control is offered and says nothing.
+    h.query.data = Array.from({ length: MAX_PROFILE_INSTRUCTIONS - 1 }, (_, index) =>
+      testInstruction({ id: `inst-${index}`, name: `instruction-${index}` })
+    );
+    const belowCap = await mountScreen();
+    expect(findAll(belowCap.renderer.root, 'AccessibleStatus')).toHaveLength(0);
+    expect(findAll(belowCap.renderer.root, 'Button')[0]?.props.disabled).toBe(false);
+    belowCap.unmount();
   });
 });

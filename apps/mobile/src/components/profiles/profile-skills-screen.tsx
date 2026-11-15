@@ -296,9 +296,6 @@ export function ProfileSkillsScreen({
           />
         ))}
         <ProfileManageSlot permission={permission}>
-          <Button onPress={handleStartAdd}>
-            <Text>{t('profiles.addSkill')}</Text>
-          </Button>
           {atSkillCap ? (
             <AccessibleStatus
               message={t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })}
@@ -306,6 +303,9 @@ export function ProfileSkillsScreen({
               className="text-sm"
             />
           ) : null}
+          <Button disabled={atSkillCap} onPress={handleStartAdd}>
+            <Text>{t('profiles.addSkill')}</Text>
+          </Button>
         </ProfileManageSlot>
       </>
     );

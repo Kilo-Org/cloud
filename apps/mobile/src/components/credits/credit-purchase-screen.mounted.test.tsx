@@ -20,6 +20,7 @@ import {
 import { act, type TestRenderer } from '@/test/renderer';
 import { compiledLengthDp } from '@/test/native-dimensions';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { i18n } from '@/i18n';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
 
 // ── Mutable state ────────────────────────────────────────────────────
@@ -39,9 +40,20 @@ const owner = vi.hoisted(() => ({
   reconnectStore: vi.fn(),
   purchase: vi.fn(),
   completingProductId: null as string | null,
+  purchaseWait: null as { productId: string; kind: 'store' | 'pending' } | null,
   errorMessageKey: null as string | null,
   completedPurchaseCount: 0,
   clearError: vi.fn(),
+  buyAgainProductId: null as string | null,
+  hasUnresolvedPurchase: false,
+  purchaseResolution: 'unknown' as
+    | 'unknown'
+    | 'found'
+    | 'not-found'
+    | 'terminal-refusal'
+    | 'credited',
+  reconcilePurchase: vi.fn(),
+  buyAgain: vi.fn(),
 }));
 
 const balance = vi.hoisted(() => ({
@@ -1763,3 +1775,195 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 });
+
+describe('CreditPurchaseScreen unresolved purchase card', () => {
+  const cardId = 'credit-unresolved-purchase';
+  const waitCardId = 'credit-purchase-wait-card';
+
+  function byTestId(
+    renderer: TestRenderer.ReactTestRenderer,
+    testID: string
+  ): TestRenderer.ReactTestInstance | undefined {
+    return renderer.root.findAll(node => (node.props as { testID?: string }).testID === testID)[0];
+  }
+
+  function cards(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
+    return renderer.root.findAll(node => {
+      const testID = (node.props as { testID?: string }).testID;
+      return testID === cardId || testID === waitCardId || testID === 'credit-pack-placeholder';
+    });
+  }
+
+  /** Each pack row's index among its parent's children, in render order. */
+  function rowPlacement(renderer: TestRenderer.ReactTestRenderer): number[] {
+    return packRows(renderer).map(row => {
+      const parent = row.parent;
+      if (parent === null) {
+        throw new Error('expected a mounted pack row');
+      }
+      return parent.children.indexOf(row);
+    });
+  }
+
+  async function press(instance: TestRenderer.ReactTestInstance | undefined): Promise<void> {
+    if (!instance) {
+      throw new Error('expected a control to press');
+    }
+    const control = instance.props as { onPress?: () => void };
+    await act(async () => {
+      control.onPress?.();
+      await Promise.resolve();
+    });
+  }
+
+  beforeEach(() => {
+    owner.hasUnresolvedPurchase = false;
+    owner.purchaseResolution = 'unknown';
+    owner.buyAgainProductId = null;
+    owner.purchaseWait = null;
+    owner.reconcilePurchase.mockReset();
+    owner.buyAgain.mockReset();
+  });
+
+  it('shows the unresolved notice as the one card, with both actions working', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const card = byTestId(renderer, cardId);
+    if (!card) {
+      throw new Error('expected the unresolved purchase card');
+    }
+    expect(cards(renderer)).toHaveLength(1);
+    expect(textWithinCard(card)).toContain(i18n.t('credits.unresolvedPurchaseFound'));
+
+    const actions = card.findAll(node => String(node.type) === 'Button');
+    expect(actions).toHaveLength(2);
+    await press(actions.find(node => labelOf(node).startsWith('Try again')));
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    await press(actions.find(node => labelOf(node).startsWith('Buy again')));
+    expect(owner.buyAgain).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('tells the person to pick a pack and leaves the rows enabled without a target', async () => {
+    owner.hasUnresolvedPurchase = true;
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const card = byTestId(renderer, cardId);
+    if (!card) {
+      throw new Error('expected the unresolved purchase card');
+    }
+    expect(textWithinCard(card)).toContain(i18n.t('credits.pickPackToBuyAgain'));
+    expect(card.findAll(node => String(node.type) === 'Button')).toHaveLength(1);
+    expect(
+      packRows(renderer).every(
+        row => (row.props as { disabled?: boolean }).disabled !== true
+      )
+    ).toBe(true);
+    unmount();
+  });
+
+  it('says the store has not answered on the waiting row and in the card', async () => {
+    owner.completingProductId = null;
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'store' };
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const waiting = i18n.t('credits.waitingForStore');
+    const row = packRows(renderer).find(candidate => labelOf(candidate).includes(waiting));
+    expect(row).toBeDefined();
+    expect(allText(renderer)).not.toContain(i18n.t('credits.storeTimedOut'));
+    const card = byTestId(renderer, waitCardId);
+    if (!card) {
+      throw new Error('expected the waiting card');
+    }
+    expect(textWithinCard(card)).toContain(waiting);
+    expect(cards(renderer)).toHaveLength(1);
+    unmount();
+  });
+
+  it('says the payment is pending on the row and in the card', async () => {
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'pending' };
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const pending = i18n.t('credits.purchasePending');
+    const row = packRows(renderer).find(candidate => labelOf(candidate).includes(pending));
+    expect(row).toBeDefined();
+    const card = byTestId(renderer, waitCardId);
+    if (!card) {
+      throw new Error('expected the waiting card');
+    }
+    expect(textWithinCard(card)).toContain(pending);
+    unmount();
+  });
+
+  it('shows one card at most, with and without an error set', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+    expect(cards(renderer)).toHaveLength(1);
+
+    // The purchase error is the floating region, not a card in the slot.
+    owner.errorMessageKey = 'credits.storeTimedOut';
+    const { unmount: unmountSecond, renderer: withError } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await waitFor(() => packRows(withError).length === 4);
+    expect(cards(withError)).toHaveLength(1);
+    expect(allText(withError)).toContain(i18n.t('credits.storeTimedOut'));
+    unmount();
+    unmountSecond();
+  });
+
+  it('never reorders a pack row or moves the copy below them when the card appears', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+    const labelsWithCard = packRows(renderer).map(row => labelOf(row));
+    expect(rowPlacement(renderer)).toHaveLength(4);
+
+    owner.hasUnresolvedPurchase = false;
+    const { renderer: withoutCard, unmount: unmountSecond } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await waitFor(() => packRows(withoutCard).length === 4);
+
+    // The rows keep their order and their copy exactly; the card joins the
+    // slot's cards, and the description lives in the footer the card cannot
+    // push.
+    expect(packRows(withoutCard).map(row => labelOf(row))).toEqual(labelsWithCard);
+    expect(byTestId(withoutCard, cardId)).toBeUndefined();
+    expect(allText(renderer)).toContain(allText(withoutCard).trim().split(' ')[0] ?? '');
+    expect(allText(withoutCard)).toContain(i18n.t('credits.description'));
+    unmount();
+    unmountSecond();
+  });
+});
+
+function textWithinCard(card: TestRenderer.ReactTestInstance): string {
+  const texts: string[] = [];
+  const walk = (instance: TestRenderer.ReactTestInstance): void => {
+    for (const child of instance.children) {
+      if (typeof child === 'string' || typeof child === 'number') {
+        texts.push(String(child));
+      } else {
+        walk(child);
+      }
+    }
+  };
+  walk(card);
+  return texts.join(' ');
+}

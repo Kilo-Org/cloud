@@ -143,6 +143,12 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   // actions all refuse them. An unresolved permission keeps the button — the
   // provider procedures stay server-authorized.
   const canConnect = permission.status !== 'ready' || canConnectAnyProvider(permission);
+  // A deep link arrives with no cached role or provider answer, and the empty
+  // state must paint its final form once: a button that appears and then leaves
+  // moves the centered stack by its own height. Keep the loading body until both
+  // inputs settle, as the manual-review screen does for the same reason.
+  const emptyStateSettled =
+    permission.status !== 'loading' && !githubStatus.isLoading && !gitlabStatus.isLoading;
 
   const pages = data?.pages;
   const firstPage = pages?.[0];
@@ -161,9 +167,18 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const errorVariant = trpcErrorVariant(error);
 
   let body: ReactNode = null;
+  const reviewsLoadingBody = (
+    <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+      <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
+        <Skeleton className="h-20 w-full rounded-lg" />
+        <Skeleton className="h-20 w-full rounded-lg" />
+        <Skeleton className="h-20 w-full rounded-lg" />
+      </Animated.View>
+    </TabScreenScrollView>
+  );
   if (!isLoading && firstPage?.success && reviews.length === 0) {
     const offersAction = hasConnectedProvider || canConnect;
-    body = (
+    body = emptyStateSettled ? (
       <EmptyState
         icon={GitPullRequest}
         title={t('codeReviewer.reviewList.noReviews')}
@@ -193,6 +208,8 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
+    ) : (
+      reviewsLoadingBody
     );
   } else if (!isLoading && ((isError && !data) || (firstPage && !firstPage.success))) {
     body = (
@@ -204,15 +221,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
       />
     );
   } else if (isLoading) {
-    body = (
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-          <Skeleton className="h-20 w-full rounded-lg" />
-          <Skeleton className="h-20 w-full rounded-lg" />
-          <Skeleton className="h-20 w-full rounded-lg" />
-        </Animated.View>
-      </TabScreenScrollView>
-    );
+    body = reviewsLoadingBody;
   } else {
     body = (
       <FlashList

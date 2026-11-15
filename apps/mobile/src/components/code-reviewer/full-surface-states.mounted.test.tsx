@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
+import type * as ReviewerStatusModule from '@/lib/code-reviewer-status';
 import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import { resetNowTickersForTests } from '@/lib/hooks/now-ticker-store';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -46,6 +47,10 @@ const state = vi.hoisted(() => ({
     organizationName: string;
     role?: string;
   }[],
+  permissionOverride: null as
+    | { status: 'loading' }
+    | { status: 'ready'; canEdit: boolean; canManage: boolean }
+    | null,
   repositories: {
     data: { repositories: [] } as unknown,
     isLoading: false,
@@ -154,6 +159,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/tab-screen', () => ({
   TAB_SCREEN_TRAILING_GAP: 16,
+  TabScreenScrollView: 'TabScreenScrollView',
   useTabBarBottomPadding: () => 0,
   useTabScreenFrame: () => ({ frameStyle: {}, measureFrame: () => undefined }),
 }));
@@ -233,6 +239,30 @@ vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
   useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: false }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.reviews }));
+// The screen reads the role from this module directly. The real hook is a thin
+// react-query wrapper, so the mock answers from the same membership rows and the
+// real classifier, and `permissionOverride` stands in for a read that has not
+// settled — which the shared `organizations` answer can never produce.
+vi.mock('@/lib/hooks/use-reviewer-permission', async () => {
+  const { classifyPermission } = await vi.importActual<ReviewerStatusModule>(
+    '@/lib/code-reviewer-status'
+  );
+  return {
+    useReviewerPermission: (scope: string) => {
+      if (state.permissionOverride) {
+        return state.permissionOverride;
+      }
+      return classifyPermission({
+        isPersonal: scope === 'personal',
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        role: state.organizations.find(org => org.organizationId === scope)?.role,
+        refetch: () => undefined,
+      });
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   useCouncilGate: () => ({ allowed: false, pending: false }),
@@ -258,6 +288,7 @@ beforeEach(() => {
   state.connected = false;
   state.scope = 'personal';
   state.organizations = [];
+  state.permissionOverride = null;
   state.repositories.data = { repositories: [] };
   state.repositories.isError = false;
   state.bitbucket.data = { repositoryCache: { status: 'available', repositories: [] } };
@@ -871,6 +902,19 @@ describe('empty reviews connect action', () => {
     const empty = emptyState(renderer);
     expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
     expect(empty.props.action).toBeDefined();
+    unmount();
+  });
+
+  it('keeps the loading body until the role settles, so no button flashes', async () => {
+    state.permissionOverride = { status: 'loading' };
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(3);
     unmount();
   });
 

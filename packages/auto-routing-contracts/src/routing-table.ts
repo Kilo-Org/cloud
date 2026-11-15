@@ -308,7 +308,7 @@ export function rankCandidates(
     .map(({ p50LatencyMs, ...c }) => {
       const estimatedRequestCostUsd =
         requestTokens !== null && c.pricing != null
-          ? c.avgCostUsd + requestTokens * c.pricing.promptUsdPerToken
+          ? estimateRequestCostUsd(c, { uncachedInputTokens: requestTokens, cachedInputTokens: 0 })
           : requestTokens !== null && c.estimatedRequestCostUsd != null
             ? c.estimatedRequestCostUsd
             : estimateRequestCostUsd(c, options?.profile ?? null);

@@ -6,7 +6,7 @@ import {
   CustomRouterClientEntryIdSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
-  customRouterCandidateModel,
+  refineEntryModelMatch,
 } from './custom-router';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import {
@@ -153,9 +153,7 @@ export const AutoRoutingDecisionSchema = z
   })
   .superRefine((decision, ctx) => {
     refineVariantExclusivity(decision, ctx, 'Decision');
-    if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
-      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
-    }
+    refineEntryModelMatch(decision, ctx);
     if (
       decision.fallback !== true &&
       (decision.taskType === null ||

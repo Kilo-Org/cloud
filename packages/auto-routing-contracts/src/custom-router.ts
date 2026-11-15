@@ -163,6 +163,23 @@ export function customRouterCandidateModel(entry: CustomRouterEntryRef): string 
   return entry.kind === 'gateway' ? entry.model : customRouterEntryKey(entry);
 }
 
+/**
+ * A decision's `model` must name the candidate its `entry` resolves to.
+ *
+ * Both decision schemas call this function, so a change to the condition, the
+ * issue path, or the message cannot leave one schema behind. `entry` is optional
+ * because the gateway decision schema still accepts a decision without one.
+ */
+export function refineEntryModelMatch(
+  decision: { model: string; entry?: CustomRouterEntryRef },
+  ctx: z.RefinementCtx
+): void {
+  if (decision.entry == null) return;
+  if (decision.model !== customRouterCandidateModel(decision.entry)) {
+    ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
+  }
+}
+
 export function parseCustomRouterCandidateModel(model: string): CustomRouterEntryRef | null {
   if (!model.startsWith(CLIENT_CANDIDATE_PREFIX)) {
     const gateway = GatewayCustomRouterEntryRefSchema.safeParse({ kind: 'gateway', model });
@@ -418,9 +435,7 @@ export const CustomRouterDecisionSchema = z
     tableVersion: z.string().nullable(),
   })
   .superRefine((decision, ctx) => {
-    if (decision.model !== customRouterCandidateModel(decision.entry)) {
-      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
-    }
+    refineEntryModelMatch(decision, ctx);
   });
 export type CustomRouterDecision = z.infer<typeof CustomRouterDecisionSchema>;
 

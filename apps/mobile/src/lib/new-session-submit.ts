@@ -152,12 +152,16 @@ export type NewSessionStartBlockedReason =
   | 'enter-prompt'
   /** Remote CLI needs prompt text or a file; an empty composer spawns nothing. */
   | 'enter-prompt-or-file'
-  /** A failed attachment blocks Start until the user removes or retries it. */
+  /** A failed attachment blocks Start until the user removes it. */
   | 'attachment-failed'
   /** An upload in flight blocks Start until it settles. */
   | 'attachment-uploading'
   /** A still-loading profile blocks Start until the query settles. */
-  | 'profile-loading';
+  | 'profile-loading'
+  /** Cloud Agent needs a model; an empty or unavailable one disables Start. */
+  | 'model-missing'
+  /** A selected repository that no longer resolves to a picker row blocks Start. */
+  | 'stale-selection';
 
 /**
  * The inputs for `resolveNewSessionStartBlockedReason`. `gate` is the entry's
@@ -210,8 +214,10 @@ type NewSessionStartBlockedReasonInput = {
  * these disables the gate on its own (`resolveNewSessionStartDisabled` ORs
  * them in), so reading them from the gate names a real cause. A failed
  * attachment outranks an upload in flight: the same chip usually carries both,
- * and the failure is what the user has to fix. A clone entry has no composer
- * and no profile, so it never reaches here.
+ * and the failure is what the user has to fix. A waiting profile outranks a
+ * missing model: the profile settles on its own, and the model the screen will
+ * show may arrive with it. A clone entry has no composer and no profile, so it
+ * never reaches here.
  */
 function resolveComposerBlockedReason(
   input: NewSessionStartBlockedReasonInput
@@ -227,6 +233,9 @@ function resolveComposerBlockedReason(
   }
   if (input.gate.isProfileLoading) {
     return 'profile-loading';
+  }
+  if (input.gate.model === '') {
+    return 'model-missing';
   }
   return null;
 }
@@ -279,9 +288,10 @@ export function resolveNewSessionStartBlockedReason(
   if (input.selectedRepo !== '') {
     // A key that no longer resolves to a picker row is the blocker (the
     // repository section asks for a new pick), so the prompt is not the reason:
-    // naming it would leave the real blocker unstated.
+    // naming it would leave the real blocker unstated. The clone entry keeps
+    // its own footer and its own gate, so it names nothing here.
     if (!input.selectedRepositoryResolved) {
-      return null;
+      return input.entry === 'new-session' ? 'stale-selection' : null;
     }
     if (
       input.entry === 'new-session' &&

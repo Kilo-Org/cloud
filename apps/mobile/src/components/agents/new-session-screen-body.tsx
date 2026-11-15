@@ -1310,13 +1310,22 @@ export function NewSessionScreenBody() {
   } else if (startBlockedReasonKey === 'attachment-failed') {
     // The composer's own file-fix copy, reused here: the footer names the same
     // failed chip the composer refuses to send, and offers no second action.
-    startBlockedReason = t('agentChat.composer.removeOrRetryFailed');
+    startBlockedReason = t('agentChat.composer.removeFailedAttachments');
   } else if (startBlockedReasonKey === 'attachment-uploading') {
-    startBlockedReason = t('agentChat.composer.waitForUploads');
+    // An upload has no timeout and a chip mid-flight offers only Remove, so the
+    // line names that escape instead of asking the person to wait for an end
+    // that may never come.
+    startBlockedReason = t('agentChat.newSession.attachmentUploadingToStart');
   } else if (startBlockedReasonKey === 'profile-loading') {
     // The Environment row already shows its busy state; the footer says why
     // Start waits on it, so a disabled control is never unexplained.
     startBlockedReason = t('agentChat.newSession.profileLoadingToStart');
+  } else if (startBlockedReasonKey === 'model-missing') {
+    startBlockedReason = t('agentChat.newSession.modelMissingToStart');
+  } else if (startBlockedReasonKey === 'stale-selection') {
+    // The repository section already asked for a new pick; the footer says why
+    // Start stayed disabled after a refresh dropped the selected row.
+    startBlockedReason = t('agentChat.newSession.staleRepositoryToStart');
   }
 
   // The plan explanation already says why Start cannot run, and nothing the

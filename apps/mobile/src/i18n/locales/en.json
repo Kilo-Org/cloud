@@ -2255,6 +2255,9 @@
       "enterPromptToStart": "Add a prompt to start.",
       "enterPromptOrFileToStart": "Add a prompt or a file to start.",
       "profileLoadingToStart": "The profile is still loading. Wait a moment and try again.",
+      "attachmentUploadingToStart": "An attachment is still uploading. Remove it to start without it.",
+      "modelMissingToStart": "Pick a model to start.",
+      "staleRepositoryToStart": "The selected repository is no longer available. Pick a repository again to start.",
       "connectProviderToStart": "Repositories come from a connected GitHub, GitLab, or Bitbucket account.",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",
@@ -2829,7 +2832,7 @@
     },
     "composer": {
       "addAttachment": "Add attachment",
-      "removeOrRetryFailed": "Remove or retry failed attachments first.",
+      "removeFailedAttachments": "Remove the attachments that failed to upload.",
       "attachmentsWithSlashCommands": "Attachments cannot be sent with slash commands.",
       "photoMetadataNotRemoved": "Photo metadata could not be removed from an attachment.",
       "charactersRemaining_one": "{{count}} character remaining",

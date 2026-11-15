@@ -788,9 +788,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
     // enabled Start can never disagree.
     const gate = newSessionGate();
     expect(
-      resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({ selectedRepo: 'org/repo', gate })
-      )
+      resolveNewSessionStartBlockedReason(newSessionReasonInput({ selectedRepo: 'org/repo', gate }))
     ).toBeNull();
     expect(
       resolveNewSessionStartDisabled({

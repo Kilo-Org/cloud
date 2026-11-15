@@ -211,10 +211,12 @@ function press(instance: TestRenderer.ReactTestInstance | undefined): void {
 
 /** The mounted sheet headers' titles, narrowed at the untyped props boundary. */
 function headerTitles(renderer: TestRenderer.ReactTestRenderer): (string | undefined)[] {
-  return renderer.root.findAll(node => node.type === SheetHeader).map(node => {
-    const title: unknown = node.props.title;
-    return typeof title === 'string' ? title : undefined;
-  });
+  return renderer.root
+    .findAll(node => node.type === SheetHeader)
+    .map(node => {
+      const title: unknown = node.props.title;
+      return typeof title === 'string' ? title : undefined;
+    });
 }
 
 async function mountSheet(

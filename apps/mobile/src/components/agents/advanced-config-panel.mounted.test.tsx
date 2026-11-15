@@ -206,13 +206,15 @@ function mount(
  * A captured callback prop. Renderer props are untyped, so the value enters as
  * `unknown` and is narrowed once before the test calls through it.
  */
+function isVoidHandler(value: unknown): value is () => void {
+  return typeof value === 'function';
+}
+
 function invokeHandler(handler: unknown): void {
-  if (typeof handler !== 'function') {
+  if (!isVoidHandler(handler)) {
     throw new TypeError('expected a handler prop');
   }
-  act(() => {
-    handler();
-  });
+  act(handler);
 }
 
 function press(node: TestRenderer.ReactTestInstance | undefined) {

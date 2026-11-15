@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Text } from '@/components/ui/text';
 import { SaveProfileSheet, type SaveProfileSheetProps } from './save-profile-sheet';
 
 vi.mock('react-native', () => ({
@@ -53,6 +54,11 @@ function voidHandler(value: unknown): () => void {
     throw new TypeError('expected a handler prop');
   }
   return value as () => void;
+}
+
+/** Narrows a captured text handler before the test calls through it. */
+function isTextChangeHandler(value: unknown): value is (value: string) => void {
+  return typeof value === 'function';
 }
 
 function defaults(overrides: Partial<SaveProfileSheetProps> = {}): SaveProfileSheetProps {
@@ -109,7 +115,7 @@ function liveMessage(renderer: TestRenderer.ReactTestRenderer): unknown {
 /** Types into a labelled field, narrowing the untyped handler once. */
 function typeInto(renderer: TestRenderer.ReactTestRenderer, label: string, value: string): void {
   const onChangeText: unknown = field(renderer, label).props.onChangeText;
-  if (typeof onChangeText !== 'function') {
+  if (!isTextChangeHandler(onChangeText)) {
     throw new TypeError(`no change handler for ${label}`);
   }
   act(() => {
@@ -248,7 +254,7 @@ describe('SaveProfileSheet', () => {
     // measured style, and the height is final on the first layout.
     expect(reserved.props.accessibilityElementsHidden).toBe(true);
     expect(reserved.props.importantForAccessibility).toBe('no-hide-descendants');
-    const [line] = reserved.findAll(node => node.type === 'Text');
+    const [line] = reserved.findAll(node => node.type === Text);
     if (!line) {
       throw new TypeError('the reserved refusal copy is empty');
     }

@@ -27,10 +27,10 @@ enum KiloVisibleSession {
     guard let responder = rootViewController() else {
       return
     }
-    let trimmed = sessionId?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmed = KiloAppActionValue.nonBlank(sessionId)
     responder.userActivity?.invalidate()
     responder.userActivity = nil
-    guard let trimmed, !trimmed.isEmpty else {
+    guard let trimmed else {
       return
     }
     let activity = NSUserActivity(activityType: activityType)

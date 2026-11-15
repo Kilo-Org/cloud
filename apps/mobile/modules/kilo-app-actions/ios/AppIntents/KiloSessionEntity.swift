@@ -68,8 +68,7 @@ struct KiloSessionEntityQuery: EntityQuery, EntityStringQuery {
   /// system asks which one to open. Streaming a single arbitrary match instead
   /// would open a session the person never named.
   func entities(matching string: String) async throws -> [KiloSessionEntity] {
-    let query = string.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !query.isEmpty else {
+    guard let query = KiloAppActionValue.nonBlank(string) else {
       return try await suggestedEntities()
     }
     let entries = KiloSessionCatalogStore.entries()

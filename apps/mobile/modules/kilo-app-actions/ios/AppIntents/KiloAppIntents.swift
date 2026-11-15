@@ -21,14 +21,17 @@ import UIKit
 /// `src/lib/app-actions/app-action-contract.ts` declares, and the contract test
 /// parses each literal with that module's `parseAppActionUrl`, so the Swift and
 /// JS grammars cannot drift.
-enum KiloAppActionTarget {
-  static let openNeedsInput = "kiloapp:///actions/open-needs-input"
-  static let openSession = "kiloapp:///actions/open-session"
-  static let openPullRequest = "kiloapp:///actions/open-pull-request"
+///
+/// The type is the closed set. A builder takes one of these cases, so an intent
+/// cannot hand the app a URL outside the slugs its pipeline resolves.
+enum KiloAppActionTarget: String {
+  case openNeedsInput = "kiloapp:///actions/open-needs-input"
+  case openSession = "kiloapp:///actions/open-session"
+  case openPullRequest = "kiloapp:///actions/open-pull-request"
 
   /// The target with its query, or nil when it cannot be built.
-  static func url(_ target: String, query: [String: String] = [:]) -> URL? {
-    guard var components = URLComponents(string: target) else {
+  static func url(_ target: KiloAppActionTarget, query: [String: String] = [:]) -> URL? {
+    guard var components = URLComponents(string: target.rawValue) else {
       return nil
     }
     if !query.isEmpty {
@@ -42,7 +45,7 @@ enum KiloAppActionTarget {
   /// Opens the target for the app's own routing to pick up. `openAppWhenRun`
   /// has already brought the app forward; this hands it the action.
   @MainActor
-  static func open(_ target: String, query: [String: String] = [:]) async throws {
+  static func open(_ target: KiloAppActionTarget, query: [String: String] = [:]) async throws {
     guard let url = url(target, query: query) else {
       throw KiloAppActionError.malformedResult
     }
@@ -75,10 +78,10 @@ struct StartAgentIntent: AppIntent {
 
   func perform() async throws -> some IntentResult & ReturnsValue<String> {
     var payload = ["action": "StartAgent", "prompt": prompt]
-    if let repository = Self.named(repository) {
+    if let repository = KiloAppActionValue.nonBlank(repository) {
       payload["repository"] = repository
     }
-    if let session = Self.named(session) {
+    if let session = KiloAppActionValue.nonBlank(session) {
       payload["sessionId"] = session
     }
     do {
@@ -86,15 +89,6 @@ struct StartAgentIntent: AppIntent {
     } catch let error as KiloAppActionError {
       throw Self.reported(error)
     }
-  }
-
-  /// A named parameter, or nil when the run left it empty.
-  private static func named(_ value: String?) -> String? {
-    guard let value else {
-      return nil
-    }
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
   }
 
   /// Shortcuts shows the thrown error's description, so a refusal the pipeline

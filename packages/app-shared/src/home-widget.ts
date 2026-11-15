@@ -158,7 +158,7 @@ export function buildHomeWidgetDetails(
         (timestampMs(a.statusUpdatedAt) ?? Infinity) - (timestampMs(b.statusUpdatedAt) ?? Infinity)
     );
   const scheduled = sessions
-    .filter(row => row.status === 'scheduled')
+    .filter(row => glanceableStatusKind(row.status) === 'scheduled')
     .sort(
       (a, b) => (timestampMs(a.scheduledAt) ?? Infinity) - (timestampMs(b.scheduledAt) ?? Infinity)
     );

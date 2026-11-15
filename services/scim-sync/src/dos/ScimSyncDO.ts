@@ -70,7 +70,7 @@ export class ScimSyncDO extends DurableObject<Env> {
       cursor,
       cursorSource: source,
       eventFailure: state.currentFailure(this.db),
-      parkedCount: state.parkedCount(this.db),
+      parkedCount: state.parkedCount(this.db, Date.now()),
       nextAlarmAt: await this.ctx.storage.getAlarm(),
       lastPoll: (await this.ctx.storage.get<PollResult>(LAST_POLL_KEY)) ?? null,
     };

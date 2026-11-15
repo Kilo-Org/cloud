@@ -120,9 +120,12 @@ the loop park the same event again, the new park replaces the row's contents and
 restarts its window, so the row names the current failure and gets the full 30
 days. The alarm expires rows on every tick: before the poll, it deletes the
 rows parked **strictly** earlier than that cutoff, so a row exactly 30 days old
-is kept by this tick and goes on the next one. Expiry rides on the existing
-alarm rather than a second cron or timer, so it cannot delay or replace the
-reschedule, and a poll that never runs is already visible as a stopped cursor.
+is kept by this tick and goes on the next one. `/status` counts with that same
+cutoff. A row past its window is not counted, even before a tick deletes it.
+The next tick removes that row from storage, so the count reports the window,
+not the table. Expiry rides on the existing alarm rather than a second cron or
+timer, so it cannot delay or replace the reschedule, and a poll that never runs
+is already visible as a stopped cursor.
 
 The policy covers the rows written before it: every row carries the `parked_at`
 its window is measured from, so an older row expires on the first tick whose
@@ -180,7 +183,7 @@ acts on.
 | Route | Purpose |
 |---|---|
 | `GET /health` | Worker liveness. Does not touch the Durable Object. |
-| `GET /status` | Environment, interval, cursor and its source, the held failure, the parked count — retained rows only, since expired ones are deleted — next alarm time, and the last poll result. |
+| `GET /status` | Environment, interval, cursor and its source, the held failure, the parked count — rows still inside the retention window at read time — next alarm time, and the last poll result. |
 
 Both routes are unauthenticated, so the Worker has no *HTTP* ingress: no
 `workers_dev` hostname, no `routes`, and no service binding. Neither route is

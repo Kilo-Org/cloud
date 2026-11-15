@@ -1019,6 +1019,32 @@ describe('parked-event retention', () => {
     expect(infoSpy).toHaveBeenCalledWith('SCIM sync expired parked events', { removed: 1 });
   });
 
+  it('reports only the rows inside the window before a tick deletes the rest', async () => {
+    const target = stub('retention-count-window');
+    // Frozen, so the expired row is still past the window when `/status` reads
+    // its own `Date.now()`, not only when the seeded row was written.
+    steppingClock(0);
+    const now = Date.now();
+    const retention = PARKED_EVENT_RETENTION_MS;
+
+    await seedParked(target, [
+      { eventId: 'expired', parkedAt: now - retention - 1 },
+      { eventId: 'retained', parkedAt: now - 1_000 },
+    ]);
+    harness({ pages: [[]] });
+
+    // Read before any tick: the expired row is still in storage, because the
+    // delete rides on the alarm, and `/status` must not report it anyway.
+    expect((await readState(target)).parked.sort()).toEqual(['expired', 'retained']);
+    expect((await target.getStatus()).parkedCount).toBe(1);
+
+    await runInDurableObject(target, instance => instance.alarm());
+
+    // The tick removes the expired row from storage and the count is unchanged.
+    expect((await readState(target)).parked).toEqual(['retained']);
+    expect((await target.getStatus()).parkedCount).toBe(1);
+  });
+
   it('is a no-op on an empty table and safe to repeat', async () => {
     const target = stub('retention-empty');
     harness({ pages: [[]] });

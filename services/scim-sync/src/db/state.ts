@@ -1,5 +1,5 @@
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
-import { and, eq, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, lt, sql } from 'drizzle-orm';
 
 import type { AttemptClass, AttemptOutcome } from '../dispatch/app-client';
 import type { CursorSource, EventFailureState } from '../types';
@@ -250,15 +250,29 @@ export function parkEvent(
 }
 
 /**
- * Counts the parked rows still retained. Expiry is a range delete from the
- * alarm, so this is the number of rows inside the retention window, which is
- * the number an operator can still act on.
+ * The instant a parked row's window ends, measured back from `now`. The count
+ * and the delete both read this boundary, so neither can report one thing
+ * while the other acts on another.
  */
-export function parkedCount(db: Db): number {
+function parkedCutoff(now: number): number {
+  return now - PARKED_EVENT_RETENTION_MS;
+}
+
+/**
+ * Counts the parked rows still inside the retention window.
+ *
+ * The cutoff is the one the prune applies, so a row past its window is never
+ * reported, even before an alarm tick removes it from storage. The comparison
+ * is `>=`, the complement of the prune's strict `<`, so a row parked exactly on
+ * the boundary is counted here and kept by that tick: the count and the delete
+ * apply one rule.
+ */
+export function parkedCount(db: Db, now: number): number {
   return (
     db
       .select({ count: sql<number>`count(*)` })
       .from(parkedEvents)
+      .where(gte(parkedEvents.parked_at, parkedCutoff(now)))
       .get()?.count ?? 0
   );
 }
@@ -289,7 +303,7 @@ export function parkedCount(db: Db): number {
  * missed row.
  */
 export function pruneParkedEvents(db: Db, now: number): number {
-  const cutoff = now - PARKED_EVENT_RETENTION_MS;
+  const cutoff = parkedCutoff(now);
   const removed =
     db
       .select({ count: sql<number>`count(*)` })

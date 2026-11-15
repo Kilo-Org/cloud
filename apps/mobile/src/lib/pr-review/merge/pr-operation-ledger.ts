@@ -8,6 +8,7 @@
 import { i18n } from '@/i18n';
 import { isOperationInProgress } from '@/lib/operation-markers';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 export const PR_OPERATION_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the PR before retrying.";
 // The ambiguous outcome could not be recorded as `reconcile_pending`, so the
@@ -46,9 +47,9 @@ const PR_SURFACE_RETRYABLE_COPY = {
  * translated. The server's own English marker is still matched below.
  */
 class PrOperationMarkerError extends Error {
-  kind: 'ambiguous' | 'persistence-failed';
+  kind: 'ambiguous' | 'persistence-failed' | 'not-admitted';
 
-  constructor(kind: 'ambiguous' | 'persistence-failed', message: string) {
+  constructor(kind: 'ambiguous' | 'persistence-failed' | 'not-admitted', message: string) {
     super(message);
     this.kind = kind;
   }
@@ -69,12 +70,47 @@ export function isPrOperationPersistenceFailed(error: unknown): boolean {
 }
 
 /**
+ * A head that moved, or a PR that closed, since the surface loaded it.
+ *
+ * The provider router settles such a ledger row as `head_moved` /
+ * `already_closed` with `confirmed_absent`, so the intent is over even though
+ * the tRPC code is a `CONFLICT`: the same key must never be retried, and a
+ * generic conflict, e.g. a merge already running, stays retryable.
+ */
+export function staleHeadRejectionMessage(error: unknown): string | null {
+  if (readTrpcErrorField(error, 'code') !== 'CONFLICT') {
+    return null;
+  }
+  const message = error instanceof Error ? error.message : '';
+  return /changed since it was loaded|closed without merging/.test(message) ? message : null;
+}
+
+/**
+ * The surface refused to admit the write: its retained-key store holds
+ * `RETAINED_OPERATION_KEY_LIMIT` unresolved intents, so nothing was sent and
+ * there is no ledger row to replay. Only an authoritative retirement frees a
+ * slot, so retrying cannot succeed and no surface may offer it.
+ */
+export function isPrOperationNotAdmitted(error: unknown): boolean {
+  return error instanceof PrOperationMarkerError && error.kind === 'not-admitted';
+}
+
+/** The refusal a surface throws when its retained-key store is full. */
+export function prOperationNotAdmittedError(message: string): Error {
+  return new PrOperationMarkerError('not-admitted', message);
+}
+
+/**
  * True when the failure is retryable, so the operation key must be KEPT (the
  * ledger dedupes the same-key retry instead of re-executing the write). A
  * non-retryable failure ends the intent: the next submit needs a fresh key.
  */
 export function isPrMutationRetryable(error: unknown): boolean {
-  if (isPrOperationPersistenceFailed(error)) {
+  if (
+    isPrOperationPersistenceFailed(error) ||
+    isPrOperationNotAdmitted(error) ||
+    staleHeadRejectionMessage(error) !== null
+  ) {
     return false;
   }
   return classifyPrReviewMutationError(error).kind === 'retryable';

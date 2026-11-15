@@ -1,6 +1,10 @@
 import './pr-merge-sheet.test-mocks';
 import { describe, expect, it } from 'vitest';
-import { PR_OPERATION_PERSISTENCE_FAILED_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { i18n } from '@/i18n';
+import {
+  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+  prOperationNotAdmittedError,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import {
   baseProps,
@@ -78,6 +82,15 @@ describe('PrMergeSheet mounted errors', () => {
     state.merge.error = new Error(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
     const renderer = await mount();
     expect(visibleText(renderer)).toContain(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+    expect(button(renderer, 'Merge').props.disabled).toBe(true);
+  });
+
+  it('does not offer a retry when the intent store refused the merge', async () => {
+    // Nothing was sent, and only a settled intent frees a slot, so a retry
+    // cannot succeed: the refusal is not a retryable failure.
+    state.merge.error = prOperationNotAdmittedError(i18n.t('prReview.merge.couldNotMerge'));
+    const renderer = await mount();
+    expect(visibleText(renderer)).toContain(i18n.t('prReview.merge.couldNotMerge'));
     expect(button(renderer, 'Merge').props.disabled).toBe(true);
   });
 

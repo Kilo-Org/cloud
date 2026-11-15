@@ -59,6 +59,7 @@ import {
 import {
   isPrMutationRetryable,
   mapPrOperationError,
+  prOperationNotAdmittedError,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { useHoistedOperationKey } from '@/lib/operation-key';
@@ -256,8 +257,10 @@ export function useMergePullRequestMutation(ref: ReviewWriteRef) {
       if (operationKey === null) {
         // The store keeps only unresolved intents and never evicts one to make
         // room, so it refuses a new intent once it is full. Sending anyway would
-        // give the write no ledger identity to dedupe a retry against.
-        throw new Error(i18n.t('prReview.merge.couldNotMerge'));
+        // give the write no ledger identity to dedupe a retry against, and a
+        // retry cannot succeed while every slot holds an unresolved write, so
+        // the refusal is not presented as one.
+        throw prOperationNotAdmittedError(i18n.t('prReview.merge.couldNotMerge'));
       }
       try {
         const result =

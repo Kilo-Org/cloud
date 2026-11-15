@@ -202,6 +202,27 @@ describe('merge intent key across a dismissed merge screen', () => {
     expect(operationKeyAt(1)).not.toBe(first);
     renderer.unmount();
   });
+
+  it('retires the key after a stale-head rejection, so its slot is not held forever', async () => {
+    // The router settled that row: the head moved, so the intent is over and the
+    // retained entry must not keep one of the store's slots.
+    const moved = new Error(
+      'The merge request changed since it was loaded. Reload the merge request and try again.'
+    );
+    Object.assign(moved, { data: { code: 'CONFLICT' } });
+    transport.merge.mockRejectedValueOnce(moved);
+    const { renderer, handle } = mountMergeScreen();
+
+    await submit(handle);
+    const first = operationKeyAt(0);
+
+    // The next submit of the same intent is a new write, so it mints a new key.
+    transport.merge.mockRejectedValueOnce(moved);
+    await submit(handle);
+
+    expect(operationKeyAt(1)).not.toBe(first);
+    renderer.unmount();
+  });
 });
 
 describe('merge intent retirement across the account boundary', () => {

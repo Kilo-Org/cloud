@@ -1366,7 +1366,7 @@
       "set": "Поставено",
       "notSet": "Не е поставено",
       "nSelected": "{{displayCount}} избрани",
-      "nSelected_one": "{{displayCount}} избрани",
+      "nSelected_one": "{{displayCount}} избрано",
       "nSelected_other": "{{displayCount}} избрани",
       "proposedReviewMdGuidance": "Предложени насоки за REVIEW.md"
     },

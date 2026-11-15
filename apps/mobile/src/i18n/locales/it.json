@@ -794,7 +794,7 @@
     "overview": {
       "allAreas": "Tutte le aree",
       "nSelected": "Selezionati: {{displayCount}}",
-      "nSelected_one": "Selezionati: {{displayCount}}",
+      "nSelected_one": "Selezionato: {{displayCount}}",
       "nSelected_other": "Selezionati: {{displayCount}}",
       "nSelected_many": "Selezionati: {{displayCount}}",
       "proposedReviewMdGuidance": "Indicazioni proposte per REVIEW.md",

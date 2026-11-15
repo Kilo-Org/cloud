@@ -179,7 +179,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
 - For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
   - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
-  - Settle the attempt once, with `succeed()`, `fail(failure)`, or `abandon()` when there is no outcome.
+  - Settle the attempt once, with `succeed()`, `fail(failure)`, or `abandon()` when there is no outcome. If nothing on the surface renders the failure (for example, a toast already reports it), use `abandon()`: a settled keyed entry stays until the surface unmounts.
   - After an `await`, check `attempt.owns()` before any effect outside the phase, such as closing a sheet, clearing a draft, or posting.
   - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
 - Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.

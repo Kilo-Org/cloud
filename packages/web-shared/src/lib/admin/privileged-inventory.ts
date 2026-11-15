@@ -957,16 +957,39 @@ export function targetKindForEntry(
 }
 
 /**
- * The id fields each target kind is named by in a request body. These routers
- * also carry `id`, `note_id`, `caseId`, `exportId`, `requestId` and `grantId`
- * for other records, so only the kind's own field names count.
+ * The one input field the resolver of each admin procedure reads to name the
+ * record it acts on. The map names that field per procedure, so a request body
+ * cannot influence the binding through any other field. Procedures that act on
+ * no single record are absent and yield no field.
  */
-const TARGET_ID_FIELDS: Record<PrivilegedTargetKind, readonly string[]> = {
-  user: ['userId', 'kilo_user_id'],
-  organization: ['organizationId'],
-  service: [],
-  none: [],
+export const TARGET_ID_FIELD_BY_ADMIN_PROCEDURE: Record<string, string> = {
+  'admin.users.resetAPIKey': 'userId',
+  'admin.users.signOutBrowserSessions': 'userId',
+  'admin.users.checkKiloPass': 'userId',
+  'admin.users.resetToMagicLinkLogin': 'userId',
+  'admin.users.releaseEmailAddress': 'userId',
+  'admin.users.updateBlockStatus': 'userId',
+  'admin.users.setPersonalAccountDisabled': 'userId',
+  'admin.users.recomputeBalances': 'userId',
+  'admin.users.DEV_ONLY_messUpBalance': 'userId',
+  'admin.users.cancelAndRefundKiloPass': 'userId',
+  'admin.users.setPlatformAdminAccess': 'userId',
+  'admin.users.setAdminPermissions': 'userId',
+  'admin.users.addNote': 'kilo_user_id',
+  'admin.internalBotUsers.create': 'organizationId',
+  'admin.salesDemo.reset': 'organizationId',
+  'admin.ossSponsorship.addExistingOrgToOss': 'organizationId',
+  'admin.supportAccess.request': 'organizationId',
+  'admin.supportAccess.emergencyIssue': 'organizationId',
 };
+
+/** The input field that procedure's resolver reads, or null when it has none. */
+export function targetIdFieldForAdminProcedure(path: string): string | null {
+  const field: string | undefined = Object.hasOwn(TARGET_ID_FIELD_BY_ADMIN_PROCEDURE, path)
+    ? TARGET_ID_FIELD_BY_ADMIN_PROCEDURE[path]
+    : undefined;
+  return field ?? null;
+}
 
 function readInputField(input: object, field: string): unknown {
   if (typeof FormData !== 'undefined' && input instanceof FormData) return input.get(field);
@@ -975,21 +998,21 @@ function readInputField(input: object, field: string): unknown {
 
 /**
  * The target id the request input names. The admin guard binds an operation
- * proof to it, so the confirmation names the account or organization the
- * request acts on. Returns null when the input names none, is not a plain
- * object or `FormData`, or names it as anything but a non-empty string. Never
- * throws.
+ * proof to it, so the confirmation names the record the request acts on. It
+ * reads only `field`, the one the procedure's resolver reads. Returns null when
+ * `field` is null, the input names no such field, is not a plain object or
+ * `FormData`, or names it as anything but a non-empty string. Never throws.
  */
-export function targetIdFromInput(targetKind: PrivilegedTargetKind, input: unknown): string | null {
+export function targetIdFromInput(field: string | null, input: unknown): string | null {
+  if (field === null) return null;
   const isFormData = typeof FormData !== 'undefined' && input instanceof FormData;
   if (!isFormData && (typeof input !== 'object' || input === null || Array.isArray(input))) {
     return null;
   }
-  for (const field of TARGET_ID_FIELDS[targetKind]) {
-    const value = readInputField(input, field);
-    if (typeof value === 'string' && value.length > 0) return value;
-  }
-  return null;
+  const value = readInputField(input, field);
+  // The client schema that echoes a binding back bounds the id at 200
+  // characters, so an id outside that bound names no target here.
+  return typeof value === 'string' && value.length > 0 && value.length <= 200 ? value : null;
 }
 
 export function actionClassForAdminProcedure(

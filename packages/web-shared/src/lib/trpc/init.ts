@@ -29,6 +29,7 @@ import {
   actionClassForAdminProcedure,
   markPrivilegedGuard,
   resolvesOwnStepUp,
+  targetIdFieldForAdminProcedure,
   targetIdFromInput,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
@@ -426,7 +427,10 @@ const adminStepUpEnforcementMiddleware = t.middleware(
     // input names. A session-class decision ignores the target, so it stays
     // unbound.
     const target: PrivilegedTarget = isOperationStepUpClass(actionClass)
-      ? { kind: targetKind, id: targetIdFromInput(targetKind, await getRawInput()) }
+      ? {
+          kind: targetKind,
+          id: targetIdFromInput(targetIdFieldForAdminProcedure(path), await getRawInput()),
+        }
       : { kind: targetKind, id: null };
 
     const adminStepUpState = await runStepUpGuard({

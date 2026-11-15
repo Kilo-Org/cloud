@@ -5,11 +5,13 @@ import { rootRouter } from './root-router';
 import {
   ADMIN_AREA_POLICIES,
   ADMIN_STEP_UP_SELF_GUARDED_ROUTES,
+  TARGET_ID_FIELD_BY_ADMIN_PROCEDURE,
   actionClassForEntry,
   findPrivilegedInventoryEntry,
   internalElevationSites,
   privilegedGuardTiers,
   resolvesOwnStepUp,
+  targetIdFieldForAdminProcedure,
   targetIdFromInput,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
@@ -604,41 +606,86 @@ describe('support never-list keys resolve to real surfaces', () => {
 });
 
 describe('targetIdFromInput', () => {
-  test('binds a user id named by userId', () => {
-    expect(targetIdFromInput('user', { userId: 'user-1' })).toBe('user-1');
+  test('reads userId for admin.users.resetAPIKey', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.resetAPIKey');
+    expect(field).toBe('userId');
+    expect(targetIdFromInput(field, { userId: 'user-1' })).toBe('user-1');
   });
 
-  test('binds a user id named by kilo_user_id', () => {
-    expect(targetIdFromInput('user', { kilo_user_id: 'user-2' })).toBe('user-2');
+  test('reads kilo_user_id for admin.users.addNote', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.addNote');
+    expect(field).toBe('kilo_user_id');
+    expect(targetIdFromInput(field, { kilo_user_id: 'user-2' })).toBe('user-2');
   });
 
-  test('binds an organization id named by organizationId', () => {
-    expect(targetIdFromInput('organization', { organizationId: 'org-1' })).toBe('org-1');
+  test('reads organizationId for admin.salesDemo.reset', () => {
+    const field = targetIdFieldForAdminProcedure('admin.salesDemo.reset');
+    expect(field).toBe('organizationId');
+    expect(targetIdFromInput(field, { organizationId: 'org-1' })).toBe('org-1');
   });
 
-  test('ignores ids that name another record', () => {
-    expect(targetIdFromInput('user', { id: 'case-1' })).toBeNull();
-    expect(targetIdFromInput('user', { note_id: 'note-1' })).toBeNull();
-    expect(targetIdFromInput('organization', { id: 'org-1' })).toBeNull();
+  test('names no field for procedures without a single target', () => {
+    expect(targetIdFieldForAdminProcedure('admin.supportAccess.deny')).toBeNull();
+    expect(targetIdFieldForAdminProcedure('admin.users.deleteNote')).toBeNull();
+    expect(targetIdFieldForAdminProcedure('admin.unknown.procedure')).toBeNull();
   });
 
-  test('ignores an array of ids', () => {
-    expect(targetIdFromInput('user', { userIds: ['user-1', 'user-2'] })).toBeNull();
+  test('binds kilo_user_id when a body also carries userId', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.addNote');
+    expect(targetIdFromInput(field, { kilo_user_id: 'user-2', userId: 'user-9' })).toBe('user-2');
   });
 
-  test('returns null for input that is not an object', () => {
-    expect(targetIdFromInput('user', 'user-1')).toBeNull();
-    expect(targetIdFromInput('user', null)).toBeNull();
-    expect(targetIdFromInput('user', undefined)).toBeNull();
+  test('names no target for a body that carries an extra organizationId', () => {
+    const field = targetIdFieldForAdminProcedure('admin.supportAccess.deny');
+    expect(targetIdFromInput(field, { grantId: 'grant-1', organizationId: 'org-1' })).toBeNull();
+  });
+
+  test('returns null for a null field', () => {
+    expect(targetIdFromInput(null, { organizationId: 'org-1' })).toBeNull();
+  });
+
+  test('returns null when the input names no such field', () => {
+    expect(targetIdFromInput('userId', { organizationId: 'org-1' })).toBeNull();
   });
 
   test('returns null for an empty id', () => {
-    expect(targetIdFromInput('user', { userId: '' })).toBeNull();
+    expect(targetIdFromInput('userId', { userId: '' })).toBeNull();
+  });
+
+  test('returns null for an id longer than the client schema allows', () => {
+    expect(targetIdFromInput('userId', { userId: 'u'.repeat(201) })).toBeNull();
+    expect(targetIdFromInput('userId', { userId: 'u'.repeat(200) })).toBe('u'.repeat(200));
+  });
+
+  test('returns null for input that is not an object', () => {
+    expect(targetIdFromInput('userId', 'user-1')).toBeNull();
+    expect(targetIdFromInput('userId', null)).toBeNull();
+    expect(targetIdFromInput('userId', undefined)).toBeNull();
   });
 
   test('reads a FormData body', () => {
     const body = new FormData();
     body.set('userId', 'user-3');
-    expect(targetIdFromInput('user', body)).toBe('user-3');
+    expect(targetIdFromInput('userId', body)).toBe('user-3');
+  });
+});
+
+describe('admin target id fields name mounted mutations', () => {
+  test('every key of the map is a mounted mutation', () => {
+    const problems: string[] = [];
+
+    for (const [route, field] of Object.entries(TARGET_ID_FIELD_BY_ADMIN_PROCEDURE)) {
+      const procedure = procedures[route];
+      if (!procedure) {
+        problems.push(`${route} (no procedure)`);
+        continue;
+      }
+      if ((procedure._def?.type ?? 'query') !== 'mutation') {
+        problems.push(`${route}: ${procedure._def?.type ?? 'query'}, expected mutation`);
+      }
+      if (field.trim().length === 0) problems.push(`${route} (empty field)`);
+    }
+
+    expect(problems).toEqual([]);
   });
 });

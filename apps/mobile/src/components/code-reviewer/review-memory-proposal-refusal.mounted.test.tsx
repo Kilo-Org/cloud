@@ -10,6 +10,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 
 import { ReviewMemoryProposalSheet } from './review-memory-proposal-sheet';
+import {
+  billingStep,
+  changeHandler,
+  dismissHandler,
+  doneHandler,
+  hosts,
+  pressHandler,
+  sheet,
+  statusMessage,
+} from './review-memory-proposal-refusal.test-helpers';
 import { collectText } from './review-memory-screen.test-helpers';
 import { i18n } from '@/i18n';
 import { type ReviewMemoryProposal } from '@/lib/review-memory-proposals';
@@ -117,33 +127,6 @@ function rejection(sentence: string) {
   });
 }
 
-function hosts(root: ReactTestInstance, type: string) {
-  return root.findAll(node => typeof node.type === 'string' && node.type === type);
-}
-
-function billingStep(root: ReactTestInstance) {
-  return hosts(root, 'Pressable').find(
-    node => node.props.accessibilityLabel === i18n.t('organization.hub.manageBilling')
-  );
-}
-
-function statusMessage(root: ReactTestInstance): string | null {
-  const status = hosts(root, 'AccessibleStatus')[0];
-  if (!status) {
-    throw new Error('Missing AccessibleStatus');
-  }
-  return (status.props as { message: string | null }).message;
-}
-
-/** The presented sheet's own node: its `visible` and its dismissal report. */
-function sheet(root: ReactTestInstance) {
-  const node = hosts(root, 'SessionPageSheet')[0];
-  if (!node) {
-    throw new Error('Missing SessionPageSheet');
-  }
-  return node;
-}
-
 /**
  * The sheet's parent in these tests. In the app the membership list settling
  * re-renders this subtree; `h.settle` is the handle a test uses to report that
@@ -172,40 +155,6 @@ function renderSheet() {
       },
     })
   );
-}
-
-/** A host prop as the callback its component contract promises. */
-function pressHandler(node: ReactTestInstance): () => void {
-  const onPress = node.props.onPress as (() => void) | undefined;
-  if (onPress === undefined) {
-    throw new Error('Missing press handler');
-  }
-  return onPress;
-}
-
-function changeHandler(node: ReactTestInstance): (text: string) => void {
-  const onChangeText = node.props.onChangeText as ((text: string) => void) | undefined;
-  if (onChangeText === undefined) {
-    throw new Error('Missing change handler');
-  }
-  return onChangeText;
-}
-
-function dismissHandler(node: ReactTestInstance): () => void {
-  const onDismiss = node.props.onDismiss as (() => void) | undefined;
-  if (onDismiss === undefined) {
-    throw new Error('Missing dismissal report');
-  }
-  return onDismiss;
-}
-
-/** The header's Done control as the callback its contract promises. */
-function doneHandler(node: ReactTestInstance): () => void {
-  const onDone = node.props.onDone as (() => void) | undefined;
-  if (onDone === undefined) {
-    throw new Error('Missing done handler');
-  }
-  return onDone;
 }
 
 async function pressButton(root: ReactTestInstance, label: string) {

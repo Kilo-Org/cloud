@@ -17,14 +17,13 @@ import {
   buildModernKiloTokenPayload,
   isKiloResourceAudienceAllowed,
 } from '@kilocode/worker-utils/kilo-token-policy';
+import { kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import {
-  CloudAgentAuthoritySchema,
   isCloudAgentAuthorityHttpPathAllowed,
   validateCloudAgentAuthorityClaims,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
-import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
@@ -200,36 +199,24 @@ export function generateOrganizationApiToken(
   };
 }
 
-const organizationRoleClaim = z.enum(ORGANIZATION_ROLES);
-
 /**
- * The claims a verified Kilo token carries.
+ * The claims a verified Kilo bearer carries, taken from the shared payload
+ * schema so the claim list has one source.
  *
- * Loose on purpose: unknown claims must survive the parse, because
+ * `version` is widened to any number: the version refusal must stay reachable
+ * for a token issued by an older version. The object is loose because
  * `validateCloudAgentAuthorityClaims` strict-parses the claim set and denies any
  * claim name it does not know.
  */
 const kiloTokenClaims = z.looseObject({
+  ...kiloTokenPayload.omit({ version: true }).shape,
   version: z.number(),
-  kiloUserId: z.string().min(1),
-  apiTokenPepper: z.string().nullable().optional(),
-  organizationId: z.string().optional(),
-  organizationRole: organizationRoleClaim.optional(),
-  internalApiUse: z.boolean().optional(),
-  createdOnPlatform: z.string().optional(),
-  botId: z.string().optional(),
-  tokenSource: z.string().optional(),
-  deviceSessionId: z.string().optional(),
-  deviceAuthRequestCode: z.string().optional(),
-  isAdmin: z.boolean().optional(),
-  orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRoleClaim })).optional(),
-  env: z.string().optional(),
-  iat: z.number().optional(),
-  exp: z.number().optional(),
-  cloudAgentAuthority: CloudAgentAuthoritySchema.optional(),
+  /**
+   * The audience stays unvalidated. `isKiloResourceAudienceAllowed` owns the
+   * audience refusal and its tolerance for legacy, null, blank and array
+   * audiences.
+   */
   aud: z.unknown().optional(),
-  runtimeAuthorization: z.unknown().optional(),
-  runtimeAdmission: z.unknown().optional(),
 });
 
 /** Claims an issued Kilo token carries; the schema is the single source. */

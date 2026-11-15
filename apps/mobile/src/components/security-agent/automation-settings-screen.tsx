@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one screen draws the three automation sections from one draft, and the section-qualified accessible names repeat their headings */
+/* eslint-disable max-lines -- one screen draws the three automation sections from one draft, and the include-existing rows and severity pickers join their section heading to their accessible name */
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
@@ -253,8 +253,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <Section title={analysisSection}>
           <ToggleRow
-            title={t('securityAgent.automation.enableAutoAnalysis')}
-            subtitle={t('securityAgent.automation.enableAutoAnalysisSubtitle')}
+            title={t('securityAgent.automation.autoAnalysisDescription')}
             value={autoAnalysisEnabled}
             disabled={!canManage}
             onValueChange={setAutoAnalysisEnabled}
@@ -291,8 +290,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <Section title={remediationSection}>
           <ToggleRow
-            title={t('securityAgent.automation.enableAutoRemediation')}
-            subtitle={t('securityAgent.automation.enableAutoRemediationSubtitle')}
+            title={t('securityAgent.automation.autoRemediationDescription')}
             value={autoRemediationEnabled}
             disabled={!canManage}
             onValueChange={handleAutoRemediationToggle}
@@ -334,8 +332,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <Section title={t('securityAgent.automation.autoDismiss')}>
           <ToggleRow
-            title={t('securityAgent.automation.enableAutoDismiss')}
-            subtitle={t('securityAgent.automation.enableAutoDismissSubtitle')}
+            title={t('securityAgent.automation.autoDismissDescription')}
             value={autoDismissEnabled}
             disabled={!canManage}
             onValueChange={setAutoDismissEnabled}

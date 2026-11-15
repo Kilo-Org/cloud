@@ -9,7 +9,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AutomationSettingsScreen } from './automation-settings-screen';
 
 const config = vi.hoisted(() => ({
@@ -88,8 +88,6 @@ vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => props.children,
 }));
 
-const AUTO_DISMISS_ROW_TITLE = 'Enable auto-dismiss';
-
 const loadedConfig = {
   isEnabled: true,
   autoAnalysisEnabled: false,
@@ -117,7 +115,11 @@ function renderScreen() {
 }
 
 function autoDismissRow() {
-  const row = toggleRows.rows.find(r => r.title === AUTO_DISMISS_ROW_TITLE);
+  // The section switch is titled with its description, which is also the name
+  // its switch reports.
+  const row = toggleRows.rows.find(
+    r => r.title === i18n.t('securityAgent.automation.autoDismissDescription')
+  );
   if (!row) {
     throw new Error('auto-dismiss toggle row not found');
   }

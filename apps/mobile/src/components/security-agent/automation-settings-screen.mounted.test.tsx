@@ -256,4 +256,33 @@ describe('AutomationSettingsScreen approval gate', () => {
     const names = [...includeNames, ...severityNames];
     expect(new Set(names).size).toBe(4);
   });
+
+  it('titles each section switch with its description, named by the visible title alone', () => {
+    config.data = enabledConfig();
+    renderScreen();
+
+    const sectionNames = [
+      'securityAgent.automation.autoAnalysis',
+      'securityAgent.automation.autoRemediation',
+      'securityAgent.automation.autoDismiss',
+    ].map(key => i18n.t(key));
+    const descriptions = [
+      'securityAgent.automation.autoAnalysisDescription',
+      'securityAgent.automation.autoRemediationDescription',
+      'securityAgent.automation.autoDismissDescription',
+    ].map(key => i18n.t(key));
+
+    const sectionRows = toggleRows.rows.filter(row => descriptions.includes(row.title));
+    expect(sectionRows.map(row => row.title)).toEqual(descriptions);
+    expect(new Set(sectionRows.map(row => row.title)).size).toBe(3);
+
+    for (const row of sectionRows) {
+      // Label in name: the switch is named by the text the row shows, so no
+      // second name and no muted copy beneath it repeat the setting.
+      expect(row.accessibilityLabel).toBeUndefined();
+      for (const sectionName of sectionNames) {
+        expect(row.title).not.toContain(sectionName);
+      }
+    }
+  });
 });

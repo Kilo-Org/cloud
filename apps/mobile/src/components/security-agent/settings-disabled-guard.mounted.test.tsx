@@ -275,11 +275,11 @@ const CASES: {
     name: 'AutomationSettingsScreen',
     Screen: AutomationSettingsScreen,
     makeDirty: () => {
-      pressToggle(i18n.t('securityAgent.automation.enableAutoAnalysis'));
+      pressToggle(i18n.t('securityAgent.automation.autoAnalysisDescription'));
     },
     makeClean: () => {
       const row = toggleRows.rows.find(
-        candidate => candidate.title === i18n.t('securityAgent.automation.enableAutoAnalysis')
+        candidate => candidate.title === i18n.t('securityAgent.automation.autoAnalysisDescription')
       );
       if (!row) {
         throw new Error('automation toggle not found');

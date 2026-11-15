@@ -112,6 +112,38 @@ function backPressableCount(root: TestInstance): number {
   return root.findAll(isBackPressable).length;
 }
 
+/**
+ * The 48dp column a non-centred row puts before the heading. It mirrors the
+ * heading's own lines with zero-ink twins, so the caret can centre on the
+ * title's line instead of on the eyebrow-plus-title block; the centred branch
+ * has no column (its leading spacer starts `h-[48px]`, this one `w-[48px]`).
+ */
+function findLeadingColumn(root: TestInstance): TestInstance {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      String(node.props.className ?? '').startsWith('w-[48px]')
+  );
+}
+
+/**
+ * The eyebrow a reader sees: the heading's own slot. The leading column lays
+ * out a twin of it (a zero-ink, hidden line box), so a bare `Eyebrow` lookup
+ * has two candidates the moment the header carries an eyebrow.
+ */
+function findHeadingEyebrow(root: TestInstance): TestInstance {
+  const eyebrow = root.findAll(
+    node =>
+      String(node.type) === 'Eyebrow' &&
+      String(node.parent?.props.className ?? '') === 'min-w-0 flex-1'
+  )[0];
+  if (!eyebrow) {
+    throw new Error('heading eyebrow not found');
+  }
+  return eyebrow;
+}
+
 function findTitlePressable(root: TestInstance): TestInstance {
   return root.find(
     node =>
@@ -311,7 +343,7 @@ describe('ScreenHeader mounted', () => {
     expect(back.props.className).not.toContain('mr-1');
     expect(back.props.hitSlop).toBeUndefined();
     expect(findBackFrame(renderer.root).props.className).toContain('shrink-0');
-    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
+    expect(findLeadingColumn(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('clips the back control to a circle instead of letting the platform surface fill its box', () => {
@@ -370,10 +402,11 @@ describe('ScreenHeader mounted', () => {
     // points under the 44-point back target and the title's box covered 0.27 of
     // it — the "two controls cover each other" finding (the scan reports above
     // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
-    // both writing directions. It rides on the frame, which is the row's child.
-    const frame = findBackFrame(renderer.root);
-    expect(frame.props.className).toContain('-ms-4');
-    expect(await compiledMarginProperties(frame.props.className as string)).toEqual([
+    // both writing directions. It rides on the leading column, which is the
+    // row's child and holds the caret's box.
+    const column = findLeadingColumn(renderer.root);
+    expect(column.props.className).toContain('-ms-4');
+    expect(await compiledMarginProperties(column.props.className as string)).toEqual([
       'marginInlineStart',
     ]);
 
@@ -408,7 +441,11 @@ describe('ScreenHeader mounted', () => {
     expect(inline.parent).toBe(cluster.parent);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
-    const heading = inline.parent?.children[0] as TestInstance;
+    // The heading is the row's other flexible child: the leading column now
+    // sits before it, so it is found by its own class rather than by index.
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    expect(heading.parent?.parent).toBe(inline.parent);
+    expect(heading.parent?.props.className).toContain('flex-row');
     expect(heading.props.className).toContain('min-w-0 flex-1');
     // Neither trailing slot clamps itself: `headerRight` sizes to its content
     // and `inlineActions` keeps its full width instead of wrapping the controls.
@@ -865,7 +902,7 @@ describe('ScreenHeader mounted', () => {
       // The hidden placeholder line, which is what holds the height when the
       // caller does not reserve the title space (the invoices boundary).
       const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
-      const placeholder = inline.root.findByType('Eyebrow');
+      const placeholder = findHeadingEyebrow(inline.root);
       expect(placeholder.children).toEqual(['\u00A0']);
       // It still paints nothing and reaches no reader.
       expect(placeholder.props.className).toBe('mb-0.5 opacity-0');
@@ -940,7 +977,7 @@ describe('ScreenHeader mounted', () => {
       className: 'pt-3',
     });
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
+    expect(title.parent?.parent).toBe(findLeadingColumn(renderer.root).parent);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
   });
@@ -988,7 +1025,7 @@ describe('ScreenHeader mounted', () => {
 
     for (const eyebrow of repositories) {
       const renderer = renderHeader({ title: '#6054', eyebrow, headerRight: 'Submit review' });
-      const label = renderer.root.findByType('Eyebrow');
+      const label = findHeadingEyebrow(renderer.root);
       expect(label.props.numberOfLines).toBe(1);
       expect(label.props.ellipsizeMode).toBe('tail');
       expect(label.children).toEqual([eyebrow]);
@@ -1000,7 +1037,7 @@ describe('ScreenHeader mounted', () => {
       act(() => {
         renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
       });
-      expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
+      expect(findHeadingEyebrow(renderer.root).props.numberOfLines).toBe(1);
       expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
       renderer.unmount();
     }
@@ -1050,7 +1087,7 @@ describe('ScreenHeader mounted', () => {
       reserveEyebrow: true,
       reservedEyebrow: 'الفواتير',
     });
-    const placeholder = renderer.root.findByType('Eyebrow');
+    const placeholder = findHeadingEyebrow(renderer.root);
     expect(placeholder.children).toEqual(['الفواتير']);
     expect(placeholder.props.className).toContain('opacity-0');
     expect(placeholder.props.accessible).toBe(false);
@@ -1065,7 +1102,7 @@ describe('ScreenHeader mounted', () => {
         })
       );
     });
-    const label = renderer.root.findByType('Eyebrow');
+    const label = findHeadingEyebrow(renderer.root);
     expect(label.children).toEqual(['الفواتير']);
     expect(label.props.className).not.toContain('opacity-0');
     expect(label.props.accessible).toBe(true);
@@ -1227,7 +1264,7 @@ describe('ScreenHeader mounted', () => {
       paddingLeft: 47,
       paddingRight: 59,
     });
-    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
+    expect(findLeadingColumn(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('keeps the container style a portrait no-op with zero side insets', () => {
@@ -1340,7 +1377,7 @@ describe('ScreenHeader mounted', () => {
       eyebrowNumberOfLines: 1,
     });
 
-    const eyebrow = renderer.root.findByType('Eyebrow');
+    const eyebrow = findHeadingEyebrow(renderer.root);
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.props.ellipsizeMode).toBe('middle');
     expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
@@ -1349,10 +1386,93 @@ describe('ScreenHeader mounted', () => {
   it('keeps the reserved eyebrow placeholder on the same single capped line', () => {
     const renderer = renderHeader({ reserveEyebrow: true, eyebrowNumberOfLines: 1 });
 
-    const eyebrow = renderer.root.findByType('Eyebrow');
+    const eyebrow = findHeadingEyebrow(renderer.root);
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.props.ellipsizeMode).toBe('middle');
     expect(eyebrow.children).toEqual(['\u00A0']);
+  });
+
+  it('centres the back control on the title line, not on the eyebrow-plus-title block', () => {
+    // The organization invoices header: the eyebrow is the screen's name and
+    // the title is the organization's, so the heading is two lines. The caret
+    // used to centre on that whole block and sat about 12dp above the title
+    // line it belongs to; it now centres on the title's own line, without the
+    // second row that would have grown the header.
+    const renderer = renderHeader({ title: 'Acme Studio Nordics', eyebrow: 'Invoices' });
+
+    const column = findLeadingColumn(renderer.root);
+    expect(column.props.className).toContain('w-[48px]');
+    expect(column.props.className).toContain('shrink-0');
+    expect(column.props.className).toContain('-ms-4');
+    // The caret's 48dp box held the row's height before, so the column keeps
+    // that floor and centres its lines in it: the header is the same height at
+    // every font scale.
+    expect(column.props.className).toContain('min-h-[48px]');
+    expect(column.props.className).toContain('justify-center');
+    // The column mirrors the heading's own lines, so it measures what the
+    // heading measures and the row keeps today's height.
+    const eyebrowTwin = column.findAllByType('Eyebrow')[0];
+    expect(eyebrowTwin?.props.className).toBe('mb-0.5');
+    expect(eyebrowTwin?.children).toEqual(['\u00A0']);
+    expect(eyebrowTwin?.props['aria-hidden']).toBe(true);
+    expect(eyebrowTwin?.props.accessibilityElementsHidden).toBe(true);
+    expect(eyebrowTwin?.props.importantForAccessibility).toBe('no-hide-descendants');
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    const titleTwin = column.findAllByType('Text')[0];
+    expect(titleTwin?.children).toEqual(['\u00A0']);
+    // The same class, so the twin holds the title's line box at any font scale.
+    expect(titleTwin?.props.className).toBe(title.props.className);
+    expect(titleTwin?.props['aria-hidden']).toBe(true);
+    expect(titleTwin?.props.accessibilityElementsHidden).toBe(true);
+    expect(titleTwin?.props.importantForAccessibility).toBe('no-hide-descendants');
+
+    // The caret is out of flow over the title twin's own line box, so it adds
+    // no height of its own and centres on the title, not on the block.
+    const box = findBackFrame(renderer.root).parent;
+    expect(box?.props.className).toBe('absolute inset-0 items-center justify-center');
+    expect(box?.parent).toBe(titleTwin?.parent);
+    expect(titleTwin?.parent?.props.className).toBe('relative');
+    // The control keeps its 48dp target and its circular press surface.
+    expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
+    expect(findBackFrame(renderer.root).props.className).toContain('rounded-full');
+    expect(findBackFrame(renderer.root).props.className).toContain('overflow-hidden');
+  });
+
+  it('keeps the caret in its plain 48dp box when the heading has no eyebrow', () => {
+    // No second line to align with: the column is the caret's own 48dp box,
+    // which is the layout every eyebrow-less header has always had.
+    const renderer = renderHeader({ title: 'Personal', showBackButton: true });
+
+    const column = findLeadingColumn(renderer.root);
+    expect(column.findAllByType('Eyebrow')).toHaveLength(0);
+    expect(column.findAllByType('Text')).toHaveLength(0);
+    expect(column.props.className).not.toContain('min-h-[48px]');
+    const box = findBackFrame(renderer.root).parent;
+    expect(box?.props.className).toBe('min-h-[48px] items-center justify-center');
+    expect(box?.parent).toBe(column);
+  });
+
+  it('truncates the title at its tail by default and in the middle when asked', () => {
+    // A scope's name is told apart by its tail, so the organization invoices
+    // header opts into a middle ellipsis; every other header keeps the tail.
+    const byDefault = renderHeader({ title: 'Acme Studio' });
+    expect(byDefault.root.findByProps({ accessibilityRole: 'header' }).props.ellipsizeMode).toBe(
+      'tail'
+    );
+
+    const middle = renderHeader({
+      title: 'Acme Studio Nordics',
+      eyebrow: 'Invoices',
+      titleEllipsizeMode: 'middle',
+    });
+    const title = middle.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.ellipsizeMode).toBe('middle');
+    // The twin follows the title's box, not its truncation: it stays one
+    // no-break space in the same class.
+    const titleTwin = findLeadingColumn(middle.root).findAllByType('Text')[0];
+    expect(titleTwin?.children).toEqual(['\u00A0']);
+    expect(titleTwin?.props.className).toBe(title.props.className);
   });
 });
 
@@ -1402,7 +1522,7 @@ describe('header actions row', () => {
     ).toHaveLength(0);
     // The title still shares its row with the back control; only the actions moved.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
+    expect(title.parent?.parent).toBe(findLeadingColumn(renderer.root).parent);
   });
 
   it('reflows a centered modal header the same way', () => {
@@ -1481,7 +1601,7 @@ describe('header status line', () => {
     layout.fontScale = 1.5;
     const renderer = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
 
-    const eyebrow = renderer.root.findByType('Eyebrow');
+    const eyebrow = findHeadingEyebrow(renderer.root);
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.children).toEqual(['1 LIVE']);
   });

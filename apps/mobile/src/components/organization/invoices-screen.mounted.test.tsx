@@ -58,7 +58,12 @@ const boundaryProps = vi.hoisted(() => ({
 }));
 
 const screenHeaders = vi.hoisted(() => ({
-  rendered: [] as { title?: string; eyebrow?: string; reserveEyebrow?: boolean }[],
+  rendered: [] as {
+    title?: string;
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+    titleEllipsizeMode?: string;
+  }[],
 }));
 
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
@@ -149,7 +154,12 @@ vi.mock('@/components/organization/organization-boundary', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
+  ScreenHeader: (props: {
+    title?: string;
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+    titleEllipsizeMode?: string;
+  }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -492,6 +502,10 @@ describe('OrganizationInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.title).toBe('Acme Corp');
     expect(screenHeaders.rendered[0]?.eyebrow).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+    // The title is the organization's name, so its tail is what tells two
+    // similar names apart: the header truncates it in the middle, on the one
+    // line it already keeps.
+    expect(screenHeaders.rendered[0]?.titleEllipsizeMode).toBe('middle');
   });
 
   it('reserves the eyebrow line on the boundary so the header keeps its height before the name arrives', async () => {

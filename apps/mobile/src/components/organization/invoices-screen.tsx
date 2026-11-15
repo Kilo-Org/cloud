@@ -37,6 +37,10 @@ export function OrganizationInvoicesScreen() {
       // one-line eyebrow while the membership read ran, so the swap to this
       // header cannot move the list.
       eyebrow={t('organization.invoices.title')}
+      // The organization name is a scope's name, so its tail is the part that
+      // tells two similar names apart: the title truncates in the middle. It
+      // stays one line, so the header's height cannot change.
+      titleEllipsizeMode="middle"
       query={query}
       entries={entries}
       hasMore={hasMore}

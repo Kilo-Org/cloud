@@ -122,6 +122,20 @@ type ScreenHeaderProps = {
    */
   titleNumberOfLines?: number;
   /**
+   * How the title truncates when it does not fit its line cap. Default `'tail'`,
+   * which is right for a screen's own name: the start of a name is what a
+   * reader scans for.
+   *
+   * A title that carries a scope's name (the organization invoices screen puts
+   * the membership's organization name here) wants `'middle'` instead: the
+   * tail of a name is what tells two names with a shared prefix apart, and a
+   * tail ellipsis clipped exactly that, so "Acme Studio" and "Acme Studio
+   * Nordics" both read as "Acme Studio…". A middle ellipsis keeps both ends
+   * without taking a second line, so the header's height still cannot change
+   * when the name arrives.
+   */
+  titleEllipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
+  /**
    * One line of context under the title, in the muted body style. The title
    * stays the screen's name and its accessible header; the subtitle is read
    * after it, never instead of it.
@@ -321,6 +335,7 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 1,
+  titleEllipsizeMode = 'tail',
   subtitle,
   reserveSubtitle = false,
   subtitlePlaceholder,
@@ -451,7 +466,7 @@ export function ScreenHeader({
       <Text
         className={cn(titleClass, centerTitle && 'text-center')}
         numberOfLines={titleLines}
-        ellipsizeMode="tail"
+        ellipsizeMode={titleEllipsizeMode}
         accessibilityRole="header"
       >
         {title}
@@ -567,7 +582,7 @@ export function ScreenHeader({
     </View>
   ) : null;
 
-  // The leading control's pull into the gutter is a START-side margin, never a
+  // The leading column's pull into the gutter is a START-side margin, never a
   // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on
   // (the default) React Native rewrites margin Left/Right to Yoga Start/End
   // before layout (YogaLayoutableShadowNode `swapLeftAndRightInYogaStyleProps`),
@@ -589,10 +604,10 @@ export function ScreenHeader({
   // whenever the device had keyboard or D-pad focus (measured on the emulator:
   // `#E8E7E3` over the target's full rect, sharp corners, from the first TAB
   // press). The frame clips that surface to a circle, so the control reads as an
-  // icon button while it stays focusable and keeps the same rect, gutter pull
-  // and label.
+  // icon button while it stays focusable and keeps the same rect and label; the
+  // leading column around it carries the gutter pull.
   const backControl = canGoBack ? (
-    <View className={cn('shrink-0 overflow-hidden rounded-full', !separateHeading && '-ms-4')}>
+    <View className="shrink-0 overflow-hidden rounded-full">
       <Pressable
         onPress={handleBack}
         accessibilityRole="button"
@@ -605,6 +620,72 @@ export function ScreenHeader({
           <DirectionalChevronLeft size={24} color={colors.foreground} />
         )}
       </Pressable>
+    </View>
+  ) : null;
+
+  // The leading column holds one 48dp control, centred on the TITLE's line
+  // rather than on the eyebrow-plus-title block, and the header's height is
+  // unchanged by it.
+  //
+  // A heading with an eyebrow is two lines, so `items-center` on the row centred
+  // the caret's 48dp box on the whole block and left the glyph about 12dp above
+  // the title line it belongs to (the organization invoices header: its eyebrow
+  // is the screen's name, its title the organization's). The column mirrors the
+  // heading's own lines with zero-ink twins instead of taking a second row: the
+  // `Eyebrow` twin holds the eyebrow's line box, the `Text` twin — the same
+  // `titleClass` — holds the title's, at whatever font scale the device runs,
+  // and the caret is laid over the title twin. The column then measures exactly
+  // what the heading measures (the eyebrow variant is one explicit line height
+  // for every script, see `EYEBROW_LINE_HEIGHT_DP`), so the header keeps the
+  // height it has today. A heading with no eyebrow falls back to the plain 48dp
+  // box the caret has always drawn, which is today's layout unchanged.
+  //
+  // The caret box overflows its title line by about 12dp above and below, which
+  // stays inside the header's own `pb-3` padding, so no touch target crosses
+  // into the screen body. The twins paint nothing (a no-break space) and reach
+  // no reader.
+  //
+  // `min-h-[48px]` with `justify-center` keeps today's row height at a font
+  // scale below 1, where the two heading lines together measure less than the
+  // 48dp the caret needs: the caret's box held that height then, and the
+  // column's own lines stay centred in it exactly as the heading centres in the
+  // row, so the caret tracks the title at every scale.
+  const hasEyebrowLine = Boolean(eyebrow) || reserveEyebrow;
+  const leadingControl = backControl ? (
+    <View
+      className={cn(
+        'w-[48px] shrink-0 justify-center',
+        !separateHeading && '-ms-4',
+        hasEyebrowLine && 'min-h-[48px]'
+      )}
+    >
+      {hasEyebrowLine ? (
+        <>
+          <Eyebrow
+            className="mb-0.5"
+            numberOfLines={1}
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {blankEyebrow}
+          </Eyebrow>
+          <View className="relative">
+            <Text
+              className={titleClass}
+              numberOfLines={1}
+              aria-hidden
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {blankEyebrow}
+            </Text>
+            <View className="absolute inset-0 items-center justify-center">{backControl}</View>
+          </View>
+        </>
+      ) : (
+        <View className="min-h-[48px] items-center justify-center">{backControl}</View>
+      )}
     </View>
   ) : null;
   // A fixed-width trailing cluster sizes to its content and never shrinks
@@ -687,7 +768,7 @@ export function ScreenHeader({
           <>
             <View className="flex-row items-center">
               <View className="min-w-0 flex-1 flex-row items-center gap-1">
-                {backControl}
+                {leadingControl}
                 {heading}
               </View>
               {reservedTitleBand}

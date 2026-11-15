@@ -31,7 +31,12 @@ const pageHook = vi.hoisted(() => ({
 const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
 
 const screenHeaders = vi.hoisted(() => ({
-  rendered: [] as { title?: string; eyebrow?: string; reserveEyebrow?: boolean }[],
+  rendered: [] as {
+    title?: string;
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+    titleEllipsizeMode?: string;
+  }[],
 }));
 
 vi.mock('@/lib/hooks/use-personal-credits', () => ({
@@ -87,7 +92,12 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
+  ScreenHeader: (props: {
+    title?: string;
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+    titleEllipsizeMode?: string;
+  }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -153,5 +163,8 @@ describe('PersonalInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+    // The personal list's title is the screen's own name, so it keeps the
+    // header's default tail ellipsis; only a scope's name wants the middle.
+    expect(screenHeaders.rendered[0]?.titleEllipsizeMode).toBeUndefined();
   });
 });

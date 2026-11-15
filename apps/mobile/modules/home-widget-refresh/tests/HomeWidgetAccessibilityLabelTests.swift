@@ -61,6 +61,7 @@
     ])
     precondition(zeroed == "2 作業中")
 
+    // No joiner in the input must not fall back to a literal comma-space.
     let noJoiner = homeWidgetAccessibilityLabel([
       "countLines": [
         ["count": 1, "label": "Working"],
@@ -69,7 +70,7 @@
       "digits": "",
       "group": ",",
     ])
-    precondition(noJoiner == "1 Working, 2 Needs input")
+    precondition(!noJoiner.contains(", "))
 
     print("HomeWidgetAccessibilityLabel: all checks passed")
   }

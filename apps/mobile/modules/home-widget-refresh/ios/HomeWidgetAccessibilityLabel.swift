@@ -9,7 +9,7 @@ import Foundation
 func homeWidgetAccessibilityLabel(_ input: [String: Any]) -> String {
   let digits = input["digits"] as? String ?? ""
   let group = input["group"] as? String ?? ","
-  let joiner = input["listJoiner"] as? String ?? ", "
+  let joiner = input["listJoiner"] as? String ?? ""
   var parts: [String] = []
   if let status = trimmed(input["statusLine"] as? String) {
     parts.append(status)

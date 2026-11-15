@@ -10,12 +10,13 @@ import {
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { resolveNewSessionStartBlockedReason } from '@/lib/new-session-submit';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
-import '@/i18n';
+import { i18n as appI18n } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -445,6 +446,59 @@ describe('NewSessionConfigureForm', () => {
     expect(footer).toBeDefined();
     expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
     expect(findElementByComponent(footer, OrganizationPlanRefusal)).toBeNull();
+  });
+
+  it('keeps the uploading-attachment reason in the pinned footer with Start', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // The reported build: a repository is resolved, the prompt is typed, the
+    // attachment chip already shows its uploaded file, and the upload flag is
+    // still true. Start stays disabled with a prompt on screen, so the footer
+    // has to say what it waits for.
+    const reason = resolveNewSessionStartBlockedReason({
+      entry: 'new-session',
+      hasRepositories: true,
+      hasConnectableProvider: false,
+      isLoadingRepositories: false,
+      isRemoteTargetSelected: false,
+      selectedRepo: 'org/repo',
+      hasAttachments: true,
+      selectedRepositoryResolved: true,
+      gate: {
+        attachmentsHasFailed: false,
+        attachmentsIsUploading: true,
+        hasPrompt: true,
+        isCreating: false,
+        isRemoteTargetSelected: false,
+        isSubmitting: false,
+        model: 'claude-opus-4-7',
+        isProfileLoading: false,
+      },
+    });
+    expect(reason).toBe('attachment-uploading');
+
+    // The screen maps the reason to the composer's own copy, so the footer and
+    // a refused send name the same wait in the same words.
+    const copy = appI18n.t('agentChat.composer.waitForUploads');
+    expect(copy).toBe('Wait for attachments to finish uploading.');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      selectedRepo: 'org/repo',
+      isStartDisabled: true,
+      startBlockedReason: copy,
+    }) as Node;
+
+    // The reason rides the lift with Start, not the scroll body above it, so
+    // the keyboard cannot hide the explanation and the control together.
+    const lift = findElement(element, 'KeyboardAvoidingView');
+    expect(findElementByType(lift, 'NewSessionStartButton')).toMatchObject({
+      isStartDisabled: true,
+      startBlockedReason: copy,
+      // These reasons are a wait or a file fix; neither needs a second control.
+      startBlockedAction: null,
+    });
   });
 
   // ── Case 1: Cloud, selector shown ──

@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Geymsla ekki skráð",
       "reasonUnknown": "Óþekkt ástæða",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Samantekt skýrslu",
       "title": "Endurskoðunarskýrsla",
       "unavailable": "Endurskoðunarskýrsla ekki tiltæk",

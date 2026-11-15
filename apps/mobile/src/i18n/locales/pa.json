@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "ਰਿਪੋਜ਼ਟਰੀ ਰਿਕਾਰਡ ਨਹੀਂ ਕੀਤੀ ਗਈ",
       "reasonUnknown": "ਅਣਪਛਾਤਾ ਕਾਰਨ",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "ਰਿਪੋਰਟ ਦਾ ਸਾਰ",
       "title": "ਆਡਿਟ ਰਿਪੋਰਟ",
       "unavailable": "ਆਡਿਟ ਰਿਪੋਰਟ ਉਪਲਬਧ ਨਹੀਂ",

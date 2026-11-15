@@ -109,10 +109,6 @@ export const NO_AGREEMENT = new Map([
     'the noun is already a family: "{{emoji}} reaction, {{displayCount}} {{countLabel}}"',
   ],
   [
-    'securityAgent.auditReport.severityCount',
-    'bare count before a severity adjective: "{{displayCount}} Critical" has no inflected word',
-  ],
-  [
     'securityAgent.remediation.attemptHistory',
     'bare count in parentheses: "Attempt history ({{displayCount}})"',
   ],

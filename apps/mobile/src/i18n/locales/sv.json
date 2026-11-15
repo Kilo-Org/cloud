@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Kodarkiv inte registrerat",
       "reasonUnknown": "Okänd orsak",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Rapportsammanfattning",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapporten är inte tillgänglig",

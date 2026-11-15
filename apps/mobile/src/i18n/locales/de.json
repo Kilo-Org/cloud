@@ -1022,6 +1022,8 @@
       "repositoryNotRecorded": "Repository nicht erfasst",
       "reasonUnknown": "Unbekannter Grund",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",

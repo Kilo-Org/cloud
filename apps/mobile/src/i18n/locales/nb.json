@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Kodelager ikke registrert",
       "reasonUnknown": "Ukjent årsak",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Rapportsammendrag",
       "title": "Revisjonsrapport",
       "unavailable": "Revisjonsrapport utilgjengelig",

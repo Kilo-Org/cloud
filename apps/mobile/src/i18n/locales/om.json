@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Kuusaan koodii hin galmoofne",
       "reasonUnknown": "Sababa hin beekamne",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Cuunfaa gabaasaa",
       "title": "Gabaasa qorannoo",
       "unavailable": "Gabaasa qorannoo hin jiru",

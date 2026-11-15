@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Хранилището не е записано",
       "reasonUnknown": "Неразпозната причина",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Резюме на доклада",
       "title": "Одитен доклад",
       "unavailable": "Одитният доклад не е достъпен",

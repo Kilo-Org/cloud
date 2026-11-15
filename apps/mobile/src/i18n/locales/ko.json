@@ -1022,6 +1022,8 @@
       "repositoryNotRecorded": "저장소가 기록되지 않음",
       "reasonUnknown": "알 수 없는 사유",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "보고서 요약",
       "title": "감사 보고서",
       "unavailable": "감사 보고서 열람 불가",

@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "زېرمتون ثبت شوی نه دی",
       "reasonUnknown": "ناتپېژندل شوی دلیل",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "د راپور لنډیز",
       "title": "د پلټنې راپور",
       "unavailable": "د پلټنې راپور نشته",

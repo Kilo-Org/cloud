@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Kodelager ikke registreret",
       "reasonUnknown": "Ukendt begrundelse",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Resumé af rapporten",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapport utilgængelig",

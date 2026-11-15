@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "களஞ்சியம் பதிவு செய்யப்படவில்லை",
       "reasonUnknown": "அங்கீகரிக்கப்படாத காரணம்",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "அறிக்கையின் சுருக்கம்",
       "title": "தணிக்கை அறிக்கை",
       "unavailable": "தணிக்கை அறிக்கை கிடைக்கவில்லை",

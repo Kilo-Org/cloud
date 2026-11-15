@@ -1022,6 +1022,8 @@
       "repositoryNotRecorded": "रिपॉज़िटरी दर्ज नहीं",
       "reasonUnknown": "अपरिचित कारण",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "रिपोर्ट का सारांश",
       "title": "ऑडिट रिपोर्ट",
       "unavailable": "ऑडिट रिपोर्ट अनुपलब्ध",

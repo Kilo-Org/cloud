@@ -529,7 +529,7 @@
       "retryLoadingContext": "Ponovo pokušaj da učitaš kontekst",
       "failedToLoadContext": "Učitavanje konteksta nije uspelo — dodirni za novi pokušaj",
       "loadingContext": "Učitavanje konteksta…",
-      "loadingLines": "Učitavanje {{loaded}} od {{total}} redova…",
+      "loadingLines": "Učitavanje redova: {{loaded}} od {{total}}…",
       "expandContext": "Prikaži kontekst",
       "expandMoreContext": "Prikaži još konteksta",
       "expandLines": "Prikaži redove ({{displayCount}}): {{start}}–{{end}}",
@@ -542,7 +542,7 @@
       "failedToLoadMoreFiles": "Učitavanje dodatnih datoteka nije uspelo — dodirni za novi pokušaj",
       "loadingAllFiles": "Učitavanje svih datoteka — {{loaded}}…",
       "loadingAllFilesOf": "Učitavanje svih datoteka — {{loaded}} od {{total}}…",
-      "loadedOfTotalFiles": "učitano {{loaded}} od {{total}} datoteka",
+      "loadedOfTotalFiles": "Učitane datoteke: {{loaded}} od {{total}}",
       "loadAllFiles": "Učitaj sve datoteke",
       "loadAll": "Učitaj sve",
       "fileLoadedCount_one": "{{displayCount}} učitana datoteka",
@@ -568,9 +568,9 @@
       "expandMoreLines_one": "Prikaži još redova ({{displayCount}}): {{start}}–{{end}}",
       "expandMoreLines_other": "Prikaži još redova ({{displayCount}}): {{start}}–{{end}}",
       "expandMoreLines_few": "Prikaži još redova ({{displayCount}}): {{start}}–{{end}}",
-      "loadedOfTotalFiles_one": "učitano {{loaded}} od {{total}} datoteka",
-      "loadedOfTotalFiles_other": "učitano {{loaded}} od {{total}} datoteka",
-      "loadedOfTotalFiles_few": "učitano {{loaded}} od {{total}} datoteka"
+      "loadedOfTotalFiles_one": "Učitane datoteke: {{loaded}} od {{total}}",
+      "loadedOfTotalFiles_other": "Učitane datoteke: {{loaded}} od {{total}}",
+      "loadedOfTotalFiles_few": "Učitane datoteke: {{loaded}} od {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "na kraju datoteke nema znaka za novi red.",

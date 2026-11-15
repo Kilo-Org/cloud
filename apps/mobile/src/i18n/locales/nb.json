@@ -527,7 +527,7 @@
       "retryLoadingContext": "Prøv å laste inn konteksten på nytt",
       "failedToLoadContext": "Kunne ikke laste inn konteksten – trykk for å prøve igjen",
       "loadingContext": "Laster inn kontekst…",
-      "loadingLines": "Laster inn {{loaded}} av {{total}} linjer…",
+      "loadingLines": "Laster inn linjer: {{loaded}} av {{total}}…",
       "expandContext": "Vis kontekst",
       "expandMoreContext": "Vis mer kontekst",
       "expandLines": "Vis {{displayCount}} linjer ({{start}}–{{end}})",
@@ -540,7 +540,7 @@
       "failedToLoadMoreFiles": "Kunne ikke laste inn flere filer – trykk for å prøve igjen",
       "loadingAllFiles": "Laster inn alle filene – {{loaded}}…",
       "loadingAllFilesOf": "Laster inn alle filene – {{loaded}} av {{total}}…",
-      "loadedOfTotalFiles": "{{loaded}} av {{total}} filer lastet inn",
+      "loadedOfTotalFiles": "Filer lastet inn: {{loaded}} av {{total}}",
       "loadAllFiles": "Last inn alle filene",
       "loadAll": "Last inn alle",
       "fileLoadedCount_one": "{{displayCount}} fil lastet inn",
@@ -560,8 +560,8 @@
       "expandLinesOfContext_other": "Vis {{displayCount}} linjer med kontekst",
       "expandMoreLines_one": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
       "expandMoreLines_other": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} av {{total}} filer lastet inn",
-      "loadedOfTotalFiles_other": "{{loaded}} av {{total}} filer lastet inn"
+      "loadedOfTotalFiles_one": "Filer lastet inn: {{loaded}} av {{total}}",
+      "loadedOfTotalFiles_other": "Filer lastet inn: {{loaded}} av {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ filen mangler linjeskift til slutt.",

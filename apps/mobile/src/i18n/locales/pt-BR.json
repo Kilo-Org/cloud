@@ -2959,11 +2959,11 @@
       "hunkHeader": "Cabeçalho do trecho {{header}}",
       "loadAll": "Carregar tudo",
       "loadAllFiles": "Carregar todos os arquivos",
-      "loadedOfTotalFiles": "{{loaded}} de {{total}} arquivos carregados",
+      "loadedOfTotalFiles": "Arquivos carregados: {{loaded}} de {{total}}",
       "loadingAllFiles": "Carregando todos os arquivos — {{loaded}}…",
       "loadingAllFilesOf": "Carregando todos os arquivos — {{loaded}} de {{total}}…",
       "loadingContext": "Carregando contexto…",
-      "loadingLines": "Carregando {{loaded}} de {{total}} linhas…",
+      "loadingLines": "Carregando linhas: {{loaded}} de {{total}}…",
       "loadingMoreFiles": "Carregando mais arquivos…",
       "retryLoadingContext": "Tentar carregar o contexto novamente",
       "retryLoadingNextPage": "Tentar carregar a próxima página novamente",
@@ -2981,9 +2981,9 @@
       "expandMoreLines_one": "Expandir mais {{displayCount}} linha ({{start}}–{{end}})",
       "expandMoreLines_other": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
       "expandMoreLines_many": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} arquivos carregados",
-      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} arquivos carregados",
-      "loadedOfTotalFiles_many": "{{loaded}} de {{total}} arquivos carregados"
+      "loadedOfTotalFiles_one": "Arquivos carregados: {{loaded}} de {{total}}",
+      "loadedOfTotalFiles_other": "Arquivos carregados: {{loaded}} de {{total}}",
+      "loadedOfTotalFiles_many": "Arquivos carregados: {{loaded}} de {{total}}"
     },
     "inbox": {
       "couldNotLoad": "Não foi possível carregar a caixa de entrada.",

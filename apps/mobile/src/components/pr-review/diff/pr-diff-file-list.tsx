@@ -227,7 +227,7 @@ export function PrReviewFileList({
   // FlashList reports the end as reached as soon as its content fits the
   // viewport, so a first page shorter than the screen used to be replaced by
   // the next pages before the partial-load row (`prReview.hunkRows
-  // .loadedOfTotalFiles`, "1 of 5 files loaded") and its Load all action could
+  // .loadedOfTotalFiles`, "Files loaded: 1 of 5") and its Load all action could
   // be read. `usePrDiffPageGate` keeps the row the resting state until the
   // user's own drag, and keeps the end report FlashList makes before it. The
   // gate is keyed by the provider ref so a drag on one PR never opens the gate

@@ -2953,11 +2953,11 @@
       "hunkHeader": "כותרת מקטע השינויים {{header}}",
       "loadAll": "טעינת הכול",
       "loadAllFiles": "טעינת כל הקבצים",
-      "loadedOfTotalFiles": "נטענו {{loaded}} מתוך {{total}} קבצים",
+      "loadedOfTotalFiles": "קבצים נטענו: {{loaded}} מתוך {{total}}",
       "loadingAllFiles": "כל הקבצים נטענים — {{loaded}}…",
       "loadingAllFilesOf": "כל הקבצים נטענים — {{loaded}} מתוך {{total}}…",
       "loadingContext": "שורות ההקשר נטענות…",
-      "loadingLines": "בטעינה: {{loaded}} מתוך {{total}} שורות…",
+      "loadingLines": "טוען שורות: {{loaded}} מתוך {{total}}…",
       "loadingMoreFiles": "קבצים נוספים נטענים…",
       "retryLoadingContext": "ניסיון נוסף לטעינת שורות ההקשר",
       "retryLoadingNextPage": "ניסיון נוסף לטעינת העמוד הבא",
@@ -2975,9 +2975,9 @@
       "expandMoreLines_one": "הצגת עוד {{displayCount}} שורה ({{start}}–{{end}})",
       "expandMoreLines_other": "הצגת עוד {{displayCount}} שורות ({{start}}–{{end}})",
       "expandMoreLines_two": "הצגת עוד {{displayCount}} שורות ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "נטענו {{loaded}} מתוך {{total}} קבצים",
-      "loadedOfTotalFiles_other": "נטענו {{loaded}} מתוך {{total}} קבצים",
-      "loadedOfTotalFiles_two": "נטענו {{loaded}} מתוך {{total}} קבצים"
+      "loadedOfTotalFiles_one": "קבצים נטענו: {{loaded}} מתוך {{total}}",
+      "loadedOfTotalFiles_other": "קבצים נטענו: {{loaded}} מתוך {{total}}",
+      "loadedOfTotalFiles_two": "קבצים נטענו: {{loaded}} מתוך {{total}}"
     },
     "inbox": {
       "couldNotLoad": "לא ניתן היה לטעון את הבקשות הנכנסות.",

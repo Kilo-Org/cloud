@@ -67,6 +67,7 @@ vi.mock('@/components/ui/accessible-status', async () => {
 });
 vi.mock('@/components/ui/icons', () => ({ Plus: 'Plus' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#ffffff',
   useThemeColors: () => ({ primaryForeground: '#ffffff' }),
 }));
 

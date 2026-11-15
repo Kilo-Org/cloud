@@ -1,5 +1,6 @@
 import 'server-only';
 import { and, asc, eq, inArray, isNull, ne, not, notExists, or, sql } from 'drizzle-orm';
+import { type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import {
   byok_api_keys,
@@ -59,6 +60,18 @@ export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
         isNull(claude_billing_connections.kilo_user_id)
       );
   }
+}
+
+/** Rows the caller may see: their own rows, plus the shared-services rows of the allowed organizations. */
+function claudeBillingVisibleWhere(
+  kiloUserId: AnyPgColumn,
+  organizationId: AnyPgColumn,
+  userId: string,
+  organizationIds: string[]
+) {
+  const ownRows = eq(kiloUserId, userId);
+  if (organizationIds.length === 0) return ownRows;
+  return or(ownRows, and(isNull(kiloUserId), inArray(organizationId, organizationIds)));
 }
 
 /** Stable identity for per-owner locks. */
@@ -606,15 +619,12 @@ export async function describeClaudeBillingSharing(
         and(
           eq(claude_billing_connection_grants.payer_connection_id, current.id),
           isNull(claude_billing_connection_grants.removed_at),
-          visibleOrgIds.length > 0
-            ? or(
-                eq(claude_billing_connection_grants.kilo_user_id, userId),
-                and(
-                  isNull(claude_billing_connection_grants.kilo_user_id),
-                  inArray(claude_billing_connection_grants.organization_id, visibleOrgIds)
-                )
-              )
-            : eq(claude_billing_connection_grants.kilo_user_id, userId)
+          claudeBillingVisibleWhere(
+            claude_billing_connection_grants.kilo_user_id,
+            claude_billing_connection_grants.organization_id,
+            userId,
+            visibleOrgIds
+          )
         )
       );
     const siblingOwners: ClaudeBillingOwner[] = [];
@@ -657,15 +667,12 @@ export async function describeClaudeBillingSharing(
       and(
         isNull(claude_billing_connection_grants.removed_at),
         eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected),
-        managedOrgList.length > 0
-          ? or(
-              eq(claude_billing_connection_grants.kilo_user_id, userId),
-              and(
-                isNull(claude_billing_connection_grants.kilo_user_id),
-                inArray(claude_billing_connection_grants.organization_id, managedOrgList)
-              )
-            )
-          : eq(claude_billing_connection_grants.kilo_user_id, userId)
+        claudeBillingVisibleWhere(
+          claude_billing_connection_grants.kilo_user_id,
+          claude_billing_connection_grants.organization_id,
+          userId,
+          managedOrgList
+        )
       )
     );
 
@@ -675,15 +682,12 @@ export async function describeClaudeBillingSharing(
     .where(
       and(
         eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected),
-        managedOrgList.length > 0
-          ? or(
-              eq(claude_billing_connections.kilo_user_id, userId),
-              and(
-                isNull(claude_billing_connections.kilo_user_id),
-                inArray(claude_billing_connections.organization_id, managedOrgList)
-              )
-            )
-          : eq(claude_billing_connections.kilo_user_id, userId),
+        claudeBillingVisibleWhere(
+          claude_billing_connections.kilo_user_id,
+          claude_billing_connections.organization_id,
+          userId,
+          managedOrgList
+        ),
         notExists(
           fromDb
             .select({ id: claude_billing_connection_grants.id })

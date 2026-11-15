@@ -83,7 +83,7 @@ describe('PasskeysScreen inline failures', () => {
     // A second passkey's removal is running. The retry in the notice names the
     // first one's delete, and that delete is not in flight, so the control must
     // stay startable while the other removal is.
-    const pendingOther = Promise.withResolvers<void>();
+    const pendingOther = Promise.withResolvers<undefined>();
     list.deleteFn.mockImplementation(() => pendingOther.promise);
     confirmSpy.mockClear();
     const removeControls = nodes(view, 'Pressable').filter(
@@ -101,7 +101,7 @@ describe('PasskeysScreen inline failures', () => {
     expect(buttonByLabel(view, 'Retry').props.loading).toBe(false);
 
     await act(() => {
-      pendingOther.resolve();
+      pendingOther.resolve(undefined);
     });
     await waitFor(() => toastSuccess.mock.calls.length > 0);
     view.unmount();

@@ -351,26 +351,39 @@ function registrationRefusal(
   },
   step: 'options' | 'verify'
 ): PasskeyRegistrationFailure {
+  // The options step answers 401 without a code only for a bearer it will not
+  // accept. Verify also answers 401 for the challenge itself — expired,
+  // replayed, or a signature that did not verify — which a fresh ceremony
+  // fixes, so its unknown refusals stay retryable.
+  const unknownRefusal: PasskeyRegistrationFailure =
+    step === 'options' && failure.httpStatus === 401 ? 'session-ended' : 'failed';
   switch (failure.errorCode) {
-    case 'PASSKEY_MANAGEMENT_REQUIRED':
+    case 'PASSKEY_MANAGEMENT_REQUIRED': {
       return 'management-required';
-    case 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID':
+    }
+    case 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID': {
       return 'authorization-invalid';
-    case 'PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED':
+    }
+    case 'PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED': {
       return 'device-unsupported';
+    }
     case 'Unauthorized':
-    case 'UNAUTHORIZED':
+    case 'UNAUTHORIZED': {
       return 'session-ended';
-    case 'REAUTH_REQUIRED':
+    }
+    case 'REAUTH_REQUIRED': {
       // The cookie path's answer; a native request that receives it needs the
       // same in-app verification a management refusal asks for.
       return 'management-required';
-    default:
-      // The options step answers 401 without a code only for a bearer it will
-      // not accept. Verify also answers 401 for the challenge itself — expired,
-      // replayed, or a signature that did not verify — which a fresh ceremony
-      // fixes, so its unknown refusals stay retryable.
-      return step === 'options' && failure.httpStatus === 401 ? 'session-ended' : 'failed';
+    }
+    // `undefined` is named for the exhaustiveness rule; the default answers the
+    // codes the server may add later. Both give the same fallback refusal.
+    case undefined: {
+      return unknownRefusal;
+    }
+    default: {
+      return unknownRefusal;
+    }
   }
 }
 

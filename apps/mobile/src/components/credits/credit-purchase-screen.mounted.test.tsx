@@ -1948,29 +1948,46 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
   });
 
   it('leaves every pack row where it is when the purchase card appears, changes and goes', async () => {
+    owner.hasUnresolvedPurchase = false;
+    owner.purchaseWait = null;
+    const absent = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(absent.renderer).length === 4);
+    const placement = rowPlacement(absent.renderer);
+
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'store' };
+    const waiting = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(waiting.renderer).length === 4);
+    expect(byTestId(waiting.renderer, waitCardId)).toBeDefined();
+
     owner.hasUnresolvedPurchase = true;
     owner.purchaseResolution = 'found';
-
-    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => packRows(renderer).length === 4);
-    const labelsWithCard = packRows(renderer).map(row => labelOf(row));
-    expect(rowPlacement(renderer)).toHaveLength(4);
+    owner.purchaseWait = null;
+    const notice = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(notice.renderer).length === 4);
+    const card = byTestId(notice.renderer, cardId);
+    if (!card) {
+      throw new Error('expected the purchase card');
+    }
+    const packArea = packRows(notice.renderer)[0]?.parent?.parent;
+    const parent = card.parent;
+    if (!packArea || !parent) {
+      throw new Error('expected a mounted pack area and card');
+    }
+    expect(parent.children.indexOf(card)).toBeGreaterThan(parent.children.indexOf(packArea));
 
     owner.hasUnresolvedPurchase = false;
-    const { renderer: withoutCard, unmount: unmountSecond } = await renderWithProviders(
-      createElement(CreditPurchaseScreen)
-    );
-    await waitFor(() => packRows(withoutCard).length === 4);
+    const gone = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(gone.renderer).length === 4);
 
-    // The card lives in its own slot after the rows, so the rows keep their
-    // place, their order and their copy exactly.
-    expect(rowPlacement(withoutCard)).toEqual(rowPlacement(renderer));
-    expect(packRows(withoutCard).map(row => labelOf(row))).toEqual(labelsWithCard);
-    expect(byTestId(withoutCard, cardId)).toBeUndefined();
-    expect(allText(renderer)).toContain(allText(withoutCard).trim().split(' ')[0] ?? '');
-    expect(allText(withoutCard)).toContain(i18n.t('credits.description'));
-    unmount();
-    unmountSecond();
+    for (const step of [waiting.renderer, notice.renderer, gone.renderer]) {
+      expect(rowPlacement(step)).toEqual(placement);
+    }
+    expect(byTestId(gone.renderer, cardId)).toBeUndefined();
+    expect(byTestId(gone.renderer, waitCardId)).toBeUndefined();
+    absent.unmount();
+    waiting.unmount();
+    notice.unmount();
+    gone.unmount();
   });
 });
 

@@ -94,6 +94,12 @@ export type Revision = 'base' | 'head';
 const INTENT = 'apps/mobile/src/app/+native-intent.tsx';
 const MARKER = '__kiloDesignProofSource';
 const LIMIT = 1024 * 1024;
+// A capture dump walks and serializes the whole screen, so a screen of a couple
+// of thousand nodes writes about 1.3 MB. The document bound above is sized for the
+// manifest and the preparation receipt, and applying it to a dump aborts a run
+// whose measurement is legitimate; the two reads that only ever open a capture
+// dump take their own bound instead.
+const DUMP_LIMIT = 8 * 1024 * 1024;
 
 const digest = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex');
 function git(repo: string, args: string[]): string {
@@ -104,8 +110,8 @@ function git(repo: string, args: string[]): string {
     env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
   });
 }
-function readJson(file: string): unknown {
-  if (fs.statSync(file).size > LIMIT) throw new Error('Proof JSON exceeds 1 MiB');
+function readJson(file: string, limit = LIMIT): unknown {
+  if (fs.statSync(file).size > limit) throw new Error(`Proof JSON exceeds ${limit} bytes`);
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 export function readProofManifest(file: string): ProofManifest {
@@ -440,7 +446,7 @@ export function targetReadiness(
         );
         continue;
       }
-      const dump = parseDump(readJson(artifactPath(out, screen.dump)));
+      const dump = parseDump(readJson(artifactPath(out, screen.dump), DUMP_LIMIT));
       if (
         cell.screens.filter(candidate => candidate.target === target.id).length !== 1 ||
         screen.link !== target.link
@@ -680,7 +686,7 @@ export async function compareProof(
   const environments = (run: typeof base, dir: string): unknown[] =>
     run.cells.flatMap(cell =>
       cell.screens.map(screen => {
-        const env = parseDump(readJson(artifactPath(dir, screen.dump))).env;
+        const env = parseDump(readJson(artifactPath(dir, screen.dump), DUMP_LIMIT)).env;
         return [
           cell.id,
           screen.target,

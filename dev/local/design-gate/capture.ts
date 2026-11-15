@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/paint-state';
 import {
+  CAPTURE_ALIGNMENT_BUDGET_MS,
   captureAlignment,
   screenshotObservation,
   type CaptureAlignment,
@@ -116,6 +117,13 @@ const LOADING_SETTLE_TIMEOUT_MS = 30_000;
 const LOADING_ARRIVAL_TIMEOUT_MS = 10_000;
 // The iOS dev client re-downloads the bundle through the SSH tunnel after a reload.
 const RELOAD_WAIT_MS = 150_000;
+// Sampling stops before the screenshot, and the screen does not: a navigation
+// push or a late render lands after the last sample. Reading the bracket while
+// that work is still arriving reads two different screens around one screenshot
+// and reports no alignment for a capture that is otherwise fine, so the bracket
+// opens only once the layout has held still for this window.
+const SCREEN_QUIET_MS = 1_500;
+const SCREEN_QUIET_TIMEOUT_MS = 15_000;
 const RTL_LANGUAGE = 'ar';
 const LTR_FALLBACK_LANGUAGE = 'en';
 
@@ -177,6 +185,18 @@ export function loadingPlaceholder(tree: LayoutTree): boolean {
  */
 export function inAppSampleInterval(dumpMs: number): number {
   return Math.max(IN_APP_SAMPLE_INTERVAL_MS, Math.ceil(dumpMs * 2));
+}
+
+/**
+ * The window one capture may span, given what one of its dumps costs.
+ *
+ * The bracket reads two full trees around the screenshot, so on a screen whose
+ * dump costs half a second the reads alone exceed the default window and a
+ * perfectly aligned capture is reported inconclusive. The window grows with the
+ * measurement and never shrinks below the constant: a cheap screen keeps it.
+ */
+export function captureBudgetMs(dumpMs: number): number {
+  return Math.max(CAPTURE_ALIGNMENT_BUDGET_MS, Math.ceil(dumpMs * 2) + 1_000);
 }
 
 /** One sampling window, sized for the settle it spans. */
@@ -522,6 +542,16 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       `design-gate: ${target.id} one in-app dump costs ${dumpMs}ms; sampling every ${samplingMs}ms`
     );
   }
+  // The bracket reads two full trees around the screenshot, so on a screen whose
+  // dump is expensive those reads alone outlast the default window and a correct
+  // bracket is reported inconclusive. The window follows the same measurement; a
+  // cheap screen keeps the constant.
+  const alignmentBudgetMs = captureBudgetMs(dumpMs);
+  if (alignmentBudgetMs > CAPTURE_ALIGNMENT_BUDGET_MS) {
+    ctx.log(
+      `design-gate: ${target.id} one dump costs ${dumpMs}ms; alignment window ${alignmentBudgetMs}ms`
+    );
+  }
   await startSampling(ctx, samplingMs);
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
@@ -551,6 +581,19 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       `design-gate: ${target.id} samples are ${Math.round(spacingMs)}ms apart; the shift rule reads that spacing`
     );
   }
+  // Sampling stops before the screenshot, and the screen does not: a navigation
+  // push or a late render arrives after the last sample. The bracket compares two
+  // dumps around one screenshot, so it opens only once the layout has held still
+  // for the quiet window; reading it while that work is still landing makes a
+  // correct capture look like two different screens. A screen that never holds
+  // still keeps its mismatch instead of becoming a pass.
+  const quiet = await waitForStableLayout(
+    ctx.probe,
+    ctx.clock,
+    SCREEN_QUIET_MS,
+    SCREEN_QUIET_TIMEOUT_MS
+  );
+  if (!quiet) ctx.log(`design-gate: ${target.id} screen still changing before the screenshot`);
   const files = captureFiles(ctx.out, cell, target.id);
   writeJson(files.absolute(files.timeline), { samples, truncated });
   const started = ctx.clock.now();
@@ -565,6 +608,12 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   };
   const before = await readTree();
   const dump = before.dump ?? settled.dump;
+  // A layout that differs from the last sample is the late work the wait above
+  // absorbed; name it so a reader knows the bracket waited for a screen that was
+  // still arriving after sampling stopped.
+  if (before.dump !== undefined && layoutSignature(before.dump) !== layoutSignature(settled.dump)) {
+    ctx.log(`design-gate: ${target.id} late change after sampling stopped; bracket waited for it`);
+  }
   // Preserve collected tree evidence even if the native screenshot or its decode fails.
   writeJson(files.absolute(files.dump), dump);
   const screenshot = { startedMs: ctx.clock.now() - started, completedMs: 0 };
@@ -577,7 +626,8 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenshot,
     after,
     layoutSignature,
-    screenshotObservation(dump, image)
+    screenshotObservation(dump, image),
+    alignmentBudgetMs
   );
   const stillLoading = loadingPlaceholder(normalize(dump));
   const sampled: Sampled = {
@@ -587,10 +637,10 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     intervalMs: spacingMs,
     alignment,
     // A screen that still paints its loading placeholder is never the settled
-    // screen the target describes, whatever the settle loop saw before it. The
-    // finding reports the wait that ran, not the settle loop's own elapsed time.
-    settled:
-      settled.settled && !stillLoading && layoutSignature(settled.dump) === layoutSignature(dump),
+    // screen the target describes. The settle loop only saw the sampled window, so
+    // work that landed after it counts as settled only when the quiet wait above
+    // proved the layout held still before the bracket opened.
+    settled: settled.settled && !stillLoading && quiet,
     ...(stillLoading ? { blockedBy: 'loading-placeholder' as const } : {}),
     ...(placeholderWaitedMs > 0 ? { loadingWaitMs: placeholderWaitedMs } : {}),
   };

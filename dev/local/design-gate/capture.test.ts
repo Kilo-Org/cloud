@@ -20,7 +20,9 @@ import {
   type CaptureContext,
   type Clock,
   type Device,
+  type RunOutcome,
 } from './capture';
+import { CAPTURE_ALIGNMENT_BUDGET_MS } from './capture-evidence';
 import type { ProbeClient, ProbeSample } from './cdp';
 import { matrixCells } from './matrix';
 import { normalize, type ProbeDump } from './tree';
@@ -935,7 +937,9 @@ test('capture brackets the screenshot with the latest tree and persists alignmen
   const dump: ProbeDump = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.dump), 'utf8'));
   const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
   assert.equal(dump.nodes[1]?.text, 'Latest before capture');
-  assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
+  // The change landed after sampling stopped; the bracket's quiet wait absorbed it,
+  // so the capture is settled and the two bracket reads see the same screen.
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'unsettled'));
   assert.equal(alignment.status, 'bracketed');
   assert.equal(alignment.before.dump.nodes[1].text, 'Latest before capture');
   assert.equal(alignment.after.dump.nodes[1].text, 'Latest before capture');
@@ -1153,4 +1157,117 @@ test('a late arrival is timed with the spacing its samples report', () => {
   assert.match(measured?.message ?? '', /within 1700 ms after settling/u);
   // Without a spacing of its own, the rule still falls back to the constant.
   assert.match(shifts(undefined)[0]?.message ?? '', /within 500 ms after settling/u);
+});
+
+/** A probe whose reads the test can hold at a fixed cost per read. */
+function costingProbe(dumpMs: number) {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    await ctx.clock.sleep(dumpMs);
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  return { ctx, logs, probe, state };
+}
+
+function captureEvidence(ctx: CaptureContext, outcome: { cells: RunOutcome['cells'] }) {
+  const capture = outcome.cells[0]?.screens[0]?.capture;
+  assert.ok(capture);
+  return JSON.parse(fs.readFileSync(path.join(ctx.out, capture), 'utf8'));
+}
+
+test('the alignment window follows the measured dump cost and keeps the constant when cheap', async () => {
+  const slow = costingProbe(600);
+  const slowRun = await runMatrix(slow.ctx, matrixCells('android', 'base'), HOME);
+  // Two bracket reads of a 600 ms dump alone outlast the 2 s window, so the
+  // caller widens it by the same measurement the sampling cadence uses.
+  assert.equal(captureEvidence(slow.ctx, slowRun).budgetMs, 2_200);
+  assert.deepEqual(
+    slow.logs.filter(line => line.includes('alignment window')),
+    ['design-gate: home one dump costs 600ms; alignment window 2200ms']
+  );
+  const cheap = costingProbe(40);
+  const cheapRun = await runMatrix(cheap.ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(captureEvidence(cheap.ctx, cheapRun).budgetMs, CAPTURE_ALIGNMENT_BUDGET_MS);
+  assert.deepEqual(
+    cheap.logs.filter(line => line.includes('alignment window')),
+    []
+  );
+});
+
+test('the bracket waits for a screen that changes once after sampling stops', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalStop = probe.stopSampling;
+  let samplingStopped = false;
+  probe.stopSampling = async () => {
+    const sampled = await originalStop();
+    samplingStopped = true;
+    return sampled;
+  };
+  const originalDump = probe.dump;
+  let readsAfterStop = 0;
+  probe.dump = async () => {
+    if (samplingStopped) {
+      readsAfterStop += 1;
+      // The late navigation lands while the bracket waits for the screen to hold.
+      if (readsAfterStop === 2) {
+        state.route = '/late';
+        state.text = screenTextFor('/late');
+      }
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  // The bracket opens on the screen the late push produced, so both reads agree.
+  assert.equal(captureEvidence(ctx, outcome).status, 'bracketed');
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.dump);
+  const captured = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.dump), 'utf8'));
+  assert.equal(captured.env.route, '/late');
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'unsettled'));
+  assert.ok(
+    logs.some(line => line.includes('late change after sampling stopped')),
+    `expected a late-change line, saw ${JSON.stringify(logs)}`
+  );
+});
+
+test('a screen that keeps changing keeps the bracket a mismatch and says so', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalStop = probe.stopSampling;
+  let samplingStopped = false;
+  probe.stopSampling = async () => {
+    const sampled = await originalStop();
+    samplingStopped = true;
+    return sampled;
+  };
+  const originalDump = probe.dump;
+  let readsAfterStop = 0;
+  probe.dump = async () => {
+    if (samplingStopped) {
+      readsAfterStop += 1;
+      state.text = readsAfterStop % 2 === 0 ? screenTextFor('/') : 'Still moving';
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  // A screen that never holds still is never certified: the two bracket reads
+  // differ, and the wait reports that it timed out rather than a settle.
+  assert.equal(captureEvidence(ctx, outcome).status, 'mismatch');
+  assert.ok(logs.some(line => line.includes('screen still changing before the screenshot')));
+  assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
 });

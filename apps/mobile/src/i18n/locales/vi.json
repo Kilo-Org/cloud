@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Không thể tải các tích hợp",
     "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
     "managedByOwner": "Hãy yêu cầu chủ sở hữu của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerOrAdmin": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerOrBilling": "Hãy yêu cầu chủ sở hữu hoặc người quản lý thanh toán của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerAdminOrBilling": "Hãy yêu cầu chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
     "connectFailed": "Không thể mở trang kết nối"
   },
   "invoices": {

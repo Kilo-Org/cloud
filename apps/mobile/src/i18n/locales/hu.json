@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Nem sikerült betölteni az integrációkat",
     "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
     "managedByOwner": "Kérd meg a szervezet egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerOrAdmin": "Kérd meg egy szervezet tulajdonosát vagy adminisztrátorát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerOrBilling": "Kérd meg egy szervezet tulajdonosát vagy számlázási felelősét, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerAdminOrBilling": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
     "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {

@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
     "managedByOwner": "Be en ägare i organisationen att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerOrAdmin": "Be en ägare eller administratör att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerOrBilling": "Be en ägare eller faktureringsansvarig att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerAdminOrBilling": "Be en ägare, administratör eller faktureringsansvarig att ändra en anslutning som du inte kan ändra.",
     "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {

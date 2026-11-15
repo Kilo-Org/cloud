@@ -158,6 +158,54 @@ export function providerRowBlocked(input: {
   });
 }
 
+/** The order the hub names roles in, so the sentence reads the same every time. */
+const NAMED_ROLE_ORDER = [
+  'owner',
+  'admin',
+  'billing_manager',
+] as const satisfies readonly OrganizationRole[];
+
+/**
+ * The roles that can change the connections this viewer has no action on. The
+ * hub names them once, above the list, instead of under every blocked row, and
+ * a role appears only when it can change at least one of those rows: the
+ * provider role sets differ, so an admin reaches GitHub and Slack while a
+ * billing manager reaches GitLab, Discord, Linear and Bitbucket.
+ */
+export function blockedConnectionRoles(input: {
+  rows: readonly {
+    provider: IntegrationProvider;
+    installed: boolean;
+    actionPending: boolean;
+  }[];
+  scope: IntegrationScope;
+  role: string | undefined;
+}): OrganizationRole[] {
+  const union = new Set<OrganizationRole>();
+  for (const row of input.rows) {
+    // A row whose connections read has not landed offers no action yet, and
+    // says nothing about the role that would own it once the read settles.
+    const blocked =
+      !row.actionPending &&
+      providerRowBlocked({
+        provider: row.provider,
+        scope: input.scope,
+        role: input.role,
+        installed: row.installed,
+      });
+    if (blocked) {
+      const allowedRoles = rolesFor(
+        PROVIDERS[row.provider],
+        row.installed ? 'disconnect' : 'connect'
+      );
+      for (const allowedRole of allowedRoles) {
+        union.add(allowedRole);
+      }
+    }
+  }
+  return NAMED_ROLE_ORDER.filter(named => union.has(named));
+}
+
 /**
  * The catalog key naming a provider. Brand names live under their existing
  * keys: the catalogs keep one key per copy, so the hub points at the key the

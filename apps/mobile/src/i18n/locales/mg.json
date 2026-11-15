@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Tsy afaka nampiditra ireo fampifandraisana",
     "permissionDenied": "Tsy manana alalana hitantana ireo fampifandraisana ireo ianao.",
     "managedByOwner": "Angataho amin'ny tompon'ny fikambanana hanova fifandraisana izay tsy azonao ovaina.",
+    "managedByOwnerOrAdmin": "Angataho amin'ny tompon'ny fikambanana na mpitantana hanova fifandraisana izay tsy azonao ovaina.",
+    "managedByOwnerOrBilling": "Angataho amin'ny tompon'ny fikambanana na mpitantana faktiora hanova fifandraisana izay tsy azonao ovaina.",
+    "managedByOwnerAdminOrBilling": "Angataho amin'ny tompon'ny fikambanana, mpitantana, na mpitantana faktiora hanova fifandraisana izay tsy azonao ovaina.",
     "connectFailed": "Tsy afaka nanokatra ny pejy fampifandraisana"
   },
   "invoices": {

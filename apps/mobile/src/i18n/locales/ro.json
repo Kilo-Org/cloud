@@ -4485,6 +4485,9 @@
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
     "managedByOwner": "Cere unui proprietar al organizației să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerOrAdmin": "Cere unui proprietar al organizației sau unui administrator să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerOrBilling": "Cere unui proprietar al organizației sau unui manager de facturare să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerAdminOrBilling": "Cere unui proprietar al organizației, unui administrator sau unui manager de facturare să modifice o conexiune pe care nu o poți modifica.",
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {

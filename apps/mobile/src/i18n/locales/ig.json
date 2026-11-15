@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Enweghị ike ibudata njikọ",
     "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
     "managedByOwner": "Gwa onye nwe nzukọ ka ọ gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerOrAdmin": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerOrBilling": "Gwa onye nwe nzukọ ma ọ bụ onye njikwa ịgba ụgwọ ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerAdminOrBilling": "Gwa onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
     "connectFailed": "Enweghị ike imepe ibe njikọ"
   },
   "invoices": {

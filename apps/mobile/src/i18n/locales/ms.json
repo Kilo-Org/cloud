@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Tidak dapat memuatkan integrasi",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerOrAdmin": "Minta pemilik organisasi atau pentadbir untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerOrBilling": "Minta pemilik organisasi atau pengurus pengebilan untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerAdminOrBilling": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menukar sambungan yang anda tidak boleh tukar.",
     "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {

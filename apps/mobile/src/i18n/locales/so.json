@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Lama soo gelin karo isku-xidhka",
     "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
     "managedByOwner": "Weydii milkiilaha ururka si uu u beddelo isku-xidhka aadan beddeli karin.",
+    "managedByOwnerOrAdmin": "Weydii mulkiile ama maamule ururka si ay u beddelaan isku-xidhka aadan beddeli karin.",
+    "managedByOwnerOrBilling": "Weydii mulkiile ama maareeyaha biilasha ururka si ay u beddelaan isku-xidhka aadan beddeli karin.",
+    "managedByOwnerAdminOrBilling": "Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay u beddelaan isku-xidhka aadan beddeli karin.",
     "connectFailed": "Bogga isku-xidhka lama furi karo"
   },
   "invoices": {

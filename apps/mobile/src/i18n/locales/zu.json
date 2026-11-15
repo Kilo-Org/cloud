@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
     "managedByOwner": "Cela umnikazi wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerOrAdmin": "Cela umnikazi noma umlawuli wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerOrBilling": "Cela umnikazi noma umphathi wokukhokha wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerAdminOrBilling": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
     "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {

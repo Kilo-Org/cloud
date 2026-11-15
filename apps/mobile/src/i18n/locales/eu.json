@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
     "managedByOwner": "Eskatu erakundearen jabe bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerOrAdmin": "Eskatu erakundearen jabe edo administratzaile bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerOrBilling": "Eskatu erakundearen jabe edo fakturazio-kudeatzaile bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerAdminOrBilling": "Eskatu erakundearen jabe, administratzaile edo fakturazio-kudeatzaile bati aldatu ezin duzun konexio bat alda dezan.",
     "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {

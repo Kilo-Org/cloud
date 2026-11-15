@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Pa t ka chaje entegrasyon yo",
     "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
     "managedByOwner": "Mande yon pwopriyetè òganizasyon pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerOrAdmin": "Mande yon pwopriyetè òganizasyon oswa yon administratè pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerOrBilling": "Mande yon pwopriyetè òganizasyon oswa yon responsab faktirasyon pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerAdminOrBilling": "Mande yon pwopriyetè òganizasyon, yon administratè, oswa yon responsab faktirasyon pou chanje yon koneksyon ou pa ka chanje.",
     "connectFailed": "Pa t ka louvri paj koneksyon an"
   },
   "invoices": {

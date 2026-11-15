@@ -4485,6 +4485,9 @@
     "couldNotLoad": "Impossible de charger les intégrations",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
     "managedByOwner": "Demandez à un propriétaire de l'organisation de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerOrAdmin": "Demandez à un propriétaire de l'organisation ou à un administrateur de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerOrBilling": "Demandez à un propriétaire de l'organisation ou à un responsable de la facturation de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerAdminOrBilling": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de modifier une connexion que vous ne pouvez pas modifier.",
     "connectFailed": "Impossible d'ouvrir la page de connexion"
   },
   "invoices": {

@@ -4615,6 +4615,9 @@
     "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
     "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
     "managedByOwner": "Iarr ar úinéir eagraíochta ceangal nach féidir leat a athrú.",
+    "managedByOwnerOrAdmin": "Iarr ar úinéir eagraíochta nó riarthóir ceangal nach féidir leat a athrú.",
+    "managedByOwnerOrBilling": "Iarr ar úinéir eagraíochta nó bainisteoir billeála ceangal nach féidir leat a athrú.",
+    "managedByOwnerAdminOrBilling": "Iarr ar úinéir eagraíochta, riarthóir, nó bainisteoir billeála ceangal nach féidir leat a athrú.",
     "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt"
   },
   "invoices": {

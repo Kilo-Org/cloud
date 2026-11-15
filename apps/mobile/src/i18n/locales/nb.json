@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Kunne ikke laste inn integrasjoner",
     "permissionDenied": "Du har ikke tillatelse til å administrere disse integrasjonene.",
     "managedByOwner": "Be en eier i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerOrAdmin": "Be en eier eller administrator i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerOrBilling": "Be en eier eller faktureringsansvarlig i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerAdminOrBilling": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å endre en tilkobling du ikke kan endre.",
     "connectFailed": "Kunne ikke åpne tilkoblingssiden"
   },
   "invoices": {

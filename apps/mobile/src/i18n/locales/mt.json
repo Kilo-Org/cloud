@@ -4615,6 +4615,9 @@
     "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
     "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
     "managedByOwner": "Itlob lil sid tal-organizzazzjoni biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerOrAdmin": "Itlob lis-sid ta' organizzazzjoni jew lill-amministratur biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerOrBilling": "Itlob lis-sid ta' organizzazzjoni jew lill-maniġer tal-ħlasijiet biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerAdminOrBilling": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex ibiddel konnessjoni li ma tistax tbiddel.",
     "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
   },
   "invoices": {

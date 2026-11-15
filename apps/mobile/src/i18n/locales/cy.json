@@ -4680,6 +4680,9 @@
     "couldNotLoad": "Methu llwytho'r integreiddiadau",
     "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
     "managedByOwner": "Gofynnwch i berchennog y sefydliad newid cysylltiad na allwch ei newid.",
+    "managedByOwnerOrAdmin": "Gofynnwch i berchennog y sefydliad neu weinyddwr newid cysylltiad na allwch ei newid.",
+    "managedByOwnerOrBilling": "Gofynnwch i berchennog y sefydliad neu reolwr bilio newid cysylltiad na allwch ei newid.",
+    "managedByOwnerAdminOrBilling": "Gofynnwch i berchennog y sefydliad, gweinyddwr neu reolwr bilio newid cysylltiad na allwch ei newid.",
     "connectFailed": "Methu agor y dudalen gysylltu"
   },
   "invoices": {

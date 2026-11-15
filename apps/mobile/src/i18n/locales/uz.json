@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Integratsiyalarni yuklab boʻlmadi",
     "permissionDenied": "Sizda bu integratsiyalarni boshqarish uchun ruxsat yoʻq.",
     "managedByOwner": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasiga murojaat qiling.",
+    "managedByOwnerOrAdmin": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasi yoki administratordan so'rang.",
+    "managedByOwnerOrBilling": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasi yoki to'lov menejeridan so'rang.",
+    "managedByOwnerAdminOrBilling": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasi, administrator yoki to'lov menejeridan so'rang.",
     "connectFailed": "Ulanish sahifasini ochib boʻlmadi"
   },
   "invoices": {

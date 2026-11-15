@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
     "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
     "managedByOwner": "Kërkoji një pronari të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerOrAdmin": "Kërkoji një pronari ose administratori të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerOrBilling": "Kërkoji një pronari ose menaxheri faturimi të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerAdminOrBilling": "Kërkoji një pronari, administratori ose menaxheri faturimi të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {

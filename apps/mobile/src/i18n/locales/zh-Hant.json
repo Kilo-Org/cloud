@@ -4420,6 +4420,9 @@
     "couldNotLoad": "無法載入整合",
     "permissionDenied": "您沒有管理這些整合的權限。",
     "managedByOwner": "請洽詢組織擁有者來變更您無法變更的連結。",
+    "managedByOwnerOrAdmin": "請洽詢組織擁有者或管理員來變更您無法變更的連結。",
+    "managedByOwnerOrBilling": "請洽詢組織擁有者或帳單管理員來變更您無法變更的連結。",
+    "managedByOwnerAdminOrBilling": "請洽詢組織擁有者、管理員或帳單管理員來變更您無法變更的連結。",
     "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {

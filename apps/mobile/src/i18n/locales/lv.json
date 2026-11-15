@@ -4485,6 +4485,9 @@
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
     "managedByOwner": "Lūdziet organizācijas īpašniekam mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerOrAdmin": "Lūdziet organizācijas īpašniekam vai administratoram mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerOrBilling": "Lūdziet organizācijas īpašniekam vai norēķinu pārvaldniekam mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerAdminOrBilling": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam mainīt savienojumu, kuru nevarat mainīt.",
     "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {

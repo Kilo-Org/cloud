@@ -4550,6 +4550,9 @@
     "couldNotLoad": "Integracij ni bilo mogoče naložiti",
     "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
     "managedByOwner": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije.",
+    "managedByOwnerOrAdmin": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije ali skrbnika.",
+    "managedByOwnerOrBilling": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije ali skrbnika obračunavanja.",
+    "managedByOwnerAdminOrBilling": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja.",
     "connectFailed": "Strani za povezavo ni bilo mogoče odpreti"
   },
   "invoices": {

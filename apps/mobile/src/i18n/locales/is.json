@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
     "managedByOwner": "Biddu eiganda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerOrAdmin": "Biddu eiganda eða stjórnanda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerOrBilling": "Biddu eiganda eða innheimtustjóra stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerAdminOrBilling": "Biddu eiganda, stjórnanda eða innheimtustjóra stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {

@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Walitti hidhamiinsota fe'uun hin danda'amne",
     "permissionDenied": "Walitti hidhamiinsota kana bulchuuf hayyama hin qabdu.",
     "managedByOwner": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa gaafadhu.",
+    "managedByOwnerOrAdmin": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa gaafadhu.",
+    "managedByOwnerOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa kaffaltii gaafadhu.",
+    "managedByOwnerAdminOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii gaafadhu.",
     "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },
   "invoices": {

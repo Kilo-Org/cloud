@@ -4485,6 +4485,9 @@
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
     "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerOrAdmin": "Chiedi a un proprietario dell'organizzazione o a un amministratore di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerOrBilling": "Chiedi a un proprietario dell'organizzazione o a un responsabile della fatturazione di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerAdminOrBilling": "Chiedi a un proprietario dell'organizzazione, a un amministratore o a un responsabile della fatturazione di modificare un collegamento che non puoi modificare.",
     "connectFailed": "Impossibile aprire la pagina di collegamento"
   },
   "invoices": {

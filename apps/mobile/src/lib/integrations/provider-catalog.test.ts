@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  blockedConnectionRoles,
   canManageProvider,
   INTEGRATION_PROVIDERS,
   type IntegrationProvider,
@@ -187,6 +188,82 @@ describe('providerRowBlocked', () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+describe('blockedConnectionRoles', () => {
+  /** The hub's rows for an organization, every provider uninstalled unless told otherwise. */
+  function rows(installed: readonly IntegrationProvider[] = []) {
+    return INTEGRATION_PROVIDERS.map(provider => ({
+      provider,
+      installed: installed.includes(provider),
+      actionPending: false,
+    }));
+  }
+
+  it('names every role that can change a blocked row for a member', () => {
+    // A member is shut out of every rule, and the union is the three role sets
+    // the providers follow: the manage set, the billing set, and Bitbucket's
+    // owner-or-billing-manager page gate.
+    expect(blockedConnectionRoles({ rows: rows(), scope: 'organization', role: 'member' })).toEqual(
+      ['owner', 'admin', 'billing_manager']
+    );
+  });
+
+  it('names the manage roles for a billing manager, who reaches every other row', () => {
+    // GitHub and Slack ask for ORGANIZATION_MANAGE_ROLES, so a billing manager
+    // is blocked there and nowhere else — connected or not, since both actions
+    // follow the same set.
+    const result = blockedConnectionRoles({
+      rows: rows(['github', 'slack']),
+      scope: 'organization',
+      role: 'billing_manager',
+    });
+    expect(result).toEqual(['owner', 'admin']);
+  });
+
+  it('names the billing manager for an admin, who is blocked on Bitbucket alone', () => {
+    const result = blockedConnectionRoles({
+      rows: rows(['bitbucket']),
+      scope: 'organization',
+      role: 'admin',
+    });
+    expect(result).toEqual(['owner', 'billing_manager']);
+  });
+
+  it('names nothing for an owner, who is offered every row', () => {
+    expect(blockedConnectionRoles({ rows: rows(), scope: 'organization', role: 'owner' })).toEqual(
+      []
+    );
+  });
+
+  it('names nothing in the personal scope, where every row belongs to the viewer', () => {
+    expect(blockedConnectionRoles({ rows: rows(), scope: 'personal', role: 'member' })).toEqual([]);
+  });
+
+  it('counts no role for a row whose connections read has not settled', () => {
+    expect(
+      blockedConnectionRoles({
+        rows: [{ provider: 'github', installed: true, actionPending: true }],
+        scope: 'organization',
+        role: 'member',
+      })
+    ).toEqual([]);
+  });
+
+  it('counts only the settled rows when a pending row sits beside a blocked one', () => {
+    // Slack's rule is the manage set alone, while the pending GitLab row would
+    // add the billing manager were it counted, so the sentence must stop at the
+    // two manage roles.
+    const result = blockedConnectionRoles({
+      rows: [
+        { provider: 'gitlab', installed: true, actionPending: true },
+        { provider: 'slack', installed: false, actionPending: false },
+      ],
+      scope: 'organization',
+      role: 'member',
+    });
+    expect(result).toEqual(['owner', 'admin']);
   });
 });
 

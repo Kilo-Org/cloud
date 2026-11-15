@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Hindi ma-load ang mga integration",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
     "managedByOwner": "Hilingin sa isang may-ari ng organisasyon na baguhin ang isang koneksyong hindi mo mababago.",
+    "managedByOwnerOrAdmin": "Hilingin sa isang may-ari ng organisasyon o admin na baguhin ang isang koneksyong hindi mo mababago.",
+    "managedByOwnerOrBilling": "Hilingin sa isang may-ari ng organisasyon o tagapamahala ng pagsingil na baguhin ang isang koneksyong hindi mo mababago.",
+    "managedByOwnerAdminOrBilling": "Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na baguhin ang isang koneksyong hindi mo mababago.",
     "connectFailed": "Hindi mabuksan ang pahina ng koneksyon"
   },
   "invoices": {

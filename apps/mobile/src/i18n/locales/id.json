@@ -4420,6 +4420,9 @@
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerOrAdmin": "Minta pemilik atau admin organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerOrBilling": "Minta pemilik atau manajer penagihan organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerAdminOrBilling": "Minta pemilik, admin, atau manajer penagihan organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
     "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {

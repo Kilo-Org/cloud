@@ -4550,6 +4550,9 @@
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
     "managedByOwner": "Paprašykite organizacijos savininko pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerOrAdmin": "Paprašykite organizacijos savininko ar administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerOrBilling": "Paprašykite organizacijos savininko ar atsiskaitymų administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerAdminOrBilling": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
     "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {

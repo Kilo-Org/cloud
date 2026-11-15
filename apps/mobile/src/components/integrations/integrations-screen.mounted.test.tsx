@@ -11,12 +11,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import IntegrationsRoute from '@/app/(app)/(tabs)/(3_profile)/integrations';
-import { IntegrationsScreen } from './integrations-screen';
+import { blockedNoteKey, IntegrationsScreen } from './integrations-screen';
 
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
-/** The catalog value, so a copy edit does not need a test edit. */
-const SHARED_NOTE = i18n.t('integrations.managedByOwner');
+/** The catalog values, so a copy edit does not need a test edit. */
+const OWNER_NOTE = i18n.t('integrations.managedByOwner');
+const OWNER_ADMIN_NOTE = i18n.t('integrations.managedByOwnerOrAdmin');
+const OWNER_BILLING_NOTE = i18n.t('integrations.managedByOwnerOrBilling');
+const OWNER_ADMIN_BILLING_NOTE = i18n.t('integrations.managedByOwnerAdminOrBilling');
 
 const GITHUB_CONNECTION = {
   id: 'gh-1',
@@ -234,6 +237,17 @@ function texts(root: TestRenderer.ReactTestInstance): ReactNode[] {
   return findOne(root, 'TextMock').map(node => node.props.children);
 }
 
+/** Every "who can change this" sentence the hub rendered, in one list. */
+function sharedNotes(root: TestRenderer.ReactTestInstance): ReactNode[] {
+  const notes = new Set<ReactNode>([
+    OWNER_NOTE,
+    OWNER_ADMIN_NOTE,
+    OWNER_BILLING_NOTE,
+    OWNER_ADMIN_BILLING_NOTE,
+  ]);
+  return texts(root).filter(text => notes.has(text));
+}
+
 /** Invokes a control the test found, matching the renderer's synchronous act. */
 function press(node: TestRenderer.ReactTestInstance | null) {
   const onPress = node?.props.onPress as (() => void) | undefined;
@@ -360,7 +374,10 @@ describe('IntegrationsScreen', () => {
       expect(actionOf(row)).toBeNull();
       expect(row.props.accessibilityLabel).toBe(`Open in browser. ${title}. ${row.props.subtitle}`);
     }
-    expect(texts(root).filter(text => text === SHARED_NOTE)).toHaveLength(1);
+    // The blocked rows follow two role sets for a member: GitHub and Slack ask
+    // for the manage set, and Bitbucket's page gate adds the billing manager, so
+    // the sentence names all three and nothing else is rendered.
+    expect(sharedNotes(root)).toEqual([OWNER_ADMIN_BILLING_NOTE]);
 
     press(rowTitled(root, 'GitLab'));
     expect(calls.openExternal).toHaveBeenCalledWith(
@@ -380,7 +397,42 @@ describe('IntegrationsScreen', () => {
     // A row that offers its control does not also open the page on press: one
     // row, one action.
     expect(findOne(root, 'RowMock').every(row => row.props.onPress == null)).toBe(true);
-    expect(texts(root)).not.toContain(SHARED_NOTE);
+    expect(sharedNotes(root)).toEqual([]);
+  });
+
+  it('names the manage roles for a billing manager, blocked on GitHub and Slack alone', () => {
+    state.role = 'billing_manager';
+    state.statuses.data = [
+      { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
+      { platform: 'slack', installed: true, installation: { teamName: 'Acme Slack' } },
+    ];
+    const root = mount('org-1').root;
+
+    // GitHub and Slack both ask for ORGANIZATION_MANAGE_ROLES, and every other
+    // row's rule admits a billing manager, so the sentence names the two manage
+    // roles and stops there.
+    for (const title of ['GitHub', 'Slack']) {
+      expect(actionOf(rowTitled(root, title))).toBeNull();
+    }
+    expect(sharedNotes(root)).toEqual([OWNER_ADMIN_NOTE]);
+  });
+
+  it('names the billing manager for an admin, blocked on Bitbucket alone', () => {
+    state.role = 'admin';
+    state.statuses.data = [
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    const root = mount('org-1').root;
+
+    // Bitbucket's page gate is owner or billing manager, so an admin reaches a
+    // read-only page there and every other row offers its own control.
+    expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
+    expect(sharedNotes(root)).toEqual([OWNER_BILLING_NOTE]);
+  });
+
+  it('names one role with the owner-only sentence, and none for an empty union', () => {
+    expect(blockedNoteKey(['owner'])).toBe('integrations.managedByOwner');
+    expect(blockedNoteKey([])).toBeNull();
   });
 
   it('shows no shared note and no organization name in the personal scope', () => {
@@ -393,7 +445,7 @@ describe('IntegrationsScreen', () => {
     // The personal scope belongs to the viewer, so every row offers its action
     // and nothing needs explaining.
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
-    expect(texts(root)).not.toContain(SHARED_NOTE);
+    expect(sharedNotes(root)).toEqual([]);
     const header = findOne(root, 'ScreenHeaderMock')[0];
     expect(header?.props.title).toBe('Integrations');
     expect(header?.props.subtitle).toBeUndefined();

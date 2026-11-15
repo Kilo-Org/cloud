@@ -4550,6 +4550,9 @@
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
     "managedByOwner": "Požiadajte vlastníka organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerOrAdmin": "Požiadajte vlastníka alebo správcu organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerOrBilling": "Požiadajte vlastníka alebo správcu fakturácie organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerAdminOrBilling": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
     "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
   },
   "invoices": {

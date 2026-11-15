@@ -4485,6 +4485,9 @@
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "managedByOwner": "Demana a un propietari de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerOrAdmin": "Demana a un propietari o administrador de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerOrBilling": "Demana a un propietari o gestor de facturació de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerAdminOrBilling": "Demana a un propietari, administrador o gestor de facturació de l'organització que canviï una connexió que no pots canviar.",
     "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
   },
   "invoices": {

@@ -2252,6 +2252,7 @@
       "selectRepositoryToStart": "Select a repository to start.",
       "enterPromptToStart": "Add a prompt to start.",
       "enterPromptOrFileToStart": "Add a prompt or a file to start.",
+      "profileLoadingToStart": "The profile is still loading. Wait a moment and try again.",
       "connectProviderToStart": "Repositories come from a connected GitHub, GitLab, or Bitbucket account.",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",

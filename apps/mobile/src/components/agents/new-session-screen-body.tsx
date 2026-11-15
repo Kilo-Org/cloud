@@ -1307,6 +1307,16 @@ export function NewSessionScreenBody() {
     startBlockedReason = t('agentChat.newSession.enterPromptToStart');
   } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
     startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
+  } else if (startBlockedReasonKey === 'attachment-failed') {
+    // The composer's own file-fix copy, reused here: the footer names the same
+    // failed chip the composer refuses to send, and offers no second action.
+    startBlockedReason = t('agentChat.composer.removeOrRetryFailed');
+  } else if (startBlockedReasonKey === 'attachment-uploading') {
+    startBlockedReason = t('agentChat.composer.waitForUploads');
+  } else if (startBlockedReasonKey === 'profile-loading') {
+    // The Environment row already shows its busy state; the footer says why
+    // Start waits on it, so a disabled control is never unexplained.
+    startBlockedReason = t('agentChat.newSession.profileLoadingToStart');
   }
 
   // The plan explanation already says why Start cannot run, and nothing the

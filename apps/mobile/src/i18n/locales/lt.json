@@ -443,7 +443,7 @@
     "keepScreenOn": "Neišjungti ekrano sesijos puslapyje",
     "keepScreenOnSubtitle": "Neišjungti ekrano, kol sesija vykdoma.",
     "appearance": "Išvaizda",
-    "notificationsSubtitle": "Tiesioginių pranešimų nuostatos",
+    "notificationsSubtitle": "Stumiamųjų pranešimų nuostatos",
     "appearanceSystem": "Sisteminė",
     "appearanceLight": "Šviesi",
     "appearanceDark": "Tamsi",
@@ -1087,7 +1087,7 @@
     "channel": {
       "agentProgress": "Agentų eiga",
       "balance": "Įspėjimai apie likutį",
-      "security": "Saugumo radiniai",
+      "security": "Saugos radiniai",
       "spend": "Išlaidų įspėjimai",
       "followedSessions": "Sekamos sesijos"
     },

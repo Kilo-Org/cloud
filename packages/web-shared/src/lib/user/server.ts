@@ -206,6 +206,7 @@ type GetAuthResponse =
       webSessionId?: undefined;
       webSessionPepper?: undefined;
       authenticatedAt?: undefined;
+      ssoSourceOrganizationId?: undefined;
     }
   | {
       user: User;
@@ -227,6 +228,13 @@ type GetAuthResponse =
       webSessionPepper?: string | null;
       /** Unix seconds when the browser session signed in. */
       authenticatedAt?: number;
+      /**
+       * The WorkOS organization this browser session authenticated through,
+       * recorded only when the session signed in through SSO. Server-only: it
+       * is the provenance a management approval checks against the
+       * organization the account's domain currently requires.
+       */
+      ssoSourceOrganizationId?: string;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -583,6 +591,7 @@ async function resolveUserFromSession(
       id: session.webSessionId,
       pepper: session.webSessionPepper,
       authenticatedAt: session.authenticatedAt,
+      ssoSourceOrganizationId: session.ssoSourceOrganizationId,
     },
   });
 }
@@ -657,7 +666,12 @@ type UserAuthorizationRequest = {
   tokenSource?: string;
   deviceSessionId?: string;
   cloudAgentAuthority?: CloudAgentAuthority;
-  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number };
+  webSession?: {
+    id?: string;
+    pepper?: string | null;
+    authenticatedAt?: number;
+    ssoSourceOrganizationId?: string;
+  };
 };
 
 async function validateUserAuthorization({
@@ -759,6 +773,7 @@ async function validateUserAuthorization({
     webSessionId: webSession?.id,
     webSessionPepper: webSession?.pepper,
     authenticatedAt: webSession?.authenticatedAt,
+    ssoSourceOrganizationId: webSession?.ssoSourceOrganizationId,
   };
 }
 

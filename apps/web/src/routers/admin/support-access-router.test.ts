@@ -11,7 +11,6 @@ import {
   support_access_grants,
 } from '@kilocode/db/schema';
 import { hashStepUpBinding, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   SUPPORT_READ_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_MAX_DURATION_SECONDS,
@@ -182,7 +181,7 @@ describe('admin.supportAccess request', () => {
     const requester = await insertRequester();
     const approver = await insertRequester();
     const { organization } = await orgWithOwner();
-    const caller = await stepUpCaller(requester.id);
+    const caller = await stepUpCaller(requester.id, organization.id);
 
     const grant = await caller.admin.supportAccess.request({
       organizationId: organization.id,
@@ -196,7 +195,7 @@ describe('admin.supportAccess request', () => {
     expect(stored?.requested_duration_seconds).toBe(SUPPORT_WRITE_MAX_DURATION_SECONDS);
 
     const approved = await (
-      await stepUpCaller(approver.id)
+      await stepUpCaller(approver.id, organization.id)
     ).admin.supportAccess.approve({
       grantId: grant.id,
     });

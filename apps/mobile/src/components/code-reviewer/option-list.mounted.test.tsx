@@ -22,7 +22,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
-import { ORGANIZATION_BILLING_HREF } from '@/lib/trial-refusal';
+import { billingHrefFor } from '@/lib/trial-refusal';
 import { OptionList } from './option-list';
 
 vi.mock('@/components/ui/activity-indicator', () => ({
@@ -298,7 +298,7 @@ describe('OptionList failed save', () => {
     act(() => {
       step.onPress?.();
     });
-    expect(routerPush).toHaveBeenCalledWith(ORGANIZATION_BILLING_HREF);
+    expect(routerPush).toHaveBeenCalledWith(billingHrefFor('org_1'));
     expect(routerBack).not.toHaveBeenCalled();
   });
 

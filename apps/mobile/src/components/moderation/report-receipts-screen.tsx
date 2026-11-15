@@ -17,7 +17,7 @@ import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { reportReceiptRoute } from '@/lib/report-receipt-route';
 import { statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
-import { readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
+import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -78,9 +78,9 @@ export function ReportReceiptsScreen() {
   // A failed page must not replace the rows already measured: only a first page
   // that never arrived turns into the error state.
   const failure = query.isError && query.data === undefined;
-  const errorCode = query.isError ? readTrpcErrorField(query.error, 'code') : undefined;
-  const permanent =
-    errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
+  // One answer for every screen: a terminal code (including a stale or malformed
+  // cursor) cannot be fixed by asking again, so it offers no Retry.
+  const retryable = query.isError && isRetryableTrpcError(query.error);
   const capped = !query.hasNextPage && (query.data?.pages.at(-1)?.nextCursor ?? null) !== null;
 
   return (
@@ -102,11 +102,11 @@ export function ReportReceiptsScreen() {
             // fixed by asking again.
             variant={trpcErrorVariant(query.error)}
             onRetry={
-              permanent
-                ? undefined
-                : () => {
+              retryable
+                ? () => {
                     void query.refetch();
                   }
+                : undefined
             }
             isRetrying={query.isFetching}
           />

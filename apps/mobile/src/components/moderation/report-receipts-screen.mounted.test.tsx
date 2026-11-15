@@ -151,6 +151,10 @@ function mustExist<T>(value: T | undefined, label: string): T {
   return value;
 }
 
+function screenTexts(root: ReactTestRenderer['root']) {
+  return root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children);
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.pages = [];
@@ -253,5 +257,74 @@ describe('ReportReceiptsScreen', () => {
     );
     expect(failure.props.title).toBe('Could not load your reports');
     expect(failure.findAll(node => Object.is(node.type, RETRY))).toHaveLength(0);
+  });
+
+  it('offers no retry when the cursor the list holds is no longer acceptable', async () => {
+    state.isError = true;
+    state.error = { data: { code: 'BAD_REQUEST' }, message: 'Invalid report receipt cursor.' };
+    const root = await mount();
+
+    const failure = mustExist(
+      root.findAll(node => Object.is(node.type, QUERY_ERROR))[0],
+      'the error state'
+    );
+    expect(failure.findAll(node => Object.is(node.type, RETRY))).toHaveLength(0);
+  });
+
+  it('says the list holds the most recent reports when the page bound ends it', async () => {
+    state.pages = [
+      {
+        items: [
+          {
+            receiptId: 'receipt-newest',
+            triageStatus: 'received',
+            appealStatus: 'none',
+            createdAt: '2026-11-15T11:00:00.000Z',
+          },
+        ],
+        nextCursor: 'page-two',
+      },
+    ];
+    state.hasNextPage = false;
+    const root = await mount();
+
+    expect(screenTexts(root)).toContain('Showing your most recent reports.');
+  });
+
+  it('keeps the rows on screen and retries the page that failed', async () => {
+    state.pages = [
+      {
+        items: [
+          {
+            receiptId: 'receipt-newest',
+            triageStatus: 'received',
+            appealStatus: 'none',
+            createdAt: '2026-11-15T11:00:00.000Z',
+          },
+          {
+            receiptId: 'receipt-older',
+            triageStatus: 'actioned',
+            appealStatus: 'none',
+            createdAt: '2026-11-14T11:00:00.000Z',
+          },
+        ],
+        nextCursor: 'page-two',
+      },
+    ];
+    state.hasNextPage = true;
+    state.isFetchNextPageError = true;
+    const root = await mount();
+
+    expect(rows(root)).toHaveLength(2);
+    expect(screenTexts(root)).not.toContain('Showing your most recent reports.');
+
+    const retry = mustExist(
+      root.findAll(node => Object.is(node.type, 'Button'))[0],
+      'the footer retry'
+    );
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(state.fetchNextPage).toHaveBeenCalledTimes(1);
   });
 });

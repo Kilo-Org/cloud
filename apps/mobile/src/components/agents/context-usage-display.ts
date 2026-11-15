@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
-import { formatCurrency, formatNumber, formatPercent } from '@/lib/format';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatNumber, formatPercent, formatPrefixedUsd } from '@/lib/format';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { formatSessionCostBadge, formatSessionTotalCost } from './session-list-helpers';
@@ -18,10 +19,13 @@ export function formatExactTokens(tokens: number): string {
 }
 
 export function formatCost(cost: number): string {
-  if (!Number.isFinite(cost) || cost <= 0) {
-    return formatCurrency(0, i18n.language, 4);
-  }
-  return formatCurrency(cost, i18n.language, 4);
+  const amount = Number.isFinite(cost) && cost > 0 ? cost : 0;
+  return isolateLtrBidiText(
+    formatPrefixedUsd(amount, i18n.language, {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
+    })
+  );
 }
 
 export function getContextTone(percentage: number | undefined): ContextTone {

@@ -1367,7 +1367,7 @@
       "set": "Imewekwa",
       "notSet": "Haijawekwa",
       "nSelected": "{{displayCount}} zimechaguliwa",
-      "nSelected_one": "{{displayCount}} zimechaguliwa",
+      "nSelected_one": "{{displayCount}} imechaguliwa",
       "nSelected_other": "{{displayCount}} zimechaguliwa",
       "proposedReviewMdGuidance": "Mwongozo uliopendekezwa wa REVIEW.md"
     },

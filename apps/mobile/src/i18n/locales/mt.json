@@ -1436,7 +1436,7 @@
       "set": "Issettjat",
       "notSet": "Mhux issettjat",
       "nSelected": "{{displayCount}} magħżula",
-      "nSelected_one": "{{displayCount}} magħżula",
+      "nSelected_one": "{{displayCount}} magħżul",
       "nSelected_other": "{{displayCount}} magħżula",
       "nSelected_few": "{{displayCount}} magħżula",
       "nSelected_many": "{{displayCount}} magħżula",

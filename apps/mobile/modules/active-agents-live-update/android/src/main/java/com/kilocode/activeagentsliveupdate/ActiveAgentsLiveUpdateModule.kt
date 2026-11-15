@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.text.SpannableString
@@ -215,17 +214,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
    */
   private fun postedChannelId(): String? = notificationState.getString(POSTED_CHANNEL, null)
 
-  private fun newBuilder(channelId: String): Notification.Builder {
-    if (Build.VERSION.SDK_INT >= 26) {
-      // The JS side creates and names every channel before the first post.
-      return Notification.Builder(context, channelId)
-    }
-    return legacyBuilder()
-  }
-
-  @Suppress("DEPRECATION")
-  private fun legacyBuilder(): Notification.Builder = Notification.Builder(context)
-
   /**
    * A PendingIntent that deep-links the app to the URL the JS side named: the
    * waiting session's route when one is recorded, the Agents tab otherwise.
@@ -318,13 +306,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
     (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
       Configuration.UI_MODE_NIGHT_YES
 
-  private fun action(label: String, intent: PendingIntent): Notification.Action =
-    Notification.Action.Builder(
-      Icon.createWithResource(context, CardStyle.icon(context)),
-      label,
-      intent
-    ).build()
-
   /**
    * The channel a card still in the shade carries, or null when no card is
    * posted. The stored marker alone can outlive the card: a terminal timeout
@@ -383,8 +364,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
     } else {
       card.text
     }
-    val builder = newBuilder(channelId)
-      .setSmallIcon(CardStyle.icon(context))
+    val icon = CardStyle.icon(context)
+    val builder = CardBuilders.builder(context, channelId)
+      .setSmallIcon(icon)
       .setColor(Color.parseColor(if (night) CardStyle.PRIMARY_NIGHT else CardStyle.PRIMARY_DAY))
       .setContentTitle(card.title)
       .setContentText(text)
@@ -398,12 +380,14 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // answered elsewhere or while an answer is in flight. Approve runs once the
     // device is unlocked, so it goes through the gate activity.
     card.approveLabel?.let {
+      builder.addAction(ApprovalGate.action(context, icon, it, approvePendingIntent()))
+    }
+    builder.addAction(CardBuilders.action(context, icon, card.openLabel, contentIntent))
+    card.newAgentLabel?.let {
       builder.addAction(
-        ApprovalGate.action(context, CardStyle.icon(context), it, approvePendingIntent())
+        CardBuilders.action(context, icon, it, newAgentPendingIntent(card.newAgentUrl))
       )
     }
-    builder.addAction(action(card.openLabel, contentIntent))
-    card.newAgentLabel?.let { builder.addAction(action(it, newAgentPendingIntent(card.newAgentUrl))) }
 
     if (needsInput) {
       // Only the first entry into the kind alerts; a later update in the same

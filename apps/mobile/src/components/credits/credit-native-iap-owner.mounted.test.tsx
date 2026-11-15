@@ -10,12 +10,16 @@ import {
 } from '@/lib/credits/store-products-loader';
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
-import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   resetCreditPurchaseIntentForTests,
   restoreCreditPurchaseIntent,
 } from '@/lib/credits/credit-purchase-intent';
 import { resetCreditPurchaseAuthorityForTests } from '@/lib/credits/credit-purchase-authority';
+import {
+  resetInlinePurchaseErrorOwnership,
+  resetPurchaseErrorToastDedup,
+  resetTerminalPurchaseRejections,
+} from '@/lib/credits/use-store-credit-purchase';
 import { act, TestRenderer } from '@/test/renderer';
 import {
   type CreditNativeIapContextValue,
@@ -54,6 +58,11 @@ const mockedQuery = vi.hoisted(() => ({
         recoveryGoogleProductIds?: string[];
       }
     | undefined,
+}));
+const mockedToasts = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
 }));
 
 vi.mock('expo-crypto', () => {
@@ -138,7 +147,6 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   },
 }));
 
-const mockedToasts = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: mockedToasts }));
 
 type ProbeHandle = { value: CreditNativeIapContextValue | null };
@@ -237,12 +245,14 @@ async function flushPromises() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetPurchaseErrorToastDedup();
   mockedIap.requestPurchase.mockReset();
   mockedIap.getAvailablePurchases.mockReset();
   mockedQuery.completePurchase.mockReset();
   resetCreditPurchaseIntentForTests();
   resetCreditPurchaseAuthorityForTests();
+  resetInlinePurchaseErrorOwnership();
+  resetPurchaseErrorToastDedup();
+  resetTerminalPurchaseRejections();
   persistedIntent.clear();
   nativeRequestCounts.clear();
   mockedPlatform.OS = 'ios';
@@ -264,6 +274,97 @@ afterEach(() => {
 });
 
 describe('CreditNativeIapOwner', () => {
+  it('bounds reconciliation through a hung finish and keeps its late completion off a successor', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const transaction = createPurchase({ transactionId: 'reconciliation-hung-finish' });
+    mockedIap.requestPurchase.mockResolvedValueOnce({ ...transaction, purchaseState: 'pending' });
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    const finish = Promise.withResolvers<undefined>();
+    mockedIap.finishTransaction.mockReturnValueOnce(finish.promise);
+    mockedIap.getAvailablePurchases.mockResolvedValue([transaction]);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const reopened = await mountOwner();
+    const reconciliation = reopened.handle.value?.purchase(creditPack);
+    try {
+      await flushPromises();
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(16_000);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBeNull();
+      expect(reopened.handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+      mockedIap.requestPurchase.mockResolvedValueOnce(
+        createPurchase({ purchaseState: 'pending', transactionId: 'after-reconciliation-deadline' })
+      );
+      await reopened.handle.value?.buyAgain(creditPack);
+      finish.resolve(undefined);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+    } finally {
+      finish.resolve(undefined);
+      await flushPromises();
+      await reconciliation;
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not settle a successor reconciliation when the earlier finish finally completes', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const transaction = createPurchase({ transactionId: 'reconciliation-successor-query' });
+    mockedIap.requestPurchase.mockResolvedValueOnce({ ...transaction, purchaseState: 'pending' });
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    const finish = Promise.withResolvers<undefined>();
+    const secondLookup = Promise.withResolvers<Purchase[]>();
+    mockedIap.finishTransaction.mockReturnValueOnce(finish.promise);
+    mockedIap.getAvailablePurchases.mockResolvedValue([transaction]);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const reopened = await mountOwner();
+    const initial = reopened.handle.value?.purchase(creditPack);
+    const successor: { promise?: Promise<boolean> } = {};
+    try {
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBeNull();
+      await initial;
+      mockedIap.getAvailablePurchases.mockReturnValueOnce(secondLookup.promise);
+      successor.promise = reopened.handle.value?.purchase(creditPack);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+      finish.resolve(undefined);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+      secondLookup.resolve([]);
+      await successor.promise;
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBeNull();
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    } finally {
+      finish.resolve(undefined);
+      secondLookup.resolve([]);
+      await flushPromises();
+      await initial;
+      await successor.promise;
+      vi.useRealTimers();
+    }
+  });
+
   it('does not publish a completion refusal after same-account unmount', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

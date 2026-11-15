@@ -220,23 +220,23 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   }, []);
 
   const retireCompletedIntent = useCallback(
-    async (intent: CreditPurchaseIntent) => {
+    async (intent: CreditPurchaseIntent, owner: PurchaseRequestRecord | null) => {
       if (!canAttributeNativePurchaseOutcome(intent)) {
         return;
       }
-      const owner = pendingPurchaseRef.current;
       await retireCreditPurchaseIntent(intent);
+      const currentOwner = pendingPurchaseRef.current;
       if (
         !mountedRef.current ||
         !isCurrentAuthEpoch(authEpochRef.current) ||
         ownsCreditPurchaseIntent(intent) ||
-        pendingPurchaseRef.current !== owner
+        (currentOwner !== null && currentOwner.intent !== intent)
       ) {
         return;
       }
       clearError();
       clearBlockedPurchase();
-      if (owner?.intent === intent) {
+      if (owner?.intent === intent && currentOwner === owner) {
         pendingPurchaseRef.current = null;
         owner.settle();
         owner.attempt.succeed();
@@ -384,7 +384,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             return delivered;
           }
           await (recoveredPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase))
-            ? retireCompletedIntent(record.intent)
+            ? retireCompletedIntent(record.intent, record)
             : completeDeliveredPurchaseRef.current?.(purchase));
           return delivered;
         },
@@ -443,6 +443,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       ) {
         return;
       }
+      const requestOwner = pendingPurchaseRef.current;
       const intent = await restoreCreditPurchaseIntent();
       if (!isCurrentAuthEpoch(authEpochRef.current)) {
         return;
@@ -471,11 +472,17 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             matchesCreditPurchaseIntent(intent, purchase) &&
             canAttributeNativePurchaseOutcome(intent)
           ) {
-            await retireCompletedIntent(intent);
+            await retireCompletedIntent(intent, requestOwner);
           }
         } else if (owned && purchase.purchaseState !== 'pending') {
-          const owner = pendingPurchaseRef.current;
-          if (owner?.intent === intent && isCurrentAuthEpoch(owner.epoch) && owner.attempt.owns()) {
+          const owner = requestOwner;
+          if (
+            owner !== null &&
+            pendingPurchaseRef.current === owner &&
+            owner.intent === intent &&
+            isCurrentAuthEpoch(owner.epoch) &&
+            owner.attempt.owns()
+          ) {
             pendingPurchaseRef.current = null;
             owner.settle();
             setUnresolvedProductId(owner.intent.productId);
@@ -566,17 +573,15 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const reconcilePurchaseIntent = useCallback(
     async (record: PurchaseRequestRecord): Promise<boolean> => {
       let emptyForIntent = false;
-      try {
-        const pending = await withStoreDeadline(
-          fetchPendingStorePurchases(storefront),
-          'the pending purchase lookup'
-        );
+      let reconciliationFailed = false;
+      const reconcile = async () => {
+        const pending = await fetchPendingStorePurchases(storefront);
         if (
           pendingPurchaseRef.current !== record ||
           !record.attempt.owns() ||
           !isCurrentAuthEpoch(record.epoch)
         ) {
-          return false;
+          return;
         }
         emptyForIntent = !pending.some(purchase =>
           purchase.productId === record.intent.productId ||
@@ -593,8 +598,11 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             }
           })
         );
+      };
+      try {
+        await withStoreDeadline(reconcile(), 'the purchase reconciliation');
       } catch {
-        // An empty or failed lookup is not proof that the native request cannot charge.
+        reconciliationFailed = true;
       }
       if (
         pendingPurchaseRef.current === record &&
@@ -603,8 +611,13 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       ) {
         pendingPurchaseRef.current = null;
         record.settle();
+        if (!ownsCreditPurchaseIntent(record.intent)) {
+          clearBlockedPurchase();
+          record.attempt.abandon();
+          return false;
+        }
         setUnresolvedProductId(record.intent.productId);
-        if (emptyForIntent && record.pack.storeProductId !== null) {
+        if ((emptyForIntent || reconciliationFailed) && record.pack.storeProductId !== null) {
           buyAgainConsentRef.current = {
             intent: record.intent,
             productId: record.pack.storeProductId,
@@ -619,7 +632,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       }
       return false;
     },
-    [completeStorePurchaseInSession, storefront]
+    [clearBlockedPurchase, completeStorePurchaseInSession, storefront]
   );
 
   const admissionRef = useRef<SurfaceAttempt<CreditPurchaseFailure> | null>(null);
@@ -882,6 +895,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       }
 
       try {
+        const requestOwner = pendingPurchaseRef.current;
         const recoveredPurchases = await actions.recoverPurchases(unrecoveredPurchases);
         if (!isCurrentAuthEpoch(authEpochRef.current)) {
           return;
@@ -894,7 +908,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
           intent !== null &&
           recoveredPurchases.some(purchase => matchesCreditPurchaseIntent(intent, purchase))
         ) {
-          await retireCompletedIntent(intent);
+          await retireCompletedIntent(intent, requestOwner);
         }
         for (const recoveredPurchase of recoveredPurchases) {
           recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));

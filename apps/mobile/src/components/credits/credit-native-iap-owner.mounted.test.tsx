@@ -15,6 +15,7 @@ import {
   resetCreditPurchaseIntentForTests,
   restoreCreditPurchaseIntent,
 } from '@/lib/credits/credit-purchase-intent';
+import { resetCreditPurchaseAuthorityForTests } from '@/lib/credits/credit-purchase-authority';
 import { act, TestRenderer } from '@/test/renderer';
 import {
   type CreditNativeIapContextValue,
@@ -241,6 +242,7 @@ beforeEach(() => {
   mockedIap.getAvailablePurchases.mockReset();
   mockedQuery.completePurchase.mockReset();
   resetCreditPurchaseIntentForTests();
+  resetCreditPurchaseAuthorityForTests();
   persistedIntent.clear();
   nativeRequestCounts.clear();
   mockedPlatform.OS = 'ios';
@@ -457,7 +459,7 @@ describe('CreditNativeIapOwner', () => {
     }
   });
 
-  it('restores unresolved admission after restart and releases it on identified recovery', async () => {
+  it('restores a dispatched barrier across process restart while late credit recovery stays independent', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,
       products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
@@ -469,6 +471,7 @@ describe('CreditNativeIapOwner', () => {
       await Promise.resolve();
     });
     resetCreditPurchaseIntentForTests();
+    resetCreditPurchaseAuthorityForTests();
     const second = await mountOwner();
     expect(second.handle.value?.errorMessageKey).toBe('credits.storeTimedOut');
     await second.handle.value?.purchase(creditPack50);
@@ -476,6 +479,8 @@ describe('CreditNativeIapOwner', () => {
     mockedIap.handlers?.onPurchaseSuccess(createPurchase());
     await flushPromises();
     await second.handle.value?.purchase(creditPack);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    await second.handle.value?.buyAgain(creditPack);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
   });
 

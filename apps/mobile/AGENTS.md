@@ -168,7 +168,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Only the per-chat web-search and Kilo MCP flags use the registry's `setChatFlag` (`@/lib/chat/registry`), which persists and applies them in the chat's own operation order and publishes the result through `ChatState`. Other standalone persisted values stay with their owning stores; components must not add a competing optimistic mirror beside either kind.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
-- A dispatched purchase admission survives the credits route and app restart until an authoritative native refusal, completion of its identified transaction, or explicit informed “Buy again” consent retires it. A reserved intent that never reached dispatch is released. An empty lookup never silently authorizes another charge on either platform; reconciliation has visible pending/failure states and offers the consent exit. Bind native outcomes to the captured request and transaction, never to whichever product is currently pending.
+- A dispatched purchase admission survives routes and process restarts. The SDK pools native purchase promises: a native outcome may retire an intent only when exactly one dispatched intent exists, it was dispatched in this process, no earlier unresolved request exists, and the outcome is not a transport disconnection. Other outcomes are transaction-deduplicated recovery input only. Informed “Buy again” consent releases the current barrier but preserves earlier uncertainty. Reserved, never-dispatched intents are released; empty queries never silently authorize another charge.
 
 ## React Native Rules
 

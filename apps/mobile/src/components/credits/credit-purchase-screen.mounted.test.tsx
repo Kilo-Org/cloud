@@ -515,7 +515,7 @@ describe('CreditPurchaseScreen', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('App Store products unavailable'));
 
-    expect(packRows(renderer)).toHaveLength(0);
+    expect(packRows(renderer)).toHaveLength(4);
     expect(allText(renderer)).toContain(
       'Could not connect to the App Store. Check your connection and try again.'
     );
@@ -528,9 +528,16 @@ describe('CreditPurchaseScreen', () => {
     // A store failure is not a catalog claim: the no-match body belongs to a
     // store that answered and priced no pack.
     expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
-    // The card above is the only visible statement of the failure: no pack row
-    // renders beside it to repeat the state.
+    // The card above is the only visible statement of the failure: a disabled
+    // row does not repeat it. A screen reader still hears the state per row.
     expect(allText(renderer)).not.toContain('Price unavailable');
+    expect(
+      packRows(renderer).every(row =>
+        (row.props as { accessibilityLabel: string }).accessibilityLabel.includes(
+          'Price unavailable'
+        )
+      )
+    ).toBe(true);
     // The store SDK's own wording never reaches the screen.
     expect(allText(renderer)).not.toContain('Failed to query product');
 
@@ -544,7 +551,7 @@ describe('CreditPurchaseScreen', () => {
     });
     await waitFor(() => owner.fetchStoreProducts.mock.calls.length >= 2);
 
-    expect(packRows(renderer)).toHaveLength(0);
+    expect(packRows(renderer)).toHaveLength(4);
     expect(allText(renderer)).not.toContain('Price unavailable');
     unmount();
   });
@@ -564,7 +571,7 @@ describe('CreditPurchaseScreen', () => {
     expect(allText(renderer)).not.toContain(
       'Could not connect to the App Store. Check your connection and try again.'
     );
-    expect(packRows(renderer)).toHaveLength(0);
+    expect(packRows(renderer)).toHaveLength(4);
     unmount();
   });
 
@@ -592,11 +599,10 @@ describe('CreditPurchaseScreen', () => {
       expect(allText(renderer)).not.toContain(
         'Could not connect to Google Play. Check your connection and try again.'
       );
-      // The notice fills the pack area, with a retry to offer, and no row
-      // renders beneath it: the pack area paints one surface at a time.
-      expect(packRows(renderer)).toHaveLength(0);
+      // The backend amounts stay on screen, unpriced, with a retry to offer,
+      // and the timeout card above is the only visible statement of why.
+      expect(packRows(renderer)).toHaveLength(4);
       expect(allText(renderer)).not.toContain('Price unavailable');
-      expect(tryAgainButton(renderer)).toBeDefined();
       unmount();
     } finally {
       vi.useRealTimers();
@@ -612,7 +618,7 @@ describe('CreditPurchaseScreen', () => {
 
     expect(allText(renderer)).toContain('No matching credit packs were returned by Google Play.');
     expect(allText(renderer)).not.toContain("Google Play didn't respond in time. Try again.");
-    expect(packRows(renderer)).toHaveLength(0);
+    expect(packRows(renderer)).toHaveLength(4);
     unmount();
   });
 
@@ -677,7 +683,7 @@ describe('CreditPurchaseScreen', () => {
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('App Store products unavailable'));
-    expect(packRows(renderer)).toHaveLength(0);
+    expect(packRows(renderer)).toHaveLength(4);
 
     const retry = tryAgainButton(renderer);
     if (!retry) {
@@ -689,9 +695,9 @@ describe('CreditPurchaseScreen', () => {
     });
 
     expect(owner.fetchStoreProducts.mock.calls.length).toBe(2);
-    // The notice keeps the pack area while the retry runs; no row or
-    // placeholder renders under it.
-    expect(packRows(renderer)).toHaveLength(0);
+    // The notice keeps the pack area while the retry runs, above the settled
+    // rows; no placeholder replaces them.
+    expect(packRows(renderer)).toHaveLength(4);
     expect(placeholderShells(renderer)).toHaveLength(0);
     expect(allText(renderer)).toContain('App Store products unavailable');
     expect(allText(renderer)).toContain(
@@ -760,7 +766,6 @@ describe('CreditPurchaseScreen', () => {
         await vi.advanceTimersByTimeAsync(8000);
       });
       expect(allText(renderer)).toContain('App Store products unavailable');
-      expect(packRows(renderer)).toHaveLength(0);
       expect(allText(renderer)).not.toContain('Price unavailable');
 
       // The store reconnects with the cached prices still fresh, so React Query
@@ -801,18 +806,50 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('store unavailable: the card states the failure once and no row renders beside it', async () => {
+  it('store unavailable: the card states the failure once and every row keeps its title, note and inactive reason', async () => {
     owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('App Store products unavailable'));
 
-    // The pack area paints one surface at a time: the notice fills it, so no
-    // row renders beside it and nothing repeats the state inside a row.
-    expect(packRows(renderer)).toHaveLength(0);
+    const rows = packRows(renderer);
+    expect(rows).toHaveLength(4);
+    // The card above is the one visible statement; no row repeats the status.
     expect(allText(renderer)).not.toContain('Price unavailable');
-    expect(allText(renderer)).not.toContain(`Add ${packAmount('$10.00')} of credits`);
-    expect(tryAgainButton(renderer)).toBeDefined();
+    // The rows keep their disabled style, their pack title and their expiry
+    // note, and a screen reader still hears why each one is inactive.
+    const labels = rows.map(
+      row => (row.props as { accessibilityLabel: string }).accessibilityLabel
+    );
+    expect(labels).toContain(
+      `Add ${packAmount('$10.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
+    );
+    expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
+    expect(
+      classNamesOf(rows).every(
+        classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
+      )
+    ).toBe(true);
+    // No row keeps an empty band for a status it does not state: the title row
+    // and the row's one note line are its only children. The note line keeps a
+    // fixed height for the note or the in-flight label it may hold.
+    expect(
+      rows.every(row => {
+        const children = row.children;
+        const line = children[1];
+        if (children.length !== 2 || line === undefined || typeof line === 'string') {
+          return false;
+        }
+        const texts = line.findAll(node => String(node.type) === 'Text');
+        return (
+          String(line.type) === 'View' &&
+          classNameOf(line).includes('min-h-5') &&
+          classNameOf(line).includes('mt-2') &&
+          texts.length === 1 &&
+          texts[0]?.props.children === 'Credits purchased through the App Store do not expire.'
+        );
+      })
+    ).toBe(true);
     unmount();
   });
 
@@ -1199,9 +1236,20 @@ describe('CreditPurchaseScreen', () => {
 
     for (const result of measured) {
       const scenario = cases.find(candidate => candidate.state === result.state);
-      // One surface at a time: a store answer swaps what the pack area paints,
-      // it does not stack another surface on top of the rows.
-      expect([...new Set(result.surfaces)], result.state).toEqual([scenario?.expected]);
+      // One card at a time: the account failure, the store notice or the empty
+      // catalogue. The priced rows render under the card whenever the catalogue
+      // answered, so a store failure keeps its rows below the notice instead of
+      // replacing them.
+      const expectedSurfaces: SurfaceKind[] = [];
+      if (scenario?.expected === 'notice') {
+        expectedSurfaces.push('notice', 'row');
+      } else if (scenario !== undefined) {
+        expectedSurfaces.push(scenario.expected);
+      }
+      expect(
+        [...new Set(result.surfaces)].sort((a, b) => a.localeCompare(b)),
+        result.state
+      ).toEqual([...expectedSurfaces].sort((a, b) => a.localeCompare(b)));
       expect(result.surfaces.length, result.state).toBeGreaterThan(0);
       // The pack area sits in flow and reserves nothing: only the balance
       // card's two data slots keep a height in the scroller, so a shorter pack

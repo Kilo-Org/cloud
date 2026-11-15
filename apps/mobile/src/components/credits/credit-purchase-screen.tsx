@@ -101,13 +101,14 @@ const PACK_SKELETON_ROWS = 4;
 /**
  * The pack-height constants, at the default font scale.
  *
- * The pack surface shows one of four mutually exclusive things: placeholder
- * rows while the store connects, the priced rows, the empty-catalogue card, or
- * the store's notice. They render in flow directly under the balance card, so a
- * shorter state simply ends sooner: the description and the legal links are
- * pinned in the footer below the scroller, and no blank band is left under the
- * surface. The placeholder rows still take exactly the priced row's height, so
- * the list never jumps when the store answers.
+ * The pack area holds one card at a time — placeholder rows while the store
+ * connects, the empty-catalogue card, or the store's notice above the priced
+ * rows — and the priced rows render under the notice whenever the catalogue
+ * answered. They render in flow directly under the balance card, so a shorter
+ * state simply ends sooner: the description and the legal links are pinned in
+ * the footer below the scroller, and no blank band is left under the surface.
+ * The placeholder rows still take exactly the priced row's height, so the list
+ * never jumps when the store answers.
  *
  * A row's height is its text plus its spacing. The text is one line of title
  * with the price beside it and one line of expiry, each capped; only that text
@@ -205,13 +206,15 @@ export function CreditPurchaseScreen() {
   // query that is pending, paused or failed must not hide the packs the backend
   // catalog named.
   const packsEmpty = !isLoading && catalogEmpty;
-  // The pack surface shows one of five things at a time: the account read's
-  // failure, the store's notice, the empty catalogue, the placeholder rows or
-  // the priced rows. They are exclusive so the pack area paints one surface and
-  // the list never shows two stacked.
+  // The pack area holds at most one card at a time — the account read's
+  // failure, the store's notice or the empty catalogue — and the priced rows
+  // render under it whenever the catalogue answered, also while the store is
+  // unavailable or timed out: the store's notice names that failure, and the
+  // rows stay on screen unpriced and disabled. The account read gates the
+  // catalogue, so its failure replaces the whole pack area.
   const storeUnavailableAlone = storeUnavailable && !identityUnavailable;
   const showPlaceholders = isLoading && !identityUnavailable && !storeUnavailable;
-  const showRows = !isLoading && !identityUnavailable && !storeUnavailable && !packsEmpty;
+  const showRows = !isLoading && !identityUnavailable && !packsEmpty;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so
@@ -339,14 +342,15 @@ export function CreditPurchaseScreen() {
             </View>
           </View>
 
-          {/* The pack surface shows exactly one of four things — placeholder
-              rows while the store connects, the priced rows, the empty
-              catalogue card, or the store's notice — in flow directly under
-              the balance card. The description and the legal links are pinned
-              in the footer below the scroller, so a shorter state ends sooner
-              instead of leaving a reserved blank band under it, while the
-              placeholder rows keep exactly the priced row's height so the list
-              never jumps when the store answers. */}
+          {/* The pack area holds at most one card — the account read's
+              failure, the store's notice or the empty catalogue — in flow
+              directly under the balance card, and the priced rows render under
+              it whenever the catalogue answered, also while the store is
+              unavailable. The description and the legal links are pinned in the
+              footer below the scroller, so a shorter state ends sooner instead
+              of leaving a reserved blank band under it, while the placeholder
+              rows keep exactly the priced row's height so the list never jumps
+              when the store answers. */}
           <View className="gap-3">
             {/* The account read gates both catalogue reads, so its failure is
                 the one state where nothing else can settle. It gets the same
@@ -448,12 +452,14 @@ export function CreditPurchaseScreen() {
                 const completingLabel = rowCompleting ? t('kiloPass.completingPurchase') : null;
                 // A status phrase takes the same line, so the title keeps one
                 // line at the compact width and the row keeps the height of its
-                // priced neighbours. No row renders while the store is
-                // unavailable (the pack area is gated above), so only the partly
+                // priced neighbours. The store-unavailable card above already
+                // names the failure, so no row repeats it there: only the partly
                 // priced state, where the store answered and left this pack out,
                 // needs the row to say it.
                 const statusLabel =
-                  !rowCompleting && !hasStorePrice ? t('credits.priceUnavailable') : null;
+                  !rowCompleting && !hasStorePrice && !storeUnavailable
+                    ? t('credits.priceUnavailable')
+                    : null;
                 // Exactly one state phrase shows: the purchase in flight, or the
                 // reason this row is inactive.
                 const stateLabel = completingLabel ?? statusLabel;

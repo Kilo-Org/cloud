@@ -1,5 +1,5 @@
 import { usePreventRemove } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
@@ -93,6 +93,13 @@ export function useReviewMemoryProposalEditor({
   // and the sheet runs it from the native dismissal report. The guard's discard
   // question sits in between, so a dirty draft is never thrown away to reach it.
   const afterCloseRef = useRef<(() => void) | null>(null);
+  // A parked action belongs to the step that asked for it. Any other close —
+  // the header's Done, a system Back, the sheet's own dismissal request — drops
+  // it, so a reader who answers Keep editing never carries the navigation into
+  // a later close.
+  const forgetParkedAction = useCallback(() => {
+    afterCloseRef.current = null;
+  }, []);
   const guard = useSheetDismissGuard({
     isDirty: () => !sameProposalDraft(draft.current, baseline.current),
     onDiscard: () => {
@@ -131,6 +138,7 @@ export function useReviewMemoryProposalEditor({
     if (pendingRef.current) {
       return;
     }
+    forgetParkedAction();
     guard.requestClose();
   });
   useEffect(() => {
@@ -224,7 +232,7 @@ export function useReviewMemoryProposalEditor({
     dialog: guard.dialog,
     requestClose: () => {
       if (!pendingRef.current) {
-        afterCloseRef.current = null;
+        forgetParkedAction();
         guard.requestClose();
       }
     },
@@ -240,6 +248,12 @@ export function useReviewMemoryProposalEditor({
         guard.requestClose();
       }
     },
-    requestDismiss: () => !pendingRef.current && guard.requestDismiss(),
+    requestDismiss: () => {
+      if (pendingRef.current) {
+        return false;
+      }
+      forgetParkedAction();
+      return guard.requestDismiss();
+    },
   };
 }

@@ -199,6 +199,15 @@ function dismissHandler(node: ReactTestInstance): () => void {
   return onDismiss;
 }
 
+/** The header's Done control as the callback its contract promises. */
+function doneHandler(node: ReactTestInstance): () => void {
+  const onDone = node.props.onDone as (() => void) | undefined;
+  if (onDone === undefined) {
+    throw new Error('Missing done handler');
+  }
+  return onDone;
+}
+
 async function pressButton(root: ReactTestInstance, label: string) {
   const button = hosts(root, 'Button').find(node => collectText(node).includes(label));
   if (!button) {
@@ -318,6 +327,49 @@ describe('ReviewMemoryProposalSheet refusal', () => {
   // The sheet is presented over the route stack rather than being a route, so a
   // push while it is up lands behind it and the tap looks dead. The step closes
   // the sheet first and lets its dismissal report run the navigation.
+  it('drops the parked navigation when the reader keeps editing', async () => {
+    h.role = 'billing_manager';
+
+    const { renderer } = await refuseSave();
+    const root = renderer.root;
+    const step = billingStep(root);
+    if (!step) {
+      throw new TypeError('Missing billing step');
+    }
+
+    // The dirty draft makes the step ask first, and the answer here is Keep
+    // editing: nothing closes and nothing navigates.
+    act(() => {
+      pressHandler(step)();
+    });
+    expect(sheet(root).props.visible).toBe(true);
+    expect(h.push).not.toHaveBeenCalled();
+
+    // A later close of the cleaned draft must not carry the abandoned step.
+    const field = hosts(root, 'FormField').find(
+      node => node.props.label === i18n.t('codeReviewer.reviewMemory.proposalTitle')
+    );
+    if (!field) {
+      throw new TypeError('Missing title field');
+    }
+    act(() => {
+      changeHandler(field)('Preserve error context');
+    });
+    const header = hosts(root, 'SheetHeader')[0];
+    if (!header) {
+      throw new TypeError('Missing sheet header');
+    }
+    act(() => {
+      doneHandler(header)();
+    });
+    expect(sheet(root).props.visible).toBe(false);
+
+    reportDismissed(root);
+
+    expect(h.events).toEqual(['close']);
+    expect(h.push).not.toHaveBeenCalled();
+  });
+
   it('closes the sheet before the billing route is pushed', async () => {
     h.role = 'billing_manager';
 

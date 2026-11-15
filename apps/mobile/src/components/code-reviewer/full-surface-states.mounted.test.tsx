@@ -41,6 +41,8 @@ const state = vi.hoisted(() => ({
   insets: { left: 0, right: 0 },
   platform: 'gitlab',
   connected: false,
+  githubError: false,
+  gitlabError: false,
   scope: 'personal',
   organizations: [] as {
     organizationId: string;
@@ -225,8 +227,14 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
   PERSONAL_SCOPE: 'personal',
-  useGitHubStatus: () => ({ data: { connected: state.connected } }),
-  useGitLabStatus: () => ({ data: { connected: false } }),
+  useGitHubStatus: () => ({
+    data: state.githubError ? undefined : { connected: state.connected },
+    isError: state.githubError,
+  }),
+  useGitLabStatus: () => ({
+    data: state.gitlabError ? undefined : { connected: false },
+    isError: state.gitlabError,
+  }),
   useReviewConfig: () => ({
     data: { repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
   }),
@@ -290,6 +298,8 @@ beforeEach(() => {
   state.insets.right = 0;
   state.platform = 'gitlab';
   state.connected = false;
+  state.githubError = false;
+  state.gitlabError = false;
   state.scope = 'personal';
   state.organizations = [];
   state.permissionOverride = null;
@@ -890,6 +900,22 @@ describe('empty reviews connect action', () => {
       connected: true,
       repositoryCache: { status: 'available', repositories: [] },
     };
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    unmount();
+  });
+
+  it('keeps the neutral explanation when the provider read failed', async () => {
+    // A failed status read leaves the connection unknown, so the notice would
+    // claim the scope has nothing connected when the screen cannot know that.
+    state.githubError = true;
     state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: SCOPE })

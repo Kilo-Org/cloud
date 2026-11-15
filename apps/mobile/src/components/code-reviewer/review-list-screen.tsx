@@ -175,6 +175,8 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     // The Bitbucket readiness query is disabled for a personal scope, so its
     // empty cache there is a final answer, not a pending one.
     (isPersonal(scope) || !providerUnresolved(bitbucketReadiness));
+  const providerReadFailed =
+    githubStatus.isError || gitlabStatus.isError || bitbucketReadiness.isError;
 
   const pages = data?.pages;
   const firstPage = pages?.[0];
@@ -206,8 +208,10 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     const offersAction = hasConnectedProvider || canConnect;
     // The role notice must be true: it appears only when no reviewer platform is
     // connected at all. A scope connected to Bitbucket keeps the neutral
-    // explanation, because an owner would find it already set up.
-    const showsRoleNotice = !hasAnyConnectedProvider && !canConnect;
+    // explanation, because an owner would find it already set up. A failed
+    // provider read is unknown, not proof of no connection, so it keeps the
+    // neutral explanation too.
+    const showsRoleNotice = !hasAnyConnectedProvider && !canConnect && !providerReadFailed;
     body = emptyStateSettled ? (
       <EmptyState
         icon={GitPullRequest}

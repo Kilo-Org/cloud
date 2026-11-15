@@ -940,11 +940,14 @@ describe('CreditNativeIapOwner', () => {
       await vi.advanceTimersByTimeAsync(16_000);
       await flushPromises();
 
-      // The store answered; the deadline cannot replace that answer.
+      // The store answered; the deadline cannot replace that answer, and the
+      // row itself is released while the barrier stays.
       expect(handle.value?.purchaseWait).toEqual({
         productId: APPLE_PRODUCT_ID,
         kind: 'pending',
       });
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
       expect(handle.value?.errorMessageKey).toBeNull();
     } finally {
       vi.useRealTimers();

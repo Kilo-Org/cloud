@@ -1891,6 +1891,9 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
 
   it('says the payment is pending on the row and in the card', async () => {
     owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'pending' };
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.buyAgainProductId = 'credits.usd50.v1';
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
@@ -1898,11 +1901,26 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
     const pending = i18n.t('credits.purchasePending');
     const row = packRows(renderer).find(candidate => labelOf(candidate).includes(pending));
     expect(row).toBeDefined();
-    const card = byTestId(renderer, waitCardId);
+    // The card in the slot carries the pending copy, and its actions stay
+    // enabled because no purchase is in flight.
+    const card = byTestId(renderer, cardId);
     if (!card) {
-      throw new Error('expected the waiting card');
+      throw new Error('expected the unresolved card');
     }
     expect(textWithinCard(card)).toContain(pending);
+    const actions = card.findAll(node => String(node.type) === 'Button');
+    expect(actions).toHaveLength(2);
+    expect(
+      actions.every(
+        node =>
+          (node.props as { disabled?: boolean }).disabled !== true &&
+          (node.props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
+            ?.disabled !== true
+      )
+    ).toBe(true);
+    expect(
+      packRows(renderer).every(row => (row.props as { disabled?: boolean }).disabled !== true)
+    ).toBe(true);
     unmount();
   });
 

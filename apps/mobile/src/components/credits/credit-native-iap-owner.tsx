@@ -1013,10 +1013,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             if (
               pendingPurchaseRef.current === record &&
               attempt.owns() &&
-              isCurrentAuthEpoch(epoch) &&
-              // A pending payment is the store's own answer: a deadline cannot
-              // turn it into "no answer yet".
-              purchaseWaitRef.current?.kind !== 'pending'
+              isCurrentAuthEpoch(epoch)
             ) {
               // The request keeps its barrier, but not the row: the store can
               // still answer, and a sheet that is open must not read as a
@@ -1024,7 +1021,12 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
               pendingPurchaseRef.current = null;
               record.settle();
               markUnresolvedPurchase('unknown');
-              markPurchaseWait({ productId: record.intent.productId, kind: 'store' });
+              // A pending payment keeps the store's own answer; anything else
+              // is "no answer yet". Either way the row itself is released.
+              markPurchaseWait({
+                productId: record.intent.productId,
+                kind: purchaseWaitRef.current?.kind === 'pending' ? 'pending' : 'store',
+              });
               attempt.abandon();
             }
           }

@@ -46,11 +46,16 @@ function booleanHandler(value: unknown): () => boolean {
 
 type HarnessProps = Readonly<{
   isDirty: () => boolean;
+  isRunning?: () => boolean;
   onDiscard: () => void;
 }>;
 
-function Harness({ isDirty, onDiscard }: HarnessProps) {
-  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({ isDirty, onDiscard });
+function Harness({ isDirty, isRunning, onDiscard }: HarnessProps) {
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty,
+    isRunning,
+    onDiscard,
+  });
   return createElement('View', {
     testID: 'sheet-dismiss-guard',
     requestClose,
@@ -130,6 +135,32 @@ describe('useSheetDismissGuard', () => {
     });
 
     expect(allowed).toBe(false);
+    expect(onDiscard).not.toHaveBeenCalled();
+    expect(confirmMock.requests).toHaveLength(1);
+  });
+
+  it('closes without asking while the form has a request in flight', () => {
+    const onDiscard = vi.fn<() => void>();
+    const root = mount({ isDirty: () => true, isRunning: () => true, onDiscard });
+
+    call(root, 'requestClose');
+
+    // The request already left, so there are no unsaved edits to discard: the
+    // dismissal closes the sheet and the run reports its own outcome.
+    expect(onDiscard).toHaveBeenCalledTimes(1);
+    expect(confirmMock.requests).toHaveLength(0);
+    expect(booleanHandler(harnessNode(root).props.requestDismiss)()).toBe(true);
+    expect(confirmMock.requests).toHaveLength(0);
+  });
+
+  it('asks again once the run has settled', () => {
+    const onDiscard = vi.fn<() => void>();
+    let running = true;
+    const root = mount({ isDirty: () => true, isRunning: () => running, onDiscard });
+
+    running = false;
+    call(root, 'requestClose');
+
     expect(onDiscard).not.toHaveBeenCalled();
     expect(confirmMock.requests).toHaveLength(1);
   });

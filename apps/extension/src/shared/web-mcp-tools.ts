@@ -72,6 +72,52 @@ const buildDescription = (title: string, description: string): string => {
 const isWebMcpGatewayToolName = (name: string): name is WebMcpGatewayToolName =>
   pageNamePattern.test(name) && !isReservedName(name);
 
+/*
+ * The signature is compared against one rebuilt inside the page, and extension
+ * messaging reorders object keys, so both sides sort keys before comparing:
+ * JSON key order is not part of a tool definition.
+ */
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- recursive canonicalizer over arbitrary third-party tool data: it mirrors an unknown input, so no narrower named type can describe the output.
+const canonicalize = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(entry => canonicalize(entry));
+  }
+
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the descriptor's schema travels as untyped tool data, so this is the boundary that decides whether to canonicalize it.
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .toSorted(([left], [right]) => (left < right ? -1 : Number(left > right)))
+      .map(([key, entry]) => [key, canonicalize(entry)])
+  );
+};
+
+export const buildWebMcpDefinitionSignature = ({
+  description,
+  inputSchema,
+  name,
+  origin,
+  title,
+}: {
+  readonly description: string;
+  readonly inputSchema: unknown;
+  readonly name: string;
+  readonly origin: string;
+  readonly title: string;
+}): string =>
+  JSON.stringify(
+    canonicalize([
+      normalizeString(name),
+      normalizeString(title),
+      normalizeString(description),
+      normalizeString(origin),
+      normalizeInputSchema(inputSchema),
+    ])
+  );
+
 export const buildWebMcpToolDefinitions = ({
   tabId,
   documentId,
@@ -108,13 +154,7 @@ export const buildWebMcpToolDefinitions = ({
       const title = normalizeString(tool.title);
       const description = normalizeString(tool.description);
       const origin = normalizeString(tool.origin);
-      const definitionSignature = JSON.stringify([
-        name,
-        title,
-        description,
-        origin,
-        normalizedSchema,
-      ]);
+      const definitionSignature = buildWebMcpDefinitionSignature(tool);
 
       routes.set(name, {
         definitionSignature,

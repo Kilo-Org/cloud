@@ -29,16 +29,8 @@ export const ANALYTICS_OUTCOMES = [
   'ambiguous',
 ] as const;
 
-/** Legacy mobile surface values (existing payloads, unchanged). */
-export const ANALYTICS_SURFACES = ['claw', 'cloud-agent', 'remote-session'] as const;
+export const ANALYTICS_SURFACES = ['cloud-agent', 'remote-session'] as const;
 export const SESSION_OPENED_VIA = ['push', 'app'] as const;
-export const INSTANCE_ACTIONS = [
-  'destroy',
-  'redeploy',
-  'start',
-  'stop',
-  'restart_openclaw',
-] as const;
 export const PERMISSION_RESPONSES = ['once', 'always', 'reject'] as const;
 export const FEEDBACK_SENTIMENTS = ['positive', 'negative'] as const;
 export const CONSENT_OUTCOME_ACTIONS = ['accepted', 'optional_changed', 'revoked'] as const;
@@ -54,17 +46,6 @@ export const STARTUP_OUTCOMES = [
   'user-error',
   'consent-error',
   'language-error',
-] as const;
-
-/** KiloClaw onboarding enum values (grandfathered; mirrors onboarding-events.ts). */
-export const PROVISION_FAILED_CATEGORIES = ['lock', 'quarantine', 'access', 'generic'] as const;
-export const ACCESS_REQUIRED_SUBCASES = [
-  'trial_expired',
-  'subscription_canceled',
-  'subscription_past_due',
-  'quarantined',
-  'multiple_current_conflict',
-  'non_canonical_earlybird',
 ] as const;
 
 /** Terminal-outcome base fields (DEC-05). */
@@ -121,8 +102,6 @@ export const MESSAGE_SENT_EVENT = 'message_sent';
 export const SESSION_CREATED_EVENT = 'session_created';
 export const PERMISSION_RESPONDED_EVENT = 'permission_responded';
 export const QUESTION_ANSWERED_EVENT = 'question_answered';
-export const CONVERSATION_CREATED_EVENT = 'conversation_created';
-export const INSTANCE_ACTION_EVENT = 'instance_action';
 export const FEEDBACK_SUBMITTED_EVENT = 'feedback_submitted';
 export const ORGANIZATION_MEMBER_INVITED_EVENT = 'organization_member_invited';
 export const KILO_PASS_PURCHASE_STARTED_EVENT = 'kilo_pass_purchase_started';
@@ -130,14 +109,6 @@ export const KILO_PASS_PURCHASE_COMPLETED_EVENT = 'kilo_pass_purchase_completed'
 export const KILO_PASS_PURCHASE_FAILED_EVENT = 'kilo_pass_purchase_failed';
 export const APP_STARTUP_EVENT = 'app_startup';
 
-// KiloClaw onboarding events. Names are locked to AppsFlyer dashboards; the
-// mobile constants live in apps/mobile/src/lib/analytics/onboarding-events.ts.
-export const ONBOARDING_ENTERED_EVENT = 'onboarding-entered';
-export const PROVISION_REQUESTED_EVENT = 'provision-requested';
-export const PROVISION_SUCCEEDED_EVENT = 'provision-succeeded';
-export const PROVISION_FAILED_EVENT = 'provision-failed';
-export const ACCESS_REQUIRED_SHOWN_EVENT = 'access-required-shown';
-export const COMPLETION_REACHED_EVENT = 'completion-reached';
 export const CLAW_WEATHER_LOCATION_SELECTED_EVENT = 'claw_weather_location_selected';
 export const CLAW_WEATHER_LOCATION_SKIPPED_EVENT = 'claw_weather_location_skipped';
 
@@ -165,12 +136,6 @@ export const PURCHASE_SETTLED_EVENT = 'purchase_settled';
  * the snake-case unit test asserts this exact set and forbids additions.
  */
 export const LEGACY_EVENT_NAMES: ReadonlySet<string> = new Set([
-  ONBOARDING_ENTERED_EVENT,
-  PROVISION_REQUESTED_EVENT,
-  PROVISION_SUCCEEDED_EVENT,
-  PROVISION_FAILED_EVENT,
-  ACCESS_REQUIRED_SHOWN_EVENT,
-  COMPLETION_REACHED_EVENT,
   CLAW_WEATHER_LOCATION_SELECTED_EVENT,
   CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
 ]);
@@ -230,17 +195,6 @@ export const ANALYTICS_EVENT_SCHEMAS = {
       skipped: z.boolean(),
     })
     .strict(),
-  [CONVERSATION_CREATED_EVENT]: z
-    .object({
-      surface: z.literal('claw'),
-    })
-    .strict(),
-  [INSTANCE_ACTION_EVENT]: z
-    .object({
-      surface: z.literal('claw'),
-      action: z.enum(INSTANCE_ACTIONS),
-    })
-    .strict(),
   [FEEDBACK_SUBMITTED_EVENT]: z
     .object({
       sentiment: z.enum(FEEDBACK_SENTIMENTS),
@@ -268,21 +222,6 @@ export const ANALYTICS_EVENT_SCHEMAS = {
     })
     .strict() as z.ZodType<Record<string, string | number>>,
 
-  // --- KiloClaw onboarding events (kebab-case, AppsFlyer-locked) ---
-  [ONBOARDING_ENTERED_EVENT]: z.object({}).strict(),
-  [PROVISION_REQUESTED_EVENT]: z.object({}).strict(),
-  [PROVISION_SUCCEEDED_EVENT]: z.object({}).strict(),
-  [PROVISION_FAILED_EVENT]: z
-    .object({
-      category: z.enum(PROVISION_FAILED_CATEGORIES),
-    })
-    .strict(),
-  [ACCESS_REQUIRED_SHOWN_EVENT]: z
-    .object({
-      subcase: z.enum(ACCESS_REQUIRED_SUBCASES),
-    })
-    .strict(),
-  [COMPLETION_REACHED_EVENT]: z.object({}).strict(),
   [CLAW_WEATHER_LOCATION_SELECTED_EVENT]: z.object({}).strict(),
   [CLAW_WEATHER_LOCATION_SKIPPED_EVENT]: z.object({}).strict(),
 

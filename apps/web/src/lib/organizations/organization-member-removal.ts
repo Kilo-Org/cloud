@@ -19,7 +19,7 @@ import { retireUnreferencedClaudeBillingPayer } from '@/lib/claude-billing/delet
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
-import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-internal-api';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { lockOrganizationMembershipMutation } from '@kilocode/web-shared/lib/organizations/organizations';
 

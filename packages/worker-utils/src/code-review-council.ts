@@ -18,6 +18,10 @@
 
 import * as z from 'zod';
 import {
+  COUNCIL_MIN_SPECIALISTS,
+  type CouncilSpecialistPreset,
+} from '@kilocode/app-shared/code-review';
+import {
   COUNCIL_BLOCKING_SEVERITY,
   COUNCIL_FINDING_SEVERITIES,
   DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
@@ -28,7 +32,6 @@ import {
   type CouncilAggregationStrategy,
   type CouncilFinding,
   type CouncilSpecialist,
-  type CouncilSpecialistRole,
   type CouncilVote,
 } from '@kilocode/db/schema-types';
 
@@ -667,42 +670,16 @@ export function upsertCouncilVerdictInBody(body: string, section: string): strin
 // Specialist presets
 // ============================================================================
 
-export type CouncilSpecialistPreset = {
-  id: string;
-  role: CouncilSpecialistRole;
-  name: string;
-  lens: string;
-};
-
-export const COUNCIL_SPECIALIST_PRESETS: CouncilSpecialistPreset[] = [
-  {
-    id: 'security',
-    role: 'security',
-    name: 'Security',
-    lens: 'Injection, auth/authorization bypass, secret handling, unsafe deserialization, SSRF, and data exposure.',
-  },
-  {
-    id: 'performance',
-    role: 'performance',
-    name: 'Performance',
-    lens: 'Hot paths, N+1 queries, unnecessary allocations, blocking I/O, and algorithmic complexity regressions.',
-  },
-  {
-    id: 'testing',
-    role: 'testing',
-    name: 'Test coverage',
-    lens: 'Missing or weak tests for new behavior, untested edge cases, and regressions lacking coverage.',
-  },
-  {
-    id: 'correctness',
-    role: 'correctness',
-    name: 'Correctness',
-    lens: 'Logic errors, incorrect edge-case handling, race conditions, and broken invariants.',
-  },
-];
-
-/** Council must have at least this many specialists selected when enabled. */
-export const COUNCIL_MIN_SPECIALISTS = 2;
+// The roster the config UI paints is plain data and also rendered by the web
+// form and the mobile council screen, so it lives in
+// @kilocode/app-shared/code-review; this module re-exports it and uses it
+// locally. `presetToSpecialist` stays because it returns the db-persisted
+// specialist shape.
+export {
+  COUNCIL_MIN_SPECIALISTS,
+  COUNCIL_SPECIALIST_PRESETS,
+  type CouncilSpecialistPreset,
+} from '@kilocode/app-shared/code-review';
 
 /** Converts a preset into a persistable specialist (enabled, default model/effort). */
 export function presetToSpecialist(preset: CouncilSpecialistPreset): CouncilSpecialist {

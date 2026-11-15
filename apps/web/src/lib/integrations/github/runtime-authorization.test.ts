@@ -29,6 +29,7 @@ const association = {
   },
   organizationDeletedAt: null,
   userRecordId: 'user-1',
+  userBlockedAt: null,
   userBlockedReason: null,
 } as const;
 
@@ -174,6 +175,16 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
     expect(
       isGitHubRuntimeAssociationAuthorized({ ...association, userBlockedReason: 'blocked' })
     ).toBe(false);
+  });
+
+  it('denies a personal owner whose account carries a block timestamp', () => {
+    const candidate = {
+      ...association,
+      userBlockedAt: new Date().toISOString(),
+      userBlockedReason: null,
+    };
+    expect(getGitHubRuntimeAssociationRejectionReason(candidate)).toBe('blocked_personal_owner');
+    expect(isGitHubRuntimeAssociationAuthorized(candidate)).toBe(false);
   });
 
   it('denies deleted owners and unhealthy canonical installations', () => {

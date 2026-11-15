@@ -2,6 +2,7 @@ import type {
   ControlPlaneEventsNotification,
   ControlPlaneOutcome,
   ControlPlaneRouteUpdate,
+  ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
 import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
 
@@ -15,6 +16,7 @@ export type SandboxNotification =
   | { kind: 'events'; payload: ControlPlaneEventsNotification }
   | { kind: 'route'; payload: ControlPlaneRouteUpdate }
   | { kind: 'outcome'; payload: ControlPlaneOutcome }
+  | { kind: 'workspace_stopped'; payload: ControlPlaneWorkspaceStoppedPayload }
   | { kind: 'worktree_changes'; payload: WorktreeChangesReady };
 
 type DropCause = 'capacity' | 'expired' | 'failed' | 'retired' | 'wrapper';

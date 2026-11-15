@@ -1,12 +1,12 @@
 /* eslint-disable max-lines -- the mocked native surface needs one mock block per bridge */
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await, matching chat-composer.test.ts */
 import * as React from 'react';
-import { createElement } from 'react';
+import { createElement, createRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ChatComposer } from './chat-composer';
+import { ChatComposer, type ChatComposerControl } from './chat-composer';
 
 // Pins the session send contract at the component level: ONE send press sends
 // the current draft exactly once, with the keyboard reported open or closed
@@ -445,6 +445,53 @@ describe('ChatComposer send — one tap sends exactly once', () => {
     });
 
     expect(onSend).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+});
+
+describe('ChatComposer withdraws a restored send the server delivered', () => {
+  it('clears the restored draft, and keeps a draft the reader edited', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    // The real host clears the draft through `onOptimisticSend` and only then
+    // reports the failure, which is when the composer restores the text.
+    const onSend = vi.fn(async () => {
+      throw new Error('Failed to send message');
+    });
+    const sendThatClearsDraft = vi.fn(
+      async (_text: string, options?: { onOptimisticSend?: () => void }) => {
+        options?.onOptimisticSend?.();
+        await onSend();
+      }
+    );
+    const renderer = await mountComposer(baseProps({ controlRef, onSend: sendThatClearsDraft }));
+
+    await typeIntoComposer(renderer, 'Delivered late');
+    await act(async () => {
+      sendControl(renderer.root).press();
+      await flushSubmitChain();
+    });
+    // The send failed, so the text came back into the composer.
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    // The confirmed message then reached the transcript: the restore is a
+    // duplicate, so it leaves the input.
+    await act(async () => {
+      controlRef.current?.withdrawRestoredSend('Delivered late');
+    });
+    expect(controlRef.current?.hasContent()).toBe(false);
+
+    // A draft typed over a restore is the next message and stays.
+    await typeIntoComposer(renderer, 'Restored prompt');
+    await act(async () => {
+      sendControl(renderer.root).press();
+      await flushSubmitChain();
+    });
+    await typeIntoComposer(renderer, 'Next message');
+    await act(async () => {
+      controlRef.current?.withdrawRestoredSend('Restored prompt');
+    });
+    expect(controlRef.current?.hasContent()).toBe(true);
 
     renderer.unmount();
   });

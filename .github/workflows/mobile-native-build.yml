@@ -40,7 +40,7 @@ permissions:
 
 jobs:
   gate:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     outputs:
       ios_hash: ${{ steps.decide.outputs.ios_hash }}
@@ -56,11 +56,17 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      # The shared store keeps this install warm when a pull request changes the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry, and every other job in this workflow waits
+      # behind this one.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       # The hash steps run tsx over the local dev/local scripts and let
       # @expo/fingerprint read the Expo config from apps/mobile, so they need the

@@ -12,6 +12,7 @@ import { eq, and, isNull, gt, gte, lt, ne, inArray, desc, sql, getTableColumns }
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKey, type VerifyAdmissionOk } from './native-admission';
 import { checkDomainSignInEligibility } from './email-signin-eligibility';
@@ -306,8 +307,8 @@ export async function rotateRefreshToken(
     return { ok: false, error: 'SESSION_REVOKED' };
   }
 
-  // User blocked_reason BEFORE consuming.
-  if (user.blocked_reason) {
+  // Blocked account BEFORE consuming.
+  if (isBlockedAccount(user)) {
     return { ok: false, error: 'USER_BLOCKED' };
   }
 

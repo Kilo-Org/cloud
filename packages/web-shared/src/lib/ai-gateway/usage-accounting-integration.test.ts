@@ -34,7 +34,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  USAGE_INGEST_URL: 'http://usage.example.test/usage',
+  USAGE_INGEST_URL: 'https://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
 }));
 jest.mock('./usage-publisher', () => {
@@ -195,6 +195,7 @@ const context: MicrodollarUsageContext = {
 let sent: UsageRecordRequest[];
 let info: jest.MockedFunction<typeof console.info>;
 let completionLogs: string[];
+let attemptLogs: string[];
 let warn: jest.MockedFunction<typeof console.warn>;
 let error: jest.MockedFunction<typeof console.error>;
 let autoTopUpUser: UserForBalance | null;
@@ -255,16 +256,22 @@ beforeEach(() => {
   process.env.VERCEL_TARGET_ENV = 'preview';
   process.env.VERCEL_ENV = 'preview';
   bouncer.deliverBouncerUsageEventNow.mockResolvedValue(true);
-  config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
+  config.USAGE_INGEST_URL = 'https://usage.example.test/usage';
   config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-local-secret';
   process.env.VERCEL_REGION = 'fra1';
   sent = [];
   autoTopUpUser = null;
   info = jest.fn();
   completionLogs = [];
+  attemptLogs = [];
   jest.spyOn(console, 'info').mockImplementation((...args) => {
     if (typeof args[0] === 'string' && args[0].includes('"event":"usage_record_completion"')) {
       completionLogs.push(args[0]);
+    } else if (
+      typeof args[0] === 'string' &&
+      args[0].includes('"event":"usage_publisher_attempt"')
+    ) {
+      attemptLogs.push(args[0]);
     } else info(...args);
   });
   error = jest.fn();
@@ -323,7 +330,7 @@ function configureQueueEnvironment(overrides: Record<string, string | undefined>
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-  config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
+  config.USAGE_INGEST_URL = 'https://usage.example.test/usage';
   config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-local-secret';
 }
 
@@ -1413,6 +1420,18 @@ describe('queued usage accounting', () => {
         expect(sent).toEqual(
           Array.from({ length: attempts }, () => JSON.parse(JSON.stringify(payload)))
         );
+        // Every completed HTTP attempt, and only those, writes one attempt diagnostic.
+        expect(
+          attemptLogs.map(value => {
+            const { usage_id, attempt } = JSON.parse(value);
+            return { usage_id, attempt };
+          })
+        ).toEqual(
+          Array.from({ length: attempts }, (_, index) => ({
+            usage_id: payload.core.id,
+            attempt: index + 1,
+          }))
+        );
         expect(publisher.enqueueUsage).toHaveBeenCalledWith(payload, {
           retryTransientFailures: true,
         });
@@ -1475,7 +1494,12 @@ describe('queued usage accounting', () => {
         expect(bouncer.deliverBouncerUsageEventNow).toHaveBeenCalledTimes(
           region === 'fra1' && failure.startsWith('missing') && reportsUsage ? 1 : 0
         );
-        const logs = JSON.stringify([...error.mock.calls, ...warn.mock.calls, ...info.mock.calls]);
+        const logs = JSON.stringify([
+          ...error.mock.calls,
+          ...warn.mock.calls,
+          ...info.mock.calls,
+          ...attemptLogs,
+        ]);
         for (const sensitive of [
           'sensitive-secret-prompt',
           'synthetic-local-secret',

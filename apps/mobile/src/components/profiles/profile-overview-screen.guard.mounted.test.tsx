@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   changeText,
   findField,
@@ -47,7 +47,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileOverview: () => h.query,
@@ -86,6 +86,8 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfileSlashCommandsPath: (id: string, org?: string) =>
     `/profiles/${id}/slash-commands${org ? `?org=${org}` : ''}`,
   getProfileMcpPath: (id: string, org?: string) => `/profiles/${id}/mcp${org ? `?org=${org}` : ''}`,
+  getProfileInstructionsPath: (id: string, org?: string) =>
+    `/profiles/${id}/instructions${org ? `?org=${org}` : ''}`,
   getProfileSkillsPath: (id: string, org?: string) =>
     `/profiles/${id}/skills${org ? `?org=${org}` : ''}`,
   getProfileAgentsPath: (id: string, org?: string) =>
@@ -122,6 +124,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   CornerDownLeft: 'CornerDownLeft',
+  Download: 'Download',
+  FileText: 'FileText',
   KeyRound: 'KeyRound',
   Server: 'Server',
   Sparkles: 'Sparkles',
@@ -247,6 +251,27 @@ describe('ProfileOverviewScreen unsaved metadata guard', () => {
     await waitFor(() => h.success.mock.calls.length > 0);
 
     expect(h.guard.enabled).toBe(false);
+  });
+
+  // The delete dialog used to offer `common.delete` as its label, so the one
+  // action that removes the whole profile read like any other delete.
+  it('asks for the profile delete with a label that names this profile', async () => {
+    h.mutations.deleteProfile.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer } = await mountScreen();
+
+    await pressDelete(renderer.root, h.confirm);
+
+    const request = h.confirm.mock.calls[0]?.[0] as
+      | { title: string; message: string; confirmLabel: string }
+      | undefined;
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.deleteTitle'),
+      message: i18n.t('profiles.deleteMessage'),
+      confirmLabel: i18n.t('profiles.deleteConfirm'),
+    });
+    expect(request?.confirmLabel).not.toBe(i18n.t('common.delete'));
+
+    await waitFor(() => h.back.mock.calls.length > 0);
   });
 
   it('does not ask about the edits of a profile that was just deleted', async () => {

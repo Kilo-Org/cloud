@@ -54,6 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ? await queueWriterAdmission.acquire('queue', record.id, {
           maxWaitMs: QUEUE_ADMISSION_MAX_WAIT_MS,
           signal: request.signal,
+          writerClass: 'non_llm',
         })
       : null;
   if (admission && !admission.admitted) {

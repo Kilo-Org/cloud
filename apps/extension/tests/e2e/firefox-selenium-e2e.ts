@@ -1067,6 +1067,11 @@ const getSelectOptionsText = async (driver: WebDriver, ariaLabel: string): Promi
   return String(result);
 };
 
+const countControls = async (driver: WebDriver, selector: string): Promise<number> => {
+  const elements = await driver.findElements(By.css(selector));
+  return elements.length;
+};
+
 const isControlDisabled = async (driver: WebDriver, selector: string): Promise<boolean> => {
   await waitUntil(
     driver,
@@ -2091,7 +2096,7 @@ const scenarios: FirefoxScenario[] = [
         await clickButtonByLabel(session.driver, 'New conversation');
         await waitForTextGone(session.driver, 'Evaluate JavaScript completed');
         // Empty transcript state (not a seeded assistant message).
-        await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
+        await waitForText(session.driver, 'Ask Kilo about ');
       }),
   },
   {
@@ -2359,9 +2364,10 @@ const scenarios: FirefoxScenario[] = [
           await session.driver.navigate().refresh();
           assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
           assert.match(await getModelTriggerText(session.driver), /Loading models/u);
+          // The thinking control only exists once the catalog supplies the model's variants.
           assert.equal(
-            await isControlDisabled(session.driver, 'select[aria-label="Thinking effort"]'),
-            true
+            await countControls(session.driver, 'select[aria-label="Thinking effort"]'),
+            0
           );
           await session.driver.findElement(By.css('#agent-message')).sendKeys('Inspect this tab');
           assert.equal(await isControlDisabled(session.driver, 'button[type="submit"]'), true);
@@ -2518,7 +2524,7 @@ const scenarios: FirefoxScenario[] = [
             await waitForText(session.driver, 'Stop');
             await clickButtonByLabel(session.driver, 'New conversation');
             // Empty transcript state on the new conversation tab.
-            await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
+            await waitForText(session.driver, 'Ask Kilo about ');
             await clickButtonByText(session.driver, 'Original tab');
             await waitForText(session.driver, 'Stop');
             releaseCompletion();

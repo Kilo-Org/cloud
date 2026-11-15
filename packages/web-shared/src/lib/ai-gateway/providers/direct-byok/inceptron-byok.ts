@@ -14,6 +14,5 @@ export default {
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  transformRequest() {},
   models: cachedDirectByokModelList('inceptron-byok'),
 } satisfies DirectByokProvider;

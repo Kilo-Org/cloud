@@ -1,5 +1,8 @@
 import type { TRPCDefaultErrorShape, TRPCErrorFormatter } from '@trpc/server';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import {
+  customerBillingFailureSchema,
+  parseCustomerBillingFailure,
+} from '@kilocode/cloud-agent-sdk';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import * as z from 'zod';
 
@@ -62,6 +65,8 @@ export const TrpcErrorDataSchema = z
         maxAgeSeconds: z.number(),
       })
       .optional(),
+    billingFailure: customerBillingFailureSchema.optional(),
+    supportAccessReason: z.string().optional(),
   })
   .passthrough();
 
@@ -103,11 +108,7 @@ export function trpcSuccessResponseJsonSchema(dataSchema: JsonSchema): JsonSchem
   };
 }
 
-export type KiloTrpcErrorData = TRPCDefaultErrorShape['data'] &
-  z.infer<typeof TrpcErrorDataSchema> & {
-    /** Client-visible reason for a support access denial. */
-    supportAccessReason?: string;
-  };
+export type KiloTrpcErrorData = TRPCDefaultErrorShape['data'] & z.infer<typeof TrpcErrorDataSchema>;
 
 export type KiloTrpcErrorShape = Omit<TRPCDefaultErrorShape, 'data'> & {
   data: KiloTrpcErrorData;

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { BlockedNotification } from '@/components/auth/BlockedNotification';
 
 export default async function AccountBlockedPage() {
@@ -7,7 +8,7 @@ export default async function AccountBlockedPage() {
     ?.user;
   if (!user) {
     redirect('/users/sign_in');
-  } else if (!user.blocked_reason) {
+  } else if (!isBlockedAccount(user)) {
     redirect('/profile');
   }
 

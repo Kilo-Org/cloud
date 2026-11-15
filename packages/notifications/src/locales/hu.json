@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Feladat befejezve"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Nem sikerült: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Megszakítva: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

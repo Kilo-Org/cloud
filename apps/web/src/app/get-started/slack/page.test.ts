@@ -85,6 +85,14 @@ describe('GetStartedSlackPage', () => {
     });
   });
 
+  test('sends an account whose block timestamp is set to the restricted-account page', async () => {
+    signInUser({ blocked_at: '2026-01-15T12:00:00.000Z' });
+
+    await expect(renderPage()).rejects.toThrow('NEXT_REDIRECT:/account-blocked');
+
+    expect(mockedRedirect).toHaveBeenCalledWith('/account-blocked');
+  });
+
   test('stops a restricted account before the account-verification redirect', async () => {
     signInUser({ blocked_reason: 'policy violation', has_validation_stytch: null });
 

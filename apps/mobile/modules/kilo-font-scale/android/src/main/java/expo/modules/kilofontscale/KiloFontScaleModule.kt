@@ -19,7 +19,14 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * restart.
  */
 class KiloFontScaleModule : Module() {
-  private var registration: ComponentCallbacks? = null
+  /**
+   * The live registration. The callbacks belong to the context they were registered on, so both
+   * travel in one handle: teardown unregisters from that exact context, which it may not be able to
+   * look up again.
+   */
+  private var registration: Registration? = null
+
+  private class Registration(val context: Context, val callbacks: ComponentCallbacks)
 
   override fun definition() = ModuleDefinition {
     Name("KiloFontScale")
@@ -38,17 +45,16 @@ class KiloFontScaleModule : Module() {
 
           override fun onLowMemory() = Unit
         }
-      registration = callbacks
+      registration = Registration(context, callbacks)
       context.registerComponentCallbacks(callbacks)
     }
 
     OnDestroy {
-      val context = appContext.reactContext?.applicationContext
-      val callbacks = registration
-      if (context != null && callbacks != null) {
-        context.unregisterComponentCallbacks(callbacks)
-      }
+      val current = registration
       registration = null
+      if (current != null) {
+        current.context.unregisterComponentCallbacks(current.callbacks)
+      }
     }
   }
 

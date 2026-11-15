@@ -44,7 +44,7 @@ import {
   sidebarListInput,
   sidebarUpdatedSince,
   sidebarWorkspaceListInput,
-  worktreeDetailsBatches,
+  sidebarWorktreeDetailsBatches,
 } from './sidebar-queries';
 import { buildWorkspaceStacks, type WorkspaceStackNode } from '../workspace-stacks';
 import { repositoryKey } from '../worktree-meta';
@@ -677,12 +677,34 @@ export function getSidebarWorktreeActivity(
 
 export function patchSidebarWorktreeSessionStatus(
   data: WorktreeDetailsQueryData,
-  update: Omit<SidebarSessionActivity, 'updatedAt'> & { updatedAt?: string }
+  update: Omit<SidebarSessionActivity, 'updatedAt'> & {
+    updatedAt?: string;
+    worktreeId?: string | null;
+  }
 ): WorktreeDetailsQueryData {
   const worktrees = { ...data.worktrees };
   let changed = false;
   for (const [worktreeId, worktree] of Object.entries(worktrees)) {
     const existing = worktree.sessions.find(session => session.sessionId === update.sessionId);
+    if (!existing && update.worktreeId === worktreeId && update.updatedAt) {
+      changed = true;
+      worktrees[worktreeId] = {
+        ...worktree,
+        sessions: [
+          ...worktree.sessions,
+          {
+            sessionId: update.sessionId,
+            sessionStatus: update.sessionStatus ?? null,
+            sessionStatusUpdatedAt: update.sessionStatusUpdatedAt ?? null,
+            updatedAt: update.updatedAt,
+            latest_run_status: null,
+            latest_run_failure_kind: update.latestRunFailureKind ?? null,
+            latest_run_terminal_at: update.latestRunTerminalAt ?? null,
+          },
+        ],
+      };
+      continue;
+    }
     if (
       !existing ||
       new Date(update.sessionStatusUpdatedAt ?? 0).getTime() <
@@ -1178,12 +1200,31 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const sharedConnection = useUserWebConnection();
+  const workspaceListInput = useMemo(
+    () =>
+      sidebarWorkspaceListInput({
+        organizationId,
+        createdOnPlatform,
+        gitUrl,
+        search: searchQuery,
+      }),
+    [organizationId, createdOnPlatform, gitUrl, searchQuery]
+  );
+  // Filter changes must not replace the reconciler and cancel its pending refresh.
+  const workspaceListInputRef = useRef(workspaceListInput);
+  workspaceListInputRef.current = workspaceListInput;
+
   const reconcileSidebarQueries = useCallback(() => {
-    void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
-    void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
-    void queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter());
-    void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
-    void queryClient.invalidateQueries(trpc.cliSessionsV2.listWorkspaces.pathFilter());
+    const options = { cancelRefetch: false };
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter(), options);
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter(), options);
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter(), options);
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter(), options);
+    // Stack navigation has a separate, unfiltered workspace list. Reconcile only this sidebar's scope.
+    void queryClient.invalidateQueries(
+      trpc.cliSessionsV2.listWorkspaces.infiniteQueryFilter(workspaceListInputRef.current),
+      options
+    );
   }, [queryClient, trpc]);
   const queryReconciler = useMemo(
     () => createSidebarQueryReconciler(reconcileSidebarQueries),
@@ -1259,16 +1300,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     verifyPrLink({ sessionId: session.session_id });
   }, [verificationSessions, isVerifyingPrLink, verifyPrLink]);
 
-  const workspaceListInput = useMemo(
-    () =>
-      sidebarWorkspaceListInput({
-        organizationId,
-        createdOnPlatform,
-        gitUrl,
-        search: searchQuery,
-      }),
-    [organizationId, createdOnPlatform, gitUrl, searchQuery]
-  );
   // Load only the first page. The list shows a banner when the server truncates it.
   const workspaceListQuery = useInfiniteQuery({
     ...trpc.cliSessionsV2.listWorkspaces.infiniteQueryOptions(workspaceListInput, {
@@ -1408,8 +1439,10 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       for (const [queryKey, data] of queries) {
         if (
           !data ||
-          !Object.values(data.worktrees).some(worktree =>
-            worktree.sessions.some(session => session.sessionId === update.sessionId)
+          !Object.entries(data.worktrees).some(
+            ([worktreeId, worktree]) =>
+              worktreeId === update.worktreeId ||
+              worktree.sessions.some(session => session.sessionId === update.sessionId)
           )
         ) {
           continue;
@@ -1491,16 +1524,14 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         return { ...current, results: withoutSession };
       });
     };
-    const patchRow = (
-      payload: UserWebSessionEventData<'session.created'>,
-      reconciliation: 'immediate' | 'delayed'
-    ) => {
+    const patchRow = (payload: UserWebSessionEventData<'session.created'>) => {
       if (payload.source !== 'v2') return;
       patchWorktreeStatus({
         sessionId: payload.session.sessionId,
         sessionStatus: payload.session.status,
         sessionStatusUpdatedAt: payload.session.statusUpdatedAt,
         updatedAt: payload.session.updatedAt,
+        worktreeId: payload.session.worktreeId,
       });
       const next = eventRowToDbSession(payload.session);
       const filterResult = eventRowMatchesSidebarFilters(payload.session, filters);
@@ -1510,7 +1541,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         setDbSessions(prev => removeSidebarDbSession(prev, next.session_id));
       }
       patchSearchCacheForRow(next, filterResult);
-      if (reconciliation === 'immediate' || filterResult === null) {
+      if (filterResult === null) {
         queryReconciler.reconcileNow();
       } else {
         queryReconciler.schedule();
@@ -1518,15 +1549,12 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     };
 
     const unsubs = [
-      sharedConnection.onSessionEvent('session.created', payload => patchRow(payload, 'immediate')),
-      sharedConnection.onSessionEvent('session.updated', payload => patchRow(payload, 'immediate')),
+      sharedConnection.onSessionEvent('session.created', patchRow),
+      sharedConnection.onSessionEvent('session.updated', patchRow),
       sharedConnection.onSessionEvent('session.status.updated', payload => {
         if (payload.source !== 'v2') return;
         if ('session' in payload) {
-          patchRow(
-            { source: 'v2', session: payload.session, changedAt: payload.changedAt },
-            'delayed'
-          );
+          patchRow({ source: 'v2', session: payload.session, changedAt: payload.changedAt });
           return;
         }
         patchWorktreeStatus({
@@ -1587,10 +1615,10 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   );
   const worktreeIdBatches = useMemo(
     () =>
-      worktreeDetailsBatches([
-        ...sessions.map(session => session.worktreeId),
-        ...workspaceRows.map(row => row.worktreeId),
-      ]),
+      sidebarWorktreeDetailsBatches(
+        sessions.map(session => session.worktreeId),
+        workspaceRows
+      ),
     [sessions, workspaceRows]
   );
   const worktreeDetailsQueries = useQueries({

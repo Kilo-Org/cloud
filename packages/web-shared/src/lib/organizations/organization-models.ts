@@ -76,7 +76,7 @@ export async function getAvailableModelsForOrganization(
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
   const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
-    getEnhancedOpenRouterModels({ countryCode }),
+    getEnhancedOpenRouterModels({ countryCode, fromDb }),
     getOrganizationByokProviderIds(readDb, organizationId),
     getAllowedDirectByokCatalogModelIds(organizationId, policy),
   ]);
@@ -114,7 +114,7 @@ export async function getAvailableModelsForOrganization(
     availableModels = await tagOpenAiChatGptByokModels(chatGptOwner, availableModels);
   }
 
-  const snapshot = await getEnkryptBenchmarks();
+  const snapshot = await getEnkryptBenchmarks({ fromDb });
   return {
     ...responseData,
     data: publishEnkryptModels(

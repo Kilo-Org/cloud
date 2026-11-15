@@ -52,6 +52,19 @@ export function timestampMs(value: string | null | undefined): number | null {
   return Number.isFinite(at) ? at : null;
 }
 
+/**
+ * ISO 8601 form of one backend time, or null when it is missing or does not
+ * parse.
+ *
+ * The one conversion from a stored time to the ISO string the widget, push and
+ * session-card payloads carry, so a value that does not parse is absent in the
+ * same way on every surface instead of each caller inventing its own fallback.
+ */
+export function timestampToIso(value: string | null | undefined): string | null {
+  const at = timestampMs(value);
+  return at === null ? null : new Date(at).toISOString();
+}
+
 /** Returns the first non-empty string, or '' when none is set. */
 export function firstNonEmpty(...values: (string | null | undefined)[]): string {
   for (const value of values) {

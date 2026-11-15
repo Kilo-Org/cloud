@@ -1,13 +1,18 @@
 import { withTimeout } from '@kilocode/worker-utils';
+import { workspaceFailureUserMessage } from '@kilocode/worker-utils/cloud-agent-failure';
 import type { EnvironmentBuild } from '../../environment-build/environment-build-do.js';
 import type { SnapshotResolution } from '../../environment-build/coordinator.js';
-import { SNAPSHOT_LOOKUP_BUDGET_MS } from '../../environment-build/policy.js';
+import {
+  SNAPSHOT_LOOKUP_BUDGET_MS,
+  type PublishedSnapshot,
+} from '../../environment-build/policy.js';
 import {
   sameEnvironmentScope,
   type SessionEnvironmentReference,
 } from '../../environment-build/reference.js';
 import type { BuildState } from '../../environment-build/sqlite-schema.js';
 import type { ProviderSnapshotStart } from '../../sandbox-control/provider.js';
+import type { SnapshotStartFailureReason } from '../../sandbox-containers/snapshot-start-failures.js';
 import {
   environmentWorkspaceDirectory,
   ISOLATED_CONTAINER_WORKSPACE_PATH,
@@ -75,6 +80,8 @@ export function environmentLaunchCandidate(
   return { candidate: { reference, actorUserId, buildCommands } };
 }
 
+export type SnapshotProvider = PublishedSnapshot['provider'];
+
 export type EnvironmentLookup =
   | { kind: 'resolved'; resolution: SnapshotResolution }
   | { kind: 'timeout' }
@@ -88,6 +95,8 @@ export type EnvironmentLookup =
 export async function lookupEnvironmentSnapshot(input: {
   namespace: DurableObjectNamespace<EnvironmentBuild> | undefined;
   candidate: EnvironmentLaunchCandidate;
+  /** The session's pinned provider; the coordinator compares snapshots against it. */
+  provider: SnapshotProvider;
   launchDeadlineAt: number;
   now?: () => number;
 }): Promise<EnvironmentLookup> {
@@ -104,6 +113,7 @@ export async function lookupEnvironmentSnapshot(input: {
         stub.resolveSnapshot({
           reference: input.candidate.reference,
           actorUserId: input.candidate.actorUserId,
+          provider: input.provider,
         }),
         remaining,
         'Environment snapshot lookup timed out',
@@ -131,7 +141,11 @@ export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotS
     resolution.snapshot.stale === 'image'
       ? (resolution.currentBaseImage ?? resolution.snapshot.baseImage)
       : resolution.snapshot.baseImage;
-  return { snapshotId: resolution.snapshot.snapshotId, baseImage };
+  return {
+    snapshotId: resolution.snapshot.snapshotId,
+    baseImage,
+    ...(resolution.snapshot.provider === 'vercel' ? { provider: 'vercel' as const } : {}),
+  };
 }
 
 export type EnvironmentSnapshotBlockReason =
@@ -168,9 +182,12 @@ export type EnvironmentSnapshotDecision =
 // failure reasons in the control plane and diagnostics.
 export const ENVIRONMENT_SNAPSHOT_MESSAGES = {
   rebuild: 'Environment snapshot is unavailable. Rebuild the environment.',
+  startFailed: `${workspaceFailureUserMessage('environment_snapshot_required')}. Send the message again to retry. Rebuild the environment only if this failure repeats.`,
   retry: 'Environment snapshot is temporarily unavailable. Try again.',
   unsupported: 'Environment snapshots are not supported for this session.',
   newSession: 'This session cannot use the environment snapshot. Start a new session.',
+  providerMismatch:
+    "This session runs on different compute than the environment's snapshot. Use the environment's compute.",
 } as const;
 
 function buildIdOf(resolution: SnapshotResolution): string | null {
@@ -202,6 +219,13 @@ function blockedEnvironment(
       return {
         reason: 'environment_not_supported',
         detail: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
+        environmentId,
+        buildId,
+      };
+    case 'provider_mismatch':
+      return {
+        reason: 'environment_not_supported',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.providerMismatch,
         environmentId,
         buildId,
       };
@@ -341,14 +365,38 @@ function blockedLookup(
 /** The final state after a required environment snapshot start failed and was not retried again. */
 export function environmentSnapshotStartBlock(
   candidate: EnvironmentLaunchCandidate,
-  buildId: string | null
+  buildId: string | null,
+  failureReason: SnapshotStartFailureReason = 'transient'
 ): EnvironmentSnapshotBlock {
-  return {
-    reason: 'environment_snapshot_start_failed',
-    detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
-    environmentId: candidate.reference.environmentId,
-    buildId,
-  };
+  const block = { environmentId: candidate.reference.environmentId, buildId };
+  switch (failureReason) {
+    case 'expired':
+      return {
+        ...block,
+        reason: 'environment_snapshot_expired',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
+      };
+    case 'image_mismatch':
+    case 'provenance':
+    case 'unsupported':
+      return {
+        ...block,
+        reason: 'environment_snapshot_incompatible',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
+      };
+    case 'missing':
+      return {
+        ...block,
+        reason: 'environment_snapshot_unavailable',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
+      };
+    case 'transient':
+      return {
+        ...block,
+        reason: 'environment_snapshot_start_failed',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.startFailed,
+      };
+  }
 }
 /**
  * The startup source for an environment session. An environment with build

@@ -9,6 +9,11 @@ describe('parsePreviewLinkTarget', () => {
     ['http://[::1]:4000/', { port: 4000, path: '/' }],
     ['http://[::]:4000/', { port: 4000, path: '/' }],
     ['http://LOCALHOST:3001/', { port: 3001, path: '/' }],
+    ['http://127.0.0.2:3001/', { port: 3001, path: '/' }],
+    ['http://127.255.255.254:3001/', { port: 3001, path: '/' }],
+    ['http://[::ffff:7f00:1]:3001/', { port: 3001, path: '/' }],
+    ['http://localhost.:3001/', { port: 3001, path: '/' }],
+    ['http://app.localhost:3001/', { port: 3001, path: '/' }],
   ])('maps %s to a sandbox port', (href, expected) => {
     expect(parsePreviewLinkTarget(href)).toEqual(expected);
   });
@@ -17,7 +22,7 @@ describe('parsePreviewLinkTarget', () => {
     ['no link', undefined],
     ['not a URL', 'localhost:3001'],
     ['public host', 'https://example.com:3001/'],
-    ['loopback-like subdomain', 'http://app.localhost:3001/'],
+    ['private network host', 'http://10.0.0.1:3001/'],
     ['no port', 'http://localhost/'],
     ['default port', 'http://localhost:80/'],
     ['port below the preview range', 'http://localhost:1023/'],

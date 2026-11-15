@@ -74,9 +74,6 @@ final class NotificationService: UNNotificationServiceExtension {
       // The schema default is `status`; an omitted category is a status
       // update, not a question for the user.
       return pushField("category", in: userInfo) as? String == "attention" ? .needsInput : .progress
-    case "chat.message":
-      // A reply in the user's conversation is what the user answers.
-      return .needsInput
     case "active_agents_glanceable":
       // A data-only wake for the widget / Live Activity, never a banner: the
       // filter governs what the user is shown, not whether the card updates.

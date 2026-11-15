@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- The profile screen composes Credits, Agents, Reviews, Organization, Linked accounts, App, Restore Purchases, and Actions; each section is a small rendered surface that mirrors the shared ConfigureRow/Text-header pattern. Splitting would re-encode the same hooks. */
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
@@ -10,14 +11,17 @@ import {
   GitMerge,
   GitPullRequest,
   KeyRound,
+  LineChart,
   Lock,
-  LogOut,
   MessageSquare,
+  Plug,
+  Plus,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Trash2,
   Users,
+  Workflow,
 } from '@/components/ui/icons';
 import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -29,8 +33,10 @@ import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -38,12 +44,14 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { useAuth } from '@/lib/auth/auth-context';
 import { providerLabel } from '@/lib/auth/provider-label';
-import { SESSION_SYNC_URL } from '@/lib/config';
+import { SESSION_SYNC_URL, WEB_BASE_URL } from '@/lib/config';
+import { getCloudTriggersUrl } from '@/lib/cloud-triggers-url';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
+import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
@@ -57,6 +65,36 @@ import { useTRPC } from '@/lib/trpc';
 // The app changelog lives on `main` and is written per store build by the
 // kilo-app Release workflow; never pin it to a version or a per-build copy.
 const CHANGELOG_URL = 'https://github.com/Kilo-Org/cloud/blob/main/apps/mobile/CHANGELOG.md';
+
+type AuthProvider =
+  inferRouterOutputs<MobileRouter>['user']['getAuthProviders']['providers'][number];
+
+/**
+ * What the Linked accounts section shows. One arm at a time, so rows and a load
+ * error can never stand together, and a failed refetch over retained rows is its
+ * own arm instead of claiming the accounts could not be loaded.
+ */
+type LinkedAccountsView =
+  | { readonly kind: 'hidden' }
+  | { readonly kind: 'skeleton' }
+  | { readonly kind: 'error' }
+  | { readonly kind: 'rows'; readonly providers: readonly AuthProvider[] }
+  | { readonly kind: 'rowsStale'; readonly providers: readonly AuthProvider[] };
+
+/** One answer for the Linked accounts section: rows and a load error never coexist. */
+function linkedAccountsView(
+  providers: readonly AuthProvider[] | undefined,
+  failed: boolean
+): LinkedAccountsView {
+  if (providers === undefined) {
+    return failed ? { kind: 'error' } : { kind: 'skeleton' };
+  }
+  if (providers.length === 0) {
+    // A settled empty read keeps the section hidden, as it always has.
+    return failed ? { kind: 'error' } : { kind: 'hidden' };
+  }
+  return failed ? { kind: 'rowsStale', providers } : { kind: 'rows', providers };
+}
 
 export function ProfileScreen() {
   const { signOut, token } = useAuth();
@@ -74,7 +112,6 @@ export function ProfileScreen() {
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const {
     data,
-    isLoading,
     isError: providersError,
     isFetching: providersFetching,
     refetch: refetchProviders,
@@ -100,16 +137,27 @@ export function ProfileScreen() {
   const agentScope = organizationContextLoaded
     ? getProfileAgentScope(organizationId, orgs)
     : undefined;
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
+  // A settled read that lists no memberships still keeps the section: its Create
+  // organization row is the app's only entry to that flow, so an account with no
+  // organization has to be able to start one. The account-picker row is dropped
+  // in that case alone — it would list Personal and nothing else.
+  const hasOrganizations = (orgs?.length ?? 0) > 0;
   // The Organization section stays on Profile in every credit-account context:
   // a Personal context still offers the account picker when the account has
   // memberships, so organization management is not gated behind the credits
   // account control. The restore decides the context first, so the chooser never
-  // paints for a frame before the active organization's row replaces it.
+  // paints for a frame before the active organization's row replaces it. A
+  // memberships read that failed keeps the section too: its error and Retry live
+  // inside this block, so hiding the section while the list is unavailable would
+  // drop the only retry. A read that is still loading, or paused offline before
+  // it ever fetched, keeps the section hidden: no empty state paints before the
+  // list settles.
   const showOrganizationSection =
-    organizationId != null || (organizationContextLoaded && (orgs?.length ?? 0) > 0);
+    organizationId != null ||
+    (organizationContextLoaded && (organizationsError || orgs !== undefined));
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
@@ -220,6 +268,15 @@ export function ProfileScreen() {
     router.push('/(app)/consent?mode=review' as Href);
   };
 
+  // One answer per render: the section exists only where it has content, rows
+  // and an error never stand together, and a failed refetch over rows keeps
+  // them with a stale line instead of claiming the accounts could not load.
+  const linkedAccounts = linkedAccountsView(data?.providers, providersError);
+  const listedProviders =
+    linkedAccounts.kind === 'rows' || linkedAccounts.kind === 'rowsStale'
+      ? linkedAccounts.providers
+      : null;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
@@ -233,6 +290,22 @@ export function ProfileScreen() {
       >
         {/* Credits */}
         <CreditsCard orgs={orgs} enabled={isAuthenticated} />
+
+        {/* Usage: one row on the balance's own section, because spend and
+            remaining credits are the two halves of the same question. */}
+        <View className="mt-3">
+          <ConfigureRow
+            icon={LineChart}
+            title={t('usage.title')}
+            subtitle={t('usage.entrySubtitle')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/usage' as Href);
+            }}
+          />
+        </View>
 
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
@@ -274,9 +347,26 @@ export function ProfileScreen() {
             // made one row of three read as disabled.
             hue="honey"
             className="rounded-lg bg-secondary px-3"
-            last
             onPress={() => {
               router.push(getProfilesPath());
+            }}
+          />
+          {/* Cloud Agent triggers stay on the web: the editor carries a body
+              schema, target, cron expression and signing secret. The row is the
+              hand-off, and it opens the page for the scope in view (personal or
+              the selected organization) so the browser lands where the app was. */}
+          <ConfigureRow
+            icon={Workflow}
+            title={t('cloudAgent.triggers.title')}
+            subtitle={t('cloudAgent.triggers.subtitle')}
+            hue="honey"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              void openExternalUrl(getCloudTriggersUrl(WEB_BASE_URL, organizationId), {
+                label: t('cloudAgent.triggers.title'),
+                retryOnError: true,
+              });
             }}
           />
         </View>
@@ -315,9 +405,20 @@ export function ProfileScreen() {
                 isRetrying={organizationsFetching}
               />
             ) : (
-              organizationRow
+              <>
+                {(organizationId != null || hasOrganizations) && organizationRow}
+                <ConfigureRow
+                  icon={Plus}
+                  title={t('organization.create.title')}
+                  hue="lime"
+                  className="rounded-lg bg-secondary px-3"
+                  last
+                  onPress={() => {
+                    router.push(CREATE_ORGANIZATION_HREF);
+                  }}
+                />
+              </>
             )}
-            {picker}
           </View>
         )}
 
@@ -371,13 +472,13 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={Sparkles}
-            title={t('kiloclaw.changelog.title')}
+            title={t('profile.changelog')}
             hue="sage"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
               void openExternalUrl(CHANGELOG_URL, {
-                label: t('kiloclaw.changelog.title'),
+                label: t('profile.changelog'),
               });
             }}
           />
@@ -394,16 +495,13 @@ export function ProfileScreen() {
             bar (Android `profile-error`, 2026-09-22). The skeleton reserves the
             row's height, so painting a row directly cannot shift the sections
             below — only the skeleton's exit fade remains. */}
-        {(providersError ||
-          (data?.providers.length ?? 0) > 0 ||
-          isLoading ||
-          (!afterIdle && !data)) && (
+        {linkedAccounts.kind === 'hidden' ? null : (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.linkedAccounts')}
             </Text>
 
-            {(isLoading || !afterIdle) && !data && !providersError && (
+            {linkedAccounts.kind === 'skeleton' ? (
               <Animated.View exiting={FadeOut.duration(150)}>
                 {/* Content-shaped skeleton (icon tile + two text bars in the
                     row's own bg-secondary card): a plain block read as an
@@ -421,9 +519,9 @@ export function ProfileScreen() {
                   </View>
                 </View>
               </Animated.View>
-            )}
+            ) : null}
 
-            {providersError && (
+            {linkedAccounts.kind === 'error' ? (
               <QueryError
                 variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
@@ -431,23 +529,63 @@ export function ProfileScreen() {
                 onRetry={() => void refetchProviders()}
                 isRetrying={providersFetching}
               />
-            )}
+            ) : null}
 
-            {data?.providers.map((p, index) => (
-              <View key={`${p.provider}-${p.email}`}>
-                <ConfigureRow
-                  icon={KeyRound}
-                  title={providerLabel(p.provider)}
-                  subtitle={p.email}
-                  subtitleNumberOfLines={1}
-                  hue="moss"
-                  className="rounded-lg bg-secondary px-3"
-                  last={index === data.providers.length - 1}
+            {listedProviders === null
+              ? null
+              : listedProviders.map((p, index) => (
+                  <View key={`${p.provider}-${p.email}`}>
+                    <ConfigureRow
+                      icon={KeyRound}
+                      title={providerLabel(p.provider)}
+                      subtitle={p.email}
+                      subtitleNumberOfLines={1}
+                      hue="moss"
+                      className="rounded-lg bg-secondary px-3"
+                      last={index === listedProviders.length - 1}
+                    />
+                  </View>
+                ))}
+
+            {linkedAccounts.kind === 'rowsStale' ? (
+              <View className="flex-row items-center gap-3">
+                <AccessibleStatus
+                  tone="warn"
+                  className="flex-1 text-xs"
+                  message={t('agents.sessionList.couldNotRefresh')}
                 />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => void refetchProviders()}
+                  loading={providersFetching}
+                >
+                  {t('common.refresh')}
+                </Button>
               </View>
-            ))}
+            ) : null}
           </View>
         )}
+
+        {/* Connected services — the integrations hub. Its own section rather
+            than a row in App: the hub manages external accounts, and its row
+            takes the next curated hue step in reading order. */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('integrations.sectionTitle')}
+          </Text>
+          <ConfigureRow
+            icon={Plug}
+            title={t('integrations.title')}
+            subtitle={t('integrations.entrySubtitle')}
+            hue="pine"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
+            }}
+          />
+        </View>
 
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
@@ -466,7 +604,7 @@ export function ProfileScreen() {
             onPress={showPrivacyChoices}
           />
           <ActionTile
-            icon={LogOut}
+            icon={DirectionalLogOut}
             label={t('common.signOut')}
             hue="fern"
             onPress={requestSignOut}

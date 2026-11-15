@@ -87,13 +87,6 @@ vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreferenc
 vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
   clearHideThinkingPreference: vi.fn(),
 }));
-vi.mock('@/lib/kiloclaw-tab-ownership', () => ({
-  gateKiloClawOwned: vi.fn(),
-  clearKiloClawOwned: vi.fn(),
-}));
-vi.mock('@/lib/last-active-instance', () => ({
-  clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
-}));
 // The sign-out block clears the launcher surfaces and the last-opened record.
 // Stub them like the rest of the teardown graph: the native wrapper imports
 // `expo`, which needs `__DEV__` and cannot load in the node test environment.
@@ -114,6 +107,12 @@ vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
 }));
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
+}));
+// The account boundary also drops the retained merge intent keys, and their
+// store mints through expo-crypto, whose expo root needs `__DEV__`. This suite
+// asserts the credential deletes, and the store's own suite covers the clear.
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => ({
+  clearMergeOperationKeys: vi.fn(),
 }));
 vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),

@@ -1,5 +1,4 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
-import { buildToolDetailSummary } from '@kilocode/app-shared/tool-detail';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
@@ -10,27 +9,9 @@ import { getDirectoryName, getFilename, truncateText } from './tool-card-utils';
 import { listPatchFilePaths } from './tool-patch-model';
 import { buildResultRowsModel } from './tool-list-model';
 import { suggestionToolMetadataSchema } from './suggestion-card-state';
+import { searchToolDisplay, summaryToolDisplay, type ToolDisplay } from './tool-display-rows';
 
-export type ToolDisplay = {
-  title: string;
-  subtitle?: string;
-  badge?: string;
-  /**
-   * Whether the shown label (`subtitle ?? title`) carries tool content worth
-   * translating. The fallback labels are either already-localized UI copy
-   * (`read`, `Read plan`) or raw tool ids (`websearch`); sending those to the
-   * gateway would translate text that is already in the app language, so the
-   * transcript row skips them.
-   */
-  translatable: boolean;
-  /**
-   * Whether the part-detail header shows `title` alone instead of
-   * `<title>: <subtitle>`. Set it when the sheet body renders the subtitle
-   * itself: the file chip already names the sent file, so the header repeating
-   * the name adds nothing.
-   */
-  headerTitleOnly?: boolean;
-};
+export type { ToolDisplay } from './tool-display-rows';
 
 function countResultRows(output: string, kind: 'grep' | 'glob'): number {
   return buildResultRowsModel(output, kind).rows.length;
@@ -240,29 +221,25 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
         translatable: files.length === 1,
       };
     }
-    case 'websearch':
-    case 'codesearch':
+    case 'websearch': {
+      return searchToolDisplay('websearch', fields);
+    }
+    case 'codesearch': {
+      return searchToolDisplay('codesearch', fields);
+    }
     case 'webfetch': {
-      const query = fields.query;
-      const url = fields.url;
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty query must fall back to url; ?? would skip ''
-      const search = query || url;
-      return {
-        title: part.tool,
-        subtitle: search ? truncateText(search, 60) : part.tool,
-        translatable: Boolean(search),
-      };
+      return searchToolDisplay('webfetch', fields);
     }
     case 'todoread': {
       return {
-        title: part.tool,
+        title: i18n.t('agentChat.toolCard.toolTodo'),
         subtitle: i18n.t('agentChat.toolCard.readTodos'),
         translatable: false,
       };
     }
     case 'todowrite': {
       return {
-        title: part.tool,
+        title: i18n.t('agentChat.toolCard.toolTodo'),
         subtitle: i18n.t('agentChat.toolCard.updateTodos'),
         translatable: false,
       };
@@ -297,23 +274,41 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
           status !== 'error' && !dismissed && suggestionText !== '' && suggestionText !== title,
       };
     }
+    case 'browser_open': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolBrowser'));
+    }
+    case 'notebook_read':
+    case 'notebook_edit':
+    case 'notebook_execute': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolNotebook'));
+    }
+    case 'board_read':
+    case 'board_post': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolBoard'));
+    }
+    case 'lsp': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolLsp'));
+    }
+    case 'recall': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolRecall'));
+    }
+    case 'repo_clone': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolRepoClone'));
+    }
+    case 'repo_overview': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolRepoOverview'));
+    }
+    case 'semantic_search': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolSemanticSearch'));
+    }
+    case 'skill': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolSkill'));
+    }
+    case 'question': {
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolQuestion'));
+    }
     default: {
-      const stateTitle =
-        status === 'running' || status === 'completed' ? part.state.title : undefined;
-      const detail = buildToolDetailSummary(part);
-      const summary = detail.name === part.tool ? detail.summary : undefined;
-      return {
-        title: part.tool,
-        subtitle:
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
-          stateTitle?.trim() || (summary !== undefined ? truncateText(summary, 60) : detail.name),
-        // The state title and the projected argument summary are agent prose.
-        // A known-tool label (`Publish Image`) is raw English app copy with no
-        // catalog, so it must reach the gateway like agent prose; a raw tool id
-        // or an `mcp` `server/tool` identifier is an id and stays out, like the
-        // already-localized fallback labels above.
-        translatable: Boolean(stateTitle?.trim()) || summary !== undefined || detail.nameIsLabel,
-      };
+      return summaryToolDisplay(part, part.tool);
     }
   }
 }

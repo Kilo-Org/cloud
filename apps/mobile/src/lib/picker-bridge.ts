@@ -148,6 +148,19 @@ export type FolderPickerBridge = {
   onSelect: (path: string) => void;
 };
 
+/**
+ * Bridge for the shared account picker route. The caller owns the membership
+ * rows and the pick; the route only renders them, so every surface that opens
+ * the account picker presents the same sheet with its own list.
+ */
+export type ContextPickerBridge = {
+  /** Account labels in list order; a row's index is its selection index. */
+  options: string[];
+  /** The row that carries the check mark, or -1 when nothing is listed for it. */
+  currentIndex: number;
+  onSelect: (index: number) => void;
+};
+
 type LanguagePickerBridge = {
   beforeReload?: () => Promise<void>;
   onApplied?: () => void;

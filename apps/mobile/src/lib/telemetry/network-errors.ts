@@ -55,7 +55,7 @@ type NetworkOutcome = 'http_error' | 'failed';
 type TransportOutcome = 'timeout' | 'failed';
 
 export type TrpcErrorContext = {
-  code?: string;
+  code?: TrpcErrorCode;
   httpStatus?: number;
   path?: string;
 };
@@ -74,13 +74,68 @@ export type NetworkErrorFetchOptions = {
   source?: TelemetrySource;
   shouldReport?: (url: string) => boolean;
   isResponseError?: (status: number) => boolean;
+  /**
+   * Whether an error response is the expected answer of the endpoint's own
+   * protocol rather than a defect. Such an answer leaves a breadcrumb and no
+   * event, as {@link EXPECTED_HTTP_STATUSES} does; a caller uses it for the
+   * answers it knows are protocol facts and this module cannot infer.
+   */
+  isExpectedAnswer?: (context: NetworkErrorContext) => boolean;
   readResponseError?: (
     response: Response
   ) => Promise<TrpcResponseError | undefined> | TrpcResponseError | undefined;
 };
 
+/**
+ * The error code names tRPC defines, copied from `TRPC_ERROR_CODES_BY_KEY` in
+ * `@trpc/server/rpc`. The app cannot import that map — `@trpc/server` is a
+ * server package and not one of this app's dependencies — so the list lives
+ * here; a name tRPC adds later is read as "no tRPC code", which keeps the status
+ * and path that name the defect.
+ *
+ * Any other string is not a tRPC code: the edge firewall answers a blocked
+ * region with `{"error":{"code":"403"}}`, and reading that number as a code
+ * made every blocked request look like app code and escaped the
+ * expected-answer rule below.
+ */
+const TRPC_ERROR_CODE_NAMES = [
+  'PARSE_ERROR',
+  'BAD_REQUEST',
+  'INTERNAL_SERVER_ERROR',
+  'NOT_IMPLEMENTED',
+  'BAD_GATEWAY',
+  'SERVICE_UNAVAILABLE',
+  'GATEWAY_TIMEOUT',
+  'UNAUTHORIZED',
+  'PAYMENT_REQUIRED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'METHOD_NOT_SUPPORTED',
+  'TIMEOUT',
+  'CONFLICT',
+  'PRECONDITION_FAILED',
+  'PAYLOAD_TOO_LARGE',
+  'UNSUPPORTED_MEDIA_TYPE',
+  'UNPROCESSABLE_CONTENT',
+  'PRECONDITION_REQUIRED',
+  'TOO_MANY_REQUESTS',
+  'CLIENT_CLOSED_REQUEST',
+] as const;
+
+/** One code name {@link TRPC_ERROR_CODE_NAMES} lists. */
+type TrpcErrorCode = (typeof TRPC_ERROR_CODE_NAMES)[number];
+
+const TRPC_ERROR_CODES: ReadonlySet<string> = new Set(TRPC_ERROR_CODE_NAMES);
+
+function isTrpcErrorCode(code: string): code is TrpcErrorCode {
+  return TRPC_ERROR_CODES.has(code);
+}
+
 // tRPC server error shape (packages @trpc/server `getErrorShape`) exposes
-// `data.httpStatus` / `data.path`; v11 client errors expose flat `data.*`.
+// `data.httpStatus` / `data.path`; v11 client errors expose flat `data.*`. A
+// code stays a plain string here: a name this module does not know must not
+// discard the status and path the same body carries (a batch item's status is
+// what names its defect), so membership is checked when the code is read.
 const TrpcErrorDataSchema = z.looseObject({
   code: z.string().optional(),
   httpStatus: z.number().optional(),
@@ -179,7 +234,9 @@ export function trpcProcedureFromUrl(url: string): string | undefined {
 /**
  * Read tRPC error metadata from a direct (`data.*`) or server-shaped
  * (`shape.data.*`) error. The body's own `message` is untrusted text and is
- * never read. Total: an unrecognized value yields `{}`.
+ * never read, and a `code` counts only when it names a code tRPC defines: a
+ * status a proxy put there is not app code. Total: an unrecognized value yields
+ * `{}`.
  */
 export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
   try {
@@ -188,11 +245,12 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
     const directData = direct.success ? direct.data.data : undefined;
     const shapedData = shaped.success ? shaped.data.shape.data : undefined;
     const topLevelCode = TopLevelCodeSchema.safeParse(error);
+    const code =
+      directData?.code ??
+      shapedData?.code ??
+      (topLevelCode.success ? topLevelCode.data.code : undefined);
     return {
-      code:
-        directData?.code ??
-        shapedData?.code ??
-        (topLevelCode.success ? topLevelCode.data.code : undefined),
+      code: code !== undefined && isTrpcErrorCode(code) ? code : undefined,
       httpStatus: directData?.httpStatus ?? shapedData?.httpStatus,
       path: directData?.path ?? shapedData?.path,
     };
@@ -367,10 +425,24 @@ type FailureIdentity = {
 };
 
 /**
+ * The separator tRPC joins a batch's procedures with in one request URL.
+ */
+const TRPC_BATCH_SEPARATOR = ',';
+
+/**
+ * How a batch that names no failing item is identified. The URL's procedure
+ * list is the batch's composition, not the defect: a blocked request or a body
+ * without `data.path` would otherwise open one issue per combination, so an
+ * outcome that names no item is filed once per outcome.
+ */
+const BATCH_PROCEDURE = '<batch>';
+
+/**
  * Name a failure after the procedure its body reports, else after the URL. The
  * message keeps the `/api/trpc/<procedure>` form a tRPC request URL uses, so a
  * batched call's title names the item that failed instead of the whole batch; a
- * body that names no procedure keeps the normalized URL path, as before.
+ * batch whose body names no item is named once ({@link BATCH_PROCEDURE}), and a
+ * single-procedure URL keeps the normalized URL path, as before.
  */
 function failureIdentity(
   context: NetworkErrorContext,
@@ -380,6 +452,9 @@ function failureIdentity(
   const urlProcedure = trpcProcedureFromUrl(context.url);
   const bodyPath = bodyProcedure(trpc);
   if (bodyPath === undefined) {
+    if (urlProcedure?.includes(TRPC_BATCH_SEPARATOR) === true) {
+      return { procedure: BATCH_PROCEDURE, messagePath: `${TRPC_PATH}${BATCH_PROCEDURE}` };
+    }
     return { procedure: urlProcedure, messagePath: normalizedPath };
   }
   return {
@@ -536,11 +611,39 @@ export function reportNetworkError(context: NetworkErrorContext): void {
 }
 
 /**
- * True when a failed response is an expected answer ({@link isExpectedStatus};
- * for a tRPC batch, the inner status), or a terminal refusal on a sign-in
- * route, which the auth layer reports once.
+ * {@link NetworkErrorFetchOptions.isExpectedAnswer}, and total: a predicate
+ * that throws expects nothing, as {@link safeShouldReport} decides for a
+ * throwing `shouldReport`. An uncaught throw here would turn a response the
+ * caller already has into a rejection.
  */
-function isExpectedResponse(context: NetworkErrorContext): boolean {
+function expectedByCaller(
+  context: NetworkErrorContext,
+  isExpectedAnswer: ((context: NetworkErrorContext) => boolean) | undefined
+): boolean {
+  if (isExpectedAnswer === undefined) {
+    return false;
+  }
+  try {
+    return isExpectedAnswer(context);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when a failed response is an expected answer: the caller's protocol
+ * answer ({@link NetworkErrorFetchOptions.isExpectedAnswer}, such as the MCP
+ * client's optional SSE probe), a status the app handles
+ * ({@link isExpectedStatus}; for a tRPC batch, the inner status), or a terminal
+ * refusal on a sign-in route, which the auth layer reports once.
+ */
+function isExpectedResponse(
+  context: NetworkErrorContext,
+  isExpectedAnswer: ((context: NetworkErrorContext) => boolean) | undefined
+): boolean {
+  if (expectedByCaller(context, isExpectedAnswer)) {
+    return true;
+  }
   const trpc = readTrpcErrorContext(context.error);
   const status = effectiveHttpStatus(context, trpc);
   if (status === undefined) {
@@ -635,7 +738,8 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
  * `isResponseError` chooses the statuses that count as errors (default `>= 400`;
  * tRPC adds 207 so a batch that yields an error status or code is reported). A
  * batch envelope whose body yields no error status or code is not a failure and
- * records nothing. An expected answer (`isExpectedResponse`), the first repeat
+ * records nothing. An expected answer (`isExpectedResponse`, including the
+ * caller's own `isExpectedAnswer` rule), the first repeat
  * of a fingerprint already reported in this process, are breadcrumbs instead of
  * reports, and later repeats record nothing. `readResponseError` may parse the
  * body via a clone to enrich the report. The original rejection is re-thrown and
@@ -676,7 +780,7 @@ export function createNetworkErrorFetch(
         if (isBatchEnvelopeWithoutError(context)) {
           return response;
         }
-        if (isExpectedResponse(context)) {
+        if (isExpectedResponse(context, options?.isExpectedAnswer)) {
           recordNetworkErrorBreadcrumb(context);
         } else {
           reportNetworkError(context);

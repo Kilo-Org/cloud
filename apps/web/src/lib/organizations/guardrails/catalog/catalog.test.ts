@@ -65,14 +65,14 @@ describe('adaptKiloMarketplaceYaml', () => {
         label: 'Local',
         identityKey: 'npm:@apify/actors-mcp-server',
         target: { kind: 'package', ecosystem: 'npm', identifier: '@apify/actors-mcp-server' },
-        versionHint: null,
+        versionSpecHint: null,
       },
       {
         eligible: true,
         label: 'Remote',
         identityKey: 'remote:https://mcp.apify.com',
         target: { kind: 'remote', url: 'https://mcp.apify.com' },
-        versionHint: null,
+        versionSpecHint: null,
       },
     ]);
   });
@@ -85,7 +85,7 @@ describe('adaptKiloMarketplaceYaml', () => {
     expect(uvx).toMatchObject({
       eligible: true,
       identityKey: 'pypi:pkg',
-      versionHint: '1.2.3',
+      versionSpecHint: '>=1.2.3',
     });
     expect(localForm).toMatchObject({ eligible: true, identityKey: 'npm:pkg-two' });
   });
@@ -158,13 +158,13 @@ describe('adaptMcpRegistryList', () => {
     expect(npm).toMatchObject({
       eligible: true,
       identityKey: 'npm:@example/server',
-      versionHint: '1.2.0',
+      versionSpecHint: '>=1.2.0',
     });
     expect(pypi).toMatchObject({ eligible: true, identityKey: 'pypi:example-server' });
     expect(oci).toMatchObject({ eligible: false });
     expect(httpPackage).toMatchObject({ eligible: false });
-    expect(tagLike).toMatchObject({ eligible: true, versionHint: null });
-    expect(built).toMatchObject({ eligible: true, versionHint: '1.2.3' });
+    expect(tagLike).toMatchObject({ eligible: true, versionSpecHint: null });
+    expect(built).toMatchObject({ eligible: true, versionSpecHint: '>=1.2.3' });
     expect(page.items[0].name).toBe('Example');
     expect(page.items[0].homepageUrl).toBe('https://github.com/example/server');
   });

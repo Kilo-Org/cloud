@@ -748,8 +748,6 @@ export const CALLBACK_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultConversation: '_',
     defaultApi: 'unified',
     defaultTimeoutMs: CALLBACK_BATCH_TIMEOUT_MS,
-    disabled:
-      'the queued-batch callback has no assistant text; suspected cause: the wrapper reports the batch completed before Kilo answers the last follow-up',
     run: runCallbackBatchFollowup,
   },
   'callback-interrupt': {

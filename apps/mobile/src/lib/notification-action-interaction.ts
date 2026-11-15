@@ -13,6 +13,11 @@
  * (`unavailable`) both stop showing as waiting — and the manager is destroyed
  * on every path.
  *
+ * The notification names the raise it presents (`raiseId`, the waiting row's
+ * own status time). An action answers that raise, and the answer is sent only
+ * while the session waits on it. A payload posted before the field existed
+ * carries no identity and keeps the earlier path.
+ *
  * Outcomes:
  * - `ok` — the matching raise was answered and acked; or an approve found the
  *   live session authoritatively free of the ask while the session's status
@@ -27,11 +32,12 @@
  *   resolved read-only, or an outcome-time status read that failed): the raise
  *   may still be live, so the caller keeps the actions and the user can tap
  *   again.
- * - `unavailable` — the session read returned `NOT_FOUND`, or a live transport
- *   opened, replayed its snapshot, and reported no raise of either kind while
- *   the session's status has moved on: the raise is authoritatively gone
- *   (answered elsewhere), so another tap can never succeed and the caller
- *   drops the actions. Absence only counts once the live snapshot is proven to
+ * - `unavailable` — the session read returned `NOT_FOUND`; the session does
+ *   not wait on the raise the notification presented; or a live transport opened,
+ *   replayed its snapshot, and reported no raise of either kind while the
+ *   session's status has moved on: the raise is authoritatively gone (answered
+ *   elsewhere), so another tap can never succeed and the caller drops the
+ *   actions. Absence only counts once the live snapshot is proven to
  *   have landed (see `liveSnapshotLanded`); a budget that expires while the
  *   transport is still `connecting`, or on a session that resolved `read-only`
  *   or never opened its socket, proves nothing — with the app closed, a cold
@@ -53,6 +59,11 @@ import { createMobileAgentSessionManager } from '@/components/agents/mobile-sess
 import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { hasVisibleComposerText } from '@/lib/composer-text';
 import { SESSION_INGEST_WS_URL } from '@/lib/config';
+import {
+  presentedRaiseGate,
+  readPresentedRaiseState,
+  rowWaitsOnPresentedRaise,
+} from '@/lib/notification-raise';
 import { ackSessionAttention } from '@/lib/session-attention';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 import { trpcClient } from '@/lib/trpc';
@@ -108,12 +119,6 @@ type ManagerFactoryOptions = {
  * The session row this module needs: existence, the manager's org scope, and
  * the status that decides a proven-absent raise's outcome.
  */
-/**
- * The raise a notification action answered: its status, plus the stored row's
- * own status time when that row still reported the answered status.
- */
-type AnsweredRaise = { status: string; statusUpdatedAt: string | null };
-
 type SessionRow = {
   organization_id?: string | null;
   status?: string | null;
@@ -152,6 +157,13 @@ export type NeedsInputInteractionInput = {
   /** Kilo session id from the notification payload. Never a cloud-agent id. */
   kiloSessionId: string;
   action: NeedsInputAction;
+  /**
+   * The raise the notification presents, from its payload (the session row's
+   * status time as the push posted it). When present, the answer is sent only
+   * while the session waits on that raise. Absent on a payload posted before
+   * the field existed, which keeps the previous behaviour.
+   */
+  raiseId?: string;
   /** The typed answer for `reply`. Never read for `approve`. */
   text?: string;
   deps?: NeedsInputInteractionDeps;
@@ -171,6 +183,7 @@ const DEFAULT_MISSING_RAISE_SETTLE_MS = 1000;
 export async function runNeedsInputInteraction({
   kiloSessionId,
   action,
+  raiseId,
   text,
   deps,
 }: NeedsInputInteractionInput): Promise<NeedsInputActionOutcome> {
@@ -196,26 +209,33 @@ export async function runNeedsInputInteraction({
   const missingRaiseSettleMs = deps?.missingRaiseSettleMs ?? DEFAULT_MISSING_RAISE_SETTLE_MS;
 
   // The raise the notification offered. A card's Approve answers a permission
-  // and a Reply answers a question, and the stored row's own status time names
-  // the raise when the row still reads that status.
+  // and a Reply answers a question; the status the answer names is the action's
+  // kind. The raise itself is named by the payload's `raiseId` — the waiting
+  // row's own status time — which both actions of one card share, because a
+  // payload posted without an `attentionKind` offers both for the same raise.
+  // A payload without an id falls back to the stored row's own status time,
+  // which names the raise only while the row still reads that status.
   const answeredStatus = action === 'approve' ? 'permission' : 'question';
   let organizationId: string | undefined = undefined;
-  let answeredRaise: AnsweredRaise = { status: answeredStatus, statusUpdatedAt: null };
+  let ackRaiseId: string | null = raiseId ?? null;
   try {
     const session = await getSession(kiloSessionId);
     organizationId = session.organization_id ?? undefined;
-    answeredRaise = {
-      status: answeredStatus,
-      // A row already reporting a different status has moved on from this
-      // raise: its time names the next one, so the ack keeps the status alone.
-      statusUpdatedAt:
-        session.status === answeredStatus ? (session.status_updated_at ?? null) : null,
-    };
+    // A row already reporting a different status has moved on from this raise:
+    // its time names the next one, so the ack keeps the status alone.
+    const stored = session.status === answeredStatus ? (session.status_updated_at ?? null) : null;
+    ackRaiseId = raiseId ?? stored;
+    // The answer is sent only while the row waits on the raise the
+    // notification presents; the ack names that raise.
+    if (!rowWaitsOnPresentedRaise(session, raiseId)) {
+      ack(kiloSessionId, answeredStatus, ackRaiseId);
+      return 'unavailable';
+    }
   } catch (error) {
     // A session the user can no longer see is stale, not retryable; every
     // other read failure (deadline, 5xx, offline) may succeed on a later tap.
     if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
-      ack(kiloSessionId, answeredRaise.status, answeredRaise.statusUpdatedAt);
+      ack(kiloSessionId, answeredStatus, ackRaiseId);
       return 'unavailable';
     }
     return 'retryable';
@@ -251,6 +271,7 @@ export async function runNeedsInputInteraction({
           manager,
           action,
           kiloSessionId,
+          raiseId,
           sleep,
           pollIntervalMs,
           missingRaiseSettleMs,
@@ -261,7 +282,7 @@ export async function runNeedsInputInteraction({
           // that can no longer do anything — the same clear a successful
           // answer performs.
           ackGone: () => {
-            ack(kiloSessionId, answeredRaise.status, answeredRaise.statusUpdatedAt);
+            ack(kiloSessionId, answeredStatus, ackRaiseId);
           },
         });
         if (resolution.kind === 'answered') {
@@ -272,10 +293,17 @@ export async function runNeedsInputInteraction({
           return 'retryable';
         }
       }
+      // The wait can span a raise: re-read the row immediately before sending,
+      // so the request is answered only while the session waits on the raise
+      // the notification presents.
+      const gate = await presentedRaiseGate({ getSession, kiloSessionId, action, raiseId, ack });
+      if (gate !== 'answer') {
+        return gate;
+      }
       await (action === 'approve'
         ? manager.respondToPermission(requestId, 'once')
         : manager.answerQuestion(requestId, [[replyText]]));
-      ack(kiloSessionId, answeredRaise.status, answeredRaise.statusUpdatedAt);
+      ack(kiloSessionId, answeredStatus, ackRaiseId);
       return 'ok';
     } finally {
       manager.destroy();
@@ -396,6 +424,8 @@ async function resolveMissingRequestId(args: {
   manager: NeedsInputSessionManager;
   action: NeedsInputAction;
   kiloSessionId: string;
+  /** The raise the notification presented, when its payload named one. */
+  raiseId: string | undefined;
   sleep: (ms: number) => Promise<void>;
   pollIntervalMs: number;
   missingRaiseSettleMs: number;
@@ -416,6 +446,7 @@ async function resolveMissingRequestId(args: {
     manager,
     action,
     kiloSessionId,
+    raiseId,
     sleep,
     pollIntervalMs,
     missingRaiseSettleMs,
@@ -442,7 +473,7 @@ async function resolveMissingRequestId(args: {
   if (!liveSnapshotLanded(store, manager) || anyRaisePending()) {
     return { kind: 'retryable' };
   }
-  const raiseState = await readRaiseState(getSession, kiloSessionId);
+  const raiseState = await readPresentedRaiseState({ getSession, kiloSessionId, raiseId });
   if (raiseState === 'unknown') {
     return { kind: 'retryable' };
   }
@@ -458,26 +489,6 @@ async function resolveMissingRequestId(args: {
   }
   ackGone();
   return { kind: 'ended', outcome: 'unavailable' };
-}
-
-/**
- * The raise's current server-side state, read fresh at outcome time: the raise
- * may have moved on (answered elsewhere) between the notification being posted
- * and this tap, which is exactly what separates an ended raise from a gone
- * one. A failed read cannot prove anything either way, so it reports
- * `unknown` — the caller keeps the actions rather than announcing an outcome
- * it cannot back.
- */
-async function readRaiseState(
-  getSession: (kiloSessionId: string) => Promise<SessionRow>,
-  kiloSessionId: string
-): Promise<'raised' | 'moved' | 'unknown'> {
-  try {
-    const { status } = await getSession(kiloSessionId);
-    return status === 'question' || status === 'permission' ? 'raised' : 'moved';
-  } catch {
-    return 'unknown';
-  }
 }
 
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin trpc / stored-value / timer passthroughs */

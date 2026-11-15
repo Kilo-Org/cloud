@@ -35,11 +35,6 @@ export function SidebarSettingsSection({ organizationId }: { organizationId?: st
       onSuccess: invalidateSidebar,
     })
   );
-  const updateFolder = useMutation(
-    trpc.workspaceFolders.update.mutationOptions({
-      onSuccess: invalidateSidebar,
-    })
-  );
   const deleteFolder = useMutation(
     trpc.workspaceFolders.delete.mutationOptions({
       onSuccess: invalidateSidebar,
@@ -54,11 +49,7 @@ export function SidebarSettingsSection({ organizationId }: { organizationId?: st
   const folders = foldersQuery.data?.folders ?? [];
   const smartFolderFor = (preset: SmartFolderPreset) =>
     folders.find(folder => folder.kind === 'smart' && folder.smartPreset === preset);
-  const busy =
-    createFolder.isPending ||
-    updateFolder.isPending ||
-    deleteFolder.isPending ||
-    setWorkspaceOrder.isPending;
+  const busy = createFolder.isPending || deleteFolder.isPending || setWorkspaceOrder.isPending;
 
   const toggleSmartFolder = (preset: SmartFolderPreset, enabled: boolean) => {
     const toggle = getSmartFolderToggle(folders, preset, enabled);
@@ -113,8 +104,7 @@ export function SidebarSettingsSection({ organizationId }: { organizationId?: st
         </div>
         <p className="text-muted-foreground text-sm">
           This order is personal to you. It applies to your personal account and to all your
-          organizations, including workspaces in regular folders. Smart folders have their own
-          order.
+          organizations, including workspaces in regular and smart folders.
         </p>
         <div className="flex flex-wrap gap-2">
           {SIDEBAR_SORT_OPTIONS.map(option => (
@@ -146,8 +136,12 @@ export function SidebarSettingsSection({ organizationId }: { organizationId?: st
           <Badge variant="secondary">Only you</Badge>
         </div>
         <p className="text-muted-foreground text-sm">
-          Smart folders group workspaces automatically. Add one to the sidebar, set its order, and
-          remove it without deleting any workspace.
+          Smart folders automatically include existing and future matching workspaces. Remove one
+          without deleting any workspace.
+        </p>
+        <p className="text-muted-foreground text-sm">
+          Workspaces in regular folders stay there, except when they need your attention. Done
+          includes older completed workspaces too.
         </p>
         <div className="flex flex-col gap-3">
           {SMART_FOLDER_DEFINITIONS.map(definition => {
@@ -167,30 +161,6 @@ export function SidebarSettingsSection({ organizationId }: { organizationId?: st
                   <p className="text-muted-foreground text-xs">{definition.description}</p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  {enabled && folder && (
-                    <select
-                      aria-label={`Sort ${definition.name}`}
-                      className="border-input bg-background h-8 rounded-md border px-2 text-xs"
-                      value={folder.sortMode}
-                      disabled={busy}
-                      onChange={event => {
-                        const value = event.target.value;
-                        if (value === 'manual' || value === 'created' || value === 'activity') {
-                          updateFolder.mutate({
-                            ...scope,
-                            folderId: folder.id,
-                            sortMode: value,
-                          });
-                        }
-                      }}
-                    >
-                      {SIDEBAR_SORT_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
                   <Button
                     type="button"
                     size="sm"
@@ -212,8 +182,8 @@ export function SidebarSettingsSection({ organizationId }: { organizationId?: st
       </section>
 
       <p className="text-muted-foreground text-xs">
-        Drag a workspace onto a folder to move it. To reorder workspaces within a regular folder or
-        Ungrouped, set Workspace order to Manual.
+        Drag a workspace onto a regular folder to move it. Smart folders do not accept drops. To
+        reorder workspaces within a regular folder or Ungrouped, set Workspace order to Manual.
       </p>
     </div>
   );

@@ -85,7 +85,11 @@ vi.mock('expo-secure-store', () => ({
     store.delete(key);
   },
 }));
-vi.mock('@/lib/storage-keys', () => ({ PR_REVIEW_RECENTS_KEY: 'pr-review-recents' }));
+vi.mock('@/lib/storage-keys', () => ({
+  ACTIVE_USER_ID_KEY: 'active-user-id',
+  ORGANIZATION_STORAGE_KEY: 'organization',
+  PR_REVIEW_RECENTS_KEY: 'pr-review-recents',
+}));
 vi.mock('@/lib/auth/account-metadata-write', () => ({
   writeAccountMetadata: async (_key: string, write: () => Promise<void>) => {
     await write();

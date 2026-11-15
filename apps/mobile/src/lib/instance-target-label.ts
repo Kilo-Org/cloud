@@ -14,6 +14,17 @@ export function formatInstanceTarget(
   return `${instance.name} · ${instance.projectName}`;
 }
 
+/**
+ * The closed selector's one-line value for a bound target: the computer name
+ * alone, including the status the CLI reports with it. The project is the
+ * Folder field's job on the same form, so repeating it here only cost the name
+ * its line on a compact screen. `formatInstanceTarget` still carries both for
+ * the accessibility label and the sheet's wrapping row.
+ */
+export function formatInstanceValue(instance: Pick<InstancePickerInstance, 'name'>): string {
+  return instance.name;
+}
+
 /** The picker's label for its default Cloud Agent target. */
 export function cloudAgentTargetLabel(): string {
   return i18n.t('agentChat.instancePicker.cloudAgent');

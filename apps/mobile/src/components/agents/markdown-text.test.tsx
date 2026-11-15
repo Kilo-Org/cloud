@@ -64,9 +64,11 @@ const translate = vi.hoisted(
 );
 
 vi.mock('react-native', () => rnStub);
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronRight: 'DirectionalChevronRight',
+}));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
-  ChevronRight: 'ChevronRight',
 }));
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },

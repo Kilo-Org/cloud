@@ -179,6 +179,8 @@ This PR does not retire legacy native exchange, shorten user credentials, change
 
 Workflow issuance reads the existing primary user pepper, including explicit `null`, without initializing or rotating it. Modern workflow tokens retain their audience, purpose, exchange restrictions, and bounded lifetime. This requires no migration and must not reset already initialized peppers; genuine pepper rotation continues to revoke previously issued credentials.
 
+The gateway credential issued for a queued workflow is limited to one hour, and it carries the caller's organization, in both issuance modes. A requested lifetime that is not positive is rejected in both modes. Its compatibility shape omits the audience for receivers that require that shape.
+
 Discord session operations use `generateCloudAgentWorkflowToken` for the installation's
 acting user, with the installation's organization scope and a one-hour lifetime.
 The shared Cloud Agent rollout flags select the credential format. Model calls retain
@@ -257,3 +259,21 @@ User-source GraphQL requests retain the user's GitHub permissions; they are not 
 Repository-only and installation-source capabilities continue to use their scoped installation credentials.
 Redemption still checks the container binding, current authorization, integration, and recorded identity.
 If the selected user authorization disappears, redemption fails without falling back to the bot.
+
+## Native passkey management
+
+A device-session bearer identifies the caller but cannot authorize a passkey change alone.
+Adding, renaming, or removing a passkey also requires fresh primary verification.
+Email codes and passkey assertions use the existing sign-in proof checks.
+Accounts that require SSO approve the change through a fresh browser SSO session for the required organization.
+The browser verifies the same account and current SSO policy; management then finishes in the native app.
+
+Each opaque authorization is bound to the account, device session, and operation.
+Enrollment also binds its registration challenge.
+Only the authorization digest is stored, and successful mutation consumes it atomically.
+An authorization expires after five minutes; an SSO approval request expires after ten minutes.
+Revocation and account recovery invalidate outstanding authorizations.
+Approval URLs carry no authorization secret, and this flow issues no access or refresh token.
+
+`device_auth_request_id` is not an app-versus-CLI security boundary: mobile browser sign-in also sets it.
+Authorization depends on the live owned session and independent primary proof, never a user-agent label.

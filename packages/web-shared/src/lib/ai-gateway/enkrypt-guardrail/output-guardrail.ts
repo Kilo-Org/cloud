@@ -5,19 +5,21 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
-  responseBlockMessage,
+  scanLogFields,
   scanRequest,
-  type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
+  type EnkryptScanContext,
   type EnkryptScanCoverage,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   guardrailSettings,
   type EnkryptOutputGuardrailReport,
-  type EnkryptScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import { usageRecordsWithAddedLatency } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
+import {
+  recordEnkryptUsageRecords,
+  usageRecordsWithAddedLatency,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import {
   extractResponseText,
   type ResponseBodyFormat,
@@ -27,11 +29,9 @@ import {
   resolveEnkryptOutputGuardrail,
   splitEnkryptInputGuardrail,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import {
-  enkryptCreditsToMicrodollars,
-  recordEnkryptUsage,
-  type EnkryptGuardrailCall,
-  type EnkryptUsageRecord,
+import type {
+  EnkryptGuardrailCall,
+  EnkryptUsageRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -40,7 +40,7 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 /** The request a response scan belongs to. The scanned text is the response. */
-export type EnkryptOutputScan = Omit<EnkryptGuardrailScan, 'text' | 'coverage'>;
+export type EnkryptOutputScan = EnkryptScanContext;
 
 /** The response scan of an organization member's request, or null without an output guardrail. */
 export function resolveEnkryptOutputScan(
@@ -63,28 +63,22 @@ const SHORTER_RESPONSE_ADVICE =
 
 const HELD_OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot hold back more than ${MAX_HELD_OUTPUT_BYTES / 1024 / 1024} MB of model response at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
-const OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of model output at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
+export const RESPONSE_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of model output at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
-type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
-  /** Null when Enkrypt was not asked. */
-  report: EnkryptScanReport | null;
-};
+type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'>;
 
 const outputTooLarge: OutputScanResult = {
-  verdict: { action: 'block', message: OUTPUT_TOO_LARGE_MESSAGE },
+  verdict: { action: 'block', message: RESPONSE_TOO_LARGE_MESSAGE },
   usageRecords: [],
-  report: null,
 };
 
-/** Responses that `scanRequest` would reject as too large never reach it, so it is not billed. */
+/**
+ * A response is scanned in one call, so one longer than a call can hold is blocked without a scan.
+ * Checking it here, rather than leaving it to `scanRequest`, words the block for the response and
+ * records why the output was not scanned.
+ */
 function isTooLargeToScan(text: string): boolean {
   return text.length > ENKRYPT_MAX_SCAN_CHARACTERS;
-}
-
-function asResponseVerdict(verdict: EnkryptGuardrailVerdict): EnkryptGuardrailVerdict {
-  return verdict.action === 'block'
-    ? { action: 'block', message: responseBlockMessage(verdict.message) }
-    : verdict;
 }
 
 /** The comment the response rewrite already sends for upstream keep-alives. */
@@ -109,17 +103,18 @@ type OutputDecision =
 const notScanned: OutputScanResult = {
   verdict: { action: 'skip' },
   usageRecords: [],
-  report: null,
 };
 
 /** A response is scanned whole; output scans never use the verdict cache. */
 function wholeResponseCoverage(text: string): EnkryptScanCoverage {
   return {
+    part: 'response',
     cache: 'off',
     totalCharacters: text.length,
     totalSegments: text.length > 0 ? 1 : 0,
     cachedCharacters: 0,
     cachedSegments: 0,
+    omittedAttachments: 0,
   };
 }
 
@@ -189,26 +184,8 @@ function outputUsageRecords(
   );
 }
 
-/** Never rejects: a failed write is logged and the record dropped, like the input guardrail's. */
-async function recordEnkryptUsageRecords(usageRecords: EnkryptUsageRecord[]): Promise<void> {
-  await Promise.all(
-    usageRecords.map(usageRecord =>
-      recordEnkryptUsage(usageRecord).catch((error: unknown) => {
-        console.error('[enkrypt-guardrail] usage record write failed; record dropped', {
-          guardrail: 'output',
-          organization_id: usageRecord.organizationId,
-          kilo_user_id: usageRecord.kiloUserId,
-          session_id: usageRecord.sessionId,
-          api_kind: usageRecord.apiKind,
-          decision: usageRecord.decision,
-          credits_cost: usageRecord.creditsCost,
-          charged_microdollars: enkryptCreditsToMicrodollars(usageRecord.creditsCost),
-          added_latency_ms: usageRecord.addedLatencyMs,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      })
-    )
-  );
+function recordOutputUsageRecords(usageRecords: EnkryptUsageRecord[]): Promise<void> {
+  return recordEnkryptUsageRecords(usageRecords, { guardrail: 'output' });
 }
 
 function errorMessage(error: unknown): string {
@@ -333,13 +310,7 @@ export async function guardEnkryptOutput({
       captureResponse: captureResponse.promise,
     },
   };
-  const logFields = {
-    guardrail: 'output',
-    organization_id: scan.organizationId,
-    session_id: scan.sessionId,
-    client_request_id: scan.clientRequestId,
-    api_kind: scan.apiKind,
-  };
+  const logFields = { guardrail: 'output', ...scanLogFields(scan) };
   const report: EnkryptOutputGuardrailReport = {
     settings: guardrailSettings(scan.config),
     held_back: blocking !== null,
@@ -361,7 +332,7 @@ export async function guardEnkryptOutput({
       { ...scan, config, text, coverage: wholeResponseCoverage(text) },
       deps
     );
-    report.scans.push(result.report);
+    report.scans.push({ ...result.report, part: 'response' });
     return result;
   };
   const finish = async (decision: OutputDecision): Promise<NextResponse> => {
@@ -380,10 +351,11 @@ export async function guardEnkryptOutput({
       verdict: verdict.action,
       reason: report.unavailable_reason ?? report.not_scanned_reason ?? undefined,
     });
-    const rejection = enkryptOutputGuardrailRejectionResponse(kind, verdict, stream);
-    return rejection
-      ? { action: 'reject', response: rejection, verdict }
-      : { action: 'release', response: allowed };
+    return {
+      action: 'reject',
+      response: enkryptOutputGuardrailRejectionResponse(kind, verdict, stream),
+      verdict,
+    };
   };
   const finalReport = (): EnkryptOutputGuardrailReport => ({
     ...report,
@@ -416,7 +388,7 @@ export async function guardEnkryptOutput({
           });
         }
       })();
-      const logged = scanned.then(records => recordEnkryptUsageRecords(records ?? []));
+      const logged = scanned.then(records => recordOutputUsageRecords(records ?? []));
       after(logged);
       captureRequestLogs?.(async (shouldCaptureResponse = true) => {
         captureResponse.resolve(shouldCaptureResponse);
@@ -478,7 +450,6 @@ export async function guardEnkryptOutput({
         return {
           verdict: { action: 'unavailable', reason: 'failed' },
           usageRecords: [],
-          report: null,
         };
       });
     const logOnlyResult = text
@@ -498,13 +469,13 @@ export async function guardEnkryptOutput({
     const addedLatencyMs = Math.round(performance.now() - waitStartedAt);
     report.added_latency_ms = addedLatencyMs;
     return {
-      decision: decide(asResponseVerdict(verdict), replayedResponse(response, buffered)),
+      decision: decide(verdict, replayedResponse(response, buffered)),
       usageRecords: logOnlyResult.then(logOnlyScan =>
         outputUsageRecords(usageRecords, logOnlyScan.usageRecords, addedLatencyMs)
       ),
     };
   })();
-  const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordEnkryptUsageRecords);
+  const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordOutputUsageRecords);
   after(recorded);
   captureRequestLogs?.(async (shouldCaptureResponse = true) => {
     captureResponse.resolve(shouldCaptureResponse);

@@ -35,7 +35,10 @@ export const listAvailableModelsProcedure = organizationMemberProcedure
         allowNonMember: true,
       },
       audience,
-      { countryCode: requestCountryCode(ctx.headersList) }
+      {
+        countryCode: requestCountryCode(ctx.headersList),
+        fromDb: ctx.fromDb,
+      }
     );
     if (!result) {
       throw new TRPCError({

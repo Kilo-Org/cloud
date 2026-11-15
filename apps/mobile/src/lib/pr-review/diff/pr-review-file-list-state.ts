@@ -19,8 +19,9 @@
 // to the right terminal state.
 
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { flattenFilePages } from '@/lib/pr-review/diff/dedupe-file-pages';
 import { PR_REVIEW_MAX_PAGES } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -37,6 +38,7 @@ import {
 } from '@/lib/pr-review/provider-pr-ref';
 import { viewedFilesKey, type ViewedFilesRef } from '@/lib/pr-review/viewed-files';
 import { withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { type SurfaceFeedback } from '@/lib/surface-feedback';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -165,23 +167,24 @@ export function usePrReviewViewedFiles(ref: ViewedFilesRef, headSha: string) {
  * Drives an infinite list query to completion. Used by the file
  * navigator (S6c) which needs the full listed set to offer a working
  * search/scrubber. Returns an imperative `run()` so the consumer can
- * start it from a button or an effect and observe progress via
- * `isRunning` / `loadedFiles` / `error`.
+ * start it from a button or an effect and observe the phase through
+ * `feedback` / `failure`.
  */
+export type PageRunFailure = { readonly kind: 'load-all-failed'; readonly at: number };
+
 export type FetchToCompletionResult = {
   run: () => Promise<void>;
-  isRunning: boolean;
   loadedFiles: number;
   totalFiles: number | null;
-  error: unknown;
+  feedback: SurfaceFeedback<PageRunFailure>;
+  failure: PageRunFailure | null;
 };
 
 export function useFetchToCompletion(
   query: ReturnType<typeof usePrReviewFileListQuery>['query'],
   totalFiles: number | null
 ): FetchToCompletionResult {
-  const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PageRunFailure>();
 
   const loadedFiles = (query.data?.pages ?? []).reduce((sum, page) => sum + page.files.length, 0);
 
@@ -191,11 +194,19 @@ export function useFetchToCompletion(
   queryRef.current = query;
 
   const run = useCallback(async () => {
+    // A background refetch is already running: fetchNextPage would cancel it
+    // (TanStack's default cancelRefetch) and append to the old pages. The
+    // admission below guards this surface's own attempt, not the query's work.
     if (queryRef.current.isFetching || !queryRef.current.hasNextPage) {
       return;
     }
-    setError(null);
-    setIsRunning(true);
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
+    // Authoritative only until the first page result arrives; every result below
+    // replaces it, so the failure records the version the run actually failed at.
+    let at = queryRef.current.dataUpdatedAt;
     try {
       // Loop instead of recursing to keep the call stack flat. Pages must be
       // fetched sequentially because each request needs the previous page's
@@ -206,6 +217,7 @@ export function useFetchToCompletion(
       while (queryRef.current.hasNextPage) {
         // eslint-disable-next-line no-await-in-loop -- sequential cursor pagination
         const result = await queryRef.current.fetchNextPage();
+        at = result.dataUpdatedAt;
         // fetchNextPage resolves (does not throw) on a failed page while
         // keeping prior pages and hasNextPage. Route that through the
         // catch so the load-all retry can render.
@@ -218,12 +230,24 @@ export function useFetchToCompletion(
           break;
         }
       }
-    } catch (caughtError) {
-      setError(caughtError);
-    } finally {
-      setIsRunning(false);
+      attempt.succeed();
+    } catch {
+      attempt.fail({ kind: 'load-all-failed', at });
     }
-  }, []);
+  }, [begin]);
 
-  return { run, isRunning, loadedFiles, totalFiles, error };
+  // A page that landed after the failure makes it false: retire the line
+  // instead of leaving a "stopped" report over a complete list.
+  useEffect(() => {
+    // The failure identity is a dependency, not just the version: a refetch can
+    // move `dataUpdatedAt` while the run is still looping, so the effect that
+    // saw the newer version ran before anything was published. Without this the
+    // failure outlives its own recovery until the user retries.
+    if (failure === null) {
+      return;
+    }
+    clearWhere(f => query.dataUpdatedAt > f.at);
+  }, [clearWhere, failure, query.dataUpdatedAt]);
+
+  return { run, loadedFiles, totalFiles, feedback, failure };
 }

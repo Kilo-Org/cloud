@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ValidateKiloTokenModule from '../validate-kilo-token.js';
 import type { HonoContext } from '../hono-context.js';
@@ -37,6 +38,7 @@ vi.mock('../logger.js', () => {
 
 const { authMiddleware } = await import('./auth.js');
 const { validateKiloToken } = await import('../validate-kilo-token.js');
+const { logger } = await import('../logger.js');
 
 describe('authMiddleware', () => {
   beforeEach(() => {
@@ -65,6 +67,41 @@ describe('authMiddleware', () => {
         retryable: false,
       },
     });
+  });
+
+  it('returns a retryable service-unavailable envelope when token validation throws', async () => {
+    vi.mocked(validateKiloToken).mockRejectedValue(new Error('pepper query failed'));
+    const handler = vi.fn(() => new Response('ok'));
+    const app = new Hono<HonoContext>();
+    app.use('/trpc/*', authMiddleware);
+    app.post('/trpc/:procedure', handler);
+
+    const response = await app.fetch(
+      new Request('https://worker.test/trpc/getSession', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer secret-token-value' },
+      }),
+      { NEXTAUTH_SECRET: 'secret', HYPERDRIVE: { connectionString: 'postgres://test' } } as Env
+    );
+    const body: any = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toMatchObject({
+      message: 'Authentication is temporarily unavailable',
+      code: TRPC_ERROR_CODES_BY_KEY.SERVICE_UNAVAILABLE,
+      data: {
+        code: 'SERVICE_UNAVAILABLE',
+        httpStatus: 503,
+        path: 'getSession',
+        clientError: { code: 'SERVICE_UNAVAILABLE', retryable: true },
+      },
+    });
+    expect(handler).not.toHaveBeenCalled();
+    expect(logger.withFields).toHaveBeenCalledWith({ error: 'pepper query failed' });
+    expect(JSON.stringify(vi.mocked(logger.withFields).mock.calls)).not.toContain(
+      'secret-token-value'
+    );
+    expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain('secret-token-value');
   });
 
   it('resolves NEXTAUTH_SECRET from Secrets Store before validating the token', async () => {

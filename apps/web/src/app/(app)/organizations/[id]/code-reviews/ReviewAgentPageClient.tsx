@@ -26,8 +26,10 @@ import {
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import { CODE_REVIEW_COUNCIL_FLAG } from '@/lib/code-reviews/core/council-selection';
-import { CODE_REVIEW_MD_CONVERSION_FLAG } from '@/lib/code-reviews/core/constants';
+import {
+  CODE_REVIEW_COUNCIL_FLAG,
+  CODE_REVIEW_MD_CONVERSION_FLAG,
+} from '@kilocode/app-shared/feature-flags';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';

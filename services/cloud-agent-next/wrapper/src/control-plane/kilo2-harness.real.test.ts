@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import { PINNED_CLIS } from '../../../scripts/runtime-cli-artifact.js';
 import { createMessageId } from '../../../src/shared/message-id.js';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import { createKiloRuntime } from './kilo-runtime.js';
@@ -31,7 +32,9 @@ suite('real Kilo v2 harness', () => {
     if (process.env.KILO_RUNTIME_HARNESS !== 'kilo2')
       throw new Error('Run this suite with KILO_RUNTIME_HARNESS=kilo2');
     const version = Bun.spawn([binary, '--version']);
-    expect((await new Response(version.stdout).text()).trim()).toBe('kilo2 v0.0.0-v2-77');
+    expect((await new Response(version.stdout).text()).trim()).toBe(
+      PINNED_CLIS.kilo2.reportedVersion
+    );
     expect(await version.exited).toBe(0);
     const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-compact-')));
     const directory = path.join(root, 'workspace');
@@ -642,6 +645,15 @@ suite('real Kilo v2 harness', () => {
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(path.join(directory, 'AGENTS.md'), 'SYNTHETIC_REPOSITORY_INSTRUCTION');
     const materializer = createRuntimeProfileMaterializer();
+    await fs.mkdir(path.join(directory, '.kilo'), { recursive: true });
+    await fs.writeFile(
+      path.join(directory, '.kilo/kilo.json'),
+      JSON.stringify({ instructions: ['.kilo/repository-instructions.md'] })
+    );
+    await fs.writeFile(
+      path.join(directory, '.kilo/repository-instructions.md'),
+      'SYNTHETIC_RELEASE_REPOSITORY_INSTRUCTION'
+    );
     await materializer.materialize(root, {
       runtimeInstructions: [
         { name: 'disabled-proof', content: 'SYNTHETIC_DISABLED_PROFILE_INSTRUCTION' },
@@ -696,10 +708,39 @@ suite('real Kilo v2 harness', () => {
     };
     await materializer.materialize(root, profile);
     const requests: string[] = [];
+    let mcpAuthenticated = false;
     const fake = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
       async fetch(request) {
+        if (new URL(request.url).pathname === '/mcp') {
+          if (request.method !== 'POST') return new Response(null, { status: 405 });
+          const rpc = z
+            .object({ id: z.union([z.string(), z.number()]).optional(), method: z.string() })
+            .parse(await request.json());
+          if (rpc.id === undefined) return new Response(null, { status: 202 });
+          mcpAuthenticated = request.headers.get('x-profile-proof') === 'synthetic-mcp-value';
+          return Response.json({
+            jsonrpc: '2.0',
+            id: rpc.id,
+            result:
+              rpc.method === 'initialize'
+                ? {
+                    protocolVersion: '2024-11-05',
+                    capabilities: { tools: {} },
+                    serverInfo: { name: 'synthetic-profile', version: '1' },
+                  }
+                : {
+                    tools: [
+                      {
+                        name: 'profile-proof',
+                        description: 'SYNTHETIC_PROFILE_MCP',
+                        inputSchema: { type: 'object', properties: {} },
+                      },
+                    ],
+                  },
+          });
+        }
         if (new URL(request.url).pathname.endsWith('/models'))
           return Response.json({
             data: [
@@ -747,7 +788,14 @@ suite('real Kilo v2 harness', () => {
             },
           },
           {},
-          { PATH: `${path.dirname(binary)}:${process.env.PATH ?? ''}` }
+          { PATH: `${path.dirname(binary)}:${process.env.PATH ?? ''}` },
+          {
+            'profile-proof': {
+              type: 'remote',
+              url: `${fake.url.origin}/mcp`,
+              headers: { 'x-profile-proof': 'synthetic-mcp-value' },
+            },
+          }
         ),
         profile
       ),
@@ -834,6 +882,7 @@ suite('real Kilo v2 harness', () => {
       );
       expect(events.some(event => event.type === 'command.updated')).toBe(true);
       expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_RELEASE_REPOSITORY_INSTRUCTION');
       expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
       expect(requests.at(-1)).not.toContain('SYNTHETIC_DISABLED_PROFILE_INSTRUCTION');
       expect((await harness.listCommands()).commands).toContainEqual(
@@ -842,6 +891,22 @@ suite('real Kilo v2 harness', () => {
       if (!profileServer) throw new Error('Profile runtime did not start');
       const api = createKilo2Api(profileServer);
       const query = `location[directory]=${encodeURIComponent(directory)}`;
+      await until(
+        async () =>
+          z
+            .array(
+              z.object({
+                name: z.string(),
+                status: z.object({ status: z.string() }),
+              })
+            )
+            .parse(await api.data(`/api/mcp?${query}`))
+            .some(
+              server => server.name === 'profile-proof' && server.status.status === 'connected'
+            ),
+        'profile MCP connection'
+      );
+      expect(mcpAuthenticated).toBe(true);
       expect(await api.data(`/api/agent?${query}`)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -877,6 +942,39 @@ suite('real Kilo v2 harness', () => {
       );
       expect(requests.at(-1)).toContain('Run the profile command SYNTHETIC_ARGUMENT');
       expect(requests.at(-1)).toContain('SYNTHETIC_PROFILE_AGENT');
+      const siblingId = `ses_${'c'.repeat(26)}`;
+      await harness.open({
+        sessionId: siblingId,
+        directory,
+        env,
+        signal,
+        restoreFiles: false,
+        onRestore() {},
+      });
+      await harness.command({
+        sessionId: siblingId,
+        directory,
+        command: 'profile-command',
+        args: 'SYNTHETIC_SIBLING_ARGUMENT',
+        model: 'fake-deterministic',
+        signal,
+      });
+      await until(
+        async () =>
+          requests.some(
+            request =>
+              request.includes('SYNTHETIC_SIBLING_ARGUMENT') &&
+              request.includes('SYNTHETIC_PROFILE_AGENT')
+          ),
+        'sibling profile command'
+      );
+      const siblingRequest = requests.find(
+        request =>
+          request.includes('SYNTHETIC_SIBLING_ARGUMENT') &&
+          request.includes('SYNTHETIC_PROFILE_AGENT')
+      );
+      expect(siblingRequest).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
+      expect(siblingRequest).toContain('SYNTHETIC_PROFILE_SKILL');
       await harness.command({
         sessionId,
         directory,

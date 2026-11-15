@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "സജീവ ഏജന്റുകൾക്ക് ഒരു അപ്ഡേറ്റ് ഉണ്ട്"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ടാസ്ക് പൂർത്തിയായി"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "പരാജയപ്പെട്ടു: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "തടസ്സപ്പെട്ടു: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

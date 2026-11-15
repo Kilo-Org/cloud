@@ -717,7 +717,7 @@ test.describe('control-plane sandbox header', () => {
         await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
         await fixture.activity(firstWorkspace, 'busy');
         await expect(
-          page.getByRole('button', { name: 'Stop response', exact: true })
+          page.getByRole('button', { name: 'Stop response or workspace preparation', exact: true })
         ).toBeVisible();
         await fixture.advance(1_000);
         const initialReads = readCount();
@@ -733,9 +733,9 @@ test.describe('control-plane sandbox header', () => {
         await fixture.worktreeReady(firstWorkspace, 2);
         await fixture.worktreeReady(firstWorkspace, 1);
         await fixture.activity(firstWorkspace, 'idle');
-        await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toHaveCount(
-          0
-        );
+        await expect(
+          page.getByRole('button', { name: 'Stop response or workspace preparation', exact: true })
+        ).toHaveCount(0);
         publish(3);
         await fixture.advance(40_000);
         expect(readCount()).toBe(initialReads + 1);
@@ -1016,7 +1016,9 @@ test.describe('control-plane sandbox header', () => {
     const changes = page.getByRole('button', { name: 'Changes', exact: true });
     await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
     await fixture.activity(firstWorkspace, 'busy');
-    await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Stop response or workspace preparation', exact: true })
+    ).toBeVisible();
     await fixture.advance(1_000);
     let attempts = 0;
     fixture.setWorktreeReply(() =>
@@ -1044,7 +1046,9 @@ test.describe('control-plane sandbox header', () => {
       const changes = page.getByRole('button', { name: 'Changes', exact: true });
       await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
       await fixture.activity(firstWorkspace, 'busy');
-      await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Stop response or workspace preparation', exact: true })
+      ).toBeVisible();
       await fixture.advance(1_000);
       let attempts = 0;
       fixture.setWorktreeReply(() => {
@@ -1073,7 +1077,9 @@ test.describe('control-plane sandbox header', () => {
     const changes = page.getByRole('button', { name: 'Changes', exact: true });
     await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
     await fixture.activity(firstWorkspace, 'busy');
-    await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Stop response or workspace preparation', exact: true })
+    ).toBeVisible();
     await fixture.advance(1_000);
     const held = deferred<RpcResult>();
     let reads = 0;
@@ -1118,7 +1124,9 @@ test.describe('control-plane sandbox header', () => {
     try {
       await fixture.open();
       await fixture.activity(firstWorkspace, 'busy');
-      await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Stop response or workspace preparation', exact: true })
+      ).toBeVisible();
       await fixture.advance(1_000);
       await expect.poll(() => fixture.worktreeRequests.length).toBeGreaterThan(0);
       const initialReads = fixture.worktreeRequests.length;
@@ -1148,7 +1156,9 @@ test.describe('control-plane sandbox header', () => {
     await fixture.navigate(secondId);
     await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
     await fixture.activity(secondWorkspace, 'busy');
-    await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Stop response or workspace preparation', exact: true })
+    ).toBeVisible();
     await fixture.advance(1_000);
     const selectedReads = fixture.worktreeRequests.length;
     fixture.setWorktreeChanges(worktreeSnapshot(2), secondWorkspace);

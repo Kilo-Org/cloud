@@ -17,6 +17,7 @@ import type {
   RecordStartInput,
   RecordStopInput,
   UsageContext,
+  BillingSubject,
 } from '@kilocode/container-usage';
 import { heartbeatIdempotencyKey } from '@kilocode/container-usage';
 import { computeMemberId } from '@kilocode/worker-utils/compute-member';
@@ -417,7 +418,7 @@ async function recoverMissingInterval(
 // organizations use their live parent's plan, trial and subscription. The
 // hierarchy is one level deep.
 async function isUnreviewedEnterpriseOrganization(
-  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  tx: WorkerDb | Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
   organizationId: string,
   now: Date
 ): Promise<boolean> {
@@ -462,7 +463,7 @@ const STARTED_PAYING_SEAT_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
 ]);
 
 async function hasStartedPayingForSeats(
-  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  tx: WorkerDb | Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
   organizationId: string
 ): Promise<boolean> {
   // Read the latest event, not any historical active subscription.
@@ -473,6 +474,26 @@ async function hasStartedPayingForSeats(
     .orderBy(desc(organization_seats_purchases.created_at))
     .limit(1);
   return purchase !== undefined && STARTED_PAYING_SEAT_SUBSCRIPTION_STATUSES.has(purchase.status);
+}
+
+export async function resolveBillingMode(
+  database: WorkerDb | Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  billingConfig: BillingConfig,
+  service: string,
+  subject: BillingSubject,
+  now: Date
+): Promise<'shadow' | 'paid'> {
+  const mode = billingModeFor(billingConfig, service, subject);
+  if (
+    mode === 'paid' &&
+    service.startsWith('cloud-agent-next-') &&
+    subject.type === 'org' &&
+    !billingConfig.cloudAgentOrgIds.has(subject.id) &&
+    (await isUnreviewedEnterpriseOrganization(database, subject.id, now))
+  ) {
+    return 'shadow';
+  }
+  return mode;
 }
 
 export async function applyStart(
@@ -547,16 +568,13 @@ export async function applyStartWithDb(
       };
     }
 
-    let billingMode = billingModeFor(billingConfig, input.service, input.subject);
-    if (
-      billingMode === 'paid' &&
-      input.service.startsWith('cloud-agent-next-') &&
-      input.subject.type === 'org' &&
-      !billingConfig.cloudAgentOrgIds.has(input.subject.id) &&
-      (await isUnreviewedEnterpriseOrganization(tx, input.subject.id, new Date(receivedAtMs)))
-    ) {
-      billingMode = 'shadow';
-    }
+    const billingMode = await resolveBillingMode(
+      tx,
+      billingConfig,
+      input.service,
+      input.subject,
+      new Date(receivedAtMs)
+    );
     const [open] = await tx
       .select()
       .from(container_usage_interval)

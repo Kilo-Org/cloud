@@ -14,11 +14,13 @@ import {
 import { resolveEnkryptOutputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import {
   guardEnkryptOutput,
   MAX_HELD_OUTPUT_BYTES,
   OUTPUT_KEEP_ALIVE_INTERVAL_MS,
   resolveEnkryptOutputScan,
+  RESPONSE_TOO_LARGE_MESSAGE,
   type EnkryptOutputScan,
 } from './output-guardrail';
 
@@ -239,15 +241,15 @@ function mockEnkrypt(
   respond: (request: DetectRequest, init: RequestInit) => Promise<Response> | Response
 ) {
   return jest.spyOn(global, 'fetch').mockImplementation(async (input, init = {}) => {
-    if (input !== ENKRYPT_DETECT_URL) throw new Error(`unexpected fetch to ${String(input)}`);
-    const body: unknown = JSON.parse(String(init.body));
+    if (input !== ENKRYPT_DETECT_URL) throw new Error(`unexpected fetch to ${requestUrlOf(input)}`);
+    const body: unknown = readJsonBody(init.body);
     return respond(body as DetectRequest, init);
   });
 }
 
 function detectRequests(fetchSpy: ReturnType<typeof mockEnkrypt>): DetectRequest[] {
   return fetchSpy.mock.calls.map(([, init]) => {
-    const body: unknown = JSON.parse(String(init?.body));
+    const body: unknown = readJsonBody(init?.body);
     return body as DetectRequest;
   });
 }
@@ -321,6 +323,7 @@ const blockingPiiSettings = {
 function scanReport(overrides: Record<string, unknown>) {
   return {
     scan: 'blocking',
+    part: 'response',
     detectors_enabled: ['pii'],
     detectors_blocking: ['pii'],
     verdict_cache: 'off',
@@ -328,6 +331,7 @@ function scanReport(overrides: Record<string, unknown>) {
     total_segments: 1,
     cached_characters: 0,
     cached_segments: 0,
+    omitted_attachments: 0,
     scanned_characters: MODEL_OUTPUT.length,
     decision: 'allowed',
     error: null,
@@ -382,6 +386,14 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+});
+
+describe('RESPONSE_TOO_LARGE_MESSAGE', () => {
+  it('says that a response is withheld above 100,000 characters', () => {
+    expect(RESPONSE_TOO_LARGE_MESSAGE).toBe(
+      "Your organization's Enkrypt AI guardrail cannot scan more than 100,000 characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry."
+    );
+  });
 });
 
 describe('resolveEnkryptOutputScan', () => {
@@ -746,6 +758,35 @@ describe('guardEnkryptOutput', () => {
         expect(response.headers.get('x-should-retry')).toBe('false');
       }
     );
+
+    it.each(FORMATS)(
+      'rejects a chat_completions %s response with blocked output in a content part type the gateway does not know',
+      async format => {
+        const fetchSpy = mockEnkrypt(({ text }) =>
+          text.includes(SECRET) ? detectPii() : allowAll()
+        );
+        const part = { type: 'output_audio', id: 'audio_1', transcript: MODEL_OUTPUT };
+        const body =
+          format === 'json'
+            ? JSON.stringify({ choices: [{ index: 0, message: { content: [part] } }] })
+            : sse([
+                { data: { choices: [{ index: 0, delta: { content: [part] } }] } },
+                { data: '[DONE]' },
+              ]);
+
+        const { client, release, onReject } = await guard(
+          upstreamResponse(body, format),
+          outputScan(blockingPii),
+          'chat_completions',
+          format === 'sse'
+        );
+
+        expect(await client.text()).not.toContain(SECRET);
+        expect(release).not.toHaveBeenCalled();
+        expect(rejection(onReject).verdict).toEqual({ action: 'block', message: BLOCK_MESSAGE });
+        expect(detectRequests(fetchSpy).map(({ text }) => text)).toEqual([MODEL_OUTPUT]);
+      }
+    );
   });
 
   describe('when the blocking scan cannot complete', () => {
@@ -849,7 +890,7 @@ describe('guardEnkryptOutput', () => {
       expect(client.status).toBe(400);
       expect(await client.json()).toMatchObject({
         error: {
-          message: expect.stringContaining('250,000 characters of model output'),
+          message: RESPONSE_TOO_LARGE_MESSAGE,
           code: 'guardrail_blocked',
         },
       });

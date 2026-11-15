@@ -199,16 +199,17 @@ export type SendSelection = {
 };
 
 /**
- * Resolve the mode/model/variant a send carries. A runtime agent's model pin
- * wins because the worker materializes that agent with its own model. Its
- * variant only applies when it also pins a model, since variants are
- * model-specific; otherwise the user's session variant applies.
+ * A runtime agent's model pin wins because the worker materializes that agent
+ * with its own model. Variants are model-specific and stay with their model.
+ * Without a pin, the current picker model and variant take precedence over
+ * session metadata.
  */
 export function resolveSendSelection(
   config:
     | Pick<CloudAgentSessionConfig, 'mode' | 'model' | 'variant' | 'runtimeAgents'>
     | null
-    | undefined
+    | undefined,
+  currentModel?: { model: string | undefined; variant: string | undefined }
 ): SendSelection {
   const selectedAgent = config?.runtimeAgents?.find(agent => agent.slug === config?.mode);
   const agentModel = selectedAgent?.model?.trim() || undefined;
@@ -216,8 +217,12 @@ export function resolveSendSelection(
 
   return {
     mode: normalizeAlias(config?.mode) || 'code',
-    model: agentModel ?? config?.model ?? '',
-    variant: agentModel ? agentVariant : (config?.variant ?? undefined),
+    model: agentModel ?? currentModel?.model ?? config?.model ?? '',
+    variant: agentModel
+      ? agentVariant
+      : currentModel?.model !== undefined
+        ? currentModel.variant
+        : (config?.variant ?? undefined),
   };
 }
 

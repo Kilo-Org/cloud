@@ -294,14 +294,20 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
  * `audience` is `shared_services` for a picker whose model a platform service
  * runs for the organization, such as the Code Reviewer: its BYOK badge then
  * counts only keys that run can use.
+ *
+ * `enabled: false` holds the catalog read until the caller's scope is resolved,
+ * so a screen that is still resolving its organization does not list the
+ * organization-less catalog as if it were that session's.
  */
 export function useAvailableModels(
   organizationId: string | undefined,
-  audience: OrganizationModelAudience = 'member'
+  audience: OrganizationModelAudience = 'member',
+  options: { enabled?: boolean } = {}
 ) {
   const { data, isLoading, isError, isFetching, isFetched, error, refetch } = useQuery({
     queryKey: ['available-models', organizationId, audience] as const,
     queryFn: fetchModels.bind(null, organizationId, audience),
+    enabled: options.enabled ?? true,
     staleTime: 60_000,
     // A paused catalogue read leaves the picker with no model to list, so
     // auto-selection never resolves.

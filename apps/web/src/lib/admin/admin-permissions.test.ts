@@ -116,6 +116,16 @@ describe('admin permissions', () => {
       expect(await canCurrentUserViewSessions(blocked.id)).toBe(false);
       expect(await canCurrentUserViewSessions('missing-admin-user')).toBe(false);
     });
+
+    it('refuses an admin whose block timestamp is set', async () => {
+      const blocked = await createUser({
+        is_admin: true,
+        can_view_sessions: true,
+        blocked_at: '2026-01-15T12:00:00.000Z',
+      });
+
+      expect(await canCurrentUserViewSessions(blocked.id)).toBe(false);
+    });
   });
 
   describe('canCurrentUserExportApiRequestLogs', () => {
@@ -163,6 +173,16 @@ describe('admin permissions', () => {
 
       expect(await canCurrentUserExportApiRequestLogs(blocked.id)).toBe(false);
       expect(await canCurrentUserExportApiRequestLogs('missing-admin-user')).toBe(false);
+    });
+
+    it('refuses an exporter whose block timestamp is set', async () => {
+      const blocked = await createUser({
+        is_admin: true,
+        can_export_api_request_logs: true,
+        blocked_at: '2026-01-15T12:00:00.000Z',
+      });
+
+      expect(await canCurrentUserExportApiRequestLogs(blocked.id)).toBe(false);
     });
   });
 });

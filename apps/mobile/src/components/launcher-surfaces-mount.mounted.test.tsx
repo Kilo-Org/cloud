@@ -1,6 +1,8 @@
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { noteLauncherSurfacesCleared } from '@/lib/launcher-surfaces-publish';
+
 import { LauncherSurfacesMount } from './launcher-surfaces-mount';
 
 // The native surface and every ambient hook the mount reads are stubbed: the
@@ -92,6 +94,27 @@ describe('LauncherSurfacesMount', () => {
     });
 
     expect(nativeMock.publishLauncherSurfaces).toHaveBeenCalledOnce();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('writes the list back on the same mount after an account boundary clear', () => {
+    const renderer = mount();
+    expect(nativeMock.publishLauncherSurfaces).toHaveBeenCalledOnce();
+
+    // The boundary clears the surface while this mount stays up; its publisher
+    // writes the same derivation again.
+    nativeMock.clearLauncherSurfaces();
+    noteLauncherSurfacesCleared();
+
+    act(() => {
+      renderer.update(<LauncherSurfacesMount />);
+    });
+
+    expect(nativeMock.publishLauncherSurfaces).toHaveBeenCalledTimes(2);
+    expect(nativeMock.publishLauncherSurfaces.mock.calls[1]?.[0]).toEqual(expectedPayload);
 
     act(() => {
       renderer.unmount();

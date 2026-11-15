@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { ToolDetailNotice, useToolDetail } from './ToolPartDetail';
 
 type ToolCardShellProps = {
   icon: LucideIcon;
@@ -13,6 +14,8 @@ type ToolCardShellProps = {
   badge?: ReactNode;
   status: 'pending' | 'running' | 'completed' | 'error';
   defaultExpanded?: boolean;
+  expansion?: { open: boolean; onOpenChange: (open: boolean) => void };
+  triggerClassName?: string;
   children?: ReactNode;
 };
 
@@ -23,10 +26,20 @@ export function ToolCardShell({
   badge,
   status,
   defaultExpanded,
+  expansion,
+  triggerClassName,
   children,
 }: ToolCardShellProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded ?? false);
+  const [localExpanded, setLocalExpanded] = useState(defaultExpanded ?? false);
+  const isExpanded = expansion?.open ?? localExpanded;
+  const setIsExpanded = expansion?.onOpenChange ?? setLocalExpanded;
   const pointerDown = useRef<{ x: number; y: number } | null>(null);
+  const detail = useToolDetail();
+  const requestDetail = detail?.request;
+  // An expanded preview reads its complete call; closed previews never fetch.
+  useEffect(() => {
+    if (isExpanded) requestDetail?.();
+  }, [isExpanded, requestDetail]);
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded} data-tool-card>
@@ -55,7 +68,8 @@ export function ToolCardShell({
         }}
         className={cn(
           'text-muted-foreground hover:bg-muted/40 hover:text-foreground focus-visible:ring-ring flex min-h-6 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs select-text focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11',
-          status === 'error' && 'text-destructive'
+          status === 'error' && 'text-destructive',
+          triggerClassName
         )}
       >
         {status === 'pending' || status === 'running' ? (
@@ -81,9 +95,12 @@ export function ToolCardShell({
         {badge}
         <ChevronRight className={cn('size-3.5 shrink-0', isExpanded && 'rotate-90')} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="border-border/60 mt-1 ml-3 space-y-2 border-l px-3 py-2">
-        {children}
-      </CollapsibleContent>
+      {isExpanded && (
+        <CollapsibleContent className="border-border/60 mt-1 ml-3 space-y-2 border-l px-3 py-2">
+          <ToolDetailNotice />
+          {children}
+        </CollapsibleContent>
+      )}
     </Collapsible>
   );
 }

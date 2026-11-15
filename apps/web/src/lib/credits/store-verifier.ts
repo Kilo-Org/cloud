@@ -1,17 +1,18 @@
 import { createHash } from 'node:crypto';
 
+import { VerificationException, VerificationStatus } from '@apple/app-store-server-library';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type { PaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
-import { APPLE_STORE_BUNDLE_ID } from '@/lib/kilo-pass/apple-store-sdk';
 import {
+  APPLE_STORE_BUNDLE_ID,
   decodeAppleStoreTransactionJws,
   normalizeEnvironment,
   type AppleStoreDecodedTransaction,
   type AppleStoreEnvironment,
-} from '@/lib/kilo-pass/apple-store-verifier';
+} from '@/lib/kilo-pass/apple-store-sdk';
 import {
   consumeGooglePlayProductPurchase,
   getGooglePlayProductPurchase,
@@ -157,10 +158,49 @@ export function mapAppleCreditTransaction(
   };
 }
 
+/**
+ * Apple's verifier rejects a transaction it can never accept (undecodable JWS,
+ * bad signature or chain, wrong app or environment) with one of these statuses.
+ * The list is explicit on purpose: `INVALID_CERTIFICATE` is absent because the
+ * library raises it for a missing or expired configured root certificate and
+ * for a clock that is off, and `FAILURE` is raised by OCSP response handling,
+ * so treating either as terminal would refuse genuine receipts after a
+ * configuration or provider problem.
+ */
+const TERMINAL_APPLE_VERIFICATION_STATUSES: ReadonlySet<VerificationStatus> = new Set([
+  VerificationStatus.VERIFICATION_FAILURE,
+  VerificationStatus.INVALID_APP_IDENTIFIER,
+  VerificationStatus.INVALID_ENVIRONMENT,
+  VerificationStatus.INVALID_CHAIN_LENGTH,
+]);
+
+/**
+ * The refusal message is fixed so neither the JWS nor the library's cause text
+ * reaches the error. It names only the status, so a configuration-induced
+ * refusal stays distinguishable from a malformed receipt in telemetry.
+ */
+async function decodeAppleCreditTransaction(
+  signedTransactionJws: string
+): Promise<AppleStoreDecodedTransaction> {
+  try {
+    return await decodeAppleStoreTransactionJws(signedTransactionJws);
+  } catch (error) {
+    if (
+      error instanceof VerificationException &&
+      TERMINAL_APPLE_VERIFICATION_STATUSES.has(error.status)
+    ) {
+      throw new StoreVerificationError(
+        `Apple transaction could not be verified (${VerificationStatus[error.status]})`
+      );
+    }
+    throw error;
+  }
+}
+
 export async function verifyAppleCreditPurchase(
   signedTransactionJws: string
 ): Promise<ValidatedStoreCreditPurchase> {
-  return mapAppleCreditTransaction(await decodeAppleStoreTransactionJws(signedTransactionJws));
+  return mapAppleCreditTransaction(await decodeAppleCreditTransaction(signedTransactionJws));
 }
 
 function googlePlayPurchaseTimeIso(apiData: androidpublisher_v3.Schema$ProductPurchase): string {
@@ -241,10 +281,8 @@ export async function verifyGooglePlayCreditPurchase(params: {
     // A test (license-tester) purchase is credited like a paid one on purpose,
     // and this is the documented exception: the stores offer no other path to
     // exercise a real charge end to end, the amount always comes from the
-    // catalog and never from the caller, and the grant is idempotent. It
-    // mirrors the Kilo Pass store flow, which also grants on a Sandbox
-    // purchase. Refusing Sandbox here would make the only testable store path
-    // uncreditable.
+    // catalog and never from the caller, and the grant is idempotent.
+    // Refusing Sandbox here would make the only testable store path uncreditable.
     environment: apiData.purchaseType === 0 ? 'Sandbox' : 'Production',
     rawPayload: apiData,
   };

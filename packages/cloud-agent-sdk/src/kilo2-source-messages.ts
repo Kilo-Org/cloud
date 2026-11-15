@@ -1,5 +1,5 @@
-import type { Part, SessionSnapshot } from './types';
-import { projectKilo2ShellNotification } from './kilo2-shell-notification';
+import type { Part, SessionSnapshot, TextPart } from './types';
+import { projectKilo2Notification } from './kilo2-notification';
 import {
   kilo2FileContentSchema,
   kilo2PartId,
@@ -7,6 +7,12 @@ import {
   type Kilo2Session,
 } from '@kilocode/session-ingest-contracts';
 type ProjectedKilo2Message = SessionSnapshot['messages'][number];
+
+export function isCompactionSummaryPart(
+  part: Part
+): part is TextPart & { metadata: { compactionSummary: true } } {
+  return part.type === 'text' && part.metadata?.['compactionSummary'] === true;
+}
 
 export type Kilo2ContentLayout = { positions: Map<string, number>; next: number };
 
@@ -118,7 +124,7 @@ export function readKilo2Messages(
   };
   let parentID = '';
   for (const nativeMessage of messages) {
-    const message = projectKilo2ShellNotification(nativeMessage);
+    const message = projectKilo2Notification(nativeMessage);
     const base = { id: message.id, sessionID: session.id };
     const model = message.model ?? session.model;
     const agent = message.agent ?? session.agent ?? 'build';
@@ -206,15 +212,26 @@ export function readKilo2Messages(
         : {}),
     };
     const parts: Part[] = [];
-    if (compaction)
+    if (compaction) {
       parts.push({
         id: kilo2PartId(message.id, 0),
         messageID: message.id,
         sessionID: session.id,
-        // Native summary bytes stay in the canonical message, not in the chat.
         type: 'compaction',
         auto: message['reason'] === 'auto',
       });
+      // The summary is outside native content; do not shift streamed content IDs.
+      // Use the same completion signal as the transcript's completed state.
+      if (info.time.completed !== undefined && !error && message.summary?.trim())
+        parts.push({
+          id: `${kilo2PartId(message.id, 0)}_summary`,
+          messageID: message.id,
+          sessionID: session.id,
+          type: 'text',
+          text: message.summary,
+          metadata: { compactionSummary: true },
+        });
+    }
     const offset = compaction ? 1 : 0;
     for (const [index, item] of (message.content ?? []).entries()) {
       const identity = {
@@ -285,6 +302,9 @@ export function readKilo2Messages(
         else if (state.status === 'completed')
           parts.push({
             ...tool,
+            // A Cloud preview marks its shortened native entry; keep the marker on
+            // the display part so the complete call can be read on expansion.
+            ...(item['cloudDetail'] === undefined ? {} : { cloudDetail: item['cloudDetail'] }),
             state: {
               status: 'completed',
               input,

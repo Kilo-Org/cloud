@@ -579,12 +579,33 @@ export function claudeBillingUnavailableResponse(message: string, retryable = fa
   );
 }
 
-export function modelDoesNotExistOnOpenRouterResponse(model: string) {
+/**
+ * Returned when the organization's shared-services Claude connection was linked
+ * by a person who is gone. The reconnect action lives on the organization's
+ * billing page, so an owner following the message can perform it there. Only an
+ * organization owner can reconnect it, so the request fails instead of moving to
+ * another billing path, and no retry helps.
+ */
+export function claudeBillingReconnectResponse(
+  message: string,
+  organizationId: string | undefined
+) {
+  const settings = organizationId
+    ? `${APP_URL}/organizations/${organizationId}/byok`
+    : `${APP_URL}/byok`;
+  const error = `${message} An organization owner must reconnect Claude billing at ${settings}.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: 400 }
+  );
+}
+
+export function unknownModelResponse(model: string) {
   const error =
     `The requested model '${model}' does not exist. ` +
     `Please use an exact model id as listed on /api/gateway/models. ` +
     `If this is a newly released model, please try again in a few minutes.`;
-  errorExceptInTest(`[modelDoesNotExistOnOpenRouterResponse] ${error}`);
+  errorExceptInTest(`[unknownModelResponse] ${error}`);
   return NextResponse.json(
     {
       error,

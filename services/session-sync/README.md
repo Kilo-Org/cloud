@@ -201,6 +201,23 @@ Use the repository's Drizzle durable-sqlite schema and migration conventions.
 Keep current entities and producer receipts in SQLite.
 Keep large bodies and assets in private R2 objects scoped to the session.
 
+Session Sync does not write transcripts or catalog rows to PostgreSQL's
+`cli_sessions_v2`. It uses PostgreSQL only for account and credential checks.
+Cloud Agent independently registers ownership metadata in `cli_sessions_v2` and
+stores native v2 history in its own Session Durable Object.
+The [hosted history consolidation design](docs/native-history-consolidation.md)
+is proposed, not implemented. Uploading a hosted copy does not change Cloud Agent's
+history authority or enable downloading, restoration, migration, or remote control.
+
+CLI v2 in Cloud Agent uses its existing native upload journal. Its opaque runtime
+handle exchanges through the binding-only `SessionSyncAuthorization` entrypoint in
+Cloud Agent. Each upload checks the current runtime grant and owned native session.
+Only registration, batch/blob uploads, and receipt inspection are permitted.
+Transcript/blob downloads, discovery, deletion, tickets, and commands remain denied.
+Human/device exchange and its account checks remain unchanged.
+Publish the Cloud Agent authorization entrypoint before deploying the Session Sync
+binding that references it. This requires no PostgreSQL migration.
+
 Normalize or version stored data at the boundary.
 Do not persist an entire growing assistant message after every token.
 Do not allocate one SQL row for each provider token.
@@ -524,6 +541,85 @@ Never replay an ambiguous external tool effect automatically.
 
 ## Live delivery, commands, and presence
 
+### User session notifications
+
+Session notifications report committed storage changes independently of remote
+control, runner sockets, and per-session subscriptions. The later Cloud Agent web
+integration can use these notifications to invalidate session lists and status.
+No web UI consumer is added here.
+
+| Method | Path | Input / result |
+|---|---|---|
+| POST | `/v1/notifications/ticket` | A human/device sync grant → `{ticket,expiresAt}` |
+| GET | `/v1/notifications` | WebSocket upgrade with a `session-notifications` viewer ticket |
+| PUT | `/v1/sessions/:id/status` | `{version:1,sourceID,after,status}` → `{value,version,updatedAt}` |
+
+Use the same `kilo-session-ticket.<ticket>` WebSocket subprotocol as live sockets.
+Bearer tickets also work for server clients. Query credentials are rejected.
+The service checks tickets again inside `SessionNotificationsDO`, which is keyed
+by authenticated user. Each socket receives only that user's sessions in its
+ticket's tenant. Organization membership never grants another creator's events.
+Open separate connections for separate tenant scopes.
+
+The service immediately sends `{version:1,type:"hello",body:{expiresAt,reauthAt,
+reconnectAfterMs,resetRequired:true}}`. It then broadcasts:
+
+```json
+{
+  "version": 1,
+  "type": "session.updated",
+  "session": {
+    "sessionID": "ses_synthetic",
+    "tenant": {"type": "user", "id": "synthetic-user"},
+    "revision": 1,
+    "position": 7,
+    "title": "Updated title",
+    "status": {"value": "question", "version": 2, "updatedAt": 1794500000000},
+    "createdAt": 1794400000000,
+    "updatedAt": 1794500000000,
+    "deletedAt": null
+  },
+  "changedAt": 1794500000000
+}
+```
+
+Event types are `session.created`, `session.updated`, `session.status.updated`,
+and `session.deleted`. Creation follows successful registration. Each newly
+committed batch emits `session.updated`, including title changes. Batch retries
+do not emit again. Rejected or rolled-back writes never emit. Deletion includes
+explicit deletion, account erasure, and idle retention; repeated deletion does
+not emit again. Events contain bounded metadata, never transcript or question
+contents. `title` is omitted when the native session entity is absent or stored
+as a blob; consumers fetch the canonical snapshot in that case. Inline titles
+are limited to 1,024 characters in notifications.
+
+Native sync does not infer execution status from transcript entities or the
+remote-control relay. Producers must explicitly write status using the new
+endpoint; existing producers do not yet do this automatically. The write checks
+the session creator, tenant, source binding, and live Cloud Agent upload authority
+where applicable. `after` is the last observed **status version**, starting at
+zero, not a transcript source position. A changed status increments that version;
+same-status writes and exact last-transition retries are no-ops. A stale version
+returns `position_conflict` with the current status version. Status accepts bounded
+lowercase tokens such as `busy`, `question`, `permission`, `retry`, and `idle`.
+`GET /v1/sessions/:id` exposes the last committed status, or null before the first
+status write or when stored status is invalid. Notifications also use null for
+invalid stored status. Status writes do not change transcript revision or position.
+
+Notifications are best-effort invalidation hints, not a durable event log.
+Delivery failure cannot reject a committed upload. Delivery can be missing,
+duplicated, or reordered; consumers refetch authoritative data and use transcript
+revision/status version to reject stale results. Refresh the creator index and
+canonical session state on every connection and periodically while connected.
+The stream has no replay cursor and retains no offline events. Each session
+allows 64 pending notification tasks plus one deletion task. The first tombstone
+can use the extra task; repeated deletion emits no event. Each user has at most 100
+notification sockets, with 120 client frames per minute per socket and an 8 KiB
+input-frame limit. Socket attachments survive hibernation; alarms close expired
+tickets. Send `{type:"reauth",ticket}` before expiry; user, tenant, and audience
+cannot change. `{type:"ping"}` receives a `pong` control frame. Clients cannot
+publish notifications or execute commands through this stream.
+
 The cloud is a thin relay: it authenticates, stamps sender/time/sequence, applies
 limits, keeps a short event replay ring, and stores opaque command payloads. It
 does not interpret approvals, aborts, slash commands, run IDs, or sync positions.
@@ -597,7 +693,9 @@ rate budget, and mailbox as socket submission.
 
 `queued` means never handed to a runner; `delivered` means handed to one, not
 executed or acknowledged. Unacked payloads redeliver oldest-first on reconnect
-until ack or TTL. Ack deletes the payload. TTL removes any remaining payload,
+until ack or TTL. Each replay re-sends the stored frame; the first hand-off records
+the transition, and later replays of an unchanged delivered row write nothing.
+Ack deletes the payload. TTL removes any remaining payload,
 marks only never-delivered items `expired`, and preserves `delivered` once handed
 off. Semantic execution outcomes are runner events. Finished status tombstones
 last up to 24 hours and may be evicted to maintain bounds; unknown/evicted IDs
@@ -705,6 +803,35 @@ are excluded. Presence fan-out points carry the cause of the fan-out in the reas
 HTTP request points retain the schema documented above.
 
 ### Local end-to-end proof
+
+The repository launcher supports the optional `session-sync` group:
+
+```sh
+pnpm dev:start --no-attach agents session-sync
+```
+
+For the service alone, select `cloudflare-session-sync`. The launcher configures
+worktree-specific ports, the local authentication database, and development secrets.
+Read the actual service port with `pnpm dev:status --json`.
+Local Durable Object and R2 data stay under this service's `.wrangler/state/`.
+
+The native CLI keeps its fixed sync destination. Cloudflare sandbox outbound handling
+forwards that origin to the local `SESSION_SYNC` service binding instead of production.
+The local service checks handles through `CLOUD_AGENT_SYNC_AUTH`, bound to this
+worktree's Cloud Agent Worker. Local credentials never need production access.
+
+After selecting the local v2 organization as described in
+`services/cloud-agent-next/kilo2-runtime/README.md`, run this producer proof from the
+repository root with a funded synthetic local account:
+
+```sh
+E2E_USER_EMAIL=<local-test-email> E2E_ORG_ID=<local-test-organization> \
+  pnpm exec tsx services/cloud-agent-next/test/e2e/session-sync-local.ts
+```
+
+It verifies cold/warm native turns, private large-content uploads, and denial of
+hosted transcript downloads and deletion. The readback uses a separate local
+human credential for verification only; no download path is added to Cloud Agent.
 
 On an isolated work VM, install workspace dependencies and run
 `node scripts/live-e2e.mjs` from this service directory. It launches real

@@ -24,9 +24,14 @@ vi.mock('@sentry/react-native', () => ({
   captureException: vi.fn(),
 }));
 
+// `openExternalUrl` reads the build-time `__DEV__` global this node project does
+// not define; the browser handoff only needs the call it makes.
+vi.mock('./external-link', () => ({ openExternalUrl: vi.fn() }));
+
 /* eslint-disable import/first */
 import * as Sentry from '@sentry/react-native';
 import { PENDING_DEEP_LINK_KEY } from '@/lib/storage-keys';
+import { openExternalUrl } from './external-link';
 import { resolvePendingNavigation } from './pending-navigation';
 import { isShellReadyForShare } from './pending-share-navigation';
 import {
@@ -78,6 +83,18 @@ describe('deep-link-launch', () => {
       setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'universal-link');
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
       expect(getPendingDeepLink()).toBeNull();
+    });
+
+    it.each([
+      '/(app)/(tabs)/(1_kiloclaw)',
+      '/(app)/(tabs)/(1_kiloclaw)/chat/instance-picker',
+      '/(app)/kiloclaw/settings',
+      '/(app)/onboarding',
+      '/chat/sandbox-1/conversation-1',
+    ])('does not queue a removed destination %s', href => {
+      setPendingDeepLink(href, 'notification');
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
     });
   });
 
@@ -467,6 +484,30 @@ describe('deep-link-launch', () => {
   });
 
   describe('restorePersistedPendingDeepLink', () => {
+    it.each([
+      '/(app)/(tabs)/(1_kiloclaw)',
+      '/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/conversation-1',
+      '/(app)/kiloclaw/settings',
+      '/(app)/onboarding',
+    ])('discards a removed destination persisted by an older app: %s', async href => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href,
+          source: 'universal-link',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
     it('restores a destination persisted before process death', async () => {
       store.set(
         PENDING_DEEP_LINK_KEY,
@@ -744,6 +785,19 @@ describe('deep-link-launch', () => {
   });
 
   describe('captureLaunchDeepLink', () => {
+    it.each([
+      'https://app.kilo.ai/claw',
+      'kiloapp://claw',
+      'kiloapp:///claw',
+      'kiloapp:///chat/sandbox-1/conversation-1',
+      'kiloapp:///(app)/(tabs)/(1_kiloclaw)',
+    ])('does not capture a removed launch destination %s', url => {
+      _setGetLinkingURLForTests(() => url);
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+    });
+
     it('stashes a mapped launch URL synchronously', () => {
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/security-agent/findings');
       captureLaunchDeepLink();
@@ -792,7 +846,7 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
 
       // Second call must not write again even if getLinkingURL returns a new URL.
-      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/claw');
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/home');
       setPendingDeepLink('/pre-existing', 'notification');
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBe('/pre-existing');
@@ -856,11 +910,11 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBeNull();
     });
 
-    it('does not capture a session link whose capture cannot open', () => {
+    it('does not capture a session link whose capture cannot address a session', () => {
       // The slot is the layout's only navigation input, so capturing a
-      // destination that resolves to the composer would replace the restored
-      // screen with it on the next launch.
-      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/not-a-real-session');
+      // destination the session route can never read would replace the
+      // restored screen with it on the next launch.
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses:1');
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBeNull();
 
@@ -988,4 +1042,25 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLinkSnapshot()).toBe('/dest');
     });
   });
+});
+
+// Cold-launch half of the same Android limitation: the org-root filter also
+// delivers the web create pages, so capture must open them instead of stashing
+// a route the app cannot build.
+describe('organization create pages from the org-root Android filter', () => {
+  it.each(['new', 'create'])(
+    'opens /organizations/%s in the browser instead of stashing it',
+    async page => {
+      _resetDeepLinkLaunchForTests();
+      vi.mocked(openExternalUrl).mockClear();
+      _setGetLinkingURLForTests(() => `https://app.kilo.ai/organizations/${page}`);
+
+      captureLaunchDeepLink();
+
+      await vi.waitFor(() => {
+        expect(openExternalUrl).toHaveBeenCalledWith(`https://app.kilo.ai/organizations/${page}`);
+      });
+      expect(getPendingDeepLink()).toBeNull();
+    }
+  );
 });

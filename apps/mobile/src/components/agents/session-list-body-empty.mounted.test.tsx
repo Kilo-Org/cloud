@@ -7,6 +7,7 @@ import { BodyEmpty } from './session-list-body-empty';
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   View: 'View',
+  Platform: { OS: 'android', select: (options: Record<string, unknown>) => options.android },
 }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -22,6 +23,7 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#999999' }),
 }));
@@ -59,7 +61,8 @@ describe('BodyEmpty mounted', () => {
     const renderer = await renderBody({
       kind: 'no-past-sessions',
       isSearching: false,
-      clearQueryAction: createElement('ClearQueryCTA'),
+      hasActiveFilters: false,
+      clearActions: createElement('ClearActions'),
       onRetry: vi.fn(() => undefined),
     });
 
@@ -67,8 +70,69 @@ describe('BodyEmpty mounted', () => {
     expect(textContents(renderer.root)).toContain('Completed sessions will appear here.');
     // No action: creation is offered by the FAB/tray, so no create CTA renders.
     expect(findHost(renderer.root, 'Button')).toHaveLength(0);
-    expect(findHost(renderer.root, 'ClearQueryCTA')).toHaveLength(0);
+    expect(findHost(renderer.root, 'ClearActions')).toHaveLength(0);
     // The History icon identifies this state.
     expect(findHost(renderer.root, 'History')).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      name: 'a search alone',
+      isSearching: true,
+      hasActiveFilters: false,
+      description: 'Try a different search term.',
+    },
+    {
+      name: 'a filter alone',
+      isSearching: false,
+      hasActiveFilters: true,
+      description: 'Try adjusting or clearing your filters.',
+    },
+    {
+      name: 'a search and a filter together',
+      isSearching: true,
+      hasActiveFilters: true,
+      description: 'Try a different search term. Try adjusting or clearing your filters.',
+    },
+  ])('names every cause in the filtered-empty copy for $name', async test => {
+    const renderer = await renderBody({
+      kind: 'filtered-empty',
+      isSearching: test.isSearching,
+      hasActiveFilters: test.hasActiveFilters,
+      clearActions: createElement('ClearActions'),
+      onRetry: vi.fn(() => undefined),
+    });
+
+    expect(textContents(renderer.root)).toContain('No sessions match');
+    expect(textContents(renderer.root)).toContain(test.description);
+    // The state's action row is rendered as given, so each cause keeps its own
+    // control.
+    expect(findHost(renderer.root, 'ClearActions')).toHaveLength(1);
+    expect(findHost(renderer.root, 'SearchX')).toHaveLength(1);
+  });
+
+  it('keeps the clear actions beside the retry in the query-error body', async () => {
+    const renderer = await renderBody({
+      kind: 'query-error-empty',
+      isSearching: true,
+      hasActiveFilters: true,
+      clearActions: createElement('ClearActions'),
+      onRetry: vi.fn(() => undefined),
+    });
+
+    expect(findHost(renderer.root, 'QueryError')).toHaveLength(1);
+    expect(findHost(renderer.root, 'ClearActions')).toHaveLength(1);
+  });
+
+  it('renders no clear control when the failed body had no active query', async () => {
+    const renderer = await renderBody({
+      kind: 'query-error-empty',
+      isSearching: false,
+      hasActiveFilters: false,
+      onRetry: vi.fn(() => undefined),
+    });
+
+    expect(findHost(renderer.root, 'QueryError')).toHaveLength(1);
+    expect(findHost(renderer.root, 'ClearActions')).toHaveLength(0);
   });
 });

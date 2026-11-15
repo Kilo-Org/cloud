@@ -82,6 +82,20 @@ describe('parseDirective', () => {
 });
 
 describe('extractLastUserMessageText', () => {
+  it.each([
+    '<system-reminder>Agent changed</system-reminder>',
+    [{ type: 'text', text: '<system-reminder>Agent changed</system-reminder>' }],
+  ])('ignores a native agent-switch reminder after the command', content => {
+    expect(
+      extractLastUserMessageText({
+        messages: [
+          { role: 'user', content: '__fake__:echo:command-argument' },
+          { role: 'user', content },
+        ],
+      })
+    ).toBe('__fake__:echo:command-argument');
+  });
+
   it('returns empty when messages is missing or not an array', () => {
     expect(extractLastUserMessageText({})).toBe('');
     expect(extractLastUserMessageText({ messages: 'nope' })).toBe('');
@@ -767,15 +781,40 @@ describe('fake-llm-server HTTP', () => {
     expect(body.error.message).toContain('unknown fake scenario: nosuch');
   });
 
-  it('missing directive echoes the last user message', async () => {
+  it.each([
+    {
+      kind: 'initial',
+      prompt:
+        'You MUST summarize the conversation above into a structured summary that will be given to another agent to resume the work.\nSummarize only what the user and the assistant said and did.',
+    },
+    {
+      kind: 'checkpoint',
+      prompt:
+        'Update the existing checkpoint in the conversation above into one consolidated summary.\nNewer history always takes precedence over the existing checkpoint.',
+    },
+  ])('streams a deterministic summary for the $kind compaction prompt', async ({ prompt }) => {
     const h = await start();
-    const res = await postChat(h.url, 'just some prompt with no directive');
+    const res = await postChat(h.url, prompt);
     expect(res.status).toBe(200);
-    const chunks = await readAllSse(res.body!);
-    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
-    expect(parsed[0].choices[0].delta.content).toBe('just some prompt with no directive');
-    expect(parsed[parsed.length - 1].choices[0].finish_reason).toBe('stop');
+    const chunks = await parseSse(res);
+    const content = assistantContent(chunks);
+    expect(content).toContain('## Objective');
+    expect(content).toContain('This is a deterministic local test summary.');
+    expect(content).not.toContain(prompt);
+    expect(chunks.at(-1)?.choices).toEqual([{ index: 0, delta: {}, finish_reason: 'stop' }]);
   });
+
+  it.each(['just some prompt with no directive', 'Please summarize this conversation'])(
+    'missing directive echoes the last user message: %s',
+    async prompt => {
+      const h = await start();
+      const res = await postChat(h.url, prompt);
+      expect(res.status).toBe(200);
+      const chunks = await parseSse(res);
+      expect(assistantContent(chunks)).toBe(prompt);
+      expect(chunks.at(-1)?.choices).toEqual([{ index: 0, delta: {}, finish_reason: 'stop' }]);
+    }
+  );
 
   it('missing directive strips kilo environment_details from the echo', async () => {
     const h = await start();
@@ -912,6 +951,33 @@ describe('fake-llm-server HTTP', () => {
     expect(completedA[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_a' } }),
     ]);
+  });
+
+  it.each(['name', 'id'])('uses the advertised skill %s argument', async key => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:skill:profile-test:profile-review',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'skill',
+            parameters: {
+              type: 'object',
+              properties: { [key]: { type: 'string' } },
+              required: [key],
+            },
+          },
+        },
+      ]
+    );
+    const chunks = await parseSse(response);
+    expect(chunks[0]?.choices[0]?.delta?.tool_calls?.[0]?.function).toMatchObject({
+      name: 'skill',
+      arguments: JSON.stringify({ [key]: 'profile-review' }),
+    });
   });
 
   it('streams a real write call and gates only after its tool result', async () => {
@@ -1236,6 +1302,192 @@ describe('fake-llm-server HTTP', () => {
       toolCalls: { write: 0, read: 0, edit: 0, question: 1 },
       toolResults: { write: 0, read: 0, edit: 0, question: 1 },
       unsupportedToolSchema: false,
+    });
+  });
+
+  it('issues a task tool call that parks the child on a gate, then finishes after the result', async () => {
+    const h = await start();
+    const prompt = '__fake__:task:drainparent:drainchild';
+    const call = extractToolCall(
+      await parseSse(
+        await postToolChat(
+          h.url,
+          prompt,
+          [],
+          [
+            {
+              type: 'function',
+              function: {
+                name: 'task',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    description: { type: 'string' },
+                    prompt: { type: 'string' },
+                    subagent_type: { type: 'string' },
+                  },
+                  required: ['description', 'prompt', 'subagent_type'],
+                },
+              },
+            },
+          ]
+        )
+      )
+    );
+    expect(call).toMatchObject({
+      name: 'task',
+      arguments: {
+        description: 'Drain child drainchild',
+        prompt: '__fake__:gate:drainchild:waiting',
+        subagent_type: 'explore',
+      },
+    });
+    expect(call.arguments).not.toHaveProperty('background');
+
+    const completed = await parseSse(
+      await postToolChat(
+        h.url,
+        prompt,
+        [
+          { role: 'assistant', tool_calls: [{ id: call.id }] },
+          { role: 'tool', tool_call_id: call.id, content: 'waiting' },
+        ],
+        [
+          {
+            type: 'function',
+            function: {
+              name: 'task',
+              parameters: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  prompt: { type: 'string' },
+                  subagent_type: { type: 'string' },
+                },
+                required: ['description', 'prompt', 'subagent_type'],
+              },
+            },
+          },
+        ]
+      )
+    );
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-drainparent' } }),
+    ]);
+  });
+
+  it('refuses a background task when the advertised schema has no background property', async () => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:background-task:drainbg:drainheld',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'task',
+            parameters: {
+              type: 'object',
+              properties: {
+                description: { type: 'string' },
+                prompt: { type: 'string' },
+                subagent_type: { type: 'string' },
+              },
+              required: ['description', 'prompt', 'subagent_type'],
+            },
+          },
+        },
+      ]
+    );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: 'background subagents are not advertised',
+        type: 'unsupported_tool_schema',
+      },
+    });
+  });
+
+  it('uses the native v2 subagent schema for a background child', async () => {
+    const h = await start();
+    const call = extractToolCall(
+      await parseSse(
+        await postToolChat(
+          h.url,
+          '__fake__:background-task:drainbg:drainheld',
+          [],
+          [
+            {
+              type: 'function',
+              function: {
+                name: 'subagent',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    agent: { type: 'string' },
+                    description: { type: 'string' },
+                    prompt: { type: 'string' },
+                    background: { type: 'boolean' },
+                  },
+                  required: ['agent', 'description', 'prompt'],
+                },
+              },
+            },
+          ]
+        )
+      )
+    );
+    expect(call).toMatchObject({
+      name: 'subagent',
+      arguments: {
+        agent: 'explore',
+        description: 'Drain child drainheld',
+        prompt: '__fake__:gate:drainheld:waiting',
+        background: true,
+      },
+    });
+    expect(call.arguments).not.toHaveProperty('subagent_type');
+  });
+
+  it('issues cron_create and schedule_wakeup, and rejects them when not advertised', async () => {
+    const h = await start();
+    const cronTools = [
+      {
+        type: 'function',
+        function: {
+          name: 'cron_create',
+          parameters: {
+            type: 'object',
+            properties: {
+              prompt: { type: 'string' },
+              delay: { type: 'string' },
+              reason: { type: 'string' },
+            },
+            required: ['prompt'],
+          },
+        },
+      },
+    ];
+    const cron = extractToolCall(
+      await parseSse(await postToolChat(h.url, '__fake__:cron:draincron:20s', [], cronTools))
+    );
+    expect(cron).toMatchObject({
+      name: 'cron_create',
+      arguments: {
+        prompt: '__fake__:echo:fired-draincron',
+        delay: '20s',
+        reason: 'drain-draincron',
+      },
+    });
+
+    const missing = await postToolChat(h.url, '__fake__:wakeup:drainwake:20s', [], cronTools);
+    expect(missing.status).toBe(422);
+    await expect(missing.json()).resolves.toMatchObject({
+      error: {
+        message: 'unsupported schedule_wakeup tool schema',
+        type: 'unsupported_tool_schema',
+      },
     });
   });
 

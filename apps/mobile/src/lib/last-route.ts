@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { currentRouteHref } from '@/lib/current-route-href';
 import { LAST_ROUTE_KEY } from '@/lib/storage-keys';
 import { isConcreteLastRouteHref, isUnrestorableLastRouteHref } from '@/lib/last-route-recordable';
+import { normalizedRoutePath } from '@/lib/last-route-repair';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -302,6 +303,32 @@ export function consumeLastRouteForRepair(userId: string | null): string | null 
   return record.href;
 }
 
+// The route the relaunch repair opened, until a screen takes the mark. The
+// repair restores a stored destination, not one the person chose in this
+// process, so the screen it lands on must not dead-end: a session the server
+// no longer has falls back to the start screen instead. Only the first screen
+// that asks takes the mark, so a later navigation to the same route — a tap, a
+// link, a retry — is an ordinary open that keeps its own not-found answer.
+let restoredRouteOpenHref: string | null = null;
+
+/** Record the stored route the relaunch repair is about to open. */
+export function noteRestoredRouteOpen(href: string): void {
+  restoredRouteOpenHref = href;
+}
+
+/**
+ * Whether the route the repair opened is this one. One-shot: the first screen
+ * that asks consumes the mark, whether or not its path matches.
+ */
+export function consumeRestoredRouteOpen(pathname: string): boolean {
+  const href = restoredRouteOpenHref;
+  if (href === null) {
+    return false;
+  }
+  restoredRouteOpenHref = null;
+  return normalizedRoutePath(href) === normalizedRoutePath(pathname);
+}
+
 // ── Injection seams used by the pure suites ────────────────────────────────
 
 export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
@@ -326,6 +353,7 @@ export function _resetLastRouteForTests(): void {
   hydrated = false;
   hydrationVersion = 0;
   repairEvaluated = false;
+  restoredRouteOpenHref = null;
   mirrorTail = null;
   listeners.clear();
   secureStoreForTests = null;

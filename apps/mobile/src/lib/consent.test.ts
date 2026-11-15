@@ -78,6 +78,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: false,
       optional: false,
+      previousOptional: undefined,
     });
   });
 
@@ -118,6 +119,8 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: false,
       optional: false,
+      // The record is from an older version, so its choice seeds the new screen.
+      previousOptional: false,
     });
   });
 
@@ -140,6 +143,8 @@ describe('consent storage', () => {
     expect(await readConsent('oauth/google:foo')).toEqual({
       mandatory: false,
       optional: false,
+      // A legacy key carries no record the new screen may read a choice from.
+      previousOptional: undefined,
     });
     // Legacy key is removed
     expect(store.has('consent-accepted-oauthgooglefoo')).toBe(false);
@@ -153,11 +158,18 @@ describe('consent storage', () => {
   });
 
   it('revokes acceptance and deletes both hex and legacy keys', async () => {
-    const { hasAcceptedConsent, revokeConsent } = await import('./consent');
+    const { CURRENT_CONSENT_VERSION, hasAcceptedConsent, revokeConsent } =
+      await import('./consent');
 
     // Set up hex and legacy keys for the revoked user
-    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: false }));
-    store.set('consent-accepted-user1', JSON.stringify({ v: 2, optional: false }));
+    store.set(
+      'consent-accepted-757365722d31',
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false })
+    );
+    store.set(
+      'consent-accepted-user1',
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: false })
+    );
 
     // Set up keys for a different user to prove they survive
     store.set('consent-accepted-757365722d32', 'stale');
@@ -174,7 +186,7 @@ describe('consent storage', () => {
     expect(store.has('consent-accepted-user2')).toBe(true);
   });
 
-  it('round-trips optional consent in a v2 record', async () => {
+  it('round-trips optional consent in a current-version record', async () => {
     const { acceptConsent, readConsent, hasAcceptedConsent } = await import('./consent');
 
     await acceptConsent('user-1', true);
@@ -183,6 +195,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: true,
       optional: true,
+      previousOptional: undefined,
     });
   });
 
@@ -194,6 +207,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: true,
       optional: false,
+      previousOptional: undefined,
     });
 
     // Hex of "user-1"
@@ -212,6 +226,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: true,
       optional: false,
+      previousOptional: undefined,
     });
 
     const raw = store.get('consent-accepted-757365722d31');
@@ -230,6 +245,7 @@ describe('consent storage', () => {
     expect(await readConsent('user-1')).toEqual({
       mandatory: false,
       optional: false,
+      previousOptional: undefined,
     });
     // user-2 untouched
     expect(await hasAcceptedConsent('user-2')).toBe(true);
@@ -382,6 +398,61 @@ describe('consent storage', () => {
     // Revoke is authoritative: the queued optional update must not recreate it.
     expect(await hasAcceptedConsent('user-1')).toBe(false);
     expect(store.has('consent-accepted-757365722d31')).toBe(false);
+  });
+});
+
+describe('consent version migration', () => {
+  beforeEach(() => {
+    store.clear();
+  });
+
+  it('requires re-consent for an older record and keeps its declined choice', async () => {
+    const { CURRENT_CONSENT_VERSION, hasAcceptedConsent, readConsent } = await import('./consent');
+    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: false }));
+
+    expect(CURRENT_CONSENT_VERSION).toBe(3);
+    expect(await hasAcceptedConsent('user-1')).toBe(false);
+    expect(await readConsent('user-1')).toEqual({
+      mandatory: false,
+      optional: false,
+      previousOptional: false,
+    });
+  });
+
+  it('carries an accepted optional choice across the update', async () => {
+    const { readConsent } = await import('./consent');
+    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: true }));
+
+    const state = await readConsent('user-1');
+    expect(state.previousOptional).toBe(true);
+  });
+
+  it('accepting the updated screen writes the current version and drops the carried choice', async () => {
+    const { CURRENT_CONSENT_VERSION, acceptConsent, readConsent } = await import('./consent');
+    store.set('consent-accepted-757365722d31', JSON.stringify({ v: 2, optional: true }));
+
+    await acceptConsent('user-1', true);
+
+    expect(store.get('consent-accepted-757365722d31')).toBe(
+      JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional: true })
+    );
+    expect(await readConsent('user-1')).toEqual({
+      mandatory: true,
+      optional: true,
+      previousOptional: undefined,
+    });
+  });
+
+  it('treats an unreadable older record as no record', async () => {
+    const { readConsent } = await import('./consent');
+    // No optional field: the record cannot seed a choice.
+    store.set('consent-accepted-757365722d31', '{"v":2}');
+
+    expect(await readConsent('user-1')).toEqual({
+      mandatory: false,
+      optional: false,
+      previousOptional: undefined,
+    });
   });
 });
 

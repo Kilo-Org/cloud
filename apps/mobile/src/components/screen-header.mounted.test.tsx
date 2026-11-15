@@ -6,7 +6,7 @@ import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
 import { HEADER_BACK_GUARD_MS } from '@/lib/hooks/header-back';
@@ -59,6 +59,8 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
   Platform: platform,
+  // `useSheetHeaderTopClearance` falls back to the status-bar height on Android.
+  StatusBar: { currentHeight: 24 },
   Pressable: 'Pressable',
   View: 'View',
   useWindowDimensions: () => ({ width: layout.width, height: 800, fontScale: layout.fontScale }),
@@ -1127,7 +1129,39 @@ describe('ScreenHeader mounted', () => {
     });
   });
 
-  it('pads a modal header by the same value on iOS and Android', () => {
+  it('pads a full-window modal below the status bar and keeps a sheet modal at its grabber clearance', () => {
+    safeArea.top = 48;
+    // The `modal` presentation reaches the window top on Android, so its header
+    // adds the status-bar inset on top of the standard gap.
+    platform.OS = 'android';
+    const androidModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
+      .props.style;
+    // A `formSheet` presents below the status bar there, and the sheet edge is
+    // what provides the clearance, so the header adds no inset of its own.
+    const androidSheet = findOuterContainer(
+      renderHeader({ title: 'Sessions', modal: true, modalTopInset: 'bottom-form-sheet' }).root
+    ).props.style;
+    const androidPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
+
+    platform.OS = 'ios';
+    const iosModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root).props
+      .style;
+    const iosSheet = findOuterContainer(
+      renderHeader({ title: 'Sessions', modal: true, modalTopInset: 'bottom-form-sheet' }).root
+    ).props.style;
+    const iosPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
+
+    expect(androidModal).toEqual({ paddingTop: 56 });
+    expect(androidSheet).toEqual({ paddingTop: 32 });
+    expect(androidPinned).toEqual({ paddingTop: 56 });
+    // The same presentation is a native sheet there, so neither modal may take
+    // the window inset: that would leave a dead band above the title.
+    expect(iosModal).toEqual({ paddingTop: 32 });
+    expect(iosSheet).toEqual({ paddingTop: 32 });
+    expect(iosPinned).toEqual({ paddingTop: 56 });
+  });
+
+  it('keeps the grabber clearance when a modal surface reports no top edge', () => {
     const iosStyle = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root).props
       .style;
 
@@ -1135,30 +1169,9 @@ describe('ScreenHeader mounted', () => {
     const androidStyle = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
       .props.style;
 
-    // A zero safe-area top: the sheet's grabber clearance is the floor on both.
+    // Zero safe-area top: the surface already clears the system bar on both.
     expect(iosStyle).toEqual({ paddingTop: 32 });
     expect(androidStyle).toEqual(iosStyle);
-  });
-
-  it('pads a modal by the fixed sheet clearance and a pinned header by the inset, on either platform', () => {
-    safeArea.top = 48;
-    const iosModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root).props
-      .style;
-    const iosPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
-
-    platform.OS = 'android';
-    const androidModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
-      .props.style;
-    const androidPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
-
-    // A modal is a native sheet whose own window reports its top inset, so the
-    // header keeps the fixed grabber clearance rather than re-adding the app
-    // window's inset. A pinned header adds the reported inset. Neither branches
-    // on the platform.
-    expect(iosModal).toEqual({ paddingTop: 32 });
-    expect(iosPinned).toEqual({ paddingTop: 56 });
-    expect(androidModal).toEqual(iosModal);
-    expect(androidPinned).toEqual(iosPinned);
   });
 
   it('never reserves the offline banner for a modal header on either platform', () => {
@@ -1212,6 +1225,20 @@ describe('ScreenHeader mounted', () => {
 });
 
 describe('header actions row', () => {
+  // This describe owns its window geometry, so every case starts from the
+  // normal phone window the file's defaults describe.
+  beforeEach(() => {
+    Object.assign(layout, { width: 390, fontScale: 1 });
+    Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
+    platform.OS = 'ios';
+  });
+  // The geometry stops leaking at the describe boundary.
+  afterEach(() => {
+    Object.assign(layout, { width: 390, fontScale: 1 });
+    Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
+    platform.OS = 'ios';
+  });
+
   it('keeps the actions on the title row at a normal phone width', () => {
     const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
 
@@ -1279,10 +1306,6 @@ describe('header actions row', () => {
   });
 
   it('keeps a narrower declared cluster on the title row', () => {
-    // A normal phone width: the suite's `beforeEach` does not cover this
-    // describe, and the test above leaves a 320dp / scale 2 window behind.
-    layout.width = 390;
-    layout.fontScale = 1;
     // Two fixed-size icon controls with a 4dp gap.
     const renderer = renderHeader({
       title: 'Detail',

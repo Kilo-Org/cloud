@@ -4,17 +4,19 @@ import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 
 import {
+  bouncerAccountId,
   bouncerWireEventId,
   creditEventWireBody,
   normalizeJa4,
   type CreditEvent,
   type CreditFlow,
 } from '@kilocode/web-shared/lib/bouncer/client';
+import { findOrganizationPayerFamily } from '@kilocode/worker-utils/account-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   enqueueBouncerCreditEvent,
-  type BouncerCreditEventOutboxDatabase,
+  type BouncerCreditEventOutboxTransaction,
   type EnqueueBouncerCreditEventResult,
 } from '@kilocode/db/bouncer-credit-event-outbox';
 import { kilocode_users } from '@kilocode/db/schema';
@@ -37,24 +39,39 @@ export function ja4FromHeaders(headers?: Headers | null): string | null {
 }
 
 /**
+ * The payer key bouncer uses for an organization charge: the root of the organization family, so a
+ * sub-organization is judged as the payer its family is known by.
+ */
+export async function organizationBouncerAccountId(
+  userId: string,
+  organizationId: string | null | undefined
+): Promise<string> {
+  if (!organizationId) return bouncerAccountId(userId);
+  const family = await findOrganizationPayerFamily(db, organizationId);
+  return bouncerAccountId(userId, family?.payerRootOrganizationId ?? organizationId);
+}
+
+/**
  * Enqueues one credit event into the durable outbox. The soft-delete check locks the user row
  * `FOR UPDATE`, so it must run inside a transaction (the callers pass `db.transaction` or an open
- * transaction) for the lock to hold. That serializes the enqueue insert against a concurrent
- * `softDeleteUser` (which updates the same row) at the database boundary, so an in-flight late
- * webhook cannot insert after the deletion commits; it does not undo a delivery that already
- * happened, and the drainer rechecks the owner before sending. Passing the caller's transaction
- * also makes the insert atomic with the primary write. A DB error propagates, so the caller can let
- * the payment or webhook provider retry instead of losing the report. The insert is idempotent on
- * `(eventId, event_type)`.
+ * transaction) for the lock to hold; the `BouncerCreditEventOutboxTransaction` parameter makes a
+ * bare client a compile error, so the lock cannot be reduced to a single statement by accident.
+ * That serializes the enqueue insert against a concurrent `softDeleteUser` (which updates the same
+ * row) at the database boundary, so an in-flight late webhook cannot insert after the deletion
+ * commits; it does not undo a delivery that already happened, and the drainer rechecks the owner
+ * before sending. Passing the caller's transaction also makes the insert atomic with the primary
+ * write. A DB error propagates, so the caller can let the payment or webhook provider retry instead
+ * of losing the report. The insert is idempotent on `(eventId, event_type)`.
  *
  * The row keeps the raw `userId` (so a soft delete can find it by the real user id). `event_id` is
  * `bouncerWireEventId(event.eventId)` — the exact id when within bouncer's 128-character limit,
  * else a SHA-256 digest — so the dedupe key equals the id bouncer receives and two distinct source
  * events never merge. The payload is the same wire body. A gone/deleting account is skipped with a
- * visible log.
+ * visible log. An organization event is reported against the root of the organization family, with
+ * the family's totals, so a sub-organization lands on the payer its family is known by.
  */
 export async function enqueueCreditEvent(
-  database: BouncerCreditEventOutboxDatabase,
+  database: BouncerCreditEventOutboxTransaction,
   event: CreditEvent
 ): Promise<EnqueueBouncerCreditEventResult> {
   const [owner] = await database
@@ -70,20 +87,46 @@ export async function enqueueCreditEvent(
     });
     return { enqueued: false };
   }
+  const payerEvent = await withOrganizationPayer(database, event);
   return enqueueBouncerCreditEvent(database, {
     // The dedupe key is the wire identity (exact when <=128 chars, else SHA-256), the same value
     // bouncer receives, so two source ids never collapse to one identity.
     eventId: bouncerWireEventId(event.eventId),
     eventType: event.type,
     userId: event.userId,
-    payload: creditEventWireBody(event),
+    payload: creditEventWireBody(payerEvent),
   });
 }
 
 /**
+ * Reports an organization event against the root of the organization family, with the family's
+ * totals. A personal event, and an event whose organization cannot be read, passes through
+ * unchanged.
+ */
+async function withOrganizationPayer(
+  database: BouncerCreditEventOutboxTransaction,
+  event: CreditEvent
+): Promise<CreditEvent> {
+  if (!event.orgId) return event;
+  const family = await findOrganizationPayerFamily(database, event.orgId);
+  if (!family) return event;
+  if (event.type === 'charge.attempted') {
+    return {
+      ...event,
+      orgId: family.payerRootOrganizationId,
+      accountCreatedAt: family.payerRootCreatedAt,
+      accountUsedMicrodollars: family.payerMicrodollarsUsed,
+    };
+  }
+  return { ...event, orgId: family.payerRootOrganizationId };
+}
+
+/**
  * The context a `charge.attempted` needs in addition to the flow-specific fields. `accountCreatedAt`
- * is `users.created_at` for a personal charge and `organizations.created_at` for an org charge;
- * `accountUsedMicrodollars` is the same payer row's `microdollars_used` at charge time.
+ * is `users.created_at` for a personal charge; for an org charge it is the root organization's
+ * `created_at`, and `accountUsedMicrodollars` is the family's sum of `microdollars_used` at charge
+ * time. The enqueue replaces both with the family's values, so a caller may pass the organization
+ * row it already read.
  */
 export type ChargeAttemptContext = {
   accountCreatedAt: Date | string;
@@ -109,7 +152,7 @@ export type ChargeAttemptContext = {
  * a delayed retry keeps the original attempt time.
  */
 export async function enqueueChargeAttempted(
-  database: BouncerCreditEventOutboxDatabase,
+  database: BouncerCreditEventOutboxTransaction,
   params: {
     /** A stable id, for example derived from the checkout session id, so a retry/reuse dedupes. */
     eventId: string;

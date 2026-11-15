@@ -176,9 +176,11 @@ export function ChatHeader({
         hasIncompleteHistory={hasIncompleteHistory}
       />
       <SessionActionsDialog
+        key={kiloSessionId}
         open={showActionsDialog}
         onOpenChange={setShowActionsDialog}
         kiloSessionId={kiloSessionId}
+        cloudAgentSessionId={cloudAgentSessionId}
         sessionTitle={sessionTitle}
         repository={repository}
         organizationId={organizationId}

@@ -188,6 +188,7 @@ function createFixture() {
   );
   const activeKey = trpc.activeSessions.list.queryKey();
   const recentKey = trpc.cliSessionsV2.recentRepositories.queryKey({
+    organizationId: null,
     updatedSince: '2026-08-01T00:00:00.000Z',
   });
   const foldersKey = trpc.workspaceFolders.list.queryKey({ organizationId: null });

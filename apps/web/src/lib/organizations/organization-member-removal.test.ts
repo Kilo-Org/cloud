@@ -31,7 +31,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { removeUserFromOrganization } from './organization-member-removal';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
-import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-internal-api';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
@@ -43,7 +43,7 @@ jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+jest.mock('@/lib/cloud-agent-next/cloud-agent-internal-api', () => ({
   closeCloudAgentOrgStreams: jest.fn().mockResolvedValue(undefined),
 }));
 

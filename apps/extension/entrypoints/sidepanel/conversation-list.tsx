@@ -4,8 +4,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { CSSProperties, JSX } from 'react';
 import { elementScroll, useVirtualizer } from '@tanstack/react-virtual';
 import { getConversationScrollKey } from '@/src/shared/agent-conversation';
-import type { GroupedConversationItem } from '@/src/shared/agent-conversation';
-import { LEGACY_CONVERSATION_GREETING } from '@/src/shared/agent-conversation-tabs';
+import type {
+  ConversationErrorEvent,
+  GroupedConversationItem,
+} from '@/src/shared/agent-conversation';
 import { AgentConversationItemView } from './agent-conversation-events';
 
 /**
@@ -93,14 +95,18 @@ const ConversationVirtualRow = ({
   index,
   item,
   measureElement,
+  onRetryError,
   start,
   streamingMessageId,
+  tabLabels,
 }: {
   index: number;
   item: GroupedConversationItem;
   measureElement: (element: HTMLElement) => void;
+  onRetryError?: ((event: ConversationErrorEvent) => void) | undefined;
   start: number;
   streamingMessageId?: string | undefined;
+  tabLabels?: ReadonlyMap<number, string> | undefined;
 }): JSX.Element => {
   const rowRef = useRef<HTMLDivElement | null>(null);
 
@@ -132,17 +138,28 @@ const ConversationVirtualRow = ({
       ref={rowRef}
       style={getVirtualRowStyle(start)}
     >
-      <AgentConversationItemView item={item} streamingMessageId={streamingMessageId} />
+      <AgentConversationItemView
+        item={item}
+        onRetryError={onRetryError}
+        streamingMessageId={streamingMessageId}
+        tabLabels={tabLabels}
+      />
     </div>
   );
 };
 
 export const ConversationList = ({
+  emptyHint,
   items,
+  onRetryError,
   streamingMessageId,
+  tabLabels,
 }: {
+  emptyHint?: string | undefined;
   items: GroupedConversationItem[];
+  onRetryError?: ((event: ConversationErrorEvent) => void) | undefined;
   streamingMessageId?: string | undefined;
+  tabLabels?: ReadonlyMap<number, string> | undefined;
 }): JSX.Element => {
   const listRef = useRef<HTMLElement | null>(null);
   // Source of truth for auto-scroll, owned outside React so a streaming render cannot race it. The state mirror below only drives the jump button.
@@ -371,14 +388,14 @@ export const ConversationList = ({
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <div className="relative min-h-0 flex-1">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <section
         aria-label="Agent conversation"
-        className="agent-conversation-scrollbar h-full overflow-y-auto px-4 py-4"
+        className="agent-conversation-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4"
         ref={listRef}
       >
-        {items.length === 0 ? (
-          <p className="type-body text-foreground-muted">{LEGACY_CONVERSATION_GREETING}</p>
+        {items.length === 0 && emptyHint !== undefined ? (
+          <p className="type-body text-foreground-muted">{emptyHint}</p>
         ) : null}
         <div className="relative w-full" style={getListSpacerStyle(totalSize)}>
           {virtualItems.map(virtualItem => {
@@ -394,22 +411,28 @@ export const ConversationList = ({
                 item={item}
                 key={getConversationItemKey(item)}
                 measureElement={virtualizer.measureElement}
+                onRetryError={onRetryError}
                 start={virtualItem.start}
                 streamingMessageId={streamingMessageId}
+                tabLabels={tabLabels}
               />
             );
           })}
         </div>
       </section>
       {showJumpButton ? (
-        <button
-          aria-label="Jump to latest"
-          className="absolute bottom-3 right-3 z-10 flex size-9 items-center justify-center rounded-full border border-border bg-surface-overlay text-foreground shadow-lg shadow-black/50 outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
-          onClick={jumpToLatest}
-          type="button"
-        >
-          <ArrowDown aria-hidden="true" className="size-4" />
-        </button>
+        // Overlaid, not a layout row: a bar pushes the button under the composer at small panel heights.
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-end px-3 pb-2">
+          <button
+            aria-label="Jump to latest"
+            className="pointer-events-auto flex size-8 items-center justify-center rounded-full border border-border bg-surface-overlay text-foreground-on-secondary shadow-lg shadow-black/50 outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
+            onClick={jumpToLatest}
+            title="Jump to latest"
+            type="button"
+          >
+            <ArrowDown aria-hidden="true" className="size-4" />
+          </button>
+        </div>
       ) : null}
     </div>
   );

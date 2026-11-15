@@ -12,6 +12,7 @@ import {
   SIGN_IN_CODE_MAX_ATTEMPTS,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import {
@@ -61,7 +62,7 @@ export const POST = withRestTiming('/api/auth/pending-link/verify', async (reque
   if (!user) {
     return NextResponse.json({ error: 'EXPIRED' }, { status: 404 });
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
   const eligibility = await checkDomainSignInEligibility(user.google_user_email);

@@ -236,6 +236,16 @@ function classNamesOf(instances: TestRenderer.ReactTestInstance[]): string[] {
   return instances.map(instance => String((instance.props as { className?: string }).className));
 }
 
+function classNameOf(instance: TestRenderer.ReactTestInstance): string {
+  const value: unknown = instance.props.className;
+  return typeof value === 'string' ? value : '';
+}
+
+function labelOf(instance: TestRenderer.ReactTestInstance | undefined): string {
+  const value: unknown = instance?.props.accessibilityLabel;
+  return typeof value === 'string' ? value : '';
+}
+
 function packRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
   return renderer.root.findAll(
     node =>
@@ -518,6 +528,9 @@ describe('CreditPurchaseScreen', () => {
     // A store failure is not a catalog claim: the no-match body belongs to a
     // store that answered and priced no pack.
     expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
+    // The card above is the only visible statement of the failure: no pack row
+    // renders beside it to repeat the state.
+    expect(allText(renderer)).not.toContain('Price unavailable');
     // The store SDK's own wording never reaches the screen.
     expect(allText(renderer)).not.toContain('Failed to query product');
 
@@ -532,6 +545,7 @@ describe('CreditPurchaseScreen', () => {
     await waitFor(() => owner.fetchStoreProducts.mock.calls.length >= 2);
 
     expect(packRows(renderer)).toHaveLength(0);
+    expect(allText(renderer)).not.toContain('Price unavailable');
     unmount();
   });
 
@@ -581,6 +595,7 @@ describe('CreditPurchaseScreen', () => {
       // The notice fills the pack area, with a retry to offer, and no row
       // renders beneath it: the pack area paints one surface at a time.
       expect(packRows(renderer)).toHaveLength(0);
+      expect(allText(renderer)).not.toContain('Price unavailable');
       expect(tryAgainButton(renderer)).toBeDefined();
       unmount();
     } finally {
@@ -682,6 +697,8 @@ describe('CreditPurchaseScreen', () => {
     expect(allText(renderer)).toContain(
       'Could not connect to the App Store. Check your connection and try again.'
     );
+    expect(allText(renderer)).not.toContain('Price unavailable');
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
     // The button that started the retry stays on screen, busy and disabled.
     const pendingRetry = tryAgainButton(renderer);
     if (!pendingRetry) {
@@ -732,7 +749,8 @@ describe('CreditPurchaseScreen', () => {
       await settleTimers(() => allText(renderer).includes('$10.99'));
 
       // The store drops while the prices are cached, so the bounded wait fires
-      // and every row reads Price unavailable.
+      // and the card above is the only visible statement: no row repeats it,
+      // and each row keeps the reason in its accessibilityLabel.
       owner.connected = false;
       await act(async () => {
         update();
@@ -743,6 +761,7 @@ describe('CreditPurchaseScreen', () => {
       });
       expect(allText(renderer)).toContain('App Store products unavailable');
       expect(packRows(renderer)).toHaveLength(0);
+      expect(allText(renderer)).not.toContain('Price unavailable');
 
       // The store reconnects with the cached prices still fresh, so React Query
       // keeps `status: success` and never refetches: only the connection itself
@@ -779,6 +798,91 @@ describe('CreditPurchaseScreen', () => {
       `Add ${packAmount('$500.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
     );
     expect(allText(renderer)).toContain('Price unavailable');
+    unmount();
+  });
+
+  it('store unavailable: the card states the failure once and no row renders beside it', async () => {
+    owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('App Store products unavailable'));
+
+    // The pack area paints one surface at a time: the notice fills it, so no
+    // row renders beside it and nothing repeats the state inside a row.
+    expect(packRows(renderer)).toHaveLength(0);
+    expect(allText(renderer)).not.toContain('Price unavailable');
+    expect(allText(renderer)).not.toContain(`Add ${packAmount('$10.00')} of credits`);
+    expect(tryAgainButton(renderer)).toBeDefined();
+    unmount();
+  });
+
+  it('place: a status phrase takes the row state line, and only a real price takes the trailing slot', async () => {
+    owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS.slice(0, 3));
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const rows = packRows(renderer);
+    const priced = rows[0]?.findAll(node => String(node.type) === 'Text') ?? [];
+    // Title, then the store price: the price is the only trailing child, and
+    // the expiry note takes the row's one state line.
+    expect(priced).toHaveLength(3);
+    expect(priced[1]?.props.children).toBe('$10.99');
+    expect(String(priced[1]?.props.className)).toContain('shrink-0');
+    const unpriced = rows[3]?.findAll(node => String(node.type) === 'Text') ?? [];
+    // Title, then the status in the same state line its neighbours fill with
+    // the expiry note: the row keeps their height, and the note it no longer
+    // prints stays in its accessibility label.
+    expect(unpriced.map(node => node.props.children)).toEqual([
+      `Add ${packAmount('$500.00')} of credits`,
+      'Price unavailable',
+    ]);
+    expect(labelOf(rows[3])).toContain('Credits purchased through the App Store do not expire.');
+    // One fixed-height state line, one gap, on every row: the store answering
+    // or dropping changes the copy in place, never a row's height.
+    const stateLines = rows.map(row =>
+      row.findAll(
+        node =>
+          String(node.type) === 'View' &&
+          String((node.props as { className?: string }).className).includes('min-h-5')
+      )
+    );
+    expect(stateLines.every(lines => lines.length === 1)).toBe(true);
+    expect(
+      stateLines.every(([line]) => {
+        if (line === undefined) {
+          return false;
+        }
+        const className = classNameOf(line);
+        return className.includes('min-h-5') && className.includes('mt-2');
+      })
+    ).toBe(true);
+    expect(
+      (stateLines[3]?.[0]?.findAll(node => String(node.type) === 'Text') ?? []).map(
+        node => node.props.children
+      )
+    ).toEqual(['Price unavailable']);
+    expect(
+      (stateLines[0]?.[0]?.findAll(node => String(node.type) === 'Text') ?? []).map(
+        node => node.props.children
+      )
+    ).toEqual(['Credits purchased through the App Store do not expire.']);
+    unmount();
+  });
+
+  it('place: every row title is bounded to one line', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const titles = renderer.root.findAll(node => {
+      if (String(node.type) !== 'Text') {
+        return false;
+      }
+      const { children } = node.props;
+      return typeof children === 'string' && children.includes('of credits');
+    });
+    expect(titles).toHaveLength(4);
+    expect(titles.every(title => title.props.numberOfLines === 1)).toBe(true);
     unmount();
   });
 
@@ -1187,8 +1291,10 @@ describe('CreditPurchaseScreen', () => {
     const caps = renderer.root
       .findAll(node => typeof node.props.numberOfLines === 'number')
       .map(node => Number(node.props.numberOfLines));
-    // The four rows carry a title, a price and an expiry line each.
-    expect(caps.filter(cap => cap === 1)).toHaveLength(12);
+    // Every row caps its title to one line; the store price holds its own
+    // `shrink-0` line and the state line holds one short phrase instead of a
+    // separate capped line.
+    expect(caps.filter(cap => cap === 1)).toHaveLength(4);
     unmount();
   });
 
@@ -1463,15 +1569,32 @@ describe('CreditPurchaseScreen', () => {
 
     expect(allText(renderer)).toContain('Completing purchase');
     const rows = packRows(renderer);
-    // The in-flight row announces its state in the label too.
+    // The in-flight row keeps its store price and its state, and the state takes
+    // the note line, so the row keeps its height and the price stays announced.
     const busyRow = rows.find(
       row =>
         (row.props as { accessibilityState?: { busy?: boolean } }).accessibilityState?.busy === true
     );
+    const busyTexts = busyRow?.findAll(node => String(node.type) === 'Text') ?? [];
+    expect(busyTexts.map(node => node.props.children)).toEqual([
+      `Add ${packAmount('$10.00')} of credits`,
+      '$10.99',
+      'Completing purchase',
+    ]);
+    // The label takes the row's last line in place of the expiry note, and that
+    // line keeps one height for both, so the row does not change height.
+    const busyLine = busyRow?.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String((node.props as { className?: string }).className).includes('min-h-5')
+    );
+    expect(busyLine).toHaveLength(1);
+    expect(busyLine?.[0]?.findAll(node => String(node.type) === 'Text')).toHaveLength(1);
+    expect(busyTexts).toHaveLength(3);
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
     ).toBe(
-      `Add ${packAmount('$10.00')} of credits, Completing purchase, Credits purchased through the App Store do not expire.`
+      `Add ${packAmount('$10.00')} of credits, $10.99, Completing purchase, Credits purchased through the App Store do not expire.`
     );
     expect(
       rows.every(

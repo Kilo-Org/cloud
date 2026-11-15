@@ -6605,6 +6605,10 @@ export const cloud_agent_workspace_folders = pgTable(
     kind: text().$type<'manual' | 'smart'>().notNull().default('manual'),
     smart_preset: text().$type<'needs_you' | 'in_review' | 'done'>(),
     sort_mode: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
+    manual_worktree_order: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6708,6 +6712,8 @@ export const cli_sessions_v2 = pgTable(
     kilo_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    // See CLI_SESSION_VERSION_BY_RUNTIME_HARNESS: Cloud Agent sets 1 (Kilo v1) or
+    // 2 (Kilo v2) after it delivers a message to a ready sandbox; 0 means unknown.
     version: integer().notNull().default(0),
     title: text(),
     public_id: uuid(),
@@ -7498,6 +7504,96 @@ export const device_refresh_tokens = pgTable(
 
 export type DeviceRefreshToken = typeof device_refresh_tokens.$inferSelect;
 
+/**
+ * A one-time, short-lived grant that lets a native app session add, rename, or
+ * remove a passkey.
+ *
+ * A native session bearer never authorizes these changes by itself: a grant is
+ * minted only after a fresh primary sign-in proof that resolved to the same
+ * account, and it is bound to that account, the device session it was minted
+ * for, and one operation. Only the SHA-256 digest of an issued grant is stored,
+ * and the consuming write is one atomic `UPDATE`, so a leaked row or a replayed
+ * grant authorizes nothing.
+ *
+ * Phases are explicit because the SSO proof completes in a browser after the
+ * app asked for it: `pending` (the app has a requestId, no authority yet),
+ * `approved` (the browser proved a fresh primary sign-in for the account), and
+ * `issued` (the app collected the token). Only `issued` authorizes anything,
+ * and `token_hash` exists only in that phase, so neither the requestId nor an
+ * approved row can be presented to any endpoint as a grant.
+ */
+export const passkey_management_authorizations = pgTable(
+  'passkey_management_authorizations',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    // Null until an SSO request is collected, so a pending id or an approved
+    // row cannot be replayed as a bearer grant.
+    token_hash: text(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    device_session_id: uuid()
+      .notNull()
+      .references(() => device_sessions.id, { onDelete: 'cascade' }),
+    operation: text().notNull().$type<'enroll' | 'rename' | 'remove'>(),
+    state: text().notNull().default('issued').$type<'pending' | 'approved' | 'issued'>(),
+    // The WorkOS organization the approving browser session must be signed in
+    // to, captured when an SSO request starts. Null for email and passkey
+    // grants, which never leave the app.
+    sso_organization_id: text(),
+    // The account's web-session pepper when the grant was created. Account
+    // recovery rotates it, so a grant minted before recovery authorizes
+    // nothing afterwards. See `revokeWebSessions`.
+    web_session_pepper: text(),
+    // The registration challenge this grant minted options for, so an
+    // attestation cannot be verified against a different grant. Null until the
+    // enrollment options step runs; always null for rename and remove.
+    passkey_challenge_id: uuid(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    approved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_passkey_management_authorizations_token_hash').on(table.token_hash),
+    index('IDX_passkey_management_authorizations_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_passkey_management_authorizations_expires_at').on(table.expires_at),
+    check(
+      'check_passkey_management_authorizations_operation',
+      sql`${table.operation} IN ('enroll', 'rename', 'remove')`
+    ),
+    check(
+      'check_passkey_management_authorizations_state',
+      sql`${table.state} IN ('pending', 'approved', 'issued')`
+    ),
+    // The phase and the stored digest cannot disagree: a row with no digest
+    // authorizes nothing, and an empty digest would authorize nothing either.
+    check(
+      'check_passkey_management_authorizations_issued_digest',
+      sql`(${table.state} = 'issued') = (${table.token_hash} IS NOT NULL)`
+    ),
+    // Only the pending phase exists without an approval, and only an approval
+    // can create one. A grant minted directly in the app is never approved.
+    check(
+      'check_passkey_management_authorizations_pending_approved_at',
+      sql`${table.state} <> 'pending' OR ${table.approved_at} IS NULL`
+    ),
+    check(
+      'check_passkey_management_authorizations_approved_approved_at',
+      sql`${table.state} <> 'approved' OR ${table.approved_at} IS NOT NULL`
+    ),
+    // Only an issued grant can be spent.
+    check(
+      'check_passkey_management_authorizations_consumed_at',
+      sql`${table.state} = 'issued' OR ${table.consumed_at} IS NULL`
+    ),
+  ]
+);
+
+export type PasskeyManagementAuthorization = typeof passkey_management_authorizations.$inferSelect;
+export type NewPasskeyManagementAuthorization =
+  typeof passkey_management_authorizations.$inferInsert;
+
 export const app_reported_messages = pgTable('app_reported_messages', {
   report_id: uuid()
     .default(sql`pg_catalog.gen_random_uuid()`)
@@ -7527,7 +7623,6 @@ export const byok_api_keys = pgTable(
       onDelete: 'cascade',
     }),
     provider_id: text().notNull(),
-    encrypted_api_key: jsonb().$type<EncryptedData>(),
     encrypted_api_key_envelope: jsonb().$type<BYOKApiKeyEnvelope>(),
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
@@ -11120,10 +11215,12 @@ export const enkrypt_usage = pgTable(
     // is an `allowed` row with detectors here. PostgreSQL cannot enforce foreign keys on array
     // elements, so the writer resolves every id through the lookup table.
     fired_detector_ids: integer().array(),
-    // Sizes in UTF-16 code units. `total_characters` is the text the scan covers: the whole
-    // extracted request or response. `scanned_characters` is what this call sent to Enkrypt: the
-    // part no cached verdict covers, plus an overlap of already-scanned text. Requests that the
-    // verdict cache covers entirely make no call and have no row. Null on rows that predate them.
+    // Sizes in UTF-16 code units. `total_characters` is the text the scan covers: one of the
+    // request's tool definitions, its system prompt, or its conversation, each scanned by its own
+    // call, or the response. `scanned_characters` is what this call sent to Enkrypt: segments no
+    // cached verdict covers, packed into one call, with their separators and the headers of split
+    // segments. Parts that the verdict cache covers entirely make no call and have no row. Null on
+    // rows that predate them.
     scanned_characters: integer(),
     total_characters: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

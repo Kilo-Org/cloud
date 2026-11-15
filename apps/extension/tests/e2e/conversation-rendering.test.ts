@@ -38,7 +38,7 @@ test('fresh conversation shows the empty-state hint without a CTA button', async
     await sidePanel.reload();
 
     const conversation = sidePanel.getByLabel('Agent conversation');
-    const emptyHint = conversation.getByText('Pick a tab and ask Kilo to inspect it.');
+    const emptyHint = conversation.getByText(/Ask Kilo about /u);
     await expect(emptyHint).toBeVisible();
     const hintBox = await emptyHint.boundingBox();
     expect(hintBox).not.toBeNull();
@@ -49,7 +49,7 @@ test('fresh conversation shows the empty-state hint without a CTA button', async
     await sidePanel.getByLabel('Message agent').fill('First user message');
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(conversation.getByText('First user message')).toBeVisible();
-    await expect(conversation.getByText('Pick a tab and ask Kilo to inspect it.')).toHaveCount(0);
+    await expect(conversation.getByText(/Ask Kilo about /u)).toHaveCount(0);
   } finally {
     await context.close();
     await fixture.close();

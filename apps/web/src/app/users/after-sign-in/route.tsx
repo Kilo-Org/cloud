@@ -1,5 +1,6 @@
 import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
 
   if (!user) {
     responsePath = signInPathWithPreservedTrackingParams(url);
-  } else if (user.blocked_reason) {
+  } else if (isBlockedAccount(user)) {
     responsePath = '/account-blocked';
   } else {
     const callbackPath = url.searchParams.get('callbackPath');

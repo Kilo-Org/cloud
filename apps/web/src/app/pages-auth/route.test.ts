@@ -17,14 +17,14 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
 
 const mockedGetUser = jest.mocked(getUserFromSessionForCredentialIssuanceOrRedirect);
 
-const PAGES = 'https://pages.kiloapps.io';
+const PAGES = 'pages';
 const STATE = 'S'.repeat(43);
 
 function enter(query: string) {
   return GET(new NextRequest(`http://localhost:3000/pages-auth${query}`));
 }
-const queryOf = (origin: string, state: string) =>
-  `?${new URLSearchParams({ origin, state }).toString()}`;
+const queryOf = (audience: string, state: string) =>
+  `?${new URLSearchParams({ audience, state }).toString()}`;
 
 describe('GET /pages-auth', () => {
   beforeEach(() => {
@@ -40,13 +40,13 @@ describe('GET /pages-auth', () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
 
     const location = new URL(response.headers.get('location') ?? '');
-    expect(location.origin).toBe(PAGES);
+    expect(location.origin).toBe('https://pages.kiloapps.io');
     expect(location.pathname).toBe('/api/auth/kilo/callback');
     expect([...location.searchParams.keys()].sort()).toEqual(['code', 'state']);
     expect(location.searchParams.get('state')).toBe(STATE);
     expect(verifyPagesAuthCode(location.searchParams.get('code'))).toEqual({
       userId: 'user-1',
-      origin: PAGES,
+      audience: PAGES,
       state: STATE,
     });
   });
@@ -66,17 +66,16 @@ describe('GET /pages-auth', () => {
 
   test.each([
     ['no parameters', ''],
-    ['no state', `?origin=${encodeURIComponent(PAGES)}`],
-    ['no origin', `?state=${STATE}`],
-    ['another site', queryOf('https://evil.example', STATE)],
-    ['a deployment with a path', queryOf(`${PAGES}/p/abc`, STATE)],
-    ['a deployment with a trailing slash', queryOf(`${PAGES}/`, STATE)],
-    ['a look-alike host', queryOf('https://pages.kiloapps.io.evil.example', STATE)],
-    ['a deployment without a secret', queryOf('https://pages-dev.kiloapps.io', STATE)],
+    ['no state', `?audience=${PAGES}`],
+    ['no audience', `?state=${STATE}`],
+    ['an audience that is not a deployment', queryOf('kilo-api', STATE)],
+    ['an origin instead of an audience', queryOf('https://pages.kiloapps.io', STATE)],
+    ['a different case', queryOf('PAGES', STATE)],
+    ['a deployment without a secret', queryOf('pages-dev', STATE)],
     ['a short state', queryOf(PAGES, 'short')],
     ['a state with other characters', queryOf(PAGES, `${'S'.repeat(42)}/`)],
     ['a repeated state', `${queryOf(PAGES, STATE)}&state=${STATE}`],
-    ['a repeated origin', `${queryOf(PAGES, STATE)}&origin=${encodeURIComponent(PAGES)}`],
+    ['a repeated audience', `${queryOf(PAGES, STATE)}&audience=${PAGES}`],
   ])('refuses %s without asking anyone to sign in', async (_name, query) => {
     const response = await enter(query);
 

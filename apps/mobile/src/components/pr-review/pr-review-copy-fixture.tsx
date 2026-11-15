@@ -153,7 +153,7 @@ export function PrReviewCopyFixture() {
             conflicts: false,
             blockedReasons: [],
           }}
-          sheetTitle={providerPrMergeTitles(t, scope.ref.platform).action}
+          sheetTitle={providerPrMergeTitles(t, scope.ref.platform).title}
           eyebrow="sample/review-copy!1"
           onRefetch={async () => {
             await queryClient.invalidateQueries();

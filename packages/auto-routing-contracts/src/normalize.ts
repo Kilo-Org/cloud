@@ -708,10 +708,14 @@ function collectModalities(
   if (role !== 'part') return;
 
   // Typed content parts: OpenAI Responses `input_image` / `input_file`,
-  // OpenAI chat `image_url`, Anthropic `image` / `document`.
+  // OpenAI chat `image_url`, Anthropic `image` / `document`. `type` is
+  // client-supplied, so the lookup takes an own key only: an index read would
+  // also answer for inherited keys such as `constructor` or `toString`.
   const type = value.type;
   if (typeof type === 'string') {
-    const modality = MEDIA_PART_MODALITY[type];
+    const modality = Object.hasOwn(MEDIA_PART_MODALITY, type)
+      ? MEDIA_PART_MODALITY[type]
+      : undefined;
     if (modality !== undefined) {
       out.add(modality);
     }
@@ -834,9 +838,10 @@ function sumContentPartTextChars(part: unknown, depth: number): number {
 
   const type = part.type;
 
-  // Media parts: zero contribution regardless of payload size
+  // Media parts: zero contribution regardless of payload size. The own-key
+  // check keeps an inherited key such as `constructor` from reading as media.
   if (typeof type === 'string') {
-    if (MEDIA_PART_MODALITY[type] !== undefined) {
+    if (Object.hasOwn(MEDIA_PART_MODALITY, type)) {
       return 0;
     }
 

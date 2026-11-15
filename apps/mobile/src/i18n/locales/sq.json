@@ -451,6 +451,10 @@
       "appealMessage": "Një apelim mund të dërgohet vetëm një herë dhe nuk mund të tërhiqet.",
       "appealConfirm": "Dërgo apelimin",
       "appealed": "Apelimi u dërgua",
+      "nextStepReceived": "Një moderator do ta shqyrtojë këtë raport. Rezultati do të shfaqet në këtë ekran dhe mund të apelosh pas një vendimi.",
+      "nextStepInReview": "Rezultati do të shfaqet në këtë ekran dhe mund të apelosh pas një vendimi.",
+      "nextStepAppeal": "Rezultati i apelimit do të shfaqet në këtë ekran.",
+      "nextStepFinal": "Vendimi i apelimit është përfundimtar. Nuk mund të dërgohet asnjë apelim tjetër.",
       "viewReceipt": "Shiko dëftesën"
     },
     "changelog": "Çfarë ka të re"

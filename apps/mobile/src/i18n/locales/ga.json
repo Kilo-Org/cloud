@@ -451,6 +451,10 @@
       "appealMessage": "Ní féidir achomharc a chur isteach ach uair amháin, agus ní féidir é a tharraingt siar.",
       "appealConfirm": "Cuir an t-achomharc isteach",
       "appealed": "Cuireadh an t-achomharc isteach",
+      "nextStepReceived": "Athbhreithneoidh modhnóir an tuairisc seo. Beidh an toradh le feiceáil ar an scáileán seo, agus is féidir leat achomharc a dhéanamh tar éis an chinnidh.",
+      "nextStepInReview": "Beidh an toradh le feiceáil ar an scáileán seo, agus is féidir leat achomharc a dhéanamh tar éis an chinnidh.",
+      "nextStepAppeal": "Beidh toradh an achomhairc le feiceáil ar an scáileán seo.",
+      "nextStepFinal": "Tá cinneadh an achomhairc críochnaitheach. Ní féidir aon achomharc breise a chur isteach.",
       "viewReceipt": "Féach ar an admháil"
     },
     "changelog": "Na rudaí nua"

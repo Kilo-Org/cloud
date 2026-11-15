@@ -451,6 +451,10 @@
       "appealMessage": "Ou ka soumèt yon apèl yon sèl fwa sèlman epi ou pa ka retire l.",
       "appealConfirm": "Soumèt apèl",
       "appealed": "Apèl soumèt",
+      "nextStepReceived": "Yon moderatè pral revize rapò sa a. Rezilta a ap parèt sou ekran sa a, epi ou ka fè apèl apre yon desizyon.",
+      "nextStepInReview": "Rezilta a ap parèt sou ekran sa a, epi ou ka fè apèl apre yon desizyon.",
+      "nextStepAppeal": "Rezilta apèl la ap parèt sou ekran sa a.",
+      "nextStepFinal": "Desizyon apèl la final. Ou pa ka soumèt okenn lòt apèl.",
       "viewReceipt": "Wè resi a"
     },
     "changelog": "Sa ki nouvo"

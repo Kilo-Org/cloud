@@ -451,6 +451,10 @@
       "appealMessage": "Du kan bare klage én gang, og klagen kan ikke trekkes tilbake.",
       "appealConfirm": "Send klage",
       "appealed": "Klagen er sendt",
+      "nextStepReceived": "En moderator vil behandle denne rapporten. Resultatet vises på denne skjermen, og du kan klage etter at avgjørelsen er tatt.",
+      "nextStepInReview": "Resultatet vises på denne skjermen, og du kan klage etter at avgjørelsen er tatt.",
+      "nextStepAppeal": "Resultatet av klagen vises på denne skjermen.",
+      "nextStepFinal": "Klageavgjørelsen er endelig. Du kan ikke klage på nytt.",
       "viewReceipt": "Vis kvittering"
     },
     "changelog": "Nyheter"

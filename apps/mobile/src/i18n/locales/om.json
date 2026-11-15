@@ -451,6 +451,10 @@
       "appealMessage": "Ol'iyyannoon al tokko qofa ergamuu danda'a, deebifamee kaafamuus hin danda'u.",
       "appealConfirm": "Ol'iyyannoo ergi",
       "appealed": "Ol'iyyannoon ergameera",
+      "nextStepReceived": "Sakatta'aan gabaasa kana ni sakatta'a. Bu'aan isaa fuula kana irratti mul'ata, murtee boodas ol'iyyachuu dandeessa.",
+      "nextStepInReview": "Bu'aan gabaasaa fuula kana irratti mul'ata, murtee boodas ol'iyyachuu dandeessa.",
+      "nextStepAppeal": "Bu'aan ol'iyyannoo kee fuula kana irratti mul'ata.",
+      "nextStepFinal": "Murteen ol'iyyannoo kan dhumaa dha. Ol'iyyannoon biraa ergamuu hin danda'u.",
       "viewReceipt": "Ragaa ilaali"
     },
     "changelog": "Waan haaraa"

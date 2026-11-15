@@ -451,6 +451,10 @@
       "appealMessage": "Du kan kun klage én gang, og klagen kan ikke trækkes tilbage.",
       "appealConfirm": "Indsend klage",
       "appealed": "Klage indsendt",
+      "nextStepReceived": "En moderator vil behandle denne rapport. Resultatet vises på denne skærm, og du kan klage, når der er truffet en afgørelse.",
+      "nextStepInReview": "Resultatet vises på denne skærm, og du kan klage, når der er truffet en afgørelse.",
+      "nextStepAppeal": "Resultatet af din klage vises på denne skærm.",
+      "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
       "viewReceipt": "Se kvittering"
     },
     "changelog": "Nyheder"

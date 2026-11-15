@@ -451,6 +451,10 @@
       "appealMessage": "'n Appèl kan net een keer ingedien word en kan nie teruggetrek word nie.",
       "appealConfirm": "Dien appèl in",
       "appealed": "Appèl ingedien",
+      "nextStepReceived": "'n Moderator sal hierdie rapport hersien. Die uitkoms sal op hierdie skerm verskyn, en jy kan ná 'n besluit appèl aanteken.",
+      "nextStepInReview": "Die uitkoms sal op hierdie skerm verskyn, en jy kan ná 'n besluit appèl aanteken.",
+      "nextStepAppeal": "Die uitkoms van jou appèl sal op hierdie skerm verskyn.",
+      "nextStepFinal": "Die appèlbesluit is finaal. Geen verdere appèl kan ingedien word nie.",
       "viewReceipt": "Bekyk ontvangsbewys"
     },
     "changelog": "Wat is nuut"

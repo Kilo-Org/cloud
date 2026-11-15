@@ -518,6 +518,10 @@
       "appealMessage": "An appeal can be submitted once and cannot be withdrawn.",
       "appealConfirm": "Submit appeal",
       "appealed": "Appeal submitted",
+      "nextStepReceived": "A moderator will review this report. The outcome will appear on this screen, and you can appeal after a decision.",
+      "nextStepInReview": "The outcome will appear on this screen, and you can appeal after a decision.",
+      "nextStepAppeal": "The appeal outcome will appear on this screen.",
+      "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
       "viewReceipt": "View receipt"
     },
     "changelog": "What's New"

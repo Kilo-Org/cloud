@@ -451,6 +451,10 @@
       "appealMessage": "申诉只能提交一次，且提交后无法撤回。",
       "appealConfirm": "提交申诉",
       "appealed": "申诉已提交",
+      "nextStepReceived": "审核员将审核此举报。结果将显示在此页面，作出决定后你可以提出申诉。",
+      "nextStepInReview": "结果将显示在此页面，作出决定后你可以提出申诉。",
+      "nextStepAppeal": "申诉结果将显示在此页面。",
+      "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
       "viewReceipt": "查看回执"
     },
     "changelog": "更新内容"

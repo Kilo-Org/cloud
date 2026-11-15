@@ -451,6 +451,10 @@
       "appealMessage": "Un recours ne peut être déposé qu'une seule fois et ne peut pas être retiré.",
       "appealConfirm": "Déposer le recours",
       "appealed": "Recours déposé",
+      "nextStepReceived": "Un modérateur examinera ce signalement. Le résultat s'affichera sur cet écran, et vous pourrez déposer un recours après la décision.",
+      "nextStepInReview": "Le résultat s'affichera sur cet écran, et vous pourrez déposer un recours après la décision.",
+      "nextStepAppeal": "Le résultat du recours s'affichera sur cet écran.",
+      "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
       "viewReceipt": "Voir l'accusé de réception"
     },
     "changelog": "Nouveautés"

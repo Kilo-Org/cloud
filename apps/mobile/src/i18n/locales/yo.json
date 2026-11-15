@@ -451,6 +451,10 @@
       "appealMessage": "Ẹ̀ẹ̀kan ṣoṣo ni a lè fi ẹ̀bẹ̀ ránṣẹ́, a kò sì lè fà á padà.",
       "appealConfirm": "Fi ẹ̀bẹ̀ ránṣẹ́",
       "appealed": "A ti fi ẹ̀bẹ̀ ránṣẹ́",
+      "nextStepReceived": "Olùtúnyẹ̀wò kan yóò ṣe àtúnyẹ̀wò ìjábọ̀ yìí. Àbájáde rẹ̀ yóò hàn lórí ojú-ìwé yìí, o sì lè fi ẹ̀bẹ̀ ránṣẹ́ lẹ́yìn ìpinnu.",
+      "nextStepInReview": "Àbájáde ìjábọ̀ yìí yóò hàn lórí ojú-ìwé yìí, o sì lè fi ẹ̀bẹ̀ ránṣẹ́ lẹ́yìn ìpinnu.",
+      "nextStepAppeal": "Àbájáde ẹ̀bẹ̀ yìí yóò hàn lórí ojú-ìwé yìí.",
+      "nextStepFinal": "Ìpinnu ẹ̀bẹ̀ yìí ti di ìparí. A kò lè fi ẹ̀bẹ̀ mìíràn ránṣẹ́ mọ́.",
       "viewReceipt": "Wo ìwé ẹ̀rí"
     },
     "changelog": "Àwọn ohun tuntun"

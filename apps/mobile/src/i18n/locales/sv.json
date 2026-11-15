@@ -451,6 +451,10 @@
       "appealMessage": "Ett överklagande kan bara skickas in en gång och kan inte dras tillbaka.",
       "appealConfirm": "Skicka överklagande",
       "appealed": "Överklagandet har skickats",
+      "nextStepReceived": "En moderator kommer att granska den här anmälan. Utfallet visas på den här skärmen, och du kan överklaga efter ett beslut.",
+      "nextStepInReview": "Utfallet visas på den här skärmen, och du kan överklaga efter ett beslut.",
+      "nextStepAppeal": "Utfallet av överklagandet visas på den här skärmen.",
+      "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },
     "changelog": "Nyheter"

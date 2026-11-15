@@ -451,6 +451,10 @@
       "appealMessage": "Odwołanie można złożyć tylko raz i nie można go wycofać.",
       "appealConfirm": "Złóż odwołanie",
       "appealed": "Złożono odwołanie",
+      "nextStepReceived": "Moderator rozpatrzy to zgłoszenie. Wynik pojawi się na tym ekranie, a od decyzji można się odwołać.",
+      "nextStepInReview": "Wynik pojawi się na tym ekranie, a od decyzji można się odwołać.",
+      "nextStepAppeal": "Wynik odwołania pojawi się na tym ekranie.",
+      "nextStepFinal": "Decyzja w sprawie odwołania jest ostateczna. Nie można złożyć kolejnego odwołania.",
       "viewReceipt": "Wyświetl potwierdzenie"
     },
     "changelog": "Co nowego"

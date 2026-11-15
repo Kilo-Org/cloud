@@ -451,6 +451,10 @@
       "appealMessage": "Apellyatsiya faqat bir marta yuboriladi va uni qaytarib olib bo'lmaydi.",
       "appealConfirm": "Apellyatsiya yuborish",
       "appealed": "Apellyatsiya yuborildi",
+      "nextStepReceived": "Moderator bu shikoyatni ko'rib chiqadi. Natija shu ekranda ko'rinadi va qaror chiqqandan so'ng apellyatsiya berishingiz mumkin.",
+      "nextStepInReview": "Natija shu ekranda ko'rinadi va qaror chiqqandan so'ng apellyatsiya berishingiz mumkin.",
+      "nextStepAppeal": "Apellyatsiya natijasi shu ekranda ko'rinadi.",
+      "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
     },
     "changelog": "Yangiliklar"

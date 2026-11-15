@@ -451,6 +451,10 @@
       "appealMessage": "Kotahi noa te tuku pīra, ā, kāore e taea te tango.",
       "appealConfirm": "Tukuna te pīra",
       "appealed": "Kua tukuna te pīra",
+      "nextStepReceived": "Ka arotakengia tēnei pūrongo e tētahi kaiarotake. Ka puta te otinga ki tēnei mata, ā, ka taea e koe te pīra i muri i te whakatau.",
+      "nextStepInReview": "Ka puta te otinga ki tēnei mata, ā, ka taea e koe te pīra i muri i te whakatau.",
+      "nextStepAppeal": "Ka puta te otinga o te pīra ki tēnei mata.",
+      "nextStepFinal": "Ko te whakatau mō te pīra he whakatau whakamutunga. Kāore e taea tētahi atu pīra te tuku.",
       "viewReceipt": "Tirohia te rīhīti"
     },
     "changelog": "Ngā mea hou"

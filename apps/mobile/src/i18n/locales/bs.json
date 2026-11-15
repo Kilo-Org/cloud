@@ -451,6 +451,10 @@
       "appealMessage": "Žalba se može podnijeti samo jednom i ne može se povući.",
       "appealConfirm": "Podnesi žalbu",
       "appealed": "Žalba podnesena",
+      "nextStepReceived": "Moderator će pregledati ovu prijavu. Ishod će se pojaviti na ovom ekranu, a žalbu možete podnijeti nakon odluke.",
+      "nextStepInReview": "Ishod će se pojaviti na ovom ekranu, a žalbu možete podnijeti nakon odluke.",
+      "nextStepAppeal": "Ishod vaše žalbe pojavit će se na ovom ekranu.",
+      "nextStepFinal": "Odluka o žalbi je konačna. Žalba se više ne može podnijeti.",
       "viewReceipt": "Prikaži potvrdu"
     },
     "changelog": "Šta je novo"

@@ -451,6 +451,10 @@
       "appealMessage": "Apellyasiya yalnız bir dəfə göndərilə bilər və geri götürülə bilməz.",
       "appealConfirm": "Apellyasiya göndər",
       "appealed": "Apellyasiya göndərildi",
+      "nextStepReceived": "Moderator bu şikayəti nəzərdən keçirəcək. Nəticə bu ekranda görünəcək və qərardan sonra apellyasiya verə bilərsiniz.",
+      "nextStepInReview": "Nəticə bu ekranda görünəcək və qərardan sonra apellyasiya verə bilərsiniz.",
+      "nextStepAppeal": "Apellyasiyanın nəticəsi bu ekranda görünəcək.",
+      "nextStepFinal": "Apellyasiya qərarı qətidir. Artıq apellyasiya vermək mümkün deyil.",
       "viewReceipt": "Qəbzə bax"
     },
     "changelog": "Yeniliklər"

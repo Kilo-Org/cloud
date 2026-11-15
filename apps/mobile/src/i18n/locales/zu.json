@@ -451,6 +451,10 @@
       "appealMessage": "Isikhalo singathunyelwa kanye kuphela futhi asikwazi ukuhoxiswa.",
       "appealConfirm": "Thumela isikhalo",
       "appealed": "Isikhalo sithunyelwe",
+      "nextStepReceived": "Umbuyekezi uzobuyekeza lo mbiko. Umphumela uzovela kulesi sikrini, futhi ungafaka isikhalo ngemva kwesinqumo.",
+      "nextStepInReview": "Umphumela uzovela kulesi sikrini, futhi ungafaka isikhalo ngemva kwesinqumo.",
+      "nextStepAppeal": "Umphumela wesikhalo uzovela kulesi sikrini.",
+      "nextStepFinal": "Isinqumo sesikhalo siyisinqumo sokugcina. Akukho esinye isikhalo esingafakwa.",
       "viewReceipt": "Buka irisidi"
     },
     "changelog": "Okusha"

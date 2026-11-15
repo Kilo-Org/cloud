@@ -451,6 +451,10 @@
       "appealMessage": "Rufaa inaweza kuwasilishwa mara moja tu na haiwezi kuondolewa.",
       "appealConfirm": "Wasilisha rufaa",
       "appealed": "Rufaa imewasilishwa",
+      "nextStepReceived": "Mkaguzi atakagua ripoti hii. Matokeo yataonekana kwenye skrini hii, na unaweza kukata rufaa baada ya uamuzi.",
+      "nextStepInReview": "Matokeo yataonekana kwenye skrini hii, na unaweza kukata rufaa baada ya uamuzi.",
+      "nextStepAppeal": "Matokeo ya rufaa yataonekana kwenye skrini hii.",
+      "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
       "viewReceipt": "Angalia risiti"
     },
     "changelog": "Mapya"

@@ -451,6 +451,10 @@
       "appealMessage": "Il ricorso può essere presentato una sola volta e non può essere ritirato.",
       "appealConfirm": "Invia ricorso",
       "appealed": "Ricorso inviato",
+      "nextStepReceived": "Un moderatore esaminerà questa segnalazione. L'esito apparirà su questa schermata e potrai presentare ricorso dopo la decisione.",
+      "nextStepInReview": "L'esito apparirà su questa schermata e potrai presentare ricorso dopo la decisione.",
+      "nextStepAppeal": "L'esito del ricorso apparirà su questa schermata.",
+      "nextStepFinal": "La decisione sul ricorso è definitiva. Non è possibile presentare altri ricorsi.",
       "viewReceipt": "Visualizza ricevuta"
     },
     "changelog": "Novità"

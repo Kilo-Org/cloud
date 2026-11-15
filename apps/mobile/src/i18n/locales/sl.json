@@ -451,6 +451,10 @@
       "appealMessage": "Pritožbo lahko oddaš samo enkrat in je ne moreš umakniti.",
       "appealConfirm": "Oddaj pritožbo",
       "appealed": "Pritožba oddana",
+      "nextStepReceived": "Moderator bo pregledal to prijavo. Izid bo prikazan na tem zaslonu, pritožbo pa lahko oddaš po odločitvi.",
+      "nextStepInReview": "Izid bo prikazan na tem zaslonu, pritožbo pa lahko oddaš po odločitvi.",
+      "nextStepAppeal": "Izid pritožbe bo prikazan na tem zaslonu.",
+      "nextStepFinal": "Odločitev o pritožbi je dokončna. Pritožbe ni več mogoče oddati.",
       "viewReceipt": "Prikaži potrdilo"
     },
     "changelog": "Kaj je novega"

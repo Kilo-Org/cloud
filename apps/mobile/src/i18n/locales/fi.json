@@ -451,6 +451,10 @@
       "appealMessage": "Valituksen voi tehdä vain kerran, eikä sitä voi perua.",
       "appealConfirm": "Lähetä valitus",
       "appealed": "Valitus lähetetty",
+      "nextStepReceived": "Moderaattori käsittelee tämän ilmoituksen. Lopputulos näkyy tällä näytöllä, ja voit valittaa päätöksen jälkeen.",
+      "nextStepInReview": "Lopputulos näkyy tällä näytöllä, ja voit valittaa päätöksen jälkeen.",
+      "nextStepAppeal": "Valituksen lopputulos näkyy tällä näytöllä.",
+      "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
       "viewReceipt": "Näytä kuitti"
     },
     "changelog": "Mitä uutta"

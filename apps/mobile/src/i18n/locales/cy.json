@@ -451,6 +451,10 @@
       "appealMessage": "Dim ond unwaith y gellir cyflwyno apêl, ac ni ellir ei thynnu'n ôl.",
       "appealConfirm": "Cyflwyno apêl",
       "appealed": "Apêl wedi'i chyflwyno",
+      "nextStepReceived": "Bydd adolygydd yn adolygu'r adroddiad hwn. Bydd y canlyniad yn ymddangos ar y sgrin hon, ac fe allwch apelio ar ôl penderfyniad.",
+      "nextStepInReview": "Bydd y canlyniad yn ymddangos ar y sgrin hon, ac fe allwch apelio ar ôl penderfyniad.",
+      "nextStepAppeal": "Bydd canlyniad eich apêl yn ymddangos ar y sgrin hon.",
+      "nextStepFinal": "Mae penderfyniad yr apêl yn derfynol. Ni ellir cyflwyno apêl bellach.",
       "viewReceipt": "Gweld y dderbynneb"
     },
     "changelog": "Beth sy'n newydd"

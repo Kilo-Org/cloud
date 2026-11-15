@@ -252,12 +252,23 @@ const CODE_FENCE_WALK_CACHE_CHARACTERS = 2_000_000;
 // source alone does not account for.
 const FENCE_WALK_TOKEN_CHARGE = 16;
 
-const fenceWalkCache = new CharacterBoundedCache<ChunkWalk>(CODE_FENCE_WALK_CACHE_CHARACTERS);
+/**
+ * One fence's resumable walk, in the one place it can be.
+ *
+ * `held` while a mounted block renders that fence: the cache's pinned predicate
+ * protects it, because the block's next mount batch continues from this walk.
+ * `cached` once no block holds it: it is kept only to make a remount cheap, and
+ * the weight budget may evict it. A separate holder map could name a key the
+ * cache had already dropped; one entry cannot.
+ */
+type FenceWalkEntry =
+  | { readonly kind: 'held'; readonly walk: ChunkWalk; readonly holders: number }
+  | { readonly kind: 'cached'; readonly walk: ChunkWalk };
 
-// Mounted blocks per walk key. The cache is keyed by the fence's value, not by
-// an instance, so two blocks rendering the same fence share one walk; a block
-// that goes away may only drop the walk once no other mounted block holds it.
-const fenceWalkHolders = new Map<string, number>();
+const fenceWalkCache = new CharacterBoundedCache<FenceWalkEntry>(
+  CODE_FENCE_WALK_CACHE_CHARACTERS,
+  entry => entry.kind === 'held'
+);
 
 function fenceWalkKey(code: string, language: string | null): string {
   return `${language ?? ''}\u0000${code}`;
@@ -271,18 +282,8 @@ function fenceWalkWeight(key: string, walk: ChunkWalk): number {
   return key.length + walk.retainedCharacters + walk.retainedTokens * FENCE_WALK_TOKEN_CHARGE;
 }
 
-/**
- * The resumable walk for one fence, keyed by its language and full source.
- * Repeated calls with a larger `maxChunks` continue the same walk, so each
- * source line is highlighted once no matter how many mount batches it takes.
- * A new walk is not cached here: `chunkCodeLines` caches it once it knows what
- * the walk retains.
- */
-function getFenceChunkWalk(code: string, language: string | null): ChunkWalk {
-  const cached = fenceWalkCache.get(fenceWalkKey(code, language));
-  if (cached !== undefined) {
-    return cached;
-  }
+/** A fresh walk from line zero of one fence, highlighting a line as it is pulled. */
+function createFenceChunkWalk(code: string, language: string | null): ChunkWalk {
   const lines = code.split('\n');
   let index = 0;
   return createChunkWalk(() => {
@@ -318,12 +319,18 @@ export function chunkCodeLines(
   maxChunks: number
 ): CodeChunkPage {
   const key = fenceWalkKey(code, language);
-  const walk = getFenceChunkWalk(code, language);
+  const existing = fenceWalkCache.get(key);
+  const walk = existing?.walk ?? createFenceChunkWalk(code, language);
   advanceChunkWalk(walk, maxChunks);
-  // Charge the cache for what the walk now retains. `set` also moves the entry
-  // to the most-recent end, which is what keeps the fence being mounted ahead
-  // of the walks of the fences the user scrolled past.
-  fenceWalkCache.set(key, walk, fenceWalkWeight(key, walk));
+  // Charge the cache for what the walk now retains, keeping its ownership: a
+  // held walk stays pinned, a cached one stays evictable. `set` also moves the
+  // entry to the most-recent end, which is what keeps the fence being mounted
+  // ahead of the walks of the fences the user scrolled past.
+  const entry: FenceWalkEntry =
+    existing?.kind === 'held'
+      ? { kind: 'held', walk, holders: existing.holders }
+      : { kind: 'cached', walk };
+  fenceWalkCache.set(key, entry, fenceWalkWeight(key, walk));
   // Return a snapshot capped at `maxChunks`: the walk's array grows on the next
   // batch (and may already hold more if another instance sharing the same
   // source advanced it first), and a caller memoized on the array's identity
@@ -342,7 +349,14 @@ export function chunkCodeLines(
  */
 export function retainFenceChunkWalk(code: string, language: string | null): void {
   const key = fenceWalkKey(code, language);
-  fenceWalkHolders.set(key, (fenceWalkHolders.get(key) ?? 0) + 1);
+  const entry = fenceWalkCache.get(key);
+  const walk = entry?.walk ?? createFenceChunkWalk(code, language);
+  const next: FenceWalkEntry = {
+    kind: 'held',
+    walk,
+    holders: entry?.kind === 'held' ? entry.holders + 1 : 1,
+  };
+  fenceWalkCache.set(key, next, fenceWalkWeight(key, walk));
 }
 
 /**
@@ -355,19 +369,34 @@ export function retainFenceChunkWalk(code: string, language: string | null): voi
  */
 export function releaseFenceChunkWalk(code: string, language: string | null): void {
   const key = fenceWalkKey(code, language);
-  const holders = fenceWalkHolders.get(key) ?? 0;
-  if (holders > 1) {
-    fenceWalkHolders.set(key, holders - 1);
+  const entry = fenceWalkCache.peek(key);
+  if (entry === undefined) {
     return;
   }
-  fenceWalkHolders.delete(key);
+  if (entry.kind === 'held' && entry.holders > 1) {
+    const walk = entry.walk;
+    fenceWalkCache.update(
+      key,
+      { kind: 'held', walk, holders: entry.holders - 1 },
+      fenceWalkWeight(key, walk)
+    );
+    return;
+  }
+  // In place, so the released walk keeps its place in the eviction order: it is
+  // dropped on the next task, and making it the newest would push out a walk
+  // another fence still resumes from.
+  fenceWalkCache.update(
+    key,
+    { kind: 'cached', walk: entry.walk },
+    fenceWalkWeight(key, entry.walk)
+  );
   // A block that renders the same fence can mount in the same commit as this
   // release, and React runs a commit's effect cleanups before its effect
   // creates: that new block's retain has not landed yet. Drop the entry on the
   // next task instead, once the commit's creates have run, and keep it if one
   // of them retained it.
   queueMicrotask(() => {
-    if (!fenceWalkHolders.has(key)) {
+    if (fenceWalkCache.peek(key)?.kind === 'cached') {
       fenceWalkCache.delete(key);
     }
   });
@@ -376,12 +405,15 @@ export function releaseFenceChunkWalk(code: string, language: string | null): vo
 /** For tests: drop the resumable fence walks so a suite starts cold. */
 export function clearFenceWalkCacheForTests(): void {
   fenceWalkCache.clear();
-  fenceWalkHolders.clear();
 }
 
-/** For tests: the walks currently retained and the total weight they are charged. */
+/** For tests: the walks currently cached, the total weight they are charged, and how many are held. */
 export function fenceWalkCacheStatsForTests() {
-  return { entries: fenceWalkCache.size, weight: fenceWalkCache.weight };
+  return {
+    entries: fenceWalkCache.size,
+    weight: fenceWalkCache.weight,
+    held: fenceWalkCache.pinnedCount,
+  };
 }
 
 /**

@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test, { after } from 'node:test';
 
+import { flattenCatalog, missingPluralCategories } from '../lib/catalogs.mjs';
 import { checkCatalogs } from './check-catalogs.mjs';
 
 // The checker parses with oxc through the shared scanner, so the import-only
@@ -264,6 +265,109 @@ test('reports an unparsed file by its path below the tree it was read from', () 
   );
 });
 
+test('accepts values that read as a brace or a key-shaped run', () => {
+  // A message may quote a brace, or a `"key": 1` fragment, without the scan
+  // mistaking either for the catalog's own structure.
+  const english = {
+    agents: {
+      title: 'Agents',
+      open: 'Keep the lone { in place',
+      close: 'Keep the lone } in place',
+      total: 'Read {{"total": 1, "title": 2}} as text',
+      headline: 'Also read {{"total": 1, "title": 2}} as text',
+    },
+  };
+  const found = run({
+    extraFiles: { 'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english) },
+    translated: {
+      agents: {
+        title: 'Агенты',
+        open: 'Оставьте одиночную { на месте',
+        close: 'Оставьте одиночную } на месте',
+        total: 'Читайте {{"total": 1, "title": 2}} как текст',
+        headline: 'Читайте ещё {{"total": 1, "title": 2}} как текст',
+      },
+    },
+    source: [
+      "t('agents.title');",
+      "t('agents.open');",
+      "t('agents.close');",
+      "t('agents.total');",
+      "t('agents.headline');",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('still reports a repeated key after a value closes a brace', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': [
+        '{',
+        '  "agents": {',
+        '    "summary": "Read as text",',
+        '    "title": "Agents }",',
+        '    "summary": "Read as text"',
+        '  }',
+        '}',
+      ].join('\n'),
+    },
+    translated: { agents: { summary: 'Читается как текст', title: 'Агенты }' } },
+    source: "t('agents.title');\nt('agents.summary');",
+  });
+  assert.deepEqual(found, ['mobile/en: duplicate key "summary"']);
+});
+
+test('reports unbalanced English catalog braces once, without a missing-key cascade', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': [
+        '{',
+        '  "agents": {',
+        '    "title": "Agents }",',
+        '    "summary": "Read as text"',
+        '}',
+      ].join('\n'),
+    },
+    source: "t('agents.title');\nt('agents.summary');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /cannot audit catalog: its strings and braces do not balance/);
+});
+
+test('reports a balanced catalog JSON rejects in the same one problem line', () => {
+  // The braces match, so only JSON.parse can reject the file; a stack trace here
+  // would hide which catalog is broken.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': '{\n  "agents": {\n    "title" "Agents"\n  }\n}\n',
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /^mobile\/en: cannot audit catalog: /);
+});
+
+test('reports an unreadable locale catalog without inventing missing keys', () => {
+  // The skipped locale carries no values, so it can say neither that a key is
+  // missing nor that a key was left in English.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/ru.json': [
+        '{',
+        '  "agents": {',
+        '    "title": "Агенты }",',
+        '    "liveCount_one": "{{count}} сеанс"',
+        '}',
+      ].join('\n'),
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(
+    found[0],
+    /^mobile\/ru: cannot audit catalog: its strings and braces do not balance/
+  );
+});
+
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {
   const source = "t('agents.missing');\n";
   const inSource = run({ source });
@@ -315,6 +419,16 @@ test('rejects the English live-session empty state in a translated catalog', () 
   });
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(found.join('\n'), /mobile\/ru: "home\.noLiveSessions" must be translated/);
+});
+
+test('accepts a translated live-session empty state', () => {
+  const english = { home: { noLiveSessions: 'Nothing running right now' } };
+  const found = run({
+    english,
+    translated: { home: { noLiveSessions: 'Сейчас ничего не запущено' } },
+    source: "t('home.noLiveSessions');",
+  });
+  assert.deepEqual(found, []);
 });
 
 test('rejects an empty translated value', () => {
@@ -905,6 +1019,40 @@ test('leaves an incomplete English family unowed by a locale', () => {
     source: "t('counts.items', { count: 2 });",
   });
   assert.deepEqual(found, []);
+});
+
+test('names the categories a locale must complete for each family', () => {
+  // A family the locale declares owes every category its tag selects, whether
+  // it declares the family through a member or through the flat base key of an
+  // owed English family; a locale that carries neither owes nothing for it. A
+  // counted flat English key becomes the locale's problem once the locale
+  // declares the family.
+  const english = flattenCatalog({
+    agents: {
+      open_one: '{{displayCount}} open session',
+      open_other: '{{displayCount}} open sessions',
+    },
+  });
+  const counted = flattenCatalog({ counts: { items: '{{count}} items' } });
+  const flatKey = flattenCatalog({ agents: { open: 'x' } });
+  const oneMember = flattenCatalog({ agents: { open_one: 'x' } });
+  const declared = flattenCatalog({
+    counts: { items: 'x', items_one: 'x', items_other: 'x' },
+  });
+
+  assert.deepEqual(
+    [...missingPluralCategories(english, flatKey, 'ru')],
+    [['agents.open', ['one', 'few', 'many', 'other']]]
+  );
+  assert.deepEqual(
+    [...missingPluralCategories(english, oneMember, 'ru')],
+    [['agents.open', ['few', 'many', 'other']]]
+  );
+  assert.deepEqual([...missingPluralCategories(english, flattenCatalog({}), 'ru')], []);
+  assert.deepEqual(
+    [...missingPluralCategories(counted, declared, 'ru')],
+    [['counts.items', ['few', 'many']]]
+  );
 });
 
 test('rejects an incomplete locale-declared family for a counted key', () => {
@@ -1820,4 +1968,40 @@ test('rejects a consent destructive label that reads as the Cancel word, and acc
     source: CONSENT_SOURCE,
   });
   assert.deepEqual(distinct, []);
+});
+
+test('reads the supported tags from the array literal, not from a comment inside it', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = [
+  'en',
+  // Sentinels: 'xx' is never shipped.
+  'ru',
+];
+`,
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
+test('reports a SUPPORTED_LANGUAGES element that is not a string literal', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
+  ]);
+});
+
+test('reports a missing SUPPORTED_LANGUAGES declaration', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
+    },
+  });
+  assert.ok(
+    found.includes('apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared')
+  );
 });

@@ -203,7 +203,10 @@ export async function runGlanceableApprove(
       options
     );
     // A request replaced by another one leaves the session waiting, so its
-    // raise is not the one that ended: only the terminal outcomes ack.
+    // raise is not the one that ended: only the terminal outcomes ack. The card
+    // carries no server raise time — its `statusSince` may be the device clock
+    // standing in for a row that has none — so the ack names only the kind of
+    // raise, exactly as the tray path does.
     if (result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)) {
       ackSessionAttention(options.target.kiloSessionId, 'permission');
     }

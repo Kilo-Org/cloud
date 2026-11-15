@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./utils": "./src/utils.ts",
+    "./text": "./src/text.ts",
     "./support": "./src/support.ts",
     "./security-agent": "./src/security-agent/index.ts",
     "./auth": "./src/auth/index.ts",
@@ -29,6 +30,7 @@
     "./agent-briefing": "./src/agent-briefing.ts",
     "./agent-profile": "./src/agent-profile.ts",
     "./approval-key": "./src/approval-key.ts",
+    "./cloud-agent-error": "./src/cloud-agent-error.ts",
     "./byok-credentials": "./src/byok-credentials.ts",
     "./home-widget": "./src/home-widget.ts",
     "./display-text": "./src/display-text.ts",

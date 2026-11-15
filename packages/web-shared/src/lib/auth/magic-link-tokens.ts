@@ -18,6 +18,21 @@ function hashSignInCode(email: string, code: string): string {
 }
 
 /**
+ * The stored identity of a magic-link token: the SHA-256 hex digest of the
+ * plaintext that goes in the URL.
+ *
+ * Issuance and verification must derive the same digest or a freshly issued
+ * link stops verifying, so both call this. The digest is unkeyed because the
+ * plaintext is 32 random bytes — a database leak yields no shortcut back to a
+ * live link. The algorithm and encoding are a storage contract: rows written
+ * by earlier releases hold this digest, so changing either strands every
+ * issued link.
+ */
+function hashMagicLinkToken(plaintextToken: string): string {
+  return createHash('sha256').update(plaintextToken).digest('hex');
+}
+
+/**
  * The row identity of a redeemable sign-in code, shared by every path that
  * settles one: the address the code was delivered to, the hash of the code,
  * the sign-in-code purpose, an unconsumed row, and the challenge when the
@@ -120,7 +135,7 @@ export async function createMagicLinkToken(
   expiresInMinutes: number = 30
 ): Promise<MagicLinkTokenWithPlaintext> {
   const plaintext_token = randomBytes(32).toString('hex');
-  const token_hash = createHash('sha256').update(plaintext_token).digest('hex');
+  const token_hash = hashMagicLinkToken(plaintext_token);
   const expires_at = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
 
   const [inserted] = await db
@@ -150,7 +165,7 @@ export async function createMagicLinkToken(
 export async function verifyAndConsumeMagicLinkToken(
   plaintextToken: string
 ): Promise<MagicLinkToken | null> {
-  const token_hash = createHash('sha256').update(plaintextToken).digest('hex');
+  const token_hash = hashMagicLinkToken(plaintextToken);
 
   const result = await db
     .update(magic_link_tokens)

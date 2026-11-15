@@ -112,7 +112,11 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
     }
   }
   const conversation = useMemo(() => (state ? readNativeConversation(state) : undefined), [state]);
-  const pending = conversation?.pending ?? { permissions: [], questions: [] };
+  const pending = conversation?.pending ?? {
+    permissions: [],
+    questions: [],
+    unreadablePermissions: [],
+  };
 
   return {
     state,

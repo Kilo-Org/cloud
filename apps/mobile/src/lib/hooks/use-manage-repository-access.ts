@@ -54,6 +54,17 @@ type ManageRepositoryAccessHandlers = {
 };
 
 /**
+ * Which attempt owns the Manage-access control. `busy` draws the busy state and
+ * refuses a tap; `waiting` has released the control at the watchdog while its
+ * browser wait is still open, so a new tap may supersede it — and only the
+ * attempt id in the phase may deliver that attempt's return edge.
+ */
+type HandoffPhase =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'busy'; readonly attempt: number }
+  | { readonly kind: 'waiting'; readonly attempt: number };
+
+/**
  * Opens the provider settings page where installation access is widened. The
  * code-reviewer picker only ever shows what the integration may read, so this
  * action is the way to make more repositories appear there; the Security Agent
@@ -78,14 +89,17 @@ export function useManageRepositoryAccess(
 ): ManageRepositoryAccess | undefined {
   const { t } = useTranslation();
   const orgScope = isPersonal(scope) ? undefined : scope;
-  const [pending, setPending] = useState(false);
-  const inFlight = useRef(false);
+  const [phase, setPhase] = useState<HandoffPhase>({ kind: 'idle' });
+  const phaseRef = useRef<HandoffPhase>(phase);
+  // The attempt ids grow monotonically, so a settled attempt is recognised by id.
+  const attempts = useRef(0);
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Identifies the attempt that owns the busy state: the watchdog lets the
-  // control go while a wait is still running, so a slow attempt must not clear
-  // the state of a newer one when it finally settles.
-  const attempt = useRef(0);
   const { onOpen, onReturn } = handlers;
+
+  const move = useCallback((next: HandoffPhase) => {
+    phaseRef.current = next;
+    setPhase(next);
+  }, []);
 
   useEffect(
     () => () => {
@@ -156,36 +170,47 @@ export function useManageRepositoryAccess(
   }, [orgScope, platform, t]);
 
   const handlePress = useCallback(() => {
-    if (inFlight.current) {
+    if (phaseRef.current.kind === 'busy') {
       return;
     }
-    inFlight.current = true;
-    setPending(true);
+    attempts.current += 1;
+    const attempt = attempts.current;
+    const ownsAttempt = (): boolean => {
+      const current = phaseRef.current;
+      return current.kind !== 'idle' && current.attempt === attempt;
+    };
+    move({ kind: 'busy', attempt });
     onOpen?.();
-    attempt.current += 1;
-    const id = attempt.current;
-    const release = () => {
-      if (attempt.current !== id) {
+    /** Returns false for an attempt the watchdog already released or a newer tap superseded. */
+    const settle = (): boolean => {
+      if (!ownsAttempt()) {
+        return false;
+      }
+      if (watchdog.current !== null) {
+        clearTimeout(watchdog.current);
+      }
+      watchdog.current = null;
+      move({ kind: 'idle' });
+      return true;
+    };
+    watchdog.current = setTimeout(() => {
+      if (!ownsAttempt()) {
         return;
       }
-      if (watchdog.current) {
-        clearTimeout(watchdog.current);
-        watchdog.current = null;
-      }
-      inFlight.current = false;
-      setPending(false);
-    };
-    watchdog.current = setTimeout(release, HANDOFF_WATCHDOG_MS);
+      // The wait stays open and still owns `onReturn`; only the control is offered again.
+      move({ kind: 'waiting', attempt });
+    }, HANDOFF_WATCHDOG_MS);
     void (async () => {
       let opened = false;
       try {
         opened = await open();
       } finally {
-        release();
-        onReturn?.(opened);
+        if (settle()) {
+          onReturn?.(opened);
+        }
       }
     })();
-  }, [onOpen, onReturn, open]);
+  }, [move, onOpen, onReturn, open]);
 
-  return platform === 'bitbucket' ? undefined : { handlePress, pending };
+  return platform === 'bitbucket' ? undefined : { handlePress, pending: phase.kind === 'busy' };
 }

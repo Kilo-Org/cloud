@@ -13,6 +13,7 @@ import type {
   DirectByokProvider,
   DirectByokUpstream,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { credentialHeaders } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   ReasoningDetailsTransform,
   type GatewayChatApiKind,
@@ -146,6 +147,7 @@ export default {
     dropThinkingBlocksOnPrefixMismatch(context);
   },
   models: cachedDirectByokModelList('bedrock-byok'),
+  chatCompletionsHeaders: credentialHeaders,
   async resolveUpstream({ credential, model }) {
     return resolveAwsBedrockUpstream(credential, model);
   },

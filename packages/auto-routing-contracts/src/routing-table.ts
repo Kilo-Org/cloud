@@ -242,11 +242,11 @@ export type RoutingTable = z.infer<typeof RoutingTableSchema>;
  * Consumers must return no decision for an omitted route (balanced fallback);
  * existing `computeDecision` already does this.
  *
- * Validates the same documents as {@link RoutingTableSchema}: the platform and
- * custom difference is which routes each producer writes, not what one schema
- * accepts over the other.
+ * Validates the same documents as {@link RoutingTableSchema}: it is that same
+ * schema. The platform and custom difference is which routes each producer
+ * writes, not what the schema accepts.
  */
-export const CustomRoutingTableSchema = z.object(routingTableShape);
+export const CustomRoutingTableSchema = RoutingTableSchema;
 export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';

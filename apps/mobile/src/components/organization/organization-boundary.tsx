@@ -14,11 +14,9 @@ import { useContextPicker } from '@/components/context-control';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 
 const PROFILE_HREF = '/(app)/(tabs)/(3_profile)' as Href;
-
-/** The in-app create flow the no-organization state opens. */
-const CREATE_ORGANIZATION_HREF = '/(app)/(tabs)/(3_profile)/organization/create' as Href;
 
 type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */

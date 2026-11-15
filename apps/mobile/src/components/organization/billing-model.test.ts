@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatSeatCount,
+  getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
   getScheduledSeatChange,
@@ -198,5 +199,19 @@ describe('getAutoTopUpReadout', () => {
     expect(
       getAutoTopUpReadout({ enabled: false, amountCents: 5000, thresholdCents: 1000 }).status
     ).toBe('Disabled');
+  });
+});
+
+describe('getAutoTopUpLinkLabel', () => {
+  it('asks to manage it when it is on', () => {
+    expect(getAutoTopUpLinkLabel(true)).toBe('Manage auto top-up');
+  });
+
+  it('asks to set it up when it is off', () => {
+    expect(getAutoTopUpLinkLabel(false)).toBe('Set up auto top-up');
+  });
+
+  it('asks to set it up when the read has no state yet', () => {
+    expect(getAutoTopUpLinkLabel(undefined)).toBe('Set up auto top-up');
   });
 });

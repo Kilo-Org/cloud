@@ -686,7 +686,10 @@ const computePolling = vi.hoisted(() => ({ focusedAndActive: true }));
 vi.mock('@/lib/hooks/use-app-active-and-focused', () => ({
   useAppActiveAndFocused: () => computePolling.focusedAndActive,
 }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
+  useThemeColors: () => ({}),
+}));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
   useFencedDraftLoad: () => ({ settled: true, value: null }),
@@ -3815,7 +3818,7 @@ describe('session detail unreadable permission notice', () => {
     expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(1);
     expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
     expect(renderedText(view.renderer.root)).toContain(
-      'The agent is waiting for a permission decision this app cannot show.'
+      'waiting on a permission request this app cannot show'
     );
 
     const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));

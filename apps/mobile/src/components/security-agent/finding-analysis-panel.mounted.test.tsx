@@ -64,6 +64,7 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
   useStartSecurityAnalysis: () => startAnalysis,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
     primaryForeground: '#fff',
     foreground: '#000',

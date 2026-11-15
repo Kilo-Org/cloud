@@ -284,7 +284,8 @@ export function openConflictWindow(
  * Closes the window when the event that opened it applies.
  *
  * A `where`-less delete would clear every directory's window; the pair of keys
- * keeps it to the one event.
+ * keeps it to the one event. This is the only per-directory removal: nothing
+ * else closes a window, and only an operator cursor reset clears every one.
  */
 export function closeConflictWindow(db: Db, directoryId: string, eventId: string): void {
   db.delete(directoryConflicts)
@@ -298,12 +299,16 @@ export function closeConflictWindow(db: Db, directoryId: string, eventId: string
 }
 
 /**
- * Drops both records for one directory: an activation that applied binds its
- * organization, so neither the conflict window nor the parked-activation marker
- * describes it any more.
+ * Drops a directory's parked-activation marker: an activation that applied
+ * binds its organization, so the marker no longer describes the directory.
+ *
+ * The conflict window is deliberately not part of this. It records stream time
+ * the directory has already spent and is measured from the event whose conflict
+ * opened it, so it is removed by that event applying or by an operator cursor
+ * reset. An activation applying is neither, and a directory's stream time must
+ * not depend on which of its events the stream happens to reach.
  */
-export function clearDirectoryLimits(db: Db, directoryId: string): void {
-  db.delete(directoryConflicts).where(eq(directoryConflicts.directory_id, directoryId)).run();
+export function clearParkedActivation(db: Db, directoryId: string): void {
   db.delete(parkedActivations).where(eq(parkedActivations.directory_id, directoryId)).run();
 }
 

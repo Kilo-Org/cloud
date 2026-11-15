@@ -3,8 +3,11 @@ import type { ProcedureType } from '@trpc/server';
 
 import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plane';
 import { RequestDeadlineError, withDeadline } from '@kilocode/event-service';
-import type { AppHeaderList } from '@kilocode/web-shared/lib/app-headers';
-import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
+import {
+  APP_CLIENT_HEADER,
+  isMobileClient,
+  type AppHeaderList,
+} from '@kilocode/web-shared/lib/app-headers';
 import {
   buildTimingLine,
   readClientDimensions,
@@ -127,7 +130,7 @@ export async function withControlPlaneBudget<TResult>({
   startedAt,
   surface = 'procedure',
 }: ControlPlaneBudgetOptions<TResult>): Promise<TResult> {
-  if (!isMobileClient(headersList)) {
+  if (!isMobileClient(headersList?.get(APP_CLIENT_HEADER))) {
     return next();
   }
   if (surface === 'procedure' && type !== 'query') {

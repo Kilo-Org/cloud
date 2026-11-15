@@ -8907,7 +8907,7 @@
       "properties": {
         "cloudAgentSessionId": {
           "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         }
       },
       "required": [
@@ -9070,7 +9070,7 @@
       "properties": {
         "cloudAgentSessionId": {
           "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         }
       },
       "required": [
@@ -21153,7 +21153,7 @@
           "properties": {
             "cloudAgentSessionId": {
               "type": "string",
-              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             "organizationId": {
               "type": "string",
@@ -21349,7 +21349,7 @@
           "properties": {
             "cloudAgentSessionId": {
               "type": "string",
-              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             "organizationId": {
               "type": "string",
@@ -21384,7 +21384,6 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         },
         "autoAddCreator": {
@@ -21423,7 +21422,6 @@
         },
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         }
       },
@@ -30396,7 +30394,6 @@
         },
         "name": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 100
         }
       },
@@ -36970,6 +36967,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "managementAuthorization": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
         }
       },
       "required": [
@@ -36979,9 +36981,10 @@
     "tags": [
       "user",
       "deletepasskey",
-      "id"
+      "id",
+      "managementauthorization"
     ],
-    "searchBlob": "user.deletePasskey Remove one of the signed-in user's registered passkeys, revoking that device or security key for future sign-in. user deletepasskey id id"
+    "searchBlob": "user.deletePasskey Remove one of the signed-in user's registered passkeys, revoking that device or security key for future sign-in. user deletepasskey id managementauthorization id managementAuthorization"
   },
   "user.getAuthProviders": {
     "path": "user.getAuthProviders",
@@ -37395,13 +37398,13 @@
   "user.listDeviceSessions": {
     "path": "user.listDeviceSessions",
     "kind": "query",
-    "summary": "List the current user's active device sessions with user agent and activity timestamps, marking which one is the current device.",
+    "summary": "List the current user's active device sessions with the client kind and activity timestamps, marking which one is the current device.",
     "inputSchema": {},
     "tags": [
       "user",
       "listdevicesessions"
     ],
-    "searchBlob": "user.listDeviceSessions List the current user's active device sessions with user agent and activity timestamps, marking which one is the current device. user listdevicesessions"
+    "searchBlob": "user.listDeviceSessions List the current user's active device sessions with the client kind and activity timestamps, marking which one is the current device. user listdevicesessions"
   },
   "user.markWelcomeFormCompleted": {
     "path": "user.markWelcomeFormCompleted",
@@ -37549,6 +37552,11 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 64
+        },
+        "managementAuthorization": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
         }
       },
       "required": [
@@ -37560,9 +37568,10 @@
       "user",
       "renamepasskey",
       "id",
-      "name"
+      "name",
+      "managementauthorization"
     ],
-    "searchBlob": "user.renamePasskey Rename a saved passkey to a custom label so the user can identify which device or security key it belongs to. user renamepasskey id name id name"
+    "searchBlob": "user.renamePasskey Rename a saved passkey to a custom label so the user can identify which device or security key it belongs to. user renamepasskey id name managementauthorization id name managementAuthorization"
   },
   "user.requestAccountDeletion": {
     "path": "user.requestAccountDeletion",

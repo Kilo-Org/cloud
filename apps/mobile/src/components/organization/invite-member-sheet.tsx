@@ -35,6 +35,7 @@ import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopOnce } from '@/lib/navigation/pop-once';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { cn } from '@/lib/utils';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 
@@ -288,7 +289,7 @@ export function InviteMemberSheet() {
                     {...radioItemA11y({ label: roleLabel(value), checked: selected })}
                   >
                     <Text className="flex-1 text-sm">{roleLabel(value)}</Text>
-                    {selected && <Check size={16} color={colors.primary} />}
+                    {selected && <Check size={16} color={selectionCheckColor(colors)} />}
                   </Pressable>
                 );
               })}

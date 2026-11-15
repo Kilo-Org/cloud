@@ -164,9 +164,27 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
-- Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
+- Optimistic updates have one owner each. A value in the TanStack query cache belongs to its mutation: snapshot in `onMutate`, roll back in `onError` only while `isLatestMutationGeneration` says this mutation still owns the key, and reconcile in `onSettled`. Never add a second optimistic copy over a query-backed value.
+- The per-chat web search and Kilo MCP choices belong to the chat registry. Change them only through `setChatFlag` and `retryChatFlag` in `@/lib/chat/registry`. Other stored values stay with the store that owns them; a component must not keep its own optimistic copy beside it.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
+- Retained merge keys retire only when the fingerprint and the captured key both still match. At capacity, refuse new intents; never evict an unresolved one.
+
+## State Machines
+
+A phase that several flags, refs, nullable fields, or timers encode together is an implicit state machine. Do not write one.
+
+- Model each phase as one discriminated union with a tag for each state, and keep each payload inside the state that owns it.
+- Before you add a flag beside existing state, list the combinations it creates. If one is invalid, extend the union instead.
+- Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
+- For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
+  - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
+  - Settle the attempt once, with `succeed()`, `fail(failure)`, or `abandon()` when there is no outcome. `abandon()` removes the key's entry. `succeed()` and `fail()` keep it until the next `begin()` for that key or until the surface unmounts; `clearWhere` retires only a failure. If nothing on the surface renders the failure (for example, a toast already reports it), use `abandon()`.
+  - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
+  - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
+- Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
+- A purchase keeps its own request and transaction records. Never settle one by looking it up by product id.
+- A regression test for one of these bugs must fail on the code before the fix. Prove that once before the fix lands.
 
 ## React Native Rules
 
@@ -294,6 +312,12 @@ Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux servi
 The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds the registry (the conversations that are running), the layers (the plugins they run on) and the store (the list and its CRUD). The SDK saves one conversation; this app owns the list, the ordering, the titles, the deleting and the scoping.
 
 **A conversation can move, and the screen follows the state rather than a return value.** Switching models clones the conversation onto a new session, and the mover is not always the screen: a question typed on another model while an answer was arriving moves the chat from inside the registry. So the chat that was left points at the one it became, and `useChat` follows that.
+
+A chat flag is one `ChatFlag` on `ChatState` (`@/lib/chat/chat-flag`): read it and write it through `setChatFlag`, never with a `useState` mirror beside it. A refused persist rejects and restores the stored choice, including its application status and Retry when that choice is behind. `retryChatFlag` applies that saved choice again without another persist. Both flags and every move share the chat's registry turn.
+
+Resolve a queued operation's session inside its turn, because an earlier move can rename it. Keep send startup in that turn through assigning `chat.answering`; a tool retry rechecks the live chat inside its turn and defers while an answer streams. Closing skips only waiting skippable tickets, never a queued reopen. A skipped caller may settle early, but its queue tail still waits for its predecessor.
+
+Sign-out and account switch cancel only the old account's chat flags: drop waiting flag tickets and abandon a pending flag persist, whose captured `AbortSignal` fences the SQL write and later application/publication. Every non-flag operation, session move and runtime close is still awaited, with no teardown deadline. Once a flag begins moving a session, finish that move and its metadata migration before teardown continues. A deferred flag stays `moving` until its move publishes `current` or `behind`.
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 

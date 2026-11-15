@@ -2079,7 +2079,7 @@ it('mounts projected native image/PDF results in the real file renderer and open
       time: { created: 1, updated: 2 },
     },
     snapshot: { position: 2, revision: 2 },
-    pending: { permissions: [], questions: [] },
+    pending: { permissions: [], questions: [], unreadablePermissions: [] },
     events: [],
     commands: {},
     assetURLs: {

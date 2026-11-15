@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import {
   formatSeatCount,
+  getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
   getScheduledSeatChange,
@@ -332,7 +333,7 @@ export function OrganizationBillingScreen() {
             />
             <ExternalBillingLink
               url={organizationBillingUrl(organizationId)}
-              label={t('organization.billing.setupAutoTopUp')}
+              label={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
             />
           </View>
         </View>

@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- one mounted case per MCP screen state: loading, error, empty, row toggle, edit, add, validation, failure fallbacks, and delete */
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -22,6 +23,7 @@ import {
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+import { isolateLtrBidiText } from '@/lib/bidi';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -41,10 +43,12 @@ const h = vi.hoisted(() => ({
   },
 }));
 
-const permissionState = vi.hoisted(() => ({ canManage: true }));
+const permissionState = vi.hoisted(() => ({
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+}));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => permissionState.canManage,
+  useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -77,7 +81,12 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  // The screen hands its action to the manage slot, so the stub renders what it
+  // is given: the read-only sentence replaces the button in the same subtree.
+  EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
+    createElement('EmptyState', { title: props.title }, props.description, props.action),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
@@ -97,6 +106,7 @@ describe('ProfileMcpScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -139,6 +149,54 @@ describe('ProfileMcpScreen', () => {
     expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No MCP servers yet');
     pressEmptyAction(renderer);
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('read-only: the empty state names who may act in place of the add control', async () => {
+    permissionState.permission = 'read-only';
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No MCP servers yet');
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('read-only: a loaded list keeps its rows, drops its controls and names who may act', async () => {
+    permissionState.permission = 'read-only';
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
+    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+
+    unmount();
+  });
+
+  it('resolving: the empty state renders neither the sentence nor an action', async () => {
+    permissionState.permission = 'resolving';
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
 
     unmount();
   });
@@ -598,6 +656,102 @@ describe('ProfileMcpScreen', () => {
     expect(h.confirm).not.toHaveBeenCalled();
     expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
     expect(h.mutations.setMcpEnabled.mutate).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+/** The server name the fixture row holds; the dialog must isolate exactly this run. */
+const SERVER_NAME = 'docs';
+
+/** The confirm sheet's request, as the screen hands it to `useConfirmDialog`. */
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+/** Read the request the screen raised, without answering it. */
+function deleteRequest(): ConfirmRequest {
+  const request = h.confirm.mock.calls[0]?.[0] as ConfirmRequest | undefined;
+  if (!request) {
+    throw new Error('the screen asked for no confirmation');
+  }
+  return request;
+}
+
+describe('ProfileMcpScreen delete confirmation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    h.query.data = testProfile([testServer({ name: SERVER_NAME })]);
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  // The dialog used to read "Delete" as both its title and its confirm label,
+  // with the bare name as the message, so the reader was never told what
+  // removing the server would do.
+  it('asks for consent with the server name in the title and states the consequence', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete MCP server ${SERVER_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.mcp.deleteTitle', { name: isolateLtrBidiText(SERVER_NAME) }),
+      message: i18n.t('profiles.mcp.deleteMessage'),
+      confirmLabel: i18n.t('profiles.mcp.deleteConfirm'),
+    });
+    expect(request.confirmLabel).not.toBe(i18n.t('common.delete'));
+    expect(request.title).not.toBe(request.message);
+    expect(request.title).not.toBe(SERVER_NAME);
+    expect(request.message).not.toBe(SERVER_NAME);
+
+    unmount();
+  });
+
+  // A server name is compared character by character, so a right-to-left
+  // sentence must not reorder it: one explicit left-to-right run, no more.
+  it('keeps the server name in exactly one left-to-right isolate pair', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete MCP server ${SERVER_NAME}`);
+    const { title } = deleteRequest();
+
+    expect(title).toContain(`\u2066${SERVER_NAME}\u2069`);
+    expect(title.split('\u2066')).toHaveLength(2);
+    expect(title.split('\u2069')).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('deletes nothing until the reader confirms, then deletes that server', async () => {
+    h.mutations.deleteMcp.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete MCP server ${SERVER_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.mutations.deleteMcp.mutateAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.onConfirm();
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteMcp.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.mutations.deleteMcp.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      mcpServerId: 'mcp-1',
+    });
+
     unmount();
   });
 });

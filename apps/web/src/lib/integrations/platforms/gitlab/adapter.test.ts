@@ -29,7 +29,9 @@ import {
   fetchGitLabBoundToAddress,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
+  findKiloProjectAccessToken,
   findKiloReviewNote,
+  findKiloWebhook,
   hasMRNoteWithMarker,
   GitLabAuthenticationError,
   GitLabProjectAccessTokenPermissionError,
@@ -1028,6 +1030,113 @@ describe('createProjectWebhook', () => {
       releases_events: false,
       enable_ssl_verification: true,
     });
+  });
+});
+
+describe('findKiloWebhook', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('finds a Kilo webhook that only exists on the second page', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 1, url: 'https://example.com/other' }],
+        headers: {
+          get: (name: string) => (name === 'x-next-page' ? '2' : null),
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 2, url: 'https://kilo.example.com/api/gitlab/webhook' }],
+        headers: {
+          get: () => null,
+        },
+      });
+
+    const webhook = await findKiloWebhook(
+      'test-token',
+      123,
+      'https://kilo.example.com/api/gitlab/webhook'
+    );
+
+    expect(webhook?.id).toBe(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      'https://gitlab.com/api/v4/projects/123/hooks?per_page=100&page=1',
+      expect.anything()
+    );
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://gitlab.com/api/v4/projects/123/hooks?per_page=100&page=2',
+      expect.anything()
+    );
+  });
+});
+
+describe('findKiloProjectAccessToken', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('finds a Kilo Code Review Bot token that only exists on the second page', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 10, name: 'Deploy Bot', active: true, revoked: false }],
+        headers: {
+          get: (name: string) => (name === 'x-next-page' ? '2' : null),
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 11, name: 'Kilo Code Review Bot', active: true, revoked: false }],
+        headers: {
+          get: () => null,
+        },
+      });
+
+    const token = await findKiloProjectAccessToken('test-token', 123);
+
+    expect(token?.id).toBe(11);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      'https://gitlab.com/api/v4/projects/123/access_tokens?per_page=100&page=1',
+      expect.anything()
+    );
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://gitlab.com/api/v4/projects/123/access_tokens?per_page=100&page=2',
+      expect.anything()
+    );
+  });
+});
+
+describe('listProjectWebhooks pagination', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('reports an error when x-next-page advances beyond the page cap', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      url: `https://example.com/hook-${i}`,
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => fullPage,
+        headers: { get: (name: string) => (name === 'x-next-page' ? '999999' : null) },
+      })
+    );
+
+    await expect(listProjectWebhooks('test-token', 123)).rejects.toThrow(
+      'GitLab pagination limit exceeded: project webhook listing returned more than 100 pages'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
 

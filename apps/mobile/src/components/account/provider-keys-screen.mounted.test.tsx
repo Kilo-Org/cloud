@@ -113,6 +113,15 @@ function switchFor(root: ReactTestRenderer['root'], provider: string) {
   return only;
 }
 
+/** Every `Text` in the row that holds this provider's switch, in render order. */
+function textsInRow(root: ReactTestRenderer['root'], provider: string) {
+  const row = switchFor(root, provider).parent;
+  if (!row) {
+    throw new Error(`the ${provider} switch has no row`);
+  }
+  return row.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children);
+}
+
 function button(root: ReactTestRenderer['root'], label: string) {
   const found = root.findAll(
     node =>
@@ -154,6 +163,14 @@ beforeEach(() => {
       is_enabled: true,
       management_source: 'user',
     },
+    // A disabled key renders exactly like an enabled one: the switch carries the
+    // state, so the row has no state line to go stale when the key is toggled.
+    {
+      id: 'key-2b',
+      provider_name: 'Groq',
+      is_enabled: false,
+      management_source: 'user',
+    },
   ];
   state.error = false;
   state.mutations = [];
@@ -170,13 +187,15 @@ afterEach(() => {
 });
 
 describe('ProviderKeysScreen', () => {
-  it('shows each key with its provider name and whether it is in use', async () => {
+  it('shows a user key as its provider name with the switch carrying the state', async () => {
     const root = await mount();
 
-    const texts = root
-      .findAll(node => Object.is(node.type, 'Text'))
-      .map(node => node.props.children);
-    expect(texts).toEqual(expect.arrayContaining(['Anthropic', 'In use']));
+    // A user row is its provider name and nothing else: no state line, so the
+    // switch is the only place the enabled/disabled state is read from.
+    expect(textsInRow(root, 'Groq')).toEqual(['Groq']);
+    expect(switchFor(root, 'Groq').props.value).toBe(false);
+    expect(textsInRow(root, 'Anthropic')).toEqual(['Anthropic']);
+    expect(switchFor(root, 'Anthropic').props.value).toBe(true);
   });
 
   it('sends the new value when a key is switched off', async () => {

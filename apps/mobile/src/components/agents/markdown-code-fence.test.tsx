@@ -2,18 +2,28 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  MIN_TAP_TARGET_DP,
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_FRAME_DP,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_ACTION_HIT_SLOP_DP,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
+
 import { MarkdownCodeFence } from './markdown-code-fence';
 
 const mocks = vi.hoisted(() => ({ performCopy: vi.fn() }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('@/components/ui/icons', () => ({ Clipboard: 'Clipboard' }));
-vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./code-block', () => ({ CodeBlock: 'CodeBlock' }));
 vi.mock('./use-message-copy', () => ({ performCopy: mocks.performCopy }));
@@ -84,10 +94,17 @@ describe('MarkdownCodeFence', () => {
 
   it('keeps the fence language in the header and leaves it blank when unnamed', async () => {
     const named = await mount(fence());
-    expect(hostProps(named, 'Text').children).toBe('ts');
+    expect(hostProps(named, 'Text')).toMatchObject({
+      children: 'ts',
+      accessible: true,
+      accessibilityLabel: 'ts',
+    });
 
     const unnamed = await mount(fence({ language: null }));
-    expect(hostProps(unnamed, 'Text').children).toBe('');
+    const chip = hostProps(unnamed, 'Text');
+    expect(chip.children).toBe('');
+    expect(chip).not.toHaveProperty('accessible');
+    expect(chip).not.toHaveProperty('accessibilityLabel');
     expect(hostProps(unnamed, 'CodeBlock')).toMatchObject({ language: null });
   });
 
@@ -95,7 +112,7 @@ describe('MarkdownCodeFence', () => {
     const onCopyCode = vi.fn((_code: string) => undefined);
     const renderer = await mount(fence({ onCopyCode }));
 
-    const button = hostProps(renderer, 'IconButton');
+    const button = hostProps(renderer, 'Pressable');
     expect(button).toMatchObject({ accessibilityLabel: 'common.copy' });
     act(() => {
       (button.onPress as () => void)();
@@ -107,9 +124,34 @@ describe('MarkdownCodeFence', () => {
     const renderer = await mount(fence());
 
     act(() => {
-      (hostProps(renderer, 'IconButton').onPress as () => void)();
+      (hostProps(renderer, 'Pressable').onPress as () => void)();
     });
     expect(mocks.performCopy).toHaveBeenCalledWith(LONG_LINE);
+  });
+
+  it('reaches the copy target through a slop its own row reserves', async () => {
+    const renderer = await mount(fence());
+
+    // The control keeps a compact box and the row reserves its hit slop as
+    // padding, so the whole touch target lies inside the row that delivers it.
+    // A row that clipped the slop would deliver only the box, which is why the
+    // row's own padding is part of the assertion.
+    const button = hostProps(renderer, 'Pressable');
+    for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
+      expect(String(button.className)).toContain(token);
+    }
+    expect(String(button.className)).toContain('items-center');
+    expect(button.hitSlop).toBe(SECTION_ACTION_HIT_SLOP);
+    const rowClasses = renderer.root
+      .findAllByType('View' as unknown as React.ComponentType<unknown>)
+      .map(node => String(node.props.className));
+    expect(rowClasses.some(className => className.includes(SECTION_HEADER_ROW_PADDING_CLASS))).toBe(
+      true
+    );
+    expect(
+      tapTargetReachDp(SECTION_ACTION_FRAME_DP, SECTION_ACTION_HIT_SLOP_DP)
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(SECTION_ACTION_FRAME_DP).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
   });
 
   it('passes a multi-line fence through unchanged', async () => {

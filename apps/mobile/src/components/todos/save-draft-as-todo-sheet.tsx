@@ -22,6 +22,9 @@ import { todoFromDraft } from '@/lib/todos/todo-model';
 import { todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
+
+import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
 
 type SaveDraftAsTodoSheetProps = {
   visible: boolean;
@@ -92,7 +95,7 @@ export function SaveDraftAsTodoSheet({
   let body: ReactNode = null;
   if (lists.isPending) {
     body = (
-      <View className="items-center py-8">
+      <View className={cn('items-center', TODO_SHEET_STATE_BODY_CLASS)}>
         <ActivityIndicator />
       </View>
     );
@@ -106,7 +109,7 @@ export function SaveDraftAsTodoSheet({
     );
   } else if (activeLists.length === 0) {
     body = (
-      <View className="gap-4 px-5 py-8">
+      <View className={cn('gap-4', TODO_SHEET_STATE_BODY_CLASS)}>
         <Text className="text-center text-sm text-muted-foreground">{t('todos.lists.empty')}</Text>
         <Button
           variant="outline"

@@ -294,9 +294,7 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
       // only way to render its in-flight label without a store.
       completingProductId: state === 'completing' ? (fixtureListings[0]?.id ?? null) : null,
       purchaseWait:
-        waitKind === null
-          ? null
-          : { productId: fixtureListings[0]?.id ?? '', kind: waitKind },
+        waitKind === null ? null : { productId: fixtureListings[0]?.id ?? '', kind: waitKind },
       // The loader's own wording for a store that missed the deadline, which
       // differs per storefront: the fixture must not show App Store copy on
       // Android.

@@ -553,7 +553,7 @@
       "retryLoadingContext": "Reyna aftur að hlaða samhengi",
       "failedToLoadContext": "Ekki tókst að hlaða samhengi — ýttu til að reyna aftur",
       "loadingContext": "Hleð samhengi…",
-      "loadingLines": "Hleð {{loaded}} af {{total}} línum…",
+      "loadingLines": "Hleð línum: {{loaded}} af {{total}}…",
       "expandContext": "Sýna samhengi",
       "expandMoreContext": "Sýna meira samhengi",
       "expandLines": "Sýna {{displayCount}} línur ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "Ekki tókst að hlaða fleiri skrám — ýttu til að reyna aftur",
       "loadingAllFiles": "Hleð öllum skrám — {{loaded}}…",
       "loadingAllFilesOf": "Hleð öllum skrám — {{loaded}} af {{total}}…",
-      "loadedOfTotalFiles": "{{loaded}} af {{total}} skrám hlaðið",
+      "loadedOfTotalFiles": "Hlaðnar skrár: {{loaded}} af {{total}}",
       "loadAllFiles": "Hlaða öllum skrám",
       "loadAll": "Hlaða öllu",
       "fileLoadedCount_one": "{{displayCount}} skrá hlaðin",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "Sýna {{displayCount}} línur af samhengi",
       "expandMoreLines_one": "Sýna {{displayCount}} lína í viðbót ({{start}}–{{end}})",
       "expandMoreLines_other": "Sýna {{displayCount}} línur í viðbót ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} af {{total}} skrám hlaðið",
-      "loadedOfTotalFiles_other": "{{loaded}} af {{total}} skrám hlaðið"
+      "loadedOfTotalFiles_one": "Hlaðnar skrár: {{loaded}} af {{total}}",
+      "loadedOfTotalFiles_other": "Hlaðnar skrár: {{loaded}} af {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "engin línuskil eru í lok skrárinnar.",

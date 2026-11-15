@@ -557,7 +557,7 @@
       "retryLoadingContext": "Паўтарыць загрузку кантэксту",
       "failedToLoadContext": "Не атрымалася загрузіць кантэкст — націсні, каб паўтарыць",
       "loadingContext": "Загрузка кантэксту…",
-      "loadingLines": "Загрузка {{loaded}} з {{total}} радкоў…",
+      "loadingLines": "Загрузка радкоў: {{loaded}} з {{total}}…",
       "expandContext": "Разгарнуць кантэкст",
       "expandMoreContext": "Паказаць больш кантэксту",
       "expandLines": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
@@ -570,7 +570,7 @@
       "failedToLoadMoreFiles": "Не атрымалася загрузіць астатнія файлы — націсні, каб паўтарыць",
       "loadingAllFiles": "Загрузка ўсіх файлаў — {{loaded}}…",
       "loadingAllFilesOf": "Загрузка ўсіх файлаў — {{loaded}} з {{total}}…",
-      "loadedOfTotalFiles": "загружана {{loaded}} з {{total}} файлаў",
+      "loadedOfTotalFiles": "Файлы загружаны: {{loaded}} з {{total}}",
       "loadAllFiles": "Загрузіць усе файлы",
       "loadAll": "Загрузіць усё",
       "fileLoadedCount_one": "загружаны {{displayCount}} файл",
@@ -602,10 +602,10 @@
       "expandMoreLines_other": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
       "expandMoreLines_few": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
       "expandMoreLines_many": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
-      "loadedOfTotalFiles_one": "загружана {{loaded}} з {{total}} файлаў",
-      "loadedOfTotalFiles_other": "загружана {{loaded}} з {{total}} файлаў",
-      "loadedOfTotalFiles_few": "загружана {{loaded}} з {{total}} файлаў",
-      "loadedOfTotalFiles_many": "загружана {{loaded}} з {{total}} файлаў"
+      "loadedOfTotalFiles_one": "Файлы загружаны: {{loaded}} з {{total}}",
+      "loadedOfTotalFiles_other": "Файлы загружаны: {{loaded}} з {{total}}",
+      "loadedOfTotalFiles_few": "Файлы загружаны: {{loaded}} з {{total}}",
+      "loadedOfTotalFiles_many": "Файлы загружаны: {{loaded}} з {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ няма пераносу радка ў канцы файла",

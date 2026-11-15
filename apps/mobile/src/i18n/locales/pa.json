@@ -553,7 +553,7 @@
       "retryLoadingContext": "ਆਸ-ਪਾਸ ਦਾ ਕੋਡ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "failedToLoadContext": "ਆਸ-ਪਾਸ ਦਾ ਕੋਡ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ",
       "loadingContext": "ਆਸ-ਪਾਸ ਦਾ ਕੋਡ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
-      "loadingLines": "{{total}} ਲਾਈਨਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋ ਰਹੀਆਂ ਹਨ…",
+      "loadingLines": "ਲਾਈਨਾਂ ਲੋਡ ਹੋ ਰਹੀਆਂ ਹਨ: {{loaded}} / {{total}}…",
       "expandContext": "ਆਸ-ਪਾਸ ਦਾ ਕੋਡ ਦਿਖਾਓ",
       "expandMoreContext": "ਆਸ-ਪਾਸ ਦਾ ਹੋਰ ਕੋਡ ਦਿਖਾਓ",
       "expandLines": "{{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "ਹੋਰ ਫਾਈਲਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ",
       "loadingAllFiles": "ਸਾਰੀਆਂ ਫਾਈਲਾਂ ਲੋਡ ਹੋ ਰਹੀਆਂ ਹਨ — {{loaded}}…",
       "loadingAllFilesOf": "ਸਾਰੀਆਂ ਫਾਈਲਾਂ ਲੋਡ ਹੋ ਰਹੀਆਂ ਹਨ — {{total}} ਵਿੱਚੋਂ {{loaded}}…",
-      "loadedOfTotalFiles": "{{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋਈਆਂ",
+      "loadedOfTotalFiles": "ਫਾਈਲਾਂ ਲੋਡ ਹੋਈਆਂ: {{loaded}} / {{total}}",
       "loadAllFiles": "ਸਾਰੀਆਂ ਫਾਈਲਾਂ ਲੋਡ ਕਰੋ",
       "loadAll": "ਸਭ ਲੋਡ ਕਰੋ",
       "fileLoadedCount_one": "{{displayCount}} ਫਾਈਲ ਲੋਡ ਹੋਈ",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "ਆਸ-ਪਾਸ ਦੇ ਕੋਡ ਦੀਆਂ {{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ",
       "expandMoreLines_one": "ਹੋਰ {{displayCount}} ਲਾਈਨ ਦਿਖਾਓ ({{start}}–{{end}})",
       "expandMoreLines_other": "ਹੋਰ {{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋਈਆਂ",
-      "loadedOfTotalFiles_other": "{{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋਈਆਂ"
+      "loadedOfTotalFiles_one": "ਫਾਈਲਾਂ ਲੋਡ ਹੋਈਆਂ: {{loaded}} / {{total}}",
+      "loadedOfTotalFiles_other": "ਫਾਈਲਾਂ ਲੋਡ ਹੋਈਆਂ: {{loaded}} / {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ਫਾਈਲ ਦੇ ਅੰਤ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਨਹੀਂ ਹੈ।",

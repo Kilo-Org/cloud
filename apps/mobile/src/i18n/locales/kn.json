@@ -553,7 +553,7 @@
       "retryLoadingContext": "ಸುತ್ತಲಿನ ಸಾಲುಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "failedToLoadContext": "ಸುತ್ತಲಿನ ಸಾಲುಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ",
       "loadingContext": "ಸುತ್ತಲಿನ ಸಾಲುಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ…",
-      "loadingLines": "{{total}} ಸಾಲುಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ…",
+      "loadingLines": "ಸಾಲುಗಳು: {{loaded}} / {{total}} ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "expandContext": "ಸುತ್ತಲಿನ ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ",
       "expandMoreContext": "ಸುತ್ತಲಿನ ಇನ್ನಷ್ಟು ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ",
       "expandLines": "{{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "ಇನ್ನಷ್ಟು ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ",
       "loadingAllFiles": "ಎಲ್ಲಾ ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ — {{loaded}}…",
       "loadingAllFilesOf": "ಎಲ್ಲಾ ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ — {{total}}ರಲ್ಲಿ {{loaded}}…",
-      "loadedOfTotalFiles": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "loadedOfTotalFiles": "ಫೈಲ್‌ಗಳು ಲೋಡ್ ಆಗಿವೆ: {{loaded}} / {{total}}",
       "loadAllFiles": "ಎಲ್ಲಾ ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಿ",
       "loadAll": "ಎಲ್ಲವನ್ನೂ ಲೋಡ್ ಮಾಡಿ",
       "fileLoadedCount_one": "{{displayCount}} ಫೈಲ್ ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "ಸುತ್ತಲಿನ {{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ",
       "expandMoreLines_one": "ಇನ್ನೂ {{displayCount}} ಸಾಲು ತೋರಿಸಿ ({{start}}–{{end}})",
       "expandMoreLines_other": "ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
-      "loadedOfTotalFiles_other": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗಿದೆ"
+      "loadedOfTotalFiles_one": "ಫೈಲ್‌ಗಳು ಲೋಡ್ ಆಗಿವೆ: {{loaded}} / {{total}}",
+      "loadedOfTotalFiles_other": "ಫೈಲ್‌ಗಳು ಲೋಡ್ ಆಗಿವೆ: {{loaded}} / {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ಫೈಲ್‌ನ ಕೊನೆಯಲ್ಲಿ ಹೊಸ ಸಾಲು ಇಲ್ಲ",

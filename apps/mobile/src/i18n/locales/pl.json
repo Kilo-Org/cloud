@@ -3019,7 +3019,7 @@
       "hunkHeader": "Nagłówek bloku zmian {{header}}",
       "loadAll": "Wczytaj wszystko",
       "loadAllFiles": "Wczytaj wszystkie pliki",
-      "loadedOfTotalFiles": "wczytano {{loaded}} z {{total}} plików",
+      "loadedOfTotalFiles": "Pliki wczytane: {{loaded}} z {{total}}",
       "loadingAllFiles": "Wczytywanie wszystkich plików — {{loaded}}…",
       "loadingAllFilesOf": "Wczytywanie wszystkich plików — {{loaded}} z {{total}}…",
       "loadingContext": "Wczytywanie kontekstu…",
@@ -3047,10 +3047,10 @@
       "expandMoreLines_other": "Rozwiń kolejne wiersze: {{displayCount}} ({{start}}–{{end}})",
       "expandMoreLines_few": "Rozwiń kolejne wiersze: {{displayCount}} ({{start}}–{{end}})",
       "expandMoreLines_many": "Rozwiń kolejne wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "wczytano {{loaded}} z {{total}} plików",
-      "loadedOfTotalFiles_other": "wczytano {{loaded}} z {{total}} plików",
-      "loadedOfTotalFiles_few": "wczytano {{loaded}} z {{total}} plików",
-      "loadedOfTotalFiles_many": "wczytano {{loaded}} z {{total}} plików"
+      "loadedOfTotalFiles_one": "Pliki wczytane: {{loaded}} z {{total}}",
+      "loadedOfTotalFiles_other": "Pliki wczytane: {{loaded}} z {{total}}",
+      "loadedOfTotalFiles_few": "Pliki wczytane: {{loaded}} z {{total}}",
+      "loadedOfTotalFiles_many": "Pliki wczytane: {{loaded}} z {{total}}"
     },
     "inbox": {
       "couldNotLoad": "Nie udało się wczytać skrzynki.",

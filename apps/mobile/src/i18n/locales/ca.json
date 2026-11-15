@@ -555,7 +555,7 @@
       "retryLoadingContext": "Torna a carregar el context",
       "failedToLoadContext": "No s'ha pogut carregar el context. Toca per tornar-ho a provar",
       "loadingContext": "S'està carregant el context…",
-      "loadingLines": "S'estan carregant {{loaded}} de {{total}} línies…",
+      "loadingLines": "Carregant línies: {{loaded}} de {{total}}…",
       "expandContext": "Mostra el context",
       "expandMoreContext": "Mostra més context",
       "expandLines": "Mostra {{displayCount}} línies ({{start}}–{{end}})",
@@ -568,7 +568,7 @@
       "failedToLoadMoreFiles": "No s'han pogut carregar més fitxers. Toca per tornar-ho a provar",
       "loadingAllFiles": "S'estan carregant tots els fitxers — {{loaded}}…",
       "loadingAllFilesOf": "S'estan carregant tots els fitxers — {{loaded}} de {{total}}…",
-      "loadedOfTotalFiles": "{{loaded}} de {{total}} fitxers carregats",
+      "loadedOfTotalFiles": "Fitxers carregats: {{loaded}} de {{total}}",
       "loadAllFiles": "Carrega tots els fitxers",
       "loadAll": "Carrega-ho tot",
       "fileLoadedCount_one": "{{displayCount}} fitxer carregat",
@@ -594,9 +594,9 @@
       "expandMoreLines_one": "Mostra {{displayCount}} línia més ({{start}}–{{end}})",
       "expandMoreLines_other": "Mostra {{displayCount}} línies més ({{start}}–{{end}})",
       "expandMoreLines_many": "Mostra {{displayCount}} línies més ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} fitxers carregats",
-      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} fitxers carregats",
-      "loadedOfTotalFiles_many": "{{loaded}} de {{total}} fitxers carregats"
+      "loadedOfTotalFiles_one": "Fitxers carregats: {{loaded}} de {{total}}",
+      "loadedOfTotalFiles_other": "Fitxers carregats: {{loaded}} de {{total}}",
+      "loadedOfTotalFiles_many": "Fitxers carregats: {{loaded}} de {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ sense salt de línia al final del fitxer",

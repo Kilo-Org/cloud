@@ -553,7 +553,7 @@
       "retryLoadingContext": "Prøv at indlæse kontekst igen",
       "failedToLoadContext": "Kunne ikke indlæse kontekst — tryk for at prøve igen",
       "loadingContext": "Indlæser kontekst…",
-      "loadingLines": "Indlæser {{loaded}} af {{total}} linjer…",
+      "loadingLines": "Indlæser linjer: {{loaded}} af {{total}}…",
       "expandContext": "Vis kontekst",
       "expandMoreContext": "Vis mere kontekst",
       "expandLines": "Vis {{displayCount}} linjer ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "Kunne ikke indlæse flere filer — tryk for at prøve igen",
       "loadingAllFiles": "Indlæser alle filer — {{loaded}}…",
       "loadingAllFilesOf": "Indlæser alle filer — {{loaded}} af {{total}}…",
-      "loadedOfTotalFiles": "{{loaded}} af {{total}} filer indlæst",
+      "loadedOfTotalFiles": "Filer indlæst: {{loaded}} af {{total}}",
       "loadAllFiles": "Indlæs alle filer",
       "loadAll": "Indlæs alle",
       "fileLoadedCount_one": "{{displayCount}} fil indlæst",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "Vis {{displayCount}} linjer med kontekst",
       "expandMoreLines_one": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
       "expandMoreLines_other": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} af {{total}} filer indlæst",
-      "loadedOfTotalFiles_other": "{{loaded}} af {{total}} filer indlæst"
+      "loadedOfTotalFiles_one": "Filer indlæst: {{loaded}} af {{total}}",
+      "loadedOfTotalFiles_other": "Filer indlæst: {{loaded}} af {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ filen slutter ikke med et linjeskift.",

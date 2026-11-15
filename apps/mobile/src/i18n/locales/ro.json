@@ -555,7 +555,7 @@
       "retryLoadingContext": "Reîncearcă încărcarea contextului",
       "failedToLoadContext": "Nu s-a putut încărca contextul — atinge pentru a încerca din nou",
       "loadingContext": "Se încarcă contextul…",
-      "loadingLines": "Se încarcă {{loaded}} din {{total}} linii…",
+      "loadingLines": "Se încarcă liniile: {{loaded}} din {{total}}…",
       "expandContext": "Afișează contextul",
       "expandMoreContext": "Afișează mai mult context",
       "expandLines": "Afișează {{displayCount}} linii ({{start}}–{{end}})",
@@ -568,7 +568,7 @@
       "failedToLoadMoreFiles": "Nu s-au putut încărca mai multe fișiere — atinge pentru a încerca din nou",
       "loadingAllFiles": "Se încarcă toate fișierele — {{loaded}}…",
       "loadingAllFilesOf": "Se încarcă toate fișierele — {{loaded}} din {{total}}…",
-      "loadedOfTotalFiles": "{{loaded}} din {{total}} fișiere încărcate",
+      "loadedOfTotalFiles": "Fișiere încărcate: {{loaded}} din {{total}}",
       "loadAllFiles": "Încarcă toate fișierele",
       "loadAll": "Încarcă tot",
       "fileLoadedCount_one": "{{displayCount}} fișier încărcat",
@@ -594,9 +594,9 @@
       "expandMoreLines_one": "Afișează încă {{displayCount}} linie ({{start}}–{{end}})",
       "expandMoreLines_other": "Afișează încă {{displayCount}} linii ({{start}}–{{end}})",
       "expandMoreLines_few": "Afișează încă {{displayCount}} linii ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} din {{total}} fișiere încărcate",
-      "loadedOfTotalFiles_other": "{{loaded}} din {{total}} fișiere încărcate",
-      "loadedOfTotalFiles_few": "{{loaded}} din {{total}} fișiere încărcate"
+      "loadedOfTotalFiles_one": "Fișiere încărcate: {{loaded}} din {{total}}",
+      "loadedOfTotalFiles_other": "Fișiere încărcate: {{loaded}} din {{total}}",
+      "loadedOfTotalFiles_few": "Fișiere încărcate: {{loaded}} din {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ fără linie nouă la sfârșitul fișierului",

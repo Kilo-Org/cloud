@@ -553,7 +553,7 @@
       "retryLoadingContext": "Повтори го вчитувањето на контекстот",
       "failedToLoadContext": "Не успеа вчитувањето на контекстот — допри за повторен обид",
       "loadingContext": "Се вчитува контекстот…",
-      "loadingLines": "Се вчитуваат {{loaded}} од {{total}} редови…",
+      "loadingLines": "Се вчитуваат редови: {{loaded}} од {{total}}…",
       "expandContext": "Прошири го контекстот",
       "expandMoreContext": "Прикажи уште контекст",
       "expandLines": "Прикажи {{displayCount}} редови ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "Не успеа вчитувањето на дополнителни датотеки — допри за повторен обид",
       "loadingAllFiles": "Се вчитуваат сите датотеки — {{loaded}}…",
       "loadingAllFilesOf": "Се вчитуваат сите датотеки — {{loaded}} од {{total}}…",
-      "loadedOfTotalFiles": "вчитани {{loaded}} од {{total}} датотеки",
+      "loadedOfTotalFiles": "Вчитани датотеки: {{loaded}} од {{total}}",
       "loadAllFiles": "Вчитај ги сите датотеки",
       "loadAll": "Вчитај сè",
       "fileLoadedCount_one": "вчитана {{displayCount}} датотека",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "Прикажи {{displayCount}} редови контекст",
       "expandMoreLines_one": "Прикажи уште {{displayCount}} ред ({{start}}–{{end}})",
       "expandMoreLines_other": "Прикажи уште {{displayCount}} редови ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "вчитани {{loaded}} од {{total}} датотеки",
-      "loadedOfTotalFiles_other": "вчитани {{loaded}} од {{total}} датотеки"
+      "loadedOfTotalFiles_one": "Вчитани датотеки: {{loaded}} од {{total}}",
+      "loadedOfTotalFiles_other": "Вчитани датотеки: {{loaded}} од {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ нема нов ред на крајот на датотеката",

@@ -301,6 +301,11 @@ describe('AutomationSettingsScreen approval gate', () => {
       // cannot swap copy between sections.
       expect(row.subtitle).toBe(section.description);
 
+      // The sentence adds only what the title and heading cannot: the heading
+      // already says "Auto", so a subtitle that names the automatic behaviour
+      // is the repeated copy this row was trimmed of.
+      expect((row.subtitle ?? '').toLowerCase()).not.toMatch(/\bauto/);
+
       // A title names the setting, not the section it sits under.
       for (const sectionName of sectionNames) {
         expect(row.title).not.toContain(sectionName);

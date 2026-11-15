@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, describe, expect, it } from '@jest/globals';
 import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -74,6 +74,20 @@ jest.mock('@/components/ui/switch', () => ({ Switch: () => null }));
 jest.mock('./BYOKRoutingPreview', () => ({ BYOKRoutingPreview: () => null }));
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 
+/**
+ * How to put each installed DOM global back. React attributes an update with a
+ * timer that reads `window`, and that timer can still be queued when a test
+ * ends, so the DOM globals outlive every test of this file and are restored
+ * once, after the last one.
+ */
+const domRestores: (() => void)[] = [];
+
+afterAll(() => {
+  for (const restore of domRestores.splice(0)) {
+    restore();
+  }
+});
+
 function installDom() {
   const requireFromHere = createRequire(__filename);
   const requireFromNext = createRequire(requireFromHere.resolve('next/package.json'));
@@ -99,12 +113,10 @@ function installDom() {
     previous.set(name, globals[name]);
     globals[name] = value;
   }
+  domRestores.push(() => previous.forEach((value, name) => (globals[name] = value)));
   const container = document.getElementById('root');
   if (!container) throw new Error('React root missing');
-  return {
-    container,
-    cleanup: () => previous.forEach((value, name) => (globals[name] = value)),
-  };
+  return { container };
 }
 
 // The personal BYOK page renders the "Sign in with ChatGPT" connection card
@@ -152,15 +164,12 @@ describe('getStructuredCredentialKind', () => {
 describe('BYOK key priorities', () => {
   let root: Root | undefined;
   let queryClient: QueryClient | undefined;
-  let cleanup: (() => void) | undefined;
 
   afterEach(async () => {
     await act(async () => root?.unmount());
     root = undefined;
     queryClient?.clear();
     queryClient = undefined;
-    cleanup?.();
-    cleanup = undefined;
     mockReorder.mockClear();
     jest.mocked(toast.error).mockClear();
   });
@@ -183,7 +192,6 @@ describe('BYOK key priorities', () => {
     queryClient = client;
     client.setQueryData(listKey(organizationId ? { organizationId } : {}), mockKeys);
     const dom = installDom();
-    cleanup = dom.cleanup;
     root = createRoot(dom.container);
     await act(async () => {
       root?.render(
@@ -263,15 +271,12 @@ describe('BYOK key priorities', () => {
 describe('BYOK stored-key test toasts', () => {
   let root: Root | undefined;
   let queryClient: QueryClient | undefined;
-  let cleanup: (() => void) | undefined;
 
   afterEach(async () => {
     await act(async () => root?.unmount());
     root = undefined;
     queryClient?.clear();
     queryClient = undefined;
-    cleanup?.();
-    cleanup = undefined;
     mockTestApiKeyOptions = undefined;
     jest.mocked(toast.error).mockClear();
     jest.mocked(toast.success).mockClear();
@@ -297,7 +302,6 @@ describe('BYOK stored-key test toasts', () => {
     queryClient = client;
     client.setQueryData(listKey({}), mockKeys);
     const dom = installDom();
-    cleanup = dom.cleanup;
     root = createRoot(dom.container);
     await act(async () => {
       root?.render(

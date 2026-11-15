@@ -284,7 +284,9 @@ describe('ReviewMemoryProposalSheet refusal', () => {
 
     const { renderer } = await refuseSave();
 
-    expect(statusMessage(renderer.root)).toBe(i18n.t('codeReviewer.reviewMemory.changeRequestInProgress'));
+    expect(statusMessage(renderer.root)).toBe(
+      i18n.t('codeReviewer.reviewMemory.changeRequestInProgress')
+    );
     expect(billingStep(renderer.root)).toBeUndefined();
   });
 

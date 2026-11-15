@@ -1,14 +1,12 @@
-import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 import type * as SurfaceFeedbackModule from '@/lib/surface-feedback';
 import { i18n } from '@/i18n';
 import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
-import { type TodoList } from '@/lib/todos/todo-types';
-import { act, TestRenderer } from '@/test/renderer';
+import { act } from '@/test/renderer';
 
-import { type StartTodoControls, useStartTodo } from './use-start-todo';
+import { createHarness, LIST, TODO } from './use-start-todo.mounted.test-helpers';
 
 const state = vi.hoisted(() => ({
   startAgent: vi.fn(),
@@ -82,29 +80,10 @@ vi.mock('@/lib/surface-feedback', async importOriginal => {
   };
 });
 
-const todo = { id: 'todo-1', title: 'Ship the fix', notes: null };
-const list: Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'> = {
-  organizationId: 'organization-1',
-  gitUrl: 'test/project',
-  mode: null,
-  model: null,
-  variant: null,
-};
-
-function Probe({ holder }: Readonly<{ holder: { current: StartTodoControls | null } }>) {
-  holder.current = useStartTodo();
-  return null;
-}
-
-let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-const holder: { current: StartTodoControls | null } = { current: null };
-
-function mounted() {
-  if (!holder.current) {
-    throw new Error('useStartTodo has not mounted');
-  }
-  return holder.current;
-}
+const todo = TODO;
+const list = LIST;
+const harness = createHarness();
+const { mounted, start, rerender } = harness;
 
 beforeEach(async () => {
   const environment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
@@ -121,30 +100,13 @@ beforeEach(async () => {
   state.link.mockResolvedValue(undefined);
   state.invalidate.mockResolvedValue(undefined);
   stores.all.length = 0;
-  act(() => {
-    renderer = TestRenderer.create(createElement(Probe, { holder }));
-  });
+  harness.mount();
 });
 
 afterEach(() => {
-  renderer?.unmount();
-  renderer = undefined;
-  holder.current = null;
+  harness.unmount();
   vi.restoreAllMocks();
 });
-
-async function start(startList: typeof list = list) {
-  await act(async () => {
-    await mounted().startNow(todo, startList);
-  });
-}
-
-/** Re-renders after a case changes what the membership list holds. */
-function rerender() {
-  act(() => {
-    renderer?.update(createElement(Probe, { holder }));
-  });
-}
 
 describe('useStartTodo start now', () => {
   it('opens the started session when the link fails', async () => {

@@ -891,7 +891,13 @@ describe('scoped JWT policy', () => {
 
 describe('organization binding parity', () => {
   type Verdict = 'accepted' | 'refused';
-  type OrganizationVariant = 'omitted' | 'own' | 'other' | 'null' | 'empty string';
+  type OrganizationVariant =
+    | 'omitted'
+    | 'own'
+    | 'other'
+    | 'null'
+    | 'empty string'
+    | 'non-string';
   type OrganizationBindingRow = {
     authority: 'personal' | 'organization';
     authorityValue: CloudAgentAuthority;
@@ -903,7 +909,14 @@ describe('organization binding parity', () => {
   const otherOrganizationId = '33333333-3333-4333-8333-333333333333';
   const organizationAuthority: CloudAgentAuthority = { ...scope, organizationId };
   const environmentRequest = { repository: { platform: 'github', fullName: 'acme/repo' } };
-  const variants: OrganizationVariant[] = ['omitted', 'own', 'other', 'null', 'empty string'];
+  const variants: OrganizationVariant[] = [
+    'omitted',
+    'own',
+    'other',
+    'null',
+    'empty string',
+    'non-string',
+  ];
 
   function organizationValue(variant: OrganizationVariant, authority: CloudAgentAuthority) {
     switch (variant) {
@@ -916,6 +929,8 @@ describe('organization binding parity', () => {
         return otherOrganizationId;
       case 'empty string':
         return '';
+      case 'non-string':
+        return 123;
     }
   }
 
@@ -936,7 +951,7 @@ describe('organization binding parity', () => {
     input: unknown
   ): Verdict {
     const schema: Schema = cloudAgentAuthorityInputSchema(authority, procedure) as Schema;
-    return new Validator(schema).validate(input).valid ? 'accepted' : 'refused';
+    return new Validator(schema, '2020-12').validate(input).valid ? 'accepted' : 'refused';
   }
 
   function validatorVerdict(
@@ -964,6 +979,7 @@ describe('organization binding parity', () => {
         other: 'refused',
         null: 'refused',
         'empty string': 'refused',
+        'non-string': 'refused',
       },
     },
     {
@@ -977,6 +993,7 @@ describe('organization binding parity', () => {
         other: 'refused',
         null: 'refused',
         'empty string': 'refused',
+        'non-string': 'refused',
       },
     },
     {
@@ -990,6 +1007,7 @@ describe('organization binding parity', () => {
         other: 'refused',
         null: 'refused',
         'empty string': 'refused',
+        'non-string': 'refused',
       },
     },
     {
@@ -1003,6 +1021,7 @@ describe('organization binding parity', () => {
         other: 'refused',
         null: 'refused',
         'empty string': 'refused',
+        'non-string': 'refused',
       },
     },
     {
@@ -1016,6 +1035,7 @@ describe('organization binding parity', () => {
         other: 'refused',
         null: 'accepted',
         'empty string': 'refused',
+        'non-string': 'refused',
       },
     },
     {
@@ -1029,6 +1049,7 @@ describe('organization binding parity', () => {
         other: 'refused',
         null: 'refused',
         'empty string': 'refused',
+        'non-string': 'refused',
       },
     },
   ];

@@ -16,6 +16,7 @@ import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   approveSupportGrant,
+  assertGrantApprovable,
   cancelSupportGrant,
   denySupportGrant,
   emergencyIssueSupportGrant,
@@ -125,19 +126,35 @@ export const adminSupportAccessRouter = createTRPCRouter({
         // The organization is a property of the grant, and the proof must name
         // it, so read it before the proof is claimed. A missing grant refuses
         // here without spending a proof.
-        const [pending] = await db
-          .select({ organization_id: support_access_grants.organization_id })
+        const [grant] = await db
+          .select({
+            organization_id: support_access_grants.organization_id,
+            actor_kilo_user_id: support_access_grants.actor_kilo_user_id,
+            status: support_access_grants.status,
+            action_class: support_access_grants.action_class,
+          })
           .from(support_access_grants)
           .where(eq(support_access_grants.id, input.grantId))
           .limit(1);
-        if (!pending) {
+        if (!grant) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
         }
+        // The transaction's approvability rules run here first, before the
+        // single-use proof is claimed. approveSupportGrant re-checks them under
+        // the grant locks.
+        const requester = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, grant.actor_kilo_user_id),
+        });
+        assertGrantApprovable({
+          approverKiloUserId: ctx.user.id,
+          grant,
+          requester,
+        });
         await supportStepUpPort.requireFresh({
           userId: ctx.user.id,
           action: 'support_approval',
           actionClass: 'support_write',
-          organizationId: pending.organization_id,
+          organizationId: grant.organization_id,
           credential: ctx.credential,
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,
@@ -145,18 +162,18 @@ export const adminSupportAccessRouter = createTRPCRouter({
           surface: 'trpc',
         });
       }
-      const grant = await approveSupportGrant({
+      const approved = await approveSupportGrant({
         approverKiloUserId: ctx.user.id,
         grantId: input.grantId,
         durationSeconds: input.durationSeconds,
       });
       await recordAdminAction(ctx, {
         action: 'support_access.approve',
-        target: { type: 'organization', id: grant.organization_id },
+        target: { type: 'organization', id: approved.organization_id },
         message: 'Approved support write access',
-        metadata: { grantId: grant.id },
+        metadata: { grantId: approved.id },
       });
-      return toSupportGrantSummary(grant);
+      return toSupportGrantSummary(approved);
     }),
 
   deny: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {

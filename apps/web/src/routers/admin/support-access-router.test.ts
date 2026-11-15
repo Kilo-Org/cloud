@@ -557,7 +557,7 @@ describe('support write step-up', () => {
     const requester = await insertRequester();
     const approver = await insertRequester();
     const superadmin = await insertSuperadmin();
-    const { organization, owner } = await orgWithOwner();
+    const { organization } = await orgWithOwner();
 
     await expect(
       (await stepUpCaller(requester.id)).admin.supportAccess.request({
@@ -580,7 +580,7 @@ describe('support write step-up', () => {
     const [directPending] = await db
       .insert(support_access_grants)
       .values({
-        actor_kilo_user_id: owner.id,
+        actor_kilo_user_id: requester.id,
         organization_id: organization.id,
         action_class: 'support_write',
         status: 'pending',
@@ -746,6 +746,83 @@ describe('support write step-up', () => {
       code: 'FORBIDDEN',
       cause: expect.objectContaining({ code: 'MFA_REQUIRED' }),
     });
+  });
+
+  test('a refused approval keeps its step-up proof unspent', async () => {
+    enableSupportAccessForStepUp(true);
+    setAdminStepUp(true);
+
+    async function approvalProof(userId: string, organizationId: string) {
+      const [proof] = await db
+        .select()
+        .from(session_step_up_proofs)
+        .where(
+          and(
+            eq(session_step_up_proofs.kilo_user_id, userId),
+            eq(session_step_up_proofs.purpose, 'operation'),
+            eq(
+              session_step_up_proofs.action_binding_hash,
+              hashStepUpBinding('support_write', {
+                surface: 'trpc',
+                route: 'admin.supportAccess.approve',
+                method: 'mutation',
+                target: { kind: 'organization', id: organizationId },
+              })
+            )
+          )
+        );
+      return proof;
+    }
+
+    // A requester cannot approve its own request. The request call claims its
+    // own route's proof; the approval proof is a separate row.
+    const requester = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const requesterCaller = await stepUpCaller(requester.id, organization.id);
+    const own = await requesterCaller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+    });
+
+    await expect(
+      requesterCaller.admin.supportAccess.approve({ grantId: own.id })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'A request cannot be approved by its requester',
+    });
+    expect((await approvalProof(requester.id, organization.id))?.consumed_at).toBeNull();
+
+    // A blocked requester answers the service's own error before the proof is
+    // claimed.
+    const blockedRequester = await insertRequester();
+    const approver = await insertRequester();
+    const pending = await (
+      await stepUpCaller(blockedRequester.id, organization.id)
+    ).admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(kilocode_users.id, blockedRequester.id));
+
+    await expect(
+      (await stepUpCaller(approver.id, organization.id)).admin.supportAccess.approve({
+        grantId: pending.id,
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Platform admin access required',
+    });
+    expect((await approvalProof(approver.id, organization.id))?.consumed_at).toBeNull();
+
+    const stored = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, pending.id),
+    });
+    expect(stored?.status).toBe('pending');
   });
 
   test('a read grant request needs a live session proof while step-up is on', async () => {

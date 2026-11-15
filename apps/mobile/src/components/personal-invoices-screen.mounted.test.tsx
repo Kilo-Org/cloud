@@ -35,7 +35,6 @@ const screenHeaders = vi.hoisted(() => ({
     title?: string;
     eyebrow?: string;
     reserveEyebrow?: boolean;
-    titleEllipsizeMode?: string;
   }[],
 }));
 
@@ -92,12 +91,7 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: {
-    title?: string;
-    eyebrow?: string;
-    reserveEyebrow?: boolean;
-    titleEllipsizeMode?: string;
-  }) => {
+  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -163,8 +157,8 @@ describe('PersonalInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
-    // The personal list's title is the screen's own name, so it keeps the
-    // header's default tail ellipsis; only a scope's name wants the middle.
-    expect(screenHeaders.rendered[0]?.titleEllipsizeMode).toBeUndefined();
+    // The personal header keeps the header's default tail ellipsis and paints
+    // no eyebrow.
+    expect(screenHeaders.rendered[0]).not.toHaveProperty('titleEllipsizeMode');
   });
 });

@@ -62,7 +62,6 @@ const screenHeaders = vi.hoisted(() => ({
     title?: string;
     eyebrow?: string;
     reserveEyebrow?: boolean;
-    titleEllipsizeMode?: string;
   }[],
 }));
 
@@ -154,12 +153,7 @@ vi.mock('@/components/organization/organization-boundary', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: {
-    title?: string;
-    eyebrow?: string;
-    reserveEyebrow?: boolean;
-    titleEllipsizeMode?: string;
-  }) => {
+  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -502,10 +496,9 @@ describe('OrganizationInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.title).toBe('Acme Corp');
     expect(screenHeaders.rendered[0]?.eyebrow).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
-    // The title is the organization's name, so its tail is what tells two
-    // similar names apart: the header truncates it in the middle, on the one
-    // line it already keeps.
-    expect(screenHeaders.rendered[0]?.titleEllipsizeMode).toBe('middle');
+    // The title keeps the header's default tail ellipsis, so the start of the
+    // organization name stays readable.
+    expect(screenHeaders.rendered[0]).not.toHaveProperty('titleEllipsizeMode');
   });
 
   it('reserves the eyebrow line on the boundary so the header keeps its height before the name arrives', async () => {

@@ -81,13 +81,6 @@ type InvoiceListScreenProps = Readonly<{
   hasMore: boolean;
   emptyTitle: string;
   emptyDescription: string;
-  /**
-   * How the header's title truncates when it does not fit. A scope whose title
-   * is a name wants `'middle'`: the tail of an organization name is what tells
-   * two similar names apart. Omitted, the header keeps its one-line tail
-   * ellipsis.
-   */
-  titleEllipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
 }>;
 
 /**
@@ -104,7 +97,6 @@ export function InvoiceListScreen({
   hasMore,
   emptyTitle,
   emptyDescription,
-  titleEllipsizeMode,
 }: InvoiceListScreenProps) {
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
@@ -236,12 +228,7 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={title}
-        eyebrow={eyebrow}
-        reserveEyebrow={reserveEyebrow}
-        titleEllipsizeMode={titleEllipsizeMode}
-      />
+      <ScreenHeader title={title} eyebrow={eyebrow} reserveEyebrow={reserveEyebrow} />
       {body}
     </View>
   );

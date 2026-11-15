@@ -283,8 +283,16 @@ describe('AutomationSettingsScreen approval gate', () => {
       },
     ];
 
-    for (const section of sections) {
-      const row = toggleRows.rows.find(candidate => candidate.title === section.title);
+    // The rendered rows carry the proof, not the expected pairs: the screen
+    // draws one row per section in section order, so a row that repeated or
+    // swapped another section's title fails here.
+    const rendered = toggleRows.rows.filter(row =>
+      sections.some(section => section.title === row.title)
+    );
+    expect(rendered.map(row => row.title)).toEqual(sections.map(section => section.title));
+
+    for (const [index, section] of sections.entries()) {
+      const row = rendered[index];
       if (!row) {
         throw new Error(`section toggle row ${section.title} not found`);
       }
@@ -299,11 +307,8 @@ describe('AutomationSettingsScreen approval gate', () => {
       }
       expect(row.title.endsWith('.')).toBe(false);
 
-      // Label in name: the switch is named by the text the row shows, and each
-      // title is unique on the screen, so no second name repeats the setting.
+      // Label in name: the switch is named by the text the row shows.
       expect(row.accessibilityLabel).toBeUndefined();
     }
-
-    expect(new Set(sections.map(section => section.title)).size).toBe(3);
   });
 });

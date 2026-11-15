@@ -203,6 +203,15 @@ function CodeEntry({
         // full-screen extract editor, which would cover the controls below.
         disableFullscreenUI
         error={error}
+        reserveErrorMessages={[
+          t('profile.passkeyVerifyCodeRejected'),
+          t('profile.passkeyVerifyTooManyAttempts'),
+          t('profile.passkeyVerifyInProgress'),
+          t('profile.passkeyVerifyAdmissionRequired'),
+          t('profile.passkeyVerifySsoRequired'),
+          t('profile.passkeyVerifyExpired'),
+          t('profile.passkeyVerifyFailed'),
+        ]}
         editable={!retrying}
         onChangeText={value => {
           codeRef.current = value;

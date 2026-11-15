@@ -251,15 +251,17 @@ export function PasskeysScreen() {
     body = (
       <>
         {failureNotice}
-        <EmptyState
-          placement="top"
-          compact={isShortViewport(windowSize.width, windowSize.height)}
-          icon={KeyRound}
-          title={t('profile.passkeysEmpty')}
-          description={
-            management.canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice
-          }
-        />
+        {!management.verifying && (
+          <EmptyState
+            placement="top"
+            compact={isShortViewport(windowSize.width, windowSize.height)}
+            icon={KeyRound}
+            title={t('profile.passkeysEmpty')}
+            description={
+              management.canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice
+            }
+          />
+        )}
       </>
     );
   } else {

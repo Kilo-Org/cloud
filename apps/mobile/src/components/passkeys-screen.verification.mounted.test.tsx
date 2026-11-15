@@ -80,6 +80,9 @@ describe('PasskeysScreen verification', () => {
     // There is no passkey to assert, so the code is the one working proof.
     expect(hasButtonLabel(view, VERIFY_PASSKEY)).toBe(false);
     expect(hasButtonLabel(view, VERIFY_EMAIL)).toBe(true);
+    expect(nodes(view, 'EmptyState')).toHaveLength(0);
+    await press(buttonByLabel(view, 'Cancel'));
+    await waitFor(() => nodes(view, 'EmptyState').length === 1);
     view.unmount();
   });
 

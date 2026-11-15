@@ -5351,7 +5351,7 @@
       "properties": {
         "session_id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[A-Za-z0-9_-]{1,255}$"
         },
         "limit": {
           "default": 50,
@@ -36967,6 +36967,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "managementAuthorization": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
         }
       },
       "required": [
@@ -36976,9 +36981,10 @@
     "tags": [
       "user",
       "deletepasskey",
-      "id"
+      "id",
+      "managementauthorization"
     ],
-    "searchBlob": "user.deletePasskey Remove one of the signed-in user's registered passkeys, revoking that device or security key for future sign-in. user deletepasskey id id"
+    "searchBlob": "user.deletePasskey Remove one of the signed-in user's registered passkeys, revoking that device or security key for future sign-in. user deletepasskey id managementauthorization id managementAuthorization"
   },
   "user.getAuthProviders": {
     "path": "user.getAuthProviders",
@@ -37546,6 +37552,11 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 64
+        },
+        "managementAuthorization": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
         }
       },
       "required": [
@@ -37557,9 +37568,10 @@
       "user",
       "renamepasskey",
       "id",
-      "name"
+      "name",
+      "managementauthorization"
     ],
-    "searchBlob": "user.renamePasskey Rename a saved passkey to a custom label so the user can identify which device or security key it belongs to. user renamepasskey id name id name"
+    "searchBlob": "user.renamePasskey Rename a saved passkey to a custom label so the user can identify which device or security key it belongs to. user renamepasskey id name managementauthorization id name managementAuthorization"
   },
   "user.requestAccountDeletion": {
     "path": "user.requestAccountDeletion",

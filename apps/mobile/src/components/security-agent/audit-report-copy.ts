@@ -169,11 +169,14 @@ type SummaryFigure = {
 /**
  * The one accessible label a summary figure exposes, so a screen reader hears
  * the count with what it counts. Findings and events inflect with the count; a
- * severity figure is an adjective and takes the interpolated label.
+ * severity figure passes its count too, so the catalog selects the form that
+ * agrees with the number, and still carries the caller's formatted
+ * `displayCount`.
  */
 export function summaryCountLabel(figure: SummaryFigure): string {
   if (figure.kind === 'severity') {
     return i18n.t('securityAgent.auditReport.severityCount', {
+      count: figure.value,
       displayCount: figure.displayCount,
       label: figure.label,
     });

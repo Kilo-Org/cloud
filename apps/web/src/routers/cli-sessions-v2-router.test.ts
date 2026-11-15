@@ -1380,7 +1380,7 @@ describe('cli-sessions-v2-router', () => {
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
 
-    it('rejects an invalid session id before calling the client', async () => {
+    it('rejects a session id that matches no owned row before calling the client', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
       await expect(
@@ -1391,6 +1391,59 @@ describe('cli-sessions-v2-router', () => {
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
+
+    it.each([
+      'ses_123/other',
+      'ses_123 456',
+      'ses_123\u0000456',
+      'ses_123:456',
+      'a'.repeat(256),
+      '',
+    ])(
+      'rejects the session id %j at the tRPC boundary before calling the client',
+      async session_id => {
+        const caller = await createCallerForUser(regularUser.id);
+
+        await expect(
+          caller.cliSessionsV2.getSessionMessagesPage({ session_id, limit: 50 })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(['xmw2l780h18', '0b6f5a9e-9a0e-4dbb-9a4a-2a0d9c6f5e11'])(
+      'forwards the stored session id %s to the reader and returns its page',
+      async stored_id => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: stored_id,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+        });
+
+        try {
+          fetchSessionMessagesPage.mockResolvedValueOnce({
+            kiloSessionId: stored_id,
+            history: null,
+          });
+          const caller = await createCallerForUser(regularUser.id);
+
+          await expect(
+            caller.cliSessionsV2.getSessionMessagesPage({ session_id: stored_id, limit: 50 })
+          ).resolves.toEqual({
+            kiloSessionId: stored_id,
+            history: null,
+            watermarkEventId: null,
+            parentSessionId: null,
+            preparationAttempts: [],
+          });
+          expect(fetchSessionMessagesPage).toHaveBeenCalledWith(stored_id, regularUser.id, {
+            limit: 50,
+          });
+        } finally {
+          await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, stored_id));
+        }
+      }
+    );
 
     describe('watermark', () => {
       const cloudAgentSessionId = 'agent_wm123456-1234-1234-1234-123456789abc';
@@ -4426,9 +4479,46 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('share result', () => {
+    const sessionId = 'ses_share_public_id_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Shared session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns the public_id the worker wrote beside the token', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            share_token: 'test.share.token',
+            public_id: '22222222-2222-4222-8222-222222222222',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).resolves.toEqual({
+          share_token: 'test.share.token',
+          public_id: '22222222-2222-4222-8222-222222222222',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
   describe('share size result', () => {
     const sessionId = 'ses_share_oversized_info_0001';
-
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values({
         session_id: sessionId,

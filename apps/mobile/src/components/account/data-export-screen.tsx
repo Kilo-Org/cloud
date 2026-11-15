@@ -23,6 +23,16 @@ import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
 
+/** The emailed-code step: either closed, or open for one export. */
+type ExportChallenge =
+  | { readonly kind: 'none' }
+  | {
+      readonly kind: 'open';
+      readonly exportId: string;
+      readonly challengeId: string;
+      readonly entryError: string | null;
+    };
+
 /**
  * A copy of the account's own data, as a file the reader can share.
  *
@@ -41,9 +51,10 @@ export function DataExportScreen() {
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const codeRef = useRef('');
-  const [exportId, setExportId] = useState<string | null>(null);
-  const [challengeId, setChallengeId] = useState<string | null>(null);
-  const [codeError, setCodeError] = useState<string | null>(null);
+  const [challenge, setChallenge] = useState<ExportChallenge>({ kind: 'none' });
+  // A rejected code request has no challenge to render inside, so its message
+  // lives under the export list beside the row that raised it.
+  const [requestCodeError, setRequestCodeError] = useState<string | null>(null);
   const listKey = trpc.userExports.list.queryKey();
 
   const access = useQuery(trpc.userExports.uiAccess.queryOptions());
@@ -66,16 +77,24 @@ export function DataExportScreen() {
   const requestCode = useMutation(
     trpc.userExports.requestDownloadCode.mutationOptions({
       onSuccess: (result, input) => {
-        setExportId(input.exportId);
-        setChallengeId(result.challengeId);
+        setChallenge({
+          kind: 'open',
+          exportId: input.exportId,
+          challengeId: result.challengeId,
+          entryError: null,
+        });
         codeRef.current = '';
-        setCodeError(null);
+        setRequestCodeError(null);
         announcingToast.success(
           t('profile.dataExport.codeSent', { minutes: result.expiresInMinutes })
         );
       },
       onError: error => {
-        setCodeError(codeFailureMessage(error, t('profile.dataExport.codeRequired')));
+        // This failure is the request that *sends* a code, so the entry-field
+        // copy ("Enter the code from the email.") would describe a field that is
+        // not on screen yet. A structured rejection has no reader-facing text,
+        // so it falls back to the generic retry line.
+        setRequestCodeError(codeFailureMessage(error, t('queryError.neutralDescription')));
       },
     })
   );
@@ -85,9 +104,8 @@ export function DataExportScreen() {
       onSuccess: async (result, variables) => {
         // The code is spent, so the form closes: nothing may resubmit it.
         codeRef.current = '';
-        setChallengeId(null);
-        setExportId(null);
-        setCodeError(null);
+        setChallenge({ kind: 'none' });
+        setRequestCodeError(null);
         try {
           await shareDataExport({ downloadUrl: result.downloadUrl, exportId: variables.exportId });
         } catch (error) {
@@ -95,7 +113,10 @@ export function DataExportScreen() {
         }
       },
       onError: error => {
-        setCodeError(codeFailureMessage(error, t('profile.dataExport.codeRequired')));
+        const message = codeFailureMessage(error, t('profile.dataExport.codeRequired'));
+        setChallenge(current =>
+          current.kind === 'open' ? { ...current, entryError: message } : current
+        );
       },
     })
   );
@@ -137,6 +158,8 @@ export function DataExportScreen() {
     );
   }
 
+  const openChallenge = challenge.kind === 'open' ? challenge : null;
+
   let body: ReactNode = null;
   if (exportsQuery.isPending) {
     body = (
@@ -172,7 +195,7 @@ export function DataExportScreen() {
               requestCode.isPending && requestCode.variables.exportId === dataExport.id
             }
             onRequestCode={() => {
-              setCodeError(null);
+              setRequestCodeError(null);
               requestCode.mutate({ exportId: dataExport.id });
             }}
           />
@@ -206,10 +229,13 @@ export function DataExportScreen() {
           <Text>{t('profile.dataExport.request')}</Text>
         </Button>
         {body}
-        {challengeId === null ? null : (
+        {requestCodeError === null ? null : (
+          <Text className="text-sm text-destructive">{requestCodeError}</Text>
+        )}
+        {openChallenge === null ? null : (
           <View className="gap-3">
             <FormField
-              key={challengeId}
+              key={openChallenge.challengeId}
               label={t('profile.dataExport.codeLabel')}
               placeholder={t('profile.dataExport.codePlaceholder')}
               keyboardType="number-pad"
@@ -218,7 +244,9 @@ export function DataExportScreen() {
               disabled={download.isPending}
               onChangeText={value => {
                 codeRef.current = value;
-                setCodeError(null);
+                setChallenge(current =>
+                  current.kind === 'open' ? { ...current, entryError: null } : current
+                );
               }}
             />
             <Button
@@ -228,23 +256,24 @@ export function DataExportScreen() {
               disabled={download.isPending}
               onPress={() => {
                 const code = codeRef.current.trim();
-                if (exportId === null) {
-                  return;
-                }
                 // The server only redeems eight digits; anything else would come
                 // back as a schema payload rather than a sentence.
                 if (!DOWNLOAD_CODE_PATTERN.test(code)) {
                   toast.error(t('profile.dataExport.codeRequired'));
                   return;
                 }
-                download.mutate({ exportId, code, challengeId });
+                download.mutate({
+                  exportId: openChallenge.exportId,
+                  code,
+                  challengeId: openChallenge.challengeId,
+                });
               }}
             >
               <Share size={16} color={colors.foreground} />
               <Text>{t('profile.dataExport.download')}</Text>
             </Button>
-            {codeError === null ? null : (
-              <Text className="text-sm text-destructive">{codeError}</Text>
+            {openChallenge.entryError === null ? null : (
+              <Text className="text-sm text-destructive">{openChallenge.entryError}</Text>
             )}
           </View>
         )}

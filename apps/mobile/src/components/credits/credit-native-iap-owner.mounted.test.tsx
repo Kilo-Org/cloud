@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The owner's request-generation, delivery and already-owned recovery tests share one IAP-owner harness; splitting them would duplicate its mocks and mount scaffolding. */
 
 import { createElement } from 'react';
-import { type Purchase } from 'expo-iap';
+import { type Purchase, type RequestPurchaseProps } from 'expo-iap';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,6 +10,13 @@ import {
 } from '@/lib/credits/store-products-loader';
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { resetCreditPurchaseIntentForTests } from '@/lib/credits/credit-purchase-intent';
+import { resetCreditPurchaseAuthorityForTests } from '@/lib/credits/credit-purchase-authority';
+import {
+  resetInlinePurchaseErrorOwnership,
+  resetPurchaseErrorToastDedup,
+  resetTerminalPurchaseRejections,
+} from '@/lib/credits/use-store-credit-purchase';
 import { act, TestRenderer } from '@/test/renderer';
 import {
   type CreditNativeIapContextValue,
@@ -19,6 +26,7 @@ import {
 
 const APPLE_PRODUCT_ID = 'credits.usd10.v1';
 const APP_ACCOUNT_TOKEN = '550e8400-e29b-41d4-a716-446655440000';
+const nativeRequestCounts = new Map<string, number>();
 
 const mockedIap = vi.hoisted(() => ({
   connected: false,
@@ -47,6 +55,21 @@ const mockedQuery = vi.hoisted(() => ({
       }
     | undefined,
 }));
+const mockedToasts = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+}));
+
+vi.mock('expo-crypto', () => {
+  let sequence = 0;
+  return {
+    randomUUID: () => {
+      sequence += 1;
+      return `purchase-intent-${String(sequence)}`;
+    },
+  };
+});
 
 vi.mock('expo-iap', () => ({
   ErrorCode: {
@@ -63,11 +86,11 @@ vi.mock('expo-iap', () => ({
   // LogBox (see credit-native-iap-owner.tsx).
   getAvailablePurchases: mockedIap.getAvailablePurchases,
   useIAP: (handlers: {
-    onPurchaseError: (error: unknown) => void;
+    onPurchaseError?: (error: unknown) => void;
     onPurchaseSuccess: (purchase: Purchase) => void;
   }) => {
     mockedIap.useIAP(handlers);
-    mockedIap.handlers = handlers;
+    mockedIap.handlers = { onPurchaseError: vi.fn<(error: unknown) => void>(), ...handlers };
     return {
       connected: mockedIap.connected,
       finishTransaction: mockedIap.finishTransaction,
@@ -105,9 +128,7 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 
-vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
-}));
+vi.mock('sonner-native', () => ({ toast: mockedToasts }));
 
 type ProbeHandle = { value: CreditNativeIapContextValue | null };
 
@@ -148,6 +169,7 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
     ids: null,
     isAutoRenewing: false,
     productId: APPLE_PRODUCT_ID,
+    appAccountToken: APP_ACCOUNT_TOKEN,
     purchaseState: 'purchased',
     purchaseToken: 'signed-jws',
     quantity: 1,
@@ -157,6 +179,22 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
     transactionId: 'tx-1',
     ...overrides,
   };
+}
+
+async function pendingRequestedPurchase(args: RequestPurchaseProps): Promise<Purchase> {
+  const productId = args.request.apple?.sku ?? args.request.google?.skus[0];
+  if (!productId) {
+    throw new Error('the fake native request has no product');
+  }
+  const count = (nativeRequestCounts.get(productId) ?? 0) + 1;
+  nativeRequestCounts.set(productId, count);
+  const baseId = productId === CREDIT_PACK_50 ? 'tx-50' : 'tx-1';
+  await Promise.resolve();
+  return createPurchase({
+    productId,
+    transactionId: count === 1 ? baseId : `${baseId}-${String(count)}`,
+    purchaseState: 'pending',
+  });
 }
 
 const mounted: TestRenderer.ReactTestRenderer[] = [];
@@ -188,13 +226,22 @@ async function flushPromises() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockedIap.requestPurchase.mockReset();
+  mockedIap.getAvailablePurchases.mockReset();
+  mockedQuery.completePurchase.mockReset();
+  resetCreditPurchaseIntentForTests();
+  resetCreditPurchaseAuthorityForTests();
+  resetInlinePurchaseErrorOwnership();
+  resetPurchaseErrorToastDedup();
+  resetTerminalPurchaseRejections();
+  nativeRequestCounts.clear();
   mockedPlatform.OS = 'ios';
   mockedIap.connected = false;
   mockedIap.finishTransaction.mockResolvedValue(undefined);
   mockedIap.getAvailablePurchases.mockResolvedValue([]);
   mockedIap.handlers = null;
   mockedIap.reconnect.mockResolvedValue(true);
-  mockedIap.requestPurchase.mockResolvedValue(null);
+  mockedIap.requestPurchase.mockImplementation(pendingRequestedPurchase);
   mockedQuery.completePurchase.mockResolvedValue({ alreadyProcessed: false });
   mockedQuery.invalidateQueries.mockResolvedValue(undefined);
   mockedQuery.serverProductsData = undefined;
@@ -207,10 +254,1088 @@ afterEach(() => {
 });
 
 describe('CreditNativeIapOwner', () => {
+  it('bounds reconciliation through a hung finish and keeps its late completion off a successor', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const transaction = createPurchase({ transactionId: 'reconciliation-hung-finish' });
+    mockedIap.requestPurchase.mockResolvedValueOnce({ ...transaction, purchaseState: 'pending' });
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    const finish = Promise.withResolvers<undefined>();
+    mockedIap.finishTransaction.mockReturnValueOnce(finish.promise);
+    mockedIap.getAvailablePurchases.mockResolvedValue([transaction]);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const reopened = await mountOwner();
+    const reconciliation = reopened.handle.value?.purchase(creditPack);
+    try {
+      await flushPromises();
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(16_000);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBeNull();
+      expect(reopened.handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+      mockedIap.requestPurchase.mockResolvedValueOnce(
+        createPurchase({ purchaseState: 'pending', transactionId: 'after-reconciliation-deadline' })
+      );
+      await reopened.handle.value?.buyAgain(creditPack);
+      finish.resolve(undefined);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+    } finally {
+      finish.resolve(undefined);
+      await flushPromises();
+      await reconciliation;
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not settle a successor reconciliation when the earlier finish finally completes', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const transaction = createPurchase({ transactionId: 'reconciliation-successor-query' });
+    mockedIap.requestPurchase.mockResolvedValueOnce({ ...transaction, purchaseState: 'pending' });
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    const finish = Promise.withResolvers<undefined>();
+    const secondLookup = Promise.withResolvers<Purchase[]>();
+    mockedIap.finishTransaction.mockReturnValueOnce(finish.promise);
+    mockedIap.getAvailablePurchases.mockResolvedValue([transaction]);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const reopened = await mountOwner();
+    const initial = reopened.handle.value?.purchase(creditPack);
+    const successor: { promise?: Promise<boolean> } = {};
+    try {
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBeNull();
+      await initial;
+      mockedIap.getAvailablePurchases.mockReturnValueOnce(secondLookup.promise);
+      successor.promise = reopened.handle.value?.purchase(creditPack);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+      finish.resolve(undefined);
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+      secondLookup.resolve([]);
+      await successor.promise;
+      await flushPromises();
+      expect(reopened.handle.value?.completingProductId).toBeNull();
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    } finally {
+      finish.resolve(undefined);
+      secondLookup.resolve([]);
+      await flushPromises();
+      await initial;
+      await successor.promise;
+      vi.useRealTimers();
+    }
+  });
+
+  it('offers consent for a terminally refused transaction that stays in the store queue', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const transaction = createPurchase({ transactionId: 'queued-refunded-receipt' });
+    mockedIap.requestPurchase.mockResolvedValueOnce({ ...transaction, purchaseState: 'pending' });
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    mockedQuery.completePurchase.mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'This store purchase has been refunded, so Kilo cannot credit it.',
+      },
+    });
+    mockedIap.getAvailablePurchases.mockResolvedValue([transaction]);
+    const reopened = await mountOwner();
+    await reopened.handle.value?.purchase(creditPack);
+    expect(reopened.handle.value?.completingProductId).toBeNull();
+    expect(reopened.handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+    expect(reopened.handle.value?.purchaseResolution).toBe('terminal-refusal');
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not publish a completion refusal after same-account unmount', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const backend = Promise.withResolvers<{ alreadyProcessed: boolean }>();
+    mockedQuery.completePurchase.mockReturnValueOnce(backend.promise);
+    const owner = await mountOwner();
+    await owner.handle.value?.purchase(creditPack);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      owner.renderer.unmount();
+      await Promise.resolve();
+    });
+    backend.reject(new Error('the receipt could not be completed'));
+    await flushPromises();
+    expect(mockedToasts.error).not.toHaveBeenCalled();
+  });
+
+  it('requires explicit Buy again consent after an empty iOS reconciliation', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    const reopened = await mountOwner();
+    await reopened.handle.value?.purchase(creditPack);
+    expect(reopened.handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    const consented = reopened.handle.value?.buyAgain(creditPack);
+    expect(await reopened.handle.value?.buyAgain(creditPack)).toBe(false);
+    await consented;
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('never starts a charge from reconciliation after the retained intent disappeared', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+    await handle.value?.reconcilePurchase();
+    expect(mockedIap.requestPurchase).not.toHaveBeenCalled();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+  });
+
+  it('does not start a consented purchase if the auth epoch changes during retirement', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    const reopened = await mountOwner();
+    await reopened.handle.value?.reconcilePurchase();
+    const consented = reopened.handle.value?.buyAgain(creditPack);
+    bumpAuthEpoch();
+    expect(await consented).toBe(false);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('credits a late old delivery once without settling the new consented request', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    const reopened = await mountOwner();
+    await reopened.handle.value?.purchase(creditPack);
+    await reopened.handle.value?.buyAgain(creditPack);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionDate: Date.now() + 1000 }));
+    await flushPromises();
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionDate: Date.now() + 1000 }));
+    await flushPromises();
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    // The delivery names this row's product, so the row's progress ends even
+    // though the outcome could not be attributed; the barrier stays.
+    expect(reopened.handle.value?.completingProductId).toBeNull();
+    expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+    expect(reopened.handle.value?.completedPurchaseCount).toBe(1);
+  });
+
+  it('does not auto-release a dispatched Play intent after empty reconciliation', async () => {
+    mockedPlatform.OS = 'android';
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    const reopened = await mountOwner();
+    await reopened.handle.value?.purchase(creditPack);
+    await reopened.handle.value?.purchase(creditPack);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    expect(reopened.handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+  });
+
+  it('allows another purchase after the captured native call throws before dispatch', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockImplementationOnce(() => {
+      throw new Error('native dispatch rejected');
+    });
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains an unresolved charge across empty reconciliation and route remount', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const native = Promise.withResolvers<null>();
+    mockedIap.requestPurchase.mockReturnValueOnce(native.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const first = await mountOwner();
+      const result = first.handle.value?.purchase(creditPack);
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await result).toBe(false);
+      await first.handle.value?.purchase(creditPack);
+      await first.handle.value?.purchase(creditPack);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        first.renderer.unmount();
+        await Promise.resolve();
+      });
+      const second = await mountOwner();
+      await second.handle.value?.purchase(creditPack50);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('binds the native returned transaction to the captured request', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockResolvedValueOnce(
+      createPurchase({ appAccountToken: null, transactionDate: 1 })
+    );
+    const { handle } = await mountOwner();
+    await handle.value?.purchase(creditPack);
+    await flushPromises();
+    expect(handle.value?.completedPurchaseCount).toBe(1);
+    await handle.value?.purchase(creditPack);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an identified but uncompleted transaction admitted through empty retries', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedQuery.completePurchase.mockRejectedValue(new Error('receipt transport dropped'));
+    const { handle } = await mountOwner();
+    await handle.value?.purchase(creditPack);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
+    await handle.value?.purchase(creditPack);
+    await handle.value?.purchase(creditPack);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles the row but not the barrier for an uncorrelated old same-product delivery', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+    await handle.value?.purchase(creditPack);
+    mockedIap.handlers?.onPurchaseSuccess(
+      createPurchase({
+        transactionId: 'old-unrelated-transaction',
+        transactionDate: Date.now() + 1000,
+      })
+    );
+    await flushPromises();
+    // The delivery names this row's product, so its progress ends; the barrier
+    // stays because the credit may not be this request's charge.
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+    mockedIap.handlers?.onPurchaseError({ code: 'user-cancelled', productId: APPLE_PRODUCT_ID });
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a newer different-product request pending after an old listener error', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [
+        { appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' },
+        { appleProductId: CREDIT_PACK_50, googleProductId: 'credits_usd50' },
+      ],
+    };
+    const { handle } = await mountOwner();
+    await handle.value?.purchase(creditPack);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    await handle.value?.purchase(creditPack50);
+    mockedIap.handlers?.onPurchaseError({
+      code: 'user-cancelled',
+      productId: APPLE_PRODUCT_ID,
+    });
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBe(CREDIT_PACK_50);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('admits reconciliation visibly and renders its timeout failure inline', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(Promise.withResolvers<null>().promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      const initial = handle.value?.purchase(creditPack);
+      await vi.advanceTimersByTimeAsync(16_000);
+      await initial;
+      mockedIap.getAvailablePurchases.mockReturnValue(Promise.withResolvers<Purchase[]>().promise);
+      handle.value?.clearError();
+      const retry = handle.value?.purchase(creditPack);
+      await flushPromises();
+      expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+      await handle.value?.purchase(creditPack);
+      expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(16_000);
+      await retry;
+      await flushPromises();
+      expect(handle.value?.errorMessageKey).toBe('credits.storeTimedOut');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds a dispatched request whose native outcome never arrives', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+      const { handle } = await mountOwner();
+      const pending = handle.value?.purchase(creditPack);
+      await flushPromises();
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await flushPromises();
+      expect(handle.value?.completingProductId).toBeNull();
+      // The sheet can still be open, so the row waits instead of failing.
+      expect(handle.value?.errorMessageKey).toBeNull();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'store',
+      });
+      await handle.value?.purchase(creditPack);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for a sheet that outlives the deadline, then credits it once', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const native = Promise.withResolvers<Purchase | null>();
+    mockedIap.requestPurchase.mockReturnValueOnce(native.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      const initial = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await initial).toBe(false);
+      await flushPromises();
+
+      // The sheet may still be open: the screen says so and nothing failed.
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'store',
+      });
+      expect(handle.value?.errorMessageKey).toBeNull();
+
+      native.resolve(createPurchase());
+      await flushPromises();
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      expect(handle.value?.completedPurchaseCount).toBe(1);
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.purchaseWait).toBeNull();
+      expect(handle.value?.errorMessageKey).toBeNull();
+    } finally {
+      native.resolve(null);
+      await flushPromises();
+      vi.useRealTimers();
+    }
+  });
+
+  it('releases a request the store cancels after the deadline without leaving an error', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const native = Promise.withResolvers<Purchase | null>();
+    mockedIap.requestPurchase.mockReturnValueOnce(native.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      const initial = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await initial).toBe(false);
+      await flushPromises();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'store',
+      });
+
+      native.reject({ code: 'user-cancelled', message: 'the sheet was cancelled late' });
+      await flushPromises();
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.purchaseWait).toBeNull();
+      expect(handle.value?.errorMessageKey).toBeNull();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+    } finally {
+      native.resolve(null);
+      await flushPromises();
+      vi.useRealTimers();
+    }
+  });
+
+  it('forgets a pool the store cleaned up, so no later request is ambiguous', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    // The first request's promise never settles, so it stays the pool's member
+    // and would make every later outcome ambiguous.
+    const first = Promise.withResolvers<Purchase | null>();
+    mockedIap.requestPurchase.mockReturnValueOnce(first.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle, renderer } = await mountOwner();
+      const pending = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await flushPromises();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+
+      // The store reconnects: whatever its pool held is gone.
+      mockedIap.connected = true;
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+
+      // A consented request is now the pool's only member, so its own result
+      // is attributed and retires the barrier.
+      const second = Promise.withResolvers<Purchase[] | null>();
+      mockedIap.requestPurchase.mockReturnValueOnce(second.promise);
+      expect(await handle.value?.purchase(creditPack)).toBe(false);
+      await flushPromises();
+      const consented = handle.value?.buyAgain(creditPack);
+      await flushPromises();
+      second.resolve([createPurchase({ transactionId: 'tx-after-reconnect' })]);
+      await consented;
+      await flushPromises();
+
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.completingProductId).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the dispatch pool when a listener-credited request retires, so the next purchase is unambiguous', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockResolvedValue(null);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      expect(await handle.value?.purchase(creditPack)).toBe(true);
+      await flushPromises();
+      mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-first' }));
+      await flushPromises();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.completingProductId).toBeNull();
+
+      // The second purchase needs no consent and its own delivery settles it
+      // without a timer advancing.
+      expect(await handle.value?.purchase(creditPack)).toBe(true);
+      await flushPromises();
+      mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-second' }));
+      await flushPromises();
+
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(2);
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.errorMessageKey).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows an earlier barrier as soon as the screen remounts', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    const first = await mountOwner();
+    void first.handle.value?.purchase(creditPack);
+    await flushPromises();
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+
+    const reopened = await mountOwner();
+    await flushPromises();
+    expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+    expect(reopened.handle.value?.purchaseResolution).toBe('unknown');
+  });
+
+  it("does not inherit another account's barrier on a remount", async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const first = await mountOwner();
+      const pending = first.handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await flushPromises();
+      expect(first.handle.value?.hasUnresolvedPurchase).toBe(true);
+      await act(async () => {
+        first.renderer.unmount();
+        await Promise.resolve();
+      });
+
+      // Another account signs in before this screen mounts.
+      mockedQuery.serverProductsData = {
+        appAccountToken: '11111111-2222-3333-4444-555555555555',
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      const reopened = await mountOwner();
+      await flushPromises();
+      expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(reopened.handle.value?.purchaseWait).toBeNull();
+      expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not inherit a barrier when the other account token arrives after an empty render', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const first = await mountOwner();
+      const pending = first.handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await act(async () => {
+        first.renderer.unmount();
+        await Promise.resolve();
+      });
+
+      mockedQuery.serverProductsData = undefined;
+      const reopened = await mountOwner();
+      await flushPromises();
+      expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+
+      mockedQuery.serverProductsData = {
+        appAccountToken: '11111111-2222-3333-4444-555555555555',
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      await act(async () => {
+        reopened.renderer.update(ownerElement(reopened.handle));
+        await Promise.resolve();
+      });
+      expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps its own barrier on a remount with the same account token', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const first = await mountOwner();
+      const pending = first.handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await act(async () => {
+        first.renderer.unmount();
+        await Promise.resolve();
+      });
+
+      const reopened = await mountOwner();
+      await flushPromises();
+      expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the barrier when the catalogue token arrives after an empty first render', async () => {
+    // A barrier admitted under this account survives a remount whose first
+    // renders have no catalogue answer (and so no account token).
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    const first = await mountOwner();
+    void first.handle.value?.purchase(creditPack);
+    await flushPromises();
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+
+    mockedQuery.serverProductsData = undefined;
+    const reopened = await mountOwner();
+    await flushPromises();
+    expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+
+    // The catalogue answers with the same account: still the same barrier.
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    await act(async () => {
+      reopened.renderer.update(ownerElement(reopened.handle));
+      await Promise.resolve();
+    });
+    expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+  });
+
+  it('drops the barrier on a sign-out and sign-in with another account and posts nothing under it', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle, renderer } = await mountOwner();
+      const first = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await first).toBe(false);
+      await flushPromises();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+
+      // The same account with a new auth epoch is still the same account: the
+      // barrier stays, because the charge is still this account's.
+      bumpAuthEpoch();
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+
+      // Sign-out: the token goes empty, then the other account answers.
+      mockedQuery.serverProductsData = undefined;
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+      mockedQuery.serverProductsData = {
+        appAccountToken: '11111111-2222-3333-4444-555555555555',
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      bumpAuthEpoch();
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.purchaseWait).toBeNull();
+      // Nothing was credited or refused for the account that left.
+      expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the pool with a refused request, so the consented charge retires the barrier', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    // The store answers no purchase on the request promise (iOS returns null),
+    // so the request keeps its place in the pool until it is refused.
+    mockedIap.requestPurchase.mockResolvedValue(null);
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+    mockedQuery.completePurchase.mockRejectedValueOnce(
+      new Error('This store purchase has been refunded, so Kilo cannot credit it.')
+    );
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-a' }));
+    await flushPromises();
+    expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+    expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+
+    // The consented request is then the pool's only member, so its own delivery
+    // is attributed and retires the barrier.
+    mockedQuery.completePurchase.mockResolvedValue({ alreadyProcessed: false });
+    const consented = handle.value?.buyAgain(creditPack);
+    await flushPromises();
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-b' }));
+    await consented;
+    await flushPromises();
+
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('handles the request error when the reconnect it triggers fails', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'not-prepared',
+      message: 'Billing client not ready',
+    });
+    mockedIap.reconnect.mockRejectedValueOnce(new Error('reconnect failed'));
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.errorMessageKey).not.toBeNull();
+
+    // The failed request still left the pool, so the next one's own delivery is
+    // attributed and retires the barrier.
+    mockedIap.requestPurchase.mockResolvedValueOnce(null);
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-after-reconnect' }));
+    await flushPromises();
+
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+  });
+
+  it('keeps the consent when buy again runs without an account token', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedQuery.completePurchase.mockRejectedValue(
+      new Error('This store purchase has been refunded, so Kilo cannot credit it.')
+    );
+    const { handle, renderer } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+
+    // The catalogue drops back to "no account token" (a refetch, a sign-out):
+    // a consent must not be spent on a request that cannot carry the account.
+    mockedQuery.serverProductsData = undefined;
+    await act(async () => {
+      renderer.update(ownerElement(handle));
+      await Promise.resolve();
+    });
+    expect(await handle.value?.buyAgain(creditPack)).toBe(false);
+    expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the barrier when the account changes', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle, renderer } = await mountOwner();
+      const first = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await first).toBe(false);
+      await flushPromises();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+
+      mockedQuery.serverProductsData = {
+        appAccountToken: '11111111-2222-3333-4444-555555555555',
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      bumpAuthEpoch();
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.purchaseWait).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('credits a delivery that arrives only through the listener and retires its barrier', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    // The store answers no purchase on the request promise (iOS returns null)
+    // and delivers the charge through the purchase listener instead.
+    mockedIap.requestPurchase.mockResolvedValueOnce(null);
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+    expect(handle.value?.errorMessageKey).toBeNull();
+  });
+
+  it("consents to the pack a row tap selects, not the earlier request's id", async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [
+        { appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' },
+        { appleProductId: CREDIT_PACK_50, googleProductId: 'credits_usd50' },
+      ],
+    };
+    // A receipt the backend refuses for good: the charge can never be credited.
+    mockedQuery.completePurchase.mockRejectedValue(
+      new Error('This store purchase has been refunded, so Kilo cannot credit it.')
+    );
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+
+    // The person picks another pack; consent names that pack from then on.
+    expect(await handle.value?.purchase(creditPack50)).toBe(false);
+    await flushPromises();
+    expect(handle.value?.buyAgainProductId).toBe(CREDIT_PACK_50);
+    await handle.value?.buyAgain(creditPack50);
+    await flushPromises();
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the pending copy when the outcome deadline passes', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockResolvedValueOnce(
+      createPurchase({ purchaseState: 'pending', transactionId: 'tx-pending' })
+    );
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      expect(await handle.value?.purchase(creditPack)).toBe(true);
+      await flushPromises();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'pending',
+      });
+
+      await vi.advanceTimersByTimeAsync(16_000);
+      await flushPromises();
+
+      // The store answered; the deadline cannot replace that answer, and the
+      // row itself is released while the barrier stays.
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'pending',
+      });
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+      expect(handle.value?.errorMessageKey).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('names a pending payment instead of a store timeout', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'pending',
+      message: 'Purchase is pending',
+    });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      expect(await handle.value?.purchase(creditPack)).toBe(false);
+      await flushPromises();
+
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'pending',
+      });
+      expect(handle.value?.errorMessageKey).toBeNull();
+      expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+
+      // Past the deadline the row is released and the pending copy stays.
+      await vi.advanceTimersByTimeAsync(16_000);
+      await flushPromises();
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'pending',
+      });
+      expect(handle.value?.errorMessageKey).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('names a deferred payment instead of a store timeout', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'deferred-payment',
+      message: 'Waiting for approval',
+    });
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
+    await flushPromises();
+
+    expect(handle.value?.purchaseWait).toEqual({
+      productId: APPLE_PRODUCT_ID,
+      kind: 'pending',
+    });
+    expect(handle.value?.errorMessageKey).toBeNull();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+  });
+
+  it('ignores a request timeout after its account epoch has ended', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(Promise.withResolvers<null>().promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      const initial = handle.value?.purchase(creditPack);
+      await flushPromises();
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+      bumpAuthEpoch();
+      await vi.advanceTimersByTimeAsync(16_000);
+      await initial;
+      await flushPromises();
+      expect(handle.value?.errorMessageKey).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels the outcome deadline after an identified native completion', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const native = Promise.withResolvers<Purchase | null>();
+    mockedIap.requestPurchase.mockReturnValueOnce(native.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      const initial = handle.value?.purchase(creditPack);
+      await flushPromises();
+      native.resolve(createPurchase());
+      await flushPromises();
+      expect(handle.value?.completedPurchaseCount).toBe(1);
+      await vi.advanceTimersByTimeAsync(16_000);
+      await initial;
+      mockedIap.requestPurchase.mockResolvedValueOnce(
+        createPurchase({ purchaseState: 'pending', transactionId: 'tx-next-after-deadline' })
+      );
+      expect(await handle.value?.purchase(creditPack)).toBe(true);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+      expect(mockedIap.getAvailablePurchases).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('is the single useIAP call site and renders its children with a purchase callback', async () => {
     const { handle } = await mountOwner();
 
-    expect(mockedIap.useIAP).toHaveBeenCalledTimes(1);
+    // The provider owns the call site; it renders once per state update, and
+    // the admission read adds one after mount, so the count is not a mount count.
+    expect(mockedIap.useIAP).toHaveBeenCalled();
+    expect(mockedIap.handlers).not.toBeNull();
     expect(handle.value).not.toBeNull();
     expect(typeof handle.value?.purchase).toBe('function');
     expect(typeof handle.value?.fetchStoreProducts).toBe('function');
@@ -254,15 +1379,13 @@ describe('CreditNativeIapOwner', () => {
     await flushPromises();
     expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
 
-    // Play delivers the slow test card's purchase as `pending` first. It must
-    // release the request without a failure, leaving the store transaction for
-    // the later approval, and must not post the token or finish it.
+    // A pending charge retains admission until its approved transaction completes.
     mockedIap.handlers?.onPurchaseSuccess(createPurchase({ purchaseState: 'pending' }));
     await flushPromises();
 
     expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
     expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
-    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
     expect(handle.value?.errorMessageKey).toBeNull();
     expect(handle.value?.completedPurchaseCount).toBe(0);
 
@@ -282,19 +1405,156 @@ describe('CreditNativeIapOwner', () => {
       appAccountToken: APP_ACCOUNT_TOKEN,
       products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
     };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'pending',
+      message: 'Purchase is pending',
+    });
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
+    await flushPromises();
+
+    expect(handle.value?.errorMessageKey).toBeNull();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+  });
+
+  it('a store call that never settles releases the row after the deadline and waits instead of failing', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      mockedQuery.serverProductsData = {
+        appAccountToken: APP_ACCOUNT_TOKEN,
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      const { handle } = await mountOwner();
+      // A store that never answers is what the deadline bounds.
+      mockedIap.requestPurchase.mockReturnValue(new Promise(() => undefined));
+
+      const started = handle.value?.purchase(creditPack);
+      await flushPromises();
+      expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+        await Promise.resolve();
+      });
+      expect(await started).toBe(false);
+
+      // The row is released, and the screen says the store has not answered:
+      // no failure, because the sheet can still be open.
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.errorMessageKey).toBeNull();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'store',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('buying a timed-out pack again reconciles first and never charges a second time', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      mockedQuery.serverProductsData = {
+        appAccountToken: APP_ACCOUNT_TOKEN,
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      const { handle } = await mountOwner();
+      mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+
+      const first = handle.value?.purchase(creditPack);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+        await Promise.resolve();
+      });
+      expect(await first).toBe(false);
+      expect(mockedIap.getAvailablePurchases).not.toHaveBeenCalled();
+
+      // The person taps the same pack again. The store cannot be told to cancel
+      // the earlier request, so the owner looks for what it still holds instead
+      // of charging again.
+      await flushPromises();
+      expect(await handle.value?.purchase(creditPack)).toBe(false);
+      await flushPromises();
+
+      expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+      expect(handle.value?.completingProductId).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('credits a late unidentified success but still requires consent before another charge', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      mockedQuery.serverProductsData = {
+        appAccountToken: APP_ACCOUNT_TOKEN,
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      const { handle } = await mountOwner();
+      mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+
+      const first = handle.value?.purchase(creditPack);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+        await Promise.resolve();
+      });
+      expect(await first).toBe(false);
+      expect(handle.value?.completingProductId).toBeNull();
+
+      vi.useRealTimers();
+      // The store lands the charge after the row was released: the delivery is
+      // not the owner's request any more, so recovery completes it.
+      mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+      await flushPromises();
+
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.completedPurchaseCount).toBe(1);
+
+      expect(await handle.value?.purchase(creditPack)).toBe(false);
+      expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+      expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+      mockedIap.requestPurchase.mockResolvedValueOnce(
+        createPurchase({ purchaseState: 'pending', transactionId: 'tx-consented-retry' })
+      );
+      expect(await handle.value?.buyAgain(creditPack)).toBe(true);
+      expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a delivery for another product does not release the pending request', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [
+        { appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' },
+        { appleProductId: CREDIT_PACK_50, googleProductId: 'credits_usd50' },
+      ],
+    };
     const { handle } = await mountOwner();
 
     expect(await handle.value?.purchase(creditPack)).toBe(true);
     await flushPromises();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
 
-    // The SDK reports a deferred/pending payment through the error channel; it
-    // is a state to wait out, so the request is released with no copy.
-    mockedIap.handlers?.onPurchaseError({ code: 'pending', message: 'Purchase is pending' });
+    // A transaction for the other pack arrives while this one is pending.
+    mockedIap.handlers?.onPurchaseSuccess(
+      createPurchase({ productId: CREDIT_PACK_50, transactionId: 'tx-other-pack' })
+    );
     await flushPromises();
 
-    expect(handle.value?.errorMessageKey).toBeNull();
+    // It is completed as recovery, and the pending row stays pending.
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
     expect(handle.value?.completingProductId).toBeNull();
-    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
   });
 
   it('recovers an unfinished purchase once per transaction', async () => {
@@ -312,12 +1572,15 @@ describe('CreditNativeIapOwner', () => {
     expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
     expect(mockedQuery.invalidateQueries).toHaveBeenCalled();
 
-    // A second store lookup returning the same transaction must not complete it
-    // again: the recovered transaction id is remembered.
-    mockedQuery.serverProductsData = {
-      appAccountToken: APP_ACCOUNT_TOKEN,
-      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
-    };
+    // The store reconnects and its lookup still returns the same transaction:
+    // it must not be completed again, because the recovered transaction id is
+    // remembered. A render alone does not re-run the pass.
+    mockedIap.connected = false;
+    await act(async () => {
+      renderer.update(ownerElement(handle));
+      await Promise.resolve();
+    });
+    mockedIap.connected = true;
     await act(async () => {
       renderer.update(ownerElement(handle));
       await Promise.resolve();
@@ -431,15 +1694,12 @@ describe('CreditNativeIapOwner', () => {
       appAccountToken: APP_ACCOUNT_TOKEN,
       products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
     };
-    const { handle } = await mountOwner();
-
-    expect(await handle.value?.purchase(creditPack)).toBe(true);
-    await flushPromises();
-
-    mockedIap.handlers?.onPurchaseError({
+    mockedIap.requestPurchase.mockRejectedValueOnce({
       code: 'billing-unavailable',
       message: 'Play Store service is not connected',
     });
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
     await flushPromises();
 
     expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
@@ -505,24 +1765,19 @@ describe('CreditNativeIapOwner', () => {
     await flushPromises();
     expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
 
-    // A store error releases that request while its completion is still in
-    // flight, and the user starts a different pack.
+    // An unrelated listener error cannot release a charge still completing.
     mockedIap.handlers?.onPurchaseError({
       code: 'billing-unavailable',
       message: 'Play Store service is not connected',
     });
     await flushPromises();
-    expect(handle.value?.completingProductId).toBeNull();
-
-    expect(await handle.value?.purchase(creditPack50)).toBe(true);
-    await flushPromises();
-    expect(handle.value?.completingProductId).toBe(CREDIT_PACK_50);
-
-    // The stale completion resolves: its finalizer owns the released request and
-    // must not clear the newer one.
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+    expect(await handle.value?.purchase(creditPack50)).toBe(false);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
     staleCompletion.resolve({ alreadyProcessed: false });
     await flushPromises();
-
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(await handle.value?.purchase(creditPack50)).toBe(true);
     expect(handle.value?.completingProductId).toBe(CREDIT_PACK_50);
   });
 
@@ -532,12 +1787,12 @@ describe('CreditNativeIapOwner', () => {
       appAccountToken: APP_ACCOUNT_TOKEN,
       products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
     };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'already-owned',
+      message: 'Item already owned',
+    });
     const { handle } = await mountOwner();
-
-    expect(await handle.value?.purchase(creditPack)).toBe(true);
-    await flushPromises();
-
-    mockedIap.handlers?.onPurchaseError({ code: 'already-owned', message: 'Item already owned' });
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
     await flushPromises();
 
     // "Already owned" is not proof of another account: the outstanding
@@ -553,12 +1808,8 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value?.completedPurchaseCount).toBe(1);
   });
 
-  it('shares one already-owned recovery between the error listener and the request rejection', async () => {
-    // The store reports one `AlreadyOwned` failure through both channels: the
-    // error listener fires and the purchase request rejects. Both call
-    // `recoverOwnedCreditPurchase`, which must run one pass and give both the
-    // same result — otherwise the rejection path sees the listener's deduped
-    // `false` and shows the generic failure after the success was announced.
+  it('ignores an already-owned listener while the captured request rejection recovers', async () => {
+    // Only the captured rejection owns recovery; an uncorrelated duplicate is ignored.
     mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,
@@ -579,10 +1830,7 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value?.errorMessageKey).toBeNull();
   });
 
-  it('shares one already-owned recovery when the request rejection starts it first', async () => {
-    // The reverse order: the rejection starts the recovery, which is still
-    // waiting on the store when the listener delivers the same failure. The
-    // listener must join that in-flight pass instead of opening a second one.
+  it('recovers once when an uncorrelated listener follows the captured request rejection', async () => {
     const pendingLookup = Promise.withResolvers<Purchase[]>();
     mockedIap.getAvailablePurchases.mockReturnValueOnce(pendingLookup.promise);
     mockedQuery.serverProductsData = {
@@ -612,9 +1860,7 @@ describe('CreditNativeIapOwner', () => {
 
   it('gives up on a lookup that never answers and retries the next already-owned attempt', async () => {
     // The store accepts the first `AlreadyOwned` lookup and never answers it.
-    // The pass must time out, release its single-flight slot, and let the next
-    // attempt run a fresh lookup instead of pinning recovery for the life of
-    // the mount.
+    // The pass must time out and let the next attempt run a fresh lookup.
     const hungLookup = Promise.withResolvers<Purchase[]>();
     mockedIap.getAvailablePurchases.mockReturnValueOnce(hungLookup.promise);
     mockedQuery.serverProductsData = {
@@ -664,7 +1910,7 @@ describe('CreditNativeIapOwner', () => {
     }
   });
 
-  it('keeps the backend ownership refusal when both triggers recover one already-owned failure', async () => {
+  it('keeps the backend ownership refusal when an uncorrelated listener repeats the rejection', async () => {
     mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,
@@ -790,7 +2036,7 @@ describe('CreditNativeIapOwner', () => {
       purchase: expect.objectContaining({ productId: APPLE_PRODUCT_ID }),
       isConsumable: true,
     });
-    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
   });
 
   describe('when Play dropped its billing client after connecting', () => {
@@ -897,11 +2143,9 @@ describe('CreditNativeIapOwner', () => {
         appAccountToken: APP_ACCOUNT_TOKEN,
         products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
       };
+      mockedIap.requestPurchase.mockRejectedValueOnce(notReady);
       const { handle } = await mountOwner();
-
-      expect(await handle.value?.purchase(creditPack)).toBe(true);
-      await flushPromises();
-      mockedIap.handlers?.onPurchaseError(notReady);
+      expect(await handle.value?.purchase(creditPack)).toBe(false);
       await flushPromises();
 
       // The request never reached the store: it is released with the generic

@@ -335,13 +335,31 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
-  it('disables the dismissal CTA and shows the persistence-failure copy after a non-retryable error', () => {
+  it('keeps the dismissal CTA live for a ledger persistence failure, whose copy invites the retry', () => {
     dismiss.isError = true;
     dismiss.error = mapSecurityDismissOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    // The key was rotated, so a resubmit is a fresh intent; leaving the CTA
+    // down would give the reader "try again later" with no way to try.
+    expect(buttonDisabled(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
+  });
+
+  it('keeps the CTA live when a stored draft predates the retry rule', () => {
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: PERSISTENCE_FAILED_MESSAGE,
+      lastErrorKey: null,
+      retryable: false,
+    };
+
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(false);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
@@ -500,9 +518,37 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       retryable: false,
     });
   });
+
+  it('reopening after a terminal rejection shows the stored copy and keeps the CTA down', () => {
+    // The rejection happened before a command id existed, so only the durable
+    // draft records it; the reopened sheet has no live mutation error.
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: CONFIGURATION_COPY,
+      lastErrorKey: null,
+      retryable: false,
+    };
+
+    const root = renderScreen();
+
+    expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
+    expect(buttonDisabled(root.root)).toBe(true);
+
+    // Choosing a reason is a new intent but not a new request: resubmitting the
+    // same unrecoverable dismissal cannot succeed, so the CTA stays down.
+    selectReason();
+    expect(buttonDisabled(root.root)).toBe(true);
+  });
 });
 
 describe('DismissFindingScreen draft persistence on type', () => {
+  beforeEach(() => {
+    dismissDraft.draft = null;
+    dismissDraft.hydrated = true;
+    dismissDraft.persist.mockClear();
+  });
+
   it('persists the reason as a draft on selection', () => {
     renderScreen();
     selectReason();

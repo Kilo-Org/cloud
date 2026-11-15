@@ -234,6 +234,26 @@ function ownerFromColumns(columns: {
     : { kind: 'shared_services', organizationId: columns.organization_id };
 }
 
+/**
+ * Puts a payer row into the removed state. The columns that retire a row live
+ * here, so every path that retires one writes the same set.
+ */
+async function retireClaudeBillingConnection(
+  onDb: DrizzleConnection,
+  connectionId: string
+): Promise<void> {
+  await onDb
+    .update(claude_billing_connections)
+    .set({
+      status: ClaudeBillingConnectionStatus.Removed,
+      connection_id: null,
+      connected_at: null,
+      last_refusal_code: null,
+      last_refusal_at: null,
+    })
+    .where(eq(claude_billing_connections.id, connectionId));
+}
+
 async function freeClaudeBillingOwnerColumns(
   owner: ClaudeBillingOwner,
   exceptPayerId: string | null,
@@ -266,16 +286,7 @@ async function freeClaudeBillingOwnerColumns(
     return;
   }
 
-  await onDb
-    .update(claude_billing_connections)
-    .set({
-      status: ClaudeBillingConnectionStatus.Removed,
-      connection_id: null,
-      connected_at: null,
-      last_refusal_code: null,
-      last_refusal_at: null,
-    })
-    .where(eq(claude_billing_connections.id, occupant.id));
+  await retireClaudeBillingConnection(onDb, occupant.id);
 }
 
 export async function insertClaudeBillingProfile(
@@ -475,16 +486,7 @@ export async function removeClaudeBillingGrant(
     const remaining = await selectNextActiveGrant(tx, connection.id);
 
     if (!remaining) {
-      await tx
-        .update(claude_billing_connections)
-        .set({
-          status: ClaudeBillingConnectionStatus.Removed,
-          connection_id: null,
-          connected_at: null,
-          last_refusal_code: null,
-          last_refusal_at: null,
-        })
-        .where(eq(claude_billing_connections.id, connection.id));
+      await retireClaudeBillingConnection(tx, connection.id);
       return { id: connection.id, userProfileId: connection.user_profile_id };
     }
 

@@ -7,8 +7,14 @@ import android.util.Log
 import com.facebook.react.HeadlessJsTaskService
 
 /**
- * Starts the headless approve task when the ongoing notification's Approve
- * action is tapped.
+ * The headless approve transport that an older build's Approve action reaches.
+ *
+ * Current cards approve through `ApprovalGate`, which sends the tap to
+ * `ActiveAgentsApprovalActivity` and starts the approval from there; no source
+ * in this module mints an Intent or PendingIntent naming this receiver. The pair
+ * stays because a PendingIntent an older build minted survives the update: a
+ * card that build posted can still be tapped, and its Approve must answer as it
+ * did then.
  *
  * Not exported: the action's PendingIntent is this app's own, so no other app
  * has to reach the receiver, and a locked phone needs no Activity to answer.

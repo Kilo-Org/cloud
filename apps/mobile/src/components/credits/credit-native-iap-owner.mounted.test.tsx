@@ -739,27 +739,45 @@ describe('CreditNativeIapOwner', () => {
       appAccountToken: APP_ACCOUNT_TOKEN,
       products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
     };
-    const never = Promise.withResolvers<Purchase | null>();
-    mockedIap.requestPurchase.mockReturnValueOnce(never.promise);
-    const { handle } = await mountOwner();
-    const first = handle.value?.purchase(creditPack);
-    await flushPromises();
-    never.reject({ code: 'service-disconnected', message: 'connection cleanup' });
-    expect(await first).toBe(false);
-    await flushPromises();
+    // The first request's promise never settles, so it stays the pool's member
+    // and would make every later outcome ambiguous.
+    const first = Promise.withResolvers<Purchase | null>();
+    mockedIap.requestPurchase.mockReturnValueOnce(first.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle, renderer } = await mountOwner();
+      const pending = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toBe(false);
+      await flushPromises();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
 
-    // The store dropped its connection, so its pool is empty and a new
-    // request's delivery is attributed instead of ambiguous.
-    mockedIap.requestPurchase.mockResolvedValueOnce(createPurchase({ transactionId: 'tx-after' }));
-    expect(await handle.value?.purchase(creditPack)).toBe(false);
-    await flushPromises();
-    const consented = handle.value?.buyAgain(creditPack);
-    await flushPromises();
-    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-after' }));
-    await consented;
-    await flushPromises();
-    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
-    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      // The store reconnects: whatever its pool held is gone.
+      mockedIap.connected = true;
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+
+      // A consented request is now the pool's only member, so its own result
+      // is attributed and retires the barrier.
+      const second = Promise.withResolvers<Purchase[] | null>();
+      mockedIap.requestPurchase.mockReturnValueOnce(second.promise);
+      expect(await handle.value?.purchase(creditPack)).toBe(false);
+      await flushPromises();
+      const consented = handle.value?.buyAgain(creditPack);
+      await flushPromises();
+      second.resolve([createPurchase({ transactionId: 'tx-after-reconnect' })]);
+      await consented;
+      await flushPromises();
+
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.completingProductId).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows an earlier barrier as soon as the screen remounts', async () => {

@@ -32,15 +32,6 @@ const WARNING_KEYS = {
   credited: 'credits.unresolvedPurchaseCredited',
 } as const satisfies Record<CreditPurchaseResolution, string>;
 
-/** Every variant the notice can paint, in the order the reserve lays them out. */
-const CREDIT_PURCHASE_RESOLUTIONS = [
-  'unknown',
-  'found',
-  'not-found',
-  'terminal-refusal',
-  'credited',
-] as const satisfies readonly CreditPurchaseResolution[];
-
 type CreditUnresolvedPurchaseNoticeProps = {
   /** What the store holds for the earlier request, which picks the copy. */
   resolution: CreditPurchaseResolution;
@@ -52,6 +43,8 @@ type CreditUnresolvedPurchaseNoticeProps = {
   actionsDisabled: boolean;
   /** The owner selected a priced pack as the consented retry target. */
   buyAgainAvailable: boolean;
+  /** What the store has not answered yet, painted above the notice copy. */
+  waitCopy: string | null;
   onReconcile: () => void;
   onBuyAgain: () => void;
 };
@@ -152,6 +145,7 @@ export function CreditUnresolvedPurchaseNotice({
   priceLabel,
   actionsDisabled,
   buyAgainAvailable,
+  waitCopy,
   onReconcile,
   onBuyAgain,
 }: Readonly<CreditUnresolvedPurchaseNoticeProps>) {
@@ -165,44 +159,18 @@ export function CreditUnresolvedPurchaseNotice({
       className="rounded-xl border border-border bg-card p-5"
       testID="credit-unresolved-purchase"
     >
-      <View testID="credit-unresolved-purchase-slot">
-        <View
-          accessibilityElementsHidden
-          className="flex-row overflow-hidden opacity-0"
-          importantForAccessibility="no-hide-descendants"
-          pointerEvents="none"
-          testID="credit-unresolved-purchase-reserve"
-        >
-          {CREDIT_PURCHASE_RESOLUTIONS.map(candidate => (
-            <View key={candidate} className="w-full shrink-0">
-              <NoticeCopy
-                announce={false}
-                actionsDisabled={actionsDisabled}
-                buyAgainFirst={buyAgainFirst}
-                onBuyAgain={onBuyAgain}
-                onReconcile={onReconcile}
-                packLabel={packLabel}
-                priceLabel={priceLabel}
-                showBuyAgain
-                warning={t(WARNING_KEYS[candidate])}
-              />
-            </View>
-          ))}
-        </View>
-        <View className="absolute inset-0" testID="credit-unresolved-purchase-live">
-          <NoticeCopy
-            announce
-            actionsDisabled={actionsDisabled}
-            buyAgainFirst={buyAgainFirst}
-            onBuyAgain={onBuyAgain}
-            onReconcile={onReconcile}
-            packLabel={packLabel}
-            priceLabel={priceLabel}
-            showBuyAgain={buyAgainAvailable}
-            warning={t(WARNING_KEYS[resolution])}
-          />
-        </View>
-      </View>
+      {waitCopy !== null && <AccessibleStatus className="text-sm" message={waitCopy} />}
+      <NoticeCopy
+        announce
+        actionsDisabled={actionsDisabled}
+        buyAgainFirst={buyAgainFirst}
+        onBuyAgain={onBuyAgain}
+        onReconcile={onReconcile}
+        packLabel={packLabel}
+        priceLabel={priceLabel}
+        showBuyAgain={buyAgainAvailable}
+        warning={t(WARNING_KEYS[resolution])}
+      />
     </View>
   );
 }

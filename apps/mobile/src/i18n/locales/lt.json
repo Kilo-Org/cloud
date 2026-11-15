@@ -1572,7 +1572,7 @@
       "rerunAnalysis": "Paleisti analizę iš naujo",
       "capacityFull": "Pasiektas vienu metu vykdomų analizių limitas. Palauk, kol baigsis viena iš vykdomų analizių.",
       "couldNotCheckCapacity": "Nepavyko patikrinti, ar galima pradėti dar vieną analizę.",
-      "watchInCloudAgent": "Stebėti debesijos agente",
+      "watchInCloudAgent": "Stebėti „Cloud Agent“",
       "triageConfidence": "Pirminio vertinimo patikimumas",
       "suggestedAction": "Siūlomas veiksmas",
       "triageReasoning": "Pirminio vertinimo pagrindimas",
@@ -1772,7 +1772,7 @@
     },
     "analysisSettings": {
       "title": "Modeliai ir analizė",
-      "couldNotLoad": "Nepavyko įkelti analizės nustatymų.",
+      "couldNotLoad": "Nepavyko įkelti analizės nustatymų",
       "depth": "Analizės išsamumas",
       "triageModel": "Pirminio vertinimo modelis",
       "analysisModel": "Analizės modelis",
@@ -3079,7 +3079,7 @@
   },
   "screenHeader": {
     "openMenu": "Atidaryti meniu",
-    "openMenuFor": "Atidaryti {{title}} meniu"
+    "openMenuFor": "Atidaryti „{{title}}“ meniu"
   },
   "picker": {
     "optionsExpired": "Parinktys nebegalioja",

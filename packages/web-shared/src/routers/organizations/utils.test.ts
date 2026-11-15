@@ -875,9 +875,7 @@ describe('binary support organization access', () => {
 
     const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
     try {
-      await expect(ensureOrganizationAccess(middlewareCtx, organization.id)).resolves.toBe(
-        'admin'
-      );
+      await expect(ensureOrganizationAccess(middlewareCtx, organization.id)).resolves.toBe('admin');
       await expect(ensureOrganizationAccess(handlerCtx, organization.id)).resolves.toBe('admin');
       expect(requireFreshSpy).toHaveBeenCalledTimes(1);
     } finally {

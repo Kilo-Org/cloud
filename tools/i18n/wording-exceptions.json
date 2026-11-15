@@ -587,6 +587,7 @@
   "lt": [
     "analysis failed",
     "block",
+    "cancelled",
     "commit",
     "edit",
     "files",

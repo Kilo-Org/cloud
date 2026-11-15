@@ -240,9 +240,14 @@ export function CreditPurchaseScreen() {
               // drops them when initialization fails), so even a priced row
               // cannot complete: keep every row disabled until it reconnects.
               const disabled = purchasing || !connected || !hasStorePrice;
-              // The row's inactive cue is the title's and the price's ink, so
-              // the note under them keeps the ink it is read in.
-              const dimmedTextClass = disabled ? 'text-muted-foreground' : 'text-foreground';
+              // A disabled row recedes by its own labels, not by its whole
+              // surface: WCAG leaves an inactive control's label out of its
+              // contrast rule, so the title and the price are muted and then
+              // dimmed, while the expiry note under them states when the
+              // credits expire and keeps the muted ink at full strength.
+              // Halving the whole row put that note at 2.2:1 on the dark card
+              // and 2.1:1 on the light one.
+              const labelClass = disabled ? 'text-muted-foreground opacity-60' : 'text-foreground';
               // The trailing slot holds the store price only: it keeps its one
               // line and its full width, so the title yields and a price a user
               // pays is never truncated.
@@ -281,11 +286,13 @@ export function CreditPurchaseScreen() {
                 .join(', ');
 
               return (
-                // A disabled row dims by token, not by row opacity: halving
-                // the row lands the already-muted expiry note at 2.2:1 on the
-                // dark card and 2.1:1 on the light one, so the title and the
-                // price take the muted ink instead, which keeps 4.94:1 dark
-                // and 5.37:1 light.
+                // A disabled row dims its own labels, not its whole surface:
+                // the title and the price keep the muted ink and are dimmed,
+                // while the expiry note under them keeps that ink at full
+                // strength, because halving the row landed the already-muted
+                // note at 2.2:1 on the dark card and 2.1:1 on the light one.
+                // The row's shell, border, padding, accessibility label and
+                // accessibilityState do not change.
                 <Pressable
                   key={pack.backend.appleProductId}
                   accessibilityLabel={rowAccessibilityLabel}
@@ -298,15 +305,12 @@ export function CreditPurchaseScreen() {
                   }}
                 >
                   <View className="flex-row items-start justify-between gap-4">
-                    <Text className={cn('flex-1 font-semibold', dimmedTextClass)} numberOfLines={1}>
+                    <Text className={cn('flex-1 font-semibold', labelClass)} numberOfLines={1}>
                       {packLabel}
                     </Text>
                     {storePrice !== null && (
                       <Text
-                        className={cn(
-                          'shrink-0 text-base font-semibold tabular-nums',
-                          dimmedTextClass
-                        )}
+                        className={cn('shrink-0 text-base font-semibold tabular-nums', labelClass)}
                       >
                         {storePrice}
                       </Text>
@@ -321,7 +325,9 @@ export function CreditPurchaseScreen() {
                   {(expiryMessage !== undefined || stateLabel !== null) && (
                     <View className="mt-2 min-h-5 justify-center">
                       {stateLabel !== null ? (
-                        <Text className="text-sm text-muted-foreground">{stateLabel}</Text>
+                        <Text className="text-sm text-muted-foreground opacity-60">
+                          {stateLabel}
+                        </Text>
                       ) : (
                         <Text className="text-xs text-muted-foreground">{expiryMessage}</Text>
                       )}

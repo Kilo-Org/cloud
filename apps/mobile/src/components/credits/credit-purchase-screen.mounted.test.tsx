@@ -723,8 +723,8 @@ describe('CreditPurchaseScreen', () => {
     expect(rows).toHaveLength(4);
     // The card above is the one visible statement; no row repeats the status.
     expect(allText(renderer)).not.toContain('Price unavailable');
-    // The rows keep their disabled style, their pack title and their expiry
-    // note, and a screen reader still hears why each one is inactive.
+    // The rows keep their title and their expiry note, and a screen reader
+    // still hears why each one is inactive.
     const labels = rows.map(
       row => (row.props as { accessibilityLabel: string }).accessibilityLabel
     );
@@ -732,18 +732,15 @@ describe('CreditPurchaseScreen', () => {
       `Add ${packAmount('$10.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
     );
     expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
-    // The row dims by token, not by row opacity: it keeps its shell and drops
-    // `opacity-50`, its title and its price take the muted ink, and its one
-    // note line keeps that same ink at full strength.
+    // A disabled row recedes by its own labels rather than its whole surface:
+    // it keeps its shell and drops `opacity-50`, its pack title and its price
+    // keep the muted ink and are dimmed, while its one note line keeps that
+    // same ink at full strength so the expiry is still read.
     expect(
       classNamesOf(rows).every(
         classes => classes.includes(PACK_ROW_SHELL) && !classes.includes('opacity-50')
       )
     ).toBe(true);
-    const mutedInk = (instance: TestRenderer.ReactTestInstance): boolean => {
-      const className = classNameOf(instance);
-      return className.includes('text-muted-foreground') && !className.includes('text-foreground');
-    };
     expect(
       rows.every(row => {
         const head = row.children[0];
@@ -758,9 +755,19 @@ describe('CreditPurchaseScreen', () => {
         const lineTexts = line.findAll(node => String(node.type) === 'Text');
         return (
           headTexts.length > 0 &&
-          headTexts.every(text => mutedInk(text)) &&
+          headTexts.every(text => {
+            const className = classNameOf(text);
+            return className.includes('text-muted-foreground') && className.includes('opacity-60');
+          }) &&
           lineTexts.length === 1 &&
-          lineTexts.every(text => mutedInk(text))
+          lineTexts.every(text => {
+            const className = classNameOf(text);
+            return (
+              className.includes('text-xs') &&
+              className.includes('text-muted-foreground') &&
+              !className.includes('opacity-60')
+            );
+          })
         );
       })
     ).toBe(true);

@@ -838,6 +838,115 @@ describe('CreditNativeIapOwner', () => {
     expect(reopened.handle.value?.purchaseResolution).toBe('unknown');
   });
 
+  it('keeps the barrier when the catalogue token arrives after an empty first render', async () => {
+    // A barrier admitted under this account survives a remount whose first
+    // renders have no catalogue answer (and so no account token).
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    const first = await mountOwner();
+    void first.handle.value?.purchase(creditPack);
+    await flushPromises();
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+
+    mockedQuery.serverProductsData = undefined;
+    const reopened = await mountOwner();
+    await flushPromises();
+    expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+
+    // The catalogue answers with the same account: still the same barrier.
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    await act(async () => {
+      reopened.renderer.update(ownerElement(reopened.handle));
+      await Promise.resolve();
+    });
+    expect(reopened.handle.value?.hasUnresolvedPurchase).toBe(true);
+  });
+
+  it('drops the barrier on a sign-out and sign-in with another account and posts nothing under it', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle, renderer } = await mountOwner();
+      const first = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await first).toBe(false);
+      await flushPromises();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+
+      // The same account with a new auth epoch is still the same account: the
+      // barrier stays, because the charge is still this account's.
+      bumpAuthEpoch();
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+      expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+
+      // Sign-out: the token goes empty, then the other account answers.
+      mockedQuery.serverProductsData = undefined;
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+      mockedQuery.serverProductsData = {
+        appAccountToken: '11111111-2222-3333-4444-555555555555',
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      bumpAuthEpoch();
+      await act(async () => {
+        renderer.update(ownerElement(handle));
+        await Promise.resolve();
+      });
+
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+      expect(handle.value?.purchaseWait).toBeNull();
+      // Nothing was credited or refused for the account that left.
+      expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the consent when buy again runs without an account token', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedQuery.completePurchase.mockRejectedValue(
+      new Error('This store purchase has been refunded, so Kilo cannot credit it.')
+    );
+    const { handle, renderer } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+
+    // The catalogue drops back to "no account token" (a refetch, a sign-out):
+    // a consent must not be spent on a request that cannot carry the account.
+    mockedQuery.serverProductsData = undefined;
+    await act(async () => {
+      renderer.update(ownerElement(handle));
+      await Promise.resolve();
+    });
+    expect(await handle.value?.buyAgain(creditPack)).toBe(false);
+    expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+  });
+
   it('drops the barrier when the account changes', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

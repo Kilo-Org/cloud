@@ -39,13 +39,17 @@ export function currentCreditPurchaseIntent(): CreditPurchaseIntent | null {
  * epoch is dropped first: the barrier belongs to the session that started it.
  */
 export function admitCreditPurchaseIntent(productId: string, accountToken: string, epoch: number) {
-  // A session that did not admit this request never inherits it — but a request
-  // that already reached the store is never dropped silently: it is a charge.
-  if (
+  // A session that did not admit this request never inherits it. The account
+  // token is the identity that matters: an empty one means the catalogue has not
+  // answered yet and says nothing about whose request this is, while two
+  // different non-empty tokens are an account change — a charge that was
+  // admitted, or reserved, under the other account.
+  const accountChanged =
     intent !== null &&
-    !intent.dispatched &&
-    (intent.epoch !== epoch || intent.accountToken !== accountToken)
-  ) {
+    accountToken !== '' &&
+    intent.accountToken !== '' &&
+    intent.accountToken !== accountToken;
+  if (accountChanged) {
     intent = null;
   }
   if (intent !== null) {

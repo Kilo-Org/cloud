@@ -1312,16 +1312,23 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     [reconnectStore]
   );
 
-  // The barrier belongs to the session that admitted it: an account change
+  // The barrier belongs to the account that admitted it: an account change
   // makes the record, its pool and its pool's ambiguity meaningless, and a
-  // receipt must never be posted under the wrong account's token.
-  const accountScopeRef = useRef({ epoch: authEpochRef.current, token: appAccountToken });
+  // receipt must never be posted under the wrong account's token. An empty
+  // token is the catalogue still answering, not another account, so a
+  // transition from or to it keeps the barrier.
+  const accountTokenRef = useRef(appAccountToken);
   useEffect(() => {
-    const scope = accountScopeRef.current;
-    if (scope.epoch === authEpochRef.current && scope.token === appAccountToken) {
+    if (appAccountToken === '') {
+      // The catalogue has not named an account yet: that is no verdict, and it
+      // must not erase the token the barrier belongs to.
       return;
     }
-    accountScopeRef.current = { epoch: authEpochRef.current, token: appAccountToken };
+    const previous = accountTokenRef.current;
+    accountTokenRef.current = appAccountToken;
+    if (previous === '' || previous === appAccountToken) {
+      return;
+    }
     const intent = currentCreditPurchaseIntent();
     if (intent !== null) {
       retireCreditPurchaseIntent(intent);

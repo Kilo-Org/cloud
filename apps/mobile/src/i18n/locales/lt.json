@@ -257,10 +257,10 @@
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
     "securityAgentSubtitle": "Rasti ir pašalinti pažeidžiamumus",
     "reviews": "Peržiūros",
-    "couldNotLoadOrganization": "Nepavyko įkelti organizacijos.",
+    "couldNotLoadOrganization": "Nepavyko įkelti organizacijos",
     "couldNotLoadOrganizationDescription": "Kol neįkelta organizacija, jos ir agentų nustatymai nepasiekiami.",
     "linkedAccounts": "Susietos paskyros",
-    "couldNotLoadAccounts": "Nepavyko įkelti paskyrų.",
+    "couldNotLoadAccounts": "Nepavyko įkelti paskyrų",
     "app": "Programėlė",
     "preferencesSubtitle": "Išvaizda, pranešimai, mąstymas ir ekrano elgsena",
     "deviceSessionsSubtitle": "Peržiūrėti kitus įrenginius ir juose atsijungti",
@@ -461,8 +461,8 @@
     "condenseToolCalls": "Sutraukti įrankių iškvietimus",
     "condenseToolCallsSubtitle": "Sugrupuokite vienas po kito einančius įrankių iškvietimus į vieną eilutę, kurią galite atidaryti.",
     "toolSummaryTranslation": "Išversti įrankių suvestines",
-    "toolSummaryTranslationSubtitle": "Siųsk kiekvieną įrankio suvestinę modeliui, kad ji būtų išversta į tavo programėlės kalbą. Jei vertimas nepavyksta, rodomas originalas.",
-    "toolSummaryTranslationModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(common.model), kad pasirinktumėte kitą.",
+    "toolSummaryTranslationSubtitle": "Siųskite kiekvieną įrankio suvestinę modeliui, kad ji būtų išversta į jūsų programėlės kalbą. Jei vertimas nepavyksta, rodomas originalas.",
+    "toolSummaryTranslationModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite eilutę „$t(common.model)“ ir pasirinkite kitą.",
     "translateSummaries": "Išversti suvestines",
     "autoExpandThinkingInactiveSubtitle": "Nėra poveikio, kai slepiama mąstymo informacija."
   },
@@ -3060,7 +3060,7 @@
     "scroll": "Slinkti"
   },
   "offline": {
-    "noInternet": "Nėra interneto ryšio.",
+    "noInternet": "Nėra interneto ryšio",
     "internetRestored": "Interneto ryšys atkurtas"
   },
   "queryError": {

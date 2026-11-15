@@ -31,7 +31,6 @@ import {
 } from '@/lib/credits/credit-purchase-authority';
 import {
   admitCreditPurchaseIntent,
-  consumeForeignCreditPurchaseIntentDrop,
   type CreditPurchaseIntent,
   currentCreditPurchaseIntent,
   currentCreditPurchaseIntentFor,
@@ -1108,8 +1107,16 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     ) {
       return Promise.resolve(false);
     }
-    const intent = currentCreditPurchaseIntentFor(appAccountToken);
+    const { intent, droppedForeign } = currentCreditPurchaseIntentFor(appAccountToken);
     if (!isStillMounted(mountedRef) || !isCurrentAuthEpoch(authEpochRef.current)) {
+      return Promise.resolve(false);
+    }
+    if (droppedForeign) {
+      // The earlier request belonged to another account, so its pool and its
+      // barrier are not this account's to retry.
+      clearCreditPurchaseDispatches();
+      pendingPurchaseRef.current = null;
+      clearBlockedPurchase();
       return Promise.resolve(false);
     }
     if (intent === null) {
@@ -1328,13 +1335,13 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   useEffect(() => {
     const inherited =
       appAccountToken === ''
-        ? currentCreditPurchaseIntent()
+        ? { intent: currentCreditPurchaseIntent(), droppedForeign: false }
         : currentCreditPurchaseIntentFor(appAccountToken);
-    if (inherited !== null) {
+    if (inherited.intent !== null) {
       markUnresolvedPurchase(purchaseResolutionRef.current);
       return;
     }
-    if (!consumeForeignCreditPurchaseIntentDrop()) {
+    if (!inherited.droppedForeign) {
       // Nothing was dropped: a pool the store still holds must not be
       // forgotten here.
       return;

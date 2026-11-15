@@ -28,7 +28,6 @@ let sequence = 0;
 export function resetCreditPurchaseIntentForTests(): void {
   intent = null;
   sequence = 0;
-  droppedForeignIntent = false;
 }
 
 export function currentCreditPurchaseIntent(): CreditPurchaseIntent | null {
@@ -43,9 +42,17 @@ export function currentCreditPurchaseIntent(): CreditPurchaseIntent | null {
  * retry posts its receipts under this token. An empty token is the catalogue
  * still answering and inherits nothing it can contradict.
  */
-let droppedForeignIntent = false;
-
-export function currentCreditPurchaseIntentFor(accountToken: string): CreditPurchaseIntent | null {
+/**
+ * The request this account may inherit, and whether this call dropped one that
+ * belonged to another account.
+ *
+ * Two different non-empty tokens are an account change: the record is dropped
+ * and never inherited, so no screen shows another account's barrier and no
+ * retry posts its receipts under this token. An empty token is the catalogue
+ * still answering and inherits nothing it can contradict.
+ */
+export function currentCreditPurchaseIntentFor(accountToken: string) {
+  let droppedForeign = false;
   if (
     intent !== null &&
     accountToken !== '' &&
@@ -53,20 +60,9 @@ export function currentCreditPurchaseIntentFor(accountToken: string): CreditPurc
     intent.accountToken !== accountToken
   ) {
     retireCreditPurchaseIntent(intent);
-    droppedForeignIntent = true;
+    droppedForeign = true;
   }
-  return intent;
-}
-
-/**
- * Whether the last `currentCreditPurchaseIntentFor` call dropped a record that
- * belonged to another account. Reading it clears it, so only the caller that
- * saw the drop forgets the state that went with it.
- */
-export function consumeForeignCreditPurchaseIntentDrop(): boolean {
-  const dropped = droppedForeignIntent;
-  droppedForeignIntent = false;
-  return dropped;
+  return { intent, droppedForeign };
 }
 
 /**

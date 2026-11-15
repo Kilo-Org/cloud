@@ -26,6 +26,7 @@ import {
   canAttributeNativePurchaseOutcome,
   isCreditPurchaseTransportDisconnection,
   registerCreditPurchaseDispatch,
+  settleCreditPurchaseDispatch,
 } from '@/lib/credits/credit-purchase-authority';
 import {
   admitCreditPurchaseIntent,
@@ -240,7 +241,12 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     setHasUnresolvedPurchase(true);
   }, []);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
-  const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
+  // The transaction each delivery is being completed for, and that completion's
+  // result: a second caller for the same transaction shares it, while a recovery
+  // pass reserves one with no completion to share.
+  const recoveryInFlightPurchaseIdsRef = useRef(
+    new Map<string, Promise<CreditPurchaseCompletion | undefined>>()
+  );
   const pendingPurchaseRef = useRef<PurchaseRequestRecord | null>(null);
   const completeDeliveredPurchaseRef = useRef<
     ((purchase: Purchase) => Promise<CreditPurchaseCompletion | undefined>) | null
@@ -260,12 +266,12 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   }, []);
 
   const offerBuyAgain = useCallback((record: PurchaseRequestRecord) => {
-    // Consent names the pack the person picked when the request came from a row
-    // tap; a store query started from the notice has no pack, so the earlier
-    // request's own id is the only target it can offer — and the screen renders
-    // no Buy again when the current catalog no longer sells that SKU.
-    const productId = record.pack?.storeProductId ?? record.intent.productId;
+    // Consent names the pack the person picked from the current catalog. A store
+    // query started from the notice has no pack and offers no target: a retired
+    // SKU is not a charge the screen could name or price.
+    const productId = record.pack?.storeProductId ?? null;
     if (
+      productId === null ||
       !mountedRef.current ||
       !isCurrentAuthEpoch(record.epoch) ||
       !record.attempt.owns() ||
@@ -301,6 +307,45 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       }
     },
     [clearBlockedPurchase, clearError]
+  );
+
+  /**
+   * Ends the row's progress on the outcome its own native request settled on.
+   * The barrier, resolution and consent stay: an outcome that could not be
+   * attributed may be another pooled request's. A pending or deferred outcome
+   * leaves the row busy, because the charge has not been decided yet.
+   */
+  const settlePurchaseRow = useCallback(
+    (record: PurchaseRequestRecord, completion: CreditPurchaseCompletion | undefined) => {
+      if (
+        completion === undefined ||
+        (completion.status !== 'completed' &&
+          completion.status !== 'terminal-refusal' &&
+          completion.status !== 'retryable-refusal')
+      ) {
+        return;
+      }
+      if (
+        pendingPurchaseRef.current !== record ||
+        !mountedRef.current ||
+        !isCurrentAuthEpoch(record.epoch) ||
+        !record.attempt.owns()
+      ) {
+        return;
+      }
+      pendingPurchaseRef.current = null;
+      record.settle();
+      if (ownsCreditPurchaseIntent(record.intent)) {
+        markUnresolvedPurchase(
+          completion.status === 'terminal-refusal' ? 'terminal-refusal' : 'found'
+        );
+        offerBuyAgain(record);
+      } else {
+        clearBlockedPurchase();
+      }
+      record.attempt.abandon();
+    },
+    [clearBlockedPurchase, markUnresolvedPurchase, offerBuyAgain]
   );
 
   const completeAppStorePurchase = useMutation(
@@ -422,38 +467,59 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
               await retireCreditPurchaseIntent(record.intent);
               record.settle();
             }
+            settleCreditPurchaseDispatch(record.intent);
             throw error;
           }
-          const nativePurchases = Array.isArray(delivered) ? delivered : [delivered];
-          const purchase = nativePurchases.length === 1 ? nativePurchases[0] : null;
-          if (
-            !purchase ||
-            purchase.productId !== record.intent.productId ||
-            !canAttributeNativePurchaseOutcome(record.intent)
-          ) {
-            await Promise.all(
-              nativePurchases.map(async recovered => {
-                if (recovered && isCurrentAuthEpoch(record.epoch)) {
-                  await completeDeliveredPurchaseRef.current?.(recovered);
+          try {
+            const nativePurchases = Array.isArray(delivered) ? delivered : [delivered];
+            const purchase = nativePurchases.length === 1 ? nativePurchases[0] : null;
+            if (
+              !purchase ||
+              purchase.productId !== record.intent.productId ||
+              !canAttributeNativePurchaseOutcome(record.intent)
+            ) {
+              const completions = await Promise.all(
+                nativePurchases.map(async recovered =>
+                  recovered !== null &&
+                  recovered !== undefined &&
+                  isCurrentAuthEpoch(record.epoch)
+                    ? {
+                        productId: recovered.productId,
+                        completion: await completeDeliveredPurchaseRef.current?.(recovered),
+                      }
+                    : null
+                )
+              );
+              for (const settled of completions) {
+                if (settled?.productId === record.intent.productId) {
+                  settlePurchaseRow(record, settled.completion);
                 }
-              })
-            );
+              }
+              return delivered;
+            }
+            if (!isCurrentAuthEpoch(record.epoch)) {
+              return delivered;
+            }
+            await identifyCreditPurchaseTransaction(record.intent, purchase);
+            if (
+              !isCurrentAuthEpoch(record.epoch) ||
+              !canAttributeNativePurchaseOutcome(record.intent)
+            ) {
+              return delivered;
+            }
+            let completion: CreditPurchaseCompletion | undefined;
+            if (recoveredPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase))) {
+              await retireCompletedIntent(record.intent, record);
+            } else {
+              completion = await completeDeliveredPurchaseRef.current?.(purchase);
+            }
+            settlePurchaseRow(record, completion);
             return delivered;
+          } finally {
+            // The pooled promise settled, so this request stops competing for
+            // later outcomes: the next dispatch is unambiguous again.
+            settleCreditPurchaseDispatch(record.intent);
           }
-          if (!isCurrentAuthEpoch(record.epoch)) {
-            return delivered;
-          }
-          await identifyCreditPurchaseTransaction(record.intent, purchase);
-          if (
-            !isCurrentAuthEpoch(record.epoch) ||
-            !canAttributeNativePurchaseOutcome(record.intent)
-          ) {
-            return delivered;
-          }
-          await (recoveredPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase))
-            ? retireCompletedIntent(record.intent, record)
-            : completeDeliveredPurchaseRef.current?.(purchase));
-          return delivered;
         },
         completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
         completePlayPurchase: completePlayPurchase.mutateAsync,
@@ -480,6 +546,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       reconnectStore,
       requestPurchase,
       retireCompletedIntent,
+      settlePurchaseRow,
       showError,
       storefront,
     ]
@@ -507,14 +574,17 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         return undefined;
       }
       const id = getPurchaseCompletionId(purchase);
-      if (
-        recoveredPurchaseIdsRef.current.has(id) ||
-        recoveryInFlightPurchaseIdsRef.current.has(id)
-      ) {
+      if (recoveredPurchaseIdsRef.current.has(id)) {
         return undefined;
       }
-      recoveryInFlightPurchaseIdsRef.current.add(id);
-      try {
+      // One completion per transaction: a caller that arrives while it runs
+      // shares the result, because the row that settled on this delivery still
+      // needs to learn what the backend decided.
+      const running = recoveryInFlightPurchaseIdsRef.current.get(id);
+      if (running !== undefined) {
+        return await running;
+      }
+      const completionRun = (async (): Promise<CreditPurchaseCompletion | undefined> => {
         const requestOwner = reconciliation ?? pendingPurchaseRef.current;
         const intent = currentCreditPurchaseIntent();
         if (!isCurrentAuthEpoch(authEpochRef.current)) {
@@ -563,6 +633,10 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
           }
         }
         return completion;
+      })();
+      recoveryInFlightPurchaseIdsRef.current.set(id, completionRun);
+      try {
+        return await completionRun;
       } finally {
         recoveryInFlightPurchaseIdsRef.current.delete(id);
       }
@@ -620,7 +694,10 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       return false;
     }
     for (const purchase of outstandingPurchases) {
-      recoveryInFlightPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
+      recoveryInFlightPurchaseIdsRef.current.set(
+        getPurchaseCompletionId(purchase),
+        Promise.resolve(undefined)
+      );
     }
     try {
       const recoveredPurchases = await actions.recoverPurchases(outstandingPurchases, {
@@ -1000,7 +1077,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         ) {
           return false;
         }
-        recoveryInFlightPurchaseIdsRef.current.add(id);
+        recoveryInFlightPurchaseIdsRef.current.set(id, Promise.resolve(undefined));
         return true;
       });
       if (unrecoveredPurchases.length === 0) {

@@ -77,6 +77,53 @@ describe('native purchase promise pool ownership', () => {
     expect(ownerValue(owner).buyAgainProductId).toBe(pack.storeProductId);
   });
 
+  it('credits an ambiguous consented success, keeps the barrier and ends the consent loop', async () => {
+    const owner = await mountPoolOwner();
+    const first = ownerValue(owner).purchase(pack);
+    await flushPool();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16_000);
+    });
+    expect(await first).toBe(false);
+    await ownerValue(owner).purchase(pack);
+    expect(ownerValue(owner).buyAgainProductId).toBe(pack.storeProductId);
+
+    const consented = ownerValue(owner).buyAgain(pack);
+    await flushPool();
+    emitNativePurchase(nativePurchase('credited-after-consent'));
+    await consented;
+    await flushPool();
+
+    // 1. One credit and no dangling progress: the row's UI does not depend on
+    // whether the outcome could be attributed.
+    expect(store.complete).toHaveBeenCalledTimes(1);
+    expect(ownerValue(owner).completingProductId).toBeNull();
+    // 2. The barrier stays: the still-pooled earlier request may yet arrive, so
+    // the notice names a found purchase and offers the consented retry.
+    expect(ownerValue(owner).hasUnresolvedPurchase).toBe(true);
+    expect(ownerValue(owner).purchaseResolution).toBe('found');
+    expect(ownerValue(owner).buyAgainProductId).toBe(pack.storeProductId);
+
+    // 3. The next tap reaches consent instead of silently reconciling forever,
+    // and the consented request is the pool's only member, so it retires.
+    await ownerValue(owner).purchase(pack);
+    await flushPool();
+    expect(store.requestPurchase).toHaveBeenCalledTimes(2);
+    const third = ownerValue(owner).buyAgain(pack);
+    await flushPool();
+    expect(store.requestPurchase).toHaveBeenCalledTimes(3);
+    emitNativePurchase(nativePurchase('credited-third'));
+    await third;
+    await flushPool();
+    expect(ownerValue(owner).hasUnresolvedPurchase).toBe(false);
+
+    // 4. The loop ends: an ordinary tap charges without consent. The dispatch
+    // stays open until the store answers, so the tap is not awaited.
+    void ownerValue(owner).purchase(pack);
+    await flushPool();
+    expect(store.requestPurchase).toHaveBeenCalledTimes(4);
+  });
+
   it('releases an unambiguous single purchase cancellation without consent', async () => {
     const owner = await mountPoolOwner();
     const first = ownerValue(owner).purchase(pack);

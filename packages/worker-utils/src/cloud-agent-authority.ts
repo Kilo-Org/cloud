@@ -217,6 +217,7 @@ const scopedChildOperations = {
   },
 } as const;
 
+const WORKSPACE_FOLDER_PROCEDURE_PREFIX = 'workspaceFolders.';
 const scopedFolderOperations = {
   'workspaceFolders.list': { kind: 'query', schema: z.object({}).strict() },
   'workspaceFolders.moveWorktree': {
@@ -251,6 +252,57 @@ function isCloudEnvironmentsListProcedure(procedure: string): boolean {
   return procedure === CLOUD_ENVIRONMENTS_LIST_PROCEDURE;
 }
 
+function isFolderProcedure(procedure: string): boolean {
+  return procedure.startsWith(WORKSPACE_FOLDER_PROCEDURE_PREFIX);
+}
+
+/**
+ * The organizationId field the advertised schema shows a caller. A folder
+ * procedure and an organization authority both pin the authority's own
+ * organization; a personal authority outside folders refuses the field.
+ */
+function advertisedOrganizationIdField(authority: CloudAgentAuthority, folder: boolean) {
+  if (folder || authority.organizationId !== null) {
+    return z.literal(authority.organizationId);
+  }
+  return z.never().optional();
+}
+
+/**
+ * The organizationId field the validator parses. It parses permissively so that
+ * assertAuthorityOrganization owns the refusal and reports it with the authority
+ * error rather than a schema message. A folder procedure pins the value, because
+ * the folder body names the organization it belongs to.
+ */
+function requestOrganizationIdField(authority: CloudAgentAuthority, folder: boolean) {
+  if (folder) {
+    return z.literal(authority.organizationId);
+  }
+  return z.string().min(1).optional();
+}
+
+/**
+ * The procedure prefix and the request's organizationId must both name the
+ * authority's organization. The environment catalog procedure is shared by
+ * personal and organization scope (it has no organizations.* mirror), so only its
+ * organizationId is scope-bearing.
+ */
+function assertAuthorityOrganization(
+  authority: CloudAgentAuthority,
+  procedure: string,
+  organizationId: string | null | undefined
+): void {
+  const organizationProcedure = procedure.startsWith('organizations.');
+  if (
+    (!isFolderProcedure(procedure) &&
+      !isCloudEnvironmentsListProcedure(procedure) &&
+      organizationProcedure !== (authority.organizationId !== null)) ||
+    (organizationId ?? null) !== authority.organizationId
+  ) {
+    throw new Error('Cloud Agent launch exceeds its authority');
+  }
+}
+
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
   const prefix =
     authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
@@ -282,21 +334,14 @@ export function cloudAgentAuthorityInputSchema(
   if (isCloudEnvironmentsListProcedure(procedure)) {
     return z.toJSONSchema(
       cloudEnvironmentsListInputSchema.extend({
-        organizationId:
-          authority.organizationId === null
-            ? z.never().optional()
-            : z.literal(authority.organizationId),
+        organizationId: advertisedOrganizationIdField(authority, false),
       }),
       { io: 'input' }
     );
   }
   return z.toJSONSchema(
     scopedOperation(procedure).schema.extend({
-      organizationId: procedure.startsWith('workspaceFolders.')
-        ? z.literal(authority.organizationId)
-        : authority.organizationId === null
-          ? z.never().optional()
-          : z.literal(authority.organizationId),
+      organizationId: advertisedOrganizationIdField(authority, isFolderProcedure(procedure)),
     }),
     { io: 'input' }
   );
@@ -323,32 +368,16 @@ export function validateCloudAgentAuthorityRequest(
   }
   if (isCloudEnvironmentsListProcedure(procedure)) {
     const request = cloudEnvironmentsListInputSchema
-      .extend({
-        organizationId:
-          scope.organizationId === null ? z.never().optional() : z.string().min(1).optional(),
-      })
+      .extend({ organizationId: requestOrganizationIdField(scope, false) })
       .parse(input);
-    if ((request.organizationId ?? null) !== scope.organizationId) {
-      throw new Error('Cloud Agent launch exceeds its authority');
-    }
+    assertAuthorityOrganization(scope, procedure, request.organizationId);
     return request;
   }
   const operation = scopedOperation(procedure);
-  const folderProcedure = procedure.startsWith('workspaceFolders.');
   const request = operation.schema
-    .extend({
-      organizationId: folderProcedure
-        ? z.literal(scope.organizationId)
-        : z.string().min(1).optional(),
-    })
+    .extend({ organizationId: requestOrganizationIdField(scope, isFolderProcedure(procedure)) })
     .parse(input);
-  const organizationProcedure = procedure.startsWith('organizations.');
-  if (
-    (!folderProcedure && organizationProcedure !== (scope.organizationId !== null)) ||
-    (request.organizationId ?? null) !== scope.organizationId
-  ) {
-    throw new Error('Cloud Agent launch exceeds its authority');
-  }
+  assertAuthorityOrganization(scope, procedure, request.organizationId);
   return request;
 }
 

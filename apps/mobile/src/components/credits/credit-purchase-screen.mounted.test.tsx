@@ -8,7 +8,6 @@ import { i18n } from '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
 import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
-import { creditStoreProductsKey } from '@/lib/credits/use-store-credit-products';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
@@ -319,16 +318,6 @@ function redraw(renderer: TestRenderer.ReactTestRenderer, queryClient: QueryClie
   renderer.update(
     createElement(QueryClientProvider, { client: queryClient }, createElement(CreditPurchaseScreen))
   );
-}
-
-/** Wait until the store catalog answered, whatever the screen then shows. */
-async function settleCatalog(queryClient: QueryClient): Promise<void> {
-  await waitFor(
-    () => queryClient.getQueryState(creditStoreProductsKey('user-1'))?.status === 'success'
-  );
-  await act(async () => {
-    await Promise.resolve();
-  });
 }
 
 async function press(instance: TestRenderer.ReactTestInstance | undefined): Promise<void> {

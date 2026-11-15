@@ -10,10 +10,7 @@ import {
 } from '@/lib/credits/store-products-loader';
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
-import {
-  currentCreditPurchaseIntent,
-  resetCreditPurchaseIntentForTests,
-} from '@/lib/credits/credit-purchase-intent';
+import { resetCreditPurchaseIntentForTests } from '@/lib/credits/credit-purchase-intent';
 import { resetCreditPurchaseAuthorityForTests } from '@/lib/credits/credit-purchase-authority';
 import {
   resetInlinePurchaseErrorOwnership,

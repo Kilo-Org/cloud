@@ -882,7 +882,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/lib/admin/support-access-service.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 3,
+    occurrences: 2,
   },
   {
     id: 'internal.organizations.organizationAuth',
@@ -954,6 +954,42 @@ export function targetKindForEntry(
   entry: PrivilegedInventoryEntry | undefined
 ): PrivilegedTargetKind {
   return entry?.target ?? 'none';
+}
+
+/**
+ * The id fields each target kind is named by in a request body. These routers
+ * also carry `id`, `note_id`, `caseId`, `exportId`, `requestId` and `grantId`
+ * for other records, so only the kind's own field names count.
+ */
+const TARGET_ID_FIELDS: Record<PrivilegedTargetKind, readonly string[]> = {
+  user: ['userId', 'kilo_user_id'],
+  organization: ['organizationId'],
+  service: [],
+  none: [],
+};
+
+function readInputField(input: object, field: string): unknown {
+  if (typeof FormData !== 'undefined' && input instanceof FormData) return input.get(field);
+  return (input as Record<string, unknown>)[field];
+}
+
+/**
+ * The target id the request input names. The admin guard binds an operation
+ * proof to it, so the confirmation names the account or organization the
+ * request acts on. Returns null when the input names none, is not a plain
+ * object or `FormData`, or names it as anything but a non-empty string. Never
+ * throws.
+ */
+export function targetIdFromInput(targetKind: PrivilegedTargetKind, input: unknown): string | null {
+  const isFormData = typeof FormData !== 'undefined' && input instanceof FormData;
+  if (!isFormData && (typeof input !== 'object' || input === null || Array.isArray(input))) {
+    return null;
+  }
+  for (const field of TARGET_ID_FIELDS[targetKind]) {
+    const value = readInputField(input, field);
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+  return null;
 }
 
 export function actionClassForAdminProcedure(

@@ -4,9 +4,10 @@ import { TRPCError } from '@trpc/server';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import {
   StepUpRequiredError,
+  type AdminStepUpDecision,
   type AdminStepUpState,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
-import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { runStepUpGuard, stepUpDecisionCovers } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import {
   isOperationStepUpClass,
   stepUpPolicyFor,
@@ -79,6 +80,11 @@ export async function requireSupportWriteUseStepUp(params: {
   /** The state the upstream guard left on the context, when one ran. */
   upstreamStepUpState?: AdminStepUpState;
   /**
+   * What the upstream guard measured. A fresh state is trusted only when this
+   * decision covers this support write against this organization.
+   */
+  upstreamStepUpDecision?: AdminStepUpDecision;
+  /**
    * The request's claim set (`TRPCContext.stepUpClaims`). It is one mutable
    * value per request, which tRPC keeps across the context copies its
    * middleware makes.
@@ -99,7 +105,16 @@ export async function requireSupportWriteUseStepUp(params: {
     return false;
   }
 
-  if (params.upstreamStepUpState?.status !== 'fresh') {
+  // A fresh upstream state counts only when the middleware measured this
+  // support write against this organization.
+  const upstreamCoversUse =
+    params.upstreamStepUpState?.status === 'fresh' &&
+    stepUpDecisionCovers(params.upstreamStepUpDecision, 'support_write', {
+      kind: 'organization',
+      id: params.organizationId,
+    });
+
+  if (!upstreamCoversUse) {
     await supportStepUpPort.requireFresh({
       userId: params.userId,
       action: 'support_write_use',

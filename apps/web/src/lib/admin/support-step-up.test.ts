@@ -8,11 +8,16 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
   return { ...actual, evaluateStepUp: jest.fn() };
 });
 
-import type { supportStepUpPort as SupportStepUpPortValue } from '@kilocode/web-shared/lib/admin/support-step-up';
+import type {
+  requireSupportWriteUseStepUp as RequireSupportWriteUseStepUpValue,
+  supportStepUpPort as SupportStepUpPortValue,
+} from '@kilocode/web-shared/lib/admin/support-step-up';
 
 let supportStepUpPort: typeof SupportStepUpPortValue;
+let requireSupportWriteUseStepUp: typeof RequireSupportWriteUseStepUpValue;
 beforeAll(async () => {
-  ({ supportStepUpPort } = await import('@kilocode/web-shared/lib/admin/support-step-up'));
+  ({ requireSupportWriteUseStepUp, supportStepUpPort } =
+    await import('@kilocode/web-shared/lib/admin/support-step-up'));
 });
 
 const mockedEvaluate = (
@@ -116,5 +121,69 @@ describe('support step-up adapter', () => {
     expect(mockedEvaluate).toHaveBeenCalledWith(
       expect.objectContaining({ actionClass: 'support_read' })
     );
+  });
+});
+
+describe('support write use', () => {
+  const freshUpstreamState = {
+    status: 'fresh' as const,
+    method: 'webauthn_uv' as const,
+    verifiedAt: '2026-01-01T00:00:00.000Z',
+    expiresAt: '2026-01-01T00:05:00.000Z',
+  };
+
+  beforeEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    mockedEvaluate.mockReset();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (originalAdminStepUp === undefined) delete process.env.ADMIN_STEP_UP_ENABLED;
+    else process.env.ADMIN_STEP_UP_ENABLED = originalAdminStepUp;
+  });
+
+  test('a support write use needs a decision for its own class and organization', async () => {
+    const requireFreshSpy = jest
+      .spyOn(supportStepUpPort, 'requireFresh')
+      .mockResolvedValue(undefined as never);
+
+    await requireSupportWriteUseStepUp({
+      userId: 'user-1',
+      organizationId: 'organization-1',
+      upstreamStepUpState: freshUpstreamState,
+      upstreamStepUpDecision: { actionClass: 'platform_write', target: { kind: 'none', id: null } },
+      credential: 'session',
+      webSessionId: 'session-1',
+    });
+
+    expect(requireFreshSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionClass: 'support_write',
+        organizationId: 'organization-1',
+      })
+    );
+  });
+
+  test('a matching support write decision is reused without a new evaluation', async () => {
+    const requireFreshSpy = jest
+      .spyOn(supportStepUpPort, 'requireFresh')
+      .mockResolvedValue(undefined as never);
+
+    await expect(
+      requireSupportWriteUseStepUp({
+        userId: 'user-1',
+        organizationId: 'organization-1',
+        upstreamStepUpState: freshUpstreamState,
+        upstreamStepUpDecision: {
+          actionClass: 'support_write',
+          target: { kind: 'organization', id: 'organization-1' },
+        },
+        credential: 'session',
+        webSessionId: 'session-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(requireFreshSpy).not.toHaveBeenCalled();
   });
 });

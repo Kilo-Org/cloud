@@ -81,6 +81,17 @@ export type AdminStepUpState =
       expiresAt: string;
     };
 
+/**
+ * What the admin step-up middleware authorized for this request, so a
+ * specialized guard chained on it can tell whether the measured decision
+ * actually covers the action and target its resolver acts on.
+ */
+export type AdminStepUpDecision = {
+  actionClass: PrivilegedActionClass;
+  /** The target the guard measured the request for; `id` is null when the request named none. */
+  target: PrivilegedTarget;
+};
+
 export type SupportGrantSlot = {
   grantId: string;
   organizationId: string;

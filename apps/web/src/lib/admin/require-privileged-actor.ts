@@ -8,11 +8,12 @@ import {
   createAdminAssurance,
   deriveCredentialKind,
   describePrivilegedAction,
+  type AdminStepUpDecision,
   type PrivilegedActionClass,
   type PrivilegedActor,
   type PrivilegedTarget,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
-import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { runStepUpGuard, stepUpDecisionCovers } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import {
@@ -42,6 +43,7 @@ type GuardContext = {
   trpcPath?: string;
   trpcType?: string;
   adminStepUpState?: PrivilegedActor['assurance']['stepUp'];
+  adminStepUpDecision?: AdminStepUpDecision;
 };
 
 const permissionRules: Record<
@@ -92,8 +94,9 @@ export async function assertPrivilegedPermission(
 /**
  * PR1's privileged actor, now with step-up assurance. Always re-reads the
  * permission on the primary. When step-up is enabled it denies a missing or
- * stale proof; when the caller is chained on adminProcedure, the decision from
- * the admin middleware is reused instead of evaluating twice.
+ * stale proof. When the caller is chained on adminProcedure, the decision from
+ * the admin middleware is reused only when it covers this action class and
+ * target instead of evaluating twice.
  */
 export async function requirePrivilegedActor(
   params: {
@@ -120,9 +123,24 @@ export async function requirePrivilegedActor(
   }
 
   const target = params.target ?? { kind: 'none', id: null };
-  const stepUp =
-    ctx.adminStepUpState ??
-    (await runStepUpGuard({
+  let stepUp: PrivilegedActor['assurance']['stepUp'];
+  if (ctx.adminStepUpState) {
+    // Reuse the middleware's measurement when it measured nothing (switch off)
+    // or when it covers this action class and target. A request whose measured
+    // decision does not cover it is refused here, because a request is
+    // evaluated once.
+    if (
+      ctx.adminStepUpState.status !== 'absent' &&
+      !stepUpDecisionCovers(ctx.adminStepUpDecision, params.actionClass, target)
+    ) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'This request was verified for a different operation',
+      });
+    }
+    stepUp = ctx.adminStepUpState;
+  } else {
+    stepUp = await runStepUpGuard({
       userId: currentUser.id,
       credential,
       webSessionId: ctx.webSessionId,
@@ -132,7 +150,8 @@ export async function requirePrivilegedActor(
       route: ctx.trpcPath ?? null,
       method: ctx.trpcType ?? null,
       surface: 'trpc',
-    }));
+    });
+  }
 
   return {
     assurance: createAdminAssurance({

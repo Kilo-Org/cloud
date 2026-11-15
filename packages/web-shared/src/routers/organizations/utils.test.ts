@@ -795,7 +795,8 @@ describe('binary support organization access', () => {
   function writeCtxFor(
     user: User,
     adminStepUpState?: TRPCContext['adminStepUpState'],
-    trpcPath = 'organizations.settings.updateDefaultModel'
+    trpcPath = 'organizations.settings.updateDefaultModel',
+    adminStepUpDecision?: TRPCContext['adminStepUpDecision']
   ): TRPCContext {
     return {
       user,
@@ -804,6 +805,7 @@ describe('binary support organization access', () => {
       trpcPath,
       trpcType: 'mutation',
       ...(adminStepUpState ? { adminStepUpState } : {}),
+      ...(adminStepUpDecision ? { adminStepUpDecision } : {}),
     };
   }
 
@@ -817,7 +819,13 @@ describe('binary support organization access', () => {
     const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
     try {
       await expect(
-        ensureOrganizationAccess(writeCtxFor(admin, freshUpstreamState()), organization.id)
+        ensureOrganizationAccess(
+          writeCtxFor(admin, freshUpstreamState(), 'organizations.settings.updateDefaultModel', {
+            actionClass: 'support_write',
+            target: { kind: 'organization', id: organization.id },
+          }),
+          organization.id
+        )
       ).resolves.toBe('admin');
       expect(requireFreshSpy).not.toHaveBeenCalled();
     } finally {

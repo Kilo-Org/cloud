@@ -10,6 +10,7 @@ import {
   internalElevationSites,
   privilegedGuardTiers,
   resolvesOwnStepUp,
+  targetIdFromInput,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   SUPPORT_NEVER_KEYS,
@@ -599,5 +600,45 @@ describe('support never-list keys resolve to real surfaces', () => {
       key => key.startsWith('/') && !routes.has(`${key}/page.tsx`) && !routes.has(`${key}/route.ts`)
     );
     expect(missing).toEqual([]);
+  });
+});
+
+describe('targetIdFromInput', () => {
+  test('binds a user id named by userId', () => {
+    expect(targetIdFromInput('user', { userId: 'user-1' })).toBe('user-1');
+  });
+
+  test('binds a user id named by kilo_user_id', () => {
+    expect(targetIdFromInput('user', { kilo_user_id: 'user-2' })).toBe('user-2');
+  });
+
+  test('binds an organization id named by organizationId', () => {
+    expect(targetIdFromInput('organization', { organizationId: 'org-1' })).toBe('org-1');
+  });
+
+  test('ignores ids that name another record', () => {
+    expect(targetIdFromInput('user', { id: 'case-1' })).toBeNull();
+    expect(targetIdFromInput('user', { note_id: 'note-1' })).toBeNull();
+    expect(targetIdFromInput('organization', { id: 'org-1' })).toBeNull();
+  });
+
+  test('ignores an array of ids', () => {
+    expect(targetIdFromInput('user', { userIds: ['user-1', 'user-2'] })).toBeNull();
+  });
+
+  test('returns null for input that is not an object', () => {
+    expect(targetIdFromInput('user', 'user-1')).toBeNull();
+    expect(targetIdFromInput('user', null)).toBeNull();
+    expect(targetIdFromInput('user', undefined)).toBeNull();
+  });
+
+  test('returns null for an empty id', () => {
+    expect(targetIdFromInput('user', { userId: '' })).toBeNull();
+  });
+
+  test('reads a FormData body', () => {
+    const body = new FormData();
+    body.set('userId', 'user-3');
+    expect(targetIdFromInput('user', body)).toBe('user-3');
   });
 });

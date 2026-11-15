@@ -110,6 +110,15 @@ function contextFor(user: Awaited<ReturnType<typeof adminUser>>) {
   };
 }
 
+function freshUpstreamState() {
+  return {
+    status: 'fresh' as const,
+    method: 'webauthn_uv' as const,
+    verifiedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  };
+}
+
 function causeOf(error: unknown): StepUpRequiredError | null {
   return error instanceof TRPCError && error.cause instanceof StepUpRequiredError
     ? error.cause
@@ -396,16 +405,134 @@ describe('requirePrivilegedActor', () => {
         { permission: 'admin', actionClass: 'platform_read' },
         {
           ...contextFor(user),
-          adminStepUpState: {
-            status: 'fresh',
-            method: 'webauthn_uv',
-            verifiedAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          adminStepUpState: freshUpstreamState(),
+          adminStepUpDecision: {
+            actionClass: 'platform_read',
+            target: { kind: 'none', id: null },
           },
         }
       );
 
       expect(actor.assurance.stepUp.status).toBe('fresh');
+    });
+
+    it('reuses a fresh decision that covers the requested operation and target', async () => {
+      const { user } = await setup();
+      const { evaluateStepUp } = jest.requireMock(
+        '@kilocode/web-shared/lib/admin/step-up-store'
+      ) as { evaluateStepUp: jest.Mock };
+      evaluateStepUp.mockClear();
+
+      const actor = await requirePrivilegedActor(
+        {
+          permission: 'admin',
+          actionClass: 'sensitive_write',
+          target: { kind: 'user', id: 'target-user' },
+        },
+        {
+          ...contextFor(user),
+          adminStepUpState: freshUpstreamState(),
+          adminStepUpDecision: {
+            actionClass: 'sensitive_write',
+            target: { kind: 'user', id: 'target-user' },
+          },
+        }
+      );
+
+      expect(actor.assurance.stepUp.status).toBe('fresh');
+      expect(evaluateStepUp).not.toHaveBeenCalled();
+    });
+
+    it('reuses an operation decision when the caller names no target', async () => {
+      const { user } = await setup();
+      const { evaluateStepUp } = jest.requireMock(
+        '@kilocode/web-shared/lib/admin/step-up-store'
+      ) as { evaluateStepUp: jest.Mock };
+      evaluateStepUp.mockClear();
+
+      const actor = await requirePrivilegedActor(
+        { permission: 'admin', actionClass: 'sensitive_write' },
+        {
+          ...contextFor(user),
+          adminStepUpState: freshUpstreamState(),
+          adminStepUpDecision: {
+            actionClass: 'sensitive_write',
+            target: { kind: 'none', id: null },
+          },
+        }
+      );
+
+      expect(actor.assurance.stepUp.status).toBe('fresh');
+      expect(evaluateStepUp).not.toHaveBeenCalled();
+    });
+
+    it('reuses a decision bound to a target when the caller names none', async () => {
+      const { user } = await setup();
+
+      const actor = await requirePrivilegedActor(
+        { permission: 'admin', actionClass: 'sensitive_write' },
+        {
+          ...contextFor(user),
+          adminStepUpState: freshUpstreamState(),
+          adminStepUpDecision: {
+            actionClass: 'sensitive_write',
+            target: { kind: 'user', id: 'target-user' },
+          },
+        }
+      );
+
+      expect(actor.assurance.stepUp.status).toBe('fresh');
+    });
+
+    it('refuses a fresh decision that does not name the requested target', async () => {
+      const { user } = await setup();
+
+      // A decision without a target id covers a request that names none, so
+      // this request needs its own decision.
+      await expect(
+        requirePrivilegedActor(
+          {
+            permission: 'admin',
+            actionClass: 'sensitive_write',
+            target: { kind: 'user', id: 'target-user' },
+          },
+          {
+            ...contextFor(user),
+            adminStepUpState: freshUpstreamState(),
+            adminStepUpDecision: {
+              actionClass: 'sensitive_write',
+              target: { kind: 'user', id: null },
+            },
+          }
+        )
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'This request was verified for a different operation',
+      });
+    });
+
+    it('binds an operation proof to the user id the request input names', async () => {
+      const { user: admin, credential } = await setup();
+      const userA = await insertTestUser({});
+      const userB = await insertTestUser({});
+      createdUserIds.push(userA.id, userB.id);
+      await insertOperationProof(admin.id, credential.id, {
+        actionClass: 'sensitive_write',
+        surface: 'trpc',
+        route: 'admin.users.resetAPIKey',
+        method: 'mutation',
+        targetKind: 'user',
+        targetId: userA.id,
+      });
+      const caller = await createSessionCallerForUser(admin.id, { webSessionId });
+
+      await expect(caller.admin.users.resetAPIKey({ userId: userA.id })).resolves.toMatchObject({
+        success: true,
+      });
+
+      const cause = await refusal(caller.admin.users.resetAPIKey({ userId: userB.id }));
+      expect(cause?.code).toBe('MFA_REQUIRED');
+      expect(cause?.binding).toMatchObject({ targetKind: 'user', targetId: userB.id });
     });
 
     it('denies an admin procedure without a proof', async () => {

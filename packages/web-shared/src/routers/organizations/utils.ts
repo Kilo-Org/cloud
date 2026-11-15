@@ -221,6 +221,7 @@ export type OrganizationAccessContext = Pick<
   | 'trpcType'
   | 'webSessionId'
   | 'adminStepUpState'
+  | 'adminStepUpDecision'
   | 'stepUpClaims'
 > & {
   auditSurface?: 'trpc' | 'rest' | 'server-component';
@@ -442,6 +443,7 @@ export async function resolveOrganizationAccess(
           userId: ctx.user.id,
           organizationId,
           upstreamStepUpState: ctx.adminStepUpState,
+          upstreamStepUpDecision: ctx.adminStepUpDecision,
           claimStore: ctx.stepUpClaims,
           claimKey: `${organizationId}:${surface}:${key ?? ''}`,
           credential: ctx.credential,

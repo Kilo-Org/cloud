@@ -20,15 +20,19 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   deriveCredentialKind,
+  type AdminStepUpDecision,
   type AdminStepUpState,
   type PrivilegedCredentialKind,
+  type PrivilegedTarget,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
   actionClassForAdminProcedure,
   markPrivilegedGuard,
   resolvesOwnStepUp,
+  targetIdFromInput,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
 import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
@@ -83,6 +87,13 @@ export type TRPCContext = {
    * on it can reuse the result instead of evaluating twice.
    */
   adminStepUpState?: AdminStepUpState;
+  /**
+   * What the admin step-up middleware authorized for this request: the action
+   * class and target its guard measured. A specialized guard chained on it
+   * reads this to refuse reusing a decision that does not cover its own
+   * request.
+   */
+  adminStepUpDecision?: AdminStepUpDecision;
   ip?: string | null;
   // Procedure path and type, injected into the context by `baseProcedure` so
   // that `is_admin` elevation sites *inside* a resolver (which only receive
@@ -396,34 +407,43 @@ const adminGuardMiddleware = t.middleware(adminGuardFn);
 // A procedure listed in `ADMIN_STEP_UP_SELF_GUARDED_ROUTES` is exempt because
 // its resolver binds the proof to the organization it acts on; the inventory
 // test keeps that list and those resolvers in step.
-// Specialized guards chained on adminProcedure reuse `adminStepUpState`.
-const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
-  const enabled = isAdminStepUpEnabled();
-  if (!enabled || path.startsWith('stepUp.') || resolvesOwnStepUp(path)) return next();
+// Specialized guards chained on adminProcedure reuse `adminStepUpState` and
+// check `adminStepUpDecision` before trusting it for their own request.
+const adminStepUpEnforcementMiddleware = t.middleware(
+  async ({ ctx, path, type, getRawInput, next }) => {
+    const enabled = isAdminStepUpEnabled();
+    if (!enabled || path.startsWith('stepUp.') || resolvesOwnStepUp(path)) return next();
 
-  const credential =
-    ctx.credential ??
-    deriveCredentialKind({
-      authViaToken: ctx.authViaToken ?? false,
-      tokenSource: ctx.tokenSource ?? null,
-      internalApiUse: ctx.internalApiUse,
+    const credential =
+      ctx.credential ??
+      deriveCredentialKind({
+        authViaToken: ctx.authViaToken ?? false,
+        tokenSource: ctx.tokenSource ?? null,
+        internalApiUse: ctx.internalApiUse,
+      });
+    const { actionClass, targetKind } = actionClassForAdminProcedure(path, type);
+    // An operation proof is bound to the account or organization the request
+    // input names. A session-class decision ignores the target, so it stays
+    // unbound.
+    const target: PrivilegedTarget = isOperationStepUpClass(actionClass)
+      ? { kind: targetKind, id: targetIdFromInput(targetKind, await getRawInput()) }
+      : { kind: targetKind, id: null };
+
+    const adminStepUpState = await runStepUpGuard({
+      userId: ctx.user.id,
+      credential,
+      webSessionId: ctx.webSessionId,
+      actionClass,
+      target,
+      enabled,
+      route: path,
+      method: type,
+      surface: 'trpc',
     });
-  const { actionClass, targetKind } = actionClassForAdminProcedure(path, type);
 
-  const adminStepUpState = await runStepUpGuard({
-    userId: ctx.user.id,
-    credential,
-    webSessionId: ctx.webSessionId,
-    actionClass,
-    target: { kind: targetKind, id: null },
-    enabled,
-    route: path,
-    method: type,
-    surface: 'trpc',
-  });
-
-  return next({ ctx: { adminStepUpState } });
-});
+    return next({ ctx: { adminStepUpState, adminStepUpDecision: { actionClass, target } } });
+  }
+);
 
 export const adminProcedure = baseProcedure
   .use(adminGuardMiddleware)

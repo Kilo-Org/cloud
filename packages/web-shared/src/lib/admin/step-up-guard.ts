@@ -2,6 +2,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import {
   StepUpRequiredError,
+  type AdminStepUpDecision,
   type AdminStepUpState,
   type PrivilegedActionClass,
   type PrivilegedCredentialKind,
@@ -69,6 +70,29 @@ export function stepUpOperationFor(params: {
     method: (params.method ?? '').toLowerCase(),
     target: params.target,
   };
+}
+
+/**
+ * Whether the admin middleware's decision covers the action and target a
+ * specialized guard is about to act on.
+ *
+ * An operation-class decision covers a request that names the same target kind
+ * and the same target id. A decision with no target id covers a request that
+ * names none; a request that names a target needs a decision that names it.
+ */
+export function stepUpDecisionCovers(
+  decision: AdminStepUpDecision | undefined,
+  actionClass: PrivilegedActionClass,
+  target: PrivilegedTarget
+): boolean {
+  if (!decision) return false;
+  if (decision.actionClass !== actionClass) return false;
+  if (!isOperationStepUpClass(actionClass)) return true;
+  // A caller that names no target accepts the decision the middleware
+  // measured, which is at least as specific.
+  if (target.kind === 'none' && target.id === null) return true;
+  if (decision.target.kind !== target.kind) return false;
+  return decision.target.id === target.id;
 }
 
 function deny(params: {

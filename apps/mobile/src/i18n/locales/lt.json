@@ -483,9 +483,9 @@
       "filesList": "Failų sąrašas"
     },
     "fileNavigator": {
-      "couldNotLoadFiles": "Nepavyko įkelti failų.",
+      "couldNotLoadFiles": "Nepavyko įkelti failų",
       "retryLoadingFiles": "Bandyti įkelti failus dar kartą",
-      "filterPlaceholder": "Failo kelias",
+      "filterPlaceholder": "Filtruoti failus pagal kelią",
       "viewedCount": "peržiūrėta {{viewed}} iš {{total}}",
       "viewedCount_one": "peržiūrėta {{viewed}} iš {{total}}",
       "viewedCount_few": "peržiūrėta {{viewed}} iš {{total}}",
@@ -512,7 +512,7 @@
       "unmarkViewed": "Pašalinti {{path}} peržiūros žymą",
       "collapseFile": "Sutraukti failą",
       "expandFile": "Išskleisti failą",
-      "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti.",
+      "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti",
       "noPreview": "Šio failo peržiūra negalima",
       "openOnGitHub": "Atidaryti GitHub platformoje",
       "openDiffOnGitHub": "Atidaryti šio failo pakeitimų palyginimą GitHub platformoje",
@@ -582,7 +582,7 @@
       "loadedOfTotalFiles_many": "įkelta {{loaded}} iš {{total}} failų"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "⚠️ failo pabaigoje nėra naujos eilutės.",
+      "noNewlineAtEndOfFile": "⚠️ failo pabaigoje nėra naujos eilutės",
       "emptyDiffColumn": "tuščias pakeitimų palyginimo stulpelis",
       "oldNew": "Senoji versija: {{old}} | Naujoji versija: {{new}}",
       "oldOnly": "Tik senojoje versijoje: {{text}}",
@@ -634,7 +634,7 @@
         "closedMergeRequest": "Šis merge request uždarytas"
       },
       "partialSuccessBanner": {
-        "body": "Nepavyko ištrinti šakos: {{reason}}.",
+        "body": "Nepavyko ištrinti šakos: {{reason}}",
         "accessibility": "Sujungta. Nepavyko ištrinti šakos: {{reason}}"
       },
       "loadFailedTitle": "Nepavyko įkelti sujungimo parinkčių.",
@@ -788,12 +788,12 @@
       "commentDeleteFailed": "Nepavyko ištrinti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
       "commentDeleteUnavailable": "Šio komentaro negalima ištrinti."
     },
-    "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
+    "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
     "checkConnection": "Patikrinti ryšį",
-    "couldNotLoadPullRequest": "Nepavyko įkelti pakeitimų užklausos.",
-    "reviewServiceUnavailable": "Paslauga neprieinama",
-    "reviewServiceUnavailableDescription": "Paslauga laikinai neprieinama. Pabandykite dar kartą netrukus.",
+    "couldNotLoadPullRequest": "Nepavyko įkelti pakeitimų užklausos",
+    "reviewServiceUnavailable": "Peržiūros paslauga neprieinama",
+    "reviewServiceUnavailableDescription": "Peržiūros paslauga laikinai neprieinama. Pabandyk dar kartą netrukus.",
     "description": "Aprašymas",
     "noDescriptionProvided": "Aprašymas nepateiktas.",
     "review": "Peržiūra",
@@ -849,7 +849,7 @@
       "loading": "Įkeliamos gautos užklausos",
       "noReviewRequests": "Nėra prašymų peržiūrėti",
       "noReviewRequestsDescription": "Čia rodomos tavo peržiūros laukiančios pakeitimų užklausos.",
-      "couldNotLoad": "Nepavyko įkelti gautų užklausų.",
+      "couldNotLoad": "Nepavyko įkelti gautų užklausų",
       "accessLostTitle": "Nėra prieigos prie šios organizacijos",
       "accessLostDescription": "Tu nebesi šios organizacijos narys, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",
       "organizationUnavailableTitle": "Šios organizacijos nebėra",
@@ -865,7 +865,7 @@
       "addTitle": "Naujas komentaras",
       "unavailableTitle": "Komentaras nepasiekiamas",
       "unavailableMessage": "Šis nepateiktas komentaras jau ištrintas arba pateiktas.",
-      "ok": "GERAI",
+      "ok": "Gerai",
       "loadFailedTitle": "Nepavyko įkelti komentaro rengyklės.",
       "discardTitle": "Atmesti komentarą?",
       "discardMessage": "Tavo juodraštis bus prarastas.",
@@ -892,7 +892,7 @@
       "checkActiveConnection": "Ryšys aktyvus, bet šio elemento vis tiek nepavyksta įkelti.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
-      "gitlabReconnectAdminOnlyDescription": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus ją prijungti iš naujo.",
+      "gitlabReconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
       "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
       "bitbucketAdminOnlyDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",
@@ -911,7 +911,7 @@
       "pendingComment": "nepateiktų komentarų",
       "pendingComment_other": "nepateiktų komentarų",
       "submitCountOfTotal": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
-      "submitReview": "Pateikti peržiūros išvadas",
+      "submitReview": "Pateikti peržiūrą",
       "partialPostedFresh": "Paskelbtų komentarų: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Paskelbtų komentarų: {{displayFreshCount}}. ",
       "partialPostedFresh_few": "Paskelbtų komentarų: {{displayFreshCount}}. ",
@@ -943,7 +943,7 @@
       "stateOpenApproved": "Atvira · Patvirtinta",
       "stateOpenChangesRequested": "Atvira · Prašoma pakeitimų",
       "stateOpenReviewRequired": "Atvira · Reikia peržiūros",
-      "stateOpen": "Atidaryta",
+      "stateOpen": "Atvira",
       "unknownAuthor": "Nežinomas autorius",
       "commit_one": "pakeitimų įrašas",
       "commit": "pakeitimų įrašų",
@@ -988,7 +988,7 @@
       "discussion": "Diskusija"
     },
     "fileStatus": {
-      "modified": "Pakeista",
+      "modified": "Modifikuota",
       "renamed": "Pervadinta",
       "copied": "Nukopijuota",
       "changed": "Pakeista"

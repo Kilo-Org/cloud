@@ -240,15 +240,12 @@ export function CreditPurchaseScreen() {
               // drops them when initialization fails), so even a priced row
               // cannot complete: keep every row disabled until it reconnects.
               const disabled = purchasing || !connected || !hasStorePrice;
-              // A disabled row recedes by its own labels, not by its whole
-              // surface: the title and the price keep the ink they are read in
-              // and are dimmed, so they still outweigh the secondary line
-              // under them, which keeps the muted ink at full strength and
-              // states when the credits expire. Halving the whole row instead
-              // put that line at 2.2:1 on the dark card and 2.1:1 on the light
-              // one, and muting the title without dimming the line under it
-              // left the secondary line reading stronger than the title.
-              const labelClass = disabled ? 'text-foreground opacity-70' : 'text-foreground';
+              // A disabled row recedes by its own labels, not its whole surface: the
+              // title and price sit at half ink, the ink the old whole-row halving
+              // painted them in, so the row still reads as inactive. The line under
+              // them keeps full muted ink and states when the credits expire, which
+              // that halving had pushed to 2.2:1 on the dark card and 2.1:1 on light.
+              const labelClass = disabled ? 'text-foreground opacity-50' : 'text-foreground';
               // The trailing slot holds the store price only: it keeps its one
               // line and its full width, so the title yields and a price a user
               // pays is never truncated.
@@ -288,11 +285,10 @@ export function CreditPurchaseScreen() {
 
               return (
                 // A disabled row dims its own labels, not its whole surface:
-                // the title and the price keep their ink and are dimmed, while
-                // the one line under them keeps the muted ink at full
-                // strength, so it stays lighter than the title and stays read.
-                // The row's shell, border, padding, accessibility label and
-                // accessibilityState do not change.
+                // the title and the price sit at half ink, while the one line
+                // under them keeps the muted ink at full strength and states
+                // when the credits expire. The row's shell, border, padding,
+                // accessibility label and accessibilityState do not change.
                 <Pressable
                   key={pack.backend.appleProductId}
                   accessibilityLabel={rowAccessibilityLabel}

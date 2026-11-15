@@ -887,7 +887,7 @@
       "commentBody": "Komentaro tekstas",
       "commentNow": "Komentuoti dabar",
       "addToReview": "Pridėti prie peržiūros",
-      "editTitle": "Komentaro redagavimas",
+      "editTitle": "Redaguoti komentarą",
       "addTitle": "Naujas komentaras",
       "unavailableTitle": "Komentaras nepasiekiamas",
       "unavailableMessage": "Šis nepateiktas komentaras jau ištrintas arba pateiktas.",
@@ -1061,8 +1061,8 @@
     },
     "capabilities": {
       "banner": {
-        "title": "Nepasiekiama šio teikėjo",
-        "accessibility": "Nepasiekiama šio teikėjo: {{reason}}"
+        "title": "Nepasiekiama šiame teikėjuje",
+        "accessibility": "Nepasiekiama šiame teikėjuje: {{reason}}"
       }
     },
     "terms": {

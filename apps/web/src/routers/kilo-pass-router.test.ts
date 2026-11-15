@@ -4653,7 +4653,7 @@ describe('kiloPassRouter', () => {
 
       const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_ended_history_test',
+        stripeSubscriptionId: 'sub_ended_history_credit_test',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'canceled',

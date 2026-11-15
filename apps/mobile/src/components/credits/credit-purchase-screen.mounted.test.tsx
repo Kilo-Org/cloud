@@ -4,7 +4,7 @@ import type * as SharedUtils from '@kilocode/app-shared/utils';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
@@ -20,7 +20,6 @@ import {
 import { act, type TestRenderer } from '@/test/renderer';
 import { compiledLengthDp } from '@/test/native-dimensions';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
-import { i18n } from '@/i18n';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
 
 // ── Mutable state ────────────────────────────────────────────────────
@@ -1784,7 +1783,9 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
     renderer: TestRenderer.ReactTestRenderer,
     testID: string
   ): TestRenderer.ReactTestInstance | undefined {
-    return renderer.root.findAll(node => (node.props as { testID?: string }).testID === testID)[0];
+    return renderer.root.findAll(
+      candidate => (candidate.props as { testID?: string }).testID === testID
+    )[0];
   }
 
   function cards(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
@@ -1796,12 +1797,12 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
 
   /** Each pack row's index among its parent's children, in render order. */
   function rowPlacement(renderer: TestRenderer.ReactTestRenderer): number[] {
-    return packRows(renderer).map(row => {
-      const parent = row.parent;
+    return packRows(renderer).map(rowInstance => {
+      const parent = rowInstance.parent;
       if (parent === null) {
         throw new Error('expected a mounted pack row');
       }
-      return parent.children.indexOf(row);
+      return parent.children.indexOf(rowInstance);
     });
   }
 
@@ -1862,9 +1863,7 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
     expect(textWithinCard(card)).toContain(i18n.t('credits.pickPackToBuyAgain'));
     expect(card.findAll(node => String(node.type) === 'Button')).toHaveLength(1);
     expect(
-      packRows(renderer).every(
-        row => (row.props as { disabled?: boolean }).disabled !== true
-      )
+      packRows(renderer).every(row => (row.props as { disabled?: boolean }).disabled !== true)
     ).toBe(true);
     unmount();
   });
@@ -1877,8 +1876,10 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
     await waitFor(() => packRows(renderer).length === 4);
 
     const waiting = i18n.t('credits.waitingForStore');
-    const row = packRows(renderer).find(candidate => labelOf(candidate).includes(waiting));
-    expect(row).toBeDefined();
+    const waitingRowNode = packRows(renderer).find(candidate =>
+      labelOf(candidate).includes(waiting)
+    );
+    expect(waitingRowNode).toBeDefined();
     expect(allText(renderer)).not.toContain(i18n.t('credits.storeTimedOut'));
     const card = byTestId(renderer, waitCardId);
     if (!card) {
@@ -1899,8 +1900,10 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
     await waitFor(() => packRows(renderer).length === 4);
 
     const pending = i18n.t('credits.purchasePending');
-    const row = packRows(renderer).find(candidate => labelOf(candidate).includes(pending));
-    expect(row).toBeDefined();
+    const pendingRowNode = packRows(renderer).find(candidate =>
+      labelOf(candidate).includes(pending)
+    );
+    expect(pendingRowNode).toBeDefined();
     // The card in the slot carries the pending copy, and its actions stay
     // enabled because no purchase is in flight.
     const card = byTestId(renderer, cardId);
@@ -1975,7 +1978,9 @@ function textWithinCard(card: TestRenderer.ReactTestInstance): string {
   const texts: string[] = [];
   const walk = (instance: TestRenderer.ReactTestInstance): void => {
     for (const child of instance.children) {
-      if (typeof child === 'string' || typeof child === 'number') {
+      if (typeof child === 'string') {
+        texts.push(child);
+      } else if (typeof child === 'number') {
         texts.push(String(child));
       } else {
         walk(child);

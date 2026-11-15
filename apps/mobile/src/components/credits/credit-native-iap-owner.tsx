@@ -791,6 +791,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       markUnresolvedPurchase,
       offerBuyAgain,
       retireCompletedIntent,
+      settlePurchaseRow,
       toastPurchaseError,
     ]
   );

@@ -200,9 +200,7 @@ export function applyPreferredProvider(
   if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
   }
-  const provider = isRecord(requestToMutate.provider)
-    ? requestToMutate.provider
-    : {};
+  const provider = isRecord(requestToMutate.provider) ? requestToMutate.provider : {};
   if (preferredProviderOrder.length > 0 && !provider.order) {
     console.debug(
       `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`

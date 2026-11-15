@@ -497,7 +497,14 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             delivered = await requestPurchase(params);
           } catch (error) {
             if (isStoreNotReadyError(error) && isCurrentAuthEpoch(record.epoch)) {
-              await reconnectStore();
+              // A reconnect is a store call of its own: one that fails must not
+              // skip this request's handling, leave it in the pool or replace
+              // the error the person is about to see.
+              try {
+                await reconnectStore();
+              } catch {
+                // The request's own error below is the one that is reported.
+              }
             }
             const attributable = canAttributeNativePurchaseOutcome(record.intent);
             const pending = isStorePendingPurchaseError(error);

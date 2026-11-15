@@ -1052,6 +1052,34 @@ describe('CreditNativeIapOwner', () => {
     expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(2);
   });
 
+  it('handles the request error when the reconnect it triggers fails', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'not-prepared',
+      message: 'Billing client not ready',
+    });
+    mockedIap.reconnect.mockRejectedValueOnce(new Error('reconnect failed'));
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.errorMessageKey).not.toBeNull();
+
+    // The failed request still left the pool, so the next one's own delivery is
+    // attributed and retires the barrier.
+    mockedIap.requestPurchase.mockResolvedValueOnce(null);
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-after-reconnect' }));
+    await flushPromises();
+
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+  });
+
   it('keeps the consent when buy again runs without an account token', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

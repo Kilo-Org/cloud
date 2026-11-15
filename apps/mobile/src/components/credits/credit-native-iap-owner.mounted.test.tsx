@@ -1019,6 +1019,39 @@ describe('CreditNativeIapOwner', () => {
     }
   });
 
+  it('leaves the pool with a refused request, so the consented charge retires the barrier', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    // The store answers no purchase on the request promise (iOS returns null),
+    // so the request keeps its place in the pool until it is refused.
+    mockedIap.requestPurchase.mockResolvedValue(null);
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+    mockedQuery.completePurchase.mockRejectedValueOnce(
+      new Error('This store purchase has been refunded, so Kilo cannot credit it.')
+    );
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-a' }));
+    await flushPromises();
+    expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+    expect(handle.value?.hasUnresolvedPurchase).toBe(true);
+
+    // The consented request is then the pool's only member, so its own delivery
+    // is attributed and retires the barrier.
+    mockedQuery.completePurchase.mockResolvedValue({ alreadyProcessed: false });
+    const consented = handle.value?.buyAgain(creditPack);
+    await flushPromises();
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ transactionId: 'tx-b' }));
+    await consented;
+    await flushPromises();
+
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the consent when buy again runs without an account token', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

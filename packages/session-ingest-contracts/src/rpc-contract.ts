@@ -1413,10 +1413,15 @@ export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
  * always bounded before it reaches the session store. `cursor` is the opaque
  * continuation cursor validated by `validateKiloSdkMessagesCursor`; a caller
  * receives one from a previous page and passes it back to walk older history.
+ *
+ * `session_id` takes `storedSessionIdSchema`, the same rule the worker reader
+ * applies. The boundary accepts exactly the ids the reader addresses: bounded,
+ * URL-safe, and including ids minted before the canonical `ses_…` shape. The
+ * ownership and organization check owns authorization, not the id shape.
  */
 export const getSessionMessagesPageInputSchema = z
   .object({
-    session_id: z.string().min(1),
+    session_id: storedSessionIdSchema,
     limit: boundedMessageHistoryLimitField,
     cursor: optionalMessageCursorField,
   })

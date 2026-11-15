@@ -165,10 +165,9 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
 - Optimistic updates have one owner each. A value in the TanStack query cache belongs to its mutation: snapshot in `onMutate`, roll back in `onError` only while `isLatestMutationGeneration` says this mutation still owns the key, and reconcile in `onSettled`. Never add a second optimistic copy over a query-backed value.
-- The per-chat web search and Kilo MCP choices belong to the chat registry. Change them only through `setChatFlag` and `retryChatFlag` in `@/lib/chat/registry`. Other stored values stay with the store that owns them; a component must not keep its own optimistic copy beside it.
+- A stored value has one owner. Change it only through that owner's API, and never keep a second optimistic copy beside it in a component.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
-- Retained merge keys retire only when the fingerprint and the captured key both still match. At capacity, refuse new intents; never evict an unresolved one.
 
 ## State Machines
 
@@ -179,12 +178,16 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
 - For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
   - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
-  - Settle the attempt once, with `succeed()`, `fail(failure)`, or `abandon()` when there is no outcome. `abandon()` removes the key's entry. `succeed()` and `fail()` keep it until the next `begin()` for that key or until the surface unmounts; `clearWhere` retires only a failure. If nothing on the surface renders the failure (for example, a toast already reports it), use `abandon()`.
+  - Settle the attempt exactly once. Leave no entry behind that nothing renders; the doc in `@/lib/surface-feedback` says which settle keeps one.
   - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
   - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
 - Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
-- A purchase keeps its own request and transaction records. Never settle one by looking it up by product id.
-- A regression test for one of these bugs must fail on the code before the fix. Prove that once before the fix lands.
+- Settle async work by its own request identity, never by a shared attribute such as a product id or a name.
+- When an outcome cannot be tied to one request, keep the safe state and give the person an explicit way out. Never leave a state with no exit.
+- Scope a barrier to the account or identity that created it. Release it only on an authoritative outcome or the person's informed consent.
+- Progress UI ends when its own work ends. It never waits for an outcome to be attributed.
+- Retire retained state only when its identity still matches. At capacity, refuse new entries; never evict an unresolved one.
+- A regression test must fail on the code before the fix. Prove that once before the fix lands.
 
 ## React Native Rules
 

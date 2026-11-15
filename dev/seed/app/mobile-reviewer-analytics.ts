@@ -30,9 +30,10 @@ export const usage = '<owner-email>';
  * `capture_status = 'captured'` exists for that review and attempt, with its
  * `code_review_analytics_findings`.
  *
- * Each platform gets nine reviews at three ages (5, 45 and 75 days), so the
- * 30-day period counts five and the 90-day period counts nine; GitHub carries
- * three findings per review and GitLab two, so the platforms differ too.
+ * Each platform gets nine reviews at four ages (5, 20, 45 and 75 days), so the
+ * 7-day period counts four, the 30-day period counts five and the 90-day period
+ * counts nine; GitHub carries three findings per review and GitLab two, so the
+ * platforms differ too.
  *
  * Every row hangs off a review whose `repo_full_name` starts with
  * {@link REPO_MARKER}: a rerun deletes those reviews (attempts, results and
@@ -63,9 +64,9 @@ type FindingBlueprint = {
 };
 
 /**
- * The nine reviews per platform. Their ages put five inside the 30-day period
- * and all nine inside the 90-day one; the classification values only vary the
- * breakdowns, not the counted reviews.
+ * The nine reviews per platform. Their ages put four inside the 7-day period,
+ * five inside the 30-day one, and all nine inside the 90-day one; the
+ * classification values only vary the breakdowns, not the counted reviews.
  */
 const REVIEW_BLUEPRINTS = [
   { ageInDays: 5, changeType: 'feature', impact: 'high', complexity: 'medium', confidence: 'high' },
@@ -85,7 +86,7 @@ const REVIEW_BLUEPRINTS = [
     confidence: 'high',
   },
   {
-    ageInDays: 5,
+    ageInDays: 20,
     changeType: 'dependency',
     impact: 'medium',
     complexity: 'low',
@@ -126,7 +127,7 @@ const FINDINGS_BY_PLATFORM = {
   ],
 } as const satisfies Record<SeedPlatform, readonly FindingBlueprint[]>;
 
-const PERIODS = [30, 90] as const;
+const PERIODS = [7, 30, 90] as const;
 
 type Period = (typeof PERIODS)[number];
 
@@ -329,7 +330,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   // The screen reads `review_analytics_enabled` from the organization's
   // `code_review` config; without a row it shows the muted "analytics off" note.
-  // An existing row wins, so a manual save survives a rerun.
+  // The analytics toggle writes the same row with `is_enabled: false`
+  // (`setReviewAnalyticsEnabled` in
+  // `apps/web/src/lib/code-reviews/analytics/settings.ts`), and review dispatch
+  // reads that flag, so the fixture leaves the agent off exactly as the toggle
+  // does. An existing row wins, so a manual save survives a rerun.
   await db
     .insert(agent_configs)
     .values(
@@ -339,6 +344,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
           agent_type: 'code_review',
           platform,
           config: agentConfigFor(platform),
+          is_enabled: false,
           created_by: user.id,
         }))
       )
@@ -371,7 +377,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   console.log(
-    'This fixture represents: completed reviews the Analytics screen captured, five of them inside the 30-day period.'
+    'This fixture represents: completed reviews the Analytics screen captured, with a different count for each period and platform.'
   );
   console.log(
     `Rows are keyed by ${REPO_MARKER}; a rerun replaces them and keeps an existing analytics setting. Suggested next step: open an organization deep link on the signed-in mobile app and switch platform and period.`

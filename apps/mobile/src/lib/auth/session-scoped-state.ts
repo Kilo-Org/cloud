@@ -95,7 +95,8 @@ function clearRecentPrsBestEffort(): void {
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
  * PR discussion conversation, the phone's own search index, the OS launcher
- * shortcuts and tile, and the durable last-opened-session and last-route
+ * shortcuts and tile, the per-organization code reviewer analytics platform and
+ * period selection, and the durable last-opened-session and last-route
  * records. Every member is
  * best-effort; one member's throw falls through to the members after it, and to
  * the caller's own sign-in/sign-out state reset. The recents delete and OS

@@ -395,6 +395,7 @@
       "testUnreadableKey": "Shranjenega ključa ni bilo mogoče prebrati. Poskusi znova pozneje.",
       "testDeprecatedProvider": "Ta ponudnik je opuščen, zato njegovega ključa ni mogoče preizkusiti.",
       "keyManagedByCodingPlan": "Tvoj paket za kodiranje upravlja ključ za tega ponudnika, ki je samo za branje. Če želiš dodati svojega, prekliči paket za kodiranje.",
+      "providerUnavailable": "Tega ponudnika še ni na voljo, zato zanj ne moreš dodati ključa.",
       "testFailed": "Preizkus ključa ni uspel. Poskusi znova."
     },
     "dataExport": {

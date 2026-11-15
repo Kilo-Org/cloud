@@ -462,6 +462,7 @@
       "testUnreadableKey": "The stored key could not be read. Try again later.",
       "testDeprecatedProvider": "This provider is deprecated, so its key cannot be tested.",
       "keyManagedByCodingPlan": "A coding plan manages this provider's key, and the key is read-only. Cancel the coding plan to add your own.",
+      "providerUnavailable": "This provider is not available yet, so you cannot add a key for it.",
       "testFailed": "The key test failed. Try again."
     },
     "dataExport": {

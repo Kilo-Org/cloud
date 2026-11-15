@@ -395,6 +395,7 @@
       "testUnreadableKey": "Hindi mabasa ang nakaimbak na key. Subukan muli mamaya.",
       "testDeprecatedProvider": "Lipas na ang provider na ito, kaya hindi na masusubukan ang key nito.",
       "keyManagedByCodingPlan": "Pinamamahalaan ng coding plan ang key ng provider na ito, at ang key ay hindi mababago. Kanselahin ang coding plan para makapagdagdag ka ng sarili mong key.",
+      "providerUnavailable": "Hindi pa available ang provider na ito, kaya hindi ka pa makakapagdagdag ng key para dito.",
       "testFailed": "Bigo ang pagsubok ng key. Subukan muli."
     },
     "dataExport": {

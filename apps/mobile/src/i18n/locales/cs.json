@@ -395,6 +395,7 @@
       "testUnreadableKey": "Uložený klíč se nepodařilo přečíst. Zkuste to znovu později.",
       "testDeprecatedProvider": "Tento poskytovatel je zastaralý, takže jeho klíč nelze otestovat.",
       "keyManagedByCodingPlan": "Klíč tohoto poskytovatele spravuje programovací tarif a je jen pro čtení. Chcete-li přidat vlastní klíč, zrušte programovací tarif.",
+      "providerUnavailable": "Tento poskytovatel zatím není dostupný, proto pro něj nelze přidat klíč.",
       "testFailed": "Test klíče selhal. Zkuste to znovu."
     },
     "dataExport": {

@@ -395,6 +395,7 @@
       "testUnreadableKey": "Níorbh fhéidir an eochair stóráilte a léamh. Bain triail eile as níos déanaí.",
       "testDeprecatedProvider": "Tá an soláthraí seo dímholta, mar sin ní féidir a eochair a thástáil.",
       "keyManagedByCodingPlan": "Bainistíonn plean códaithe eochair an tsoláthraí seo, agus tá sí inléite amháin. Cealaigh an plean códaithe chun d'eochair féin a chur leis.",
+      "providerUnavailable": "Níl an soláthraí seo ar fáil fós, mar sin ní féidir leat eochair a chur leis.",
       "testFailed": "Theip ar an tástáil eochrach. Bain triail eile as."
     },
     "dataExport": {

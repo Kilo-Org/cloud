@@ -395,6 +395,7 @@
       "testUnreadableKey": "Saqlangan kalitni o'qib bo'lmadi. Keyinroq qayta urinib ko'ring.",
       "testDeprecatedProvider": "Bu provayder eskirgan, shuning uchun uning kalitini sinab bo'lmaydi.",
       "keyManagedByCodingPlan": "Kodlash tarifi ushbu provayderning kalitini boshqaradi va kalit faqat o'qish uchun. O'z kalitingizni qo'shish uchun kodlash tarifini bekor qiling.",
+      "providerUnavailable": "Bu provayder hali mavjud emas, shuning uchun unga kalit qoʻshib boʻlmaydi.",
       "testFailed": "Kalit sinovi muvaffaqiyatsiz tugadi. Qayta urinib ko'ring."
     },
     "dataExport": {

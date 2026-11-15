@@ -395,6 +395,7 @@
       "testUnreadableKey": "De opgeslagen sleutel kon niet worden gelezen. Probeer het later opnieuw.",
       "testDeprecatedProvider": "Deze provider is verouderd, dus de sleutel kan niet worden getest.",
       "keyManagedByCodingPlan": "Een codeerabonnement beheert de sleutel van deze provider en de sleutel is alleen-lezen. Zeg je codeerabonnement op om je eigen sleutel toe te voegen.",
+      "providerUnavailable": "Deze provider is nog niet beschikbaar, dus je kunt er geen sleutel voor toevoegen.",
       "testFailed": "De sleuteltest is mislukt. Probeer het opnieuw."
     },
     "dataExport": {

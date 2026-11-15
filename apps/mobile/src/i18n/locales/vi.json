@@ -395,6 +395,7 @@
       "testUnreadableKey": "Không thể đọc khóa đã lưu. Hãy thử lại sau.",
       "testDeprecatedProvider": "Nhà cung cấp này đã ngừng hỗ trợ, vì vậy không thể kiểm tra khóa của nó.",
       "keyManagedByCodingPlan": "Gói lập trình của bạn quản lý khóa của nhà cung cấp này và khóa này ở chế độ chỉ đọc. Bạn cần hủy gói lập trình để thêm khóa của riêng mình.",
+      "providerUnavailable": "Nhà cung cấp này chưa khả dụng nên bạn không thể thêm khóa cho nhà cung cấp này.",
       "testFailed": "Kiểm tra khóa thất bại. Hãy thử lại."
     },
     "dataExport": {

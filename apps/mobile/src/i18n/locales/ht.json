@@ -395,6 +395,7 @@
       "testUnreadableKey": "Kle ki anrejistre a pa t kapab li. Eseye ankò pita.",
       "testDeprecatedProvider": "Founisè sa a pa rekòmande ankò, kidonk kle li pa ka teste.",
       "keyManagedByCodingPlan": "Yon plan kodaj jere kle founisè sa a, epi kle a se lekti sèlman. Anile plan kodaj la pou ajoute pwòp kle ou.",
+      "providerUnavailable": "Founisè sa a poko disponib, kidonk ou pa ka ajoute yon kle pou li.",
       "testFailed": "Tès kle a echwe. Eseye ankò."
     },
     "dataExport": {

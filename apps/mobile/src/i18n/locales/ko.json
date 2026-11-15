@@ -395,6 +395,7 @@
       "testUnreadableKey": "저장된 키를 읽을 수 없습니다. 나중에 다시 시도하세요.",
       "testDeprecatedProvider": "이 제공업체는 사용 중단되었으므로 해당 키를 테스트할 수 없습니다.",
       "keyManagedByCodingPlan": "코딩 플랜에서 이 제공업체의 키를 관리하며, 키는 읽기 전용입니다. 직접 키를 추가하려면 코딩 플랜을 해지하세요.",
+      "providerUnavailable": "이 제공업체는 아직 사용할 수 없으므로 키를 추가할 수 없습니다.",
       "testFailed": "키 테스트에 실패했습니다. 다시 시도하세요."
     },
     "dataExport": {

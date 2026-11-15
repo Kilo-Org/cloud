@@ -395,6 +395,7 @@
       "testUnreadableKey": "Ni ellid darllen yr allwedd a storiwyd. Ceisiwch eto yn nes ymlaen.",
       "testDeprecatedProvider": "Mae'r darparwr hwn wedi darfod amdano, felly ni ellir profi ei allwedd.",
       "keyManagedByCodingPlan": "Mae cynllun codio yn rheoli allwedd y darparwr hwn, ac mae'r allwedd yn ddarllen yn unig. Canslwch y cynllun codio i ychwanegu eich allwedd eich hun.",
+      "providerUnavailable": "Nid yw'r darparwr hwn ar gael eto, felly ni allwch ychwanegu allwedd ar ei gyfer.",
       "testFailed": "Methodd prawf yr allwedd. Ceisiwch eto."
     },
     "dataExport": {

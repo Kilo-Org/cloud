@@ -395,6 +395,7 @@
       "testUnreadableKey": "Ufunguo uliohifadhiwa haukuweza kusomwa. Jaribu tena baadaye.",
       "testDeprecatedProvider": "Mtoa huduma huyu amepitwa na wakati, kwa hivyo ufunguo wake hauwezi kujaribiwa.",
       "keyManagedByCodingPlan": "Mpango wa uandishi wa msimbo unasimamia ufunguo wa mtoa huduma huyu, na ufunguo huo ni wa kusoma pekee. Ghairi mpango wa uandishi wa msimbo ili kuongeza ufunguo wako mwenyewe.",
+      "providerUnavailable": "Mtoa huduma huyu bado hapatikani, kwa hivyo huwezi kuongeza ufunguo wake.",
       "testFailed": "Jaribio la ufunguo limeshindwa. Jaribu tena."
     },
     "dataExport": {

@@ -395,6 +395,7 @@
       "testUnreadableKey": "Kunci yang tersimpan tidak dapat dibaca. Coba lagi nanti.",
       "testDeprecatedProvider": "Penyedia ini sudah usang, sehingga kuncinya tidak dapat diuji.",
       "keyManagedByCodingPlan": "Paket coding mengelola kunci penyedia ini, dan kunci tersebut bersifat hanya-baca. Batalkan paket coding untuk menambahkan kunci milikmu sendiri.",
+      "providerUnavailable": "Penyedia ini belum tersedia, jadi kamu belum dapat menambahkan kunci untuknya.",
       "testFailed": "Pengujian kunci gagal. Coba lagi."
     },
     "dataExport": {

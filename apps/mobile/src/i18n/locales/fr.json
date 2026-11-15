@@ -395,6 +395,7 @@
       "testUnreadableKey": "La clé stockée n'a pas pu être lue. Réessayez plus tard.",
       "testDeprecatedProvider": "Ce fournisseur est obsolète, sa clé ne peut donc pas être testée.",
       "keyManagedByCodingPlan": "Un forfait de code gère la clé de ce fournisseur, et cette clé est en lecture seule. Annulez le forfait de code pour ajouter votre propre clé.",
+      "providerUnavailable": "Ce fournisseur n'est pas encore disponible, vous ne pouvez donc pas ajouter de clé pour celui-ci.",
       "testFailed": "Le test de la clé a échoué. Réessayez."
     },
     "dataExport": {

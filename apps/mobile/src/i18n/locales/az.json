@@ -395,6 +395,7 @@
       "testUnreadableKey": "Saxlanılan açar deşifrə edilib oxuna bilmədi. Sonra yenidən cəhd et.",
       "testDeprecatedProvider": "Bu provayder köhnəlmişdir, buna görə də onun açarı yoxlana bilməz.",
       "keyManagedByCodingPlan": "Bu provayderin açarı kodlaşdırma planı tərəfindən idarə olunur və açar yalnız oxumaq üçündür. Öz açarını əlavə etmək üçün kodlaşdırma planını ləğv et.",
+      "providerUnavailable": "Bu provayder hələ istifadəyə verilməyib, ona görə də onun üçün açar əlavə edə bilməzsən.",
       "testFailed": "Açar yoxlaması uğursuz oldu. Yenidən cəhd et."
     },
     "dataExport": {

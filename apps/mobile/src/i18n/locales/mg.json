@@ -395,6 +395,7 @@
       "testUnreadableKey": "Tsy azo novakiana ny lakile voatahiry. Andramo indray aoriana.",
       "testDeprecatedProvider": "Lany andro ity mpamatsy ity, ka tsy azo andramana ny lakile.",
       "keyManagedByCodingPlan": "Tantanan'ny drafitra fandaharana ny lakilen'ity mpamatsy ity, ary tsy azo ovaina izy. Foano ny drafitra fandaharana mba hanampianao ny lakilenao manokana.",
+      "providerUnavailable": "Tsy mbola misy ity mpamatsy ity, ka tsy azo ampiana lakile ho azy.",
       "testFailed": "Tsy nahomby ny andramana lakile. Andramo indray."
     },
     "dataExport": {

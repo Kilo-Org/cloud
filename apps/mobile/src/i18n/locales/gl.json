@@ -395,6 +395,7 @@
       "testUnreadableKey": "A clave gardada non se puido ler. Téntao de novo máis tarde.",
       "testDeprecatedProvider": "Este provedor está obsoleto, polo que a súa clave non se pode probar.",
       "keyManagedByCodingPlan": "O plan de programación xestiona a clave deste provedor, que é de só lectura. Cancela o plan de programación para engadir a túa propia clave.",
+      "providerUnavailable": "Este provedor aínda non está dispoñible, polo que non podes engadir unha clave para el.",
       "testFailed": "A proba da clave fallou. Téntao de novo."
     },
     "dataExport": {

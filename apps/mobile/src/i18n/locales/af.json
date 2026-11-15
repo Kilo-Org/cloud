@@ -395,6 +395,7 @@
       "testUnreadableKey": "Die gestoorde sleutel kon nie gelees word nie. Probeer later weer.",
       "testDeprecatedProvider": "Hierdie verskaffer is verouderd, dus kan die sleutel daarvan nie getoets word nie.",
       "keyManagedByCodingPlan": "'n Koderingsplan bestuur hierdie verskaffer se sleutel, en die sleutel is alleenlees. Kanselleer die koderingsplan om jou eie sleutel by te voeg.",
+      "providerUnavailable": "Hierdie verskaffer is nog nie beskikbaar nie, so jy kan nie 'n sleutel daarvoor byvoeg nie.",
       "testFailed": "Die sleuteltoets het misluk. Probeer weer."
     },
     "dataExport": {

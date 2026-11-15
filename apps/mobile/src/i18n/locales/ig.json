@@ -395,6 +395,7 @@
       "testUnreadableKey": "Enweghị ike ịgụ igodo echekwara. Nwaa ọzọ ma emechara.",
       "testDeprecatedProvider": "Onye na-enye ọrụ a adịlarị ochie, ya mere a pụghị ịnwale igodo ya.",
       "keyManagedByCodingPlan": "Atụmatụ koodu na-ahazi igodo onye na-enye ọrụ a, igodo ahụ bụkwa naanị ịgụ. Kagbuo atụmatụ koodu ahụ iji tinye nke gị.",
+      "providerUnavailable": "Onye na-enye ọrụ a adịbeghị, yabụ ị pụghị ịtinye igodo maka ya.",
       "testFailed": "Nnwale igodo ahụ daara. Nwaa ọzọ."
     },
     "dataExport": {

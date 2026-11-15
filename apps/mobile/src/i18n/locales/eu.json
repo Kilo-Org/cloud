@@ -395,6 +395,7 @@
       "testUnreadableKey": "Ezin izan da gordetako gakoa irakurri. Saiatu geroago.",
       "testDeprecatedProvider": "Hornitzaile hau zaharkituta dago, beraz ezin da haren gakoa probatu.",
       "keyManagedByCodingPlan": "Kodetze-plan batek hornitzaile honen gakoa kudeatzen du, eta gakoa irakurtzeko soilik da. Zure gakoa gehitzeko, kodetze-plana bertan behera utzi behar duzu.",
+      "providerUnavailable": "Hornitzaile hau oraindik ez dago erabilgarri, beraz, ezin duzu gako bat gehitu.",
       "testFailed": "Gakoaren proba huts egin du. Saiatu berriro."
     },
     "dataExport": {

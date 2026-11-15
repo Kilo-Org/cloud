@@ -395,6 +395,7 @@
       "testUnreadableKey": "无法读取已存储的密钥。请稍后重试。",
       "testDeprecatedProvider": "此提供商已弃用，因此其密钥无法测试。",
       "keyManagedByCodingPlan": "编程套餐管理着此提供商的密钥，该密钥为只读。要添加你自己的密钥，请先取消编程套餐。",
+      "providerUnavailable": "此提供商尚未开放，因此无法为其添加密钥。",
       "testFailed": "密钥测试失败。请重试。"
     },
     "dataExport": {

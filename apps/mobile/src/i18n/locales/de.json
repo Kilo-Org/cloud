@@ -395,6 +395,7 @@
       "testUnreadableKey": "Der gespeicherte Schlüssel konnte nicht gelesen werden. Versuche es später erneut.",
       "testDeprecatedProvider": "Dieser Anbieter ist veraltet, daher kann sein Schlüssel nicht getestet werden.",
       "keyManagedByCodingPlan": "Ein Coding-Plan verwaltet den Schlüssel dieses Anbieters, und der Schlüssel ist schreibgeschützt. Kündige den Coding-Plan, um deinen eigenen Schlüssel hinzuzufügen.",
+      "providerUnavailable": "Dieser Anbieter ist noch nicht verfügbar, daher kannst du keinen Schlüssel für ihn hinzufügen.",
       "testFailed": "Der Schlüsseltest ist fehlgeschlagen. Versuche es erneut."
     },
     "dataExport": {

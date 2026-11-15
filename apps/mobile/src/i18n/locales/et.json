@@ -395,6 +395,7 @@
       "testUnreadableKey": "Salvestatud võtit ei saanud lugeda. Proovi hiljem uuesti.",
       "testDeprecatedProvider": "See teenusepakkuja on vananenud, seega ei saa selle võtit testida.",
       "keyManagedByCodingPlan": "Kodeerimispakett haldab selle teenusepakkuja võtit ja võti on ainult lugemiseks. Oma võtme lisamiseks tühista kodeerimispakett.",
+      "providerUnavailable": "See teenusepakkuja pole veel saadaval, seega ei saa sellele võtit lisada.",
       "testFailed": "Võtme test ebaõnnestus. Proovi uuesti."
     },
     "dataExport": {

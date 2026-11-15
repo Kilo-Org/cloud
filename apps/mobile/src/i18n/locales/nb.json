@@ -395,6 +395,7 @@
       "testUnreadableKey": "Den lagrede nøkkelen kunne ikke leses. Prøv igjen senere.",
       "testDeprecatedProvider": "Denne leverandøren er utdatert, så nøkkelen kan ikke testes.",
       "keyManagedByCodingPlan": "Et kodeabonnement administrerer denne leverandørens nøkkel, og nøkkelen er skrivebeskyttet. Avbryt kodeabonnementet for å legge til din egen nøkkel.",
+      "providerUnavailable": "Denne leverandøren er ikke tilgjengelig ennå, så du kan ikke legge til en nøkkel for den.",
       "testFailed": "Nøkkeltesten mislyktes. Prøv igjen."
     },
     "dataExport": {

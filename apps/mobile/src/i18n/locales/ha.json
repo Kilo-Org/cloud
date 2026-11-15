@@ -395,6 +395,7 @@
       "testUnreadableKey": "Ba a iya karanta maɓallin da aka adana ba. Sake gwadawa daga baya.",
       "testDeprecatedProvider": "Wannan mai samarwa ya tsufa, don haka ba za a iya gwada maɓallinsa ba.",
       "keyManagedByCodingPlan": "Tsarin coding yana sarrafa maɓallin wannan mai samarwa, kuma maɓallin na karatu kawai ne. Soke tsarin coding don ƙara naka.",
+      "providerUnavailable": "Wannan mai samarwa bai samu ba tukuna, don haka ba za a iya ƙara masa maɓalli ba.",
       "testFailed": "Gwajin maɓallin ya kasa. Sake gwadawa."
     },
     "dataExport": {

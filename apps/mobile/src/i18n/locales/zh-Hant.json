@@ -395,6 +395,7 @@
       "testUnreadableKey": "無法讀取已儲存的金鑰。請稍後再試一次。",
       "testDeprecatedProvider": "此供應商已棄用，因此無法測試其金鑰。",
       "keyManagedByCodingPlan": "程式設計方案會管理此供應商的金鑰，且該金鑰為唯讀。若要新增自己的金鑰，請取消程式設計方案。",
+      "providerUnavailable": "此供應商尚未上線，因此無法為其新增金鑰。",
       "testFailed": "金鑰測試失敗。請再試一次。"
     },
     "dataExport": {

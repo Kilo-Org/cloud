@@ -395,6 +395,7 @@
       "testUnreadableKey": "Išsaugoto rakto perskaityti nepavyko. Bandykite dar kartą vėliau.",
       "testDeprecatedProvider": "Šis teikėjas pasenęs, todėl jo rakto negalima išbandyti.",
       "keyManagedByCodingPlan": "Šio teikėjo raktą valdo programavimo planas, todėl raktas yra tik skaitomas. Norėdami pridėti savo raktą, atšaukite programavimo planą.",
+      "providerUnavailable": "Šis teikėjas dar neprieinamas, todėl negalite jam pridėti rakto.",
       "testFailed": "Rakto bandymas nepavyko. Bandykite dar kartą."
     },
     "dataExport": {

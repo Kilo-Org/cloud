@@ -395,6 +395,7 @@
       "testUnreadableKey": "A tárolt kulcsot nem sikerült beolvasni. Próbáld újra később.",
       "testDeprecatedProvider": "Ez a szolgáltató elavult, ezért a kulcsa nem tesztelhető.",
       "keyManagedByCodingPlan": "A kódolási csomagod kezeli ennek a szolgáltatónak a kulcsát, és a kulcs csak olvasható. Saját kulcs hozzáadásához mondd le a kódolási csomagot.",
+      "providerUnavailable": "Ez a szolgáltató még nem érhető el, ezért nem adhatsz hozzá kulcsot.",
       "testFailed": "A kulcs tesztelése nem sikerült. Próbáld újra."
     },
     "dataExport": {

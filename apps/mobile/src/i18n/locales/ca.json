@@ -395,6 +395,7 @@
       "testUnreadableKey": "No s'ha pogut llegir la clau desada. Torna-ho a provar més tard.",
       "testDeprecatedProvider": "Aquest proveïdor està obsolet, així que la seva clau no es pot provar.",
       "keyManagedByCodingPlan": "El teu pla de programació gestiona la clau d'aquest proveïdor i la clau és només de lectura. Cancel·la el pla de programació per afegir la teva pròpia clau.",
+      "providerUnavailable": "Aquest proveïdor encara no està disponible, així que no hi pots afegir cap clau.",
       "testFailed": "La prova de la clau ha fallat. Torna-ho a provar."
     },
     "dataExport": {

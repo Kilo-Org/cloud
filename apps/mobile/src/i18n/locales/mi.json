@@ -395,6 +395,7 @@
       "testUnreadableKey": "Kāore i taea te pānui i te kī kua penapenahia. Whakamātau anō ā muri ake.",
       "testDeprecatedProvider": "Kua tawhito tēnei kaiwhakarato, nā reira kāore e taea te whakamātau i tōna kī.",
       "keyManagedByCodingPlan": "Kei tō mahere waehere e whakahaere te kī o tēnei kaiwhakarato, ā, he pānui anake te kī. Whakakorehia tō mahere waehere kia taea ai e koe tōu ake kī te tāpiri.",
+      "providerUnavailable": "Kāore anō tēnei kaiwhakarato kia wātea, nō reira kāore e taea e koe tētahi kī te tāpiri mōna.",
       "testFailed": "I rahua te whakamātau kī. Whakamātau anō."
     },
     "dataExport": {

@@ -395,6 +395,7 @@
       "testUnreadableKey": "Den lagrade nyckeln kunde inte läsas. Försök igen senare.",
       "testDeprecatedProvider": "Den här leverantören är föråldrad, så dess nyckel kan inte testas.",
       "keyManagedByCodingPlan": "En kodningsplan hanterar den här leverantörens nyckel, och nyckeln är skrivskyddad. Avbryt kodningsplanen för att lägga till en egen nyckel.",
+      "providerUnavailable": "Den här leverantören är ännu inte tillgänglig, så du kan inte lägga till någon nyckel för den.",
       "testFailed": "Nyckeltestet misslyckades. Försök igen."
     },
     "dataExport": {

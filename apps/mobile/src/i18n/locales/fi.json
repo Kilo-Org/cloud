@@ -395,6 +395,7 @@
       "testUnreadableKey": "Tallennettua avainta ei voitu lukea. Yritä myöhemmin uudelleen.",
       "testDeprecatedProvider": "Tämä palveluntarjoaja on vanhentunut, joten sen avainta ei voi testata.",
       "keyManagedByCodingPlan": "Koodaustilaus hallinnoi tämän palveluntarjoajan avainta, ja avain on vain luku -tilassa. Peruuta koodaustilaus, jotta voit lisätä oman avaimen.",
+      "providerUnavailable": "Tämä palveluntarjoaja ei ole vielä saatavilla, joten sille ei voi lisätä avainta.",
       "testFailed": "Avaimen testaus epäonnistui. Yritä uudelleen."
     },
     "dataExport": {

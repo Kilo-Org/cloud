@@ -395,6 +395,7 @@
       "testUnreadableKey": "Sačuvani ključ nije mogao biti pročitan. Pokušaj ponovo kasnije.",
       "testDeprecatedProvider": "Ovaj pružalac je zastario, pa se njegov ključ ne može testirati.",
       "keyManagedByCodingPlan": "Tvoj plan za kodiranje upravlja ključem ovog pružaoca, a ključ je samo za čitanje. Otkaži plan za kodiranje da bi dodao svoj ključ.",
+      "providerUnavailable": "Ovaj pružalac još nije dostupan, pa ne možeš dodati ključ za njega.",
       "testFailed": "Test ključa nije uspio. Pokušaj ponovo."
     },
     "dataExport": {

@@ -395,6 +395,7 @@
       "testUnreadableKey": "Kayıtlı anahtar okunamadı. Daha sonra tekrar dene.",
       "testDeprecatedProvider": "Bu sağlayıcı kullanımdan kaldırıldı, bu yüzden anahtarı test edilemez.",
       "keyManagedByCodingPlan": "Bu sağlayıcının anahtarını bir kodlama planı yönetir ve anahtar salt okunurdur. Kendi anahtarını eklemek için kodlama planını iptal et.",
+      "providerUnavailable": "Bu sağlayıcı henüz kullanıma açık olmadığı için ona anahtar ekleyemezsin.",
       "testFailed": "Anahtar testi başarısız oldu. Tekrar dene."
     },
     "dataExport": {

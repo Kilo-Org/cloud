@@ -395,6 +395,7 @@
       "testUnreadableKey": "Saglabāto atslēgu neizdevās nolasīt. Mēģini vēlreiz vēlāk.",
       "testDeprecatedProvider": "Šis nodrošinātājs ir novecojis, tāpēc tā atslēgu nevar pārbaudīt.",
       "keyManagedByCodingPlan": "Kodēšanas plāns pārvalda šī nodrošinātāja atslēgu, un atslēga ir tikai lasāma. Atcel kodēšanas plānu, lai pievienotu savu atslēgu.",
+      "providerUnavailable": "Šis nodrošinātājs vēl nav pieejams, tāpēc tam vēl nevar pievienot atslēgu.",
       "testFailed": "Atslēgas pārbaude neizdevās. Mēģini vēlreiz."
     },
     "dataExport": {

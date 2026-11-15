@@ -395,6 +395,7 @@
       "testUnreadableKey": "Ekki tókst að lesa geymda lykilinn. Reyndu aftur síðar.",
       "testDeprecatedProvider": "Þessi þjónustuveita er úrelt, svo ekki er hægt að prófa lykilinn hennar.",
       "keyManagedByCodingPlan": "Forritunaráskriftin þín stýrir lyklinum fyrir þessa þjónustuveitu og hann er aðeins til lesturs. Segðu forritunaráskriftinni upp til að bæta við þínum eigin lykli.",
+      "providerUnavailable": "Þessi þjónustuveita er ekki enn fáanleg, svo þú getur ekki bætt við lykli fyrir hana.",
       "testFailed": "Prófun lykilsins mistókst. Reyndu aftur."
     },
     "dataExport": {

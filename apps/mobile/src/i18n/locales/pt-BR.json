@@ -395,6 +395,7 @@
       "testUnreadableKey": "Não foi possível ler a chave armazenada. Tente novamente mais tarde.",
       "testDeprecatedProvider": "Este provedor está obsoleto, então a chave dele não pode ser testada.",
       "keyManagedByCodingPlan": "Um plano de programação gerencia a chave deste provedor, e a chave é somente leitura. Cancele o plano de programação para adicionar a sua própria chave.",
+      "providerUnavailable": "Este provedor ainda não está disponível, então não é possível adicionar uma chave para ele.",
       "testFailed": "O teste da chave falhou. Tente novamente."
     },
     "dataExport": {

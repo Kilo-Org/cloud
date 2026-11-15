@@ -45,6 +45,12 @@ function refusedKeyMessage(error: unknown): string {
   if (code === 'UNPROCESSABLE_CONTENT') {
     return i18n.t('profile.providerKeys.invalidCredentials');
   }
+  // The server refuses a provider it has not opened for this account. Retrying
+  // the same request cannot change that verdict, so the copy must not ask for
+  // one.
+  if (code === 'FORBIDDEN') {
+    return i18n.t('profile.providerKeys.providerUnavailable');
+  }
   return i18n.t('profile.providerKeys.keyStoreFailed');
 }
 

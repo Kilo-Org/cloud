@@ -395,6 +395,7 @@
       "testUnreadableKey": "Nie udało się odczytać zapisanego klucza. Spróbuj ponownie później.",
       "testDeprecatedProvider": "Ten dostawca jest przestarzały, więc nie można przetestować jego klucza.",
       "keyManagedByCodingPlan": "Klucz tego dostawcy jest zarządzany przez plan kodowania i jest tylko do odczytu. Anuluj plan kodowania, aby dodać własny klucz.",
+      "providerUnavailable": "Ten dostawca nie jest jeszcze dostępny, więc nie można dodać dla niego klucza.",
       "testFailed": "Test klucza nie powiódł się. Spróbuj ponownie."
     },
     "dataExport": {

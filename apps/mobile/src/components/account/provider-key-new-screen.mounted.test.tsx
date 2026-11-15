@@ -225,6 +225,24 @@ describe('ProviderKeyNewScreen', () => {
     expect(state.dismissTo).not.toHaveBeenCalled();
   });
 
+  it('reports a provider the server has not opened as unavailable, not as a retry', async () => {
+    const root = await mount();
+    submit(root, 'sk-test-123');
+
+    act(() => {
+      // The server's own text names an internal provider the form does not show,
+      // so the code, not the message, decides the copy.
+      state.mutations[0]?.onError?.(
+        serverRefusal('FORBIDDEN', 'Provider bedrock is not available yet.')
+      );
+    });
+
+    expect(statusMessages(root)).toEqual([
+      'This provider is not available yet, so you cannot add a key for it.',
+    ]);
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
   it('reports a store failure in its own words for a transport or server fault', async () => {
     const root = await mount();
     submit(root, 'sk-test-123');

@@ -395,6 +395,7 @@
       "testUnreadableKey": "Den gemte nøgle kunne ikke læses. Prøv igen senere.",
       "testDeprecatedProvider": "Denne udbyder er forældet, så dens nøgle kan ikke testes.",
       "keyManagedByCodingPlan": "Dit kodningsabonnement administrerer denne udbyders nøgle, og nøglen er skrivebeskyttet. Annullér kodningsabonnementet for at tilføje din egen nøgle.",
+      "providerUnavailable": "Denne udbyder er endnu ikke tilgængelig, så du kan ikke tilføje en nøgle til den.",
       "testFailed": "Nøgletesten mislykkedes. Prøv igen."
     },
     "dataExport": {

@@ -395,6 +395,7 @@
       "testUnreadableKey": "Iċ-ċavetta maħżuna ma setgħetx tinqara. Erġa' pprova aktar tard.",
       "testDeprecatedProvider": "Dan il-fornitur huwa skadut, għalhekk iċ-ċavetta tiegħu ma tistax tiġi ttestjata.",
       "keyManagedByCodingPlan": "Pjan tal-ikkowdjar jimmaniġġja ċ-ċavetta ta' dan il-fornitur, u ċ-ċavetta hija biss għall-qari. Ikkanċella l-pjan tal-ikkowdjar biex iżżid ċavetta tiegħek.",
+      "providerUnavailable": "Dan il-fornitur għadu mhux disponibbli, għalhekk ma tistax iżżid ċavetta għalih.",
       "testFailed": "It-test taċ-ċavetta falla. Erġa' pprova."
     },
     "dataExport": {

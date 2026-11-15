@@ -395,6 +395,7 @@
       "testUnreadableKey": "Furaha la kaydiyay lama akhrin karin. Mar dambe isku day.",
       "testDeprecatedProvider": "Bixiyahan waa duugoobay, markaa furahiisa lama tijaabin karo.",
       "keyManagedByCodingPlan": "Qorshaha koodhka ayaa maamula furaha bixiyahan, furahana waa wax-akhris kaliya. Jooji qorshaha koodhka si aad u darto furahaaga.",
+      "providerUnavailable": "Bixiyahan wali lama heli karo, sidaas darteed furaha lama dari karo.",
       "testFailed": "Tijaabada furaha waa guuldareysatay. Isku day mar kale."
     },
     "dataExport": {

@@ -9,7 +9,7 @@ import {
   RoutingTableSchema,
   ProductionTokenProfileSchema,
 } from './routing-table';
-import { ReasoningEffortSchema } from './reasoning';
+import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
@@ -108,15 +108,7 @@ export const BenchmarkDeciderModelSchema = z
     // Legacy snapshot identity; new benchmark writers emit variant only.
     reasoningEffort: ReasoningEffortSchema.nullable().default(null),
   })
-  .superRefine((model, ctx) => {
-    if (model.variant != null && model.reasoningEffort != null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['variant'],
-        message: 'Decider model must not set both variant and reasoningEffort; emit variant only',
-      });
-    }
-  });
+  .superRefine((model, ctx) => refineVariantExclusivity(model, ctx, 'Decider model'));
 export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
 /** Platform selectors choose models; the current catalog supplies every effort. */

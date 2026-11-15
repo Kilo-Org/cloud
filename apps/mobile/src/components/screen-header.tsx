@@ -303,6 +303,17 @@ function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: n
 }
 
 /**
+ * Measured one-line title boxes at font scale 1, in dp: the 18px default
+ * title's `text-lg` box and the 30px large title's. A one-line title sits
+ * centred in the 48 dp band the caret occupies, so half of what the band leaves
+ * outside this box is empty above the title and half below it.
+ */
+const TITLE_LINE_HEIGHT_DP = { default: 24.76, large: 41.27 } as const;
+
+/** The `mb-0.5` (1.75 dp, NativeWind's 0.25rem at 14pt) gap the eyebrow keeps from the title line. */
+const EYEBROW_GAP_DP = 1.75;
+
+/**
  * The band the header's title occupies, and the band the leading control
  * occupies beside it. One class for both, so the two cells measure the same
  * height and the row's `items-center` lines the control up with the title at
@@ -531,11 +542,27 @@ export function ScreenHeader({
   const hasBackControl = canGoBack && !separateHeading;
   const bandClass = cn('justify-center', hasBackControl && titleBandClass(size, titleLines));
 
+  // A one-line title is centred in the 48 dp band the caret occupies, so
+  // (48 - title box) / 2 dp above it is empty by construction. Giving that
+  // space back as the eyebrow's own bottom margin pulls the eyebrow a full line
+  // down onto the title's ink instead of leaving it above the band's top edge,
+  // and the header shrinks by the same amount. Both twins carry the very same
+  // margin, so the heading and the leading column still measure the same height
+  // and the caret stays centred on the title. The clamp keeps a large font
+  // scale from pulling the eyebrow into the title's ink; a header with no back
+  // control has no band and gets the 1.75 dp gap it has always had.
+  const bandSlackDp =
+    hasBackControl && titleLines === 1
+      ? Math.max(0, (48 - TITLE_LINE_HEIGHT_DP[size] * fontScale) / 2)
+      : 0;
+  const eyebrowSpacingStyle = { marginBottom: EYEBROW_GAP_DP - bandSlackDp };
+
   const heading = (
     <View className="min-w-0 flex-1">
       {eyebrow || reserveEyebrow ? (
         <Eyebrow
-          className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+          className={cn(centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+          style={eyebrowSpacingStyle}
           // A status line is one line: a narrow window truncates it rather than
           // stacking it into a column beside the title. A caller that raises
           // `eyebrowNumberOfLines` opts into the extra lines and the middle
@@ -605,7 +632,7 @@ export function ScreenHeader({
   const reservedTitleBand = reserveTitleSpace ? (
     <View className="w-0 overflow-hidden" aria-hidden>
       {eyebrow || reserveEyebrow ? (
-        <Eyebrow className="mb-0.5">{reservedEyebrow ?? eyebrow ?? blankEyebrow}</Eyebrow>
+        <Eyebrow style={eyebrowSpacingStyle}>{reservedEyebrow ?? eyebrow ?? blankEyebrow}</Eyebrow>
       ) : null}
       <View className={reservedTitleHeightClass(size, titleLines)} />
     </View>
@@ -684,7 +711,7 @@ export function ScreenHeader({
     <View className="w-[48px] shrink-0 -ms-4">
       {hasEyebrowLine ? (
         <Eyebrow
-          className="mb-0.5"
+          style={eyebrowSpacingStyle}
           numberOfLines={1}
           aria-hidden
           accessibilityElementsHidden

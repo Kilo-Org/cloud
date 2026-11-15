@@ -935,8 +935,10 @@ describe('ScreenHeader mounted', () => {
       const twin = findReservedBand(banded.root).find(node => String(node.type) === 'Eyebrow');
       expect(twin.children).toEqual(['\u00A0']);
       // No eyebrow class is forced on the reserve: the size and family stay the
-      // `Text` variant's business.
-      expect(twin.props.className).toBe('mb-0.5');
+      // `Text` variant's business. The gap comes from the style the heading's
+      // own eyebrow carries, so the reserve keeps the band's height.
+      expect(twin.props.className).toBeUndefined();
+      expect(twin.props.style.marginBottom).toBeCloseTo(-9.87, 5);
       banded.unmount();
 
       // The hidden placeholder line, which is what holds the height when the
@@ -944,8 +946,10 @@ describe('ScreenHeader mounted', () => {
       const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
       const placeholder = findHeadingEyebrow(inline.root);
       expect(placeholder.children).toEqual(['\u00A0']);
-      // It still paints nothing and reaches no reader.
-      expect(placeholder.props.className).toBe('mb-0.5 opacity-0');
+      // It still paints nothing and reaches no reader, and it closes the band's
+      // empty top space like any other one-line-title eyebrow.
+      expect(placeholder.props.className).toBe('opacity-0');
+      expect(placeholder.props.style.marginBottom).toBeCloseTo(-9.87, 5);
       inline.unmount();
 
       i18nManager.isRTL = false;
@@ -1451,9 +1455,13 @@ describe('ScreenHeader mounted', () => {
     expect(column.props.className).not.toContain('min-h');
 
     // The column mirrors the heading's own lines: the eyebrow twin above the
-    // band, and no line below it because this header has no subtitle.
+    // band, and no line below it because this header has no subtitle. The twin
+    // carries the heading eyebrow's margin itself, which is what keeps the two
+    // cells the same height and the caret centred on the title.
     const eyebrowTwin = column.findAllByType('Eyebrow')[0];
-    expect(eyebrowTwin?.props.className).toBe('mb-0.5');
+    expect(eyebrowTwin?.props.className).toBeUndefined();
+    expect(eyebrowTwin?.props.style).toEqual(findHeadingEyebrow(renderer.root).props.style);
+    expect(eyebrowTwin?.props.style.marginBottom).toBeLessThan(0);
     expect(eyebrowTwin?.children).toEqual(['\u00A0']);
     expect(eyebrowTwin?.props.numberOfLines).toBe(1);
     expect(eyebrowTwin?.props['aria-hidden']).toBe(true);
@@ -1489,6 +1497,82 @@ describe('ScreenHeader mounted', () => {
     expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(findBackFrame(renderer.root).props.className).toContain('rounded-full');
     expect(findBackFrame(renderer.root).props.className).toContain('overflow-hidden');
+  });
+
+  // The band's space above a one-line title is empty by construction: the title
+  // is centred in the 48 dp box the caret sits in, so (48 - 24.76) / 2 = 11.62
+  // dp above its box paints nothing. The eyebrow's bottom margin gives that
+  // space back — 1.75 - 11.62 = -9.87 dp — so the eyebrow sits a full line
+  // closer to the title's ink and the header shrinks by the same amount.
+  it('closes the band above a one-line title with the eyebrow margin', () => {
+    const variants: ScreenHeaderProps[] = [
+      { title: 'Acme Studio Nordics', eyebrow: 'Invoices' },
+      { title: 'Invoices', reserveEyebrow: true },
+      { title: 'Acme Studio Nordics', eyebrow: 'Invoices', reserveTitleSpace: true },
+    ];
+
+    for (const props of variants) {
+      const renderer = renderHeader(props);
+      const margin = findHeadingEyebrow(renderer.root).props.style?.marginBottom;
+      expect(margin).toBeCloseTo(-9.87, 5);
+
+      // The leading column's twin carries the same value, so both cells still
+      // measure the same height and the caret stays centred on the title.
+      const twin = findLeadingColumn(renderer.root).findAllByType('Eyebrow')[0];
+      expect(twin?.props.style.marginBottom).toBe(margin);
+
+      if (props.reserveTitleSpace) {
+        // The clipped reserve is the second copy the header lays out, and it
+        // holds the band's height only, so it must agree too.
+        const reserved = findReservedBand(renderer.root).findAllByType('Eyebrow')[0];
+        expect(reserved?.props.style.marginBottom).toBe(margin);
+      }
+      renderer.unmount();
+    }
+  });
+
+  it('keeps the plain 1.75 dp eyebrow gap when the header has no back control', () => {
+    // No band, so no empty space to give back: the eyebrow keeps the gap it has
+    // always had.
+    const renderer = renderHeader({
+      title: 'Personal',
+      eyebrow: 'RECENT REVIEWS',
+      showBackButton: false,
+    });
+
+    expect(findHeadingEyebrow(renderer.root).props.style).toEqual({ marginBottom: 1.75 });
+    expect(renderer.root.findAllByType('Eyebrow')).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('keeps the 1.75 dp eyebrow gap under a two-line title cap', () => {
+    // A deeper cap keeps the title's own reserve instead of the 48 dp floor, so
+    // the eyebrow sits above the band as before.
+    const renderer = renderHeader({
+      title: 'Shared session',
+      eyebrow: 'KILO-ORG/CLOUD',
+      titleNumberOfLines: 2,
+    });
+
+    const expected = { marginBottom: 1.75 };
+    expect(findHeadingEyebrow(renderer.root).props.style).toEqual(expected);
+    expect(findLeadingColumn(renderer.root).findAllByType('Eyebrow')[0]?.props.style).toEqual(
+      expected
+    );
+    renderer.unmount();
+  });
+
+  it('never pulls the eyebrow into the title ink at a large font scale', () => {
+    // The clamp: once the title's box fills the band, the negative margin gives
+    // way to the plain gap instead of eating the title's own line.
+    const renderer = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
+    expect(findHeadingEyebrow(renderer.root).props.style.marginBottom).toBeCloseTo(-1.615, 3);
+    renderer.unmount();
+
+    layout.fontScale = 2;
+    const scaled = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
+    expect(findHeadingEyebrow(scaled.root).props.style).toEqual({ marginBottom: 1.75 });
+    scaled.unmount();
   });
 
   it('gives a two-line title and its subtitle one band for both cells', () => {

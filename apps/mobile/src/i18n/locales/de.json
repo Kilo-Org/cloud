@@ -2266,7 +2266,7 @@
       "olderActivityDescription": "Kosten, die nicht dem geladenen Verlauf zugeordnet sind",
       "ofWindowTokens": "von {{window}} Tokens",
       "tokens": "text-Tokens",
-      "tokens_one": "text-Tokens",
+      "tokens_one": "text-Token",
       "tokens_other": "text-Tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
       "stepsCount_one": "{{steps}} Schritt",

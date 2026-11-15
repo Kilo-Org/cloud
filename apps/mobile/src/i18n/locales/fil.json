@@ -2809,7 +2809,7 @@
       "olderActivityDescription": "Gastos na hindi nakaugnay sa na-load na kasaysayan",
       "ofWindowTokens": "sa {{window}} na token",
       "tokens": "mga token",
-      "tokens_one": "mga token",
+      "tokens_one": "token",
       "tokens_other": "mga token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} hakbang",

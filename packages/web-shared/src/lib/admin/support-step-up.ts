@@ -68,43 +68,24 @@ export const supportStepUpPort: SupportStepUpPort = {
   },
 };
 
-/** Requests whose support write use already passed step-up. */
-const claimedRequests = new WeakSet<object>();
-
 /**
  * Step-up for a use of an already-issued support write grant.
  *
- * A support write proof is single-use and bound to the exact operation that
- * minted it, so one request gets exactly one claim. On an `adminProcedure`
- * mutation the middleware has already claimed and spent a proof for the exact
- * tRPC route before the resolver runs. Claiming again here would bind a second
- * proof to the concrete organization instead, so the two claims could never
- * converge: each retry would answer one prompt and demand the other, and the
- * write would never complete.
- *
- * Therefore a fresh upstream state means this request already confirmed this
- * operation and is reused as-is; the organization is still written to the
- * audit record by the caller, it is just not part of the proof on this path.
- * Without an upstream state (a caller that is not on `adminProcedure`, or a
- * REST or server-component surface) the use claims a proof of its own, bound
- * to the organization it acts on.
- *
- * With the switch off the write is still refused: the reuse path must not
- * become a way to spend an operation grant without step-up enabled.
- *
- * A resolver can also be entered more than once for one request: the
- * organization middleware resolves access, and a handler may call
- * `ensureOrganizationAccess` again to assert a narrower role. Both entries
- * authorize the same operation, so the second one reuses the claim the first
- * one made instead of spending the proof a second time.
+ * With the switch off a support write is still refused.
  */
 export async function requireSupportWriteUseStepUp(params: {
   userId: string;
   organizationId: string;
   /** The state the upstream guard left on the context, when one ran. */
   upstreamStepUpState?: AdminStepUpState;
-  /** The request context, used to claim once per request. */
-  requestToken?: object;
+  /**
+   * The request's claim set (`TRPCContext.stepUpClaims`). It is one mutable
+   * value per request, which tRPC keeps across the context copies its
+   * middleware makes.
+   */
+  claimStore?: Set<string>;
+  /** The operation this request is confirming, as it appears in the set. */
+  claimKey?: string;
   credential?: SupportStepUpCredential;
   webSessionId?: string | null;
   route?: string | null;
@@ -115,7 +96,7 @@ export async function requireSupportWriteUseStepUp(params: {
     refuse('support_write');
   }
   if (params.upstreamStepUpState?.status === 'fresh') return;
-  if (params.requestToken && claimedRequests.has(params.requestToken)) return;
+  if (params.claimStore && params.claimKey && params.claimStore.has(params.claimKey)) return;
 
   await supportStepUpPort.requireFresh({
     userId: params.userId,
@@ -129,5 +110,5 @@ export async function requireSupportWriteUseStepUp(params: {
     surface: params.surface ?? 'trpc',
   });
 
-  if (params.requestToken) claimedRequests.add(params.requestToken);
+  if (params.claimStore && params.claimKey) params.claimStore.add(params.claimKey);
 }

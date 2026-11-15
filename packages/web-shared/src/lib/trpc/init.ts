@@ -96,6 +96,8 @@ export type TRPCContext = {
    * `support` apart without re-querying.
    */
   organizationAccess?: OrganizationAccess;
+  /** Per-request step-up state. Each request gets its own set. */
+  stepUpClaims?: Set<string>;
   // Populated by `createTRPCContext` and read by the min-version middleware.
   headersList?: Headers;
   // `performance.now()` when the mobile control-plane budget started, set by
@@ -184,6 +186,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     webSessionPepper: webSessionPepper ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
+    stepUpClaims: new Set<string>(),
     controlPlaneStartedAt: isMobileClient(headersList?.get(APP_CLIENT_HEADER))
       ? startedAt
       : undefined,

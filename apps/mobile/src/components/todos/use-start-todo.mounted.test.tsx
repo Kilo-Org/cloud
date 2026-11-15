@@ -200,6 +200,39 @@ describe('useStartTodo start now', () => {
     expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
+  it('keeps the row starting until the started session is linked and opened', async () => {
+    state.startAgent.mockResolvedValue({ ok: true, sessionId: 'session-link', message: '' });
+    const linking = Promise.withResolvers<undefined>();
+    state.link.mockReturnValue(linking.promise);
+
+    await act(async () => {
+      void mounted().startNow(todo, list);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The agent has answered, but the to-do's session link is still out: the row
+    // has no session yet, so its start is still running and stays admitted.
+    expect(state.link).toHaveBeenCalledOnce();
+    expect(mounted().isStarting(todo.id)).toBe(true);
+
+    await act(async () => {
+      await mounted().startNow(todo, list);
+    });
+    expect(state.startAgent).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      linking.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(state.navigate).toHaveBeenCalledExactlyOnceWith('session-link', 'organization-1');
+    expect(mounted().isStarting(todo.id)).toBe(false);
+  });
+
   it('opens the review route when the list has no repository', async () => {
     await start({ ...list, gitUrl: null });
 

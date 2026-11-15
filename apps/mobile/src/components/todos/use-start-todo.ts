@@ -94,9 +94,9 @@ export function useStartTodo(): StartTodoControls {
           return;
         }
         notificationHaptic(Haptics.NotificationFeedbackType.Success);
-        // The session exists now: that is the start's outcome, so the row's
-        // spinner ends here and the token publishes nothing.
-        attempt.abandon();
+        // The to-do has no session until the link lands, so the start stays
+        // admitted: ending the row's spinner here would let a second press
+        // start a second session for the same to-do.
         // Nothing below may stop the session from opening: a failed link or
         // cache refresh is reported and the session still opens.
         const settled = await Promise.allSettled([
@@ -118,6 +118,11 @@ export function useStartTodo(): StartTodoControls {
         // here rather than escape as an unhandled rejection.
         attempt.fail({ kind: 'start-failed' });
         toast.error(i18n.t('common.somethingWentWrong'));
+      } finally {
+        // One settlement per start: the arms above already settled a refused
+        // start, so this releases only the admission of the start that reached
+        // the session it opens.
+        attempt.abandon();
       }
     },
     [navigateToSession, queryClient, review, starts, trpc]

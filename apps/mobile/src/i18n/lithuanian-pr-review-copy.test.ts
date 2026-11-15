@@ -42,26 +42,55 @@ describe('Lithuanian merge action and heading', () => {
 });
 
 describe('Lithuanian provider-noun sentences', () => {
-  it('keeps the noun out of the verb phrase on both platform nouns', () => {
-    const KEYS = [
-      'prReview.discussion.replyForbiddenTerm',
-      'prReview.merge.mergeTermTitle',
-      'prReview.merge.confirmTitleTerm',
-      'prReview.merge.enableAutoMergeConfirmMessageTerm',
-      'prReview.merge.enableAutoMergeDescriptionTerm',
-      'prReview.merge.providerBlocked.permission',
-      'prReview.merge.providerBlocked.draft',
-      'prReview.operation.mergeResultNotCompleted',
-      'prReview.mutationError.reviewNotSubmittedTerm',
-    ] as const;
+  /** Where the noun sits, and therefore the shape the sentence has to keep. */
+  const SLOTS = [
+    ['prReview.discussion.replyForbiddenTerm', 'label'],
+    ['prReview.merge.enableAutoMergeConfirmMessageTerm', 'label'],
+    ['prReview.merge.enableAutoMergeDescriptionTerm', 'label'],
+    ['prReview.merge.providerBlocked.permission', 'label'],
+    ['prReview.merge.providerBlocked.draft', 'label'],
+    ['prReview.merge.mergeTermTitle', 'named-action'],
+    ['prReview.merge.confirmTitleTerm', 'named-action-question'],
+    ['prReview.operation.mergeResultNotCompleted', 'clause-subject'],
+    ['prReview.mutationError.reviewNotSubmittedTerm', 'clause-subject'],
+  ] as const;
+
+  it('keeps the noun in the shape its slot can carry, on both platform nouns', () => {
+    const shape = {
+      label: (term: string) => `(${term})`,
+      'named-action': (term: string) => `: ${term}`,
+      'named-action-question': (term: string) => `: ${term}?`,
+      'clause-subject': () => '',
+    } as const;
     for (const platform of PLATFORMS) {
       const term = i18n.t(providerPrNounKey(platform));
-      for (const key of KEYS) {
+      for (const [key, kind] of SLOTS) {
         const rendered = withTerm(key, platform);
-        // `į` governs the accusative, so a nominative noun cannot follow it.
-        // The trailing label sits in parentheses, which `[^()]*` never enters.
-        expect(rendered, `${key} ${platform}`).not.toMatch(/į [^()]*užklausa/);
-        expect(rendered.startsWith(term), `${key} ${platform}`).toBe(false);
+        const labelled = `${key} ${platform}`;
+        if (kind === 'label') {
+          // Every occurrence of the noun sits inside its own label.
+          expect(rendered.split(`(${term})`).length - 1, labelled).toBe(
+            rendered.split(term).length - 1
+          );
+        } else if (kind === 'named-action-question') {
+          expect(rendered.endsWith(shape['named-action-question'](term)), labelled).toBe(true);
+        } else if (kind === 'named-action') {
+          expect(rendered.endsWith(shape['named-action'](term)), labelled).toBe(true);
+        } else if (key === 'prReview.operation.mergeResultNotCompleted') {
+          // The object is the clause subject, so it follows a non-interpolated word.
+          expect(rendered.startsWith(`Ši ${term} `), labelled).toBe(true);
+        } else {
+          // The refusal opens its second clause with an adverb, so the noun
+          // follows the verb as that clause's subject and never starts the line.
+          expect(rendered.startsWith(term), labelled).toBe(false);
+          expect(rendered.includes(`pasikeitė ${term} `), labelled).toBe(true);
+        }
+        // No verb and no accusative preposition may take the noun directly:
+        // `sujungti`, `sujungs`, `peržiūrėti` and `į` all require a declined
+        // object, and the catalog stores one base form.
+        expect(rendered, labelled).not.toMatch(
+          new RegExp(`(?:sujungti|sujungs|peržiūrėti|į) ${term}`, 'i')
+        );
       }
     }
   });

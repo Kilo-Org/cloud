@@ -594,7 +594,7 @@
       "merge": "Sujungti",
       "mergeTitle": "Sujungimas",
       "mergeNow": "Sujungti dabar",
-      "mergePullRequest": "Pakeitimų užklausos sujungimas",
+      "mergePullRequest": "Sujungti pakeitimų užklausą",
       "mergeTermTitle": "Sujungti: {{term}}",
       "enableAutoMerge": "Įjungti automatinį sujungimą",
       "disableAutoMerge": "Išjungti automatinį sujungimą",

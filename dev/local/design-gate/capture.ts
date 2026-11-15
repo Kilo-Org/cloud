@@ -566,37 +566,46 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
-  const { samples, truncated } = await ctx.probe.stopSampling();
-  if (truncated) {
-    ctx.log(
-      `design-gate: ${target.id} retained only the newest layouts; older samples were dropped`
-    );
-  }
+  let { samples, truncated } = await ctx.probe.stopSampling();
+  const reportTruncation = () => {
+    if (truncated) {
+      ctx.log(
+        `design-gate: ${target.id} retained only the newest layouts; older samples were dropped`
+      );
+    }
+  };
   // The samples report the cadence they were produced at, which the app's own
   // tick cost extends beyond the interval it was asked for. Say so when that
   // spacing is far enough from the constant that the shift timings would move.
-  const spacingMs = sampleInterval(samples);
-  if (Math.abs(spacingMs - IN_APP_SAMPLE_INTERVAL_MS) > IN_APP_SAMPLE_INTERVAL_MS * 0.25) {
-    ctx.log(
-      `design-gate: ${target.id} samples are ${Math.round(spacingMs)}ms apart; the shift rule reads that spacing`
-    );
-  }
+  const reportSpacing = (sampled: readonly ProbeSample[]): number => {
+    const spacing = sampleInterval(sampled);
+    if (Math.abs(spacing - IN_APP_SAMPLE_INTERVAL_MS) > IN_APP_SAMPLE_INTERVAL_MS * 0.25) {
+      ctx.log(
+        `design-gate: ${target.id} samples are ${Math.round(spacing)}ms apart; the shift rule reads that spacing`
+      );
+    }
+    return spacing;
+  };
+  reportTruncation();
+  let spacingMs = reportSpacing(samples);
+  const files = captureFiles(ctx.out, cell, target.id);
   // Sampling stops before the screenshot, and the screen does not: a navigation
   // push or a late render arrives after the last sample. The bracket compares two
   // dumps around one screenshot, so it opens only once the layout has held still
   // for the quiet window; reading it while that work is still landing makes a
   // correct capture look like two different screens. A screen that never holds
   // still keeps its mismatch instead of becoming a pass.
-  const quiet = await waitForStableLayout(
-    ctx.probe,
-    ctx.clock,
-    SCREEN_QUIET_MS,
-    SCREEN_QUIET_TIMEOUT_MS
-  );
-  if (!quiet) ctx.log(`design-gate: ${target.id} screen still changing before the screenshot`);
-  const files = captureFiles(ctx.out, cell, target.id);
-  writeJson(files.absolute(files.timeline), { samples, truncated });
-  const started = ctx.clock.now();
+  const waitForQuiet = async (): Promise<boolean> => {
+    const held = await waitForStableLayout(
+      ctx.probe,
+      ctx.clock,
+      SCREEN_QUIET_MS,
+      SCREEN_QUIET_TIMEOUT_MS
+    );
+    if (!held) ctx.log(`design-gate: ${target.id} screen still changing before the screenshot`);
+    return held;
+  };
+  let started = ctx.clock.now();
   const readTree = async (): Promise<TimedTree> => {
     const startedMs = ctx.clock.now() - started;
     try {
@@ -606,14 +615,28 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       return { startedMs, completedMs: ctx.clock.now() - started, error: String(error) };
     }
   };
-  const before = await readTree();
-  const dump = before.dump ?? settled.dump;
-  // A layout that differs from the last sample is the late work the wait above
-  // absorbed; name it so a reader knows the bracket waited for a screen that was
-  // still arriving after sampling stopped.
+  let quiet = await waitForQuiet();
+  let before = await readTree();
+  let dump = before.dump ?? settled.dump;
   if (before.dump !== undefined && layoutSignature(before.dump) !== layoutSignature(settled.dump)) {
+    // A layout the sampled window never saw is real work, and the bracket must not
+    // absorb it: silent acceptance would hide a late layout shift exactly on the
+    // slow screens this wait exists for. One more pass samples the screen as it now
+    // is, so the change joins the timeline the shift rule reads. A bound of one
+    // retry keeps a screen that keeps moving from extending the run.
     ctx.log(`design-gate: ${target.id} late change after sampling stopped; bracket waited for it`);
+    ctx.log(`design-gate: ${target.id} sampling once more so the late change joins the timeline`);
+    await startSampling(ctx, samplingMs);
+    settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
+    ({ samples, truncated } = await ctx.probe.stopSampling());
+    reportTruncation();
+    spacingMs = reportSpacing(samples);
+    quiet = await waitForQuiet();
+    started = ctx.clock.now();
+    before = await readTree();
+    dump = before.dump ?? settled.dump;
   }
+  writeJson(files.absolute(files.timeline), { samples, truncated });
   // Preserve collected tree evidence even if the native screenshot or its decode fails.
   writeJson(files.absolute(files.dump), dump);
   const screenshot = { startedMs: ctx.clock.now() - started, completedMs: 0 };

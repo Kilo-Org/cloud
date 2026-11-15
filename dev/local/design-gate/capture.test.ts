@@ -1205,6 +1205,10 @@ test('the bracket waits for a screen that changes once after sampling stops', as
   const state = probeState();
   const probe = fakeProbe(state);
   const ctx = context(fakeDevice(calls, state), probe);
+  const samplingPasses: number[] = [];
+  probe.startSampling = async intervalMs => {
+    samplingPasses.push(intervalMs);
+  };
   const originalStop = probe.stopSampling;
   let samplingStopped = false;
   probe.stopSampling = async () => {
@@ -1239,6 +1243,53 @@ test('the bracket waits for a screen that changes once after sampling stops', as
     logs.some(line => line.includes('late change after sampling stopped')),
     `expected a late-change line, saw ${JSON.stringify(logs)}`
   );
+  // The late change is real work, so the sampled window follows the screen: one
+  // more pass samples it and the timeline the shift rule reads ends on it.
+  assert.equal(samplingPasses.length, 2);
+  assert.equal(samplingPasses[1], samplingPasses[0]);
+  assert.ok(logs.some(line => line.includes('sampling once more')));
+  const timeline = JSON.parse(
+    fs.readFileSync(path.join(ctx.out, 'cells/base/home.timeline.json'), 'utf8')
+  ) as { samples: { dump: ProbeDump }[] };
+  assert.equal(timeline.samples.at(-1)?.dump.env.route, '/late');
+});
+
+test('a late change is sampled at most once more', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const samplingPasses: number[] = [];
+  let readsThisPass = 0;
+  probe.startSampling = async intervalMs => {
+    samplingPasses.push(intervalMs);
+    readsThisPass = 0;
+  };
+  const originalStop = probe.stopSampling;
+  let passes = 0;
+  probe.stopSampling = async () => {
+    passes += 1;
+    readsThisPass = 0;
+    return originalStop();
+  };
+  const originalDump = probe.dump;
+  let changes = 0;
+  probe.dump = async () => {
+    readsThisPass += 1;
+    // The screen changes late in both passes; the second must not start a third.
+    if (passes >= 1 && readsThisPass === 2 && changes < 2) {
+      changes += 1;
+      state.route = `/late-${changes}`;
+      state.text = screenTextFor(state.route);
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(changes, 2);
+  assert.equal(samplingPasses.length, 2);
+  assert.equal(logs.filter(line => line.includes('sampling once more')).length, 1);
 });
 
 test('a screen that keeps changing keeps the bracket a mismatch and says so', async () => {

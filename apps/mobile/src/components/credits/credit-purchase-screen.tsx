@@ -493,12 +493,12 @@ export function CreditPurchaseScreen() {
                 // drops them when initialization fails), so even a priced row
                 // cannot complete: keep every row disabled until it reconnects.
                 const disabled = purchasing || !connected || !hasStorePrice;
-                // A disabled row recedes by its own labels, not its whole surface: the
-                // title and price sit at half ink, the ink the old whole-row halving
-                // painted them in, so the row still reads as inactive. The line under
-                // them keeps full muted ink and states when the credits expire, which
-                // that halving had pushed to 2.2:1 on the dark card and 2.1:1 on light.
-                const labelClass = disabled ? 'text-foreground opacity-50' : 'text-foreground';
+                // A disabled row recedes by its own labels, never by its whole
+                // surface: the title and price sit at reduced foreground ink (70%),
+                // which still outranks the muted ink of the note under them, so the
+                // title stays the strongest line while the row reads lighter than an
+                // enabled one. The note keeps its muted ink at full strength.
+                const labelClass = disabled ? 'text-foreground opacity-70' : 'text-foreground';
                 // The trailing slot holds the store price only: it keeps its one
                 // line and its full width, so the title yields and a price a user
                 // pays is never truncated.
@@ -543,11 +543,13 @@ export function CreditPurchaseScreen() {
                   .join(', ');
 
                 return (
-                  // A disabled row dims its own labels, not its whole surface:
-                  // the title and the price sit at half ink, while the one line
-                  // under them keeps the muted ink at full strength and states
-                  // when the credits expire. The row's shell, border, padding,
-                  // accessibility label and accessibilityState do not change.
+                  // A disabled row recedes by its own labels, never by its shell:
+                  // the title and the price sit at reduced foreground ink (70%),
+                  // above the muted ink of the one line under them, so the title
+                  // stays the row's strongest line while the note still states
+                  // when the credits expire at full muted strength. The row's
+                  // shell, border, padding, accessibility label and
+                  // accessibilityState do not change.
                   <Pressable
                     key={pack.backend.appleProductId}
                     accessibilityLabel={rowAccessibilityLabel}

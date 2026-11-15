@@ -9,12 +9,14 @@ import {
   ProfileNameField,
 } from '@/components/profiles/profile-bound-field';
 import { SheetHeader } from '@/components/sheet-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Lock } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
 
@@ -39,6 +41,14 @@ export type SaveProfileSheetProps = Readonly<{
   onSave: (submission: SaveProfileSubmission) => Promise<boolean>;
 }>;
 
+/** The save's own refusal; the sheet's one line is the copy, so no message travels. */
+type SaveProfileFailure = { readonly kind: 'save-failed' };
+
+/** The sheet's one line for this failure; it has a single refusal arm. */
+function saveFailureMessage(t: (key: string) => string): string {
+  return t('profiles.saveFailed');
+}
+
 /**
  * The `Save as Profile` sheet. Mounted only while open, so every open seeds
  * fresh fields. Fields are uncontrolled (refs) per the app's iOS text-input
@@ -59,7 +69,9 @@ export function SaveProfileSheet({
   const descriptionRef = useRef('');
   const [setAsDefault, setSetAsDefault] = useState(false);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const save = useSurfaceFeedback<SaveProfileFailure>();
+  const feedback = save.feedback;
+  const isSaving = feedback.status === 'pending';
 
   const hasSecrets = envVars.some(envVar => envVar.isSecret);
   // Both numbers are counted messages, so the line agrees with each one instead
@@ -74,6 +86,7 @@ export function SaveProfileSheet({
       nameField.valueRef.current.trim().length > 0 ||
       descriptionRef.current.trim().length > 0 ||
       setAsDefault,
+    isRunning: () => isSaving,
     onDiscard: onClose,
   });
 
@@ -90,14 +103,24 @@ export function SaveProfileSheet({
     }
     setDescriptionError(null);
 
-    setIsSubmitting(true);
+    const attempt = save.begin();
+    if (attempt === null) {
+      return;
+    }
     try {
       const saved = await onSave({ name, description, setAsDefault });
+      // The sheet closing is its own new state, so a success publishes no phase.
+      // It is still fenced: a token from a closed sheet is dead, and the panel's
+      // instance id stops this closure from closing its successor.
       if (saved) {
-        onClose();
+        if (attempt.abandon()) {
+          onClose();
+        }
+        return;
       }
-    } finally {
-      setIsSubmitting(false);
+      attempt.fail({ kind: 'save-failed' });
+    } catch {
+      attempt.fail({ kind: 'save-failed' });
     }
   };
 
@@ -110,7 +133,7 @@ export function SaveProfileSheet({
         }}
         onCancel={requestClose}
         doneLabel={t('common.save')}
-        doneDisabled={isSubmitting}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
@@ -121,17 +144,35 @@ export function SaveProfileSheet({
         showsVerticalScrollIndicator={false}
       >
         <Text variant="muted">{t('agentChat.newSession.saveProfileDescription')}</Text>
+        {/* The refusal overlays the copy this slot already lays out, so a
+            rejected save never inserts space and the fields cannot move. */}
+        <View testID="save-profile-status">
+          <View
+            className="opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            testID="save-profile-status-reserve"
+          >
+            <Text className="text-sm">{saveFailureMessage(t)}</Text>
+          </View>
+          {save.failure !== null ? (
+            <View className="absolute inset-0 justify-center" testID="save-profile-status-live">
+              <AccessibleStatus className="text-sm" message={saveFailureMessage(t)} />
+            </View>
+          ) : null}
+        </View>
         <ProfileNameField
           defaultValue=""
           error={nameField.error}
-          disabled={isSubmitting}
+          disabled={isSaving}
           autoCorrect={false}
           onChangeText={nameField.handleChangeText}
         />
         <ProfileDescriptionField
           defaultValue=""
           error={descriptionError ?? undefined}
-          disabled={isSubmitting}
+          disabled={isSaving}
           autoCorrect={false}
           onChangeText={value => {
             descriptionRef.current = value;
@@ -148,7 +189,7 @@ export function SaveProfileSheet({
           <Switch
             value={setAsDefault}
             accessibilityLabel={t('profiles.setAsDefault')}
-            disabled={isSubmitting}
+            disabled={isSaving}
             onValueChange={setSetAsDefault}
           />
         </View>

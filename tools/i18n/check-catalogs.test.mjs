@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test, { after } from 'node:test';
 
+import { flattenCatalog, missingPluralCategories } from '../lib/catalogs.mjs';
 import { checkCatalogs } from './check-catalogs.mjs';
 
 // The checker parses with oxc through the shared scanner, so the import-only
@@ -69,6 +70,9 @@ function run({
   translated = TRANSLATED,
   source = SOURCE,
   language = 'ru',
+  pushEnglish = {},
+  pushTranslated = {},
+  pushSource = '',
   extraFiles = {},
 } = {}) {
   const root = fixture({
@@ -76,8 +80,9 @@ function run({
     'apps/mobile/src/example.ts': source,
     'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
     [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(translated),
-    'packages/notifications/src/locales/en.json': '{}',
-    [`packages/notifications/src/locales/${language}.json`]: '{}',
+    'packages/notifications/src/locales/en.json': JSON.stringify(pushEnglish),
+    [`packages/notifications/src/locales/${language}.json`]: JSON.stringify(pushTranslated),
+    'packages/notifications/src/push-copy.ts': pushSource,
     // The push locale module the catalog checker reads: one import and one
     // registry entry per fixture catalog, as the real module writes them.
     'packages/notifications/src/i18n.ts': [
@@ -260,6 +265,109 @@ test('reports an unparsed file by its path below the tree it was read from', () 
   );
 });
 
+test('accepts values that read as a brace or a key-shaped run', () => {
+  // A message may quote a brace, or a `"key": 1` fragment, without the scan
+  // mistaking either for the catalog's own structure.
+  const english = {
+    agents: {
+      title: 'Agents',
+      open: 'Keep the lone { in place',
+      close: 'Keep the lone } in place',
+      total: 'Read {{"total": 1, "title": 2}} as text',
+      headline: 'Also read {{"total": 1, "title": 2}} as text',
+    },
+  };
+  const found = run({
+    extraFiles: { 'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english) },
+    translated: {
+      agents: {
+        title: 'Агенты',
+        open: 'Оставьте одиночную { на месте',
+        close: 'Оставьте одиночную } на месте',
+        total: 'Читайте {{"total": 1, "title": 2}} как текст',
+        headline: 'Читайте ещё {{"total": 1, "title": 2}} как текст',
+      },
+    },
+    source: [
+      "t('agents.title');",
+      "t('agents.open');",
+      "t('agents.close');",
+      "t('agents.total');",
+      "t('agents.headline');",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('still reports a repeated key after a value closes a brace', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': [
+        '{',
+        '  "agents": {',
+        '    "summary": "Read as text",',
+        '    "title": "Agents }",',
+        '    "summary": "Read as text"',
+        '  }',
+        '}',
+      ].join('\n'),
+    },
+    translated: { agents: { summary: 'Читается как текст', title: 'Агенты }' } },
+    source: "t('agents.title');\nt('agents.summary');",
+  });
+  assert.deepEqual(found, ['mobile/en: duplicate key "summary"']);
+});
+
+test('reports unbalanced English catalog braces once, without a missing-key cascade', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': [
+        '{',
+        '  "agents": {',
+        '    "title": "Agents }",',
+        '    "summary": "Read as text"',
+        '}',
+      ].join('\n'),
+    },
+    source: "t('agents.title');\nt('agents.summary');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /cannot audit catalog: its strings and braces do not balance/);
+});
+
+test('reports a balanced catalog JSON rejects in the same one problem line', () => {
+  // The braces match, so only JSON.parse can reject the file; a stack trace here
+  // would hide which catalog is broken.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': '{\n  "agents": {\n    "title" "Agents"\n  }\n}\n',
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /^mobile\/en: cannot audit catalog: /);
+});
+
+test('reports an unreadable locale catalog without inventing missing keys', () => {
+  // The skipped locale carries no values, so it can say neither that a key is
+  // missing nor that a key was left in English.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/ru.json': [
+        '{',
+        '  "agents": {',
+        '    "title": "Агенты }",',
+        '    "liveCount_one": "{{count}} сеанс"',
+        '}',
+      ].join('\n'),
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(
+    found[0],
+    /^mobile\/ru: cannot audit catalog: its strings and braces do not balance/
+  );
+});
+
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {
   const source = "t('agents.missing');\n";
   const inSource = run({ source });
@@ -311,6 +419,16 @@ test('rejects the English live-session empty state in a translated catalog', () 
   });
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(found.join('\n'), /mobile\/ru: "home\.noLiveSessions" must be translated/);
+});
+
+test('accepts a translated live-session empty state', () => {
+  const english = { home: { noLiveSessions: 'Nothing running right now' } };
+  const found = run({
+    english,
+    translated: { home: { noLiveSessions: 'Сейчас ничего не запущено' } },
+    source: "t('home.noLiveSessions');",
+  });
+  assert.deepEqual(found, []);
 });
 
 test('rejects an empty translated value', () => {
@@ -891,6 +1009,52 @@ test('accepts a flat counted key kept untranslated to a family in another locale
   assert.deepEqual(found, []);
 });
 
+test('leaves an incomplete English family unowed by a locale', () => {
+  // English declares only the `_one` category of the family, so it is not a
+  // family every locale owes. Neither value interpolates {{count}}: a locale
+  // that keeps only the flat base key owes no categories for it.
+  const found = run({
+    english: { counts: { items: 'items', items_one: 'one item' } },
+    translated: { counts: { items: 'lokal' } },
+    source: "t('counts.items', { count: 2 });",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('names the categories a locale must complete for each family', () => {
+  // A family the locale declares owes every category its tag selects, whether
+  // it declares the family through a member or through the flat base key of an
+  // owed English family; a locale that carries neither owes nothing for it. A
+  // counted flat English key becomes the locale's problem once the locale
+  // declares the family.
+  const english = flattenCatalog({
+    agents: {
+      open_one: '{{displayCount}} open session',
+      open_other: '{{displayCount}} open sessions',
+    },
+  });
+  const counted = flattenCatalog({ counts: { items: '{{count}} items' } });
+  const flatKey = flattenCatalog({ agents: { open: 'x' } });
+  const oneMember = flattenCatalog({ agents: { open_one: 'x' } });
+  const declared = flattenCatalog({
+    counts: { items: 'x', items_one: 'x', items_other: 'x' },
+  });
+
+  assert.deepEqual(
+    [...missingPluralCategories(english, flatKey, 'ru')],
+    [['agents.open', ['one', 'few', 'many', 'other']]]
+  );
+  assert.deepEqual(
+    [...missingPluralCategories(english, oneMember, 'ru')],
+    [['agents.open', ['few', 'many', 'other']]]
+  );
+  assert.deepEqual([...missingPluralCategories(english, flattenCatalog({}), 'ru')], []);
+  assert.deepEqual(
+    [...missingPluralCategories(counted, declared, 'ru')],
+    [['counts.items', ['few', 'many']]]
+  );
+});
+
 test('rejects an incomplete locale-declared family for a counted key', () => {
   const found = run({
     english: COUNTED,
@@ -1346,6 +1510,208 @@ test('rejects a push locale registry with no initializer', () => {
   );
 });
 
+// The push catalog binds its keys two ways: a literal handed to
+// `translatePush`, and a payload `i18nKey` base that the worker and the app
+// expand to `.title`/`.body`. `translatePush` returns its fallback for a key the
+// catalog does not define, so the lock screen would carry English copy and no
+// check would say so. Both directions of the usage check read that shape here.
+const PUSH_ENGLISH = {
+  generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
+};
+const PUSH_TRANSLATED = {
+  generic: { title: 'Kilo', body: { chatMessage: 'Tienes un mensaje nuevo' } },
+};
+const PUSH_SOURCE = [
+  "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+  "translatePush(locale, 'generic.body.chatMessage', undefined, 'You have a new message');",
+].join('\n');
+
+test('accepts a push key the source passes to translatePush', () => {
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: PUSH_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push key no catalog defines, which would ship its English fallback', () => {
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: `${PUSH_SOURCE}\ntranslatePush(locale, 'generic.body.chatMesage', undefined, 'x');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: source uses "generic\.body\.chatMesage", which en\.json does not define/
+  );
+});
+
+test('rejects an English push key no source uses', () => {
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: PUSH_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: en\.json defines "generic\.body\.scheduledAction", which no source file uses/
+  );
+});
+
+test('accepts a push key no source names in full, because the payload carries its base', () => {
+  // A producer sends `i18nKey: 'sessionReady'`; the worker appends `.title` and
+  // `.body`. Both halves of the family are used, so neither is dead copy.
+  const found = run({
+    pushEnglish: {
+      sessionReady: {
+        title: '{{sessionTitle}}',
+        body: 'Your Kilo session is ready to control from your phone',
+      },
+    },
+    pushTranslated: {
+      sessionReady: {
+        title: '{{sessionTitle}}',
+        body: 'Tu sesión de Kilo está lista para controlarla desde tu teléfono',
+      },
+    },
+    pushSource: "const push = { i18nKey: 'sessionReady' };",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a push source that builds its key from the payload', () => {
+  // `translatePush(locale, `${i18nKey}.title`)` is the mechanism the catalog
+  // exists for, not a key the audit can read. It must not be reported.
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: [
+      PUSH_SOURCE,
+      'const title = translatePush(locale, `${base}.title`, params, stored);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push value left in English in one locale', () => {
+  // The mobile rule only fires when a value is English in every locale, which a
+  // single untranslated locale never is.
+  const found = run({
+    pushEnglish: {
+      internal: {
+        lowBalance: {
+          title: 'Low balance alert',
+          body: '{{organizationName}} balance fell below ${{minimumBalanceUsd}}',
+        },
+      },
+    },
+    pushTranslated: {
+      internal: {
+        lowBalance: {
+          title: 'Low balance alert',
+          body: 'El saldo de {{organizationName}} cayó por debajo de ${{minimumBalanceUsd}}',
+        },
+      },
+    },
+    pushSource: "const push = { i18nKey: 'internal.lowBalance' };",
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/ru: "internal\.lowBalance\.title" is English; translate it/
+  );
+});
+
+test('accepts a one-token push value that reads the same in every language', () => {
+  // A product name and a bare placeholder carry no grammar to translate.
+  const found = run({
+    pushEnglish: { generic: { title: 'Kilo' }, sessionReady: { title: '{{sessionTitle}}' } },
+    pushTranslated: { generic: { title: 'Kilo' }, sessionReady: { title: '{{sessionTitle}}' } },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "const push = { i18nKey: 'sessionReady' };",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+// A language whose preposition for this message is the English word keeps the
+// copy: reviewed per (value, tag) in NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS.
+const SHARED_PREPOSITION_ENGLISH = {
+  internal: {
+    securityFindingNew: {
+      title: 'New security finding ({{severity}})',
+      body: '{{findingTitle}} in {{repoFullName}}',
+    },
+  },
+};
+const SHARED_PREPOSITION_SOURCE = "const push = { i18nKey: 'internal.securityFindingNew' };";
+const SINGLE_ENGLISH = { agents: { title: 'Agents' } };
+const SINGLE_SOURCE = "t('agents.title');";
+
+test('accepts a push value a reviewed exception lists for its language', () => {
+  const found = run({
+    english: SINGLE_ENGLISH,
+    translated: { agents: { title: 'Agenten' } },
+    source: SINGLE_SOURCE,
+    language: 'de',
+    pushEnglish: SHARED_PREPOSITION_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingNew: {
+          title: 'Neue Sicherheitsfeststellung ({{severity}})',
+          body: '{{findingTitle}} in {{repoFullName}}',
+        },
+      },
+    },
+    pushSource: SHARED_PREPOSITION_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('still rejects that push value in a language the exceptions do not list', () => {
+  const found = run({
+    english: SINGLE_ENGLISH,
+    translated: { agents: { title: 'Агенты' } },
+    source: SINGLE_SOURCE,
+    language: 'ru',
+    pushEnglish: SHARED_PREPOSITION_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingNew: {
+          title: 'Новая находка ({{severity}})',
+          body: '{{findingTitle}} in {{repoFullName}}',
+        },
+      },
+    },
+    pushSource: SHARED_PREPOSITION_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/ru: "internal\.securityFindingNew\.body" is English; translate it/
+  );
+});
+
 test('importing the module reads and audits nothing', () => {
   // A root holding only the checker and its shared modules: no catalogs, no
   // wording exceptions, no source tree. Anything the module does on import
@@ -1390,4 +1756,252 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
+});
+
+// A confirmation's safe button falls back to the catalog's own Cancel label
+// (`cancelLabel ?? t('common.cancel')`), so a destructive label translated with
+// that same word leaves the reader two buttons that both read Cancel.
+const CONFIRM_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  sessionShare: { revoke: 'Revoke link' },
+};
+const CONFIRM_SOURCE = [
+  "t('common.cancel');",
+  "t('common.keepEditing');",
+  "confirm({ message: 'Stop sharing?', confirmLabel: t('sessionShare.revoke') });",
+].join('\n');
+const FRENCH_CANCEL = { cancel: 'Annuler', keepEditing: 'Continuer la modification' };
+
+test('rejects a destructive confirm label that is the catalog’s Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('rejects a destructive confirm label that contains the Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler le partage' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler le partage", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('accepts a destructive confirm label with a verb of its own', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Révoquer le lien' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+// "Cancel subscription" beside "Cancel" is the shipped English pattern, so
+// English anchors the class: a locale may translate this label with its Cancel
+// word, because English already tells the reader which action ends. The
+// equality test still applies there: a locale that renders the red button with
+// nothing but the Cancel word leaves two buttons reading Cancel.
+const ANCHORED_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  kiloPass: { manage: { cancel: 'Cancel subscription' } },
+};
+const ANCHORED_SOURCE = [
+  "t('common.cancel');",
+  "t('common.keepEditing');",
+  "confirm({ message: 'Stop renewing?', confirmLabel: t('kiloPass.manage.cancel') });",
+].join('\n');
+
+test('accepts an English confirm label that names the action it cancels', () => {
+  const found = run({
+    english: ANCHORED_ENGLISH,
+    translated: {
+      common: { cancel: 'Отмена', keepEditing: 'Продолжить изменение' },
+      kiloPass: { manage: { cancel: 'Отмена подписки' } },
+    },
+    source: ANCHORED_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an anchored confirm label that is only the catalog’s Cancel word', () => {
+  const found = run({
+    english: ANCHORED_ENGLISH,
+    translated: {
+      common: { cancel: 'Отмена', keepEditing: 'Продолжить изменение' },
+      kiloPass: { manage: { cancel: 'Отмена' } },
+    },
+    source: ANCHORED_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/ru: "kiloPass.manage.cancel" reads "Отмена", which this catalog already uses for Cancel ("Отмена"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+// Turkish writes the capital of `i` as `İ` (U+0130), which lowercases to `i`
+// plus U+0307; a fold that keeps the mark misses every value spelling the word
+// with a plain `i`.
+const TURKISH_CANCEL = { cancel: 'İptal', keepEditing: 'Düzenlemeye devam et' };
+const TURKISH_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  sessionShare: { revoke: 'Revoke link' },
+};
+
+test('rejects a destructive confirm label that spells the dotted Cancel word with a plain i', () => {
+  const found = run({
+    language: 'tr',
+    english: TURKISH_ENGLISH,
+    translated: {
+      common: TURKISH_CANCEL,
+      sessionShare: { revoke: 'Bağlantıyı iptal et' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/tr: "sessionShare.revoke" reads "Bağlantıyı iptal et", which this catalog already uses for Cancel ("İptal"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('accepts a Turkish label that names the action beside an anchored Cancel word', () => {
+  const found = run({
+    language: 'tr',
+    english: ANCHORED_ENGLISH,
+    translated: {
+      common: TURKISH_CANCEL,
+      kiloPass: { manage: { cancel: 'Aboneliği iptal et' } },
+    },
+    source: ANCHORED_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a destructive label whose every call site names its own cancel label', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: [
+      "t('common.cancel');",
+      "t('common.keepEditing');",
+      "confirm({ message: 'Stop sharing?', confirmLabel: t('sessionShare.revoke'), cancelLabel: t('common.keepEditing') });",
+      "confirm({ message: 'Stop sharing this link?', confirmLabel: t('sessionShare.revoke'), cancelLabel: t('common.keepEditing') });",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an Alert destructive button that reads as the Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: [
+      "t('common.cancel');",
+      "t('common.keepEditing');",
+      "Alert.alert('Stop sharing?', undefined, [{ text: t('common.keepEditing'), style: 'cancel' }, { text: t('sessionShare.revoke'), style: 'destructive' }]);",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+// `consent-card.tsx` passes `actions.destructiveLabel` into `confirm()` with no
+// `cancelLabel`, so the safe button falls back to Cancel there too; the label
+// itself is resolved from an object literal in `consent-mode.ts`.
+const CONSENT_ENGLISH = {
+  common: { back: 'Back', cancel: 'Cancel' },
+  consent: { revokeConsent: 'Revoke consent' },
+};
+const CONSENT_SOURCE = [
+  "t('common.back');",
+  "t('common.cancel');",
+  "const actions = { primaryLabel: i18n.t('common.back'), destructiveLabel: i18n.t('consent.revokeConsent') };",
+  "confirm({ title: 'Revoke consent?', message: 'You will be signed out.', confirmLabel: actions.destructiveLabel });",
+].join('\n');
+
+test('rejects a consent destructive label that reads as the Cancel word, and accepts a verb of its own', () => {
+  const found = run({
+    language: 'fr',
+    english: CONSENT_ENGLISH,
+    translated: {
+      common: { back: 'Retour', cancel: 'Annuler' },
+      consent: { revokeConsent: 'Annuler' },
+    },
+    source: CONSENT_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "consent.revokeConsent" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+
+  const distinct = run({
+    language: 'fr',
+    english: CONSENT_ENGLISH,
+    translated: {
+      common: { back: 'Retour', cancel: 'Annuler' },
+      consent: { revokeConsent: 'Révoquer le consentement' },
+    },
+    source: CONSENT_SOURCE,
+  });
+  assert.deepEqual(distinct, []);
+});
+
+test('reads the supported tags from the array literal, not from a comment inside it', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = [
+  'en',
+  // Sentinels: 'xx' is never shipped.
+  'ru',
+];
+`,
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
+test('reports a SUPPORTED_LANGUAGES element that is not a string literal', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
+  ]);
+});
+
+test('reports a missing SUPPORTED_LANGUAGES declaration', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
+    },
+  });
+  assert.ok(
+    found.includes('apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared')
+  );
 });

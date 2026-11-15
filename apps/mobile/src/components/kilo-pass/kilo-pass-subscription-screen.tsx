@@ -181,6 +181,19 @@ function KiloPassMessageBody({ message }: { message: string }) {
   );
 }
 
+/**
+ * A lapsed pass is one of the screen's centered states — crown, the plan it
+ * was, the day it stopped — so the reader sees where their pass stands instead
+ * of a bare line floating in an otherwise empty body.
+ */
+function KiloPassEndedBody({ detail }: { detail: Extract<KiloPassDetail, { kind: 'ended' }> }) {
+  return (
+    <KiloPassFrame>
+      <EmptyState icon={Crown} title={detail.planLabel} description={detail.endedLabel} />
+    </KiloPassFrame>
+  );
+}
+
 export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
@@ -231,7 +244,7 @@ export function KiloPassSubscriptionScreen() {
     return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
   }
   if (detail.kind === 'ended') {
-    return <KiloPassMessageBody message={t('kiloPass.purchaseUnavailableEnded')} />;
+    return <KiloPassEndedBody detail={detail} />;
   }
   if (subscription == null) {
     // An active detail is derived from a subscription, so this only narrows the

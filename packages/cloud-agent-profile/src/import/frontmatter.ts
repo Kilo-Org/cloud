@@ -4,6 +4,8 @@
  * (for example `permission`); lists and other YAML constructs are reported as
  * invalid frontmatter rather than silently mis-mapped.
  */
+import { locateFrontmatterBlock } from '../frontmatter-block';
+
 export type FrontmatterParseResult =
   | { status: 'none' }
   | { status: 'error'; message: string }
@@ -199,33 +201,13 @@ function parseMap(
 
 export function parseFrontmatter(markdown: string): FrontmatterParseResult {
   const normalized = markdown.replace(/\r\n/g, '\n');
-  const firstLineEnd = normalized.indexOf('\n');
-  if (firstLineEnd === -1) return { status: 'none' };
-
-  const opener = normalized.slice(0, firstLineEnd).trimEnd();
-  if (opener !== '---' && opener !== '+++') return { status: 'none' };
-
-  let lineStart = firstLineEnd + 1;
-  let blockEnd: number | null = null;
-  let bodyStart: number | null = null;
-  while (lineStart <= normalized.length) {
-    const lineEnd = normalized.indexOf('\n', lineStart);
-    const end = lineEnd === -1 ? normalized.length : lineEnd;
-    if (normalized.slice(lineStart, end).trimEnd() === opener) {
-      blockEnd = lineStart;
-      bodyStart = lineEnd === -1 ? normalized.length : lineEnd + 1;
-      break;
-    }
-    if (lineEnd === -1) break;
-    lineStart = lineEnd + 1;
-  }
-
-  if (blockEnd === null || bodyStart === null) {
+  const located = locateFrontmatterBlock(normalized);
+  if (located.status === 'none') return { status: 'none' };
+  if (located.status === 'unterminated') {
     return { status: 'error', message: 'Frontmatter is not terminated' };
   }
-
-  const body = normalized.slice(bodyStart);
-  const block = normalized.slice(firstLineEnd + 1, blockEnd);
+  const body = located.body;
+  const block = located.block;
 
   try {
     const lines = splitIndentedLines(block);

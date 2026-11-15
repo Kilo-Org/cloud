@@ -382,7 +382,7 @@ describe('shareSession', () => {
     );
   });
 
-  it('returns share_token on success', async () => {
+  it('returns share_token on success, with a null public_id for an older worker', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -391,7 +391,27 @@ describe('shareSession', () => {
 
     const result = await shareSession('ses_abc123', 'user_123');
 
-    expect(result).toEqual({ share_token: 'share.jwt.token' });
+    expect(result).toEqual({ share_token: 'share.jwt.token', public_id: null });
+  });
+
+  it('returns the public_id the worker created', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          share_token: 'share.jwt.token',
+          public_id: '33333333-3333-4333-8333-333333333333',
+        }),
+    });
+
+    const result = await shareSession('ses_abc123', 'user_123');
+
+    expect(result).toEqual({
+      share_token: 'share.jwt.token',
+      public_id: '33333333-3333-4333-8333-333333333333',
+    });
   });
 
   it('calls POST on the correct URL', async () => {

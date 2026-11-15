@@ -1,10 +1,20 @@
 /* eslint-disable max-lines -- The hub composes every organization row (money, members, Kilo Pass, rename) on one screen. */
 import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Bell, FileText, Pencil, Plug, Receipt, Users, Wallet } from '@/components/ui/icons';
+import {
+  Bell,
+  CreditCard,
+  FileText,
+  Pencil,
+  Plug,
+  Receipt,
+  Users,
+  Wallet,
+} from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +29,10 @@ import {
   type OrgKiloPassRowState,
 } from '@/components/organization/org-kilo-pass-row-state';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
+import {
+  visibleInAppSettingsRows,
+  visibleOrgSettingsRows,
+} from '@/components/organization/organization-settings-rows';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
@@ -41,7 +55,7 @@ import {
   isMoneyRole,
   useOrgBoundary,
   useOrgKiloPassSummary,
-  useOrgWithMembers,
+  useOrgParentLink,
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
@@ -75,28 +89,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     setOrganizationId(organizationIdOverride);
   }, [organizationIdOverride, org, setOrganizationId]);
 
-  const orgWithMembers = useOrgWithMembers(organizationId);
   // `organizations.list` carries the org's parent link, so the billing group
   // knows from its first frame whether this org has a Kilo Pass row instead of
-  // adding one a request later and pushing the rows under it down. A device
-  // that persisted the list before that field existed hydrates an entry
-  // without it, and an entry written before an admin moved the organization
-  // under a parent still says `null`, so the membership payload fills the gap
-  // in both directions: a parent id from either payload makes this a child,
-  // because only an admin change moves an organization under a parent after
-  // creation and that id is never the stale side. A `null` confirms a
-  // top-level organization only from the freshly fetched membership payload;
-  // the list's own `null` is a cached value and leaves the link unknown until
-  // membership answers.
-  const listParentLink = org?.parentOrganizationId;
-  const membershipParentLink = orgWithMembers.data?.parent_organization_id;
-  const reportedParentLink = listParentLink ?? membershipParentLink;
-  const topLevelConfirmed = membershipParentLink === null;
-  const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
-  // No membership payload and a failed or paused fetch: the payload that would
-  // settle anything waiting on it will not arrive on its own.
-  const membershipUnavailable =
-    orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
+  // adding one a request later and pushing the rows under it down. The hook
+  // reconciles that cached entry with the membership payload.
+  const {
+    membership: orgWithMembers,
+    parentLink,
+    membershipUnavailable,
+  } = useOrgParentLink(organizationId, org?.parentOrganizationId);
   // An unknown link keeps the row: it renders in its loading state instead of
   // appearing once a payload lands. Only a known child organization, which
   // carries its parent's id, has no Kilo Pass row.
@@ -194,6 +195,30 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const planMessage = showMoney
     ? t('organization.hub.planEnded')
     : t('common.organizationTrialEnded');
+
+  // The in-app destinations the hub opens itself, and the only card rows that
+  // need no payload: their gate reads the role and the plan, which the
+  // organization row decides before this screen renders.
+  const inAppSettingsRows = visibleInAppSettingsRows({ role, plan: org.plan });
+
+  // The organization dashboard's own settings on the web, one row per area.
+  // The group waits for the membership payload because the parent link decides
+  // whether the sub-organization rows exist: painting them on the cached list
+  // entry's `null` and removing them a request later would move every row
+  // under them. It is the last group on the screen, so its arrival pushes
+  // nothing above it.
+  const settingsRows =
+    orgWithMembers.data == null && !membershipUnavailable
+      ? null
+      : visibleOrgSettingsRows(
+          {
+            role,
+            plan: org.plan,
+            isTopLevel: parentLink === null,
+            guardrailsEnabled: orgWithMembers.data?.settings.kilo_encrypt === true,
+          },
+          organizationId
+        );
 
   return (
     <View className="flex-1 bg-background">
@@ -324,11 +349,20 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <ConfigureRow
             icon={Plug}
             title={t('integrations.title')}
-            last={!showMoney}
+            last={!showMoney && inAppSettingsRows.length === 0}
             onPress={() => {
               router.push(`/(app)/(tabs)/(3_profile)/integrations?org=${organizationId}` as Href);
             }}
           />
+          {showMoney && (
+            <ConfigureRow
+              icon={CreditCard}
+              title={t('organization.billing.title')}
+              onPress={() => {
+                router.push('/(app)/(tabs)/(3_profile)/organization/billing' as Href);
+              }}
+            />
+          )}
           {showMoney && (
             <>
               <ConfigureRow
@@ -395,7 +429,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               <ConfigureRow
                 icon={Wallet}
                 title={t('notifications.channel.spend')}
-                last
+                last={inAppSettingsRows.length === 0}
                 onPress={() => {
                   router.push(
                     `/(app)/(tabs)/(3_profile)/spend-alerts?org=${organizationId}` as Href
@@ -404,7 +438,45 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
             </>
           )}
+          {/* The one destination this app reads itself. It closes the card, and
+              it is painted before any web row because its gate needs no
+              payload — see `visibleInAppSettingsRows`. */}
+          {inAppSettingsRows.map((row, index) => (
+            <ConfigureRow
+              key={row.area}
+              icon={row.icon}
+              title={row.title}
+              last={index === inAppSettingsRows.length - 1}
+              onPress={() => {
+                router.push(row.href);
+              }}
+            />
+          ))}
         </View>
+
+        {/* The areas this app does not reimplement. Each row opens the page
+            that already owns the setting, and the row set follows the web
+            sidebar's role and plan gates — see `visibleOrgSettingsRows`. */}
+        {settingsRows == null ? null : (
+          <View className="gap-2">
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('organization.settingsOnWeb.title')}
+            </Text>
+            <View className="rounded-lg bg-secondary px-3">
+              {settingsRows.map((row, index) => (
+                <ConfigureRow
+                  key={row.area}
+                  icon={row.icon}
+                  title={row.title}
+                  last={index === settingsRows.length - 1}
+                  onPress={() => {
+                    void openExternalUrl(row.url, { label: row.title });
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        )}
       </TabScreenScrollView>
 
       {renameVisible && (
@@ -414,10 +486,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           initialValue={org.organizationName}
           // The server validates a rename with `OrganizationNameSchema`
           // (packages/web-shared), so the field must accept the name it would
-          // accept. RenameModal's own default is lower than a stored name can
+          // accept, and it refuses a name the server's visible-character rule
+          // refuses. RenameModal's own default is lower than a stored name can
           // be, and React Native applies `maxLength` to the seeded value: the
           // dialog would open on a cut name, and saving would store the cut.
           maxLength={ORGANIZATION_NAME_MAX_LENGTH}
+          isAcceptableValue={hasVisibleText}
           onSave={async name => {
             await mutations.rename.mutateAsync({ name });
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

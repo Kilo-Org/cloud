@@ -3,7 +3,12 @@ import { View } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Button, BUTTON_BUSY_OVERLAY_CLASS, type ButtonProps } from './button';
+import {
+  Button,
+  BUTTON_BUSY_LABEL_CLASS,
+  BUTTON_BUSY_OVERLAY_CLASS,
+  type ButtonProps,
+} from './button';
 
 // Every token the ink table names, with a distinct value each: a mark drawn
 // from the wrong token renders a different colour, so the case below fails
@@ -34,6 +39,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.col
 
 const BusyMark = 'ActivityIndicator' as ElementType;
 const busyMarks = (node: TestRenderer.ReactTestInstance) => node.findAllByType(BusyMark);
+const busyWrappers = (node: TestRenderer.ReactTestInstance) =>
+  node.findAll(n => `${n.props.className ?? ''}`.startsWith(BUTTON_BUSY_LABEL_CLASS));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
@@ -127,5 +134,28 @@ describe('Button busy mark', () => {
     const button = root.findByType('Pressable' as never);
     expect(button.props.accessibilityLabel).toBe('Send');
     expect(button.props.accessibilityState).toEqual({ disabled: true, busy: true });
+  });
+
+  it('keeps a caller busy that spins its own glyph out of the loading layout', () => {
+    // A caller that spins its own glyph declares `busy` without opting into
+    // `loading`, so the announced state must survive and no busy chrome appears.
+    const root = render({ accessibilityState: { busy: true } });
+
+    const button = root.findByType('Pressable' as never);
+    expect(button.props.accessibilityState).toEqual({ busy: true, disabled: false });
+    expect(busyWrappers(root)).toHaveLength(0);
+    expect(busyMarks(root)).toHaveLength(0);
+    expect(root.findAllByProps({ className: BUTTON_BUSY_OVERLAY_CLASS })).toHaveLength(0);
+  });
+
+  it('lets an explicit loading value decide the state over a caller busy', () => {
+    // `loading` wins when it is set, so a caller busy cannot leak past
+    // `loading: false`; the label wrapper is drawn but stays undimmed.
+    const root = render({ accessibilityState: { busy: true }, loading: false });
+
+    expect(busyWrappers(root)[0]?.props.className).not.toContain('opacity-0');
+    expect(busyMarks(root)).toHaveLength(0);
+    const button = root.findByType('Pressable' as never);
+    expect(button.props.accessibilityState).toEqual({ busy: false, disabled: false });
   });
 });

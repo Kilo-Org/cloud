@@ -9,7 +9,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-review';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
 import '@/i18n';
@@ -53,6 +53,8 @@ const mintInstallState = vi.hoisted(() =>
 const launchBrowser = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
+
+const councilUi = vi.hoisted(() => ({ allowed: false }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -161,6 +163,10 @@ vi.mock('@/lib/code-reviewer-config', () => ({
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
+}));
+vi.mock('@/lib/hooks/use-reviewer-council', () => ({
+  useCouncilGate: () => ({ allowed: councilUi.allowed, pending: false }),
+  useCouncilUiEnabled: () => councilUi.allowed,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => provider,

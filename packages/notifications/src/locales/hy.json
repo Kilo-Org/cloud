@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Ակտիվ գործակալներն ունեն թարմացում"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Առաջադրանքն ավարտված է"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ձախողվեց: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Ընդհատվեց: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

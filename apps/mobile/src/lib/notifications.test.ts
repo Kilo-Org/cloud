@@ -72,6 +72,7 @@ const mocks = vi.hoisted(() => ({
   captureEvent: vi.fn(),
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPresentedNotificationsAsync: vi.fn(),
   runNeedsInputInteraction: vi.fn(),
   requireOptionalNativeModule: vi.fn(),
   whenLanguagePreferenceLoaded: vi.fn(),
@@ -105,6 +106,7 @@ vi.mock('expo-notifications', () => ({
   setNotificationHandler: mocks.setNotificationHandler,
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPresentedNotificationsAsync: mocks.getPresentedNotificationsAsync,
   addNotificationResponseReceivedListener: (listener: ResponseListener) => {
     mocks.listeners.add(listener);
     return { remove: () => mocks.listeners.delete(listener) };
@@ -328,6 +330,7 @@ beforeEach(() => {
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.scheduleNotificationAsync.mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockResolvedValue(undefined);
+  mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
   mocks.getNotificationChannelAsync.mockResolvedValue(null);
   mocks.deleteNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -516,14 +519,19 @@ describe('ensureAndroidNotificationChannels', () => {
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
   });
 
-  it('swallows a per-channel failure and still creates the remaining channels', async () => {
+  it('retries a failed pass once and both concurrent callers then post', async () => {
     mocks.setNotificationChannelAsync.mockRejectedValueOnce(new Error('channel failed'));
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
+    const first = ensureAndroidNotificationChannels();
+    const second = ensureAndroidNotificationChannels();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+
+    // The failed pass wrote five channels; the retry wrote all six again.
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(12);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(10);
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
@@ -537,8 +545,9 @@ describe('ensureAndroidNotificationChannels', () => {
     mocks.deleteNotificationChannelAsync.mockRejectedValueOnce(new Error('delete failed'));
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
+    await expect(ensureAndroidNotificationChannels()).resolves.toBe(true);
 
+    // A failed delete never failed the pass, so there is no retry pass.
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
@@ -549,31 +558,25 @@ describe('ensureAndroidNotificationChannels', () => {
     });
   });
 
-  it('retries every channel after a pass that failed one write', async () => {
-    mocks.setNotificationChannelAsync.mockRejectedValueOnce(new Error('channel failed'));
+  it('resolves false and drops the memo when the write fails in both passes', async () => {
+    mocks.setNotificationChannelAsync.mockImplementation((id: string) =>
+      id === 'needs-input' ? Promise.reject(new Error('channel failed')) : Promise.resolve()
+    );
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await ensureAndroidNotificationChannels();
-    expect(mocks.captureException).toHaveBeenCalledTimes(1);
-    mocks.setNotificationChannelAsync.mockClear();
+    const first = ensureAndroidNotificationChannels();
+    const second = ensureAndroidNotificationChannels();
 
-    // A pass that failed a required channel is not cached: the next start
-    // retries before it posts, and a channel the framework never created would
-    // drop that post.
-    await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toEqual([
-      'needs-input',
-      'agent-progress',
-      'agent-briefing',
-      'balance',
-      'security',
-      'followed-sessions-lock-screen',
-    ]);
+    await expect(Promise.all([first, second])).resolves.toEqual([false, false]);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(12);
+    expect(mocks.captureException).toHaveBeenCalledTimes(2);
 
-    // A fully successful pass is cached again.
+    // The memo is dropped, so the next caller runs a fresh pass once the channel
+    // write works again.
     mocks.setNotificationChannelAsync.mockClear();
-    await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+    mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
+    await expect(ensureAndroidNotificationChannels()).resolves.toBe(true);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
   });
 
   it('keeps a fully successful pass cached', async () => {
@@ -2539,6 +2542,7 @@ describe('foreground attention-push suppression', () => {
     // Imported through the same resetModules cycle as './notifications', so the
     // posted marker this test reads is the one the handler reads.
     const needsInput = await import('./needs-input-notification');
+    const presentation = await import('./needs-input-presentation');
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
@@ -2548,7 +2552,7 @@ describe('foreground attention-push suppression', () => {
         };
       }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
     };
-    return { loaded, needsInput, registration };
+    return { loaded, needsInput, presentation, registration };
   }
 
   const attentionPush = {
@@ -2569,13 +2573,17 @@ describe('foreground attention-push suppression', () => {
   } as const;
 
   it('suppresses the server attention push while the app notification for that session is posted', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],
       updates: [],
     });
+    // The marker is only a fast path; the OS says the notification is on screen.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: presentation.notificationIdentifierForSession('ses_1') } },
+    ]);
 
     const behavior = await registration.handleNotification({
       request: { identifier: 'expo-push-remote-1', content: { data: attentionPush } },
@@ -2584,8 +2592,30 @@ describe('foreground attention-push suppression', () => {
     expect(behavior.shouldSetBadge).toBe(false);
   });
 
-  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+  it('shows a foreground attention push whose app-owned notification the user dismissed', async () => {
     const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({
+      publish: [postedRow],
+      dismiss: [],
+      updates: [],
+    });
+    // The user swiped the notification away: the marker is stale and must not
+    // suppress the only presentation the raise has left.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
+
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: 'expo-push-remote-1',
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+    expect(mocks.getPresentedNotificationsAsync).toHaveBeenCalled();
+  });
+
+  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
@@ -2597,7 +2627,7 @@ describe('foreground attention-push suppression', () => {
     // suppressing it would drop the only notification the app presents.
     const behavior = await registration.handleNotification({
       request: {
-        identifier: needsInput.notificationIdentifierForSession('ses_1'),
+        identifier: presentation.notificationIdentifierForSession('ses_1'),
         content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
       },
     });
@@ -2631,14 +2661,14 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows the server attention push again after the raise is answered headless', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],
       updates: [],
     });
 
-    needsInput.clearPostedNeedsInputNotification('ses_1');
+    presentation.clearPostedNeedsInputNotification('ses_1');
 
     const behavior = await registration.handleNotification({
       request: {

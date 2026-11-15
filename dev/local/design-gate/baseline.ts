@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { evaluate, listPages, openSession, selectPage } from './cdp';
 import type { RunOutcome } from './capture';
 import { normalize, parseDump } from './tree';
-import type { Finding } from './findings';
+import { RULE_IDS, type Finding } from './findings';
 import { collapseFindings, type CollapsedFinding } from './report';
 import { baselineGit, containedProofSource } from './baseline-preflight';
 
@@ -28,7 +28,7 @@ const TargetSchema = z
       .string()
       .max(256)
       .regex(/^(?:[^/]+(?:\/[^/]+)*)?$/),
-    readyTestID: z.string().min(1).max(128),
+    readyTestID: z.string().min(1).max(128).optional(),
     diagnostic: z
       .object({
         component: SourcePath,
@@ -450,22 +450,47 @@ export function targetReadiness(
       const blocked = /(?:^|\/)(?:login|sign-in|signin|splash|onboarding)(?:\/|$)/i.test(
         `${dump.env.route}/${dump.env.screen ?? ''}`
       );
-      const ready = normalize(dump).nodes.some(
-        node =>
-          node.probe.testID === target.readyTestID &&
-          node.visibleRect[2] > 0 &&
-          node.visibleRect[3] > 0
-      );
-      const warning = outcome.findings.some(
+      // A product screen need not carry a testID. Without a readiness marker the
+      // declared route and screen (checked below) plus one laid-out node identify
+      // the same prepared screen; a declared marker keeps the stricter rule that
+      // this exact node is visible.
+      const nodes = normalize(dump).nodes;
+      const ready =
+        target.readyTestID === undefined
+          ? nodes.some(node => node.visibleRect[2] > 0 && node.visibleRect[3] > 0)
+          : nodes.some(
+              node =>
+                node.probe.testID === target.readyTestID &&
+                node.visibleRect[2] > 0 &&
+                node.visibleRect[3] > 0
+            );
+      // A tab route keeps the URL at its group root, so opening it can leave the
+      // route unchanged and the runner reports `link-unopened`. For a marker-less
+      // target the declared screen identity below is what proves the link landed,
+      // so only that rule is dropped. Every other finding still fails the target:
+      // a cell config that did not apply, a language that did not switch, two
+      // targets on one screen, an unsettled or misaligned or blank capture.
+      const failed = outcome.findings.some(
         finding =>
           finding.cell === cell.id &&
           finding.target === target.id &&
-          ['env-mismatch', 'unsettled', 'capture-alignment', 'blank-frame'].includes(finding.rule)
+          ['unsettled', 'capture-alignment', 'blank-frame', 'env-mismatch'].includes(finding.rule)
       );
+      // A target that declares a marker keeps the original rule, where a link
+      // that did not open is a failure too.
+      const landingFailed =
+        target.readyTestID !== undefined &&
+        outcome.findings.some(
+          finding =>
+            finding.cell === cell.id &&
+            finding.target === target.id &&
+            finding.rule === 'link-unopened'
+        );
       if (
         blocked ||
         !ready ||
-        warning ||
+        failed ||
+        landingFailed ||
         dump.env.route !== target.route ||
         dump.env.screen !== target.screen
       ) {
@@ -548,25 +573,8 @@ const ElementSchema = z
   .passthrough();
 const ComparisonFindingSchema = z
   .object({
-    rule: z.enum([
-      'clipped',
-      'cut-off',
-      'overlap',
-      'touch-overlap',
-      'row-misaligned',
-      'ink-off-center',
-      'touch-target',
-      'inset-asymmetry',
-      'layout-shift',
-      'rtl-mirror',
-      'safe-area',
-      'leading-gap',
-      'unsettled',
-      'loading-placeholder',
-      'capture-alignment',
-      'blank-frame',
-      'env-mismatch',
-    ]),
+    // Shared on purpose: a new rule id cannot be forgotten here.
+    rule: z.enum(RULE_IDS),
     severity: z.enum(['error', 'warning']),
     cell: z.string(),
     target: z.string(),

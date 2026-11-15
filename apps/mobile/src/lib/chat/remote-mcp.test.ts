@@ -1,108 +1,33 @@
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { type Tool } from '@kilocode/harness-sdk';
-import {
-  type RemoteMcpClientDeps,
-  RemoteMcpError,
-  type RemoteMcpServer,
-} from '@kilocode/harness-sdk/plugins/remote-mcp';
+import { RemoteMcpError } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
 import { place, server, stateOf, tool } from './remote-mcp.test-helpers';
-import { type StoredRemoteMcpServer } from './remote-mcp-store';
+import {
+  discovery,
+  emitServers,
+  ensureRemoteMcp,
+  forgetRemoteMcp,
+  oauthProvider,
+  remoteMcpState,
+  remoteServerToolNames,
+  remoteServerTools,
+  resetWorld,
+  whenReleased,
+  world,
+} from './remote-mcp.world.test-helpers';
 
 /**
  * The stored remote MCP servers, discovered for the tools they offer.
  *
- * The store is faked so the module's own subscription — the thing that drops a
- * disabled server's tools — can be driven without a device.
+ * The store is faked, in `remote-mcp.world.test-helpers`, so the module's own
+ * subscription — the thing that drops a disabled server's tools — can be driven
+ * without a device.
  */
 
-const world = vi.hoisted(() => ({
-  servers: [] as StoredRemoteMcpServer[],
-  epoch: 0,
-  calls: [] as {
-    readonly server: RemoteMcpServer;
-    readonly deps: RemoteMcpClientDeps;
-  }[],
-  listeners: [] as (() => void)[],
-  /** Whether the stored list has been read, and what reading it later does. */
-  loaded: true,
-  load: undefined as (() => void) | undefined,
-  connectivity: 'online' as 'online' | 'offline' | 'unknown',
-}));
-
-vi.mock('./remote-mcp-store', () => ({
-  listRemoteMcpServers: () => world.servers,
-  subscribeRemoteMcpServers: (listener: () => void) => {
-    world.listeners.push(listener);
-    return () => {
-      world.listeners = world.listeners.filter(current => current !== listener);
-    };
-  },
-  getRemoteMcpServersHasLoaded: () => world.loaded,
-  whenRemoteMcpServersLoaded: async () => {
-    await new Promise<void>(resolve => {
-      world.load = resolve;
-    });
-  },
-}));
-
-vi.mock('@/lib/auth/auth-epoch', () => ({ currentAuthEpoch: () => world.epoch }));
-vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  getCommittedConnectivityStatus: () => world.connectivity,
-}));
-
-/** The provider an OAuth server is discovered with; its storage is its own module's. */
-const { oauthProvider } = vi.hoisted(() => ({ oauthProvider: { redirectUrl: 'kiloapp:///x' } }));
-vi.mock('./remote-mcp-oauth-provider', () => ({ remoteMcpOAuthProvider: () => oauthProvider }));
-
-/** The one discovery function, answering from a `let` so a test can change it. */
-let answer: () => Effect.Effect<readonly Tool[], RemoteMcpError> = () => Effect.succeed([]);
-
-vi.mock('@kilocode/harness-sdk/plugins/remote-mcp', () => ({
-  RemoteMcpError: class FakeRemoteMcpError extends Error {
-    readonly kind: string;
-    constructor(fields: {
-      readonly serverId: string;
-      readonly kind: string;
-      readonly cause: unknown;
-    }) {
-      super(`${fields.serverId}: ${fields.kind}`);
-      this.name = 'RemoteMcpError';
-      this.kind = fields.kind;
-    }
-  },
-  remoteMcpTools: (held: RemoteMcpServer, deps: RemoteMcpClientDeps) => {
-    world.calls.push({ server: held, deps });
-    return answer();
-  },
-}));
-
-const {
-  ensureRemoteMcp,
-  forgetRemoteMcp,
-  remoteMcpState,
-  remoteServerToolNames,
-  remoteServerTools,
-} = await import('./remote-mcp');
-
-/** What the app does when the stored list changes. */
-function emitServers(): void {
-  for (const listener of world.listeners) {
-    listener();
-  }
-}
-
 beforeEach(() => {
-  world.servers = [];
-  world.epoch = 0;
-  world.calls.length = 0;
-  world.loaded = true;
-  world.load = undefined;
-  answer = () => Effect.succeed([tool('mcp_alpha_read')]);
-  world.connectivity = 'online';
-  forgetRemoteMcp();
+  resetWorld();
 });
 
 describe('the discovered state', () => {
@@ -143,6 +68,88 @@ describe('the discovered state', () => {
     expect(world.calls[0]?.deps.discoverTimeoutMs).toBe(15_000);
   });
 
+  it('asks a person’s Retry again after an automatic pass settles', async () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    world.servers = [alpha, beta];
+    const gate: { open?: () => void } = {};
+    const held = new Promise<void>(resolve => {
+      gate.open = resolve;
+    });
+    let call = 0;
+    discovery.answer = () => {
+      call += 1;
+      if (call === 1) {
+        return Effect.fail(
+          new RemoteMcpError({ serverId: 'alpha', kind: 'unreachable', cause: 'gone' })
+        );
+      }
+      if (call === 2) {
+        return whenReleased(held, [tool('mcp_beta_read')]);
+      }
+      return Effect.succeed([tool('mcp_alpha_read')]);
+    };
+
+    const automatic = ensureRemoteMcp(place);
+    // The retry is tapped while the automatic pass is still running: alpha has
+    // already failed and beta is the reason the pass has not settled.
+    const retry = ensureRemoteMcp(place, { retry: true });
+    gate.open?.();
+    await Promise.all([automatic, retry]);
+
+    const alphaCalls = world.calls.filter(entry => entry.server.id === 'alpha');
+    expect(alphaCalls).toHaveLength(2);
+    // The retry asked with its own deadline, not the automatic pass's.
+    expect(alphaCalls[1]?.deps.discoverTimeoutMs).toBe(15_000);
+  });
+
+  it('asks again even when the running pass was itself a retry', async () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    world.servers = [alpha, beta];
+    const gate: { open?: () => void } = {};
+    const held = new Promise<void>(resolve => {
+      gate.open = resolve;
+    });
+    let call = 0;
+    discovery.answer = () => {
+      call += 1;
+      if (call === 1) {
+        return Effect.fail(
+          new RemoteMcpError({ serverId: 'alpha', kind: 'unreachable', cause: 'gone' })
+        );
+      }
+      if (call === 2) {
+        return whenReleased(held, [tool('mcp_beta_read')]);
+      }
+      return Effect.succeed([tool('mcp_alpha_read')]);
+    };
+
+    const first = ensureRemoteMcp(place, { retry: true });
+    const second = ensureRemoteMcp(place, { retry: true });
+    gate.open?.();
+    await Promise.all([first, second]);
+
+    expect(world.calls.filter(entry => entry.server.id === 'alpha')).toHaveLength(2);
+  });
+
+  it('joins one pass for an automatic ask', async () => {
+    const alpha = server({ id: 'alpha' });
+    world.servers = [alpha];
+    const gate: { open?: () => void } = {};
+    const held = new Promise<void>(resolve => {
+      gate.open = resolve;
+    });
+    discovery.answer = () => whenReleased(held, [tool('mcp_alpha_read')]);
+
+    const first = ensureRemoteMcp(place);
+    const second = ensureRemoteMcp(place);
+    gate.open?.();
+    await Promise.all([first, second]);
+
+    expect(world.calls).toHaveLength(1);
+  });
+
   it('sends the stored token for a bearer server and none for an open one', async () => {
     const open = server({ id: 'alpha' });
     const bearer = server({ id: 'beta', auth: { type: 'bearer', token: 'secret' } });
@@ -178,7 +185,7 @@ describe('the discovered state', () => {
   it('asks the person to sign in when an OAuth server refuses, and offers no Retry', async () => {
     const oauth = server({ id: 'gamma', auth: { type: 'oauth' } });
     world.servers = [oauth];
-    answer = () =>
+    discovery.answer = () =>
       Effect.fail(
         new RemoteMcpError({ serverId: 'gamma', kind: 'unauthorized', cause: 'sign in' })
       );
@@ -211,13 +218,12 @@ describe('the discovered state', () => {
       gate.open = resolve;
     });
     let call = 0;
-    answer = () => {
+    discovery.answer = () => {
       call += 1;
       if (call > 1) {
         return Effect.succeed([tool('mcp_alpha_write')]);
       }
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- the promise settles when the test releases it, not on an await
-      return Effect.promise(() => held).pipe(Effect.map(() => [tool('mcp_alpha_read')]));
+      return whenReleased(held, [tool('mcp_alpha_read')]);
     };
 
     world.servers = [server({ id: 'alpha', url: 'https://old.example/mcp' })];
@@ -289,7 +295,7 @@ describe('the discovered state', () => {
   it('asks a server that answered with no tools again, never serving the empty list', async () => {
     const alpha = server({ id: 'alpha' });
     world.servers = [alpha];
-    answer = () => Effect.succeed([]);
+    discovery.answer = () => Effect.succeed([]);
 
     await ensureRemoteMcp(place);
     expect(remoteMcpState()).toEqual([
@@ -298,7 +304,7 @@ describe('the discovered state', () => {
 
     // An empty catalog is not an answer: the next ask reconnects, and a server
     // that has tools by then offers them.
-    answer = () => Effect.succeed([tool('mcp_alpha_read')]);
+    discovery.answer = () => Effect.succeed([tool('mcp_alpha_read')]);
     await ensureRemoteMcp(place);
 
     expect(world.calls).toHaveLength(2);

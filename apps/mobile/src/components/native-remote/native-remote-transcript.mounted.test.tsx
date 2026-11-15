@@ -185,3 +185,66 @@ it('opens native tool details through the shared host and keeps an open sheet li
     },
   });
 });
+
+it('shows one unreadable notice instead of consent controls and keeps readable cards', async () => {
+  const fixture = nativeRemoteFixture();
+  const renderer = await mount(fixture.client);
+  await press(renderer, 'ses-first');
+
+  await act(() =>
+    fixture.publishSession('ses-first', {
+      ...readySession,
+      pending: {
+        permissions: [],
+        questions: [],
+        unreadablePermissions: [{ requestId: 'perm-proof' }],
+      },
+    })
+  );
+  expect(text(renderer.root)).toContain('agentChat.permissionCard.unreadableTitle');
+  expect(text(renderer.root)).not.toContain('agentChat.permissionCard.allowOnce');
+  expect(
+    renderer.root
+      .findAllByType('Button')
+      .map(node => text(node))
+      .filter(label => label.startsWith('agentChat.permissionCard.'))
+  ).toEqual([]);
+  expect(renderer.root.findAll(node => node.props.accessibilityRole === 'alert')).toHaveLength(1);
+
+  await act(() =>
+    fixture.publishSession('ses-first', {
+      ...readySession,
+      pending: { permissions: [], questions: [], unreadablePermissions: [] },
+    })
+  );
+  expect(text(renderer.root)).not.toContain('agentChat.permissionCard.unreadableTitle');
+  expect(renderer.root.findAll(node => node.props.accessibilityRole === 'alert')).toEqual([]);
+
+  await act(() =>
+    fixture.publishSession('ses-first', {
+      ...readySession,
+      pending: {
+        permissions: [{ id: 'perm-readable', action: 'shell', resources: ['Run tests'] }],
+        questions: [],
+        unreadablePermissions: [{ requestId: 'perm-proof' }],
+      },
+    })
+  );
+  const rendered = text(renderer.root);
+  expect(rendered).toContain('agentChat.permissionCard.unreadableTitle');
+  expect(rendered).toContain('shell');
+  expect(rendered).toContain('Run tests');
+  expect(rendered.indexOf('agentChat.permissionCard.unreadableTitle')).toBeLessThan(
+    rendered.indexOf('agentChat.permissionCard.allowOnce')
+  );
+  expect(
+    renderer.root
+      .findAllByType('Button')
+      .map(node => text(node))
+      .filter(label => label.startsWith('agentChat.permissionCard.'))
+  ).toEqual([
+    'agentChat.permissionCard.allowOnce',
+    'agentChat.permissionCard.alwaysAllow',
+    'agentChat.permissionCard.deny',
+  ]);
+});

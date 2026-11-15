@@ -90,6 +90,7 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/ui/icons', () => ({
   CirclePlus: 'CirclePlus',
+  LineChart: 'LineChart',
   GitBranch: 'GitBranch',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',

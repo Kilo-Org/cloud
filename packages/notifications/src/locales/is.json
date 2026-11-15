@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Virk umboð hafa uppfærslu"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Verkefni lokið"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Mistókst: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Rofin: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

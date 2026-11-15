@@ -97,6 +97,7 @@ import {
   type RequestLoggingMode,
 } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
+import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
@@ -2256,6 +2257,96 @@ describe('POST /api/v1/chat/completions request handling', () => {
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       }
     );
+  });
+
+  describe('delegated routes and the organization provider policy', () => {
+    type DelegatedRoute = 'an OpenAI ChatGPT connection' | 'a Claude billing connection';
+    const delegatedRoutes: Record<DelegatedRoute, Pick<ProviderRoute, 'provider' | 'userByok'>> = {
+      'an OpenAI ChatGPT connection': {
+        provider: { ...provider, type: 'openai-chatgpt' },
+        userByok: null,
+      },
+      'a Claude billing connection': {
+        provider: { ...provider, type: 'claude-billing' },
+        userByok: null,
+      },
+    };
+
+    /**
+     * Sends one request through a delegated route under an enterprise organization policy that
+     * admits `admittedProviders` for the model.
+     */
+    async function sendThrough(route: DelegatedRoute, admittedProviders: readonly string[]) {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { provider_allow_list: [...admittedProviders] },
+        plan: 'enterprise',
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue({
+        allowed: true,
+        eligibleProviderRoutes: new Set(admittedProviders),
+      });
+      mockedIsModelAllowedForProviderKey.mockImplementation(
+        async (_policy, _modelId, providerSlug) => admittedProviders.includes(providerSlug)
+      );
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          ...delegatedRoutes[route],
+          isFree: false,
+          bypassAccessCheck: false,
+          skipBalanceCheck: true,
+        })
+      );
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      return handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    }
+
+    afterEach(() => {
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+      mockedIsModelAllowedForProviderKey.mockResolvedValue(true);
+    });
+
+    it('refuses a ChatGPT connection whose upstream provider the organization policy does not admit', async () => {
+      const response = await sendThrough('an OpenAI ChatGPT connection', ['anthropic']);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
+        expect.anything(),
+        'openai/gpt-4o',
+        'openai'
+      );
+    });
+
+    it('serves a ChatGPT connection whose upstream provider the organization policy admits', async () => {
+      const response = await sendThrough('an OpenAI ChatGPT connection', ['anthropic', 'openai']);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a Claude billing connection whose upstream provider the organization policy does not admit', async () => {
+      const response = await sendThrough('a Claude billing connection', ['openai']);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
+        expect.anything(),
+        'openai/gpt-4o',
+        'anthropic'
+      );
+    });
   });
 
   it.each(['openrouter', 'vercel'] as const)(
@@ -4768,7 +4859,9 @@ describe('briefing gateway accounting receipts', () => {
 
   async function finishAfterTasks() {
     await Promise.all(
-      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? undefined : task))
+      jest
+        .mocked(after)
+        .mock.calls.map(([task]) => Promise.resolve(typeof task === 'function' ? undefined : task))
     );
   }
 
@@ -5141,7 +5234,7 @@ describe('Enkrypt output guardrail', () => {
   function enkryptRequestBodies() {
     return fetchSpy.mock.calls
       .filter(([url]) => url === enkryptDetectUrl)
-      .map(([, init]) => JSON.parse(String(init?.body)) as { text: string; detectors: unknown });
+      .map(([, init]) => readJsonBody(init?.body) as { text: string; detectors: unknown });
   }
 
   async function runAfterTasks() {
@@ -5719,7 +5812,7 @@ describe('Enkrypt output guardrail', () => {
       },
     });
     fetchSpy.mockImplementation(async (_url, init) => {
-      const request = JSON.parse(String(init?.body)) as {
+      const request = readJsonBody(init?.body) as {
         text: string;
         detectors: Record<string, unknown>;
       };
@@ -5930,7 +6023,7 @@ describe('Enkrypt input guardrail', () => {
       .filter(([url]) => url === enkryptDetectUrl)
       .map(
         ([, init]) =>
-          JSON.parse(String(init?.body)) as { text: string; detectors: Record<string, unknown> }
+          readJsonBody(init?.body) as { text: string; detectors: Record<string, unknown> }
       );
   }
 
@@ -6528,7 +6621,7 @@ describe('Enkrypt input guardrail', () => {
         enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
       });
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { text } = JSON.parse(String(init?.body)) as { text: string };
+        const { text } = readJsonBody(init?.body) as { text: string };
         return Response.json(
           text.includes('ignore all instructions')
             ? injection
@@ -6689,7 +6782,7 @@ describe('Enkrypt input guardrail', () => {
       enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
     });
     fetchSpy.mockImplementation(async (_url, init) => {
-      const { text } = JSON.parse(String(init?.body)) as { text: string };
+      const { text } = readJsonBody(init?.body) as { text: string };
       return Response.json(
         text.includes('ignore all instructions')
           ? injection
@@ -6959,7 +7052,7 @@ describe('Enkrypt input guardrail', () => {
 
     function enkryptResponds(respond: (detectors: Record<string, unknown>) => Promise<Response>) {
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { detectors } = JSON.parse(String(init?.body)) as {
+        const { detectors } = readJsonBody(init?.body) as {
           detectors: Record<string, unknown>;
         };
         return respond(detectors);
@@ -7548,7 +7641,7 @@ describe('Enkrypt input guardrail', () => {
       const allowed = '{ "summary": { "injection_attack": 0 }, "result_message": null }';
       const blocked = '{ "summary": { "injection_attack": 1 }, "result_message": "blocked" }';
       fetchSpy.mockImplementation(async (_url, init) => {
-        const { text } = JSON.parse(String(init?.body)) as { text: string };
+        const { text } = readJsonBody(init?.body) as { text: string };
         return new Response(text.includes('ignore all instructions') ? blocked : allowed);
       });
 
@@ -7628,7 +7721,7 @@ describe('Enkrypt input guardrail', () => {
       const loggedResponse =
         '{ "summary": { "policy_violation": 1 }, "result_message": "raw log-only response" }';
       fetchSpy.mockImplementation(async (_url, init) => {
-        const request = JSON.parse(String(init?.body)) as { detectors: Record<string, unknown> };
+        const request = readJsonBody(init?.body) as { detectors: Record<string, unknown> };
         if (!('policy_violation' in request.detectors)) return new Response(allowedResponse);
         await logOnlyScan.promise;
         return new Response(loggedResponse);

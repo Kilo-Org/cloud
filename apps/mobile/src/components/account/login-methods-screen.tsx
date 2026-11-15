@@ -1,4 +1,5 @@
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { signInMethodRefusalForCode } from '@kilocode/app-shared/auth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +23,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** The web page that starts a link: the round trip needs the browser's session. */
 const CONNECTED_ACCOUNTS_URL = `${WEB_BASE_URL}/connected-accounts`;
@@ -72,11 +74,19 @@ function ProviderRow({
 /**
  * The sign-in methods of the account, and the way to add another.
  *
- * Unlinking asks first and the server owns the rule that at least one method
- * stays: its refusal is rendered in place, beside the list, rather than as a
- * toast, because it is the answer to the tap the reader just made and the list
- * they can act on is still above it. That inline status is the screen's single
+ * Unlinking asks first and the server owns the rules that at least one method
+ * stays and that the row it names still exists: a refusal is rendered in place,
+ * beside the list, rather than as a toast, because it is the answer to the tap
+ * the reader just made and the list they can act on is still above it. A known
+ * refusal code becomes catalog copy, and only an unknown failure shows the
+ * server's sentence as written. That inline status is the screen's single
  * announcement owner, so no toast repeats it.
+ *
+ * The screen refuses a last-method tap itself, without asking the server, and
+ * that sentence retires as soon as the loaded list shows a second method; a
+ * server refusal stands until the screen refuses a later tap itself or the
+ * server answers again, because the server's answer is about the account, not
+ * about the list this render drew.
  *
  * Adding a method is the web's round trip (the OAuth callback needs the browser
  * session that starts it), so the row opens the connected-accounts page in the
@@ -88,27 +98,60 @@ export function LoginMethodsScreen() {
   const queryClient = useQueryClient();
   const { confirm, dialog } = useConfirmDialog();
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
+  // The screen's own refusal, kept apart from a server refusal: it describes the
+  // one-method list the reader tapped on, so a list that later shows two methods
+  // retires it instead of leaving a sentence the reader can check.
+  const [lastMethodRefusal, setLastMethodRefusal] = useState(false);
   useRouteForegroundRefresh([[['user']]]);
 
   const providers = useQuery(trpc.user.getAuthProviders.queryOptions());
+  const methodCount = providers.data?.providers.length ?? 0;
+  // The screen's refusal only holds for the one-method list that produced it.
+  const statusMessage =
+    lastMethodRefusal && methodCount < 2 ? t('profile.signInMethods.lastMethod') : unlinkError;
   const unlink = useMutation(
     trpc.user.unlinkAuthProvider.mutationOptions({
       onSuccess: (_result, input) => {
         setUnlinkError(null);
+        setLastMethodRefusal(false);
         void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
         announcingToast.success(
           t('profile.signInMethods.unlinked', { provider: providerLabel(input.provider) })
         );
       },
-      // The server's message is the account of why it refused (the last method),
-      // so it is shown as written.
-      onError: error => {
+      // A known refusal code becomes catalog copy. Only a failure the screen
+      // does not recognise shows the server's sentence as written.
+      onError: (error, input) => {
+        const refusal = signInMethodRefusalForCode(readTrpcErrorField(error, 'upstreamCode'));
+        if (refusal === 'lastMethod') {
+          setUnlinkError(t('profile.signInMethods.lastMethod'));
+          return;
+        }
+        if (refusal === 'notLinked') {
+          setUnlinkError(
+            t('profile.signInMethods.notLinked', { provider: providerLabel(input.provider) })
+          );
+          // The list still draws the row the server reports as gone.
+          void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
+          return;
+        }
         setUnlinkError(error.message);
       },
     })
   );
 
   const confirmUnlink = (provider: AuthProviderId) => {
+    // The server refuses the last method, so a confirmation would promise an
+    // outcome this tap cannot deliver.
+    if (methodCount < 2) {
+      setLastMethodRefusal(true);
+      // This tap answers for the list it drew, so an answer to an earlier tap
+      // must not wait behind it: once the refusal retires, that sentence would
+      // sit beside rows it never described.
+      setUnlinkError(null);
+      return;
+    }
+    setLastMethodRefusal(false);
     const label = providerLabel(provider);
     confirm({
       title: t('profile.signInMethods.unlinkTitle', { provider: label }),
@@ -168,7 +211,7 @@ export function LoginMethodsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {body}
-        <AccessibleStatus message={unlinkError} className="text-sm" />
+        <AccessibleStatus message={statusMessage} className="text-sm" />
         <ConfigureRow
           icon={Plus}
           title={t('profile.signInMethods.linkAnother')}

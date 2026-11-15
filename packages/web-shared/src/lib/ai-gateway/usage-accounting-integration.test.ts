@@ -34,7 +34,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  USAGE_INGEST_URL: 'http://usage.example.test/usage',
+  USAGE_INGEST_URL: 'https://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
 }));
 jest.mock('./usage-publisher', () => {
@@ -256,7 +256,7 @@ beforeEach(() => {
   process.env.VERCEL_TARGET_ENV = 'preview';
   process.env.VERCEL_ENV = 'preview';
   bouncer.deliverBouncerUsageEventNow.mockResolvedValue(true);
-  config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
+  config.USAGE_INGEST_URL = 'https://usage.example.test/usage';
   config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-local-secret';
   process.env.VERCEL_REGION = 'fra1';
   sent = [];
@@ -330,7 +330,7 @@ function configureQueueEnvironment(overrides: Record<string, string | undefined>
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-  config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
+  config.USAGE_INGEST_URL = 'https://usage.example.test/usage';
   config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-local-secret';
 }
 

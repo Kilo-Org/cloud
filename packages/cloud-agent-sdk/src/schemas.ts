@@ -6,12 +6,14 @@ import {
 } from '@kilocode/session-ingest-contracts';
 export { customerBillingFailureSchema, type CustomerBillingFailure };
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
-import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import { PREPARATION_OUTPUT_MAX_LENGTH } from './limits';
+import { PREPARATION_MAX_DETAIL_LENGTH, preparationStepSchema } from './preparation-step';
 import { mutationCursorSchema } from './cloud-conversation-schemas';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
 export * from './cloud-conversation-schemas';
+export { PREPARATION_MAX_DETAIL_LENGTH, preparationStepSchema } from './preparation-step';
 
 export const cloudWorktreeChangesReadyDataSchema = z
   .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
@@ -371,7 +373,6 @@ export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
 export const PREPARATION_MAX_MESSAGE_LENGTH = 16_384;
-export const PREPARATION_MAX_DETAIL_LENGTH = 16_384;
 export const PREPARATION_MAX_SETUP_LOG_ENTRIES = 100;
 export const PREPARATION_MAX_ATTEMPTS = 10;
 export const PREPARATION_MAX_STEPS = 100;
@@ -380,20 +381,6 @@ export const PREPARATION_MAX_STEPS = 100;
 export const SESSION_QUEUE_MAX_IDS = 1_000;
 /** Most questions a `question.asked` event may carry. */
 export const SESSION_QUESTION_MAX_QUESTIONS = 32;
-
-/**
- * A snapshot's retained tail carries the same byte budget the client applies
- * when it trims step output. The character maximum is a cheap first pass: a
- * string can never encode to fewer bytes than it has characters, so anything
- * rejected there would fail the byte check too.
- */
-const preparationOutputTailSchema = z
-  .string()
-  .max(PREPARATION_OUTPUT_TAIL_MAX_BYTES)
-  .refine(
-    value => new TextEncoder().encode(value).byteLength <= PREPARATION_OUTPUT_TAIL_MAX_BYTES,
-    { message: `Output tail cannot exceed ${PREPARATION_OUTPUT_TAIL_MAX_BYTES} UTF-8 bytes` }
-  );
 
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
 const remoteSlashCommandInfoSchema = z
@@ -998,28 +985,6 @@ export type ErrorData = z.infer<typeof errorDataSchema>;
 
 export const wrapperDisconnectedDataSchema = z.unknown();
 export type WrapperDisconnectedData = z.infer<typeof wrapperDisconnectedDataSchema>;
-
-const preparationStepSchema = z.object({
-  id: z.string(),
-  key: z.string(),
-  kind: z.enum(['phase', 'setup_command']),
-  label: z.string(),
-  status: z.enum(['running', 'completed', 'failed']),
-  startedAt: z.number(),
-  startedRevision: z.number().optional(),
-  parentStepId: z.string().optional(),
-  completedAt: z.number().optional(),
-  revision: z.number(),
-  latestDetail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
-  snapshotCapturedAt: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
-  safeError: z.string().optional(),
-  command: z.string().optional(),
-  commandIndex: z.number().optional(),
-  commandCount: z.number().optional(),
-  outputTail: preparationOutputTailSchema.optional(),
-  outputTruncated: z.boolean().optional(),
-  exitCode: z.number().optional(),
-});
 
 const preparationAttemptSchema = z.object({
   id: z.string(),

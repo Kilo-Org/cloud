@@ -618,7 +618,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // are silently ignored; the caller treats an empty result as "text only".
 export function detectRequiredInputModalities(body: unknown): string[] {
   const found = new Set<string>();
-  collectModalities(body, found, 0);
+  collectModalities(body, found, 0, 'body');
 
   if (found.size === 0) {
     return [];
@@ -627,6 +627,17 @@ export function detectRequiredInputModalities(body: unknown): string[] {
   return [...found].sort();
 }
 
+// The role of a record in a request body. A key name means different things at
+// different levels, and the role picks the meaning.
+type ModalityRole = 'body' | 'message' | 'part';
+
+// Child keys per role, with the role of the records each key holds.
+const MODALITY_CHILD_ROLES: Record<ModalityRole, Record<string, ModalityRole>> = {
+  body: { messages: 'message', input: 'message', system: 'part' },
+  message: { content: 'part', parts: 'part' },
+  part: { parts: 'part' },
+};
+
 // The same body reaches this walk as reaches the text walk, with the same
 // unbounded nesting. Its work is already linear in the parsed body, which the
 // request size bounds, and every level costs one node per message, so the
@@ -634,30 +645,52 @@ export function detectRequiredInputModalities(body: unknown): string[] {
 // conversation and silently drop a modality from the newest turn. A value
 // nested past the depth limit keeps what was found before it, which is the
 // documented "malformed shapes are ignored" result.
-function collectModalities(value: unknown, out: Set<string>, depth: number): void {
+function collectModalities(
+  value: unknown,
+  out: Set<string>,
+  depth: number,
+  role: ModalityRole
+): void {
   if (value === null || value === undefined) return;
   if (depth > PROMPT_WALK_MAX_DEPTH) return;
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      collectModalities(item, out, depth + 1);
+      collectModalities(item, out, depth + 1, role);
     }
     return;
   }
 
   if (!isRecord(value)) return;
 
-  // Walk known container fields so message arrays and content parts are
-  // visited. Bodies use different keys per provider:
-  //   * OpenAI chat completions / Anthropic: `messages[]`
-  //   * OpenAI Responses: `input` (string or array)
-  // Content parts live under `content` (chat / Anthropic) or `parts`
-  // (Responses). We do NOT recurse into every key — that would over-walk
-  // tools, metadata, and provider hints — only into the known structural
-  // containers.
-  for (const key of MODALITY_CONTAINER_KEYS) {
-    collectModalities(value[key], out, depth + 1);
+  // The walk follows the request structure by role, instead of visiting the
+  // same key names at every level. A body holds its messages under `messages`
+  // or `input`, and its system prompt under `system`. A message holds its
+  // content parts under `content` or `parts`. A part holds nested parts under
+  // `parts`. `input` is a message list only on a body. On a `tool_use` record
+  // it holds tool arguments. `content` is a part list only on a message. On a
+  // `tool_result` record it usually holds tool output. Keying the walk by role
+  // keeps it out of tool payloads, which reuse these names.
+  const childRoles = MODALITY_CHILD_ROLES[role];
+  for (const key of Object.keys(childRoles)) {
+    collectModalities(value[key], out, depth + 1, childRoles[key]);
   }
+
+  // A tool record can list content blocks that the model receives, and those
+  // blocks can be images. An Anthropic `tool_result` part holds them under
+  // `content`; an OpenAI Responses `function_call_output` item holds them
+  // under `output`. Only an array is such a list. A string or an object is
+  // tool payload, so the walk leaves it alone.
+  if (role === 'part' && Array.isArray(value.content)) {
+    collectModalities(value.content, out, depth + 1, 'part');
+  }
+  if (role === 'message' && Array.isArray(value.output)) {
+    collectModalities(value.output, out, depth + 1, 'part');
+  }
+
+  // Media detection runs only on a content part. Nothing else in the body
+  // describes what the model must accept.
+  if (role !== 'part') return;
 
   // Typed content parts: OpenAI Responses `input_image` / `input_file`,
   // OpenAI chat `image_url`, Anthropic `image` / `document`.
@@ -670,12 +703,14 @@ function collectModalities(value: unknown, out: Set<string>, depth: number): voi
     }
   }
 
-  // Guards against callers that omit the `type` discriminator — the
-  // presence of a known media field is itself sufficient signal. We do NOT
-  // treat a bare `file` key as a signal: it collides with ordinary tool
-  // output (e.g. a `read_file` result whose `content` is `{ file: ... }`),
-  // and the typed `file`/`input_file`/`document` cases above already cover
-  // the real Responses/Anthropic file shapes.
+  // Guards against callers that omit the `type` discriminator on a part. The
+  // presence of a known media field on that part is itself sufficient signal.
+  // A bare `image_url` / `input_image` / `input_file` key counts only on a
+  // part, because tool arguments and tool output use those names for ordinary
+  // payloads. We do NOT treat a bare `file` key as a signal: it collides with
+  // ordinary tool output (e.g. a `read_file` result whose `content` is
+  // `{ file: ... }`), and the typed `file`/`input_file`/`document` cases above
+  // already cover the real Responses/Anthropic file shapes.
   if ('image_url' in value || 'input_image' in value) {
     out.add('image');
   }
@@ -683,8 +718,6 @@ function collectModalities(value: unknown, out: Set<string>, depth: number): voi
     out.add('file');
   }
 }
-
-const MODALITY_CONTAINER_KEYS = ['messages', 'input', 'content', 'parts', 'system'];
 
 // Routing-only token estimator. Deliberately distinct from the gateway's
 // per-request `estimateTokenCount`, which mis-counts base64 image payloads

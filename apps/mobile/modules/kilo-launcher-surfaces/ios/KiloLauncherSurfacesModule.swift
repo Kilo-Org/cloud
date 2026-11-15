@@ -9,8 +9,9 @@ import UIKit
  * waits; this module owns what the launcher shows. The shortcut `type` is a
  * stable per-action identifier and the deep-link url rides in `userInfo`, so
  * native holds no route mapping and a tap re-enters the app through the same
- * pipeline a notification tap uses. An action whose url is null is absent, which
- * is how "Needs input" disappears once nothing waits.
+ * pipeline a notification tap uses. Only the actions JS publishes become
+ * shortcuts, so "Needs input" disappears once nothing waits, and a payload
+ * without the required New agent action never reaches the launcher or the cache.
  *
  * iOS has no quick-settings tile; its twin is a Control Center control, which is
  * a separate request and deliberately not built here.
@@ -47,7 +48,10 @@ public final class KiloLauncherSurfacesModule: Module {
     setShortcutItems(surfaces.shortcutItems)
   }
 
-  /** Called by JS after sign-out: keep only the cached New agent action. */
+  /**
+   * Called by JS after sign-out: keep only the cached New agent action. An empty
+   * list means no valid payload was ever cached.
+   */
   private func clearDynamicSurfaces() {
     // The parked cold-start url belongs to the account that is leaving: its only
     // reader, `consumePendingLaunchUrl`, runs on the signed-in mount, so a url
@@ -57,7 +61,7 @@ public final class KiloLauncherSurfacesModule: Module {
     let cached = KiloLauncherSurfacesStore.cachedPayloadJson().flatMap {
       KiloLauncherSurfacesPayload(json: $0)
     }
-    setShortcutItems(cached?.newAgentItem.map { [$0] } ?? [])
+    setShortcutItems(cached.map { [$0.newAgentItem] } ?? [])
   }
 
   private func setShortcutItems(_ items: [UIApplicationShortcutItem]) {
@@ -84,91 +88,45 @@ enum KiloLauncherSurfacesShortcut {
   static let urlUserInfoKey = "kilo.launcher.url"
 }
 
-/**
- * The launcher surfaces payload frozen by the JS side. `newAgentUrl` and
- * `newAgentLabel` are always present; the other two actions are dynamic, and a
- * null or empty url means the action is absent and must not be offered.
- */
-private struct KiloLauncherSurfacesPayload {
-  let newAgentUrl: String?
-  let newAgentLabel: String?
-  let needsInputUrl: String?
-  let needsInputLabel: String?
-  let openLastSessionUrl: String?
-  let openLastSessionLabel: String?
+private extension KiloLauncherSurfacesPayload {
 
-  init?(json: String) {
-    guard let data = json.data(using: .utf8),
-          let parsed = try? JSONSerialization.jsonObject(with: data),
-          let object = parsed as? [String: Any] else {
-      return nil
-    }
-    newAgentUrl = payloadString(object, "newAgentUrl")
-    newAgentLabel = payloadString(object, "newAgentLabel")
-    needsInputUrl = payloadString(object, "needsInputUrl")
-    needsInputLabel = payloadString(object, "needsInputLabel")
-    openLastSessionUrl = payloadString(object, "openLastSessionUrl")
-    openLastSessionLabel = payloadString(object, "openLastSessionLabel")
-  }
-
-  /** At most three items, in publish order. A null url omits its action. */
+  /** One item per published action, in publish order. */
   var shortcutItems: [UIApplicationShortcutItem] {
     [newAgentItem, needsInputItem, openLastSessionItem].compactMap { $0 }
   }
 
-  var newAgentItem: UIApplicationShortcutItem? {
-    shortcut(
-      identifier: KiloLauncherSurfacesShortcut.newAgentType,
-      url: newAgentUrl,
-      label: newAgentLabel
-    )
+  var newAgentItem: UIApplicationShortcutItem {
+    shortcut(identifier: KiloLauncherSurfacesShortcut.newAgentType, action: newAgent)
   }
 
   private var needsInputItem: UIApplicationShortcutItem? {
-    shortcut(
-      identifier: KiloLauncherSurfacesShortcut.needsInputType,
-      url: needsInputUrl,
-      label: needsInputLabel
-    )
+    needsInput.map {
+      shortcut(identifier: KiloLauncherSurfacesShortcut.needsInputType, action: $0)
+    }
   }
 
   private var openLastSessionItem: UIApplicationShortcutItem? {
-    shortcut(
-      identifier: KiloLauncherSurfacesShortcut.openLastSessionType,
-      url: openLastSessionUrl,
-      label: openLastSessionLabel
-    )
+    openLastSession.map {
+      shortcut(identifier: KiloLauncherSurfacesShortcut.openLastSessionType, action: $0)
+    }
   }
 
   /**
-   * The title is the label JS translated; the url is only the fallback for a
-   * missing label, never an English literal. The type is the action identifier,
-   * not the url, so two actions opening the same session keep distinct types.
+   * The title is the label JS translated. The type is the action identifier, not
+   * the url, so two actions opening the same session keep distinct types, and
+   * the url rides in `userInfo` as the NSString the `NSSecureCoding` value type
+   * accepts.
    */
   private func shortcut(
     identifier: String,
-    url: String?,
-    label: String?
-  ) -> UIApplicationShortcutItem? {
-    guard let url else {
-      return nil
-    }
-    return UIApplicationShortcutItem(
+    action: LauncherSurfacesAction
+  ) -> UIApplicationShortcutItem {
+    UIApplicationShortcutItem(
       type: identifier,
-      localizedTitle: label ?? url,
+      localizedTitle: action.label,
       localizedSubtitle: nil,
       icon: nil,
-      // The url rides in `userInfo` as the NSString the `NSSecureCoding` value
-      // type accepts, so two actions opening the same session keep distinct types.
-      userInfo: [KiloLauncherSurfacesShortcut.urlUserInfoKey: url as NSString]
+      userInfo: [KiloLauncherSurfacesShortcut.urlUserInfoKey: action.url as NSString]
     )
   }
-}
-
-/** Reads a payload string, treating an explicit JSON null or an empty string as absent. */
-private func payloadString(_ object: [String: Any], _ key: String) -> String? {
-  guard let value = object[key] as? String, !value.isEmpty else {
-    return nil
-  }
-  return value
 }

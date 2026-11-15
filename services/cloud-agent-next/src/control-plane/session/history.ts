@@ -30,6 +30,8 @@ import {
   readKilo2MessagesPage,
   type Kilo2MessagesPage,
 } from './conversation-history.js';
+import type { PreparationAttempt } from '../../shared/protocol.js';
+import type { QueuedMessageSnapshot } from '../../websocket/stream.js';
 
 export const MAX_SESSION_PAGE_BYTES = 4 * 1024 * 1024;
 /**
@@ -106,6 +108,17 @@ function parseItem<T>(raw: string | null | undefined, schema: z.ZodType<T>): T |
   }
 }
 
+/**
+ * Rows the WebSocket `connected` event replays on connect. The first history
+ * page carries them so a client that opens without a socket still shows the
+ * run's preparation rows and its queued or failed turns. Older pages must not
+ * repeat them.
+ */
+export type SessionSnapshotRows = {
+  preparationAttempts?: PreparationAttempt[];
+  queuedMessages?: QueuedMessageSnapshot[];
+};
+
 type V1SessionMessagesPage = {
   kind: 'success';
   source: { version: 'v1' };
@@ -115,10 +128,16 @@ type V1SessionMessagesPage = {
   omittedItemCount: number;
   updateCursor: number;
   totalCostMicrodollars: number;
-};
+} & SessionSnapshotRows;
 
 export type SessionMessagesPage = V1SessionMessagesPage | Kilo2MessagesPage;
 
+/**
+ * Reads one stored history page under `MAX_SESSION_PAGE_BYTES`. `reservedBytes`
+ * is the size the caller appends to the page after it is built (the first
+ * page's stream rows), so the readers' hard limits leave that room free and
+ * the whole response stays inside the bound.
+ */
 export function readSessionMessagesPage(input: {
   db: DrizzleSqliteDODatabase;
   storage: DurableObjectStorage;
@@ -132,6 +151,8 @@ export function readSessionMessagesPage(input: {
   parentID?: string;
   omittedItemCount?: number;
   toolDisplay?: ToolDisplayMode;
+  /** Size the caller appends after the page is built; the page keeps it free. */
+  reservedBytes?: number;
 }): SessionMessagesPage {
   const source = readConversationSource(input);
   if (source) return readKilo2MessagesPage(input, source);
@@ -160,6 +181,7 @@ export function readSessionMessagesPage(input: {
   };
   const size = (value: unknown) => encoder.encode(JSON.stringify(value)).byteLength;
   const preview = input.toolDisplay === 'preview';
+  const pageLimit = MAX_SESSION_PAGE_BYTES - (input.reservedBytes ?? 0);
   const softBudget = preview ? MAX_SESSION_PREVIEW_PAGE_BYTES : MAX_SESSION_PAGE_BYTES;
   const partBytesSql = preview ? previewPartBytes() : storedPartBytes();
   const envelopeBytes = () =>
@@ -180,7 +202,7 @@ export function readSessionMessagesPage(input: {
     .from(events)
     .where(sessionWhere)
     .get()?.bytes;
-  if (sessionBytes !== undefined && sessionBytes < MAX_SESSION_PAGE_BYTES - envelopeBytes()) {
+  if (sessionBytes !== undefined && sessionBytes < pageLimit - envelopeBytes()) {
     const info = parseItem(
       db
         .select({ value: sql<string>`json_extract(${events.payload}, '$.properties.info')` })
@@ -198,7 +220,7 @@ export function readSessionMessagesPage(input: {
   } else if (sessionBytes !== undefined) {
     page.omittedItemCount += 1;
   }
-  if (envelopeBytes() > MAX_SESSION_PAGE_BYTES) {
+  if (envelopeBytes() > pageLimit) {
     page.info = {
       id: kiloSessionId,
       ...(input.parentID === undefined ? {} : { parentID: input.parentID }),
@@ -330,7 +352,7 @@ export function readSessionMessagesPage(input: {
       break;
     }
     consumed = key;
-    if (candidate.bytes + bytes + 22 > MAX_SESSION_PAGE_BYTES) {
+    if (candidate.bytes + bytes + 22 > pageLimit) {
       page.omittedItemCount += 1 + partCount;
       continue;
     }
@@ -348,7 +370,7 @@ export function readSessionMessagesPage(input: {
     }
     const message: V1SessionMessagesPage['messages'][number] = { info, parts: [] };
     let messageSize = size(message);
-    if (bytes + messageSize + 1 > MAX_SESSION_PAGE_BYTES) {
+    if (bytes + messageSize + 1 > pageLimit) {
       page.omittedItemCount += 1 + partCount;
       continue;
     }
@@ -373,7 +395,7 @@ export function readSessionMessagesPage(input: {
       let projected = bytes + messageSize + 1;
       for (const row of batch) {
         projected += row.bytes + 1;
-        if (projected > MAX_SESSION_PAGE_BYTES) break;
+        if (projected > pageLimit) break;
         fitting.push(row.id);
       }
       const values = new Map(
@@ -391,7 +413,7 @@ export function readSessionMessagesPage(input: {
               .map(row => [row.id, row])
       );
       for (const row of batch) {
-        if (bytes + messageSize + row.bytes + 2 > MAX_SESSION_PAGE_BYTES) {
+        if (bytes + messageSize + row.bytes + 2 > pageLimit) {
           page.omittedItemCount += partCount - readParts;
           full = true;
           break;
@@ -415,7 +437,7 @@ export function readSessionMessagesPage(input: {
             ? (projectToolPartForDisplay(stored, value.revision) as typeof stored)
             : stored;
         const partBytes = size(part) + (message.parts.length === 0 ? 0 : 1);
-        if (bytes + messageSize + partBytes + 1 > MAX_SESSION_PAGE_BYTES) {
+        if (bytes + messageSize + partBytes + 1 > pageLimit) {
           page.omittedItemCount += partCount - readParts + 1;
           full = true;
           break;

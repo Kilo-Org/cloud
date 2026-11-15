@@ -147,7 +147,17 @@ describe('custom router entry keys', () => {
 
 describe('custom router entries', () => {
   it('rejects duplicate keys, over-long pools, and client providers with a slash', () => {
-    expect(CustomRouterEntriesSchema.safeParse([gatewayEntry, gatewayEntry]).success).toBe(false);
+    const duplicate = CustomRouterEntriesSchema.safeParse([gatewayEntry, gatewayEntry]);
+
+    expect(duplicate.success).toBe(false);
+    if (!duplicate.success) {
+      expect(duplicate.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: [1],
+          message: 'Duplicate entry gateway:anthropic/claude-sonnet-4',
+        })
+      );
+    }
     expect(
       CustomRouterEntriesSchema.safeParse(
         Array.from({ length: 21 }, (_, index) => ({ kind: 'gateway', model: `model-${index}` }))

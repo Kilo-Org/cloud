@@ -7,6 +7,8 @@ import {
   kilo2EventSchema,
   kilo2FormSchema,
   kilo2PermissionSchema,
+  kilo2MessageSchema,
+  kilo2SessionPath,
 } from './kilo2-api.js';
 import {
   createKilo2Reads,
@@ -199,6 +201,12 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
       return;
     }
     if (typeof id !== 'string') return;
+    // The next step start clears retry status. Emit before native reads so a failed
+    // read cannot preserve it.
+    if (event.type === 'session.execution.started')
+      emit('session.turn.open', { sessionID: id }, directory);
+    if (event.type === 'session.execution.started' || event.type === 'session.step.started')
+      emit('session.status', { sessionID: id, status: { type: 'busy' } }, directory);
     const textKind = event.type.startsWith('session.text.')
       ? 'text'
       : event.type.startsWith('session.reasoning.')
@@ -257,16 +265,28 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
         { sessionID: id, source: { version: 'v2', session: info } },
         nativeDirectory
       );
+      if (event.type === 'session.synthetic') {
+        const messageID = z.string().startsWith('evt_').parse(event.id).replace(/^evt_/, 'msg_');
+        const message = kilo2MessageSchema.parse(
+          await api.data(`${kilo2SessionPath(id)}/message/${encodeURIComponent(messageID)}`, {
+            signal,
+          })
+        );
+        if (message.id !== messageID || message.type !== 'synthetic')
+          throw new Error('Native notice identity mismatch');
+        if (changed(id, message))
+          emit(
+            'conversation.message.updated',
+            { sessionID: id, source: { version: 'v2', session: info }, message },
+            nativeDirectory
+          );
+      }
       if (event.type === 'session.created' || event.type === 'session.renamed') {
         emit(
           event.type === 'session.created' ? 'session.created' : 'session.updated',
           { info: { ...info, directory: nativeDirectory } },
           nativeDirectory
         );
-      }
-      if (event.type === 'session.execution.started') {
-        emit('session.turn.open', { sessionID: id }, nativeDirectory);
-        emit('session.status', { sessionID: id, status: { type: 'busy' } }, nativeDirectory);
       }
       // Read the native database. This preserves content ordinals, tool state,
       // and user-message identity without maintaining a second execution state machine.

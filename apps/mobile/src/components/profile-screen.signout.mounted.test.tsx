@@ -146,6 +146,7 @@ vi.mock('@/components/ui/icons', () => ({
   LineChart: 'LineChart',
   Lock: 'Lock',
   MessageSquare: 'MessageSquare',
+  Plus: 'Plus',
   Plug: 'Plug',
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',

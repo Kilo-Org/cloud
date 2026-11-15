@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
 import {
   gatePreviewTarget,
   selectPreviewTarget,

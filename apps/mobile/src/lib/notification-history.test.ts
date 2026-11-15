@@ -103,15 +103,18 @@ describe('notificationHistoryCopy', () => {
   it('keeps the title of a session the user named after the app', () => {
     const copy = notificationHistoryCopy(
       {
-        i18nKey: 'cloudAgentSession.completed',
+        i18nKey: 'sessionReady',
         i18nParams: { sessionTitle: 'Kilo' },
         title: 'Kilo',
-        body: 'Task completed',
+        body: 'Your Kilo session is ready to control from your phone',
       },
       'en'
     );
 
-    expect(copy).toEqual({ headline: 'Kilo', detail: 'Task completed' });
+    expect(copy).toEqual({
+      headline: 'Kilo',
+      detail: 'Your Kilo session is ready to control from your phone',
+    });
   });
 });
 

@@ -62,6 +62,7 @@ import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/prot
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
+import { clearEnvironmentChoices } from '@/lib/hooks/environment-choice';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
@@ -73,7 +74,7 @@ import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
-import { clearLoginDrafts } from '@/lib/login-draft';
+import { retireLoginAttempt } from '@/lib/login-draft';
 import { takeAccountIndependentLaunchUrl } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
@@ -476,8 +477,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         clearSessionScopedState();
         // The sign-in form's drafts belong to the attempt that just succeeded,
         // whatever provider finished it; a later signed-out screen must not
-        // prefill the previous attempt's address or SSO banner.
-        clearLoginDrafts();
+        // prefill the previous attempt's address or SSO banner. The token is
+        // already published, so a keychain write that fails here may not undo
+        // the sign-in: the retirement is left as an obligation, reported, and
+        // retried on the sign-out path before that screen can draw.
+        await retireLoginAttempt();
       });
     },
     []
@@ -641,6 +645,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // the next signed-in account.
           clearAgentModelPreference();
           clearRunOnDestinationPreference();
+          clearEnvironmentChoices();
           clearReasoningPreference();
           clearHideThinkingPreference();
           clearKeepScreenOnPreference();
@@ -657,6 +662,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearCondenseToolCallsPreference();
           clearCollapsedConnectCtasPreference();
         } finally {
+          /* Still inside the auth-transition run and ahead of the token
+             clearing below, so the signed-out login screen cannot mount, let
+             alone restore, before a retirement this process owes is retried.
+             It never rejects: a sign-out may not fail on a keychain write. */
+          await retireLoginAttempt();
           queryClient.clear();
           setSessionEnded(ended);
           setToken(undefined);

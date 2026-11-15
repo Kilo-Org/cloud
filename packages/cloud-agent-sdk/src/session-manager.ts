@@ -1,5 +1,7 @@
 import type { ToolDisplayMode } from './tool-detail-marker';
+import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
+import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
@@ -31,6 +33,7 @@ import {
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
+  REMOTE_SESSION_ORGANIZATION_MISMATCH,
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
@@ -186,7 +189,7 @@ const PENDING_CONFIRMATION_MAX_SESSIONS = 20;
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
  * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
  */
-const RETAINED_MESSAGE_WINDOW = 200;
+export const RETAINED_MESSAGE_WINDOW = 200;
 
 /**
  * How long a matching `Aborted` error stays suppressed after an interrupt RPC
@@ -403,6 +406,14 @@ type SessionManagerConfig = {
    */
   isStalledTransportError?: (err: unknown) => boolean;
   /**
+   * Opt-in for a consumer that opens a session immediately after creating it
+   * (the extension's CLI target). A just-created session can answer NOT_FOUND
+   * until its row is readable, so inside the window the open keeps loading and
+   * retries instead of latching the terminal not-available state. Absent, a
+   * NOT_FOUND stays terminal, which is what web and mobile expect.
+   */
+  spawnedSessionOpen?: SpawnedSessionOpenOptions;
+  /**
    * The consumer's send path can deliver remote-CLI attachment parts: it
    * materializes the presigned GET parts and passes them as `attachmentParts`.
    * The `supportsAttachments` gate reports a `remote` session supported only
@@ -555,6 +566,7 @@ type SessionManagerAtoms = {
   activePermission: W<StandalonePermission | null>;
   /** Every pending question, oldest first. `activeQuestion` is the head. */
   pendingQuestions: W<readonly StandaloneQuestion[]>;
+  backgroundActivity: W<BackgroundActivityState>;
   /** Every pending permission, oldest first. `activePermission` is the head. */
   pendingPermissions: W<readonly StandalonePermission[]>;
   /**
@@ -651,6 +663,12 @@ type SessionManagerAtoms = {
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
+  /**
+   * Record that the consumer just created this session, so an open that races
+   * its row can wait for it instead of latching "no longer available". Only
+   * meaningful with `spawnedSessionOpen` configured.
+   */
+  noteSpawnedSession(kiloSessionId: KiloSessionId): void;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
   /**
    * Load the next page of older messages for a hydrated child session using
@@ -719,6 +737,7 @@ type SessionManager = {
   setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
   retryRemoteModels(): void;
   retryRemoteCommands(): void;
+  retryBackgroundActivity(): void;
   createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId>;
   exitRemoteSession(): Promise<void>;
   interrupt(): Promise<void>;
@@ -770,6 +789,18 @@ type SessionManager = {
   atoms: SessionManagerAtoms;
 };
 
+export type SpawnedSessionOpenOptions = {
+  /** How long after `noteSpawnedSession` a NOT_FOUND still counts as "not readable yet". */
+  graceMs: number;
+  /** Delay before re-opening a session that answered NOT_FOUND inside the window. */
+  retryDelayMs?: number;
+  /** Cap on NOT_FOUND retries per spawned session, so a missing row still surfaces. */
+  maxAttempts?: number;
+};
+
+const DEFAULT_SPAWNED_RETRY_DELAY_MS = 1_000;
+const DEFAULT_SPAWNED_MAX_ATTEMPTS = 10;
+
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
 /** Terminal message for a child session whose first page is a worker 404 (not-found). */
 const CHILD_SESSION_NOT_FOUND_MESSAGE = 'This session is no longer available.';
@@ -811,9 +842,9 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
   if (r.success) {
     if (isSelectedModelUnavailable(r.data.message))
       return { message: SELECTED_MODEL_UNAVAILABLE_ERROR, code: 'selected-model-unavailable' };
-    const code = r.data.data?.code ?? r.data.shape?.code;
-    const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
-    if (code === 'PAYMENT_REQUIRED' || http === 402)
+    const fields = readCloudAgentErrorFields(err);
+    const { code, httpStatus } = fields;
+    if (code === 'PAYMENT_REQUIRED' || httpStatus === 402)
       return {
         message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
         code: 'insufficient-credits',
@@ -825,17 +856,19 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         message: 'Service is unavailable right now. Please try again.',
         code: 'service-unavailable',
       };
-    if (code === 'CONFLICT' || http === 409)
+    if (code === 'CONFLICT' || httpStatus === 409)
       return {
         message: 'Previous task is still finishing up. Please wait a moment.',
         code: 'previous-task-in-progress',
       };
-    if (code === 'SERVICE_UNAVAILABLE' || http === 503)
+    if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503)
       return {
         message: 'Service is temporarily unavailable. Please retry in a moment.',
         code: 'service-temporarily-unavailable',
       };
-    if (code !== undefined || http !== undefined) {
+    // The numeric JSON-RPC `shape.code` is a server answer, not a code, so it
+    // reaches this branch through `answeredByServer`.
+    if (code !== undefined || httpStatus !== undefined || fields.answeredByServer) {
       const reason = serverErrorReason(r.data.message);
       return {
         message: GENERIC_ERROR,
@@ -1180,6 +1213,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const permissionAtom = atom<PermissionState | null>(null);
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const pendingQuestionsAtom = atom<readonly StandaloneQuestion[]>([]);
+  const backgroundActivityAtom = atom<BackgroundActivityState>({ status: 'inactive' });
   const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
   const unreadablePermissionsAtom = atom<readonly UnreadablePermissionState[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
@@ -1528,6 +1562,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * eviction order (`rememberDeniedSession`).
    */
   const deniedSessionIds = new Set<KiloSessionId>();
+  const spawnedSessions = new Map<KiloSessionId, { attempts: number; spawnedAt: number }>();
+  const spawnedRetryTimers = new Map<KiloSessionId, ReturnType<typeof setTimeout>>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1717,6 +1753,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
     store.set(pendingQuestionsAtom, []);
+    store.set(backgroundActivityAtom, { status: 'inactive' });
     store.set(pendingPermissionsAtom, []);
     store.set(unreadablePermissionsAtom, []);
     store.set(suggestionAtom, null);
@@ -2764,6 +2801,66 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * Whether this NOT_FOUND belongs to a session the consumer just created and
+   * whose row may still be on its way. Consumes one retry of the budget.
+   */
+  function takeSpawnedRetry(kiloSessionId: KiloSessionId): boolean {
+    const options = config.spawnedSessionOpen;
+    const spawned = spawnedSessions.get(kiloSessionId);
+    if (options === undefined || spawned === undefined) return false;
+    if (Date.now() - spawned.spawnedAt > options.graceMs) {
+      spawnedSessions.delete(kiloSessionId);
+      return false;
+    }
+    const maxAttempts = options.maxAttempts ?? DEFAULT_SPAWNED_MAX_ATTEMPTS;
+    if (spawned.attempts >= maxAttempts) {
+      spawnedSessions.delete(kiloSessionId);
+      return false;
+    }
+    spawned.attempts += 1;
+    return true;
+  }
+
+  /**
+   * Cancel a scheduled spawned retry. The handle must not outlive the open it
+   * belongs to: a fired retry re-opens the session by id, which would replace a
+   * session that has since opened or been reported unavailable.
+   */
+  function clearSpawnedRetry(kiloSessionId: KiloSessionId): void {
+    const timer = spawnedRetryTimers.get(kiloSessionId);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    spawnedRetryTimers.delete(kiloSessionId);
+  }
+
+  /** Cancel every pending spawned retry except the one for the newly opened id. */
+  function clearOtherSpawnedRetries(kiloSessionId: KiloSessionId): void {
+    for (const [id, timer] of spawnedRetryTimers) {
+      if (id === kiloSessionId) continue;
+      clearTimeout(timer);
+      spawnedRetryTimers.delete(id);
+    }
+  }
+
+  /**
+   * Re-open a spawned session that answered NOT_FOUND, unless the caller has
+   * moved on. The session stays in its loading state until the row is readable
+   * or the retry budget runs out.
+   */
+  function scheduleSpawnedRetry(open: SessionOpen): void {
+    const delay = config.spawnedSessionOpen?.retryDelayMs ?? DEFAULT_SPAWNED_RETRY_DELAY_MS;
+    clearSpawnedRetry(open.kiloSessionId);
+    spawnedRetryTimers.set(
+      open.kiloSessionId,
+      scheduleUnrefdTimer(() => {
+        spawnedRetryTimers.delete(open.kiloSessionId);
+        if (open.expectedGeneration !== switchGeneration) return;
+        void switchSession(open.kiloSessionId);
+      }, delay)
+    );
+  }
+
+  /**
    * Record a session the server answered as not available. Recently touched
    * ids survive eviction; the active session is never evicted.
    */
@@ -2890,6 +2987,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     cacheActiveSessionPage();
+    clearOtherSpawnedRetries(kiloSessionId);
     const preserveTranscript = preserveTranscriptOnOpen(kiloSessionId);
     const expectedGeneration = beginSessionOpen(kiloSessionId);
     const resolvedFailures = seedResolvedDeliveryFailures(kiloSessionId, expectedGeneration);
@@ -3240,14 +3338,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (open.expectedGeneration !== switchGeneration || open.denied) return null;
     // The server confirmed this id, so its page may be used again.
     deniedSessionIds.delete(open.kiloSessionId);
+    spawnedSessions.delete(open.kiloSessionId);
+    clearSpawnedRetry(open.kiloSessionId);
     return data;
   }
 
   function denySessionOpen(open: SessionOpen, error: unknown): boolean {
-    const parsed = errorShapeSchema.safeParse(error);
-    const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
+    const { code } = readCloudAgentErrorFields(error);
     if (code !== 'NOT_FOUND' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') return false;
+    if (code === 'NOT_FOUND' && takeSpawnedRetry(open.kiloSessionId)) {
+      open.denied = true;
+      open.acceptCachedPage = false;
+      stateUnsub?.();
+      stateUnsub = null;
+      currentSession?.destroy();
+      currentSession = null;
+      store.set(isLoadingAtom, true);
+      setIndicator(null);
+      scheduleSpawnedRetry(open);
+      return true;
+    }
     open.denied = true;
+    clearSpawnedRetry(open.kiloSessionId);
+    spawnedSessions.delete(open.kiloSessionId);
     open.acceptCachedPage = false;
     open.surfaceDeferredOpenFailure = null;
     stateUnsub?.();
@@ -3472,6 +3585,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       },
       onEvent: event => {
+        if (event.type === 'background.activity') {
+          store.set(backgroundActivityAtom, event.state);
+          return;
+        }
         if (
           event.type === 'cloud.message.queued' ||
           event.type === 'cloud.message.sent' ||
@@ -4028,15 +4145,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // that carries a code or an HTTP status is the server's own verdict on
       // this send, whatever `formatErrorDetail` labels it, so no row will ever
       // confirm it; so is a failure no transport could have delivered.
-      const shape = errorShapeSchema.safeParse(err);
-      const answeredByServer =
-        shape.success &&
-        (shape.data.data?.code !== undefined ||
-          shape.data.data?.httpStatus !== undefined ||
-          shape.data.shape?.code !== undefined ||
-          shape.data.shape?.data?.httpStatus !== undefined);
+      const serverAnswered = readCloudAgentErrorFields(err).answeredByServer;
       const outcomeUnknown =
-        !answeredByServer &&
+        !serverAnswered &&
         (detail.code === 'connection-failed' ||
           detail.code === 'connection-lost' ||
           detail.code === 'generic-error');
@@ -4351,18 +4462,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.retryRemoteCommands();
   }
 
+  /**
+   * Create a session beside the active one. The organization and the other
+   * inheritance fields come from the active session's own row; a caller may
+   * repeat that organization but not change it.
+   */
   async function createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId> {
     if (!currentSession || activeSessionType !== 'remote') {
       throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
     }
-    // Inheritance from the active session (Decision 6). Explicit caller fields
-    // win when provided (e.g. tests); otherwise store-derived values apply. Only
-    // the active session's own row supplies an organization, and a caller that
-    // names its own organization needs no row.
     const fetched = store.get(fetchedSessionDataAtom);
-    const scopeSupplied = input?.orgId !== undefined;
-    if (!scopeSupplied && fetched?.kiloSessionId !== activeSessionId) {
+    if (fetched?.kiloSessionId !== activeSessionId) {
       throw new Error(REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED);
+    }
+    if (input?.orgId !== undefined && input.orgId !== fetched?.organizationId) {
+      throw new Error(REMOTE_SESSION_ORGANIZATION_MISMATCH);
     }
     const selection = store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
     const inherited = computeCreateRemoteSessionInheritance({
@@ -4426,6 +4540,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     metadataRecoveryCleanups = [];
     resetChildSessionHydration();
     switchGeneration += 1;
+    for (const timer of spawnedRetryTimers.values()) clearTimeout(timer);
+    spawnedRetryTimers.clear();
+    spawnedSessions.clear();
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -4453,6 +4570,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   return {
     switchSession,
+    noteSpawnedSession: (kiloSessionId: KiloSessionId) => {
+      const options = config.spawnedSessionOpen;
+      if (options === undefined) return;
+      const now = Date.now();
+      for (const [id, spawned] of spawnedSessions) {
+        if (now - spawned.spawnedAt > options.graceMs) spawnedSessions.delete(id);
+      }
+      spawnedSessions.set(kiloSessionId, { attempts: 0, spawnedAt: now });
+    },
     hydrateChildSession,
     loadOlderChildMessages,
     loadOlderMessages,
@@ -4463,6 +4589,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     setCloudAgentModelOverride,
     retryRemoteModels,
     retryRemoteCommands,
+    retryBackgroundActivity: () => currentSession?.retryBackgroundActivity?.(),
     createRemoteSession,
     exitRemoteSession,
     interrupt,
@@ -4516,6 +4643,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       permission: permissionAtom,
       activePermission: activePermissionAtom,
       pendingQuestions: pendingQuestionsAtom,
+      backgroundActivity: backgroundActivityAtom,
       pendingPermissions: pendingPermissionsAtom,
       unreadablePermissions: unreadablePermissionsAtom,
       suggestion: suggestionAtom,

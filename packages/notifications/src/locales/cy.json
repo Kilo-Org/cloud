@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Mae gan asiantau gweithredol ddiweddariad"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Cwblhawyd y dasg"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Methodd: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Wedi'i ymyrryd: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

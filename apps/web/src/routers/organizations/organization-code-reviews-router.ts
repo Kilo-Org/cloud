@@ -198,6 +198,9 @@ const PatchReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  // GitHub only: skip automated reviews of bot-authored PRs. Omission preserves
+  // the stored value (field-merge); mobile exposes this toggle.
+  skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   council: CodeReviewCouncilConfigSchema.nullable().optional(),
   councilEnabledRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
@@ -947,6 +950,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinkingEffort: o.thinking_effort ?? null,
           })),
           disableReviewMd: isBitbucket ? true : (prevCfg.disable_review_md ?? true),
+          skipBotPullRequests: prevCfg.skip_bot_pull_requests ?? true,
           manuallyAddedRepositories: isBitbucket ? [] : prevCfg.manually_added_repositories || [],
           // Council is org-only and Bitbucket never carries one; preserve as-is
           // otherwise. The patch input accepts `null` to clear and an object
@@ -1089,12 +1093,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council,
             council_enabled_repository_ids: councilEnabledRepositoryIds,
             disable_review_md: disableReviewMd,
-            // The patch schema never carries `skipBotPullRequests` (a
-            // web-only setting from the full save). Pass the stored value
-            // through so a mobile PATCH can't silently reset it to the
-            // default — same field-merge contract as every other omitted
-            // field.
-            skip_bot_pull_requests: prevCfg.skip_bot_pull_requests ?? true,
+            // `skipBotPullRequests` is GitHub-only. Mobile exposes it, so the
+            // patch schema now accepts it; a patch that omits it keeps the
+            // stored value (field-merge), never the bare default.
+            skip_bot_pull_requests: merged.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktīvajiem aģentiem ir atjauninājums"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Uzdevums pabeigts"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Neizdevās: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Pārtraukts: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

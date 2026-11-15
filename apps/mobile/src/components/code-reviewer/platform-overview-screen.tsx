@@ -42,6 +42,7 @@ import {
   useSaveReviewConfig,
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
+import { useCouncilUiEnabled } from '@/lib/hooks/use-reviewer-council';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -63,6 +64,7 @@ export function PlatformOverviewScreen({
   const canEdit = permission.status === 'ready' && permission.canEdit;
   const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
+  const councilUiEnabled = useCouncilUiEnabled(scope);
   const { reducedMotion } = useMotionPolicy();
   // The body of the config read has exactly one surface: rows from cache, an
   // error with retry, or a loading state. Bitbucket renders its own overview,
@@ -213,6 +215,12 @@ export function PlatformOverviewScreen({
                   pushOnce(`/(app)/code-reviewer/${scope}/review-memory` as Href);
                 }
               : undefined,
+          onOpenCouncil:
+            capabilities.council && councilUiEnabled
+              ? () => {
+                  pushField('council');
+                }
+              : undefined,
         });
 
   return (
@@ -331,6 +339,21 @@ export function PlatformOverviewScreen({
                   disabled={!canEdit || save.isPending}
                   onValueChange={value => {
                     save.mutate({ disableReviewMd: !value });
+                  }}
+                />
+              )}
+
+              {/* Bot detection relies on GitHub's authoritative user type, which
+                  GitLab and Bitbucket webhooks do not provide, so this setting
+                  exists on GitHub only (same gate as the web form). */}
+              {capabilities.skipBotPullRequests && (
+                <ToggleRow
+                  title={t('codeReviewer.skipBotPullRequests.title')}
+                  subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
+                  value={data.skipBotPullRequests}
+                  disabled={!canEdit || save.isPending}
+                  onValueChange={value => {
+                    save.mutate({ skipBotPullRequests: value });
                   }}
                 />
               )}

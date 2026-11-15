@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "فعال ایجنٹس میں اپڈیٹ ہے"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "کام مکمل ہو گیا"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ناکام: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "مداخلت شدہ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

@@ -44,7 +44,7 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/todos/use-start-todo', () => ({
-  useStartTodo: () => ({ review: vi.fn(), startNow: vi.fn(), startingTodoId: null }),
+  useStartTodo: () => ({ review: vi.fn(), startNow: vi.fn(), isStarting: () => false }),
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/directional-icons', () => ({

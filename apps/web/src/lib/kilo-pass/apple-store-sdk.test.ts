@@ -97,6 +97,24 @@ describe('apple-store-sdk', () => {
     );
   });
 
+  it.each([
+    [' Production ', 'Production'],
+    ['Sandbox\n', 'Sandbox'],
+    ['\tSandbox', 'Sandbox'],
+  ])('trims padding from APPLE_IAP_ENVIRONMENT %j and selects %s', (value, expected) => {
+    process.env.APPLE_IAP_ENVIRONMENT = value;
+    const { createAppleStoreSignedDataVerifier } = loadAppleStoreSdk();
+
+    createAppleStoreSignedDataVerifier();
+
+    expect(mockSignedDataVerifier).toHaveBeenCalledWith(
+      expect.any(Array),
+      true,
+      expected,
+      'com.kilocode.kiloapp',
+      1234567890
+    );
+  });
   it('accepts a production environment with its numeric App ID', () => {
     process.env.APPLE_IAP_ENVIRONMENT = 'Production';
     const { createAppleStoreSignedDataVerifier } = loadAppleStoreSdk();

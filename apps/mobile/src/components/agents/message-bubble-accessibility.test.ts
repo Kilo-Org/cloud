@@ -124,6 +124,11 @@ describe.each([
         expect(host).toBeNull();
         return;
       }
+      // Android composes an unnamed focus stop's name from its speaking
+      // non-focusable descendants in child order, so the host comes first.
+      const children = wrapper.props.children;
+      const [firstChild] = Array.isArray(children) ? children : [children];
+      expect(findElementByType(firstChild, 'View', isActionsOverlayProps)).not.toBeNull();
       expect(host?.props.accessibilityRole).toBe('text');
       expect(host?.props.accessibilityLabel).toBe(label);
       expect(host?.props.children).toBeUndefined();

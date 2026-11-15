@@ -6,10 +6,11 @@
   "type": "module",
   "exports": {
     "./utils": "./src/utils.ts",
+    "./text": "./src/text.ts",
     "./support": "./src/support.ts",
     "./security-agent": "./src/security-agent/index.ts",
+    "./auth": "./src/auth/index.ts",
     "./code-review": "./src/code-review/index.ts",
-    "./code-reviews": "./src/code-reviews/index.ts",
     "./organizations": "./src/organizations/index.ts",
     "./platforms": "./src/platforms.ts",
     "./universal-links": "./src/universal-links/index.ts",
@@ -29,8 +30,10 @@
     "./agent-briefing": "./src/agent-briefing.ts",
     "./agent-profile": "./src/agent-profile.ts",
     "./approval-key": "./src/approval-key.ts",
+    "./cloud-agent-error": "./src/cloud-agent-error.ts",
     "./byok-credentials": "./src/byok-credentials.ts",
     "./home-widget": "./src/home-widget.ts",
+    "./display-text": "./src/display-text.ts",
     "./tool-detail": "./src/tool-detail/index.ts",
     "./worktree-review": "./src/worktree-review/index.ts"
   },

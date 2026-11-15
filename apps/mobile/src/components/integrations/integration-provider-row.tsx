@@ -8,6 +8,7 @@ import {
   MessageSquare,
 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
+import { Pressable } from 'react-native';
 import { type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ import {
   type IntegrationScope,
   providerLabelKey,
 } from '@/lib/integrations/provider-catalog';
+import { cn } from '@/lib/utils';
 
 /**
  * The app's icon set carries no brand glyphs, so each provider takes the
@@ -89,6 +91,13 @@ export function IntegrationProviderRow({
   }
   const namedAction = (action: string) => [action, label].join(t('common.sentenceJoiner'));
 
+  // An uninstalled row's body starts the same Connect action as its trailing
+  // button: the row names the service and its state, and a tap on it is a tap on
+  // the only thing the row offers. An installed row stays inert — its one action
+  // is Disconnect or the web page, and a body tap must never take a destructive
+  // action by accident — and a pending row has no action to offer yet.
+  const rowStartsConnect = !row.installed && !row.actionPending && canConnect;
+
   // The page behind "Manage on the web" is the same manager-only surface as
   // Disconnect, so it follows the disconnect roles; Connect follows the
   // connect flow's own rule, which for GitLab admits any member.
@@ -127,13 +136,21 @@ export function IntegrationProviderRow({
         loading={connecting}
         onPress={onConnect}
         accessibilityLabel={namedAction(t('common.connect'))}
+        // The row below carries this action for a press anywhere on it, so the
+        // button is that control's face and draws the busy mark: a second stop
+        // here would read the same provider twice.
+        accessible={!rowStartsConnect}
+        importantForAccessibility={rowStartsConnect ? 'no-hide-descendants' : 'auto'}
       >
         <Text>{t('common.connect')}</Text>
       </Button>
     ) : null;
   }
 
-  return (
+  // Where the body acts, the wrapper is the row's one control: it spans the row,
+  // carries the action's name and busy state, and keeps the trailing button out
+  // of the tree. Two stops would announce the same provider twice.
+  const configuredRow = (
     <ConfigureRow
       icon={PROVIDER_ICONS[row.provider]}
       title={label}
@@ -142,5 +159,21 @@ export function IntegrationProviderRow({
       trailing={action}
       last={last}
     />
+  );
+  if (!rowStartsConnect) {
+    return configuredRow;
+  }
+  return (
+    <Pressable
+      onPress={onConnect}
+      // A second tap while the browser is on its way must not mint again.
+      disabled={connecting}
+      accessibilityRole="button"
+      accessibilityLabel={namedAction(t('common.connect'))}
+      accessibilityState={{ disabled: connecting, busy: connecting }}
+      className={cn('active:opacity-70', connecting && 'opacity-70')}
+    >
+      {configuredRow}
+    </Pressable>
   );
 }

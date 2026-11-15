@@ -4,6 +4,7 @@ import { getActiveSessionsQueryMetadata } from '@/lib/query-client';
 
 import {
   ActiveSessionsLiveSync,
+  makeCached,
   makeConnection,
   makeFakeQueryClient,
   makeQueryFn,
@@ -82,11 +83,12 @@ describe('ActiveSessionsLiveSync — reconnect (onConnectionChange rising edge)'
   });
 });
 
-describe('ActiveSessionsLiveSync — scheduled fetch invokes the queryFn', () => {
-  it('queryFn is invoked when scheduleRefresh runs', async () => {
+describe('ActiveSessionsLiveSync — scheduled fetch publishes its result', () => {
+  it('publishes the fetched payload and advances the accepted revision once', async () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();
-    const queryFn = makeQueryFn({ sessions: [] });
+    const fetched = { sessions: [makeCached({ id: 'fetched', createdOnPlatform: 'cli' })] };
+    const queryFn = makeQueryFn(fetched);
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
       queryClient: qc,
@@ -97,8 +99,12 @@ describe('ActiveSessionsLiveSync — scheduled fetch invokes the queryFn', () =>
     sync.scheduleRefresh('reconnect');
     await sync.getFetchQueue();
     expect(queryFn).toHaveBeenCalledTimes(1);
-    qc.__triggerFetchResolve({ sessions: [] });
+    const query = qc.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
+    expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(0);
+    qc.__triggerFetchResolve(fetched);
     await sync.getFetchCompletion();
-    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(qc.__getCached()).toEqual(fetched);
+    expect(sync.getPendingReasons()).toEqual(new Set());
+    expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(1);
   });
 });

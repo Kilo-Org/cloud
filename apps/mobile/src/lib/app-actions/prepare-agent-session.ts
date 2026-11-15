@@ -43,6 +43,18 @@ export type PrepareAgentSessionInput =
       model: string;
       variant?: string;
       profileId?: string | null;
+      /**
+       * The cloud environment the form's picker chose. Omitted, the server
+       * resolves the repository's single match; with none there, the session
+       * runs without one.
+       */
+      requestedEnvironment?: { id: string };
+      /**
+       * Set by the form's environment picker. A repository with several
+       * environments and no choice then fails the start and names them, as the
+       * web form does, instead of silently running without one.
+       */
+      requireEnvironmentChoice?: true;
       /** Manual env vars layered over the profile; omitted from the body when empty. */
       envVars?: Record<string, string>;
       /** Manual setup commands layered over the profile; omitted from the body when empty. */
@@ -263,6 +275,8 @@ type PrepareSessionSharedFields = PrepareSessionRepositoryFields & {
   operationKey: string;
   upstreamBranch?: string;
   profileId?: string;
+  requestedEnvironment?: { id: string };
+  requireEnvironmentChoice?: true;
   envVars?: Record<string, string>;
   setupCommands?: string[];
   attachments?: AgentAttachmentWire;
@@ -330,6 +344,13 @@ function newIntentFingerprint(
     input.setupCommands !== undefined && input.setupCommands.length > 0
       ? { setupCommands: input.setupCommands }
       : {};
+  // A different environment is a different intent: a retry after changing the
+  // pick must not replay the previous create's dedupe key. Appended, so an
+  // intent without one keeps the exact stored fingerprint.
+  const environment =
+    input.requestedEnvironment !== undefined
+      ? { environmentId: input.requestedEnvironment.id }
+      : {};
   return JSON.stringify({
     prompt: input.prompt,
     mode: input.mode,
@@ -342,6 +363,7 @@ function newIntentFingerprint(
     attachments: input.attachments ?? null,
     ...inlineOverrides,
     ...setupCommands,
+    ...environment,
   });
 }
 
@@ -393,6 +415,15 @@ function prepareSessionBody(
   }
   if (input.profileId) {
     body.profileId = input.profileId;
+  }
+  // The environment the picker chose, and the picker's own admission that a
+  // repository with several environments and no choice must fail the start:
+  // only the form that shows a picker sends the latter.
+  if (input.requestedEnvironment) {
+    body.requestedEnvironment = input.requestedEnvironment;
+  }
+  if (input.requireEnvironmentChoice) {
+    body.requireEnvironmentChoice = true;
   }
   // Inline overrides the server layers over the resolved profile. Omitted when
   // empty so the body is byte-identical to what the deployed app sent before

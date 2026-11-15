@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { sessionLiveText } from '@kilocode/session-ingest-contracts';
+import { sessionDisplayLine, sessionLiveText } from '@kilocode/session-ingest-contracts';
 
 describe('sessionLiveText', () => {
   it('keeps only the characters it draws', () => {
@@ -41,6 +41,15 @@ describe('sessionLiveText', () => {
   it('still maps line breaks and control characters to one space', () => {
     expect(sessionLiveText('a\u0000b\nc', 40)).toBe('a b c');
     expect(sessionLiveText('  a\u2028\u2029b  ', 40)).toBe('a b');
+    // The C1 range is control too: U+0080, the next-line break U+0085 and the
+    // control-sequence introducer U+009B all draw nothing of their own.
+    expect(sessionLiveText('a\u0080b\u0085c\u009bd', 40)).toBe('a b c d');
+    expect(sessionLiveText('\u0085', 40)).toBeNull();
+  });
+
+  it('maps the C1 range to a space before the white space collapses', () => {
+    expect(sessionDisplayLine('report\u0085fdp.exe')).toBe('report fdp.exe');
+    expect(sessionDisplayLine('a\u0080b\u009fc')).toBe('a b c');
   });
 
   it('cuts on character boundaries, not inside a drawn sequence', () => {

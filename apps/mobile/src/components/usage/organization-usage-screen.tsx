@@ -7,6 +7,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { ScreenHeader } from '@/components/screen-header';
 import { UsageContent } from '@/components/usage/usage-content';
 import { isMoneyRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { type UsageScope } from '@/lib/hooks/use-usage-analytics';
 
 type OrganizationUsageScreenProps = Readonly<{
@@ -23,7 +24,16 @@ export function OrganizationUsageScreen({
   organizationIdOverride,
 }: OrganizationUsageScreenProps = {}) {
   const { t } = useTranslation();
-  const { organizationId, role, org, isResolving } = useOrgBoundary(organizationIdOverride);
+  const { organizationId, role, org, isResolving, contextOrganizationId, orgs, isLoading } =
+    useOrgBoundary(organizationIdOverride);
+  // The link's organization becomes the selection once it resolves to a
+  // membership; a foreign id writes nothing and stays on the boundary's state.
+  useOrgDeepLinkSelection({
+    orgParam: organizationIdOverride,
+    contextOrganizationId,
+    orgs,
+    isOrgListLoading: isLoading,
+  });
   const orgWide = isMoneyRole(role);
   const scope = useMemo<UsageScope | null>(
     () => (organizationId == null ? null : { kind: 'organization', organizationId, orgWide }),

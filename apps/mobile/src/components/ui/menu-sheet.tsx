@@ -7,6 +7,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { cn } from '@/lib/utils';
 
 export type MenuSheetOption = Readonly<{
@@ -102,7 +103,7 @@ function MenuSheetBody({
     >
       {isSingleSelect ? (
         <View className="w-4 items-center">
-          {option.selected ? <Check size={16} color={colors.primary} /> : null}
+          {option.selected ? <Check size={16} color={selectionCheckColor(colors)} /> : null}
         </View>
       ) : null}
       <Text

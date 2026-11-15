@@ -149,7 +149,9 @@ export function KiloPassManagementSections({
             resumeCancelled.mutate();
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: nothing resumes.
+      { cancelable: true }
     );
   };
 
@@ -165,7 +167,9 @@ export function KiloPassManagementSections({
             cancelScheduledChange.mutate();
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: no change is cancelled.
+      { cancelable: true }
     );
   };
 

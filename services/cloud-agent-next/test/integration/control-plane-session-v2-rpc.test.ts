@@ -22,7 +22,10 @@ import {
 } from '../../src/persistence/session-metadata.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
-import type { PublishCloudAgentSessionStatusParams } from '@kilocode/session-ingest-contracts';
+import type {
+  PublishCloudAgentSessionStatusParams,
+  RecordCloudAgentSessionHarnessParams,
+} from '@kilocode/session-ingest-contracts';
 import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
@@ -231,6 +234,7 @@ async function readStoredRegistration(
 const GENERATED_TITLE_AI_CALLS_KEY = 'test:generated-title:ai-calls';
 const GENERATED_TITLE_PERSISTS_KEY = 'test:generated-title:persists';
 const LIST_STATUS_PUBLISHES_KEY = 'test:list-status:publishes';
+const HARNESS_RECORDS_KEY = 'test:runtime-harness:records';
 
 type GeneratedTitleAiInput = {
   messages?: unknown;
@@ -431,6 +435,122 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       )
     ).toBe(true);
   });
+
+  it('accepts delivery when the runtime record has an invalid ingest session identity', async () => {
+    const { stub, peer, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    peer.prepareView = {
+      ...peer.view('ready'),
+      container: {
+        provider: 'cloudflare-containers',
+        sandboxId: 'sandbox-invalid-harness-id',
+        runtimeHarness: 'kilo2',
+      },
+    };
+    sessionMetadata.auth.kiloSessionId = 'legacy-session-id';
+    await expect(
+      stub.createSessionWithInitialAdmission({
+        metadata: sessionMetadata,
+        sandboxSelection,
+        message: promptPayload(messageId()),
+      })
+    ).resolves.toMatchObject({ success: true });
+    expect(peer.deliverCalls).toHaveLength(1);
+    expect(await stub.getSession()).toMatchObject({ messages: [{ state: 'accepted' }] });
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('session_runtime_harness')
+      )
+    ).toBeUndefined();
+  });
+
+  it.each(['unavailable', 'unmatched'] as const)(
+    'retries an %s harness record from the alarm after completion and eviction',
+    async failure => {
+      const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+        await setupGeneratedTitleSession();
+      await runInDurableObject(stub, async (instance, state) => {
+        await state.storage.put(HARNESS_RECORDS_KEY, []);
+        Object.assign(instance.env.SESSION_INGEST, {
+          async recordCloudAgentSessionHarness(params: RecordCloudAgentSessionHarnessParams) {
+            const records =
+              (await state.storage.get<RecordCloudAgentSessionHarnessParams[]>(
+                HARNESS_RECORDS_KEY
+              )) ?? [];
+            await state.storage.put(HARNESS_RECORDS_KEY, [...records, params]);
+            if (records.length === 0) {
+              if (failure === 'unavailable') throw new Error('ingest unavailable');
+              return false;
+            }
+            return true;
+          },
+        });
+      });
+      const readRecords = () =>
+        runInDurableObject(
+          stub,
+          async (_instance, state) =>
+            (await state.storage.get<RecordCloudAgentSessionHarnessParams[]>(
+              HARNESS_RECORDS_KEY
+            )) ?? []
+        );
+      peer.prepareView = {
+        state: 'ready',
+        attemptId: peer.attemptId,
+        container: {
+          provider: 'cloudflare-containers',
+          sandboxId: 'sandbox-harness',
+          runtimeHarness: 'kilo2',
+        },
+      };
+      const expected = {
+        sessionId: kiloId,
+        kiloUserId: USER_ID,
+        cloudAgentSessionId: sessionId,
+        runtimeHarness: 'kilo2',
+      };
+
+      const firstMessage = messageId();
+      await stub.createSessionWithInitialAdmission({
+        metadata: sessionMetadata,
+        sandboxSelection,
+        message: promptPayload(firstMessage),
+      });
+      await waitFor(async () => expect(await readRecords()).toEqual([expected]));
+
+      await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+      await waitFor(async () => {
+        const pending = await runInDurableObject(stub, (_instance, state) =>
+          state.storage.get<{ dueAt: number }>('session_runtime_harness')
+        );
+        expect(pending?.dueAt).toBeGreaterThan(Date.now());
+      });
+      await evictAllDurableObjects();
+      await installGeneratedTitleFakes(stub);
+      await runInDurableObject(stub, async (instance, state) => {
+        instance.sandboxPeerFor = () => peer;
+        Object.assign(instance.env.SESSION_INGEST, {
+          async recordCloudAgentSessionHarness(params: RecordCloudAgentSessionHarnessParams) {
+            const records =
+              (await state.storage.get<RecordCloudAgentSessionHarnessParams[]>(
+                HARNESS_RECORDS_KEY
+              )) ?? [];
+            await state.storage.put(HARNESS_RECORDS_KEY, [...records, params]);
+            return true;
+          },
+        });
+        const pending = await state.storage.get<{ dueAt: number }>('session_runtime_harness');
+        if (pending === undefined) throw new Error('Expected a durable harness obligation');
+        await state.storage.put('session_runtime_harness', { ...pending, dueAt: Date.now() - 1 });
+        await instance.alarm();
+      });
+      await waitFor(async () => expect(await readRecords()).toEqual([expected, expected]));
+
+      await runInDurableObject(stub, instance => instance.alarm());
+      expect(await stub.getSession()).toMatchObject({ messages: [{ state: 'completed' }] });
+      expect(peer.deliverCalls).toHaveLength(1);
+      expect(await readRecords()).toEqual([expected, expected]);
+    }
+  );
 
   it('does not publish idle for registration alone, but still publishes autonomous native work', async () => {
     const { stub, kiloId, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();

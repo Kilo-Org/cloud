@@ -78,6 +78,17 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     isResolving: false,
   }),
   useOrgWithMembers: () => membersQuery,
+  // Mirrors the hook's derivation over the same mocked membership payload.
+  useOrgParentLink: (_organizationId: string | null, listParentLink: string | null | undefined) => {
+    const membershipParentLink = membersQuery.data?.parent_organization_id;
+    const reportedParentLink = listParentLink ?? membershipParentLink;
+    return {
+      membership: membersQuery,
+      parentLink: reportedParentLink ?? (membershipParentLink === null ? null : undefined),
+      membershipUnavailable:
+        membersQuery.data == null && (membersQuery.isError || membersQuery.isPaused),
+    };
+  },
   useOrgKiloPassSummary: (_organizationId: string, enabled: boolean) => {
     kiloPassQuery.enabled.push(enabled);
     return { data: undefined, isError: false, refetch: vi.fn() };
@@ -192,12 +203,25 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 
+// Every icon the hub composes, including the web-settings rows' own set: the
+// row table resolves them at module scope, so a missing export fails collection.
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
+  Building2: 'Building2',
+  Cpu: 'Cpu',
+  CreditCard: 'CreditCard',
   FileText: 'FileText',
+  KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
+  Lock: 'Lock',
+  Mail: 'Mail',
   Pencil: 'Pencil',
   Plug: 'Plug',
   Receipt: 'Receipt',
+  ScrollText: 'ScrollText',
+  Server: 'Server',
+  Shield: 'Shield',
+  SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
   Wallet: 'Wallet',
 }));
@@ -869,6 +893,40 @@ describe('Organization hub billing card while its data loads', () => {
     });
     expect(membersQuery.refetch).toHaveBeenCalledOnce();
     expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    unmount();
+  });
+});
+
+describe('Organization hub integrations rows', () => {
+  it('names the in-app screen and the web page apart, and opens each where it says', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // Both rows carry the same Plug glyph and reach different places, so the
+    // titles are the only thing that tells them apart.
+    const rows = renderer.root
+      .findAllByType('ConfigureRow')
+      .filter(node => node.props.icon === 'Plug');
+    expect(rows.map(node => node.props.title)).toEqual([
+      i18n.t('integrations.title'),
+      i18n.t('organization.settingsOnWeb.integrations'),
+    ]);
+
+    const [inApp, web] = rows;
+    if (inApp === undefined || web === undefined) {
+      throw new Error('the hub shows both integrations rows');
+    }
+    act(() => {
+      (inApp.props.onPress as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/integrations?org=org-1');
+
+    act(() => {
+      (web.props.onPress as () => void)();
+    });
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      'https://app.kilo.test/organizations/org-1/integrations',
+      { label: i18n.t('organization.settingsOnWeb.integrations') }
+    );
     unmount();
   });
 });

@@ -408,6 +408,11 @@ export function SessionDetailContent({
   const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
+  // A failed preparation row is the run's own failure statement, so it counts as
+  // content: without this the zero-message open would replace it with the
+  // page-load card. Only a failed attempt counts — a running or completed one is
+  // still a load in progress or a loaded run.
+  const hasFailedPreparation = preparationAttempts.some(attempt => attempt.status === 'failed');
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   // A failed row offers Retry only when this session can accept the re-send now.
@@ -817,6 +822,7 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
     cloudAgentModelOverride,
+    sessionId,
     spawnedMode,
   });
 
@@ -2037,9 +2043,10 @@ export function SessionDetailContent({
         error,
         statusIndicator,
         messageCount: messages.length,
+        hasFailedPreparation,
         connectionLost,
       }),
-    [error, statusIndicator, messages.length, connectionLost]
+    [error, statusIndicator, messages.length, hasFailedPreparation, connectionLost]
   );
   // Acknowledging a terminal error's Retry. The reopen clears `errorAtom` and
   // sets the loading flag before its first await, so the card that carries the
@@ -2111,8 +2118,11 @@ export function SessionDetailContent({
     fetchedData,
     sessionId,
   ]);
+  // A Retry tapped while the rows were still missing must release once the
+  // failed preparation rows arrive: they are the run's own failure statement,
+  // so the stale page-load failure has nothing left to say.
   const shownTerminalError =
-    terminalRetryPending && messages.length === 0
+    terminalRetryPending && messages.length === 0 && !hasFailedPreparation
       ? (terminalError ?? terminalRetry.error)
       : terminalError;
   const handleTerminalRetry = (failure: SessionTerminalError): void => {
@@ -3035,6 +3045,7 @@ export function SessionDetailContent({
               modelOptions={modelOptions}
               connectionDisplay={connectionDisplay}
               onRetryConnection={retrySessionConnection}
+              cloudStatusType={cloudStatus?.type ?? null}
               autoApproveState={autoApproveState}
               onAutoApproveChange={enabled => {
                 // Selection haptic for the commit: a capability iOS and Android
@@ -3411,9 +3422,18 @@ export function SessionDetailContent({
               }
               isRetrying={terminalRetryPending}
             />
+            {/* One primary action per surface (DESIGN.md): Back is the recovery
+                action, so it fills; Copy stays outlined as the utility. A
+                read-only transcript keeps its footer beside this card, and that
+                footer's Continue in a new session is the surface's filled
+                primary, so Back steps back to the outline there instead. Dark
+                takes the lifted olive `--selection` with its own label tone
+                instead of the glare of #ffdd00, so both themes give the control
+                the light mode's weight. */}
             <View className="flex-row gap-3">
               <Button
-                variant="ghost"
+                variant="outline"
+                size="action"
                 accessibilityLabel={t('agentChat.session.copyErrorDetails')}
                 onPress={() => {
                   void performCopy(copyText);
@@ -3421,8 +3441,20 @@ export function SessionDetailContent({
               >
                 <Text>{t('common.copy')}</Text>
               </Button>
-              <Button variant="ghost" onPress={handleBackToSessions}>
-                <Text>{t('agentChat.session.backToSessions')}</Text>
+              <Button
+                variant={isReadOnlyContinueVisible ? 'outline' : undefined}
+                size="action"
+                className={cn(!isReadOnlyContinueVisible && 'bg-primary dark:bg-selection')}
+                onPress={handleBackToSessions}
+              >
+                <Text
+                  className={cn(
+                    !isReadOnlyContinueVisible &&
+                      'text-primary-foreground dark:text-selection-foreground'
+                  )}
+                >
+                  {t('agentChat.session.backToSessions')}
+                </Text>
               </Button>
             </View>
           </View>

@@ -170,3 +170,79 @@ export function shouldFollowSessionViewportResize({
   }
   return true;
 }
+
+/**
+ * Who has claimed the transcript's position right now.
+ *
+ * One value for the three flags the list used to keep separately, so the
+ * combinations they allowed — a live drag and a send's take-over at once, or
+ * a send whose follow a stale fling event could turn off — cannot be
+ * represented. `send` outranks a drag: the send owns the position until the
+ * user drags again or a new `?at=` anchor arrives.
+ */
+export type SessionPositionClaim =
+  | { readonly kind: 'free' }
+  | { readonly kind: 'drag' }
+  | { readonly kind: 'user' }
+  | { readonly kind: 'send' };
+
+const FREE: SessionPositionClaim = { kind: 'free' };
+const DRAG: SessionPositionClaim = { kind: 'drag' };
+const USER: SessionPositionClaim = { kind: 'user' };
+const SEND: SessionPositionClaim = { kind: 'send' };
+
+/** A drag replaces any earlier claim, including a send's. */
+export function claimAfterDragBegin(claim: SessionPositionClaim): SessionPositionClaim {
+  return claim.kind === 'drag' ? claim : DRAG;
+}
+
+/** A drag that ended leaves the user owning the position. */
+export function claimAfterDragEnd(claim: SessionPositionClaim): SessionPositionClaim {
+  return claim.kind === 'drag' ? USER : claim;
+}
+
+/**
+ * A momentum end that follows a send cannot touch it: the fling is the drag's
+ * trailing motion, and the send owns the position now.
+ */
+export function claimAfterMomentumEnd(claim: SessionPositionClaim): SessionPositionClaim {
+  return claim.kind === 'drag' ? USER : claim;
+}
+
+/** A send takes the position over from anything. */
+export function claimAfterSend(claim: SessionPositionClaim): SessionPositionClaim {
+  return claim.kind === 'send' ? claim : SEND;
+}
+
+/** A session reset releases every claim. */
+export function claimAfterReset(claim: SessionPositionClaim): SessionPositionClaim {
+  return claim.kind === 'free' ? claim : FREE;
+}
+
+/**
+ * A new `?at=` anchor owns the position again, which ends a send's take-over
+ * but not the user's own drag or their settled position.
+ */
+export function claimAfterResumeAnchor(claim: SessionPositionClaim): SessionPositionClaim {
+  return claim.kind === 'send' ? FREE : claim;
+}
+
+/** True while a drag or its momentum is live. */
+export function claimIsDragging(claim: SessionPositionClaim): boolean {
+  return claim.kind === 'drag';
+}
+
+/** True while a send owns the position. */
+export function claimIsSend(claim: SessionPositionClaim): boolean {
+  return claim.kind === 'send';
+}
+
+/** A claim the paging resume must not fight: a drag, a finished drag, or a send. */
+export function claimBlocksResume(claim: SessionPositionClaim): boolean {
+  return claim.kind !== 'free';
+}
+
+/** True while a scroll event may not turn the tail follow off. */
+export function claimKeepsTail(claim: SessionPositionClaim): boolean {
+  return claim.kind === 'send';
+}

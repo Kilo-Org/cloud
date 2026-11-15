@@ -36,7 +36,7 @@ const TARGET = {
 };
 const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
 
-function syntheticRepo(t: TestContext) {
+function syntheticRepo(t: TestContext, proofManifest = manifest) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-proof-git-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, 'repo');
@@ -70,7 +70,7 @@ function syntheticRepo(t: TestContext) {
   git('commit', '-m', 'head product');
   const head = git('rev-parse', 'HEAD');
   const targets = path.join(root, 'targets.json');
-  fs.writeFileSync(targets, JSON.stringify(manifest));
+  fs.writeFileSync(targets, JSON.stringify(proofManifest));
   const out = path.join(root, 'prepared');
   return { root, repo, git, base, head, targets, out };
 }
@@ -210,24 +210,16 @@ test('prepared run rejects changed product, changed fixtures and unrelated files
   );
 });
 
-function capture(
-  preparation: Preparation,
-  revision: Revision,
-  dir: string,
+function probeDump(
   options: {
     route?: string;
     screen?: string;
     ready?: boolean;
-    findings?: (Finding & { count?: number })[];
     width?: number;
     nodes?: ProbeDump['nodes'];
-    skipped?: SkippedTarget[];
-    /** Model a cell the runner applied but never started: no CellRun at all. */
-    omitCell?: boolean;
   } = {}
-) {
-  fs.mkdirSync(dir);
-  const dump: ProbeDump = {
+): ProbeDump {
+  return {
     version: 1,
     env: {
       platform: 'android',
@@ -253,6 +245,27 @@ function capture(
       },
     ],
   };
+}
+
+function capture(
+  preparation: Preparation,
+  revision: Revision,
+  dir: string,
+  options: {
+    target?: { id: string; link: string };
+    route?: string;
+    screen?: string;
+    ready?: boolean;
+    findings?: (Finding & { count?: number })[];
+    width?: number;
+    nodes?: ProbeDump['nodes'];
+    skipped?: SkippedTarget[];
+    /** Model a cell the runner applied but never started: no CellRun at all. */
+    omitCell?: boolean;
+  } = {}
+) {
+  fs.mkdirSync(dir);
+  const dump = probeDump(options);
   fs.writeFileSync(path.join(dir, 'screen.json'), JSON.stringify(dump));
   // Deliberately synthetic bytes: these tests exercise receipt binding, not visual claims.
   fs.writeFileSync(path.join(dir, 'screen.png'), 'synthetic-image');
@@ -266,8 +279,8 @@ function capture(
               config: { id: 'base', dark: false, rtl: false, compact: false, landscape: false },
               screens: [
                 {
-                  target: TARGET.id,
-                  link: TARGET.link,
+                  target: (options.target ?? TARGET).id,
+                  link: (options.target ?? TARGET).link,
                   dump: 'screen.json',
                   screenshot: 'screen.png',
                   annotated: 'annotated.png',
@@ -366,6 +379,43 @@ test('pre-existing findings are not attributed to head', async t => {
       .introduced.length,
     0
   );
+});
+
+test('a landing notice persisted in both findings artifacts still compares', async t => {
+  // The shape `warningFinding` in capture.ts writes for a tab route whose link
+  // leaves the route unchanged: a ratio warning on the root node.
+  const landing: Finding = {
+    rule: 'link-unopened',
+    severity: 'warning',
+    cell: 'base',
+    target: UNMARKED.id,
+    element: { index: 0, path: 'View', tag: 'View', rect: [0, 0, 400, 800] },
+    measured: 1,
+    expected: 'the deep link changes the screen',
+    unit: 'ratio',
+    message: 'deep link did not open',
+  };
+  const run = {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: UNMARKED.screen,
+    findings: [landing],
+  };
+  const fixture = syntheticRepo(t, unmarkedManifest);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  capture(preparation, 'base', baseRun, run);
+  capture(preparation, 'head', headRun, run);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, []);
 });
 
 for (const state of [
@@ -501,6 +551,228 @@ test('manifest screen identity uses the raw segments.join producer key, not a ro
       targets: [{ ...TARGET, screen: '/design-proof-card' }],
     }).success,
     false
+  );
+});
+
+/** A readiness run for one captured dump, without a full preparation. */
+function readinessRun(t: TestContext, target: { id: string; link: string }, dump: ProbeDump) {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-ready-'));
+  t.after(() => fs.rmSync(out, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(out, 'screen.json'), JSON.stringify(dump));
+  return {
+    out,
+    outcome: {
+      cells: [
+        {
+          id: 'base',
+          screens: [{ target: target.id, link: target.link, dump: 'screen.json' }],
+        },
+      ],
+      findings: [],
+    },
+  };
+}
+
+const UNMARKED = {
+  id: 'profile',
+  link: 'kiloapp:///profile',
+  route: '/profile',
+  screen: '(app)/(tabs)/profile',
+};
+const unmarkedManifest = ProofManifestSchema.parse({ version: 1, targets: [UNMARKED] });
+
+test('manifest accepts a target without readyTestID and rejects an empty marker', () => {
+  assert.equal(
+    ProofManifestSchema.parse({ version: 1, targets: [UNMARKED] }).targets[0].readyTestID,
+    undefined
+  );
+  assert.equal(
+    ProofManifestSchema.safeParse({ version: 1, targets: [{ ...UNMARKED, readyTestID: '' }] })
+      .success,
+    false
+  );
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...UNMARKED, readyTestID: 'r'.repeat(129) }],
+    }).success,
+    false
+  );
+});
+
+test('a target without readyTestID is ready by its declared route, screen and a visible node', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), []);
+});
+
+test('a target without readyTestID is not ready on another screen or with no visible node', t => {
+  const otherScreen = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({ route: UNMARKED.route, screen: '(app)/(tabs)/chats' })
+  );
+  assert.deepEqual(targetReadiness(otherScreen.outcome, unmarkedManifest, otherScreen.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, (app)/(tabs)/chats)`,
+  ]);
+  const hidden = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800], style: { display: 'none' } }],
+    })
+  );
+  assert.deepEqual(targetReadiness(hidden.outcome, unmarkedManifest, hidden.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a target with readyTestID is not ready when that node is absent', t => {
+  const run = readinessRun(t, TARGET, probeDump({ ready: false }));
+  assert.deepEqual(targetReadiness(run.outcome, manifest, run.out), [
+    `base/${TARGET.id}: target not ready or screen identity differs (${TARGET.route}, ${TARGET.screen})`,
+  ]);
+});
+
+test('a tab route keeps a marker-less target ready when the link leaves the route unchanged', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'link-unopened',
+    severity: 'warning',
+    expected: 'the deep link changes the screen',
+    message: 'deep link did not open',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), []);
+});
+
+test('a target that declares a marker keeps failing on the landing notice', t => {
+  const run = readinessRun(t, TARGET, probeDump({ ready: true }));
+  run.outcome.findings.push({
+    cell: 'base',
+    target: TARGET.id,
+    rule: 'link-unopened',
+    severity: 'warning',
+    expected: 'the deep link changes the screen',
+    message: 'deep link did not open',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, manifest, run.out), [
+    `base/${TARGET.id}: target not ready or screen identity differs (${TARGET.route}, ${TARGET.screen})`,
+  ]);
+});
+
+test('a marker-less target stays not ready when its cell config did not apply', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'env-mismatch',
+    severity: 'error',
+    expected: 'probe env matches the cell config',
+    message: 'Cell config did not apply (isRTL false, expected true)',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a marker-less target stays not ready when another target landed on its screen', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'env-mismatch',
+    severity: 'warning',
+    expected: 'a distinct screen per target',
+    message: 'showed the same screen as profile',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a marker-less target stays not ready when the capture itself is unusable', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'unsettled',
+    severity: 'warning',
+    message: 'layout kept changing',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a target ready by its route keeps the comparison inconclusive when it never reached that screen', async t => {
+  const fixture = syntheticRepo(t, unmarkedManifest);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'unmarked-base');
+  const headRun = path.join(fixture.root, 'unmarked-head');
+  capture(preparation, 'base', baseRun, {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: '(app)/(tabs)/chats',
+  });
+  capture(preparation, 'head', headRun, {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: UNMARKED.screen,
+  });
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'unmarked-comparison')
+  );
+  assert.equal(result.status, 'inconclusive');
+  assert.deepEqual(result.introduced, []);
+  assert.match(
+    result.reasons.join(' '),
+    /base: base\/profile: target not ready or screen identity differs/
   );
 });
 

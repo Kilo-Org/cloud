@@ -6,7 +6,11 @@ import type {
   ProviderResponseTransforms,
   TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { DirectByokModel, OpenRouterProvider } from '@kilocode/db/schema-types';
+import type {
+  CustomLlmProvider,
+  DirectByokModel,
+  OpenRouterProvider,
+} from '@kilocode/db/schema-types';
 import type { OpenRouterInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 export {
@@ -47,6 +51,17 @@ export type DirectByokResolveUpstreamInput = {
   stream: boolean;
 };
 
+/** The AI SDK provider that serves a direct BYOK model; `openrouter` is the default. */
+export type DirectByokAiSdkProvider = Exclude<CustomLlmProvider, 'openrouter'>;
+
+/**
+ * A provider's AI SDK choice for one model. `aiSdkProvider: undefined` means Chat Completions,
+ * which differs from the model-name classification a `null` choice falls back to.
+ */
+export type DirectByokAiSdkProviderChoice = {
+  aiSdkProvider: DirectByokAiSdkProvider | undefined;
+};
+
 type DirectByokProviderBase = {
   id: DirectByokProviderMetaId;
   /** models.dev provider key; omitted for providers models.dev does not list. */
@@ -59,6 +74,13 @@ type DirectByokProviderBase = {
    * The upstream's `supportedChatApis` must match `getDirectByokModelChatApis`.
    */
   resolveUpstream(input: DirectByokResolveUpstreamInput): Promise<DirectByokUpstream>;
+  /** The headers the Chat Completions client sends with the stored credential. */
+  chatCompletionsHeaders(upstream: DirectByokUpstream): Record<string, string>;
+  /**
+   * The AI SDK provider this provider chooses for a model, or null to classify the model by name.
+   * A choice is authoritative, including `Chat Completions` stated as `aiSdkProvider: undefined`.
+   */
+  getAiSdkProvider?(model: string): DirectByokAiSdkProviderChoice | null;
 };
 
 /**
@@ -97,6 +119,14 @@ export type DirectByokProvider = DirectByokProviderBase &
   );
 
 /**
+ * The credential as its own header, for an upstream that does not take a bearer token. Providers
+ * that resolve their own upstream use this to state the same default.
+ */
+export function credentialHeaders(upstream: DirectByokUpstream): Record<string, string> {
+  return upstream.apiKeyHeader ? { [upstream.apiKeyHeader]: upstream.apiKey } : {};
+}
+
+/**
  * The upstream of a provider that takes the stored credential as a bearer API key, with the chat
  * APIs it serves and the no-op request transform. Spread the result into the provider; a provider
  * that rewrites the request declares its own `transformRequest` after the spread.
@@ -106,12 +136,13 @@ export function apiKeyUpstream(upstream: {
   apiUrlOverrides?: ProviderApiUrlOverrides;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;
-}): Pick<DirectByokProvider, 'resolveUpstream' | 'transformRequest'> & {
+}): Pick<DirectByokProvider, 'resolveUpstream' | 'transformRequest' | 'chatCompletionsHeaders'> & {
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
 } {
   return {
     supportedChatApis: upstream.supportedChatApis,
     transformRequest() {},
+    chatCompletionsHeaders: credentialHeaders,
     async resolveUpstream({ credential }) {
       return {
         apiUrl: upstream.apiUrl,

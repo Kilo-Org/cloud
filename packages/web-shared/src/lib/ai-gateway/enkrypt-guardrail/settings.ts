@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { captureMessage } from '@sentry/nextjs';
 import {
   ENKRYPT_DETECTOR_IDS,
   EnkryptInputDetectorsSchema,
@@ -23,6 +24,7 @@ import {
   type EnkryptDetectRequestDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 
 /**
  * `invalid`: the organization enabled the guardrail but its saved detectors do not match the
@@ -95,9 +97,9 @@ const GUARDRAIL_SETTINGS_KEYS = {
 
 /**
  * The enabled settings of one direction's guardrail, or null when Kilo admins have not granted the
- * feature (`kilo_encrypt`), or the section is absent, invalid, or disabled. An invalid section is
- * logged with its issue paths and treated as absent, so no request is scanned under settings nobody
- * can read.
+ * feature (`kilo_encrypt`), or the section is absent, invalid, or disabled. A section that does not
+ * match its schema is logged and reported to error monitoring with its issue paths, so on-call can
+ * repair the stored settings.
  */
 function resolveGuardrailSettings(
   organizationId: string,
@@ -110,11 +112,25 @@ function resolveGuardrailSettings(
   if (section === undefined) return null;
   const parsed = schema.safeParse(section);
   if (!parsed.success) {
+    // The request keeps being served and the report tells on-call what to repair. Both halves are
+    // the intended policy for this branch: reading organization settings must not take the
+    // organization's traffic down. The report is bounded per organization and direction so a
+    // request loop cannot flood the event quota.
+    const issues = issuePaths(parsed.error);
     warnExceptInTest('[enkrypt-guardrail] invalid organization settings; guardrail disabled', {
       guardrail: direction,
       organization_id: organizationId,
-      issues: issuePaths(parsed.error),
+      issues,
     });
+    if (
+      claimReportWindow(`enkrypt-guardrail-settings:${organizationId}:${direction}`, Date.now())
+    ) {
+      captureMessage('[enkrypt-guardrail] invalid organization settings; guardrail disabled', {
+        level: 'error',
+        tags: { source: 'enkrypt_guardrail_settings', guardrail: direction },
+        extra: { organization_id: organizationId, issues },
+      });
+    }
     return null;
   }
   if (!parsed.data.enabled) return null;

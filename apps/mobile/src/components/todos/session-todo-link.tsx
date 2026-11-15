@@ -13,12 +13,16 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { ListTodo } from '@/components/ui/icons';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { invalidateTodoQueries, useSessionTodo, useTodoCandidates } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { todoItemPath } from '@/lib/todos/todo-routes';
 import { type TodoCandidate } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
+
+import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
 
 /** `To-do: <title>` under the session header while the session belongs to a to-do. */
 export function SessionTodoChip({ sessionId }: Readonly<{ sessionId: string }>) {
@@ -95,7 +99,7 @@ function SessionTodoCandidatesSheet({
   let body: ReactNode = null;
   if (candidates.isPending) {
     body = (
-      <View className="items-center py-8">
+      <View className={cn('items-center', TODO_SHEET_STATE_BODY_CLASS)}>
         <ActivityIndicator />
       </View>
     );
@@ -109,7 +113,9 @@ function SessionTodoCandidatesSheet({
     );
   } else if (groups.length === 0) {
     body = (
-      <Text className="px-5 py-8 text-center text-sm text-muted-foreground">
+      <Text
+        className={cn(TODO_SHEET_STATE_BODY_CLASS, 'text-center text-sm text-muted-foreground')}
+      >
         {t('todos.candidates.empty')}
       </Text>
     );
@@ -202,7 +208,7 @@ export function SessionTodoLinkRow({ sessionId }: Readonly<{ sessionId: string }
         }
         {...linkedA11y}
         accessibilityRole="button"
-        className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
       >
         <ListTodo size={16} color={colors.mutedForeground} />
         <Text className="min-w-0 flex-1 text-base font-medium text-foreground" numberOfLines={1}>

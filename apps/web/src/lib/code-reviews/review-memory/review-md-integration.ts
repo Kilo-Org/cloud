@@ -3,12 +3,7 @@ import * as z from 'zod';
 import type { CodeReviewMemoryProposal } from '@kilocode/db/schema';
 import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';
-import {
-  createReviewMemoryGatewayProvider,
-  generateReviewMemoryStructuredOutput,
-  resolveReviewMemoryActor,
-  resolveReviewMemoryModel,
-} from './llm';
+import { createReviewMemoryGatewayForOwner, generateReviewMemoryStructuredOutput } from './llm';
 
 const MAX_REVIEW_MD_CHARS = 30_000;
 export const MAX_INTEGRATION_SUMMARY_CHARS = 1_000;
@@ -47,14 +42,9 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
     );
   }
 
-  const actor = await resolveReviewMemoryActor(input.owner);
-  const { modelSlug } = await resolveReviewMemoryModel({
+  const { modelSlug, provider } = await createReviewMemoryGatewayForOwner({
     owner: input.owner,
     platform: input.platform,
-  });
-  const provider = createReviewMemoryGatewayProvider({
-    owner: input.owner,
-    actor,
     userAgent: 'Kilo Review Memory Integrator',
   });
 

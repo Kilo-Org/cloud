@@ -56,6 +56,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'open-inference',
   'openai',
   'parasail',
+  'particle-ai',
   'perceptron',
   'perplexity',
   'phala',
@@ -226,6 +227,7 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'meta',
   'morph',
   'parasail',
+  'particle',
   'poolside',
   'prodia',
   'quiverai',
@@ -258,6 +260,8 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelUserByokInferenceProviderIdSchema.enum.google,
   [OpenRouterInferenceProviderIdSchema.enum['google-vertex']]:
     VercelUserByokInferenceProviderIdSchema.enum.vertex,
+  [OpenRouterInferenceProviderIdSchema.enum['particle-ai']]:
+    VercelNonUserByokInferenceProviderIdSchema.enum.particle,
   [OpenRouterInferenceProviderIdSchema.enum.seed]:
     VercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
   [OpenRouterInferenceProviderIdSchema.enum['z-ai']]:

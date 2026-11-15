@@ -609,6 +609,167 @@ describe('detectRequiredInputModalities', () => {
     ).toEqual([]);
   });
 
+  it('does not walk Anthropic tool_use arguments', () => {
+    // `input` is a message list only on the body; here it holds tool arguments.
+    expect(
+      detectRequiredInputModalities({
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'user', content: 'Fetch the page' },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool_use',
+                id: 'toolu_1',
+                name: 'fetch',
+                input: { image_url: 'https://example.com/x.png' },
+              },
+            ],
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('does not walk an object tool_result content payload', () => {
+    expect(
+      detectRequiredInputModalities({
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'user', content: 'Fetch the page' },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: 'toolu_1',
+                content: { image_url: 'https://example.com/x.png' },
+              },
+            ],
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('does not treat an input_image key in tool output as a media part', () => {
+    expect(
+      detectRequiredInputModalities({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'user', content: 'Look at this' },
+          {
+            role: 'tool',
+            content: [{ type: 'tool_result', content: { input_image: 'aGVsbG8=' } }],
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('does not walk an OpenAI Responses function_call_output payload', () => {
+    expect(
+      detectRequiredInputModalities({
+        model: 'gpt-4o',
+        input: [
+          {
+            type: 'function_call_output',
+            call_id: 'call_1',
+            output: { image_url: 'https://example.com/x.png' },
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('detects a typed image block inside an OpenAI Responses tool output list', () => {
+    // A function tool can return images the model receives, so an output list
+    // is walked as parts.
+    expect(
+      detectRequiredInputModalities({
+        model: 'gpt-4o',
+        input: [
+          { role: 'user', content: 'Screenshot the page' },
+          {
+            type: 'function_call_output',
+            call_id: 'call_1',
+            output: [{ type: 'input_image', image_url: 'https://example.com/x.png' }],
+          },
+        ],
+      })
+    ).toEqual(['image']);
+  });
+
+  it('does not read a media key out of a tool output string', () => {
+    expect(
+      detectRequiredInputModalities({
+        model: 'gpt-4o',
+        input: [
+          {
+            type: 'function_call_output',
+            call_id: 'call_1',
+            output: '{"image_url":"https://example.com/x.png"}',
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('detects a typed image block inside an Anthropic tool_result content array', () => {
+    // A tool result can return images the model receives, so array content is
+    // walked as parts.
+    expect(
+      detectRequiredInputModalities({
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'user', content: 'Look at this' },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: 'toolu_1',
+                content: [{ type: 'image', source: { type: 'base64', data: 'AA' } }],
+              },
+            ],
+          },
+        ],
+      })
+    ).toEqual(['image']);
+  });
+
+  it('detects a bare image_url key on a content part with no type discriminator', () => {
+    expect(
+      detectRequiredInputModalities({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: [{ image_url: 'https://example.com/cat.png' }] }],
+      })
+    ).toEqual(['image']);
+  });
+
+  it('returns [] for a text-only body with a normal tool_use argument object', () => {
+    expect(
+      detectRequiredInputModalities({
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'user', content: 'Call the API' },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool_use',
+                id: 'toolu_2',
+                name: 'fetch',
+                input: { url: 'x', method: 'GET' },
+              },
+            ],
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
   it('does not claim support for Gemini native contents[].parts[] bodies', () => {
     // Native Gemini request bodies never reach this helper: the gateway only
     // invokes auto-routing for chat_completions / responses / messages shapes,

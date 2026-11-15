@@ -144,12 +144,14 @@ const indicatorFor = (message: string) => ({
   error: null,
   statusIndicator: { type: 'error' as const, message },
   messageCount: 0,
+  hasFailedPreparation: false,
 });
 
 const codedIndicatorFor = (message: string, code: SdkStatusMessageCode) => ({
   error: null,
   statusIndicator: { type: 'error' as const, message, code },
   messageCount: 0,
+  hasFailedPreparation: false,
 });
 
 describe('resolveSessionTerminalError', () => {
@@ -159,13 +161,76 @@ describe('resolveSessionTerminalError', () => {
         error: 'boom',
         statusIndicator: { type: 'error', message: 'Connection lost. Please retry in a moment.' },
         messageCount: 1,
+        hasFailedPreparation: false,
       })
     ).toBeNull();
   });
 
+  // A run whose sandbox preparation failed has no messages at all: the failed
+  // group is its own failure statement, with the stage and reason, and the
+  // question row keeps the Retry and Copy the page-load card would replace.
+  it('returns null when a failed preparation row is all the open has', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: { type: 'error', message: 'Connection lost. Please retry in a moment.' },
+        messageCount: 0,
+        hasFailedPreparation: true,
+      })
+    ).toBeNull();
+    expect(
+      resolveSessionTerminalError({
+        error: 'boom',
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: true,
+      })
+    ).toBeNull();
+  });
+
+  it('keeps today’s result when the preparation row has not failed', () => {
+    // A running or completed preparation is still a load in progress or a loaded
+    // run, so the card answers exactly as it did before the field existed.
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: { type: 'error', message: 'Connection lost. Please retry in a moment.' },
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Connection trouble. Please retry in a moment.',
+      retryable: true,
+      retryWith: 'session',
+      detail: 'Connection lost. Please retry in a moment.',
+    });
+    expect(
+      resolveSessionTerminalError({
+        error: 'boom',
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Failed to load session details',
+      retryable: true,
+      retryWith: 'session',
+      detail: 'boom',
+    });
+  });
+
   it('returns null when there is no error and no error indicator', () => {
     expect(
-      resolveSessionTerminalError({ error: null, statusIndicator: null, messageCount: 0 })
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
     ).toBeNull();
   });
 
@@ -175,13 +240,19 @@ describe('resolveSessionTerminalError', () => {
         error: null,
         statusIndicator: { type: 'info', message: 'Session stopped' },
         messageCount: 0,
+        hasFailedPreparation: false,
       })
     ).toBeNull();
   });
 
   it('shows translated copy for the error atom and keeps the original for Copy', () => {
     expect(
-      resolveSessionTerminalError({ error: 'boom', statusIndicator: null, messageCount: 0 })
+      resolveSessionTerminalError({
+        error: 'boom',
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
     ).toEqual({
       variant: 'server',
       title: "Couldn't load this session",
@@ -200,7 +271,12 @@ describe('resolveSessionTerminalError', () => {
     // same way every time: the reader gets the permanent not-available state
     // instead of a Retry that cannot succeed.
     expect(
-      resolveSessionTerminalError({ error: message, statusIndicator: null, messageCount: 0 })
+      resolveSessionTerminalError({
+        error: message,
+        statusIndicator: null,
+        messageCount: 0,
+        hasFailedPreparation: false,
+      })
     ).toMatchObject({ retryable: false, detail: message });
   });
 
@@ -210,6 +286,7 @@ describe('resolveSessionTerminalError', () => {
         error: SESSION_HISTORY_FAILURES.retryable_failure.message,
         statusIndicator: null,
         messageCount: 0,
+        hasFailedPreparation: false,
       })
     ).toMatchObject({ retryable: true });
   });
@@ -247,7 +324,12 @@ describe('resolveSessionTerminalError', () => {
       // longer has all answer a second open the same way, so the reader gets the
       // class copy that names what to change instead of a Retry.
       expect(
-        resolveSessionTerminalError({ error: message, statusIndicator: null, messageCount: 0 })
+        resolveSessionTerminalError({
+          error: message,
+          statusIndicator: null,
+          messageCount: 0,
+          hasFailedPreparation: false,
+        })
       ).toEqual({
         variant,
         title,
@@ -331,6 +413,7 @@ describe('resolveSessionTerminalError', () => {
             code: 'agent-connection-lost',
           },
           messageCount: 0,
+          hasFailedPreparation: false,
         })
       ).toEqual({
         variant: 'server',
@@ -349,6 +432,7 @@ describe('resolveSessionTerminalError', () => {
         error: null,
         statusIndicator: null,
         messageCount: 0,
+        hasFailedPreparation: false,
         connectionLost: true,
       })
     ).toEqual({
@@ -371,6 +455,7 @@ describe('resolveSessionTerminalError', () => {
           code: 'agent-connection-lost',
         },
         messageCount: 2,
+        hasFailedPreparation: false,
         connectionLost: true,
       })
     ).toBeNull();

@@ -75,6 +75,12 @@ type NewSessionProfileOverrideProps = {
    * the clone entry.
    */
   accountSection?: React.ReactNode;
+  /**
+   * The Cloud environment row under the repository picker: the environment the
+   * session starts in, from the environments that contain the selected
+   * repository. Cloud-only, like the repository section it follows.
+   */
+  environmentSection?: React.ReactNode;
 };
 
 /**
@@ -155,6 +161,7 @@ export function NewSessionConfigureForm({
   onManualCommandsChange,
   onOpenRepoDefaults,
   accountSection,
+  environmentSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -267,7 +274,7 @@ export function NewSessionConfigureForm({
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerClassName="flex-grow px-4 pt-4"
+      contentContainerClassName="flex-grow px-4 pt-4 pb-4"
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -346,7 +353,14 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      {isRemote ? (
+      {/* Under the folder field: only the computer target with no instance yet
+          carries the setup sentence, because that is the one state where it is
+          the instruction for connecting a computer. A bound instance already
+          runs Kilo, and the Run on row and Folder field above it already name
+          the computer, its project and its folder, so an empty slot repeats
+          nothing. A refused spawn resets the target and raises the
+          disconnected note, which owns that copy. */}
+      {isRemote && runOnInstance === null && !showInstanceDisconnectedNote ? (
         <Text className="mt-2 text-sm text-muted-foreground">
           {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
@@ -371,6 +385,8 @@ export function NewSessionConfigureForm({
           isCloneEntry={isCloneEntry}
         />
       ) : null}
+
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? environmentSection : null}
 
       {/*
         Everything below the repository section waits for that section's final

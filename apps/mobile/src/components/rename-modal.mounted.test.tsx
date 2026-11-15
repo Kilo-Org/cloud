@@ -8,6 +8,7 @@
 // caller's cache write and its rollback never re-seed it, so a refused save
 // leaves the typed name in place beside the inline error.
 
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -71,6 +72,7 @@ type MountOverrides = {
   onSave?: (name: string) => Promise<void>;
   onClose?: () => void;
   initialValue?: string;
+  isAcceptableValue?: (trimmed: string) => boolean;
 };
 
 function modalElement(
@@ -84,6 +86,7 @@ function modalElement(
     initialValue,
     multiline,
     maxLength: 500,
+    isAcceptableValue: overrides.isAcceptableValue,
     onSave: overrides.onSave ?? resolveSave,
     onClose: overrides.onClose ?? (() => undefined),
   });
@@ -114,6 +117,14 @@ function fieldProps(renderer: TestRenderer.ReactTestRenderer) {
     onChangeText?: (value: string) => void;
     onSubmitEditing?: () => void;
   };
+}
+
+/** The Save button's `disabled` prop: the button whose label is the save copy. */
+function saveDisabled(renderer: TestRenderer.ReactTestRenderer): boolean | undefined {
+  const button = renderer.root
+    .findAllByType('Button')
+    .find(node => node.findAllByType('Text').some(text => text.props.children === 'common.save'));
+  return button?.props.disabled as boolean | undefined;
 }
 
 describe('RenameModal field wrapping', () => {
@@ -267,5 +278,26 @@ describe('RenameModal keyboard submit', () => {
     const props = fieldProps(mount(true));
     expect(props.onSubmitEditing).toBeUndefined();
     expect(props.returnKeyType).toBeUndefined();
+  });
+});
+
+describe('RenameModal save gate', () => {
+  // The organization rename dialog passes the server's visible-character rule,
+  // so a name of zero-width spaces is not saveable while a real name is.
+  it('refuses a value of only invisible characters when the caller requires visible text', () => {
+    const renderer = mount(false, {
+      initialValue: 'Old name',
+      isAcceptableValue: hasVisibleText,
+    });
+
+    act(() => {
+      fieldProps(renderer).onChangeText?.('\u200B\u200B\u200B');
+    });
+    expect(saveDisabled(renderer)).toBe(true);
+
+    act(() => {
+      fieldProps(renderer).onChangeText?.('  Acme  ');
+    });
+    expect(saveDisabled(renderer)).toBe(false);
   });
 });

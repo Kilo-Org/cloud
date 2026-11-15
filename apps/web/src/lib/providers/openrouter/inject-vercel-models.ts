@@ -70,10 +70,6 @@ const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
       termsOfServiceURL: 'https://boundless.network/terms-of-service',
       privacyPolicyURL: 'https://boundless.network/privacy-policy',
     },
-    particle: {
-      termsOfServiceURL: 'https://particle.ai/legal/terms',
-      privacyPolicyURL: 'https://particle.ai/legal/privacy',
-    },
     runinfra: {
       termsOfServiceURL: 'https://runinfra.ai/terms-of-service',
       privacyPolicyURL: 'https://runinfra.ai/privacy-policy',

@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeRemoteMcpUrl } from './remote-mcp-url';
+import { normalizeRemoteMcpUrl, sameRemoteMcpEndpoint } from './remote-mcp-url';
 
 describe('normalizeRemoteMcpUrl', () => {
   it('trims whitespace and drops a trailing slash', () => {
     expect(normalizeRemoteMcpUrl(' https://remote.example/mcp/ ')).toBe(
       'https://remote.example/mcp'
     );
+  });
+
+  it('lowercases the host', () => {
+    expect(normalizeRemoteMcpUrl('https://Remote.Example/mcp/')).toBe('https://remote.example/mcp');
+  });
+
+  it('drops a default port', () => {
+    expect(normalizeRemoteMcpUrl('https://remote.example:443/mcp')).toBe(
+      'https://remote.example/mcp'
+    );
+    expect(normalizeRemoteMcpUrl('http://localhost:80/mcp')).toBe('http://localhost/mcp');
   });
 
   it('rejects a non-http protocol', () => {
@@ -58,5 +69,21 @@ describe('normalizeRemoteMcpUrl', () => {
     expect(normalizeRemoteMcpUrl('https://remote.example/?base=/')).toBe(
       'https://remote.example?base=/'
     );
+  });
+});
+
+describe('sameRemoteMcpEndpoint', () => {
+  it('matches two spellings of one endpoint', () => {
+    expect(
+      sameRemoteMcpEndpoint('https://remote.example/mcp/', 'https://Remote.Example:443/mcp')
+    ).toBe(true);
+  });
+
+  it('separates endpoints by path, port and query', () => {
+    const saved = 'https://remote.example/mcp';
+
+    expect(sameRemoteMcpEndpoint(saved, 'https://remote.example/other')).toBe(false);
+    expect(sameRemoteMcpEndpoint(saved, 'https://remote.example:8443/mcp')).toBe(false);
+    expect(sameRemoteMcpEndpoint(saved, 'https://remote.example/mcp?base=/')).toBe(false);
   });
 });

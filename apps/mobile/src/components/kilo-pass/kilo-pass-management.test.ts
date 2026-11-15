@@ -73,6 +73,7 @@ function passState(): KiloPassSubscriptionState {
     currentStreakMonths: 3,
     nextYearlyIssueAt: null,
     startedAt: '2026-01-01T00:00:00.000Z',
+    endedAt: null,
     resumesAt: null,
     nextBonusCreditsUsd: 9.8,
     nextBillingAt: '2026-12-05T12:00:00.000Z',

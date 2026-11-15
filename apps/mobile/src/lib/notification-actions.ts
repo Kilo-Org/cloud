@@ -48,8 +48,8 @@ import {
 import {
   clearPostedNeedsInputNotification,
   notificationIdentifierForSession,
-  type NotificationPreviews,
-} from './needs-input-notification';
+} from './needs-input-presentation';
+import { type NotificationPreviews } from './needs-input-notification';
 
 /** Register one category per (raise kind × hasPr) descriptor. */
 export async function registerNeedsInputCategories(): Promise<void> {

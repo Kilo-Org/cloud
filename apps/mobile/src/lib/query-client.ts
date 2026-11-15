@@ -268,7 +268,7 @@ function refreshOrganizationsListOnPermissionLoss(
  * the network answers (U4); this keeps a mount or focus regain from re-requesting
  * the same payload for 30 s. Explicit `staleTime: 0` call sites still override it.
  */
-export const DEFAULT_QUERY_STALE_TIME_MS = 30_000;
+const DEFAULT_QUERY_STALE_TIME_MS = 30_000;
 
 export function createKiloAppQueryClient(): QueryClient {
   const queryClient = new QueryClient({

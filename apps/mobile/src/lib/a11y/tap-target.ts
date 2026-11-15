@@ -61,6 +61,33 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The frame a stacked form gives its pickers — Account, Run on, Repository and
+ * the branch row under them. One field shape for the whole column, so a form
+ * never shows two trigger heights side by side.
+ *
+ * It carries no vertical padding of its own on purpose: a floor placed on the
+ * frame is measured against its border box, so a state whose content is
+ * already {@link ROW_TARGET_CLASS} tall renders one border taller than a state
+ * whose content is a line of text, and the column moves as that state arrives.
+ * The body inside it owns the height instead (see
+ * {@link FIELD_TRIGGER_BODY_CLASS}).
+ */
+export const FIELD_TRIGGER_FRAME_CLASS =
+  'flex-row items-center rounded-lg border border-border bg-secondary px-3';
+
+/**
+ * The content box inside {@link FIELD_TRIGGER_FRAME_CLASS}. Every trigger and
+ * every state of one renders in this box, so all of them measure
+ * `48 dp + the frame's two borders` (50 dp) — above `DESIGN.md:364`'s 44pt
+ * floor, and the height the controls beside them take rather than their own:
+ * a 48 dp action on the same row stretches to this frame's outer edges, so the
+ * two boxes line up instead of one sitting a border inside the other. A value
+ * line, a skeleton, a note or a 48 dp action all fit inside it without growing
+ * the frame.
+ */
+export const FIELD_TRIGGER_BODY_CLASS = 'min-h-[48px] flex-1 flex-row items-center gap-2';
+
+/**
  * The frame a screen header's titled control renders on its own pressable
  * node — the pressable title and a header title composed of its own content.
  * A title sized by its text reports that line's height (`text-lg` is 24.8dp),
@@ -157,6 +184,30 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
  * `DESIGN.md:364`'s 44pt rather than landing on it.
  */
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
+
+/**
+ * The box an in-field clear control renders at the end of a search field.
+ *
+ * The control sits inside the field's content box next to its `TextInput`, so
+ * this box carries the target on its own node rather than through `hitSlop`:
+ * `hitSlop` grows the touch region but not the frame a control-size audit
+ * reads, and a reach toward the input would take taps the field itself should
+ * get. The box is {@link ICON_TARGET_DP}, not the 44pt design target, because
+ * Android lays a control out in whole physical pixels and a 44pt box measures
+ * under the target there; this is the reason {@link COMPACT_CONTROL_HIT_SLOP_DP}
+ * reaches past 44pt instead of onto it.
+ *
+ * A box taller than the shared single-line `Input`'s `min-h-[44px]` would grow
+ * the field, so it cancels the difference in layout: `-my-[7px]` is 7pt a side
+ * at NativeWind's 14pt rem, so the box contributes 48 - 14 = 34pt to the row's
+ * cross size — under the input's floor, which therefore keeps setting the
+ * field's height. The margin does not move the border box: the row centres that
+ * box against the input's 44pt content area, so it overhangs the content area
+ * by `(48 - 44) / 2 = 2pt` each side and still paints and hit-tests its whole
+ * height inside the field's 7pt `py-2` padding, with 5pt to spare before the
+ * field's own edge. The same shape as `LINE_ACTION_BOX_CLASS` on a line of copy.
+ */
+export const FIELD_CLEAR_BOX_CLASS = 'h-[48px] w-[48px] -my-[7px] items-center justify-center';
 
 /**
  * Per-side `hitSlop` of the shared `Button`'s compact size (`sm`), whose

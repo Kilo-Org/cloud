@@ -31,6 +31,16 @@ import {
   listHostedWorkspaces,
 } from './router/handlers/hosted-workspace-list.js';
 import { getHostedWorkspaceStatus } from './router/handlers/hosted-workspace-status.js';
+import { refreshHostedWorkspacePullRequest } from './router/handlers/hosted-workspace-pull-request-refresh.js';
+import {
+  getHostedWorkspaceChangeFile,
+  getHostedWorkspaceChanges,
+  refreshHostedWorkspaceChanges,
+} from './router/handlers/hosted-workspace-changes.js';
+import {
+  getHostedWorkspacePullRequest,
+  getHostedWorkspacePullRequestFile,
+} from './router/handlers/hosted-workspace-pull-request.js';
 import {
   buildEnvironment,
   cancelEnvironmentBuild,
@@ -55,6 +65,12 @@ export const appRouter = router({
   listHostedWorkspaces,
   getHostedWorkspace,
   getHostedWorkspaceStatus,
+  refreshHostedWorkspacePullRequest,
+  getHostedWorkspaceChanges,
+  refreshHostedWorkspaceChanges,
+  getHostedWorkspaceChangeFile,
+  getHostedWorkspacePullRequest,
+  getHostedWorkspacePullRequestFile,
   buildEnvironment,
   getEnvironmentBuildStatus,
   getEnvironmentBuildLogs,

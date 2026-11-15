@@ -375,19 +375,15 @@ export function AgentSessionListContent({
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
+      // The reserved cold-open slots are separate list items in the stored
+      // list's own shape — a date-header placeholder, then one cell per session
+      // placeholder — so each is measured at its real height and the rows swap
+      // into the reserved space without a jump.
+      if (item.kind === 'section-header-skeleton') {
+        return <SessionSectionHeaderSkeleton />;
+      }
       if (item.kind === 'skeleton') {
-        // Reserved cold-open slot in the stored list's own shape (a date header
-        // above the first row, then eyebrow and title rows), so the rows swap
-        // into the reserved space without a jump.
-        const row = <SessionRowSkeleton index={item.index} subtitle={false} />;
-        return item.index === 0 ? (
-          <View>
-            <SessionSectionHeaderSkeleton />
-            {row}
-          </View>
-        ) : (
-          row
-        );
+        return <SessionRowSkeleton index={item.index} subtitle={false} />;
       }
       if (item.kind === 'section-header') {
         return <SessionListSectionHeader title={item.title} count={item.count} />;

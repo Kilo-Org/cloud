@@ -59,7 +59,10 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   bitbucket: {
-    data: { repositoryCache: { status: 'available', repositories: [] } } as unknown,
+    data: {
+      connected: false,
+      repositoryCache: { status: 'available', repositories: [] },
+    } as unknown,
     isLoading: false,
     isError: false,
     isFetching: false,
@@ -291,7 +294,10 @@ beforeEach(() => {
   state.permissionOverride = null;
   state.repositories.data = { repositories: [] };
   state.repositories.isError = false;
-  state.bitbucket.data = { repositoryCache: { status: 'available', repositories: [] } };
+  state.bitbucket.data = {
+    connected: false,
+    repositoryCache: { status: 'available', repositories: [] },
+  };
   state.bitbucket.isError = false;
   state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
   state.reviews.isError = false;
@@ -872,6 +878,26 @@ describe('empty reviews connect action', () => {
     const empty = emptyState(renderer);
     expect(empty.props.action).toBeUndefined();
     expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.connectOwnerOnly'));
+    unmount();
+  });
+
+  it('keeps the neutral explanation when only Bitbucket is connected', async () => {
+    // Bitbucket runs automatic reviews but offers no manual review, so a member
+    // cannot act here either; the notice would be false, because the scope is
+    // connected, and an owner would find it already set up.
+    state.bitbucket.data = {
+      connected: true,
+      repositoryCache: { status: 'available', repositories: [] },
+    };
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
     unmount();
   });
 

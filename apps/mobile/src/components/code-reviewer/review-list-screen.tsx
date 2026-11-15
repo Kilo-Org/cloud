@@ -20,7 +20,11 @@ import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { canConnectAnyProvider } from '@/lib/code-reviewer-status';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
-import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
+import {
+  useBitbucketReadiness,
+  useGitHubStatus,
+  useGitLabStatus,
+} from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -134,8 +138,17 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   useRouteForegroundRefresh([[['codeReviews']]]);
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
+  // The manual-review action exists only for the platforms whose review it can
+  // start, so the connected check behind that action stays GitHub and GitLab.
   const hasConnectedProvider =
     githubStatus.data?.connected === true || gitlabStatus.data?.connected === true;
+  const bitbucketReadiness = useBitbucketReadiness(scope);
+  // Any connected reviewer platform changes what the empty list says: Bitbucket
+  // runs automatic reviews without offering a manual one, so a scope connected
+  // only to Bitbucket is still a configured scope and must not read as though
+  // nothing were connected.
+  const hasAnyConnectedProvider =
+    hasConnectedProvider || bitbucketReadiness.data?.connected === true;
   const permission = useReviewerPermission(scope);
   // The Configure button opens the platform list, where each platform's connect
   // card is per-role: GitHub's needs an organization-manage role and GitLab's a
@@ -145,10 +158,13 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const canConnect = permission.status !== 'ready' || canConnectAnyProvider(permission);
   // A deep link arrives with no cached role or provider answer, and the empty
   // state must paint its final form once: a button that appears and then leaves
-  // moves the centered stack by its own height. Keep the loading body until both
+  // moves the centered stack by its own height. Keep the loading body until all
   // inputs settle, as the manual-review screen does for the same reason.
   const emptyStateSettled =
-    permission.status !== 'loading' && !githubStatus.isLoading && !gitlabStatus.isLoading;
+    permission.status !== 'loading' &&
+    !githubStatus.isLoading &&
+    !gitlabStatus.isLoading &&
+    !bitbucketReadiness.isLoading;
 
   const pages = data?.pages;
   const firstPage = pages?.[0];
@@ -178,14 +194,18 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   );
   if (!isLoading && firstPage?.success && reviews.length === 0) {
     const offersAction = hasConnectedProvider || canConnect;
+    // The role notice must be true: it appears only when no reviewer platform is
+    // connected at all. A scope connected to Bitbucket keeps the neutral
+    // explanation, because an owner would find it already set up.
+    const showsRoleNotice = !hasAnyConnectedProvider && !canConnect;
     body = emptyStateSettled ? (
       <EmptyState
         icon={GitPullRequest}
         title={t('codeReviewer.reviewList.noReviews')}
         description={
-          offersAction
-            ? t('codeReviewer.reviewList.noReviewsDescription')
-            : t('codeReviewer.reviewList.connectOwnerOnly')
+          showsRoleNotice
+            ? t('codeReviewer.reviewList.connectOwnerOnly')
+            : t('codeReviewer.reviewList.noReviewsDescription')
         }
         action={
           offersAction ? (

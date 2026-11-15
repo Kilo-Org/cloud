@@ -209,7 +209,7 @@ export function getContextSheetContent(
   const remainingPercentage = realPercentage >= 100 ? 0 : Math.max(0, 100 - realPercentage);
   return {
     usedTokens,
-    usedTokensCount: info ? info.contextTokens : null,
+    usedTokensCount: info.contextTokens,
     windowTokens: formatExactTokens(info.contextWindow),
     windowUnavailable: false,
     windowUnavailableLabel: i18n.t('agentChat.contextUsage.windowUnavailable'),

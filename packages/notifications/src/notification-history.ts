@@ -87,9 +87,15 @@ export type RecordedNotificationPushType = {
   [Kind in PushData['type']]: RecordedPushKind<Kind>;
 }[PushData['type']];
 
-/** True for the push kinds that become a history row. */
+/**
+ * True for the push kinds that become a history row.
+ *
+ * The map is total over `PushData['type']`, but a payload reaches the worker
+ * unparsed, so a kind outside the union must answer "not recorded" instead of
+ * falling through to a rule call that does not exist.
+ */
 function isRecordedNotificationPush(type: PushData['type']): type is RecordedNotificationPushType {
-  return PUSH_HISTORY_DECISIONS[type] !== NOT_RECORDED;
+  return typeof PUSH_HISTORY_DECISIONS[type] === 'function';
 }
 
 export const RECORDED_NOTIFICATION_PUSH_TYPES: readonly RecordedNotificationPushType[] =

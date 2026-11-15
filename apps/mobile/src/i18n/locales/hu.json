@@ -4263,8 +4263,10 @@
     "unresolvedPurchaseFound": "Az áruházban megtaláltuk a korábbi vásárlásodat, és teljesülésekor megkapod a krediteket; ha újra vásárolsz, külön vásárlást indítasz, amelyért ismét fizetned kellhet.",
     "unresolvedPurchaseNotFound": "Az áruházban nem találtuk a korábbi vásárlásodat, de az még teljesülhet, és megkaphatod a krediteket; ha újra vásárolsz, külön vásárlást indítasz, amelyért ismét fizetned kellhet.",
     "unresolvedPurchaseRefused": "Az áruházban megtaláltuk a korábbi vásárlásodat, de a kreditjei nem írhatók jóvá; ha újra vásárolsz, külön vásárlást indítasz, amelyért ismét fizetned kellhet.",
+    "unresolvedPurchaseCredited": "Egy korábbi vásárlás jóváírásra került. Ugyanabból a munkamenetből egy másik terhelés még teljesülhet, ezért az újbóli vásárlás új vásárlást indít, és ismét terhelhetnek.",
     "waitingForStore": "Várakozás az áruház válaszára, ez eltarthat egy pillanatig.",
     "pickPackToBuyAgain": "Új vásárlás indításához válassz egy csomagot fent.",
+    "purchasePending": "Az áruház még feldolgozza ezt a fizetést. A kreditjeid a terhelés jóváhagyása után érkeznek meg.",
     "buyAgain": "Vásárolj újra",
     "purchaseOwnedByAnotherAccount": "Az ezen Apple-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
     "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."

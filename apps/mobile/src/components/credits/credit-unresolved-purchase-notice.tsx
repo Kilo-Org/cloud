@@ -13,16 +13,23 @@ import { Text } from '@/components/ui/text';
  * completion may still post; `not-found` is a lookup that returned nothing, so
  * only a later store delivery can settle the earlier charge; and
  * `terminal-refusal` is a transaction the store keeps queuing but the backend
- * will never credit. Only the last one is a dead end, and even it keeps the
- * barrier until the person consents to another purchase.
+ * will never credit. `credited` is a charge this session already credited while
+ * another pooled request could still complete. Only the refusal is a dead end,
+ * and even it keeps the barrier until the person consents to another purchase.
  */
-export type CreditPurchaseResolution = 'unknown' | 'found' | 'not-found' | 'terminal-refusal';
+export type CreditPurchaseResolution =
+  | 'unknown'
+  | 'found'
+  | 'not-found'
+  | 'terminal-refusal'
+  | 'credited';
 
 const WARNING_KEYS = {
   unknown: 'credits.unresolvedPurchase',
   found: 'credits.unresolvedPurchaseFound',
   'not-found': 'credits.unresolvedPurchaseNotFound',
   'terminal-refusal': 'credits.unresolvedPurchaseRefused',
+  credited: 'credits.unresolvedPurchaseCredited',
 } as const satisfies Record<CreditPurchaseResolution, string>;
 
 /** Every variant the notice can paint, in the order the reserve lays them out. */
@@ -31,6 +38,7 @@ const CREDIT_PURCHASE_RESOLUTIONS = [
   'found',
   'not-found',
   'terminal-refusal',
+  'credited',
 ] as const satisfies readonly CreditPurchaseResolution[];
 
 type CreditUnresolvedPurchaseNoticeProps = {

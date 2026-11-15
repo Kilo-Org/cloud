@@ -4326,8 +4326,10 @@
     "unresolvedPurchaseFound": "Trgovina je pronašla tvoju prethodnu kupovinu i njeni krediti će biti dodani kad se dovrši, a ponovnom kupovinom pokrećeš zasebnu kupovinu koja ti može biti ponovo naplaćena.",
     "unresolvedPurchaseNotFound": "Trgovina nije pronašla tvoju prethodnu kupovinu, ali ona može biti naknadno dovršena i njeni krediti dodani, a ponovnom kupovinom pokrećeš zasebnu kupovinu koja ti može biti ponovo naplaćena.",
     "unresolvedPurchaseRefused": "Trgovina je pronašla tvoju prethodnu kupovinu, ali za nju nije moguće dodati kredite, a ponovnom kupovinom pokrećeš zasebnu kupovinu koja ti može biti ponovo naplaćena.",
+    "unresolvedPurchaseCredited": "Ranija kupovina je pripisana. Druga naplata iz iste sesije još se može izvršiti, pa ponovna kupovina pokreće novu kupovinu i može vam ponovo biti naplaćeno.",
     "waitingForStore": "Čeka se odgovor prodavnice; to može potrajati trenutak.",
     "pickPackToBuyAgain": "Odaberite paket iznad da biste započeli novu kupovinu.",
+    "purchasePending": "Trgovina još obrađuje ovo plaćanje. Vaši krediti stižu čim odobri naplatu.",
     "buyAgain": "Kupi ponovo",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."

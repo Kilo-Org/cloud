@@ -40,7 +40,7 @@ const PACK_SKELETON_ROWS = 4;
 /** The row and the status region say the same thing about a waiting request. */
 const WAIT_COPY_KEYS = {
   store: 'credits.waitingForStore',
-  pending: 'common.pending',
+  pending: 'credits.purchasePending',
 } as const satisfies Record<CreditPurchaseWait['kind'], string>;
 
 /**
@@ -356,15 +356,17 @@ export function CreditPurchaseScreen() {
                       changes height when a purchase or the store state
                       changes, and no row keeps an empty band for copy it does
                       not state. */}
-                  {(expiryMessage !== undefined || stateLabel !== null) && (
-                    <View className="mt-2 min-h-5 justify-center">
-                      {stateLabel !== null ? (
-                        <Text className="text-sm text-muted-foreground">{stateLabel}</Text>
-                      ) : (
-                        <Text className="text-xs text-muted-foreground">{expiryMessage}</Text>
-                      )}
-                    </View>
-                  )}
+                  {/* The state slot is reserved on every row: the completing
+                      or waiting label and the expiry note share its line, so a
+                      purchase starting or ending never changes a row's height. */}
+                  <View className="mt-2 min-h-5 justify-center">
+                    {stateLabel !== null && (
+                      <Text className="text-sm text-muted-foreground">{stateLabel}</Text>
+                    )}
+                    {stateLabel === null && expiryMessage !== undefined && (
+                      <Text className="text-xs text-muted-foreground">{expiryMessage}</Text>
+                    )}
+                  </View>
                 </Pressable>
               );
             })}

@@ -4332,8 +4332,10 @@
     "unresolvedPurchaseFound": "Sua compra anterior foi encontrada na loja e os créditos serão adicionados quando ela for concluída; comprar novamente inicia outra compra e pode gerar uma nova cobrança.",
     "unresolvedPurchaseNotFound": "Sua compra anterior não foi encontrada na loja, mas ainda pode ser concluída mais tarde e adicionar os créditos; comprar novamente inicia outra compra e pode gerar uma nova cobrança.",
     "unresolvedPurchaseRefused": "Sua compra anterior foi encontrada na loja, mas seus créditos não podem ser adicionados; comprar novamente inicia outra compra e pode gerar uma nova cobrança.",
+    "unresolvedPurchaseCredited": "Uma compra anterior foi creditada. Outra cobrança da mesma sessão ainda pode ser concluída, então comprar de novo inicia uma nova compra e pode gerar uma nova cobrança.",
     "waitingForStore": "Aguardando a resposta da loja. Isso pode levar um momento.",
     "pickPackToBuyAgain": "Escolha um pacote acima para iniciar uma nova compra.",
+    "purchasePending": "A loja ainda está processando este pagamento. Seus créditos chegam assim que ela aprovar a cobrança.",
     "buyAgain": "Comprar novamente",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Conta Apple pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos nesta conta do Google Play pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los."

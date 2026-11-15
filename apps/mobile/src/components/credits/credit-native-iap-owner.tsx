@@ -24,6 +24,7 @@ import { i18n } from '@/i18n';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   canAttributeNativePurchaseOutcome,
+  clearCreditPurchaseDispatches,
   isCreditPurchaseTransportDisconnection,
   registerCreditPurchaseDispatch,
   settleCreditPurchaseDispatch,
@@ -52,6 +53,7 @@ import {
   type CreditPurchaseFailure,
   creditStoreTimeoutKey,
   getPurchaseCompletionId,
+  getStoreCreditPurchaseErrorMessageKey,
   isRecoverableCreditPurchase,
   isStoreNotReadyError,
   isStorePendingPurchaseError,
@@ -105,6 +107,13 @@ async function fetchCreditStoreProducts(
  * not answered instead of reporting a failure. `pending` is a payment the store
  * itself reported as pending or deferred, which no retry can hurry.
  */
+/** How a completion that ended a row names the barrier it leaves behind. */
+const SETTLED_RESOLUTIONS = {
+  completed: 'credited',
+  'terminal-refusal': 'terminal-refusal',
+  'retryable-refusal': 'found',
+} as const;
+
 export type CreditPurchaseWait = {
   readonly productId: string;
   readonly kind: 'store' | 'pending';
@@ -241,7 +250,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const purchaseWaitRef = useRef<CreditPurchaseWait | null>(null);
   const markPurchaseWait = useCallback((wait: CreditPurchaseWait | null) => {
     purchaseWaitRef.current = wait;
-    if (mountedRef.current && isCurrentAuthEpoch(authEpochRef.current)) {
+    if (mountedRef.current) {
       setPurchaseWait(wait);
     }
   }, []);
@@ -264,6 +273,15 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     setPurchaseResolution(resolution);
     setHasUnresolvedPurchase(true);
   }, []);
+  // A remounted screen must show the barrier its process already holds: the
+  // intent outlives the screen, so the notice and any wait start from it.
+  useEffect(() => {
+    const intent = currentCreditPurchaseIntent();
+    if (intent === null) {
+      return;
+    }
+    markUnresolvedPurchase('unknown');
+  }, [markUnresolvedPurchase]);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   // The transaction each delivery is being completed for, and that completion's
   // result: a second caller for the same transaction shares it, while a recovery
@@ -360,9 +378,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       record.settle();
       markPurchaseWait(null);
       if (ownsCreditPurchaseIntent(record.intent)) {
-        markUnresolvedPurchase(
-          completion.status === 'terminal-refusal' ? 'terminal-refusal' : 'found'
-        );
+        markUnresolvedPurchase(SETTLED_RESOLUTIONS[completion.status]);
         offerBuyAgain(record);
       } else {
         clearBlockedPurchase();
@@ -485,6 +501,11 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             }
             const attributable = canAttributeNativePurchaseOutcome(record.intent);
             const pending = isStorePendingPurchaseError(error);
+            if (isCreditPurchaseTransportDisconnection(error)) {
+              // The SDK's connection cleanup tore the pool down: no request is
+              // waiting in it, so its missing answers make nothing ambiguous.
+              clearCreditPurchaseDispatches();
+            }
             if (attributable && !pending && !isCreditPurchaseTransportDisconnection(error)) {
               retireCreditPurchaseIntent(record.intent);
               record.settle();
@@ -521,6 +542,12 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
               isCurrentAuthEpoch(record.epoch)
             ) {
               clearBlockedPurchase();
+              // The store finally answered: a refusal that is not the person
+              // cancelling is theirs to see, now that the sheet is gone.
+              const refusalKey = getStoreCreditPurchaseErrorMessageKey(error, storefront);
+              if (refusalKey !== null) {
+                showError(refusalKey);
+              }
             }
             settleCreditPurchaseDispatch(record.intent);
             throw error;
@@ -530,9 +557,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
           // empty array) is not this request's outcome: its delivery is still
           // coming through the listener, so it stays the pool's waiting member
           // and can be attributed then.
-          const carriesPurchase = nativePurchases.some(
-            recovered => recovered !== null && recovered !== undefined
-          );
+          const carriesPurchase = nativePurchases.some(recovered => recovered !== null);
           try {
             const purchase = nativePurchases.length === 1 ? nativePurchases[0] : null;
             if (
@@ -562,6 +587,15 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
               return delivered;
             }
             identifyCreditPurchaseTransaction(record.intent, purchase);
+            if (
+              purchase.purchaseState === 'pending' &&
+              pendingPurchaseRef.current === record &&
+              isCurrentAuthEpoch(record.epoch)
+            ) {
+              // The store accepted the charge but has not decided it. The row
+              // waits for the deferred delivery, and the copy says so.
+              markPurchaseWait({ productId: purchase.productId, kind: 'pending' });
+            }
             if (
               !isCurrentAuthEpoch(record.epoch) ||
               !canAttributeNativePurchaseOutcome(record.intent)
@@ -687,6 +721,18 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         const completion = await actions.handlePurchaseSuccess(purchase, { notifyErrors: false });
         if (completion.status === 'completed') {
           recoveredPurchaseIdsRef.current.add(id);
+          // A credit landed in this session, whichever pooled request it
+          // belonged to: no wait can still be the row's state, and a barrier
+          // that is still up names it credited rather than "will be added".
+          markPurchaseWait(null);
+          if (
+            !owned &&
+            intent !== null &&
+            pendingPurchaseRef.current === null &&
+            ownsCreditPurchaseIntent(intent)
+          ) {
+            markUnresolvedPurchase('credited');
+          }
           if (intent !== null && matchesCreditPurchaseIntent(intent, purchase)) {
             retireCompletedIntent(intent, requestOwner);
           }
@@ -730,6 +776,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       actions,
       creditPackAppleProductIds,
       creditPackGoogleProductIds,
+      markPurchaseWait,
       markUnresolvedPurchase,
       offerBuyAgain,
       retireCompletedIntent,
@@ -955,7 +1002,10 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             if (
               pendingPurchaseRef.current === record &&
               attempt.owns() &&
-              isCurrentAuthEpoch(epoch)
+              isCurrentAuthEpoch(epoch) &&
+              // A pending payment is the store's own answer: a deadline cannot
+              // turn it into "no answer yet".
+              purchaseWaitRef.current?.kind !== 'pending'
             ) {
               // The request keeps its barrier, but not the row: the store can
               // still answer, and a sheet that is open must not read as a
@@ -1075,6 +1125,9 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       const productId = pack.storeProductId;
       if (
         !mountedRef.current ||
+        // Without the account token the store request cannot carry this
+        // account: retiring the consent first would consume it for nothing.
+        appAccountToken === '' ||
         consent === null ||
         productId === null ||
         consent.productId !== productId ||
@@ -1110,7 +1163,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [beginPurchase, clearBlockedPurchase, startPurchase, storefront]
+    [appAccountToken, beginPurchase, clearBlockedPurchase, startPurchase, storefront]
   );
 
   // Recover the purchases the store already charged but the backend has not
@@ -1245,6 +1298,36 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     },
     [reconnectStore]
   );
+
+  // The barrier belongs to the session that admitted it: an account change
+  // makes the record, its pool and its pool's ambiguity meaningless, and a
+  // receipt must never be posted under the wrong account's token.
+  const accountScopeRef = useRef({ epoch: authEpochRef.current, token: appAccountToken });
+  useEffect(() => {
+    const scope = accountScopeRef.current;
+    if (scope.epoch === authEpochRef.current && scope.token === appAccountToken) {
+      return;
+    }
+    accountScopeRef.current = { epoch: authEpochRef.current, token: appAccountToken };
+    const intent = currentCreditPurchaseIntent();
+    if (intent !== null) {
+      retireCreditPurchaseIntent(intent);
+    }
+    clearCreditPurchaseDispatches();
+    pendingPurchaseRef.current = null;
+    clearBlockedPurchase();
+  }, [appAccountToken, clearBlockedPurchase]);
+
+  // A store that comes back holds no request it dropped: the pool a reconnect
+  // reopens starts empty, so no earlier missing answer may mark a new one
+  // ambiguous.
+  const wasConnectedRef = useRef(connected);
+  useEffect(() => {
+    if (connected && !wasConnectedRef.current) {
+      clearCreditPurchaseDispatches();
+    }
+    wasConnectedRef.current = connected;
+  }, [connected]);
 
   const value = useMemo<CreditNativeIapContextValue>(
     () => ({

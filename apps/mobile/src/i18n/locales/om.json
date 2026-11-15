@@ -4263,8 +4263,10 @@
     "unresolvedPurchaseFound": "Bittaan kee duraanii suuqicha keessatti argameera, yommuu xumuramu kireeditiin isaa ni dabalama; irra deebi'anii bituun bittaa biraa jalqaba, ammas si kaffalchiisuu danda'a.",
     "unresolvedPurchaseNotFound": "Bittaan kee duraanii suuqicha keessatti hin argamne, garuu booda xumuramee kireedita isaa dabaluu danda'a; irra deebi'anii bituun bittaa biraa jalqaba, ammas si kaffalchiisuu danda'a.",
     "unresolvedPurchaseRefused": "Bittaan kee duraanii suuqicha keessatti argameera, garuu kireeditiin isaa kennamuu hin danda'u; irra deebi'anii bituun bittaa biraa jalqaba, ammas si kaffalchiisuu danda'a.",
+    "unresolvedPurchaseCredited": "Bittaan duraanii herrega kee keessatti galmaa'eera. Kaffaltiin biroo seeshinii sanuma irraa ammallee xumuramuu danda'a, kanaaf irra deebitee bituun bittaa haaraa jalqaba, akkasumas irra deebiin si kaffalchiisuu danda'a.",
     "waitingForStore": "Deebii suuqaa eegaa jira. Kun yeroo muraasa fudhachuu danda'a.",
     "pickPackToBuyAgain": "Bittaa haaraa jalqabuuf paakeejii olii keessaa tokko filadhu.",
+    "purchasePending": "Suuqni kaffaltii kana ammallee hojjechaa jira. Kireeditiin keessan akkuma inni kaffaltii mirkaneesseen ni dhufa.",
     "buyAgain": "Irra deebi'ii biti",
     "purchaseOwnedByAnotherAccount": "Kireeditiin Apple Account kana irratti jiru kan herrega Kilo biraati. Fayyadamuuf herrega Kilo sanatti seeni.",
     "purchaseOwnedByAnotherAccountPlay": "Kireeditiin akaawuntii Google Play kana irratti jiru akaawuntii Kilo adda tokko kan ta'e dha. Fayyadamuuf akaawuntii Kilo sana seeni."

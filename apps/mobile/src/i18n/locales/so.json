@@ -4263,8 +4263,10 @@
     "unresolvedPurchaseFound": "Iibsigaagii hore dukaanka waa laga helay, lacagtiisa adeegna waa lagu dari doonaa marka uu dhammaystirmo; iibsashada mar kale waa iibsi cusub oo laga yaabo in mar kale lacag lagaa qaado.",
     "unresolvedPurchaseNotFound": "Iibsigaagii hore dukaanka lagama helin, balse mar dambe wuu dhammaystirmi karaa oo lacagtiisa adeeg ku dari karaa dheelitirkaaga; iibsashada mar kale waa iibsi cusub oo laga yaabo in mar kale lacag lagaa qaado.",
     "unresolvedPurchaseRefused": "Iibsigaagii hore dukaanka waa laga helay, balse lacagtiisa adeeg laguma dari karo dheelitirkaaga; iibsashada mar kale waa iibsi cusub oo laga yaabo in mar kale lacag lagaa qaado.",
+    "unresolvedPurchaseCredited": "Iibsasho hore ayaa lagu daray akoonkaaga. Lacag-goyn kale oo ka timid isla fadhigaas ayaa weli dhammaystirmi karta, sidaa darteed iibsashada mar kale waxay bilaabaysaa iibsasho cusub waxaana laga yaabaa in lacag lagaa jaro mar kale.",
     "waitingForStore": "Waxaa la sugayaa jawaabta dukaanka. Tani waxay qaadan kartaa waqti yar.",
     "pickPackToBuyAgain": "Dooro xirmo kor ku xusan si aad u bilowdo iib cusub.",
+    "purchasePending": "Dukaanku weli wuu habaynayaa lacag bixintan. Dhibcahaagu waxay imaan doonaan marka uu ansixiyo lacag-qaadista.",
     "buyAgain": "Mar kale iibso",
     "purchaseOwnedByAnotherAccount": "Lacagta adeeg ee ku jirta Apple Account-kan waxaa leh akoon kale oo Kilo ah. Isticmaalka, soo gal akoonkaas Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Lacagta adeeg ee ku yaal xisaabtan Google Play waxaa leh koonto Kilo oo kale. Isticmaalka, ku saxiix bax koontada Kilo-ga ah."

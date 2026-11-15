@@ -70,6 +70,16 @@ export function isCreditPurchaseTransportDisconnection(error: unknown): boolean 
   return transportDisconnection.safeParse(error).success;
 }
 
+/**
+ * The store that was holding our requests is gone or came back. Its pool is
+ * empty, so nothing it delivers belongs to a request still waiting there, and
+ * the ambiguity its missing answers created no longer describes anything.
+ */
+export function clearCreditPurchaseDispatches(): void {
+  unsettledDispatches = new Set<CreditPurchaseIntent>();
+  ambiguousDispatches = new Set<CreditPurchaseIntent>();
+}
+
 export function resetCreditPurchaseAuthorityForTests(): void {
   unsettledDispatches = new Set<CreditPurchaseIntent>();
   ambiguousDispatches = new Set<CreditPurchaseIntent>();

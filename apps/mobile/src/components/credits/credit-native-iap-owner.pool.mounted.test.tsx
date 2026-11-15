@@ -51,6 +51,18 @@ describe('native purchase promise pool ownership', () => {
     expect(ownerValue(owner).buyAgainProductId).toBe(pack.storeProductId);
   });
 
+  it('names a credited pooled delivery as credited, not as found', async () => {
+    const owner = await mountPoolOwner();
+    const { completion } = await dispatchAfterConsent(owner);
+    emitNativePurchase(nativePurchase('credited-pooled'));
+    await completion;
+    await flushPool();
+
+    expect(ownerValue(owner).hasUnresolvedPurchase).toBe(true);
+    expect(ownerValue(owner).purchaseResolution).toBe('credited');
+    expect(ownerValue(owner).purchaseWait).toBeNull();
+  });
+
   it('settles an unattributable cancellation at once and keeps the barrier', async () => {
     const owner = await mountPoolOwner();
     const { completion } = await dispatchAfterConsent(owner);
@@ -112,9 +124,9 @@ describe('native purchase promise pool ownership', () => {
     expect(store.complete).toHaveBeenCalledTimes(1);
     expect(ownerValue(owner).completingProductId).toBeNull();
     // 2. The barrier stays: the still-pooled earlier request may yet arrive, so
-    // the notice names a found purchase and offers the consented retry.
+    // the notice names the credit that already landed and offers the retry.
     expect(ownerValue(owner).hasUnresolvedPurchase).toBe(true);
-    expect(ownerValue(owner).purchaseResolution).toBe('found');
+    expect(ownerValue(owner).purchaseResolution).toBe('credited');
     expect(ownerValue(owner).buyAgainProductId).toBe(pack.storeProductId);
 
     // 3. The next tap reaches consent instead of silently reconciling forever,

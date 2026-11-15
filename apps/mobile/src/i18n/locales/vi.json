@@ -4263,8 +4263,10 @@
     "unresolvedPurchaseFound": "Cửa hàng đã tìm thấy giao dịch mua trước đó của bạn và sẽ cộng tín dụng khi giao dịch hoàn tất; mua lần nữa sẽ tạo giao dịch mua riêng và có thể khiến bạn bị tính phí lần nữa.",
     "unresolvedPurchaseNotFound": "Cửa hàng không tìm thấy giao dịch mua trước đó của bạn nhưng giao dịch vẫn có thể hoàn tất sau và cộng tín dụng; mua lần nữa sẽ tạo giao dịch mua riêng và có thể khiến bạn bị tính phí lần nữa.",
     "unresolvedPurchaseRefused": "Cửa hàng đã tìm thấy giao dịch mua trước đó của bạn nhưng không thể cộng tín dụng cho giao dịch này; mua lần nữa sẽ tạo giao dịch mua riêng và có thể khiến bạn bị tính phí lần nữa.",
+    "unresolvedPurchaseCredited": "Một giao dịch mua trước đó đã được ghi có. Một khoản phí khác từ cùng phiên vẫn có thể hoàn tất, vì vậy mua lại sẽ bắt đầu một giao dịch mua mới và bạn có thể bị tính phí lần nữa.",
     "waitingForStore": "Đang chờ cửa hàng phản hồi. Việc này có thể mất một chút thời gian.",
     "pickPackToBuyAgain": "Chọn một gói ở trên để bắt đầu giao dịch mua mới.",
+    "purchasePending": "Cửa hàng vẫn đang xử lý khoản thanh toán này. Tín dụng của bạn sẽ được cộng ngay khi cửa hàng phê duyệt khoản phí.",
     "buyAgain": "Mua lần nữa",
     "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
     "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."

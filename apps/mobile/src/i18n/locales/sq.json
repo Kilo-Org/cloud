@@ -4263,8 +4263,10 @@
     "unresolvedPurchaseFound": "Blerja juaj e mëparshme u gjet në dyqan dhe kreditet e saj do të shtohen kur të përfundojë; nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
     "unresolvedPurchaseNotFound": "Blerja juaj e mëparshme nuk u gjet në dyqan, por mund të përfundojë më vonë dhe të shtojë kreditet e saj; nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
     "unresolvedPurchaseRefused": "Blerja juaj e mëparshme u gjet në dyqan, por kreditet e saj nuk mund të shtohen; nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
+    "unresolvedPurchaseCredited": "Një blerje e mëparshme u kreditua. Një tarifim tjetër nga i njëjti sesion mund të përfundojë ende, prandaj blerja përsëri nis një blerje të re dhe mund të tarifoheni sërish.",
     "waitingForStore": "Në pritje të përgjigjes nga dyqani. Kjo mund të zgjasë pak.",
     "pickPackToBuyAgain": "Zgjidhni një paketë më sipër për të nisur një blerje të re.",
+    "purchasePending": "Dyqani ende po e përpunon këtë pagesë. Kreditet do të mbërrijnë sapo ai ta miratojë tarifën.",
     "buyAgain": "Bli sërish",
     "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."

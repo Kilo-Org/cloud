@@ -4263,8 +4263,10 @@
     "unresolvedPurchaseFound": "Hitan'ny fivarotana ny fividiananao teo aloha ka hampiana ny kireditrany rehefa vita izany, fa ny fividianana indray dia fividianana vaovao ary mety hampandoa vola anao indray.",
     "unresolvedPurchaseNotFound": "Tsy hitan'ny fivarotana ny fividiananao teo aloha nefa mety ho vita any aoriana ka hampiana ny kireditrany, fa ny fividianana indray dia fividianana vaovao ary mety hampandoa vola anao indray.",
     "unresolvedPurchaseRefused": "Hitan'ny fivarotana ny fividiananao teo aloha nefa tsy azo ampiana ny kireditrany, fa ny fividianana indray dia fividianana vaovao ary mety hampandoa vola anao indray.",
+    "unresolvedPurchaseCredited": "Voaray tao amin'ny kaontinao ny fividianana teo aloha. Mety mbola ho vita ny fandoavana hafa tamin'io fotoana io ihany, ka raha mividy indray ianao dia fividianana vaovao no atomboka ary mety hisy vola halaina aminao indray.",
     "waitingForStore": "Miandry ny valin'ny fivarotana. Mety haharitra kely izany.",
     "pickPackToBuyAgain": "Misafidiana fonosana iray etsy ambony mba hanombohana fividianana vaovao.",
+    "purchasePending": "Mbola karakarain'ny fivarotana ity fandoavam-bola ity. Ho tonga ny kredinao rehefa ankatoaviny ny fandoavana.",
     "buyAgain": "Hividy indray",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."

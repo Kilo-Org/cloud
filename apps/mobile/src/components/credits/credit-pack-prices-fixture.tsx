@@ -36,8 +36,7 @@ export type CreditPackPricesFixtureState =
   | 'unresolved'
   | 'legacy-unresolved'
   | 'refused-unresolved'
-  | 'failed'
-  | 'hydration-malformed';
+  | 'failed';
 
 const FIXTURE_STATES = [
   'priced',

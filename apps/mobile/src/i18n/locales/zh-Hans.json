@@ -4263,8 +4263,10 @@
     "unresolvedPurchaseFound": "商店已找到你之前的购买记录，购买完成后，相应额度将添加到你的余额；再次购买会发起一笔新的购买，并可能再次向你收费。",
     "unresolvedPurchaseNotFound": "商店未找到你之前的购买记录，但该笔购买仍可能稍后完成，并将相应额度添加到你的余额；再次购买会发起一笔新的购买，并可能再次向你收费。",
     "unresolvedPurchaseRefused": "商店已找到你之前的购买记录，但无法发放相应额度；再次购买会发起一笔新的购买，并可能再次向你收费。",
+    "unresolvedPurchaseCredited": "之前的一笔购买已入账。同一会话中的另一笔扣款可能仍会完成，因此再次购买将发起新的购买，并可能再次向你收费。",
     "waitingForStore": "正在等待商店响应，这可能需要一点时间。",
     "pickPackToBuyAgain": "请在上方选择一个套餐以开始新的购买。",
+    "purchasePending": "商店仍在处理此笔付款。商店批准扣款后，你的点数就会到账。",
     "buyAgain": "再次购买",
     "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"

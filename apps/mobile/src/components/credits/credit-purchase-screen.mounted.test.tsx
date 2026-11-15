@@ -38,7 +38,12 @@ const owner = vi.hoisted(() => ({
   // from, and the fakes prove which callback a tap reaches, never a store call.
   buyAgainProductId: null as string | null,
   hasUnresolvedPurchase: false,
-  purchaseResolution: 'unknown' as 'unknown' | 'found' | 'not-found' | 'terminal-refusal',
+  purchaseResolution: 'unknown' as
+    | 'unknown'
+    | 'found'
+    | 'not-found'
+    | 'terminal-refusal'
+    | 'credited',
   reconcilePurchase: vi.fn(),
   buyAgain: vi.fn(),
 }));
@@ -1049,6 +1054,19 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('reserves the state slot on every row, so a purchase never moves a row', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const slots = renderer.root.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String((node.props as { className?: string }).className).includes('min-h-5')
+    );
+    expect(slots).toHaveLength(packRows(renderer).length);
+    unmount();
+  });
+
   it('waits neutrally on the row and in the status region while the store has not answered', async () => {
     owner.completingProductId = null;
     owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'store' };
@@ -1555,13 +1573,14 @@ describe('CreditPurchaseScreen', () => {
       'credits.unresolvedPurchaseFound',
       'credits.unresolvedPurchaseNotFound',
       'credits.unresolvedPurchaseRefused',
+      'credits.unresolvedPurchaseCredited',
     ] as const) {
       expect(reserveText).toContain(i18n.t(key));
     }
     // Every variant shares one full-width cell in a clipped row, so the row
     // takes the height of the tallest variant and the card never resizes when
     // the resolution changes.
-    expect(reserve.children).toHaveLength(4);
+    expect(reserve.children).toHaveLength(5);
     for (const cell of reserve.children) {
       if (typeof cell === 'string') {
         throw new TypeError('expected a reserved notice cell');

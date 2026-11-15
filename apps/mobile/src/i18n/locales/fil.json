@@ -4263,8 +4263,10 @@
     "unresolvedPurchaseFound": "Nakita sa store ang nauna mong pagbili at idaragdag ang kredito kapag nakumpleto ito; ang pagbili muli ay magsisimula ng hiwalay na pagbili at maaari kang masingil muli.",
     "unresolvedPurchaseNotFound": "Hindi nakita sa store ang nauna mong pagbili, pero maaari pa itong makumpleto kalaunan at maidagdag ang kredito; ang pagbili muli ay magsisimula ng hiwalay na pagbili at maaari kang masingil muli.",
     "unresolvedPurchaseRefused": "Nakita sa store ang nauna mong pagbili, pero hindi maidaragdag ang kredito nito; ang pagbili muli ay magsisimula ng hiwalay na pagbili at maaari kang masingil muli.",
+    "unresolvedPurchaseCredited": "Na-credit na ang isang naunang pagbili. Maaaring makumpleto pa ang isa pang singil mula sa parehong session, kaya ang pagbili muli ay magsisimula ng bagong pagbili at maaari kang masingil muli.",
     "waitingForStore": "Hinihintay ang sagot ng store; maaaring tumagal ito nang ilang sandali.",
     "pickPackToBuyAgain": "Pumili ng pack sa itaas para magsimula ng bagong pagbili.",
+    "purchasePending": "Pinoproseso pa ng store ang bayad na ito. Darating ang iyong mga credit kapag naaprubahan na nito ang singil.",
     "buyAgain": "Bumili muli",
     "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
     "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."

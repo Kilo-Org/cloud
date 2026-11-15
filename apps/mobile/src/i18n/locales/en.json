@@ -4330,8 +4330,10 @@
     "unresolvedPurchaseFound": "Your earlier purchase was found at the store. Its credits will be added when it completes. Buying again starts another purchase and may charge you again.",
     "unresolvedPurchaseNotFound": "Your earlier purchase was not found at the store, but it may still complete later and add its credits. Buying again starts another purchase and may charge you again.",
     "unresolvedPurchaseRefused": "Your earlier purchase was found at the store, but it cannot be credited. Buying again starts another purchase and may charge you again.",
+    "unresolvedPurchaseCredited": "An earlier purchase was credited. Another charge from the same session may still complete, so buying again starts a new purchase and may charge you again.",
     "waitingForStore": "Waiting for the store to answer. This can take a moment.",
     "pickPackToBuyAgain": "Choose a pack above to start a new purchase.",
+    "purchasePending": "The store is still processing this payment. Your credits arrive once it approves the charge.",
     "buyAgain": "Buy again",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."

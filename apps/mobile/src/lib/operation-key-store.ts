@@ -19,7 +19,7 @@ export type RetainedOperationKeys = {
   /** The key for this fingerprint, minted on first use and kept until retired. */
   getKey(fingerprint: string): string;
   /** Forgets one intent, so its next `getKey` mints a fresh key. */
-  retireKey(fingerprint: string): void;
+  retireKey(fingerprint: string, operationKey: string): void;
   /** Forgets every intent: the account boundary. */
   clear(): void;
 };
@@ -36,7 +36,10 @@ export function createRetainedOperationKeys(mint: () => string): RetainedOperati
       keys.set(fingerprint, minted);
       return minted;
     },
-    retireKey(fingerprint) {
+    retireKey(fingerprint, operationKey) {
+      if (keys.get(fingerprint) !== operationKey) {
+        return;
+      }
       keys.delete(fingerprint);
     },
     clear() {

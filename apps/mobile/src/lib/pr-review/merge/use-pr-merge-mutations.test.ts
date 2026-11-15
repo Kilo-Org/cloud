@@ -323,7 +323,8 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
     // field list must fail here instead of silently rotating in-flight keys.
     expect(mergeKeys.mergeOperationKey).toHaveBeenCalledWith(
-      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+      'retained-merge-key'
     );
     expect(mutateMock).toHaveBeenCalledWith(
       expect.objectContaining({ operationKey: 'retained-merge-key' })
@@ -346,7 +347,8 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     await lastCapturedOptions?.mutationFn?.(INPUT);
 
     expect(mergeKeys.retireMergeOperationKey).toHaveBeenCalledWith(
-      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+      'retained-merge-key'
     );
   });
 

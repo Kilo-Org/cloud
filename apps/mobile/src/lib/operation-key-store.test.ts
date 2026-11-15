@@ -42,10 +42,21 @@ describe('createRetainedOperationKeys', () => {
     const second = keys.getKey('merge-2');
     expect(second).not.toBe(first);
 
-    keys.retireKey('merge-1');
+    keys.retireKey('merge-1', first);
 
     expect(keys.getKey('merge-1')).not.toBe(first);
     // Retiring one intent leaves the others exactly as they were.
     expect(keys.getKey('merge-2')).toBe(second);
+  });
+
+  it('retires a fingerprint only while the stored key is the one it captured', () => {
+    const keys = createRetainedOperationKeys(countingMint());
+    const accountA = keys.getKey('merge-1');
+    keys.clear();
+    const accountB = keys.getKey('merge-1');
+    keys.retireKey('merge-1', accountA);
+    expect(keys.getKey('merge-1')).toBe(accountB);
+    keys.retireKey('merge-1', accountB);
+    expect(keys.getKey('merge-1')).not.toBe(accountB);
   });
 });

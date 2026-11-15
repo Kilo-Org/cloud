@@ -10,7 +10,11 @@ import { act, TestRenderer } from '@/test/renderer';
 import { createTestQueryClient } from '@/test/render-with-providers';
 
 import { useMergePullRequestMutation } from './use-pr-merge-mutations';
-import { clearMergeOperationKeys } from './pr-merge-operation-key';
+import {
+  clearMergeOperationKeys,
+  mergeOperationKey,
+  retireMergeOperationKey,
+} from './pr-merge-operation-key';
 
 /** The merge input the transport records: the key is the only field asserted. */
 type MergeCall = { readonly operationKey?: string };
@@ -135,6 +139,18 @@ function operationKeyAt(index: number): string | undefined {
   return transport.merge.mock.calls.at(index)?.[0].operationKey;
 }
 
+/** One fingerprint two accounts can both name, so the boundary is the only reset. */
+const MERGE_FINGERPRINT = '{"resource":["octocat","hello",1],"method":"squash"}';
+
+/** The key the merge store holds for a fingerprint; a refusal is a test failure. */
+function heldMergeKey(fingerprint: string): string {
+  const key = mergeOperationKey(fingerprint);
+  if (key === null) {
+    throw new Error(`no merge key was admitted for ${fingerprint}`);
+  }
+  return key;
+}
+
 beforeEach(() => {
   transport.merge.mockReset();
   transport.announce.mockReset();
@@ -185,5 +201,26 @@ describe('merge intent key across a dismissed merge screen', () => {
 
     expect(operationKeyAt(1)).not.toBe(first);
     renderer.unmount();
+  });
+});
+
+describe('merge intent retirement across the account boundary', () => {
+  it('retires only its own account’s key when an earlier request settles late', () => {
+    // Account A's merge is still out when the account boundary clears the store,
+    // and account B admits the same fingerprint with a key of its own.
+    const accountAKey = heldMergeKey(MERGE_FINGERPRINT);
+    clearMergeOperationKeys();
+    const accountBKey = heldMergeKey(MERGE_FINGERPRINT);
+    expect(accountBKey).not.toBe(accountAKey);
+
+    // A's late terminal outcome names the key it captured, so it retires A's
+    // intent only: B's entry must survive, or B's retry would mint a fresh key
+    // and execute the merge again.
+    retireMergeOperationKey(MERGE_FINGERPRINT, accountAKey);
+    expect(heldMergeKey(MERGE_FINGERPRINT)).toBe(accountBKey);
+
+    // B's own outcome is the authoritative retirement of B's entry.
+    retireMergeOperationKey(MERGE_FINGERPRINT, accountBKey);
+    expect(heldMergeKey(MERGE_FINGERPRINT)).not.toBe(accountBKey);
   });
 });

@@ -260,11 +260,11 @@ export function useMergePullRequestMutation(ref: ReviewWriteRef) {
             : await providerMergeResult(scope, input as ProviderMergeVars, operationKey);
         // Throws on `merged: false`; returns the gate on clean / partial.
         assertMergeResult(result);
-        retireMergeOperationKey(fingerprint);
+        retireMergeOperationKey(fingerprint, operationKey);
         return result;
       } catch (error) {
         if (!isPrMutationRetryable(error)) {
-          retireMergeOperationKey(fingerprint);
+          retireMergeOperationKey(fingerprint, operationKey);
         }
         throw mapPrOperationError(error, 'merge');
       }

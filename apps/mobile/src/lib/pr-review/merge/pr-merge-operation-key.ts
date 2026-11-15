@@ -21,8 +21,8 @@ export function mergeOperationKey(fingerprint: string): string {
 }
 
 /** Retires one merge intent after an authoritative outcome. */
-export function retireMergeOperationKey(fingerprint: string): void {
-  keys.retireKey(fingerprint);
+export function retireMergeOperationKey(fingerprint: string, operationKey: string): void {
+  keys.retireKey(fingerprint, operationKey);
 }
 
 /** The account boundary: one account never replays another's merge intent. */

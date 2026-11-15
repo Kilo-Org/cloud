@@ -10,6 +10,7 @@ import {
 } from '@/lib/credits/store-products-loader';
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   resetCreditPurchaseIntentForTests,
   restoreCreditPurchaseIntent,
@@ -136,9 +137,8 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   },
 }));
 
-vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
-}));
+const mockedToasts = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
+vi.mock('sonner-native', () => ({ toast: mockedToasts }));
 
 type ProbeHandle = { value: CreditNativeIapContextValue | null };
 
@@ -236,6 +236,7 @@ async function flushPromises() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetPurchaseErrorToastDedup();
   mockedIap.requestPurchase.mockReset();
   mockedIap.getAvailablePurchases.mockReset();
   mockedQuery.completePurchase.mockReset();
@@ -261,6 +262,27 @@ afterEach(() => {
 });
 
 describe('CreditNativeIapOwner', () => {
+  it('does not publish a completion refusal after same-account unmount', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const backend = Promise.withResolvers<{ alreadyProcessed: boolean }>();
+    mockedQuery.completePurchase.mockReturnValueOnce(backend.promise);
+    const owner = await mountOwner();
+    await owner.handle.value?.purchase(creditPack);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      owner.renderer.unmount();
+      await Promise.resolve();
+    });
+    backend.reject(new Error('the receipt could not be completed'));
+    await flushPromises();
+    expect(mockedToasts.error).not.toHaveBeenCalled();
+  });
+
   it('allows a never-dispatched reservation to be replaced after restart', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

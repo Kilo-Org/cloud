@@ -268,6 +268,9 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
 
   const showError = useCallback(
     (key: string) => {
+      if (!mountedRef.current || !isCurrentAuthEpoch(authEpochRef.current)) {
+        return;
+      }
       toastPurchaseError(key);
       // A refusal that is not one product request's failure (a recovery pass
       // refuses a receipt) still reaches the screen's one line.

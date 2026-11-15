@@ -489,6 +489,23 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
               retireCreditPurchaseIntent(record.intent);
               record.settle();
             }
+            // An error that cannot be this request's outcome (another pooled
+            // request may own it) still ends this row's progress: the barrier
+            // stays, but the person must not watch a spinner for a charge the
+            // store has already answered.
+            if (
+              !attributable &&
+              !pending &&
+              !isCreditPurchaseTransportDisconnection(error) &&
+              pendingPurchaseRef.current === record &&
+              mountedRef.current &&
+              isCurrentAuthEpoch(record.epoch)
+            ) {
+              pendingPurchaseRef.current = null;
+              record.settle();
+              markUnresolvedPurchase('unknown');
+              record.attempt.abandon();
+            }
             if (pending && pendingPurchaseRef.current === record) {
               // Play's pending payment and StoreKit's deferred one are states
               // to wait out, not failures: the row says so and stays busy.
@@ -589,6 +606,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       appAccountToken,
       clearBlockedPurchase,
       markPurchaseWait,
+      markUnresolvedPurchase,
       completeAppStorePurchase.mutateAsync,
       completePlayPurchase.mutateAsync,
       creditPackAppleProductIds,

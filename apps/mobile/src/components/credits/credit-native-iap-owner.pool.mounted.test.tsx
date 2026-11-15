@@ -51,6 +51,19 @@ describe('native purchase promise pool ownership', () => {
     expect(ownerValue(owner).buyAgainProductId).toBe(pack.storeProductId);
   });
 
+  it('settles an unattributable cancellation at once and keeps the barrier', async () => {
+    const owner = await mountPoolOwner();
+    const { completion } = await dispatchAfterConsent(owner);
+    emitNativeError({ code: 'user-cancelled', message: 'A was cancelled' });
+    await completion;
+    await flushPool();
+
+    // No timer advance: the row is not left spinning for a charge the store
+    // has answered, and the outcome may still be another request's.
+    expect(ownerValue(owner).completingProductId).toBeNull();
+    expect(ownerValue(owner).hasUnresolvedPurchase).toBe(true);
+  });
+
   it('recovers A once when its result resolves A and B without retiring B', async () => {
     const owner = await mountPoolOwner();
     const { completion } = await dispatchAfterConsent(owner);

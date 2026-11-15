@@ -6,6 +6,12 @@ import { cn } from '@/lib/utils';
 
 import { useMessageDetailsCopyFeedback } from './message-details-copy';
 
+/** Every outcome the line can show; the slot lays out all of them to size itself. */
+const COPY_STATUS_KEYS: readonly string[] = [
+  'common.copiedToClipboard',
+  'common.couldNotCopyToClipboard',
+];
+
 /**
  * The Copy pressable and its feedback line, as one block. The sheet mounts it
  * with a `key` per message and per visibility, so a new message or a reopen
@@ -29,17 +35,39 @@ export function DetailsCopyAction({ copyText }: Readonly<{ copyText: string }>) 
           {t('agentChat.messageDetails.copyMessage')}
         </Text>
       </Pressable>
-      {copy.status ? (
-        <Text
-          className={cn(
-            'text-center text-sm',
-            copy.feedback.status === 'failed' ? 'text-destructive' : 'text-foreground'
-          )}
-          testID="message-details-copy-feedback"
+      {/* The outcome overlays the outcome copies this slot already lays out, so
+          the line never inserts space and Select text below cannot move. */}
+      <View testID="message-details-copy-feedback-slot">
+        <View
+          className="opacity-0"
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          testID="message-details-copy-feedback-reserve"
         >
-          {copy.status}
-        </Text>
-      ) : null}
+          {COPY_STATUS_KEYS.map(key => (
+            <Text key={key} className="text-center text-sm">
+              {t(key)}
+            </Text>
+          ))}
+        </View>
+        {copy.status ? (
+          <View
+            className="absolute inset-0 justify-center"
+            testID="message-details-copy-feedback-live"
+          >
+            <Text
+              className={cn(
+                'text-center text-sm',
+                copy.feedback.status === 'failed' ? 'text-destructive' : 'text-foreground'
+              )}
+              testID="message-details-copy-feedback"
+            >
+              {copy.status}
+            </Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

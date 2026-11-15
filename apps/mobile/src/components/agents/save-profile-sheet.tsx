@@ -144,9 +144,24 @@ export function SaveProfileSheet({
         showsVerticalScrollIndicator={false}
       >
         <Text variant="muted">{t('agentChat.newSession.saveProfileDescription')}</Text>
-        {save.failure !== null ? (
-          <AccessibleStatus className="text-sm" message={saveFailureMessage(t)} />
-        ) : null}
+        {/* The refusal overlays the copy this slot already lays out, so a
+            rejected save never inserts space and the fields cannot move. */}
+        <View testID="save-profile-status">
+          <View
+            className="opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            testID="save-profile-status-reserve"
+          >
+            <Text className="text-sm">{saveFailureMessage(t)}</Text>
+          </View>
+          {save.failure !== null ? (
+            <View className="absolute inset-0 justify-center" testID="save-profile-status-live">
+              <AccessibleStatus className="text-sm" message={saveFailureMessage(t)} />
+            </View>
+          ) : null}
+        </View>
         <ProfileNameField
           defaultValue=""
           error={nameField.error}

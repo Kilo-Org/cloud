@@ -460,6 +460,67 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
+  it('overlays the Copy outcome on a reserve holding both translated copies so a settlement moves no control', async () => {
+    const renderer = await mountSheet(
+      storedMessage(assistantInfo(), [textPart('copy this response')])
+    );
+    const reserved = renderer.root.findAll(
+      node => node.props.testID === 'message-details-copy-feedback-reserve'
+    )[0];
+    if (!reserved) {
+      throw new TypeError('the Copy block has no reserved status copy');
+    }
+
+    // Both outcomes are laid out at the device font scale and width and hidden
+    // from readers, so the slot needs no measured style or layout callback: a
+    // wrapped translation is what sets its height.
+    expect(reserved.props.accessibilityElementsHidden).toBe(true);
+    expect(reserved.props.importantForAccessibility).toBe('no-hide-descendants');
+    const lines = reserved.findAll(node => node.type === Text);
+    expect(lines.map(node => node.props.children)).toEqual([
+      i18n.t('common.copiedToClipboard'),
+      i18n.t('common.couldNotCopyToClipboard'),
+    ]);
+    const slot = renderer.root.findAll(
+      node => node.props.testID === 'message-details-copy-feedback-slot'
+    )[0];
+    if (!slot) {
+      throw new TypeError('the Copy block has no status slot');
+    }
+    expect(slot.props.style).toBeUndefined();
+
+    const blockOrder = () =>
+      renderer.root
+        .findAll(node => typeof node.props.testID === 'string')
+        .map(node => node.props.testID)
+        .filter(
+          testID =>
+            testID === 'message-details-copy' ||
+            testID === 'message-details-copy-feedback-slot' ||
+            testID === 'message-details-select-text'
+        );
+    const orderBefore = blockOrder();
+
+    await act(async () => {
+      press(findByTestID(renderer.root, 'message-details-copy')[0]);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The live line is an absolute overlay inside the reserved block: Select
+    // text below it keeps its place.
+    expect(findByTestID(renderer.root, 'message-details-copy-feedback')[0]?.props.children).toBe(
+      'Copied to clipboard'
+    );
+    expect(findByTestID(renderer.root, 'message-details-copy-feedback-reserve')).toHaveLength(1);
+    const live = findByTestID(renderer.root, 'message-details-copy-feedback-live')[0];
+    expect(String(live?.props.className)).toContain('absolute');
+    expect(blockOrder()).toEqual(orderBefore);
+
+    await unmount(renderer);
+  });
+
   it('issues one clipboard write for a second Copy press during the first', async () => {
     const gate = Promise.withResolvers<unknown>();
     native.gate = gate.promise;

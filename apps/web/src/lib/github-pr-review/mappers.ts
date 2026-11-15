@@ -168,13 +168,6 @@ function buildReviewers(
   return reviewers;
 }
 
-const GitHubRestUserSchema = z
-  .object({
-    login: z.string().min(1),
-    avatar_url: z.string().url(),
-  })
-  .strict();
-
 export function buildOverviewDto(args: {
   pr: PullRequestRestData;
   repo: RepoRestData;
@@ -537,5 +530,3 @@ export function buildInboxResult(args: {
   const nextCursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
   return GitHubPrReviewInboxResultSchema.parse({ items, nextCursor });
 }
-
-export { GitHubRestUserSchema };

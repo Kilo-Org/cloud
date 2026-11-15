@@ -4569,6 +4569,55 @@ describe('kiloPassRouter', () => {
       expect(result.hasMore).toBe(false);
       expect(result.cursor).toBeNull();
     });
+
+    it('lists the invoices of a canceled pass', async () => {
+      const stripeMock = getStripeMock();
+      const invoiceCreatedTs = Math.floor(Date.now() / 1000) - 86400;
+      stripeMock.invoices.list.mockResolvedValue({
+        data: [
+          {
+            id: 'in_canceled_1',
+            created: invoiceCreatedTs,
+            amount_due: 4900,
+            currency: 'usd',
+            status: 'paid',
+            hosted_invoice_url: 'https://stripe.example.test/invoice/canceled',
+            invoice_pdf: 'https://stripe.example.test/invoice/canceled.pdf',
+            lines: { data: [{ description: 'Kilo Pass Tier 49' }] },
+          },
+        ],
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-canceled@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_ended_history_test',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getBillingHistory({});
+
+      // A lapsed pass keeps its receipts, so the read still answers for it.
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith(
+        expect.objectContaining({ subscription: 'sub_ended_history_test' })
+      );
+      expect(result.entries).toHaveLength(1);
+      const entry = result.entries[0];
+      if (!entry) throw new Error('Expected at least one billing history entry');
+      expect(entry.kind).toBe('stripe');
+      if (entry.kind !== 'stripe') throw new Error('Expected stripe entry');
+      expect(entry.id).toBe('in_canceled_1');
+      expect(entry.amountCents).toBe(4900);
+      expect(entry.currency).toBe('usd');
+      expect(entry.status).toBe('paid');
+      expect(result.hasMore).toBe(false);
+      expect(result.cursor).toBeNull();
+    });
   });
 
   describe('getCreditHistory', () => {
@@ -4590,6 +4639,32 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getCreditHistory({});
 
+      expect(result.entries.length).toBeGreaterThanOrEqual(1);
+      const entry = result.entries[0];
+      if (!entry) throw new Error('Expected at least one credit history entry');
+      expect(entry.kind).toBe('base');
+      expect(entry.amountUsd).toBe(10);
+    });
+
+    it('returns issuance items for a canceled pass', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-credit-history-canceled@example.com',
+      });
+
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_ended_history_test',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+      });
+
+      await insertBaseCreditsIssuance({ subscriptionId, kiloUserId: user.id });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCreditHistory({});
+
+      // A lapsed pass keeps the credits it issued, so the ledger still answers.
       expect(result.entries.length).toBeGreaterThanOrEqual(1);
       const entry = result.entries[0];
       if (!entry) throw new Error('Expected at least one credit history entry');

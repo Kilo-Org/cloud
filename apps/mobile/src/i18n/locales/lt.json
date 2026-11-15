@@ -1003,8 +1003,8 @@
       "emptyLine": "(tuščia)",
       "truncationBanner_one": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}",
       "truncationBanner_other": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}",
-      "truncationBanner_few": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
-      "truncationBanner_many": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}."
+      "truncationBanner_few": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}",
+      "truncationBanner_many": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}"
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia",
     "linkPasteDenied": "Prieiga prie įdėjimo buvo atmesta. Leiskite įdėti ir bandykite dar kartą.",
@@ -2378,8 +2378,8 @@
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas",
       "updatedFileCount": "Atnaujinta {{displayCount}} failų",
       "updatedFileCount_other": "Atnaujinta {{displayCount}} failų",
-      "updatedFileCount_few": "Atnaujinti {{displayCount}} failai.",
-      "updatedFileCount_many": "Atnaujinta {{displayCount}} failo."
+      "updatedFileCount_few": "Atnaujinti {{displayCount}} failai",
+      "updatedFileCount_many": "Atnaujinta {{displayCount}} failo"
     },
     "toolCard": {
       "accessibility": "Įrankis „{{label}}“, {{status}}",
@@ -2801,8 +2801,8 @@
       "onlyAddingFiles": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
       "maxFilesAllowed_one": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
       "maxFilesAllowed_other": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
-      "maxFilesAllowed_few": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
-      "maxFilesAllowed_many": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed_few": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
+      "maxFilesAllowed_many": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
       "onlyAddingFiles_one": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
       "onlyAddingFiles_other": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
       "onlyAddingFiles_few": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",

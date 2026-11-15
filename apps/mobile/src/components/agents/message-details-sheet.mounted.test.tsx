@@ -209,6 +209,14 @@ function press(instance: TestRenderer.ReactTestInstance | undefined): void {
   onPress();
 }
 
+/** The mounted sheet headers' titles, narrowed at the untyped props boundary. */
+function headerTitles(renderer: TestRenderer.ReactTestRenderer): (string | undefined)[] {
+  return renderer.root.findAll(node => node.type === SheetHeader).map(node => {
+    const title: unknown = node.props.title;
+    return typeof title === 'string' ? title : undefined;
+  });
+}
+
 async function mountSheet(
   message: StoredMessage | null,
   overrides: SheetOverrides = {}
@@ -688,6 +696,33 @@ describe('MessageDetailsSheet mounted', () => {
         .map(node => node.props.title as string | undefined);
     expect(sheetHeaderTitles()).toContain('Message details');
     expect(sheetHeaderTitles()).not.toContain('Select text');
+
+    await unmount(renderer);
+  });
+
+  it('opens on Details again after its parent hides and reopens the sheet in the Select text view', async () => {
+    const message = storedMessage(userInfo(), [textPart('selectable body')]);
+    const renderer = await mountSheet(message);
+
+    await act(async () => {
+      await Promise.resolve();
+      press(findByTestID(renderer.root, 'message-details-select-text')[0]);
+    });
+    expect(headerTitles(renderer)).toContain('Select text');
+
+    // The session owns `visible` and hides the sheet without unmounting it, so
+    // the Select text view must not survive the hide and greet the reopen.
+    await act(async () => {
+      renderer.update(sheetElement(message, { visible: false }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      renderer.update(sheetElement(message));
+      await Promise.resolve();
+    });
+
+    expect(headerTitles(renderer)).toContain('Message details');
+    expect(headerTitles(renderer)).not.toContain('Select text');
 
     await unmount(renderer);
   });

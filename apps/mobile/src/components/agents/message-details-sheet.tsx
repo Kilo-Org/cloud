@@ -1,5 +1,5 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
@@ -60,6 +60,13 @@ export function MessageDetailsSheet({
   const { confirm, dialog } = useConfirmDialog();
   const { showReport, handleReport } = useMessageReport(message, confirm);
   const [selectVisible, setSelectVisible] = useState(false);
+  // The session hides the sheet without unmounting it, so a reopen must start
+  // from Details rather than the Select text view left open last time.
+  useEffect(() => {
+    if (!visible) {
+      setSelectVisible(false);
+    }
+  }, [visible]);
   const content = useMemo(
     () => (message ? getMessageDetailsContent(message, modelOptions, deliveryState) : null),
     // `getLanguageSnapshot()` re-resolves the captured copy (role labels,

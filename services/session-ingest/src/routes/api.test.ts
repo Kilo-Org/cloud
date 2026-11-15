@@ -3358,10 +3358,12 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { share_token: string };
+    const body = (await res.json()) as { share_token: string; public_id: string };
     expect(body).toMatchObject({ success: true });
     expect(body).toHaveProperty('share_token', expect.any(String));
-    expect(body).not.toHaveProperty('public_id');
+    /* The capability it wrote, so the app can tell its own link from one a later
+       rotation made. */
+    expect(body.public_id).toBe(sharedPublicId);
     expect(sharedPublicId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
@@ -3472,7 +3474,7 @@ describe('api routes', () => {
     const json: unknown = await res.json();
     expect(json).toMatchObject({ success: true });
     expect(json).toHaveProperty('share_token', expect.any(String));
-    expect(json).not.toHaveProperty('public_id');
+    expect(json).toHaveProperty('public_id', expect.any(String));
     expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
     expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(
       expect.stringMatching(

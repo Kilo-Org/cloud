@@ -13,6 +13,7 @@ import {
   type KiloPassCreditHistory,
 } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
+import { trpcErrorVariant } from '@/lib/trpc-error';
 import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function HistorySection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
@@ -62,9 +63,22 @@ function SectionPending({ children }: Readonly<{ children: ReactNode }>) {
  * A failed later page keeps the rows the list already has and says more could
  * not be loaded; a failed first page has nothing on screen and says so, rather
  * than claiming more could not be loaded when nothing loaded at all.
+ *
+ * A server that refused permanently gets the reason alone: offering Retry
+ * there would promise an action that cannot succeed.
  */
-function SectionError({ message, onRetry }: Readonly<{ message: string; onRetry: () => void }>) {
+function SectionError({
+  message,
+  onRetry,
+}: Readonly<{ message: string; onRetry?: (() => void) | undefined }>) {
   const { t } = useTranslation();
+  if (!onRetry) {
+    return (
+      <View className="flex-row items-center gap-2">
+        <Text className="text-sm text-muted-foreground">{message}</Text>
+      </View>
+    );
+  }
   return (
     <Pressable
       className="flex-row items-center gap-2 active:opacity-70"
@@ -76,6 +90,12 @@ function SectionError({ message, onRetry }: Readonly<{ message: string; onRetry:
       <Text className="text-sm text-primary">{t('common.retry')}</Text>
     </Pressable>
   );
+}
+
+/** Whether asking the server again cannot change this failure. */
+function isPermanentFailure(error: unknown): boolean {
+  const variant = trpcErrorVariant(error);
+  return variant === 'permission' || variant === 'not-found';
 }
 
 function CreditHistoryLine({ entry }: Readonly<{ entry: KiloPassCreditEntry }>) {
@@ -109,6 +129,7 @@ export function KiloPassCreditHistorySection({
   const { t } = useTranslation();
   const { query, entries, hasMore } = history;
   const firstPageFailed = query.isError && entries.length === 0;
+  const permanent = isPermanentFailure(query.error);
 
   let body: ReactNode = null;
   if (query.isPending) {
@@ -122,9 +143,13 @@ export function KiloPassCreditHistorySection({
     body = (
       <SectionError
         message={t('common.couldnTLoad')}
-        onRetry={() => {
-          query.refetch();
-        }}
+        onRetry={
+          permanent
+            ? undefined
+            : () => {
+                query.refetch();
+              }
+        }
       />
     );
   } else if (entries.length === 0) {
@@ -156,9 +181,13 @@ export function KiloPassCreditHistorySection({
       {query.isFetchNextPageError && (
         <SectionError
           message={t('common.couldnTLoadMore')}
-          onRetry={() => {
-            query.fetchNextPage();
-          }}
+          onRetry={
+            permanent
+              ? undefined
+              : () => {
+                  query.fetchNextPage();
+                }
+          }
         />
       )}
     </HistorySection>
@@ -172,6 +201,7 @@ export function KiloPassBillingHistorySection({
   const { t } = useTranslation();
   const { query, entries, hasMore } = history;
   const firstPageFailed = query.isError && entries.length === 0;
+  const permanent = isPermanentFailure(query.error);
 
   let body: ReactNode = null;
   if (query.isPending) {
@@ -185,9 +215,13 @@ export function KiloPassBillingHistorySection({
     body = (
       <SectionError
         message={t('common.couldnTLoad')}
-        onRetry={() => {
-          query.refetch();
-        }}
+        onRetry={
+          permanent
+            ? undefined
+            : () => {
+                query.refetch();
+              }
+        }
       />
     );
   } else if (entries.length === 0) {
@@ -219,9 +253,13 @@ export function KiloPassBillingHistorySection({
       {query.isFetchNextPageError && (
         <SectionError
           message={t('common.couldnTLoadMore')}
-          onRetry={() => {
-            query.fetchNextPage();
-          }}
+          onRetry={
+            permanent
+              ? undefined
+              : () => {
+                  query.fetchNextPage();
+                }
+          }
         />
       )}
     </HistorySection>

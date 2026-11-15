@@ -3122,7 +3122,7 @@
   "voiceInput": {
     "listening": "Klausomasi...",
     "onlineTitle": "Kalba apdorojama internetu",
-    "onlineMessage": "Šis įrenginys negali paversti kalbos tekstu be interneto ryšio. Tavo įrašas perduodamas paslaugų teikėjui {{provider}}, kad būtų paverstas tekstu. Kilo garso įrašo nesaugo.",
+    "onlineMessage": "Šis įrenginys negali paversti kalbą tekstu be interneto ryšio. Tavo įrašas perduodamas paslaugų teikėjui {{provider}}, kad būtų paverstas tekstu. Kilo garso įrašo nesaugo.",
     "allow": "Leisti",
     "start": "Pradėti balso įvestį",
     "stop": "Sustabdyti balso įvestį",
@@ -3135,7 +3135,7 @@
     "busy": "Balso įvestis užimta. Bandyk dar kartą.",
     "stopped": "Balso įvestis sustabdyta. Bakstelėk mikrofoną ir bandyk dar kartą.",
     "unavailableDevice": "Balso įvestis šiame įrenginyje nepasiekiama.",
-    "unavailableLanguage": "Balso įvestis nepalaiko pasirinktos įrenginio kalbos.",
+    "unavailableLanguage": "Balso įvestis nepalaiko šios įrenginio kalbos. Įdiek jos neprisijungus veikiančius kalbos failus arba naudok kitą programėlės kalbą.",
     "languageNotInstalledTitle": "Balso įvestis {{language}} kalbai dar neparengta",
     "languageNotInstalledMessage": "Neįdiegti {{language}} kalbai skirti neprisijungus veikiantys kalbos failai, o transkripcija internetu išjungta. Atsisiųsk šiuos failus arba vėl įjunk transkripciją internetu, kad veiktų balso įvedimas.",
     "downloadOfflineModel": "Atsisiųsti",
@@ -3143,14 +3143,14 @@
     "offlineModelDownloadScheduled": "Neprisijungus veikiantys kalbos failai bus atsisiunčiami fone. Pabandyk balso įvestį vėliau.",
     "listeningStopped": "Klausymasis sustabdytas.",
     "transcribing": "Transkribuojama...",
-    "gatewayUnreachable": "Nepavyko pasiekti Kilo Gateway. Patikrinkite ryšį ir bandykite dar kartą.",
+    "gatewayUnreachable": "Nepavyko pasiekti Kilo Gateway. Patikrink ryšį ir bandyk dar kartą.",
     "gatewayTimeout": "Transkribavimas užtruko per ilgai. Bandyk dar kartą.",
-    "gatewayModelUnavailable": "Šis transkribavimo modelis nepasiekiamas. Pasirinkite kitą Nuostatose.",
-    "gatewayModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(transcriptionModel.title), kad pasirinktumėte kitą.",
-    "gatewaySignInRequired": "Prisijunkite, kad naudotumėte transkribavimą per Kilo Gateway.",
-    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose.",
+    "gatewayModelUnavailable": "Šis transkribavimo modelis nepasiekiamas. Pasirink kitą Nuostatose.",
+    "gatewayModelUnavailableNotice": "Šis modelis nebeteikiamas. Paliesk $t(transcriptionModel.title), kad pasirinktum kitą.",
+    "gatewaySignInRequired": "Prisijunk, kad naudotum transkribavimą per Kilo Gateway.",
+    "gatewayNoModel": "Pirmiausia pasirink transkribavimo modelį Nuostatose.",
     "testTitle": "Išbandyti balso įvestį",
-    "testPlaceholder": "Bakstelėkite mikrofoną ir pradėkite kalbėti.",
+    "testPlaceholder": "Bakstelėk mikrofoną ir pradėk kalbėti.",
     "testClear": "Išvalyti tekstą"
   },
   "share": {
@@ -3654,7 +3654,7 @@
     "title": "Patikimos svetainės",
     "subtitle": "Svetainės, kurias leidžiate atidaryti be patvirtinimo",
     "emptyTitle": "Patikimų svetainių nėra",
-    "emptyDescription": "Pažymėjus svetainę kaip patikimą, jos nuorodos atidaromos neprašant patvirtinimo.",
+    "emptyDescription": "Pažymėjus svetainės nuorodą arba paveikslėlių svetainę kaip patikimą, ji atidaroma neprašant dar kartą.",
     "imagesSectionTitle": "Patikimos paveikslėlių svetainės",
     "imagesSectionDescription": "Šių svetainių paveikslėliai įkeliami neprašant dar kartą.",
     "imagesSectionEmpty": "Patikimų paveikslėlių svetainių nėra",
@@ -4420,8 +4420,8 @@
       "archived_other": "Archyvuota ({{count}})",
       "archive": "Archyvuoti",
       "unarchive": "Išarchyvuoti",
-      "deleteTitle": "Ištrinti {{name}}?",
-      "deleteMessage": "Jos užduotys taip pat ištrinamos. Jų sesijos lieka.",
+      "deleteTitle": "Ištrinti sąrašą „{{name}}“?",
+      "deleteMessage": "Šio sąrašo užduotys taip pat ištrinamos. Jų sesijos lieka.",
       "createFailed": "Sąrašo sukurti nepavyko"
     },
     "listSettings": {
@@ -4495,7 +4495,7 @@
     },
     "saveSheet": {
       "title": "Išsaugoti į sąrašą",
-      "saved": "Išsaugota į {{list}}"
+      "saved": "Išsaugota sąraše „{{list}}“"
     }
   },
   "agentBriefing": {

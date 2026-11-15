@@ -350,9 +350,7 @@ describe('the Approve presence gate', () => {
     expect(GATE).toMatch(
       /if \(Build\.VERSION\.SDK_INT >= 31\) \{\s+builder\.setAuthenticationRequired\(true\)/
     );
-    expect(MODULE).toContain(
-      'ApprovalGate.action(context, CardStyle.icon(context), it, approvePendingIntent())'
-    );
+    expect(MODULE).toContain('ApprovalGate.action(context, icon, it, approvePendingIntent())');
     expect(NOTIFICATIONS).toContain(
       'ApprovalGate.action(context, icon, label, approveIntent(context, card))'
     );

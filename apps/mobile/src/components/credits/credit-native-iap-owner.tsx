@@ -32,6 +32,7 @@ import {
 import {
   admitCreditPurchaseIntent,
   type CreditPurchaseIntent,
+  consumeForeignCreditPurchaseIntentDrop,
   currentCreditPurchaseIntent,
   currentCreditPurchaseIntentFor,
   identifyCreditPurchaseTransaction,
@@ -276,16 +277,8 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     setPurchaseResolution(resolution);
     setHasUnresolvedPurchase(true);
   }, []);
-  // A remounted screen must show the barrier its process already holds: the
-  // intent outlives the screen, so the notice and any wait start from it.
-  useEffect(() => {
-    const intent = currentCreditPurchaseIntentFor(appAccountToken);
-    if (intent === null) {
-      return;
-    }
-    markUnresolvedPurchase('unknown');
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: the token that arrives later is answered by the effect below
-  }, [markUnresolvedPurchase]);
+  const purchaseResolutionRef = useRef<CreditPurchaseResolution>('unknown');
+  purchaseResolutionRef.current = purchaseResolution;
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   // The transaction each delivery is being completed for, and that completion's
   // result: a second caller for the same transaction shares it, while a recovery
@@ -1327,21 +1320,29 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // receipt must never be posted under the wrong account's token. An empty
   // token is the catalogue still answering, not another account, so a
   // transition from or to it keeps the barrier.
+  // This effect also runs on mount, so a remounted screen shows the barrier its
+  // process already holds: the intent outlives the screen, and an account token
+  // that has not arrived says nothing to contradict it. A resolution the screen
+  // already knows (`found`, `credited`, `not-found`) is never reset to `unknown`
+  // by a later token answer.
   useEffect(() => {
-    if (appAccountToken === '') {
-      // The catalogue has not named an account yet: that is no verdict, and it
-      // must not erase the token the barrier belongs to.
+    const inherited =
+      appAccountToken === ''
+        ? currentCreditPurchaseIntent()
+        : currentCreditPurchaseIntentFor(appAccountToken);
+    if (inherited !== null) {
+      markUnresolvedPurchase(purchaseResolutionRef.current);
       return;
     }
-    // The helper drops a record another account admitted, whatever the token
-    // read before it, so an arriving token cannot inherit a foreign barrier.
-    if (currentCreditPurchaseIntentFor(appAccountToken) !== null) {
+    if (!consumeForeignCreditPurchaseIntentDrop()) {
+      // Nothing was dropped: a pool the store still holds must not be
+      // forgotten here.
       return;
     }
     clearCreditPurchaseDispatches();
     pendingPurchaseRef.current = null;
     clearBlockedPurchase();
-  }, [appAccountToken, clearBlockedPurchase]);
+  }, [appAccountToken, clearBlockedPurchase, markUnresolvedPurchase]);
 
   // A store that comes back holds no request it dropped: the pool a reconnect
   // reopens starts empty, so no earlier missing answer may mark a new one

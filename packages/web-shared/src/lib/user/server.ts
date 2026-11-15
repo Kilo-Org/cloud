@@ -354,13 +354,21 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   return result;
 }
 
-export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {
-  const headersList = await headers();
-  if (headersList.has('authorization')) {
+/**
+ * Reads the browser session only. A request that presents a credential is
+ * refused, never downgraded to its session, because these callers mint or
+ * exchange credentials and must not do so for a bearer caller.
+ */
+async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthResponse> {
+  if ((await headers()).has('authorization')) {
     return authError(401, 'Unauthorized', '?');
   }
 
-  return resolveUserFromSession({ adminOnly: false }, db);
+  return resolveUserFromSession(opts, db);
+}
+
+export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {
+  return resolveSessionOnly({ adminOnly: false });
 }
 
 /**
@@ -369,33 +377,20 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
  * caller still enforces the route's Origin check before trusting the session.
  */
 export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
-  const headersList = await headers();
-  if (headersList.has('authorization')) {
-    return authError(401, 'Unauthorized', '?');
-  }
-
-  return resolveUserFromSession({ adminOnly: true }, db);
+  return resolveSessionOnly({ adminOnly: true });
 }
 
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   loggedOutRedirectUrl = '/users/sign_in'
 ): Promise<User> {
-  const headersList = await headers();
-  if (headersList.has('authorization')) {
+  if ((await headers()).has('authorization')) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
 
-  const { user } = await resolveUserFromSession(
-    { adminOnly: false, DANGEROUS_allowBlockedUsers: true },
-    db
+  return userOrRedirect(
+    await resolveUserFromSession({ adminOnly: false, DANGEROUS_allowBlockedUsers: true }, db),
+    loggedOutRedirectUrl
   );
-  if (!user) {
-    redirect(await appendCallbackPath(loggedOutRedirectUrl));
-  }
-  if (isBlockedAccount(user)) {
-    redirect('/account-blocked');
-  }
-  return user;
 }
 
 export async function getUserFromBearerForCredentialExchange(
@@ -596,17 +591,28 @@ async function resolveUserFromSession(
   });
 }
 
+/**
+ * Returns the resolved user, or redirects a request that has none to the
+ * callback-aware sign-in URL, or a blocked account to the blocked-account
+ * page. This is the one place that answers both redirect cases.
+ */
+async function userOrRedirect(auth: GetAuthResponse, loggedOutRedirectUrl: string): Promise<User> {
+  if (!auth.user) {
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
+  }
+  if (isBlockedAccount(auth.user)) {
+    redirect('/account-blocked');
+  }
+  return auth.user;
+}
+
 export async function getUserFromAuthOrRedirect(
   loggedOutRedirectUrl = '/users/sign_in'
 ): Promise<User> {
-  const { user } = await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true });
-  if (!user) {
-    redirect(await appendCallbackPath(loggedOutRedirectUrl));
-  }
-  if (isBlockedAccount(user)) {
-    redirect('/account-blocked');
-  }
-  return user;
+  return userOrRedirect(
+    await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true }),
+    loggedOutRedirectUrl
+  );
 }
 
 export async function signInUrlWithCallbackPath(): Promise<string> {

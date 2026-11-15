@@ -399,10 +399,21 @@ export async function upstreamRequest({
     }
 
     // The request below dials the hop this process opens, so it connects to the
-    // addresses the policy checked. The secure-proxy `targetUrl` is a body field
-    // the relay dials itself, so only the policy check applies to it.
-    const dispatcher = urlPolicy
-      ? upstreamDispatcherFor(urlPolicy.allowed[0].hostname, urlPolicy.allowed[0].addresses)
+    // addresses the policy checked for that exact URL. The secure-proxy
+    // `targetUrl` is a body field the relay dials itself, so only the policy
+    // check applies to it.
+    const dialedHop = urlPolicy?.allowed.find(entry => entry.url === outgoing.url);
+    if (urlPolicy && !dialedHop) {
+      // The policy checks every URL it is given, and `outgoing.url` is one of
+      // them; an allowed list without it sends nothing.
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return {
+        type: 'error',
+        response: upstreamFetchFailureResponse('unknown', vercelRequestId, reasoningEffort),
+      };
+    }
+    const dispatcher = dialedHop
+      ? upstreamDispatcherFor(dialedHop.hostname, dialedHop.addresses)
       : undefined;
 
     const requestOptions: RequestInit & { duplex: 'half'; dispatcher?: Dispatcher } = {

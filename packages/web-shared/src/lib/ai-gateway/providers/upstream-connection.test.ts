@@ -1,4 +1,7 @@
 import { Agent, fetch as undiciFetch } from 'undici';
+import type { Dispatcher } from 'undici';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { LookupOptions } from 'node:dns';
 import {
   clearUpstreamConnectionCache,
@@ -183,5 +186,47 @@ describe('pinned connections and fetch', () => {
     expect(error).toBeInstanceOf(TypeError);
     expect(causeOf(error)).toBeInstanceOf(UpstreamAddressUnverifiedError);
     expect(causeOf(error)).toMatchObject({ code: 'ERR_UPSTREAM_ADDRESS_UNVERIFIED' });
+  });
+
+  it('makes the runtime fetch dial the address the dispatcher lookup answers', async () => {
+    const receivedHosts: string[] = [];
+    const lookedUpHostnames: string[] = [];
+    const server = createServer((request, response) => {
+      receivedHosts.push(request.headers.host ?? '');
+      response.writeHead(200, { 'content-type': 'text/plain' });
+      response.end('pinned');
+    });
+    const listening = Promise.withResolvers<void>();
+    server.listen(0, '127.0.0.1', listening.resolve);
+    await listening.promise;
+    const { port } = server.address() as AddressInfo;
+
+    const dispatcher = new Agent({
+      connect: {
+        lookup: (hostname, options, callback) => {
+          lookedUpHostnames.push(hostname);
+          if (options.all === true) {
+            callback(null, [{ address: '127.0.0.1', family: 4 }]);
+            return;
+          }
+          callback(null, '127.0.0.1', 4);
+        },
+      },
+    });
+
+    try {
+      const init: RequestInit & { dispatcher: Dispatcher } = { dispatcher };
+      const response = await globalThis.fetch(`http://pinned-guard.test:${port}/`, init);
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('pinned');
+      expect(receivedHosts).toEqual([`pinned-guard.test:${port}`]);
+      expect(lookedUpHostnames).toContain('pinned-guard.test');
+    } finally {
+      await dispatcher.close();
+      const closed = Promise.withResolvers<void>();
+      server.close(() => closed.resolve());
+      await closed.promise;
+    }
   });
 });

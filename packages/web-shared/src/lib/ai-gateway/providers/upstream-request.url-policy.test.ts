@@ -137,6 +137,29 @@ describe('upstreamRequest upstream URL policy', () => {
       expect(dispatcher).toBe(upstreamDispatcherFor('llm.example.com', ['104.18.2.115']));
     });
 
+    it('pins the proxy host for a secure proxy request', async () => {
+      lookupMock.mockImplementation(async hostname => [
+        {
+          address: hostname.startsWith('proxy.') ? '104.18.2.115' : '104.18.3.116',
+          family: 4,
+        },
+      ]);
+      const fetchMock = mockFetch();
+
+      await send(
+        secureProxyProvider('https://proxy.example.com/api', 'https://llm.example.com/v1')
+      );
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://proxy.example.com/api');
+      const dispatcher = (init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)
+        ?.dispatcher;
+      // The request dials the proxy; the relayed upstream URL travels in the
+      // body.
+      expect(dispatcher).toBe(upstreamDispatcherFor('proxy.example.com', ['104.18.2.115']));
+      expect(dispatcher).not.toBe(upstreamDispatcherFor('llm.example.com', ['104.18.3.116']));
+    });
+
     it('keeps the first checked address when a second resolution would answer another', async () => {
       lookupMock
         .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])

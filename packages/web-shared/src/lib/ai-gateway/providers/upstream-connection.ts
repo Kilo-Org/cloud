@@ -6,6 +6,14 @@
  * pin, and hands it to undici as the `lookup` of the connection, so a connection
  * dials an address the policy approved and checks it again as it opens. The
  * lookup never resolves a name.
+ *
+ * The gateway's `fetch` is the Node global built on undici, and Next's server
+ * fetch patch rebuilds the init by spreading the fields it did not consume, so
+ * a `dispatcher` reaches undici. Verified on Node v24.22.2 with `undici@7.30.1`:
+ * a `Dispatcher` from that version passed as `dispatcher` makes the global
+ * `fetch` connect through it, and the requested name stays the `Host`.
+ * `upstream-connection.test.ts` checks that pairing on the runtime the gateway
+ * ships.
  */
 import type { LookupFunction } from 'node:net';
 import { Agent } from 'undici';
@@ -91,7 +99,7 @@ export function upstreamDispatcherFor(hostname: string, addresses: readonly stri
     if (oldest.done) break;
     const evicted = upstreamDispatchers.get(oldest.value);
     upstreamDispatchers.delete(oldest.value);
-    void evicted?.close();
+    void evicted?.close().catch(() => {});
   }
   return agent;
 }
@@ -136,7 +144,7 @@ export const lookupPinnedUpstreamAddress: LookupFunction = (hostname, options, c
 
 /** Test hook. Closes every pool and forgets every pin. */
 export function clearUpstreamConnectionCache(): void {
-  for (const dispatcher of upstreamDispatchers.values()) void dispatcher.close();
+  for (const dispatcher of upstreamDispatchers.values()) void dispatcher.close().catch(() => {});
   upstreamDispatchers.clear();
   pinnedAddresses.clear();
 }

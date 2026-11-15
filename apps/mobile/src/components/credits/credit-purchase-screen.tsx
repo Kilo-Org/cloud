@@ -38,7 +38,8 @@ import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import { useCreditNativeIap } from './credit-native-iap-owner';
+import { type CreditPurchaseWait, useCreditNativeIap } from './credit-native-iap-owner';
+import { CreditUnresolvedPurchaseNotice } from './credit-unresolved-purchase-notice';
 import { CreditExpiryNote } from './credit-expiry-note';
 
 /**
@@ -98,6 +99,12 @@ function expiryCaptionFloor(fontScale: number): number {
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
 
+/** The row and the pending card say the same thing about a waiting request. */
+const WAIT_COPY_KEYS = {
+  store: 'credits.waitingForStore',
+  pending: 'credits.purchasePending',
+} as const satisfies Record<CreditPurchaseWait['kind'], string>;
+
 /**
  * The pack-height constants, at the default font scale.
  *
@@ -148,6 +155,12 @@ export function CreditPurchaseScreen() {
     purchase,
     reconnectStore,
     completingProductId,
+    purchaseWait,
+    reconcilePurchase,
+    buyAgain,
+    buyAgainProductId,
+    hasUnresolvedPurchase,
+    purchaseResolution,
     errorMessageKey: purchaseErrorMessageKey,
     completedPurchaseCount,
     clearError,
@@ -202,6 +215,7 @@ export function CreditPurchaseScreen() {
   }, [completedPurchaseCount, refetchBalance, t]);
 
   const purchasing = completingProductId !== null;
+  const waitCopy = purchaseWait ? t(WAIT_COPY_KEYS[purchaseWait.kind]) : null;
   // Only a catalog the backend answered as empty is the empty state: a store
   // query that is pending, paused or failed must not hide the packs the backend
   // catalog named.
@@ -222,6 +236,43 @@ export function CreditPurchaseScreen() {
   // the two lines.
   const storeUnavailableCopy = getStoreUnavailableCopyKeys(storefront);
   const storeBannerBodyKey = productsErrorMessageKey ?? storeUnavailableCopy.bodyKey;
+
+  // The consent target is the pack the owner selected from the current
+  // catalog, never the earlier request's own id: a retired SKU has no row to
+  // name and no price to show, while the replacement the person picked is the
+  // exact charge a second tap would start.
+  const buyAgainTarget =
+    buyAgainProductId === null
+      ? null
+      : (products.find(pack => pack.storeProductId === buyAgainProductId) ?? null);
+  // Buy again names one exact charge only once the store priced that pack.
+  const buyAgainAvailable = buyAgainTarget !== null && buyAgainTarget.displayPrice !== null;
+  // The card's retry is a store query and its consent is a row tap: neither
+  // needs the store connection the rows do, so only a purchase in flight
+  // disables them.
+  const statusActionsDisabled = purchasing;
+
+  // One label source for the row and the card: the pack amount reads the same
+  // on both, so consent names the same pack the list sells.
+  const formatPackLabel = (pack: StoreCreditProduct) =>
+    t('credits.packLabel', {
+      amount: isolateLtrBidiText(formatPrefixedMoney(pack.backend.amountUsd, i18n.language)),
+    });
+
+  const handleReconcilePress = () => {
+    selectionHaptic();
+    clearError();
+    void reconcilePurchase();
+  };
+
+  const handleBuyAgainPress = () => {
+    if (buyAgainTarget === null) {
+      return;
+    }
+    selectionHaptic();
+    clearError();
+    void buyAgain(buyAgainTarget);
+  };
 
   const handlePackPress = (pack: StoreCreditProduct) => {
     selectionHaptic();
@@ -401,7 +452,7 @@ export function CreditPurchaseScreen() {
               </View>
             )}
 
-            {packsEmpty && (
+            {packsEmpty && !hasUnresolvedPurchase && (
               <View className="rounded-xl border border-border bg-card p-5">
                 <Text className="text-sm text-muted-foreground">{t('credits.empty')}</Text>
               </View>
@@ -449,7 +500,13 @@ export function CreditPurchaseScreen() {
                 // The row's state copy takes its one fixed-height line under the
                 // title, in place of the expiry note, and keeps the full row
                 // width instead of squeezing the title.
-                const completingLabel = rowCompleting ? t('kiloPass.completingPurchase') : null;
+                const rowWaiting = purchaseWait?.productId === pack.storeProductId;
+                let completingLabel: string | null = null;
+                if (rowWaiting) {
+                  completingLabel = waitCopy;
+                } else if (rowCompleting) {
+                  completingLabel = t('kiloPass.completingPurchase');
+                }
                 // A status phrase takes the same line, so the title keeps one
                 // line at the compact width and the row keeps the height of its
                 // priced neighbours. The store-unavailable card above already
@@ -527,6 +584,39 @@ export function CreditPurchaseScreen() {
                   </Pressable>
                 );
               })}
+          </View>
+
+          {/* The purchase state is its own slot after the pack rows: a request
+              the store has not answered yet, or the barrier an unresolved charge
+              leaves. It sits below the rows so its arrival, change or removal
+              never moves one, and the footer copy stays pinned outside the
+              scroller. */}
+          <View className="gap-3">
+            {hasUnresolvedPurchase ? (
+              <CreditUnresolvedPurchaseNotice
+                actionsDisabled={statusActionsDisabled}
+                buyAgainAvailable={buyAgainAvailable}
+                onBuyAgain={handleBuyAgainPress}
+                onReconcile={handleReconcilePress}
+                packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
+                priceLabel={
+                  buyAgainTarget !== null
+                    ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
+                    : null
+                }
+                resolution={purchaseResolution}
+                waitCopy={waitCopy}
+              />
+            ) : (
+              waitCopy !== null && (
+                <View
+                  className="rounded-xl border border-border bg-card p-5"
+                  testID="credit-purchase-wait-card"
+                >
+                  <AccessibleStatus className="text-sm" message={waitCopy} />
+                </View>
+              )
+            )}
           </View>
 
           {/* The room the floating purchase error needs at the end of the

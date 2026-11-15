@@ -52,7 +52,7 @@
     "required": "privaloma",
     "error": "klaida: {{error}}",
     "back": "Atgal",
-    "somethingWentWrong": "Įvyko klaida.",
+    "somethingWentWrong": "Įvyko klaida",
     "actionNotRecorded": "Nepavyko užfiksuoti šio veiksmo. Bandyk dar kartą vėliau.",
     "couldNotOpen": "Nepavyko atidaryti: {{label}}",
     "link": "nuoroda",

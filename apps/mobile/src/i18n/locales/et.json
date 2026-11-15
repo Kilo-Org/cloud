@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play ei tagastanud ühtegi sobivat krediidipaketti.",
     "storeTimedOut": "App Store ei vastanud õigeaegselt. Proovi uuesti.",
     "storeTimedOutPlay": "Google Play ei vastanud õigeaegselt. Proovi uuesti.",
+    "unresolvedPurchase": "Sinu varasem ost võib veel lõpule jõuda ja selle krediit sinu saldole lisanduda. Uuesti ostes alustad eraldi ostu ja sinult võidakse uuesti tasu võtta.",
+    "buyAgain": "Osta uuesti",
     "purchaseOwnedByAnotherAccount": "Selle Apple Accountiga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellele Kilo kontole.",
     "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellele Kilo kontole."
   },

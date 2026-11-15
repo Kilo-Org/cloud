@@ -32,6 +32,13 @@ const owner = vi.hoisted(() => ({
   errorMessageKey: null as string | null,
   completedPurchaseCount: 0,
   clearError: vi.fn(),
+  // The owner's money-path exits. The mock supplies them untyped-from-the-screen:
+  // the screen reads them off the same context value every other field comes
+  // from, and the fakes prove which callback a tap reaches, never a store call.
+  unresolvedProductId: null as string | null,
+  buyAgainProductId: null as string | null,
+  reconcilePurchase: vi.fn(),
+  buyAgain: vi.fn(),
 }));
 
 const balance = vi.hoisted(() => ({ balance: 1234 }));
@@ -156,6 +163,12 @@ const STORE_LISTINGS = [
 
 const PACK_ROW_SHELL = 'rounded-xl border border-border bg-card p-5';
 
+// The exact consent copy: a person must be told the earlier charge may still
+// complete before the screen offers a second one.
+const UNRESOLVED_PURCHASE_WARNING =
+  'Your earlier purchase may still complete and add its credits. Buying again starts another purchase and may charge you again.';
+const BUY_AGAIN_LABEL = 'Buy again';
+
 function placeholderShells(
   renderer: TestRenderer.ReactTestRenderer
 ): TestRenderer.ReactTestInstance[] {
@@ -189,7 +202,7 @@ function packRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactT
   );
 }
 
-function allText(renderer: TestRenderer.ReactTestRenderer): string {
+function textWithin(root: TestRenderer.ReactTestInstance): string {
   const texts: string[] = [];
   const walk = (instance: TestRenderer.ReactTestInstance): void => {
     for (const child of instance.children) {
@@ -202,8 +215,12 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
       }
     }
   };
-  walk(renderer.root);
+  walk(root);
   return texts.join(' ');
+}
+
+function allText(renderer: TestRenderer.ReactTestRenderer): string {
+  return textWithin(renderer.root);
 }
 
 function tryAgainButton(
@@ -214,6 +231,33 @@ function tryAgainButton(
       String(node.type) === 'Button' &&
       (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Try again'
   )[0];
+}
+
+function testId(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): TestRenderer.ReactTestInstance | undefined {
+  return root.findAll(node => node.props.testID === testID)[0];
+}
+
+/** The live unresolved-purchase notice: its reserved twin is hidden from every reader. */
+function unresolvedNotice(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance {
+  const live = testId(renderer.root, 'credit-unresolved-purchase-live');
+  if (!live) {
+    throw new Error('expected the live unresolved-purchase notice');
+  }
+  return live;
+}
+
+/** The normal-flow twin that fixes the notice's height, laid out and hidden. */
+function reserveOf(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const reserve = testId(renderer.root, 'credit-unresolved-purchase-reserve');
+  if (!reserve) {
+    throw new Error('expected the reserved unresolved-purchase block');
+  }
+  return reserve;
 }
 
 /**
@@ -259,6 +303,10 @@ describe('CreditPurchaseScreen', () => {
     owner.completingProductId = null;
     owner.errorMessageKey = null;
     owner.completedPurchaseCount = 0;
+    owner.unresolvedProductId = null;
+    owner.buyAgainProductId = null;
+    owner.reconcilePurchase.mockResolvedValue(true);
+    owner.buyAgain.mockResolvedValue(true);
     balance.balance = 1234;
     creditBlocks.entries = [];
     hideBalancePref.hideBalance = false;
@@ -1035,6 +1083,116 @@ describe('CreditPurchaseScreen', () => {
       'https://example.com/privacy-app',
       { label: 'Privacy Policy' }
     );
+    unmount();
+  });
+
+  it('unresolved purchase: warns, then only Buy again charges after an empty reconciliation', async () => {
+    // The state an empty reconciliation leaves on either store: the earlier
+    // charge is still unresolved and the owner now offers the explicit retry.
+    owner.unresolvedProductId = 'credits.usd50.v1';
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
+
+    // The card is a reserved block with the live copy overlaid, so its height is
+    // final on the first frame and the retry adds no space when it appears.
+    const reserve = reserveOf(renderer);
+    expect(reserve.props.accessibilityElementsHidden).toBe(true);
+    expect(reserve.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(testId(renderer.root, 'credit-unresolved-purchase-slot')?.props.style).toBeUndefined();
+
+    // Consent names the exact target: the pack's credit amount and the price the
+    // store would charge for buying it again.
+    const live = unresolvedNotice(renderer);
+    expect(textWithin(live)).toContain(`Add ${packAmount('$50.00')} of credits`);
+    expect(textWithin(live)).toContain('$54.99');
+    expect(textWithin(live)).toContain('Try again');
+    expect(textWithin(live)).toContain(BUY_AGAIN_LABEL);
+
+    const buyAgain = testId(live, 'credit-unresolved-buy-again');
+    if (!buyAgain) {
+      throw new Error('expected a Buy again action');
+    }
+    expect(labelOf(buyAgain)).toContain(BUY_AGAIN_LABEL);
+    expect(labelOf(buyAgain)).toContain(packAmount('$50.00'));
+    expect(labelOf(buyAgain)).toContain('$54.99');
+
+    await act(async () => {
+      (buyAgain.props as { onPress?: () => void }).onPress?.();
+      await Promise.resolve();
+    });
+
+    // The explicit tap is the only thing that admits a new charge, and it reaches
+    // the owner's consented entry, never the ordinary pack purchase.
+    expect(owner.buyAgain).toHaveBeenCalledTimes(1);
+    expect(owner.buyAgain.mock.calls[0]?.[0]).toMatchObject({
+      storeProductId: 'credits.usd50.v1',
+    });
+    expect(owner.purchase).not.toHaveBeenCalled();
+    expect(owner.reconcilePurchase).not.toHaveBeenCalled();
+
+    const retry = testId(live, 'credit-unresolved-try-again');
+    if (!retry) {
+      throw new Error('expected a reconciliation action');
+    }
+    await act(async () => {
+      (retry.props as { onPress?: () => void }).onPress?.();
+      await Promise.resolve();
+    });
+
+    // Retry only asks the store what it still holds: no native request, no charge.
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    expect(owner.reconcilePurchase.mock.calls[0]?.[0]).toMatchObject({
+      storeProductId: 'credits.usd50.v1',
+    });
+    expect(owner.purchase).not.toHaveBeenCalled();
+    expect(owner.buyAgain).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('unresolved purchase: keeps a query-only retry and disables both actions in flight', async () => {
+    owner.unresolvedProductId = 'credits.usd10.v1';
+    owner.completingProductId = 'credits.usd10.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
+    const live = unresolvedNotice(renderer);
+    // Buy again exists only after the owner reconciled empty; without that
+    // consent its space stays reserved, so the card cannot move when it lands.
+    expect(testId(live, 'credit-unresolved-buy-again')).toBeUndefined();
+    expect(testId(reserveOf(renderer), 'credit-unresolved-buy-again')).toBeDefined();
+
+    const retry = testId(live, 'credit-unresolved-try-again');
+    if (!retry) {
+      throw new Error('expected a reconciliation action');
+    }
+    expect(retry.props.disabled).toBe(true);
+    expect(
+      (retry.props as { accessibilityState?: { disabled?: boolean } }).accessibilityState?.disabled
+    ).toBe(true);
+    unmount();
+  });
+
+  it('unresolved purchase: still warns when the store cannot price the pack', async () => {
+    owner.unresolvedProductId = 'credits.usd50.v1';
+    owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('App Store products unavailable'));
+
+    // The warning is about money already in flight, so a store that cannot name
+    // the pack must not hide it; only the actions that need that pack wait.
+    expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
+    const live = unresolvedNotice(renderer);
+    expect(testId(live, 'credit-unresolved-try-again')).toBeUndefined();
+    expect(testId(live, 'credit-unresolved-buy-again')).toBeUndefined();
+    expect(owner.reconcilePurchase).not.toHaveBeenCalled();
+    expect(owner.buyAgain).not.toHaveBeenCalled();
     unmount();
   });
 });

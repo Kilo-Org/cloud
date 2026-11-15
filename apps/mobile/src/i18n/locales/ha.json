@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
     "storeTimedOut": "App Store bai amsa a kan lokaci ba. Sake gwadawa.",
     "storeTimedOutPlay": "Google Play bai amsa a kan lokaci ba. Sake gwadawa.",
+    "unresolvedPurchase": "Har yanzu sayayyar da ka yi a baya na iya kammaluwa, a kuma ƙara kuɗin amfaninta a ma'auninka. Idan ka sake saya, za ka fara wata sayayya dabam kuma ana iya sake cajinka.",
+    "buyAgain": "Sake saya",
     "purchaseOwnedByAnotherAccount": "Kuɗin amfani da ke kan wannan Apple Account na wani asusun Kilo ne daban. Shiga wancan asusun Kilo don amfani da shi.",
     "purchaseOwnedByAnotherAccountPlay": "Kuɗin amfani da ke kan wannan Google Play account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don amfani da shi."
   },

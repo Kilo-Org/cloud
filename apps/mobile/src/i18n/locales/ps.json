@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
     "storeTimedOut": "App Store په وخت کې ځواب ورنه کړ. بیا هڅه وکړئ.",
     "storeTimedOutPlay": "Google Play په وخت کې ځواب ورنه کړ. بیا هڅه وکړئ.",
+    "unresolvedPurchase": "ستاسو پخوانی پېرود ښايي لا هم بشپړ شي او خپل کریډیټونه ستاسو توازن ته زیات کړي. بیا پېرل یو جلا پېرود پیلوي او ښايي له تاسو بیا پیسې واخیستل شي.",
+    "buyAgain": "بیا وپېرئ",
     "purchaseOwnedByAnotherAccount": "په دې Apple Account کې کریډیټونه د Kilo په بل حساب پورې اړه لري. د کارولو لپاره یې د Kilo هماغه حساب ته ننوځئ.",
     "purchaseOwnedByAnotherAccountPlay": "دا Google Play حساب باندې کریډیټونه د بل Kilo حساب پورې اړه لري. د کارولو لپاره هغه Kilo حساب ته ننوځئ."
   },

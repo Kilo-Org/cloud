@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
     "storeTimedOut": "App Storeが時間内に応答しませんでした。再試行",
     "storeTimedOutPlay": "Google Playが時間内に応答しませんでした。再試行",
+    "unresolvedPurchase": "前回の購入が後から完了し、その分のクレジットが残高に追加される可能性があります。もう一度購入すると別の購入が開始され、再度料金が請求される可能性があり、完了した購入ごとにその分のクレジットが残高に追加されます。",
+    "buyAgain": "もう一度購入",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   },

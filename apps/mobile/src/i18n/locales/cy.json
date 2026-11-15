@@ -4473,6 +4473,8 @@
     "noMatchingProductsPlay": "Ni ddychwelodd Google Play unrhyw becynnau credydau cyfatebol.",
     "storeTimedOut": "Ni ymatebodd yr App Store mewn amser. Rhoi cynnig eto.",
     "storeTimedOutPlay": "Ni ymatebodd Google Play mewn amser. Rhoi cynnig eto.",
+    "unresolvedPurchase": "Mae’n bosibl y bydd eich pryniant blaenorol yn cael ei gwblhau o hyd ac y caiff ei gredydau eu hychwanegu. Mae prynu eto’n dechrau pryniant arall a gall olygu y codir tâl arnoch eto.",
+    "buyAgain": "Prynu eto",
     "purchaseOwnedByAnotherAccount": "Mae'r credydau ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio.",
     "purchaseOwnedByAnotherAccountPlay": "Mae'r credydau ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio."
   },

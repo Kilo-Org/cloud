@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play pa t retounen okenn pake kredi ki matche.",
     "storeTimedOut": "App Store pa t reponn a tan. Eseye ankò.",
     "storeTimedOutPlay": "Google Play pa t reponn a tan. Eseye ankò.",
+    "unresolvedPurchase": "Acha ou te fè anvan an ka toujou finalize epi ajoute kredi pa li yo nan balans ou. Lè ou achte ankò, ou kòmanse yon lòt acha epi yo ka fè ou peye yon lòt fwa.",
+    "buyAgain": "Achte ankò",
     "purchaseOwnedByAnotherAccount": "Kredi ki sou Apple Account sa a fè pati yon lòt kont Kilo. Konekte nan kont Kilo sa a pou itilize yo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredi ki sou kont Google Play sa a fè pati yon lòt kont Kilo. Siyen nan kont Kilo sa a pou itilize yo."
   },

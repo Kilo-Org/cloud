@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
     "storeTimedOut": "App Store-k ez du denboran erantzun. Saiatu berriro.",
     "storeTimedOutPlay": "Google Play-k ez du denboran erantzun. Saiatu berriro.",
+    "unresolvedPurchase": "Baliteke zure aurreko erosketa oraindik burutzea eta dagozkion kredituak zure saldoari gehitzea. Berriro erosiz gero, beste erosketa bat hasiko da, eta baliteke berriro kobratzea.",
+    "buyAgain": "Erosi berriro",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
   },

@@ -313,7 +313,7 @@ function missingTokenKey(purchase: Purchase): string {
  * outstanding transaction first; only the backend's explicit ownership refusal
  * earns the different-account copy.
  */
-export function isStoreAlreadyOwnedError(error: unknown): boolean {
+function isStoreAlreadyOwnedError(error: unknown): boolean {
   return alreadyOwnedPurchaseErrorSchema.safeParse(error).success;
 }
 
@@ -325,6 +325,10 @@ export function isStoreAlreadyOwnedError(error: unknown): boolean {
  */
 export function isStoreNotReadyError(error: unknown): boolean {
   return notReadyStoreErrorSchema.safeParse(error).success;
+}
+
+export function isStorePendingPurchaseError(error: unknown): boolean {
+  return pendingPurchaseErrorSchema.safeParse(error).success;
 }
 
 /**

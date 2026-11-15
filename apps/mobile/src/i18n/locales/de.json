@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play hat keine passenden Guthaben-Pakete zurückgegeben.",
     "storeTimedOut": "Der App Store hat nicht rechtzeitig geantwortet. Erneut versuchen.",
     "storeTimedOutPlay": "Google Play hat nicht rechtzeitig geantwortet. Erneut versuchen.",
+    "unresolvedPurchase": "Dein vorheriger Kauf kann noch abgeschlossen und das zugehörige Guthaben deinem Kontostand hinzugefügt werden. Wenn du erneut kaufst, startest du einen separaten Kauf, der dir erneut berechnet werden kann und bei erfolgreichem Abschluss weiteres Guthaben hinzufügt.",
+    "buyAgain": "Erneut kaufen",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   },

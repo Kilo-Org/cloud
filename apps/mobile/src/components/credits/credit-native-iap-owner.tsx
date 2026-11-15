@@ -16,11 +16,22 @@ import {
   fetchProducts as fetchIapProducts,
   type ProductOrSubscription,
   type Purchase,
+  type RequestPurchaseResult,
   useIAP,
 } from 'expo-iap';
 
 import { i18n } from '@/i18n';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import {
+  admitCreditPurchaseIntent,
+  type CreditPurchaseIntent,
+  identifyCreditPurchaseTransaction,
+  markCreditPurchaseIntentDispatched,
+  matchesCreditPurchaseIntent,
+  ownsCreditPurchaseIntent,
+  restoreCreditPurchaseIntent,
+  retireCreditPurchaseIntent,
+} from '@/lib/credits/credit-purchase-intent';
 import {
   type StoreCreditProduct,
   type StoreCreditProductListing,
@@ -34,10 +45,9 @@ import {
   type CreditPurchaseFailure,
   creditStoreTimeoutKey,
   getPurchaseCompletionId,
-  getStoreCreditPurchaseErrorMessageKey,
   isRecoverableCreditPurchase,
-  isStoreAlreadyOwnedError,
   isStoreNotReadyError,
+  isStorePendingPurchaseError,
   showDedupedPurchaseError,
 } from '@/lib/credits/use-store-credit-purchase';
 import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -84,6 +94,10 @@ export type CreditNativeIapContextValue = {
    */
   reconnectStore: () => Promise<boolean>;
   purchase: (pack: StoreCreditProduct) => Promise<boolean>;
+  reconcilePurchase: (pack: StoreCreditProduct) => Promise<boolean>;
+  buyAgain: (pack: StoreCreditProduct) => Promise<boolean>;
+  unresolvedProductId: string | null;
+  buyAgainProductId: string | null;
   /** Store product id whose purchase or backend completion is in flight. */
   completingProductId: string | null;
   /** Catalog key of the last purchase error, or null. The screen translates it. */
@@ -123,16 +137,18 @@ const RECOVERY_ERROR_KEY = 'store';
  * belong to a newer request. The record is the only thing a delivery settles.
  */
 type PurchaseRequestRecord = {
-  readonly productId: string;
+  readonly intent: CreditPurchaseIntent;
+  readonly epoch: number;
   readonly attempt: SurfaceAttempt<CreditPurchaseFailure>;
+  readonly pack: StoreCreditProduct;
+  readonly settle: () => void;
 };
 
-/**
- * The one in-flight already-owned recovery, scoped to the auth epoch that
- * started it. The store error listener and the `requestPurchase` rejection both
- * report the same `AlreadyOwned`; sharing this promise gives them one decision.
- */
-type InFlightOwnedRecovery = { epoch: number; promise: Promise<boolean> };
+type BuyAgainConsent = {
+  readonly intent: CreditPurchaseIntent;
+  readonly productId: string;
+  readonly epoch: number;
+};
 
 /**
  * The single `useIAP` call site for the credits route.
@@ -159,27 +175,65 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const errorMessageKey =
     [...purchases.snapshot.states.values()].find(phase => phase.status === 'failed')?.failure
       .messageKey ?? null;
+  const purchaseStatesRef = useRef(purchases.snapshot.states);
+  purchaseStatesRef.current = purchases.snapshot.states;
+  const clearPurchaseFailure = purchases.clearWhere;
   const clearError = useCallback(() => {
-    for (const [key, phase] of purchases.snapshot.states) {
+    for (const [key, phase] of purchaseStatesRef.current) {
       if (phase.status === 'failed') {
-        purchases.clearWhere(key, () => true);
+        clearPurchaseFailure(key, () => true);
       }
     }
-    // The controller's identity holds until the store changes, so reading the
-    // snapshot inside the callback is what keeps this correct.
-  }, [purchases]);
+  }, [clearPurchaseFailure]);
   const [completedPurchaseCount, setCompletedPurchaseCount] = useState(0);
+  const [unresolvedProductId, setUnresolvedProductId] = useState<string | null>(null);
+  const [buyAgainProductId, setBuyAgainProductId] = useState<string | null>(null);
+  const buyAgainConsentRef = useRef<BuyAgainConsent | null>(null);
+  const clearBlockedPurchase = useCallback(() => {
+    setUnresolvedProductId(null);
+    setBuyAgainProductId(null);
+    buyAgainConsentRef.current = null;
+  }, []);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
-  const inFlightOwnedRecoveryRef = useRef<InFlightOwnedRecovery | null>(null);
   const pendingPurchaseRef = useRef<PurchaseRequestRecord | null>(null);
-  // Products whose request timed out: a new charge waits for reconciliation.
-  const unreconciledProductIdsRef = useRef(new Set<string>());
+  const completeDeliveredPurchaseRef = useRef<((purchase: Purchase) => Promise<void>) | null>(null);
   // The auth epoch this owner belongs to. Sign-out/sign-in bumps it and this
   // screen unmounts, but a store delivery or completion already in flight keeps
   // running; `isAccountCurrent` reports whether this instance is still the
   // current session's, so the old one never posts or announces under the new.
   const authEpochRef = useRef(currentAuthEpoch());
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      pendingPurchaseRef.current?.settle();
+    };
+  }, []);
+
+  const retireCompletedIntent = useCallback(
+    async (intent: CreditPurchaseIntent) => {
+      const owner = pendingPurchaseRef.current;
+      await retireCreditPurchaseIntent(intent);
+      if (
+        !mountedRef.current ||
+        !isCurrentAuthEpoch(authEpochRef.current) ||
+        ownsCreditPurchaseIntent(intent) ||
+        pendingPurchaseRef.current !== owner
+      ) {
+        return;
+      }
+      clearError();
+      clearBlockedPurchase();
+      if (owner?.intent === intent) {
+        pendingPurchaseRef.current = null;
+        owner.settle();
+        owner.attempt.succeed();
+      }
+    },
+    [clearBlockedPurchase, clearError]
+  );
 
   const completeAppStorePurchase = useMutation(
     trpc.credits.completeAppStorePurchase.mutationOptions()
@@ -240,77 +294,16 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     reconnect: reconnectStore,
     requestPurchase,
   } = useIAP({
-    onPurchaseError: error => {
-      // A store error with no request this owner started is the store failing
-      // to answer, not a purchase the user began: the screen's store-unavailable
-      // banner already reports that state, so a second "purchase failed"
-      // affordance beside it would contradict the banner.
-      const record = pendingPurchaseRef.current;
-      if (record === null) {
-        return;
-      }
-      if (isStoreNotReadyError(error)) {
-        // Play dropped its billing client after this owner connected, so every
-        // later tap would fail the same way. Restore the connection for the next
-        // tap; the request itself never reached the store, so the refusal below
-        // is still the truth for this one.
-        void (async () => {
-          try {
-            await reconnectStore();
-          } catch {
-            // Still unreachable: the screen keeps its store-unavailable state.
-          }
-        })();
-      }
-      if (isStoreAlreadyOwnedError(error)) {
-        // The store says the pack is already owned. For a consumable that is
-        // usually this same user's unfinished purchase — charged, granted
-        // nothing, never consumed — so recover it before saying anything; only
-        // the backend's explicit ownership refusal earns the account copy.
-        void recoverOwnedPurchaseRef.current?.();
-        return;
-      }
-      const key = getStoreCreditPurchaseErrorMessageKey(error, storefront);
-      if (key === null) {
-        // A user cancel or a Play pending payment: no outcome to publish, so the
-        // row goes idle rather than inventing a failure.
-        pendingPurchaseRef.current = null;
-        record.attempt.abandon();
-        return;
-      }
-      pendingPurchaseRef.current = null;
-      showError(key);
-      record.attempt.fail({ kind: 'purchase-refused', messageKey: key });
-    },
+    // Native listener errors carry no request or transaction identity. Only the
+    // rejection of the captured request promise may settle an admission.
     onPurchaseSuccess: purchase => {
-      const record = pendingPurchaseRef.current;
-      if (record === null || record.productId !== purchase.productId) {
-        // The store answered with a delivery this owner did not request (or
-        // requested before a timeout). Its transaction belongs to recovery:
-        // completing it grants the credits and touches no request.
-        void completeStorePurchaseInSession(purchase);
-        return;
-      }
-
       void (async () => {
         try {
-          const completed = await actions.handlePurchaseSuccess(purchase);
-          if (completed) {
-            // The store can re-deliver this transaction (its `finishTransaction`
-            // failed and the error was swallowed). Record the id the request
-            // completed, so the re-delivery path skips it instead of completing
-            // and announcing the same purchase twice.
-            recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
-            unreconciledProductIdsRef.current.delete(record.productId);
+          await completeDeliveredPurchaseRef.current?.(purchase);
+        } catch {
+          if (mountedRef.current && isCurrentAuthEpoch(authEpochRef.current)) {
+            showError(creditStoreTimeoutKey(storefront));
           }
-        } finally {
-          if (pendingPurchaseRef.current === record) {
-            pendingPurchaseRef.current = null;
-          }
-          // Single-use: `false` (and nothing published) when the deadline
-          // already settled this attempt, when a newer purchase superseded it,
-          // or when the owner unmounted.
-          record.attempt.succeed();
         }
       })();
     },
@@ -323,13 +316,76 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         appAccountToken,
         creditPackAppleProductIds,
         creditPackGoogleProductIds,
-        requestPurchase,
+        requestPurchase: async params => {
+          const record = pendingPurchaseRef.current;
+          if (record === null) {
+            throw new Error('A purchase needs an admitted request.');
+          }
+          try {
+            await markCreditPurchaseIntentDispatched(record.intent);
+          } catch (error) {
+            await retireCreditPurchaseIntent(record.intent);
+            throw error;
+          }
+          if (!record.attempt.owns() || !isCurrentAuthEpoch(record.epoch) || !ownsCreditPurchaseIntent(record.intent)) {
+            await retireCreditPurchaseIntent(record.intent);
+            return null;
+          }
+          let delivered: RequestPurchaseResult = null;
+          try {
+            delivered = await requestPurchase(params);
+          } catch (error) {
+            if (isStoreNotReadyError(error) && isCurrentAuthEpoch(record.epoch)) {
+              await reconnectStore();
+            }
+            if (!isStorePendingPurchaseError(error)) {
+              await retireCreditPurchaseIntent(record.intent);
+              record.settle();
+            }
+            throw error;
+          }
+          if (!ownsCreditPurchaseIntent(record.intent)) {
+            const recovered = Array.isArray(delivered) ? delivered : [delivered];
+            await Promise.all(recovered.map(async purchase => {
+              if (purchase && isCurrentAuthEpoch(record.epoch)) {
+                await completeDeliveredPurchaseRef.current?.(purchase);
+              }
+            }));
+            return delivered;
+          }
+          const nativePurchases = Array.isArray(delivered) ? delivered : [delivered];
+          await Promise.all(
+            nativePurchases.map(async purchase => {
+              if (
+                !purchase ||
+                !isCurrentAuthEpoch(record.epoch) ||
+                !ownsCreditPurchaseIntent(record.intent)
+              ) {
+                return;
+              }
+              if (purchase.productId !== record.intent.productId) {
+                await completeDeliveredPurchaseRef.current?.(purchase);
+                return;
+              }
+              await identifyCreditPurchaseTransaction(record.intent, purchase);
+              if (!isCurrentAuthEpoch(record.epoch) || !ownsCreditPurchaseIntent(record.intent)) {
+                return;
+              }
+              await (recoveredPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase))
+                ? retireCompletedIntent(record.intent)
+                : completeDeliveredPurchaseRef.current?.(purchase));
+            })
+          );
+          return delivered;
+        },
         completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
         completePlayPurchase: completePlayPurchase.mutateAsync,
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
-          clearError();
+          if (!mountedRef.current || !isCurrentAuthEpoch(authEpochRef.current)) {
+            return;
+          }
           setCompletedPurchaseCount(count => count + 1);
         },
         recoverOwnedPurchase: async () => (await recoverOwnedPurchaseRef.current?.()) ?? false,
@@ -338,14 +394,15 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       }),
     [
       appAccountToken,
-      clearError,
       completeAppStorePurchase.mutateAsync,
       completePlayPurchase.mutateAsync,
       creditPackAppleProductIds,
       creditPackGoogleProductIds,
       finishTransaction,
       invalidateAfterCompletion,
+      reconnectStore,
       requestPurchase,
+      retireCompletedIntent,
       showError,
       storefront,
     ]
@@ -356,7 +413,10 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // store connects, so the purchase callback must complete it in-session or the
   // user stays charged and uncredited until the screen remounts.
   const completeStorePurchaseInSession = useCallback(
-    async (purchase: Purchase) => {
+    async (purchase: Purchase): Promise<void> => {
+      if (!isCurrentAuthEpoch(authEpochRef.current)) {
+        return;
+      }
       if (
         !isRecoverableCreditPurchase(
           purchase,
@@ -373,26 +433,56 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       ) {
         return;
       }
+      const intent = await restoreCreditPurchaseIntent();
+      if (!isCurrentAuthEpoch(authEpochRef.current)) {
+        return;
+      }
+      const owned = intent !== null && matchesCreditPurchaseIntent(intent, purchase);
+      if (owned) {
+        await identifyCreditPurchaseTransaction(intent, purchase);
+        if (!isCurrentAuthEpoch(authEpochRef.current)) {
+          return;
+        }
+      }
       recoveryInFlightPurchaseIdsRef.current.add(id);
       try {
         // The store delivered this transaction on its own, so the completion
         // announces itself; a failure stays silent because the recovery pass
         // retries it on the next connect.
         const completed = await actions.handlePurchaseSuccess(purchase, {
-          notifyErrors: false,
+          notifyErrors: owned,
         });
         if (completed) {
           recoveredPurchaseIdsRef.current.add(id);
-          // A delivery that lands before the person taps again resolves the
-          // timed-out intent itself, so a same-pack retry need not reconcile.
-          unreconciledProductIdsRef.current.delete(purchase.productId);
+          if (
+            intent !== null &&
+            matchesCreditPurchaseIntent(intent, purchase) &&
+            ownsCreditPurchaseIntent(intent)
+          ) {
+            await retireCompletedIntent(intent);
+          }
+        } else if (owned && purchase.purchaseState !== 'pending') {
+          const owner = pendingPurchaseRef.current;
+          if (owner?.intent === intent && isCurrentAuthEpoch(owner.epoch) && owner.attempt.owns()) {
+            pendingPurchaseRef.current = null;
+            owner.settle();
+            setUnresolvedProductId(owner.intent.productId);
+            owner.attempt.fail({
+              kind: 'purchase-refused',
+              messageKey: 'kiloPass.purchaseFailed',
+            });
+          }
         }
       } finally {
         recoveryInFlightPurchaseIdsRef.current.delete(id);
       }
     },
-    [actions, creditPackAppleProductIds, creditPackGoogleProductIds]
+    [actions, creditPackAppleProductIds, creditPackGoogleProductIds, retireCompletedIntent]
   );
+
+  useEffect(() => {
+    completeDeliveredPurchaseRef.current = completeStorePurchaseInSession;
+  }, [completeStorePurchaseInSession]);
 
   // The store reported the pack as already owned. For a consumable credit pack
   // that is not proof of another Kilo account: a charge whose backend completion
@@ -404,94 +494,53 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // The boolean means "handled", not "recovered": `true` once a completion was
   // attempted, which covers both the announced grant and the backend's refusal
   // shown through `notifyErrors`. `false` means no outstanding transaction was
-  // found, so the caller still owes its own failure copy. Both triggers below
-  // share this one decision.
+  // found, so the caller still owes its own failure copy.
   const recoverOwnedCreditPurchase = useCallback(async (): Promise<boolean> => {
-    // One store `AlreadyOwned` failure reaches this owner twice: the `useIAP`
-    // error listener and the `requestPurchase` rejection both report it, and a
-    // pass per trigger would each read the other's dedupe as "nothing
-    // recovered". Instead both await this one promise, so they share the same
-    // decision — the second never sees a `false` the first did not.
-    //
-    // Keyed by the epoch that started it: a recovery belongs to the account
-    // that asked for it, so a session change starts a fresh pass instead of
-    // letting the new account join the old account's result.
-    const epoch = authEpochRef.current;
-    const inFlight = inFlightOwnedRecoveryRef.current;
-    if (inFlight?.epoch === epoch) {
-      return inFlight.promise;
+    let pendingPurchases: Purchase[] = [];
+    try {
+      pendingPurchases = await withStoreDeadline(
+        fetchPendingStorePurchases(storefront),
+        'the pending purchase lookup'
+      );
+    } catch {
+      return false;
     }
-
-    const recovery = (async (): Promise<boolean> => {
-      try {
-        // A recovery belongs to the account that asked for it. If the session
-        // changes while the store answers, the new account's own pass recovers.
-        let pendingPurchases: Purchase[] = [];
-        try {
-          // Bounded: a store that never answers must not hold this epoch's
-          // single-flight slot open. The pass gives up, releases the slot, and
-          // the next `AlreadyOwned` attempt retries the lookup.
-          pendingPurchases = await withStoreDeadline(
-            fetchPendingStorePurchases(storefront),
-            'the pending purchase lookup'
-          );
-        } catch {
-          // The store cannot answer; the retry re-runs this.
-          return false;
-        }
-        if (!isCurrentAuthEpoch(authEpochRef.current)) {
-          return false;
-        }
-        const outstandingPurchases = pendingPurchases.filter(
-          purchase =>
-            isRecoverableCreditPurchase(
-              purchase,
-              creditPackAppleProductIds,
-              creditPackGoogleProductIds
-            ) &&
-            !recoveredPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase)) &&
-            !recoveryInFlightPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase))
-        );
-        if (outstandingPurchases.length === 0) {
-          return false;
-        }
-        for (const purchase of outstandingPurchases) {
-          recoveryInFlightPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
-        }
-        try {
-          const recoveredPurchases = await actions.recoverPurchases(outstandingPurchases, {
-            notifyCompletion: true,
-            notifyErrors: true,
-          });
-          for (const purchase of recoveredPurchases) {
-            recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
-          }
-          // Reaching here means the pass matched an outstanding transaction and
-          // tried to complete it, so this pass owns the outcome: either the
-          // credits were announced, or the backend's own refusal was shown
-          // through `notifyErrors`. The purchase path must not add the generic
-          // failure on top of that — which is why this is `true`, not
-          // `recoveredPurchases.length > 0`: a refusal has no recovered
-          // purchases but is still a handled `AlreadyOwned`.
-          return true;
-        } finally {
-          for (const purchase of outstandingPurchases) {
-            recoveryInFlightPurchaseIdsRef.current.delete(getPurchaseCompletionId(purchase));
-          }
-        }
-      } finally {
-        // This pass holds its epoch's slot until it settles — a same-epoch call
-        // joins it rather than replacing it — so the epoch identifies the entry
-        // to release. An epoch change has already installed a newer pass.
-        if (inFlightOwnedRecoveryRef.current?.epoch === epoch) {
-          inFlightOwnedRecoveryRef.current = null;
+    if (!isCurrentAuthEpoch(authEpochRef.current)) {
+      return false;
+    }
+    const outstandingPurchases = pendingPurchases.filter(
+      purchase =>
+        isRecoverableCreditPurchase(
+          purchase,
+          creditPackAppleProductIds,
+          creditPackGoogleProductIds
+        ) &&
+        !recoveredPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase)) &&
+        !recoveryInFlightPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase))
+    );
+    if (outstandingPurchases.length === 0) {
+      return false;
+    }
+    for (const purchase of outstandingPurchases) {
+      recoveryInFlightPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
+    }
+    try {
+      const recoveredPurchases = await actions.recoverPurchases(outstandingPurchases, {
+        notifyCompletion: true,
+        notifyErrors: true,
+      });
+      if (isCurrentAuthEpoch(authEpochRef.current)) {
+        for (const purchase of recoveredPurchases) {
+          recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
         }
       }
-    })();
-
-    inFlightOwnedRecoveryRef.current = { epoch, promise: recovery };
-    const handled = await recovery;
-    return handled;
+      // A backend refusal is handled too: the recovery already published its copy.
+      return true;
+    } finally {
+      for (const purchase of outstandingPurchases) {
+        recoveryInFlightPurchaseIdsRef.current.delete(getPurchaseCompletionId(purchase));
+      }
+    }
   }, [actions, creditPackAppleProductIds, creditPackGoogleProductIds, storefront]);
 
   useEffect(() => {
@@ -503,99 +552,257 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // buying the same pack again must finish that intent instead of charging
   // twice. Bounded like every other store read in this flow.
   const reconcilePurchaseIntent = useCallback(
-    async (productId: string): Promise<boolean> => {
+    async (record: PurchaseRequestRecord): Promise<boolean> => {
+      let emptyForIntent = false;
       try {
         const pending = await withStoreDeadline(
           fetchPendingStorePurchases(storefront),
           'the pending purchase lookup'
         );
-        await Promise.all(
-          pending
-            .filter(candidate =>
-              isRecoverableCreditPurchase(
-                candidate,
-                creditPackAppleProductIds,
-                creditPackGoogleProductIds
-              )
-            )
-            .map(purchase => completeStorePurchaseInSession(purchase))
+        if (
+          pendingPurchaseRef.current !== record ||
+          !record.attempt.owns() ||
+          !isCurrentAuthEpoch(record.epoch)
+        ) {
+          return false;
+        }
+        emptyForIntent = !pending.some(purchase =>
+          purchase.productId === record.intent.productId ||
+          matchesCreditPurchaseIntent(record.intent, purchase)
         );
-        unreconciledProductIdsRef.current.delete(productId);
-        return true;
+        await Promise.all(
+          pending.map(async purchase => {
+            if (
+              isCurrentAuthEpoch(record.epoch) &&
+              pendingPurchaseRef.current === record &&
+              record.attempt.owns()
+            ) {
+              await completeStorePurchaseInSession(purchase);
+            }
+          })
+        );
       } catch {
-        // The store cannot answer, so this pack may not be charged again: the
-        // copy says the store did not respond.
-        return false;
+        // An empty or failed lookup is not proof that the native request cannot charge.
       }
+      if (
+        pendingPurchaseRef.current === record &&
+        record.attempt.owns() &&
+        isCurrentAuthEpoch(record.epoch)
+      ) {
+        pendingPurchaseRef.current = null;
+        record.settle();
+        setUnresolvedProductId(record.intent.productId);
+        if (emptyForIntent && record.pack.storeProductId !== null) {
+          buyAgainConsentRef.current = {
+            intent: record.intent,
+            productId: record.pack.storeProductId,
+            epoch: record.epoch,
+          };
+          setBuyAgainProductId(record.pack.storeProductId);
+        }
+        record.attempt.fail({
+          kind: 'store-timeout',
+          messageKey: creditStoreTimeoutKey(storefront),
+        });
+      }
+      return false;
     },
-    [
-      completeStorePurchaseInSession,
-      creditPackAppleProductIds,
-      creditPackGoogleProductIds,
-      storefront,
-    ]
+    [completeStorePurchaseInSession, storefront]
   );
 
+  const admissionRef = useRef<SurfaceAttempt<CreditPurchaseFailure> | null>(null);
   const startPurchase = useCallback(
-    async (pack: StoreCreditProduct): Promise<boolean> => {
+    async (pack: StoreCreditProduct, queryOnly = false): Promise<boolean> => {
       const storeProductId = pack.storeProductId;
-      if (!storeProductId || !appAccountToken) {
+      if (
+        !mountedRef.current ||
+        !isCurrentAuthEpoch(authEpochRef.current) ||
+        !storeProductId ||
+        !appAccountToken ||
+        admissionRef.current?.owns()
+      ) {
         return false;
       }
-      if (pendingPurchaseRef.current !== null) {
-        // One purchase at a time: the store delivers an outcome, not a promise,
-        // so two open requests could not be told apart.
-        return false;
-      }
-      if (unreconciledProductIdsRef.current.has(storeProductId)) {
-        // This pack's earlier request timed out and the SDK cannot cancel it, so
-        // the charge may already be at the store. Complete whatever the store
-        // still holds for it before letting a second charge start; the earlier
-        // one is finished, not bought again.
-        const reconciled = await reconcilePurchaseIntent(storeProductId);
-        if (!reconciled) {
-          toastPurchaseError(creditStoreTimeoutKey(storefront));
-        }
-        return false;
-      }
-
       const attempt = beginPurchase(storeProductId);
       if (attempt === null) {
         return false;
       }
-      const record = { productId: storeProductId, attempt };
-      pendingPurchaseRef.current = record;
+      admissionRef.current = attempt;
+      const epoch = authEpochRef.current;
       clearError();
-      const outcome = await actions.purchase(pack);
-      if (outcome.started) {
-        return true;
-      }
-      if (pendingPurchaseRef.current === record) {
+      buyAgainConsentRef.current = null;
+      setBuyAgainProductId(null);
+      let reservedIntent: CreditPurchaseIntent | null = null;
+      try {
+        const admitted = await admitCreditPurchaseIntent(storeProductId, appAccountToken, !queryOnly);
+        reservedIntent = admitted.intent;
+        if (!attempt.owns() || !isCurrentAuthEpoch(epoch)) {
+          if (admitted.created && admitted.intent !== null) {
+            await retireCreditPurchaseIntent(admitted.intent);
+          }
+          return false;
+        }
+        if (admitted.intent === null) {
+          clearBlockedPurchase();
+          attempt.abandon();
+          return false;
+        }
+        const settlement = Promise.withResolvers<undefined>();
+        const record = {
+          intent: admitted.intent,
+          epoch,
+          attempt,
+          pack,
+          settle: () => {
+            settlement.resolve(undefined);
+          },
+        };
+        pendingPurchaseRef.current = record;
+        if (!admitted.created) {
+          setUnresolvedProductId(admitted.intent.productId);
+          return await reconcilePurchaseIntent(record);
+        }
+        clearBlockedPurchase();
+        void (async () => {
+          try {
+            await withStoreDeadline(settlement.promise, 'the purchase outcome');
+          } catch {
+            if (
+              pendingPurchaseRef.current === record &&
+              attempt.owns() &&
+              isCurrentAuthEpoch(epoch)
+            ) {
+              pendingPurchaseRef.current = null;
+              setUnresolvedProductId(record.intent.productId);
+              attempt.fail({
+                kind: 'store-timeout',
+                messageKey: creditStoreTimeoutKey(storefront),
+              });
+            }
+          }
+        })();
+        const outcome = await actions.purchase(pack);
+        if (
+          pendingPurchaseRef.current !== record ||
+          !attempt.owns() ||
+          !isCurrentAuthEpoch(epoch)
+        ) {
+          return false;
+        }
+        if (outcome.started) {
+          return true;
+        }
+        if (outcome.failure === null && ownsCreditPurchaseIntent(record.intent)) {
+          return false;
+        }
         pendingPurchaseRef.current = null;
+        record.settle();
+        if (ownsCreditPurchaseIntent(record.intent)) {
+          setUnresolvedProductId(record.intent.productId);
+        } else {
+          clearBlockedPurchase();
+        }
+        if (outcome.failure === null) {
+          attempt.abandon();
+          return false;
+        }
+        toastPurchaseError(outcome.failure.messageKey);
+        attempt.fail(outcome.failure);
+      } catch {
+        if (reservedIntent !== null && !reservedIntent.dispatched) {
+          try {
+            await retireCreditPurchaseIntent(reservedIntent);
+          } catch {
+            // A reservation whose deletion failed remains a charge admission barrier.
+          }
+        }
+        if (attempt.owns() && isCurrentAuthEpoch(epoch)) {
+          setUnresolvedProductId(
+            reservedIntent !== null && ownsCreditPurchaseIntent(reservedIntent)
+              ? reservedIntent.productId
+              : null
+          );
+          attempt.fail({ kind: 'store-timeout', messageKey: creditStoreTimeoutKey(storefront) });
+        }
       }
-      if (outcome.failure === null) {
-        // A store-side cancel or a Play pending payment: no outcome to publish,
-        // so the attempt leaves the phase idle instead of inventing a failure.
-        attempt.abandon();
-        return false;
-      }
-      if (outcome.failure.kind === 'store-timeout') {
-        unreconciledProductIdsRef.current.add(storeProductId);
-      }
-      toastPurchaseError(outcome.failure.messageKey);
-      attempt.fail(outcome.failure);
       return false;
     },
     [
       actions,
       appAccountToken,
       beginPurchase,
+      clearBlockedPurchase,
       clearError,
       reconcilePurchaseIntent,
       storefront,
       toastPurchaseError,
     ]
   );
+
+  const reconcilePurchase = useCallback(async (pack: StoreCreditProduct): Promise<boolean> => {
+    const reconciled = await startPurchase(pack, true);
+    return reconciled;
+  }, [startPurchase]);
+
+  const buyAgain = useCallback(async (pack: StoreCreditProduct): Promise<boolean> => {
+    const consent = buyAgainConsentRef.current;
+    const productId = pack.storeProductId;
+    if (
+      !mountedRef.current ||
+      consent === null ||
+      productId === null ||
+      consent.productId !== productId ||
+      !isCurrentAuthEpoch(consent.epoch) ||
+      !ownsCreditPurchaseIntent(consent.intent) ||
+      admissionRef.current?.owns()
+    ) {
+      return false;
+    }
+    const attempt = beginPurchase(productId);
+    if (attempt === null) {
+      return false;
+    }
+    admissionRef.current = attempt;
+    buyAgainConsentRef.current = null;
+    setBuyAgainProductId(null);
+    try {
+      await retireCreditPurchaseIntent(consent.intent);
+      if (!attempt.owns() || !isCurrentAuthEpoch(consent.epoch)) {
+        return false;
+      }
+      if (ownsCreditPurchaseIntent(consent.intent)) {
+        attempt.fail({ kind: 'store-timeout', messageKey: creditStoreTimeoutKey(storefront) });
+        return false;
+      }
+      clearBlockedPurchase();
+      attempt.abandon();
+      return await startPurchase(pack);
+    } catch {
+      if (attempt.owns() && isCurrentAuthEpoch(consent.epoch)) {
+        attempt.fail({ kind: 'store-timeout', messageKey: creditStoreTimeoutKey(storefront) });
+      }
+      return false;
+    }
+  }, [beginPurchase, clearBlockedPurchase, startPurchase, storefront]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const intent = await restoreCreditPurchaseIntent();
+        if (intent !== null && mountedRef.current && isCurrentAuthEpoch(authEpochRef.current)) {
+          setUnresolvedProductId(intent.productId);
+          beginPurchase(intent.productId)?.fail({
+            kind: 'store-timeout',
+            messageKey: creditStoreTimeoutKey(storefront),
+          });
+        }
+      } catch {
+        if (mountedRef.current && isCurrentAuthEpoch(authEpochRef.current)) {
+          showError(creditStoreTimeoutKey(storefront));
+        }
+      }
+    })();
+  }, [beginPurchase, showError, storefront]);
 
   // Recover the purchases the store already charged but the backend has not
   // granted yet.
@@ -653,6 +860,19 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
 
       try {
         const recoveredPurchases = await actions.recoverPurchases(unrecoveredPurchases);
+        if (!isCurrentAuthEpoch(authEpochRef.current)) {
+          return;
+        }
+        const intent = await restoreCreditPurchaseIntent();
+        if (!isCurrentAuthEpoch(authEpochRef.current)) {
+          return;
+        }
+        if (
+          intent !== null &&
+          recoveredPurchases.some(purchase => matchesCreditPurchaseIntent(intent, purchase))
+        ) {
+          await retireCompletedIntent(intent);
+        }
         for (const recoveredPurchase of recoveredPurchases) {
           recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
         }
@@ -670,6 +890,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     };
   }, [
     actions,
+    retireCompletedIntent,
     connected,
     creditPackAppleProductIds.length,
     creditPackGoogleProductIds.length,
@@ -717,12 +938,18 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       fetchStoreProducts,
       reconnectStore,
       purchase: startPurchase,
+      reconcilePurchase,
+      buyAgain,
+      unresolvedProductId,
+      buyAgainProductId,
       completingProductId,
       errorMessageKey,
       completedPurchaseCount,
       clearError,
     }),
     [
+      buyAgain,
+      buyAgainProductId,
       clearError,
       completedPurchaseCount,
       completingProductId,
@@ -730,7 +957,9 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       errorMessageKey,
       fetchStoreProducts,
       reconnectStore,
+      reconcilePurchase,
       startPurchase,
+      unresolvedProductId,
     ]
   );
 

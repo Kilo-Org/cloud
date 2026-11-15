@@ -4351,6 +4351,8 @@
     "noMatchingProductsPlay": "Google Play nevrátil žádné odpovídající balíčky kreditů.",
     "storeTimedOut": "App Store neodpověděl včas. Zkusit znovu.",
     "storeTimedOutPlay": "Google Play neodpověděl včas. Zkusit znovu.",
+    "unresolvedPurchase": "Váš předchozí nákup může být ještě dokončen a kredity z něj přidány do vašeho zůstatku. Opětovným nákupem zahájíte další samostatný nákup, za který vám může být znovu účtována platba.",
+    "buyAgain": "Koupit znovu",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účtu Apple Account patří k jinému účtu Kilo. Chcete-li je použít, přihlaste se k příslušnému účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účtu Google Play patří jinému účtu Kilo. Přihlaste se k tomuto účtu Kilo pro jejich použití."
   },

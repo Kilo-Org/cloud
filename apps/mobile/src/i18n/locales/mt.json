@@ -4412,6 +4412,8 @@
     "noMatchingProductsPlay": "Google Play ma rritornax pakketti tal-krediti li jaqblu.",
     "storeTimedOut": "L-App Store ma wieġebx f'ħinha. Erġa' pprova.",
     "storeTimedOutPlay": "Google Play ma wieġebx f'ħinha. Erġa' pprova.",
+    "unresolvedPurchase": "Ix-xiri preċedenti tiegħek xorta jista' jitlesta u jżid il-krediti tiegħu mal-bilanċ tiegħek. Jekk terġa' tixtri, tibda xiri ieħor u tista' terġa' tiġi ċċarġjat.",
+    "buyAgain": "Ixtri mill-ġdid",
     "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
     "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."
   },

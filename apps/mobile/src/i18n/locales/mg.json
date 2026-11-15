@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
     "storeTimedOut": "Tsy namaly tamin'ny fotoana ilay App Store. Andramo indray.",
     "storeTimedOutPlay": "Tsy namaly tamin'ny fotoana ilay Google Play. Andramo indray.",
+    "unresolvedPurchase": "Mety mbola ho vita ny fividiananao teo aloha ka hampiana ao amin'ny balananao ny kireditra avy amin'izany. Ny fividianana indray dia manomboka fividianana vaovao misaraka amin'ilay teo aloha ary mety hampandoa vola anao indray.",
+    "buyAgain": "Hividy indray",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   },

@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play 未返回匹配的额度包。",
     "storeTimedOut": "App Store 未及时响应。请再试一次。",
     "storeTimedOutPlay": "Google Play 未及时响应。请再试一次。",
+    "unresolvedPurchase": "你之前的购买仍可能完成，并将相应额度添加到你的余额。再次购买会发起一笔新的购买，并可能再次向你收费。",
+    "buyAgain": "再次购买",
     "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"
   },

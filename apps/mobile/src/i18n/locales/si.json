@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
     "storeTimedOut": "App Store නියමිත වේලාව තුළ ප්‍රතිචාර නොදැක්වීය. නැවත උත්සාහ කරන්න.",
     "storeTimedOutPlay": "Google Play නියමිත වේලාව තුළ ප්‍රතිචාර නොදැක්වීය. නැවත උත්සාහ කරන්න.",
+    "unresolvedPurchase": "ඔබේ පෙර මිලදී ගැනීම පසුව සම්පූර්ණ වී එහි ක්‍රෙඩිට් ඔබේ ශේෂයට එක් විය හැක. නැවත මිලදී ගැනීමෙන් වෙනම මිලදී ගැනීමක් ආරම්භ වන අතර ඔබෙන් නැවත මුදල් අය විය හැක.",
+    "buyAgain": "නැවත මිලදී ගන්න",
     "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
     "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
   },

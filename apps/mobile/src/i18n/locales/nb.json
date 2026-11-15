@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play returnerte ingen samsvarende kredittpakker.",
     "storeTimedOut": "App Store svarte ikke i tide. Prøv igjen.",
     "storeTimedOutPlay": "Google Play svarte ikke i tide. Prøv igjen.",
+    "unresolvedPurchase": "Det tidligere kjøpet ditt kan fortsatt bli fullført og legge kredittene til saldoen din. Hvis du kjøper igjen, starter du et nytt kjøp og kan bli belastet på nytt.",
+    "buyAgain": "Kjøp igjen",
     "purchaseOwnedByAnotherAccount": "Kredittene på denne Apple-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kredittene på denne Google Play-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem."
   },

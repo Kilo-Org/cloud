@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play tidak mengembalikan paket kredit yang cocok.",
     "storeTimedOut": "App Store tidak merespons tepat waktu. Coba lagi.",
     "storeTimedOutPlay": "Google Play tidak merespons tepat waktu. Coba lagi.",
+    "unresolvedPurchase": "Pembelian Anda sebelumnya mungkin masih akan selesai dan menambahkan kredit dari pembelian tersebut. Membeli lagi akan memulai pembelian terpisah dan Anda mungkin akan dikenai biaya lagi.",
+    "buyAgain": "Beli lagi",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   },

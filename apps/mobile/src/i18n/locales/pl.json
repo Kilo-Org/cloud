@@ -4351,6 +4351,8 @@
     "noMatchingProductsPlay": "Google Play nie zwrócił pasujących pakietów kredytów.",
     "storeTimedOut": "App Store nie odpowiedział na czas. Spróbuj ponownie.",
     "storeTimedOutPlay": "Google Play nie odpowiedział na czas. Spróbuj ponownie.",
+    "unresolvedPurchase": "Twój wcześniejszy zakup może jeszcze zostać zrealizowany, a kredyty z niego dodane do Twojego salda. Kupując ponownie, rozpoczynasz odrębny zakup, za który może zostać naliczona kolejna opłata.",
+    "buyAgain": "Kup ponownie",
     "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
     "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
   },

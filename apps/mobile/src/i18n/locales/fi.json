@@ -4229,6 +4229,8 @@
     "noMatchingProductsPlay": "Google Play ei palauttanut yhtään sopivaa krediittipakettia.",
     "storeTimedOut": "App Store ei vastannut ajoissa. Yritä uudelleen.",
     "storeTimedOutPlay": "Google Play ei vastannut ajoissa. Yritä uudelleen.",
+    "unresolvedPurchase": "Aiempi ostoksesi voi vielä toteutua, jolloin sen krediitit lisätään saldoosi. Ostamalla uudelleen aloitat erillisen ostoksen, josta sinua voidaan veloittaa uudelleen, ja jokainen toteutunut ostos lisää omat krediittinsä saldoosi.",
+    "buyAgain": "Osta uudelleen",
     "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
     "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille."
   },

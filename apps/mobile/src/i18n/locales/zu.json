@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Inqolobane yekhodi ayirekhodwanga",
       "reasonUnknown": "Isizathu esingaziwa",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Isifinyezo sombiko",
       "title": "Umbiko wokuhlola",
       "unavailable": "Umbiko wokuhlola awutholakali",

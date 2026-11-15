@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "ไม่ได้บันทึกคลังโค้ดไว้",
       "reasonUnknown": "ไม่รู้จักเหตุผล",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "สรุปรายงาน",
       "title": "รายงานการตรวจสอบ",
       "unavailable": "รายงานการตรวจสอบไม่พร้อมใช้งาน",

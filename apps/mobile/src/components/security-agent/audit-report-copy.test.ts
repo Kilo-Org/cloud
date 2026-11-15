@@ -2,7 +2,7 @@ import { type TFunction } from 'i18next';
 import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { eventEvidenceLines } from './audit-report-copy';
+import { eventEvidenceLines, summaryCountLabel } from './audit-report-copy';
 
 const t = i18n.t as TFunction;
 
@@ -189,5 +189,41 @@ describe('eventEvidenceLines', () => {
         t
       )
     ).toEqual([]);
+  });
+});
+
+describe('summaryCountLabel', () => {
+  it('keeps the formatted count in front of the severity word', () => {
+    expect(
+      summaryCountLabel({ kind: 'severity', value: 2, displayCount: '2', label: 'Critical' })
+    ).toBe('2 Critical');
+  });
+
+  it('selects the Lithuanian counted form the number requires', async () => {
+    // The catalog loads on `changeLanguage`; the `lng` option alone only
+    // selects among the catalogs the instance already holds.
+    await i18n.changeLanguage('lt');
+    try {
+      const cases = [
+        [1, '1', '1 radinys, Kritinis'],
+        [2, '2', '2 radiniai, Kritinis'],
+        [11, '11', '11 radinių, Kritinis'],
+        [1.5, '1,5', '1,5 radinio, Kritinis'],
+      ] as const;
+
+      for (const [count, displayCount, expected] of cases) {
+        expect(
+          i18n.t('securityAgent.auditReport.severityCount', {
+            lng: 'lt',
+            count,
+            displayCount,
+            label: 'Kritinis',
+          }),
+          `${count}`
+        ).toBe(expected);
+      }
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

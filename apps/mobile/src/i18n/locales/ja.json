@@ -1022,6 +1022,8 @@
       "repositoryNotRecorded": "リポジトリの記録なし",
       "reasonUnknown": "認識されない理由",
       "severityCount": "{{displayCount}}件{{label}}",
+      "severityCount_one": "{{displayCount}}件{{label}}",
+      "severityCount_other": "{{displayCount}}件{{label}}",
       "summary": "レポートの概要",
       "title": "監査レポート",
       "unavailable": "監査レポートを利用できません",

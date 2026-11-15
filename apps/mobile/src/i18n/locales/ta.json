@@ -553,7 +553,7 @@
       "retryLoadingContext": "சுற்றியுள்ள வரிகளை ஏற்ற மீண்டும் முயற்சிக்கவும்",
       "failedToLoadContext": "சுற்றியுள்ள வரிகளை ஏற்ற முடியவில்லை — மீண்டும் முயற்சிக்கத் தட்டவும்",
       "loadingContext": "சுற்றியுள்ள வரிகள் ஏற்றப்படுகின்றன…",
-      "loadingLines": "{{total}} வரிகளில் {{loaded}} ஏற்றப்படுகின்றன…",
+      "loadingLines": "வரிகள் ஏற்றப்படுகின்றன: {{loaded}} / {{total}}…",
       "expandContext": "சுற்றியுள்ள வரிகளைக் காட்டவும்",
       "expandMoreContext": "சுற்றியுள்ள மேலும் சில வரிகளைக் காட்டவும்",
       "expandLines": "{{displayCount}} வரிகளைக் காட்டவும் ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "மேலும் கோப்புகளை ஏற்ற முடியவில்லை — மீண்டும் முயற்சிக்கத் தட்டவும்",
       "loadingAllFiles": "எல்லாக் கோப்புகளும் ஏற்றப்படுகின்றன — {{loaded}}…",
       "loadingAllFilesOf": "எல்லாக் கோப்புகளும் ஏற்றப்படுகின்றன — {{total}}-இல் {{loaded}}…",
-      "loadedOfTotalFiles": "{{total}} கோப்புகளில் {{loaded}} ஏற்றப்பட்டன",
+      "loadedOfTotalFiles": "கோப்புகள் ஏற்றப்பட்டன: {{loaded}} / {{total}}",
       "loadAllFiles": "எல்லாக் கோப்புகளையும் ஏற்றவும்",
       "loadAll": "அனைத்தையும் ஏற்றவும்",
       "fileLoadedCount_one": "{{displayCount}} கோப்பு ஏற்றப்பட்டது",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "சுற்றியுள்ள {{displayCount}} வரிகளைக் காட்டவும்",
       "expandMoreLines_one": "மேலும் {{displayCount}} வரி காட்டவும் ({{start}}–{{end}})",
       "expandMoreLines_other": "மேலும் {{displayCount}} வரிகளைக் காட்டவும் ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{total}} கோப்புகளில் {{loaded}} ஏற்றப்பட்டன",
-      "loadedOfTotalFiles_other": "{{total}} கோப்புகளில் {{loaded}} ஏற்றப்பட்டன"
+      "loadedOfTotalFiles_one": "கோப்புகள் ஏற்றப்பட்டன: {{loaded}} / {{total}}",
+      "loadedOfTotalFiles_other": "கோப்புகள் ஏற்றப்பட்டன: {{loaded}} / {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ கோப்பின் முடிவில் புதிய வரி இல்லை",
@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "களஞ்சியம் பதிவு செய்யப்படவில்லை",
       "reasonUnknown": "அங்கீகரிக்கப்படாத காரணம்",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "அறிக்கையின் சுருக்கம்",
       "title": "தணிக்கை அறிக்கை",
       "unavailable": "தணிக்கை அறிக்கை கிடைக்கவில்லை",

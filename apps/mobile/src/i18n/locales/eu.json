@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Biltegia ez da erregistratu",
       "reasonUnknown": "Arrazoi ezezaguna",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Txostenaren laburpena",
       "title": "Auditoria-txostena",
       "unavailable": "Auditoria-txostena ez dago erabilgarri",

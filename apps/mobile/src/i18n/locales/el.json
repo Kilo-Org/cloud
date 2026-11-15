@@ -553,7 +553,7 @@
       "retryLoadingContext": "Νέα προσπάθεια φόρτωσης του περιβάλλοντος κώδικα",
       "failedToLoadContext": "Δεν φορτώθηκε ο περιβάλλων κώδικας — πάτησε για νέα προσπάθεια",
       "loadingContext": "Φόρτωση περιβάλλοντος κώδικα…",
-      "loadingLines": "Φόρτωση {{loaded}} από {{total}} γραμμές…",
+      "loadingLines": "Φόρτωση γραμμών: {{loaded}} από {{total}}…",
       "expandContext": "Εμφάνιση περιβάλλοντος κώδικα",
       "expandMoreContext": "Εμφάνιση περισσότερου περιβάλλοντος κώδικα",
       "expandLines": "Εμφάνιση {{displayCount}} γραμμών ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "Δεν φορτώθηκαν περισσότερα αρχεία — πάτησε για νέα προσπάθεια",
       "loadingAllFiles": "Φόρτωση όλων των αρχείων — {{loaded}}…",
       "loadingAllFilesOf": "Φόρτωση όλων των αρχείων — {{loaded}} από {{total}}…",
-      "loadedOfTotalFiles": "{{loaded}} από {{total}} αρχεία φορτώθηκαν",
+      "loadedOfTotalFiles": "Φορτωμένα αρχεία: {{loaded}} από {{total}}",
       "loadAllFiles": "Φόρτωση όλων των αρχείων",
       "loadAll": "Φόρτωση όλων",
       "fileLoadedCount_one": "{{displayCount}} αρχείο φορτώθηκε",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "Εμφάνιση {{displayCount}} γραμμών περιβάλλοντος κώδικα",
       "expandMoreLines_one": "Εμφάνιση {{displayCount}} επιπλέον γραμμής ({{start}}–{{end}})",
       "expandMoreLines_other": "Εμφάνιση {{displayCount}} επιπλέον γραμμών ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} από {{total}} αρχεία φορτώθηκε",
-      "loadedOfTotalFiles_other": "{{loaded}} από {{total}} αρχεία φορτώθηκαν"
+      "loadedOfTotalFiles_one": "Φορτωμένα αρχεία: {{loaded}} από {{total}}",
+      "loadedOfTotalFiles_other": "Φορτωμένα αρχεία: {{loaded}} από {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ χωρίς αλλαγή γραμμής στο τέλος του αρχείου",
@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Το αποθετήριο δεν καταγράφηκε",
       "reasonUnknown": "Μη αναγνωρισμένος λόγος",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Περίληψη αναφοράς",
       "title": "Αναφορά ελέγχου",
       "unavailable": "Η αναφορά ελέγχου δεν είναι διαθέσιμη",

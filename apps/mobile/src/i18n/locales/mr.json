@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "रिपॉझिटरी नोंदवलेली नाही",
       "reasonUnknown": "अनोळखी कारण",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "अहवालाचा सारांश",
       "title": "ऑडिट अहवाल",
       "unavailable": "ऑडिट अहवाल अनुपलब्ध",

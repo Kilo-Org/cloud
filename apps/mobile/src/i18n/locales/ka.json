@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "რეპოზიტორი არ არის ჩაწერილი",
       "reasonUnknown": "ამოუცნობი მიზეზი",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "ანგარიშის შეჯამება",
       "title": "აუდიტის ანგარიში",
       "unavailable": "აუდიტის ანგარიში მიუწვდომელია",

@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "रिपोजिटरीको अभिलेख छैन",
       "reasonUnknown": "नचिनिएको कारण",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "प्रतिवेदनको सारांश",
       "title": "अडिट प्रतिवेदन",
       "unavailable": "अडिट प्रतिवेदन उपलब्ध छैन",

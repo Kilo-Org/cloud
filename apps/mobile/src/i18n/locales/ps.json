@@ -553,7 +553,7 @@
       "retryLoadingContext": "د شاوخوا کرښو د بارولو بیا هڅه وکړئ",
       "failedToLoadContext": "شاوخوا کرښې بار نه شوې — د بیا هڅې لپاره ټک وکړئ",
       "loadingContext": "شاوخوا کرښې بارېږي…",
-      "loadingLines": "له {{total}} کرښو څخه {{loaded}} بارېږي…",
+      "loadingLines": "کرښې بارېږي: له {{total}} څخه {{loaded}}…",
       "expandContext": "شاوخوا کرښې ښکاره کړئ",
       "expandMoreContext": "نورې شاوخوا کرښې ښکاره کړئ",
       "expandLines": "{{displayCount}} کرښې ښکاره کړئ ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "نور فایلونه بار نه شول — د بیا هڅې لپاره ټک وکړئ",
       "loadingAllFiles": "ټول فایلونه بارېږي — {{loaded}}…",
       "loadingAllFilesOf": "ټول فایلونه بارېږي — له {{total}} څخه {{loaded}}…",
-      "loadedOfTotalFiles": "له {{total}} فایلونو څخه {{loaded}} بار شوي",
+      "loadedOfTotalFiles": "فایلونه بار شوي: {{loaded}} له {{total}}",
       "loadAllFiles": "ټول فایلونه بار کړئ",
       "loadAll": "ټول بار کړئ",
       "fileLoadedCount_one": "{{displayCount}} فایل بار شو",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "{{displayCount}} شاوخوا کرښې ښکاره کړئ",
       "expandMoreLines_one": "{{displayCount}} نوره کرښه ښکاره کړئ ({{start}}–{{end}})",
       "expandMoreLines_other": "{{displayCount}} نورې کرښې ښکاره کړئ ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "له {{total}} فایلونو څخه {{loaded}} بار شوی",
-      "loadedOfTotalFiles_other": "له {{total}} فایلونو څخه {{loaded}} بار شوي"
+      "loadedOfTotalFiles_one": "فایلونه بار شوي: {{loaded}} له {{total}}",
+      "loadedOfTotalFiles_other": "فایلونه بار شوي: {{loaded}} له {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ د فایل په پای کې نوې کرښه نشته.",
@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "زېرمتون ثبت شوی نه دی",
       "reasonUnknown": "ناتپېژندل شوی دلیل",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "د راپور لنډیز",
       "title": "د پلټنې راپور",
       "unavailable": "د پلټنې راپور نشته",

@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "ରିପୋଜିଟୋରୀ ରେକର୍ଡ ହୋଇନାହିଁ",
       "reasonUnknown": "ଅଜଣା କାରଣ",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "ରିପୋର୍ଟର ସାରାଂଶ",
       "title": "ଅଡିଟ୍ ରିପୋର୍ଟ",
       "unavailable": "ଅଡିଟ୍ ରିପୋର୍ଟ ଉପଲବ୍ଧ ନୁହେଁ",

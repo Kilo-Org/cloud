@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "ကုဒ်သိုလှောင်ရာကို မှတ်တမ်းမတင်ထား",
       "reasonUnknown": "အသိအမှတ်မပြုသော အကြောင်းရင်း",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "အစီရင်ခံစာ အကျဉ်းချုပ်",
       "title": "စစ်ဆေးမှုအစီရင်ခံစာ",
       "unavailable": "စစ်ဆေးမှုအစီရင်ခံစာ မရရှိနိုင်",

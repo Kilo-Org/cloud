@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "مخزن ثبت نشده",
       "reasonUnknown": "دلیل ناشناخته",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "خلاصه گزارش",
       "title": "گزارش ممیزی",
       "unavailable": "گزارش ممیزی در دسترس نیست",

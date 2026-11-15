@@ -553,7 +553,7 @@
       "retryLoadingContext": "చుట్టుపక్కల కోడ్‌ను లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "failedToLoadContext": "చుట్టుపక్కల కోడ్‌ను లోడ్ చేయలేకపోయాము — మళ్లీ ప్రయత్నించడానికి నొక్కండి",
       "loadingContext": "చుట్టుపక్కల కోడ్‌ను లోడ్ చేస్తోంది…",
-      "loadingLines": "{{total}} పంక్తుల్లో {{loaded}} లోడ్ చేస్తోంది…",
+      "loadingLines": "పంక్తులు లోడ్ అవుతున్నాయి: {{loaded}} / {{total}}…",
       "expandContext": "చుట్టుపక్కల కోడ్‌ను చూపండి",
       "expandMoreContext": "చుట్టుపక్కల మరింత కోడ్‌ను చూపండి",
       "expandLines": "{{displayCount}} పంక్తులను చూపండి ({{start}}–{{end}})",
@@ -566,7 +566,7 @@
       "failedToLoadMoreFiles": "మరిన్ని ఫైళ్లను లోడ్ చేయలేకపోయాము — మళ్లీ ప్రయత్నించడానికి నొక్కండి",
       "loadingAllFiles": "అన్ని ఫైళ్లను లోడ్ చేస్తోంది — {{loaded}}…",
       "loadingAllFilesOf": "అన్ని ఫైళ్లను లోడ్ చేస్తోంది — {{total}}లో {{loaded}}…",
-      "loadedOfTotalFiles": "{{total}} ఫైళ్లలో {{loaded}} లోడ్ అయ్యాయి",
+      "loadedOfTotalFiles": "ఫైళ్లు లోడ్ అయ్యాయి: {{loaded}} / {{total}}",
       "loadAllFiles": "అన్ని ఫైళ్లను లోడ్ చేయండి",
       "loadAll": "అన్నీ లోడ్ చేయండి",
       "fileLoadedCount_one": "{{displayCount}} ఫైల్ లోడ్ అయింది",
@@ -586,8 +586,8 @@
       "expandLinesOfContext_other": "చుట్టుపక్కల కోడ్‌లోని {{displayCount}} పంక్తులను చూపండి",
       "expandMoreLines_one": "మరో {{displayCount}} పంక్తి చూపండి ({{start}}–{{end}})",
       "expandMoreLines_other": "మరో {{displayCount}} పంక్తులను చూపండి ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{total}} ఫైళ్లలో {{loaded}} లోడ్ అయ్యాయి",
-      "loadedOfTotalFiles_other": "{{total}} ఫైళ్లలో {{loaded}} లోడ్ అయ్యాయి"
+      "loadedOfTotalFiles_one": "ఫైళ్లు లోడ్ అయ్యాయి: {{loaded}} / {{total}}",
+      "loadedOfTotalFiles_other": "ఫైళ్లు లోడ్ అయ్యాయి: {{loaded}} / {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "ఫైల్ చివర కొత్త పంక్తి లేదు.",
@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "రిపోజిటరీ నమోదు కాలేదు",
       "reasonUnknown": "గుర్తించబడని కారణం",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "నివేదిక సారాంశం",
       "title": "ఆడిట్ నివేదిక",
       "unavailable": "ఆడిట్ నివేదిక అందుబాటులో లేదు",

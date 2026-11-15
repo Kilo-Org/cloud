@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { awsProviderFixture } from '../../test/fixtures/aws-provider.js';
+import { AWS_TEST_CONFIGURATION, awsProviderFixture } from '../../test/fixtures/aws-provider.js';
 import { AWS_LAUNCH_RECOVERY_MS } from './aws-provider.js';
 import { encodeAwsProviderRef } from './aws-operation.js';
 import { ProviderCreationError } from './provider.js';
@@ -26,6 +26,48 @@ function gate() {
 }
 
 describe('AWS durable allocation lifecycle', () => {
+  it('retains the existing strict MicroVM record shape through launch and stop', async () => {
+    const f = awsProviderFixture();
+    const ref = await create(f.adapter());
+    await f.adapter().launch(ref, startup);
+    expect(Object.keys(f.operations.get(intent.intentId) ?? {}).sort()).toEqual(
+      [
+        'ref',
+        'config',
+        'phase',
+        'request',
+        'requestAt',
+        'microvmId',
+        'deadlineAt',
+        'submission',
+      ].sort()
+    );
+    expect(await f.adapter().stop(ref)).toBe('terminal');
+    expect(f.operations.get(intent.intentId)).toEqual({
+      ref: JSON.parse(ref),
+      config: AWS_TEST_CONFIGURATION,
+      phase: 'terminated',
+      microvmId: 'microvm-1',
+    });
+  });
+  it('prunes only confirmed history after cleaning previous intents at the retention limit', async () => {
+    const f = awsProviderFixture();
+    for (let index = 0; index < 32; index++) {
+      const intentId = `previous-${index}`;
+      f.operations.set(intentId, {
+        ref: { provider: 'aws', sandboxId: 'ses-abcdef', intentId, createdAt: 1 },
+        config: AWS_TEST_CONFIGURATION,
+        phase: 'created',
+      });
+    }
+    await create(f.adapter());
+    expect(f.operations.size).toBe(32);
+    expect([...f.operations.values()].filter(value => value.phase !== 'terminated')).toHaveLength(
+      1
+    );
+    expect(f.operations.get(intent.intentId)?.phase).toBe('created');
+    expect(f.vms.size).toBe(0);
+  });
   it('creates only an intent; compute starts from the immutable launch document', async () => {
     const f = awsProviderFixture();
     const adapter = f.adapter();
@@ -270,10 +312,11 @@ describe('AWS durable allocation lifecycle', () => {
     const waiting = gate();
     f.gatePut(waiting.promise);
     const launch = adapter.launch(ref, startup);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await f.putStarted;
     expect(await adapter.stop(ref)).toBe('terminal');
     waiting.release();
     await expect(launch).rejects.toThrow('stopping');
+    expect(f.objects.size).toBe(0);
     expect(f.vms.size).toBe(0);
   });
 

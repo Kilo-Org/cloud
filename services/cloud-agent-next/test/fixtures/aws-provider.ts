@@ -1,3 +1,5 @@
+import type { ProviderStartup } from '../../src/sandbox-control/provider.js';
+import { z } from 'zod';
 import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
 import { AwsRequestError } from '@kilocode/worker-utils/aws-client';
 import type {
@@ -27,8 +29,10 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
   const objects = new Map<string, string>();
   const submitted: MicrovmRunRequest[] = [];
   const runStarted = Promise.withResolvers<void>();
+  const putStarted = Promise.withResolvers<void>();
   const vms = new Map<string, { request: MicrovmRunRequest; initial: Microvm; current: Microvm }>();
   let now = 10_000;
+  let prepareSnapshot: Parameters<typeof createAwsProviderAdapter>[0]['prepareSnapshot'];
   let loseReply = false;
   let runError: Error | undefined;
   let inspectError = false;
@@ -112,6 +116,7 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
     inspectArchive: async () => null,
     deleteArchive: async () => {},
     async putLaunch(key, body) {
+      putStarted.resolve();
       if (putGate) await putGate;
       if (objects.has(key)) throw new AwsRequestError(412, 'PreconditionFailed');
       objects.set(key, body);
@@ -129,6 +134,7 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
     return createAwsProviderAdapter({
       sandboxId,
       storage: operationStorage,
+      prepareSnapshot,
       prepareStartup: async ({ startup }) => startup,
       now: () => now,
       async resolveRuntime(config = AWS_TEST_CONFIGURATION) {
@@ -139,11 +145,15 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
     });
   }
   return {
+    setSnapshotPreparation(hook: (startup: ProviderStartup) => Promise<ProviderStartup>) {
+      prepareSnapshot = ({ startup }) => hook(startup);
+    },
     adapter,
     operations,
     objects,
     submitted,
     runStarted: runStarted.promise,
+    putStarted: putStarted.promise,
     vms,
     storage,
     setNow(value: number) {
@@ -183,7 +193,10 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
     runtimeReads: () => runtimeReads,
     launchedDocument() {
       const body = [...objects.values()].at(-1);
-      return body ? JSON.parse(body) : undefined;
+      if (!body) throw new Error('Launch document unavailable');
+      return z
+        .object({ argv: z.array(z.string()), env: z.record(z.string(), z.string()) })
+        .parse(JSON.parse(body));
     },
   };
 }

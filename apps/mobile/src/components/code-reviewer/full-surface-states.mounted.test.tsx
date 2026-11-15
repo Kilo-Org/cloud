@@ -244,7 +244,7 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.revi
 // real classifier, and `permissionOverride` stands in for a read that has not
 // settled — which the shared `organizations` answer can never produce.
 vi.mock('@/lib/hooks/use-reviewer-permission', async () => {
-  const { classifyPermission } = await vi.importActual<ReviewerStatusModule>(
+  const { classifyPermission } = await vi.importActual<typeof ReviewerStatusModule>(
     '@/lib/code-reviewer-status'
   );
   return {

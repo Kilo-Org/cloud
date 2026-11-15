@@ -299,12 +299,19 @@ function requestIsLiveAt(now: string): SQL {
 
 /**
  * Check if a device auth request has expired. This is the expiry rule.
+ *
+ * `now` is the instant the caller acts on, so a caller that also writes with a
+ * captured instant decides liveness against that same instant and a request it
+ * refuses is never approved later in the same call.
  */
-export function isDeviceAuthRequestExpired(request: {
-  expires_at: string;
-  status: DeviceAuthRequestStatus;
-}): boolean {
-  return request.status === 'expired' || isExpiredAt(request.expires_at);
+export function isDeviceAuthRequestExpired(
+  request: {
+    expires_at: string;
+    status: DeviceAuthRequestStatus;
+  },
+  now = new Date().toISOString()
+): boolean {
+  return request.status === 'expired' || isExpiredAt(request.expires_at, now);
 }
 
 /**
@@ -318,7 +325,7 @@ export async function approveDeviceAuthRequest(
   const now = new Date().toISOString();
   const existing = await getDeviceAuthRequest(userCode);
   const requestingClientId = existing?.requesting_client_id ?? null;
-  const actionable = existing?.status === 'pending' && !isDeviceAuthRequestExpired(existing);
+  const actionable = existing?.status === 'pending' && !isDeviceAuthRequestExpired(existing, now);
   // An actionable row that names a client requires its confirmation before any
   // other outcome is considered; an expired row reports its expiry below.
   const confirmed =

@@ -757,6 +757,7 @@
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",
+      "connectOwnerOnly": "組織のオーナーまたは管理者にプロバイダーの接続を依頼してください。",
       "couldNotLoad": "レビューを読み込めませんでした。",
       "noReviews": "まだレビューはありません",
       "noReviewsDescription": "コードレビュアーがプルリクエストをレビューすると、その結果がここに表示されます。",

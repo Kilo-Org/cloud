@@ -757,6 +757,7 @@
     },
     "reviewList": {
       "configureProvider": "Atur penyedia",
+      "connectOwnerOnly": "Minta pemilik organisasi atau admin untuk menghubungkan penyedia.",
       "couldNotLoad": "Tidak dapat memuat tinjauan.",
       "noReviews": "Belum ada tinjauan",
       "noReviewsDescription": "Tinjauan muncul di sini setelah Peninjau kode meninjau PR.",

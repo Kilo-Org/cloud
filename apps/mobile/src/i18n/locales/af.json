@@ -1345,7 +1345,8 @@
       "noReviews": "Nog geen hersienings nie",
       "noReviewsDescription": "Hersienings verskyn hier sodra die Kodehersiener 'n trekversoek hersien.",
       "startManualReview": "Begin 'n handmatige hersiening",
-      "configureProvider": "Stel verskaffer op"
+      "configureProvider": "Stel verskaffer op",
+      "connectOwnerOnly": "Vra 'n organisasie-eienaar of administrateur om 'n verskaffer te koppel."
     },
     "platformList": {
       "checking": "Besig om na te gaan…",

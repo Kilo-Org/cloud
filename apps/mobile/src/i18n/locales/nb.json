@@ -1345,7 +1345,8 @@
       "noReviews": "Ingen gjennomganger ennå",
       "noReviewsDescription": "Gjennomganger vises her når kodegranskeren har gjennomgått en PR.",
       "startManualReview": "Start en manuell gjennomgang",
-      "configureProvider": "Konfigurer leverandør"
+      "configureProvider": "Konfigurer leverandør",
+      "connectOwnerOnly": "Be en eier eller administrator i organisasjonen om å koble til en leverandør."
     },
     "platformList": {
       "checking": "Sjekker…",

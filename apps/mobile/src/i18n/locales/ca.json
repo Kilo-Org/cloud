@@ -1368,7 +1368,8 @@
       "noReviews": "Encara no hi ha revisions",
       "noReviewsDescription": "Les revisions apareixeran aquí quan el revisor de codi revisi una sol·licitud d'integració.",
       "startManualReview": "Inicia una revisió manual",
-      "configureProvider": "Configura el proveïdor"
+      "configureProvider": "Configura el proveïdor",
+      "connectOwnerOnly": "Demana a un propietari o administrador de l'organització que connecti un proveïdor."
     },
     "platformList": {
       "checking": "S'està comprovant…",

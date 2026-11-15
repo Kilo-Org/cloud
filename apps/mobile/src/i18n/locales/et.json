@@ -1345,7 +1345,8 @@
       "noReviews": "Ülevaatusi pole veel",
       "noReviewsDescription": "Ülevaatused ilmuvad siia pärast seda, kui koodiülevaataja on tõmbetaotluse üle vaadanud.",
       "startManualReview": "Käivita ülevaatus käsitsi",
-      "configureProvider": "Seadista teenusepakkuja"
+      "configureProvider": "Seadista teenusepakkuja",
+      "connectOwnerOnly": "Palu organisatsiooni omanikul või administraatoril teenusepakkuja ühendada."
     },
     "platformList": {
       "checking": "Kontrollimine…",

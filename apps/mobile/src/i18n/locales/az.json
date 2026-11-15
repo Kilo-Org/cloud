@@ -1345,7 +1345,8 @@
       "noReviews": "Hələ kod yoxlaması yoxdur",
       "noReviewsDescription": "Kod yoxlayıcısı PR-i yoxladıqdan sonra kod yoxlamaları burada görünəcək.",
       "startManualReview": "Əl ilə yoxlamaya başla",
-      "configureProvider": "Provayderi tənzimlə"
+      "configureProvider": "Provayderi tənzimlə",
+      "connectOwnerOnly": "Provayderi qoşmaq üçün təşkilat sahibindən və ya inzibatçıdan xahiş edin."
     },
     "platformList": {
       "checking": "Yoxlanılır…",

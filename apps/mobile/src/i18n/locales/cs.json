@@ -1391,7 +1391,8 @@
       "noReviews": "Zatím žádné kontroly",
       "noReviewsDescription": "Kontroly se zde zobrazí, jakmile agent pro kontrolu kódu zkontroluje PR.",
       "startManualReview": "Zahájit ruční kontrolu",
-      "configureProvider": "Nastavit poskytovatele"
+      "configureProvider": "Nastavit poskytovatele",
+      "connectOwnerOnly": "Požádejte vlastníka organizace nebo správce, aby připojil poskytovatele."
     },
     "platformList": {
       "checking": "Kontroluje se…",

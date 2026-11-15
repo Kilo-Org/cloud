@@ -1345,7 +1345,8 @@
       "noReviews": "Engar yfirferðir ennþá",
       "noReviewsDescription": "Yfirferðir birtast hér þegar kóðarýnirinn fer yfir samrunabeiðni.",
       "startManualReview": "Hefja handvirka yfirferð",
-      "configureProvider": "Stilla þjónustuveitanda"
+      "configureProvider": "Stilla þjónustuveitanda",
+      "connectOwnerOnly": "Biddu eiganda eða stjórnanda samtakanna um að tengja þjónustuveitanda."
     },
     "platformList": {
       "checking": "Athuga…",

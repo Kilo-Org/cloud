@@ -1414,7 +1414,8 @@
       "noReviews": "Níl aon athbhreithniú ann fós",
       "noReviewsDescription": "Beidh athbhreithnithe le feiceáil anseo nuair a dhéanfaidh an tAthbhreithneoir cóid athbhreithniú ar iarratas tarraingthe.",
       "startManualReview": "Tosaigh athbhreithniú de láimh",
-      "configureProvider": "Cumraigh soláthraí"
+      "configureProvider": "Cumraigh soláthraí",
+      "connectOwnerOnly": "Iarr ar Úinéir eagraíochta nó Riarthóir soláthraí a cheangal."
     },
     "platformList": {
       "checking": "Ag seiceáil…",

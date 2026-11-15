@@ -757,6 +757,7 @@
     },
     "reviewList": {
       "configureProvider": "Configurar proveedor",
+      "connectOwnerOnly": "Pídele a un propietario o a un administrador de la organización que conecte un proveedor.",
       "couldNotLoad": "No se pudieron cargar las revisiones.",
       "noReviews": "Aún no hay revisiones",
       "noReviewsDescription": "Las revisiones aparecen aquí cuando el revisor de código analiza un PR.",

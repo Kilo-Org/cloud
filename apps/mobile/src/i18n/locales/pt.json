@@ -1368,7 +1368,8 @@
       "noReviews": "Ainda sem revisões",
       "noReviewsDescription": "As revisões aparecem aqui depois de o revisor de código analisar um pedido de integração.",
       "startManualReview": "Iniciar uma revisão manual",
-      "configureProvider": "Configurar fornecedor"
+      "configureProvider": "Configurar fornecedor",
+      "connectOwnerOnly": "Peça a um proprietário ou administrador da organização que ligue um fornecedor."
     },
     "platformList": {
       "checking": "A verificar…",

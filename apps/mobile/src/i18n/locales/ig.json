@@ -1345,7 +1345,8 @@
       "noReviews": "Enwebeghị nyocha",
       "noReviewsDescription": "Nyocha na-apụta ebe a mgbe onye nyocha koodu nyochachara arịrịọ ijikọ koodu.",
       "startManualReview": "Jiri aka malite nyocha",
-      "configureProvider": "Hazie onye na-enye ọrụ"
+      "configureProvider": "Hazie onye na-enye ọrụ",
+      "connectOwnerOnly": "Rịọ onye nwe nzukọ ma ọ bụ onye nchịkwa ka ha jikọọ onye na-enye ọrụ."
     },
     "platformList": {
       "checking": "Na-enyocha…",

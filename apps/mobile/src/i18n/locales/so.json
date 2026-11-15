@@ -1345,7 +1345,8 @@
       "noReviews": "Wali ma jiraan dib-u-eegisyo",
       "noReviewsDescription": "Dib-u-eegisyadu halkan ayay ka soo muuqanayaan marka Dib-u-eegaha koodhku ka shaqeeyo codsi isku dar ah.",
       "startManualReview": "Bilow dib-u-eegis gacmeed",
-      "configureProvider": "Deji bixiyaha"
+      "configureProvider": "Deji bixiyaha",
+      "connectOwnerOnly": "Weydii mulkiile ama maamule ururka si uu ugu xidho bixiyaha."
     },
     "platformList": {
       "checking": "Waa la hubinayaa...",

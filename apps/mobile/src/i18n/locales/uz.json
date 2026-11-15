@@ -1345,7 +1345,8 @@
       "noReviews": "Hali ko'rib chiqishlar yo'q",
       "noReviewsDescription": "Kodni ko'rib chiquvchi PRni tekshirgach, natijalar shu yerda ko'rsatiladi.",
       "startManualReview": "Qo'lda ko'rib chiqishni boshlash",
-      "configureProvider": "Provayderni sozlash"
+      "configureProvider": "Provayderni sozlash",
+      "connectOwnerOnly": "Provayderni ulashni tashkilot Egasi yoki Administratoridan so'rang."
     },
     "platformList": {
       "checking": "Tekshirilmoqda…",

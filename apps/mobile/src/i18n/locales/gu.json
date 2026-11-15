@@ -1345,7 +1345,8 @@
       "noReviews": "હજી કોઈ સમીક્ષા નથી",
       "noReviewsDescription": "કોડ સમીક્ષક પુલ રિક્વેસ્ટની સમીક્ષા કરે પછી તે અહીં દેખાશે.",
       "startManualReview": "સમીક્ષા જાતે શરૂ કરો",
-      "configureProvider": "સેવા પ્રદાતા ગોઠવો"
+      "configureProvider": "સેવા પ્રદાતા ગોઠવો",
+      "connectOwnerOnly": "સંસ્થાના માલિક અથવા એડમિનને સેવા પ્રદાતા જોડવા માટે વિનંતી કરો."
     },
     "platformList": {
       "checking": "તપાસ થઈ રહી છે…",

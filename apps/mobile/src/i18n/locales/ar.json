@@ -757,6 +757,7 @@
     },
     "reviewList": {
       "configureProvider": "إعداد المزوّد",
+      "connectOwnerOnly": "اطلب من مالك مؤسسة أو مشرف ربط المزوّد.",
       "couldNotLoad": "تعذّر تحميل المراجعات.",
       "noReviews": "لا توجد مراجعات بعد",
       "noReviewsDescription": "تظهر المراجعات هنا بعد أن يراجع مراجع الشفرة طلب سحب.",

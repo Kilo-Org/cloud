@@ -1368,7 +1368,8 @@
       "noReviews": "Încă nu există revizuiri",
       "noReviewsDescription": "Revizuirile apar aici după ce agentul de revizuire a codului analizează un PR.",
       "startManualReview": "Începe o revizuire manuală",
-      "configureProvider": "Configurează furnizorul"
+      "configureProvider": "Configurează furnizorul",
+      "connectOwnerOnly": "Cere unui proprietar de organizație sau unui administrator să conecteze un furnizor."
     },
     "platformList": {
       "checking": "Se verifică…",

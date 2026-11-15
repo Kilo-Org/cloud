@@ -1414,7 +1414,8 @@
       "noReviews": "S'issa l-ebda reviżjoni",
       "noReviewsDescription": "Ir-reviżjonijiet jidhru hawn wara li r-reviżur tal-kodiċi jirrevedi PR.",
       "startManualReview": "Ibda reviżjoni manwali",
-      "configureProvider": "Ikkonfigura l-fornitur"
+      "configureProvider": "Ikkonfigura l-fornitur",
+      "connectOwnerOnly": "Itlob lis-sid ta' organizzazzjoni jew lill-amministratur biex jikkonnettja fornitur."
     },
     "platformList": {
       "checking": "Qed jiġi ċċekkjat…",

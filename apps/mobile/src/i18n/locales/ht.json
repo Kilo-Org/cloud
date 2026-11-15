@@ -1345,7 +1345,8 @@
       "noReviews": "Poko gen revizyon",
       "noReviewsDescription": "Revizyon yo parèt isit la apre Revizè kòd la analize yon demann fizyon.",
       "startManualReview": "Kòmanse yon revizyon manyèl",
-      "configureProvider": "Konfigire founisè a"
+      "configureProvider": "Konfigire founisè a",
+      "connectOwnerOnly": "Mande yon pwopriyetè òganizasyon an oswa yon administratè pou konekte yon founisè."
     },
     "platformList": {
       "checking": "Ap tcheke…",

@@ -1437,7 +1437,8 @@
       "noReviews": "Dim adolygiadau eto",
       "noReviewsDescription": "Bydd adolygiadau'n ymddangos yma ar ôl i'r Adolygydd cod adolygu cais tynnu.",
       "startManualReview": "Dechrau adolygiad â llaw",
-      "configureProvider": "Ffurfweddu darparwr"
+      "configureProvider": "Ffurfweddu darparwr",
+      "connectOwnerOnly": "Gofynnwch i berchennog sefydliad neu weinyddwr gysylltu darparwr."
     },
     "platformList": {
       "checking": "Yn gwirio…",

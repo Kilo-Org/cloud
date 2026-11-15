@@ -1345,7 +1345,8 @@
       "noReviews": "Κανένας έλεγχος ακόμη",
       "noReviewsDescription": "Οι έλεγχοι εμφανίζονται εδώ μόλις ο ελεγκτής κώδικα εκτελεστεί σε ένα PR.",
       "startManualReview": "Έναρξη χειροκίνητου ελέγχου",
-      "configureProvider": "Ρύθμιση παρόχου"
+      "configureProvider": "Ρύθμιση παρόχου",
+      "connectOwnerOnly": "Ζήτησε από έναν κάτοχο ή διαχειριστή του οργανισμού να συνδέσει έναν πάροχο."
     },
     "platformList": {
       "checking": "Έλεγχος…",

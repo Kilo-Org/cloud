@@ -757,6 +757,7 @@
     },
     "reviewList": {
       "configureProvider": "Skonfiguruj dostawcę",
+      "connectOwnerOnly": "Poproś właściciela organizacji lub administratora o połączenie dostawcy.",
       "couldNotLoad": "Nie udało się wczytać przeglądów.",
       "noReviews": "Brak przeglądów",
       "noReviewsDescription": "Przeglądy pojawią się tutaj, gdy recenzent kodu przeanalizuje PR.",

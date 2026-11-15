@@ -1345,7 +1345,8 @@
       "noReviews": "Ստուգումներ դեռ չկան",
       "noReviewsDescription": "Ստուգումներն այստեղ կհայտնվեն, երբ Կոդի ստուգիչը ստուգի pull request։",
       "startManualReview": "Սկսել ձեռքով ստուգում",
-      "configureProvider": "Կարգավորել մատակարարը"
+      "configureProvider": "Կարգավորել մատակարարը",
+      "connectOwnerOnly": "Խնդրիր կազմակերպության սեփականատիրոջը կամ ադմինիստրատորին միացնել մատակարար։"
     },
     "platformList": {
       "checking": "Ստուգվում է…",

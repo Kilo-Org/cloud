@@ -1368,7 +1368,8 @@
       "noReviews": "Još nema pregleda",
       "noReviewsDescription": "Pregledi se prikazuju ovde kada agent za pregled koda pregleda neki PR.",
       "startManualReview": "Pokreni ručni pregled",
-      "configureProvider": "Podesi platformu"
+      "configureProvider": "Podesi platformu",
+      "connectOwnerOnly": "Zamoli vlasnika organizacije ili administratora da poveže platformu."
     },
     "platformList": {
       "checking": "Provera…",

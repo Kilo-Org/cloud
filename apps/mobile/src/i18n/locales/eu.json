@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} jada ez dago erabilgarri. Aukeratu biltegi bat behean.",
       "prefillModelUnavailable": "{{model}} jada ez dago erabilgarri. Zure modelo lehenetsia erabiltzen ari da.",
       "couldNotReadPendingSessions": "Ezin izan dira zain dauden saioak irakurri. Saiatu berriro.",
-      "failedToCreate": "Ezin izan da saioa sortu.",
+      "failedToCreate": "Ezin izan da saioa sortu",
       "checkOrganizationAccess": "Egiaztatu zure sarbidea erakunde honetara eta saiatu berriro.",
       "couldNotRefreshRepositories": "Ezin izan da biltegien zerrenda freskatu. Saiatu berriro.",
       "discardDraftTitle": "Baztertu zirriborroa?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kargatutako historiari esleitu gabeko kostua",
       "ofWindowTokens": "{{window}} tokenetik",
       "tokens": "token",
+      "tokens_one": "token",
+      "tokens_other": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} urrats",
       "stepsCount": "{{steps}} urrats",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Kargatu",
       "loadWithHost": "Kargatu {{host}}",
-      "httpsOnly": "HTTPS bidezko irudiak soilik onartzen dira.",
+      "httpsOnly": "HTTPS bidezko irudiak soilik",
       "trustTitle": "Kargatu irudia {{host}}(e)tik?",
       "trustMessage": "{{host}} ostalariari konfiantza emanez gero, haren irudiak ez dira aldi bakoitzean galdetu gabe kargatuko. Geroago konfiantza hori kendu dezakezu Konfiantzako ostalariak atalean.",
       "loadOnce": "Kargatu behin"

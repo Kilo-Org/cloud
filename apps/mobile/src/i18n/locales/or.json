@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ନିମ୍ନରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
       "prefillModelUnavailable": "{{model}} ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆପଣଙ୍କ ଡିଫଲ୍ଟ ମଡେଲ୍ ବ୍ୟବହାର କରାଯାଉଛି।",
       "couldNotReadPendingSessions": "ଅପେକ୍ଷାରେ ଥିବା ସେସନ୍ ପଢ଼ି ହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "failedToCreate": "ସେସନ୍ ତିଆରି ହୋଇପାରିଲା ନାହିଁ।",
+      "failedToCreate": "ସେସନ୍ ତିଆରି ହୋଇପାରିଲା ନାହିଁ",
       "checkOrganizationAccess": "ଏହି ସଂଗଠନକୁ ଆପଣଙ୍କର ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "couldNotRefreshRepositories": "ରିପୋଜିଟୋରୀ ତାଲିକା ରିଫ୍ରେସ୍ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "discardDraftTitle": "ଡ୍ରାଫ୍ଟ ହଟାଇବେ?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ଲୋଡ୍ ହୋଇଥିବା ଇତିହାସ ସହ ଯୋଡ଼ା ହୋଇନଥିବା ଖର୍ଚ୍ଚ",
       "ofWindowTokens": "{{window}} ଟୋକନ୍ ମଧ୍ୟରୁ",
       "tokens": "ଟୋକେନ୍",
+      "tokens_one": "ଟୋକେନ୍",
+      "tokens_other": "ଟୋକେନ୍",
       "tokensWithPercentage": "ଟୋକନ୍ ({{percentage}})",
       "stepsCount_one": "{{steps}} ପଦକ୍ଷେପ",
       "stepsCount": "{{steps}}ଟି ପର୍ଯ୍ୟାୟ",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ଲୋଡ୍ କରନ୍ତୁ",
       "loadWithHost": "{{host}} ଲୋଡ୍ କରନ୍ତୁ",
-      "httpsOnly": "କେବଳ HTTPS ଛବି ଲୋଡ୍ କରିହେବ।",
+      "httpsOnly": "କେବଳ HTTPS ଛବି",
       "trustTitle": "{{host}} ରୁ ଛବି ଲୋଡ୍ କରିବେ?",
       "trustMessage": "{{host}} କୁ ବିଶ୍ୱାସ କଲେ ଏହାର ଛବିଗୁଡ଼ିକ ପ୍ରତ୍ୟେକ ଥର ପଚାରିବା ବିନା ଲୋଡ୍ ହେବ। ପରେ ଆପଣ ବିଶ୍ୱସ୍ତ ହୋଷ୍ଟଗୁଡ଼ିକରେ ଏହାକୁ ପ୍ରତ୍ୟାହାର କରିପାରିବେ।",
       "loadOnce": "ଥରେ ଲୋଡ୍ କରନ୍ତୁ"

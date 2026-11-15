@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ໃຊ້ບໍ່ໄດ້ແລ້ວ. ເລືອກຄັງໂຄດຂ້າງລຸ່ມ.",
       "prefillModelUnavailable": "{{model}} ໃຊ້ບໍ່ໄດ້ແລ້ວ. ກຳລັງໃຊ້ໂມເດວມາດຕະຖານຂອງເຈົ້າແທນ.",
       "couldNotReadPendingSessions": "ບໍ່ສາມາດອ່ານເຊດຊັນທີ່ລໍຖ້າຢູ່ໄດ້. ລອງໃໝ່.",
-      "failedToCreate": "ບໍ່ສາມາດສ້າງເຊດຊັນໄດ້.",
+      "failedToCreate": "ບໍ່ສາມາດສ້າງເຊດຊັນໄດ້",
       "checkOrganizationAccess": "ກະລຸນາກວດສອບສິດການເຂົ້າເຖິງອົງການນີ້ຂອງທ່ານ ແລ້ວລອງໃໝ່.",
       "couldNotRefreshRepositories": "ບໍ່ສາມາດໂຫຼດລາຍການຄັງໂຄດໃໝ່ໄດ້. ກະລຸນາລອງໃໝ່.",
       "discardDraftTitle": "ລຶບຂໍ້ຄວາມຮ່າງບໍ?",
@@ -2630,7 +2630,7 @@
       "loadingDescription": "ກຳລັງລໍຖ້າຂໍ້ຄວາມຈາກເອເຈນຍ່ອຍ…"
     },
     "messageBubble": {
-      "failure": "ຂໍ້ຜິດພາດ: {{title}}.",
+      "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. ລອງໃໝ່ໄດ້.",
       "copyToComposer": "ຄັດລອກໃສ່ຊ່ອງປ້ອນຂໍ້ຄວາມ",
       "queuedAccessibility": "ຂໍ້ຄວາມກຳລັງລໍຖ້າສົ່ງ",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ຄ່າໃຊ້ຈ່າຍທີ່ບໍ່ໄດ້ລວມຢູ່ໃນປະຫວັດທີ່ໂຫຼດມາ",
       "ofWindowTokens": "ຈາກ {{window}} ໂທເຄັນ",
       "tokens": "ໂທເຄັນ",
+      "tokens_other": "ໂທເຄັນ",
+      "tokens_one": "ໂທເຄັນ",
       "tokensWithPercentage": "ໂທເຄັນ ({{percentage}})",
       "stepsCount_one": "{{steps}} ຂັ້ນຕອນ",
       "stepsCount": "{{steps}} ຂັ້ນຕອນ",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ໂຫຼດ",
       "loadWithHost": "ໂຫຼດ {{host}}",
-      "httpsOnly": "ຮອງຮັບສະເພາະຮູບພາບຜ່ານ HTTPS ເທົ່ານັ້ນ.",
+      "httpsOnly": "ສະເພາະຮູບພາບຜ່ານ HTTPS ເທົ່ານັ້ນ",
       "trustTitle": "ໂຫຼດຮູບຈາກ {{host}} ຫຼືບໍ່?",
       "trustMessage": "ການໄວ້ໃຈ {{host}} ຈະໂຫຼດຮູບຂອງມັນໂດຍບໍ່ຖາມທຸກຄັ້ງ. ທ່ານສາມາດຍົກເລີກໄດ້ພາຍຫຼັງໃນໂຮສທີ່ໄວ້ໃຈໄດ້.",
       "loadOnce": "ໂຫຼດເທື່ອດຽວ"

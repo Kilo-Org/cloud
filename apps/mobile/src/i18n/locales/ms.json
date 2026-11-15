@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} tidak lagi tersedia. Pilih repositori di bawah.",
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Model lalai anda digunakan.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu. Cuba semula.",
-      "failedToCreate": "Gagal mencipta sesi.",
+      "failedToCreate": "Gagal mencipta sesi",
       "checkOrganizationAccess": "Sila semak akses anda ke organisasi ini, kemudian cuba semula.",
       "couldNotRefreshRepositories": "Tidak dapat memuatkan semula repositori. Sila cuba semula.",
       "discardDraftTitle": "Buang draf?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kos yang tidak dikaitkan dengan sejarah yang dimuatkan",
       "ofWindowTokens": "daripada {{window}} token",
       "tokens": "token",
+      "tokens_other": "token",
+      "tokens_one": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} langkah",
       "stepsCount": "{{steps}} langkah",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Muatkan",
       "loadWithHost": "Muatkan {{host}}",
-      "httpsOnly": "Hanya imej HTTPS dibenarkan.",
+      "httpsOnly": "Hanya imej HTTPS",
       "trustTitle": "Muatkan imej daripada {{host}}?",
       "trustMessage": "Mempercayai {{host}} akan memuatkan imejnya tanpa bertanya setiap kali. Anda boleh menarik baliknya kemudian dalam Hos yang dipercayai.",
       "loadOnce": "Muatkan sekali"

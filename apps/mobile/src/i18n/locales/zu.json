@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ayisatholakali. Khetha inqolobane yekhodi ngezansi.",
       "prefillModelUnavailable": "{{model}} ayisatholakali. Kusetshenziswa imodeli yakho ezenzakalelayo.",
       "couldNotReadPendingSessions": "Asikwazanga ukufunda iziseshini ezilindile. Zama futhi.",
-      "failedToCreate": "Asikwazanga ukudala iseshini.",
+      "failedToCreate": "Asikwazanga ukudala iseshini",
       "checkOrganizationAccess": "Sicela uhlolo ukufinyelela kwakho kule nhlangano, bese uzama futhi.",
       "couldNotRefreshRepositories": "Asikwazanga ukuvuselela izinqolobane zekhodi. Sicela uzame futhi.",
       "discardDraftTitle": "Uyafuna ukulahla okusalungiswa?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Izindleko ezingahlotshaniswa nomlando olayishiwe",
       "ofWindowTokens": "kwamathokheni angu-{{window}}",
       "tokens": "amathokheni",
+      "tokens_one": "ithokheni",
+      "tokens_other": "amathokheni",
       "tokensWithPercentage": "amathokheni ({{percentage}})",
       "stepsCount_one": "isinyathelo esi-{{steps}}",
       "stepsCount": "Izinyathelo ezingu-{{steps}}",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Layisha",
       "loadWithHost": "Layisha {{host}}",
-      "httpsOnly": "Kuvunyelwe izithombe ze-HTTPS kuphela.",
+      "httpsOnly": "Izithombe ze-HTTPS kuphela",
       "trustTitle": "Layisha isithombe kusuka ku-{{host}}?",
       "trustMessage": "Ukuthemba u-{{host}} kuzolayisha izithombe zakhe ngaphandle kokubuza njalo. Ungakuhoxisa kamuva ngaphansi kwabasingathi abathenjwayo.",
       "loadOnce": "Layisha kanye"

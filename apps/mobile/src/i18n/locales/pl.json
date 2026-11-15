@@ -1659,7 +1659,7 @@
       "prefillRepoUnavailable": "{{repo}} nie jest już dostępne. Wybierz repozytorium poniżej.",
       "prefillModelUnavailable": "Model {{model}} nie jest już dostępny. Używany jest twój domyślny model.",
       "couldNotReadPendingSessions": "Nie udało się odczytać oczekujących sesji. Spróbuj ponownie.",
-      "failedToCreate": "Nie udało się utworzyć sesji.",
+      "failedToCreate": "Nie udało się utworzyć sesji",
       "checkOrganizationAccess": "Sprawdź dostęp do tej organizacji, a następnie spróbuj ponownie.",
       "couldNotRefreshRepositories": "Nie udało się odświeżyć repozytoriów. Spróbuj ponownie.",
       "discardDraftTitle": "Odrzucić szkic?",
@@ -2131,7 +2131,7 @@
       "loadingDescription": "Czekamy na wiadomości podagenta…"
     },
     "messageBubble": {
-      "failure": "Błąd: {{title}}.",
+      "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Możesz spróbować ponownie.",
       "copyToComposer": "Kopiuj do pola wiadomości",
       "queuedAccessibility": "Wiadomość w kolejce",
@@ -2318,6 +2318,10 @@
       "olderActivityDescription": "Koszt nieprzypisany do wczytanej historii",
       "ofWindowTokens": "z {{window}} tokenów",
       "tokens": "tokenów",
+      "tokens_one": "token",
+      "tokens_few": "tokeny",
+      "tokens_many": "tokenów",
+      "tokens_other": "tokena",
       "tokensWithPercentage": "tok. ({{percentage}})",
       "stepsCount_one": "{{steps}} krok",
       "stepsCount": "{{steps}} kroku",
@@ -2375,7 +2379,7 @@
     "markdownImage": {
       "load": "Wczytaj",
       "loadWithHost": "Wczytaj {{host}}",
-      "httpsOnly": "Można wczytywać tylko obrazy przez HTTPS.",
+      "httpsOnly": "Tylko obrazy przez HTTPS",
       "trustTitle": "Wczytać obraz z {{host}}?",
       "trustMessage": "Zaufanie hostowi {{host}} spowoduje, że jego obrazy będą wczytywane bez pytania za każdym razem. Możesz to później cofnąć w sekcji Zaufane hosty.",
       "loadOnce": "Wczytaj raz"

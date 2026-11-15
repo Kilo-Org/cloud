@@ -2248,7 +2248,7 @@
       "prefillRepoUnavailable": "{{repo}} již není k dispozici. Níže vyberte repozitář.",
       "prefillModelUnavailable": "{{model}} již není k dispozici. Používá se váš výchozí model.",
       "couldNotReadPendingSessions": "Čekající relace se nepodařilo načíst. Zkuste to znovu.",
-      "failedToCreate": "Relaci se nepodařilo vytvořit.",
+      "failedToCreate": "Relaci se nepodařilo vytvořit",
       "checkOrganizationAccess": "Zkontrolujte svůj přístup k této organizaci a zkuste to znovu.",
       "couldNotRefreshRepositories": "Seznam repozitářů se nepodařilo obnovit. Zkuste to znovu.",
       "discardDraftTitle": "Zahodit koncept?",
@@ -2907,6 +2907,10 @@
       "olderActivityDescription": "Náklady nezahrnuté v načtené historii",
       "ofWindowTokens": "z {{window}} tokenů",
       "tokens": "tokenů",
+      "tokens_one": "token",
+      "tokens_few": "tokeny",
+      "tokens_many": "tokenu",
+      "tokens_other": "tokenů",
       "tokensWithPercentage": "tokenů ({{percentage}})",
       "stepsCount_one": "{{steps}} krok",
       "stepsCount": "{{steps}} kroků",
@@ -2964,7 +2968,7 @@
     "markdownImage": {
       "load": "Načíst",
       "loadWithHost": "Načíst {{host}}",
-      "httpsOnly": "Lze načíst pouze obrázky přes HTTPS.",
+      "httpsOnly": "Pouze obrázky přes HTTPS",
       "trustTitle": "Načíst obrázek z {{host}}?",
       "trustMessage": "Pokud doméně {{host}} důvěřuješ, její obrázky se načtou bez pokaždé se ptát. Později to můžeš odebrat v Důvěryhodné domény.",
       "loadOnce": "Načíst jednou"

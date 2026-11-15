@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ከእንግዲህ አይገኝም። ከታች ማከማቻ ይምረጡ።",
       "prefillModelUnavailable": "{{model}} ከእንግዲህ አይገኝም። ነባሪ ሞዴልዎ ጥቅም ላይ እየዋለ ነው።",
       "couldNotReadPendingSessions": "የሚጠባበቁ ክፍለ ጊዜዎችን ማንበብ አልተቻለም። እንደገና ይሞክሩ።",
-      "failedToCreate": "ክፍለ ጊዜ መፍጠር አልተሳካም።",
+      "failedToCreate": "ክፍለ ጊዜ መፍጠር አልተሳካም",
       "checkOrganizationAccess": "እባክዎ ወደ ይህ ድርጅት ያለዎትን መዳረሻ ያረጋግጡ እና እንደገና ይሞክሩ።",
       "couldNotRefreshRepositories": "ማከማቻዎችን ማደስ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "discardDraftTitle": "ረቂቁን ማስወገድ ይፈልጋሉ?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ለተጫነው ታሪክ ያልተመደበ ወጪ",
       "ofWindowTokens": "ከ{{window}} ቶከኖች",
       "tokens": "ቶከኖች",
+      "tokens_one": "ቶከን",
+      "tokens_other": "ቶከኖች",
       "tokensWithPercentage": "ቶከኖች ({{percentage}})",
       "stepsCount_one": "{{steps}} እርምጃ",
       "stepsCount": "{{steps}} እርምጃዎች",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ይጫኑ",
       "loadWithHost": "{{host}}ን ይጫኑ",
-      "httpsOnly": "በHTTPS የሚጫኑ ምስሎች ብቻ ይፈቀዳሉ።",
+      "httpsOnly": "HTTPS ምስሎች ብቻ",
       "trustTitle": "ከ{{host}} ምስል ይጫኑ?",
       "trustMessage": "{{host}}ን ማመን ምስሎቹን በየጊዜው ሳይጠይቅ ይጭናል። በኋላ ከታመኑ አስተናጋጆች ላይ ሊያስወግዱት ይችላሉ።",
       "loadOnce": "አንድ ጊዜ ጫን"

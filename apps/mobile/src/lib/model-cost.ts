@@ -44,7 +44,9 @@ export function formatModelCostPer1M(pricing: ModelPricing | undefined): string 
     million,
     output,
     outputLabel: i18n.t('agentChat.messageDetails.output'),
-    tokens: i18n.t('agentChat.contextUsage.tokens'),
+    // This frame prices one million tokens, so the unit label's plural family
+    // must pick the form that count selects.
+    tokens: i18n.t('agentChat.contextUsage.tokens', { count: 1_000_000 }),
   });
 }
 

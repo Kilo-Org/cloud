@@ -2207,7 +2207,7 @@
       "prefillRepoUnavailable": "Repozitorij {{repo}} više nije dostupan. Odaberi repozitorij u nastavku.",
       "prefillModelUnavailable": "Model {{model}} više nije dostupan. Koristi se tvoj zadani model.",
       "couldNotReadPendingSessions": "Nije moguće učitati sesije na čekanju. Pokušaj ponovno.",
-      "failedToCreate": "Stvaranje sesije nije uspjelo.",
+      "failedToCreate": "Stvaranje sesije nije uspjelo",
       "checkOrganizationAccess": "Provjeri imaš li pristup ovoj organizaciji, pa pokušaj ponovno.",
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovno.",
       "discardDraftTitle": "Odbaciti nacrt?",
@@ -2866,7 +2866,10 @@
       "stepsCount_few": "{{steps}} koraka",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})",
-      "modelsCount_few": "Modeli ({{displayCount}})"
+      "modelsCount_few": "Modeli ({{displayCount}})",
+      "tokens_one": "token",
+      "tokens_few": "tokena",
+      "tokens_other": "tokena"
     },
     "sessionChanges": {
       "viewChanges": "Prikaži izmjene",
@@ -2913,7 +2916,7 @@
     "markdownImage": {
       "load": "Učitaj",
       "loadWithHost": "Učitaj {{host}}",
-      "httpsOnly": "Dopuštene su samo slike dostupne putem HTTPS-a.",
+      "httpsOnly": "Samo slike putem HTTPS-a",
       "trustTitle": "Učitati sliku s {{host}}?",
       "trustMessage": "Ako povjeruješ poslužitelju {{host}}, njegove slike učitavat će se bez svakog pitanja. Kasnije to možeš opozvati u odjeljku Pouzdani poslužitelji.",
       "loadOnce": "Učitaj jednom"

@@ -1641,7 +1641,7 @@
       "prefillRepoUnavailable": "{{repo}} אינו זמין עוד. בחר מאגר למטה.",
       "prefillModelUnavailable": "{{model}} כבר אינו זמין. במקומו ייעשה שימוש במודל ברירת המחדל שלך.",
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא את הסשנים הממתינים. נסה שוב.",
-      "failedToCreate": "לא ניתן היה ליצור סשן.",
+      "failedToCreate": "לא ניתן היה ליצור סשן",
       "checkOrganizationAccess": "בדוק את הגישה שלך לארגון הזה, ואז נסה שוב.",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
       "discardDraftTitle": "למחוק את הטיוטה?",
@@ -2292,6 +2292,9 @@
       "olderActivityDescription": "עלות שאינה משויכת להיסטוריה שנטענה",
       "ofWindowTokens": "מתוך {{window}} טוקנים",
       "tokens": "טוקנים",
+      "tokens_one": "טוקן",
+      "tokens_two": "טוקנים",
+      "tokens_other": "טוקנים",
       "tokensWithPercentage": "טוקנים ({{percentage}})",
       "stepsCount_one": "מספר שלבים: {{steps}}",
       "stepsCount": "{{steps}} צעדים",
@@ -2347,7 +2350,7 @@
     "markdownImage": {
       "load": "טעינה",
       "loadWithHost": "טעינה מ-{{host}}",
-      "httpsOnly": "אפשר לטעון תמונות רק דרך HTTPS.",
+      "httpsOnly": "רק תמונות HTTPS",
       "trustTitle": "לטעון תמונה מ-{{host}}?",
       "trustMessage": "מתן אמון ב-{{host}} טוען את התמונות שלו בלי לשאול בכל פעם. אפשר לבטל זאת מאוחר יותר תחת אתרים מהימנים.",
       "loadOnce": "טעינה פעם אחת"

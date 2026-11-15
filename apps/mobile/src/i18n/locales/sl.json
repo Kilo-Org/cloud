@@ -2248,7 +2248,7 @@
       "prefillRepoUnavailable": "Skladišče {{repo}} ni več na voljo. Spodaj izberi drugo skladišče.",
       "prefillModelUnavailable": "{{model}} ni več na voljo. Uporabljen je tvoj privzeti model.",
       "couldNotReadPendingSessions": "Čakajočih sej ni bilo mogoče prebrati. Poskusi znova.",
-      "failedToCreate": "Seje ni bilo mogoče ustvariti.",
+      "failedToCreate": "Seje ni bilo mogoče ustvariti",
       "checkOrganizationAccess": "Preveri dostop do te organizacije in poskusi znova.",
       "couldNotRefreshRepositories": "Skladišč ni bilo mogoče osvežiti. Poskusi znova.",
       "discardDraftTitle": "Želiš zavreči osnutek?",
@@ -2917,7 +2917,11 @@
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})",
       "modelsCount_two": "Modeli ({{displayCount}})",
-      "modelsCount_few": "Modeli ({{displayCount}})"
+      "modelsCount_few": "Modeli ({{displayCount}})",
+      "tokens_one": "žeton",
+      "tokens_two": "žetona",
+      "tokens_few": "žetoni",
+      "tokens_other": "žetonov"
     },
     "sessionChanges": {
       "viewChanges": "Prikaži spremembe",
@@ -2964,7 +2968,7 @@
     "markdownImage": {
       "load": "Naloži",
       "loadWithHost": "Naloži {{host}}",
-      "httpsOnly": "Podprte so samo slike prek HTTPS.",
+      "httpsOnly": "Samo slike prek HTTPS",
       "trustTitle": "Naložiti sliko z {{host}}?",
       "trustMessage": "Če zaupaš gostitelju {{host}}, se njegove slike naložijo brez vsakokratnega vprašanja. To lahko pozneje prekličeš v Zaupanja vredni gostitelji.",
       "loadOnce": "Naloži enkrat"

@@ -26,6 +26,9 @@ export type ReportConfirmRequest = Readonly<{
   onConfirm: () => void;
 }>;
 
+/** What the sheet's Report control renders and calls. */
+export type MessageReport = Readonly<{ showReport: boolean; handleReport: () => void }>;
+
 /**
  * One report's phase on the details sheet, keyed by the message it reports.
  *
@@ -34,9 +37,6 @@ export type ReportConfirmRequest = Readonly<{
  * mutation on the same hook. The invocation that started a report is the one
  * that settles its attempt.
  */
-/** What the sheet's Report control renders and calls. */
-export type MessageReport = Readonly<{ showReport: boolean; handleReport: () => void }>;
-
 export function useMessageReport(
   message: StoredMessage | null,
   requestConfirm: (request: ReportConfirmRequest) => void

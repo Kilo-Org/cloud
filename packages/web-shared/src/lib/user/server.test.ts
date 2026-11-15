@@ -61,7 +61,7 @@ import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken, JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -70,7 +70,7 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
+import { KILO_TOKEN_VERSION, signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -553,7 +553,7 @@ describe('getUserFromAuth', () => {
   test('flags an operation-scoped token presented to another endpoint', async () => {
     const user = await insertTestUser({ api_token_pepper: 'audience-fallthrough-pepper' });
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -578,7 +578,7 @@ describe('getUserFromAuth', () => {
       web_session_pepper: 'current-web-session-pepper',
     });
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -610,7 +610,7 @@ describe('getUserFromAuth', () => {
   test('accepts a gateway audience only for a gateway operation', async () => {
     const user = await insertTestUser({ api_token_pepper: 'gateway-audience-pepper' });
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -642,7 +642,7 @@ describe('getUserFromAuth', () => {
       0
     );
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -673,7 +673,7 @@ describe('getUserFromAuth', () => {
       0
     );
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,

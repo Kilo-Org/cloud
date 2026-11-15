@@ -1,10 +1,7 @@
 import { describe, test, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
-import {
-  validateAuthorizationHeader,
-  JWT_TOKEN_VERSION,
-  isRejectedCredentialReason,
-} from './tokens';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
+import { validateAuthorizationHeader, isRejectedCredentialReason } from './tokens';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 describe('validateAuthorizationHeader (C15 device-session compatibility)', () => {
@@ -14,7 +11,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         env: process.env.NODE_ENV,
         kiloUserId: 'test-user-c15',
         apiTokenPepper: 'test-pepper',
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
         deviceSessionId: 'device-session-c15-test',
       },
       getEnvVariable('NEXTAUTH_SECRET'),
@@ -39,7 +36,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         env: process.env.NODE_ENV,
         kiloUserId: 'test-user-c15',
         apiTokenPepper: 'test-pepper',
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
         deviceSessionId,
       },
       getEnvVariable('NEXTAUTH_SECRET'),
@@ -61,7 +58,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         env: process.env.NODE_ENV,
         kiloUserId: 'test-user-c15',
         apiTokenPepper: 'test-pepper',
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
       },
       getEnvVariable('NEXTAUTH_SECRET'),
       { algorithm: 'HS256', expiresIn: '5y' }

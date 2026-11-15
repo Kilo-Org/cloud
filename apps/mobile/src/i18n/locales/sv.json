@@ -3640,6 +3640,8 @@
       "available": "Tillgängliga verktyg: {{count}}",
       "none": "Inga verktyg tillgängliga",
       "noneDescription": "Kilo-servern svarade utan verktyg.",
+      "notApplied": "Kilo-verktyg lades inte till i den här chatten",
+      "notAppliedDescription": "Ditt val har sparats. Försök igen för att använda det i den här chatten nu.",
       "unreachable": "Kunde inte nå Kilo-verktyg",
       "unreachableDescription": "Servern svarade inte. Kontrollera anslutningen och försök igen.",
       "unauthorized": "Kilo-verktyg avvisade den här sessionen",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Det gick inte att koppla från kodarkivet",
       "repoValue": "Kodarkiv: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Den här profilen är inte längre tillgänglig. Välj en annan.",
       "pickerEmptyDescriptionOrganization": "Skapa en organisationsprofil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner.",
       "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsägare eller administratör kan skapa en organisationsprofil."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Går ut om {{duration}}",
     "neverExpires": "Går aldrig ut",
     "includesNewMessages": "Nya meddelanden inkluderas.",
-    "excludesNewMessages": "Nya meddelanden inkluderas inte."
+    "excludesNewMessages": "Nya meddelanden inkluderas inte.",
+    "superseded": "Den här länken har ersatts på annat håll och fungerar därför inte längre."
   },
   "sharedSession": {
     "title": "Delad session",

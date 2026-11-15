@@ -3694,6 +3694,8 @@
       "available": "Pieejamie rīki: {{count}}",
       "none": "Nav pieejamu rīku",
       "noneDescription": "Kilo serveris neatgrieza nevienu rīku.",
+      "notApplied": "Kilo rīki netika pievienoti šai tērzēšanai",
+      "notAppliedDescription": "Jūsu izvēle ir saglabāta. Mēģiniet vēlreiz, lai to tagad izmantotu šajā tērzēšanā.",
       "unreachable": "Neizdevās sasniegt Kilo rīkus",
       "unreachableDescription": "Serveris neatbildēja. Pārbaudi savienojumu un mēģini vēlreiz.",
       "unauthorized": "Kilo rīki atteica šo sesiju",
@@ -4220,6 +4222,7 @@
       "unbindFailed": "Nevarēja atsaistīt repo",
       "repoValue": "Repozitorijs: {{name}}",
       "profileValue": "Profils: {{name}}",
+      "profileUnavailable": "Šis profils vairs nav pieejams. Izvēlieties citu.",
       "pickerEmptyDescriptionOrganization": "Izveidojiet organizācijas profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organizācijas īpašnieks vai administrators var izveidot organizācijas profilu."
     },
@@ -4544,7 +4547,8 @@
     "expiresIn": "Derīga vēl {{duration}}",
     "neverExpires": "Derīga bez termiņa",
     "includesNewMessages": "Jauni ziņojumi tiek iekļauti.",
-    "excludesNewMessages": "Jauni ziņojumi netiek iekļauti."
+    "excludesNewMessages": "Jauni ziņojumi netiek iekļauti.",
+    "superseded": "Šī saite tika aizstāta citur, tāpēc tā vairs nedarbojas."
   },
   "sharedSession": {
     "title": "Kopīgota sesija",

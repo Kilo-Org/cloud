@@ -3856,6 +3856,8 @@
       "available": "Offer ar gael: {{count}}",
       "none": "Dim offer ar gael",
       "noneDescription": "Ni chyflwynodd gweinydd Kilo unrhyw offer.",
+      "notApplied": "Ni ychwanegwyd offer Kilo at y sgwrs hon",
+      "notAppliedDescription": "Mae eich dewis wedi'i gadw. Rhoi cynnig eto i'w ddefnyddio yn y sgwrs hon nawr.",
       "unreachable": "Ni ellid cyrraedd offer Kilo",
       "unreachableDescription": "Ni wnaeth y gweinydd ateb. Gwiriwch eich cysylltiad, yna ceisiwch eto.",
       "unauthorized": "Gwrthododd offer Kilo y sesiwn hon",
@@ -4403,6 +4405,7 @@
       "unbindFailed": "Ni fu modd dadrwymo repo",
       "repoValue": "Ystorfa: {{name}}",
       "profileValue": "Proffil: {{name}}",
+      "profileUnavailable": "Nid yw'r proffil hwn ar gael mwyach. Dewiswch un arall.",
       "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Gall perchennog sefydliad neu weinyddwr greu proffil sefydliad."
     },
@@ -4739,7 +4742,8 @@
     "expiresIn": "Yn dod i ben ymhen {{duration}}",
     "neverExpires": "Byth yn dod i ben",
     "includesNewMessages": "Mae negeseuon newydd wedi'u cynnwys.",
-    "excludesNewMessages": "Nid yw negeseuon newydd wedi'u cynnwys."
+    "excludesNewMessages": "Nid yw negeseuon newydd wedi'u cynnwys.",
+    "superseded": "Disodlwyd y ddolen hon mewn man arall, felly nid yw'n gweithio mwyach."
   },
   "sharedSession": {
     "title": "Sesiwn a rannwyd",

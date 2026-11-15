@@ -3640,6 +3640,8 @@
       "available": "Mavjud vositalar: {{count}}",
       "none": "Mavjud vosita yo'q",
       "noneDescription": "Kilo serveri hech qanday vosita qaytarmadi.",
+      "notApplied": "Bu suhbatga Kilo vositalari qoʻshilmadi",
+      "notAppliedDescription": "Tanlovingiz saqlandi. Uni hozir shu suhbatda ishlatish uchun “Qayta urinish”ni bosing.",
       "unreachable": "Kilo vositalariga yetib bo'lmadi",
       "unreachableDescription": "Server javob bermadi. Ulanishni tekshirib, qayta urinib ko'ring.",
       "unauthorized": "Kilo vositalari bu sessiyani rad etdi",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Reponi ajratib boʻlmadi",
       "repoValue": "Repozitoriy: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Bu profil endi mavjud emas. Boshqasini tanlang.",
       "pickerEmptyDescriptionOrganization": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun tashkilot profili yarating.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Tashkilot profili tashkilot egasi yoki administratori tomonidan yaratilishi mumkin."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Tugashiga {{duration}} qoldi",
     "neverExpires": "Muddati tugamaydi",
     "includesNewMessages": "Yangi xabarlar qoʻshiladi.",
-    "excludesNewMessages": "Yangi xabarlar qoʻshilmaydi."
+    "excludesNewMessages": "Yangi xabarlar qoʻshilmaydi.",
+    "superseded": "Bu havola boshqa joyda almashtirilgani uchun endi ishlamaydi."
   },
   "sharedSession": {
     "title": "Ulashilgan seans",

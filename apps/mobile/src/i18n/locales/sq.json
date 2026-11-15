@@ -3640,6 +3640,8 @@
       "available": "Mjetet e disponueshme: {{count}}",
       "none": "Nuk ka mjete të disponueshme",
       "noneDescription": "Serveri Kilo nuk ktheu asnjë mjet.",
+      "notApplied": "Mjetet Kilo nuk u shtuan në këtë bisedë",
+      "notAppliedDescription": "Zgjedhja jote është ruajtur. Riprovo për ta përdorur tani në këtë bisedë.",
       "unreachable": "Nuk u arritën mjetet Kilo",
       "unreachableDescription": "Serveri nuk u përgjigj. Kontrollo lidhjen dhe provo përsëri.",
       "unauthorized": "Mjetet Kilo refuzuan këtë sesion",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Repo nuk mund të shkëputej",
       "repoValue": "Depoja: {{name}}",
       "profileValue": "Profili: {{name}}",
+      "profileUnavailable": "Ky profil nuk është më i disponueshëm. Zgjidh një tjetër.",
       "pickerEmptyDescriptionOrganization": "Krijo një profil organizate për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Pronari i organizatës ose një administrator mund të krijojë një profil organizate."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Skadon pas {{duration}}",
     "neverExpires": "Nuk skadon kurrë",
     "includesNewMessages": "Mesazhet e reja përfshihen.",
-    "excludesNewMessages": "Mesazhet e reja përjashtohen."
+    "excludesNewMessages": "Mesazhet e reja përjashtohen.",
+    "superseded": "Kjo lidhje u zëvendësua nga një pajisje tjetër, ndaj nuk funksionon më."
   },
   "sharedSession": {
     "title": "Seancë e ndarë",

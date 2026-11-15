@@ -3640,6 +3640,8 @@
       "available": "ਉਪਲਬਧ ਟੂਲ: {{count}}",
       "none": "ਕੋਈ ਟੂਲ ਉਪਲਬਧ ਨਹੀਂ",
       "noneDescription": "Kilo ਸਰਵਰ ਨੇ ਕੋਈ ਟੂਲ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
+      "notApplied": "ਇਸ ਚੈਟ ਵਿੱਚ Kilo ਟੂਲ ਨਹੀਂ ਜੋੜੇ ਗਏ",
+      "notAppliedDescription": "ਤੁਹਾਡੀ ਚੋਣ ਸੰਭਾਲ ਲਈ ਗਈ ਹੈ। ਇਸਨੂੰ ਹੁਣ ਇਸ ਚੈਟ ਵਿੱਚ ਵਰਤਣ ਲਈ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "unreachable": "Kilo ਟੂਲ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ",
       "unreachableDescription": "ਸਰਵਰ ਨੇ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "unauthorized": "Kilo ਟੂਲ ਨੇ ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਅਸਵੀਕਾਰ ਕੀਤਾ",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "ਰੈਪੋ ਨੂੰ ਅਨਬਾਈਂਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
       "repoValue": "ਰਿਪੋਜ਼ਟਰੀ: {{name}}",
       "profileValue": "ਪ੍ਰੋਫਾਈਲ: {{name}}",
+      "profileUnavailable": "ਇਹ ਪ੍ਰੋਫਾਈਲ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਚੁਣੋ।",
       "pickerEmptyDescriptionOrganization": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।",
       "pickerEmptyDescriptionOrganizationReadOnly": "ਸੰਗਠਨ ਦਾ ਮਾਲਕ ਜਾਂ ਪ੍ਰਬੰਧਕ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾ ਸਕਦਾ ਹੈ।"
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "{{duration}} ਵਿੱਚ ਮਿਆਦ ਖਤਮ",
     "neverExpires": "ਮਿਆਦ ਕਦੇ ਖਤਮ ਨਹੀਂ ਹੁੰਦੀ",
     "includesNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਹਨ।",
-    "excludesNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ।"
+    "excludesNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ।",
+    "superseded": "ਇਹ ਲਿੰਕ ਕਿਸੇ ਹੋਰ ਥਾਂ ਤੋਂ ਬਦਲ ਦਿੱਤਾ ਗਿਆ ਸੀ, ਇਸ ਲਈ ਇਹ ਹੁਣ ਕੰਮ ਨਹੀਂ ਕਰਦਾ।"
   },
   "sharedSession": {
     "title": "ਸਾਂਝਾ ਕੀਤਾ ਸੈਸ਼ਨ",

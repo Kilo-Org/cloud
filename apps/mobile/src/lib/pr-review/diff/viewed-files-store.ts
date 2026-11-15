@@ -47,6 +47,10 @@ type ViewedFilesEntry = {
   listeners: Set<() => void>;
   /** The first read for this entry has been started. */
   started: boolean;
+  /** Reads started for this entry, so an older read cannot publish over a newer one. */
+  readSeq: number;
+  /** Toggles of this entry whose durable write has not settled yet. */
+  writes: number;
 };
 
 const entries = new Map<string, ViewedFilesEntry>();
@@ -77,11 +81,20 @@ async function readPaths(entry: ViewedFilesEntry): Promise<readonly string[]> {
 }
 
 async function loadViewedFiles(key: string, entry: ViewedFilesEntry): Promise<void> {
+  const seq = (entry.readSeq += 1);
   const paths = await readPaths(entry);
   // The entry can be dropped (last listener removed) or replaced (remount
   // subscribed again) while the read is in flight; a late result must never
-  // serve the entry that now owns the key.
-  if (entries.get(key) !== entry) {
+  // serve the entry that now owns the key. The same goes for a read a newer
+  // read already replaced.
+  if (entries.get(key) !== entry || seq !== entry.readSeq) {
+    return;
+  }
+  /* A read taken while this key's toggle is still writing holds the set from
+     before that write, so publishing it would take the tick back off the path
+     the person just ticked. The toggle's own revalidation publishes the durable
+     truth once the write has settled. */
+  if (entry.writes > 0) {
     return;
   }
   publish(entry, Object.freeze({ paths: Object.freeze([...paths]), isLoading: false }));
@@ -100,7 +113,15 @@ export function subscribeViewedFiles(
   const key = storeKey(ref, headSha);
   let entry = entries.get(key);
   if (!entry) {
-    entry = { ref, headSha, snapshot: PENDING, listeners: new Set(), started: false };
+    entry = {
+      ref,
+      headSha,
+      snapshot: PENDING,
+      listeners: new Set(),
+      started: false,
+      readSeq: 0,
+      writes: 0,
+    };
     entries.set(key, entry);
   }
   entry.listeners.add(listener);
@@ -150,6 +171,11 @@ export async function applyViewedFilesToggle(
 ): Promise<void> {
   const entry = entries.get(storeKey(ref, headSha));
   if (entry) {
+    /* A read already in flight was taken before this write, so it would publish
+       the set this flip replaces; and the write is counted so a read started
+       inside the window the write is open is dropped too. */
+    entry.readSeq += 1;
+    entry.writes += 1;
     const current = entry.snapshot.paths;
     const nextPaths = current.includes(path)
       ? current.filter(existing => existing !== path)
@@ -159,8 +185,14 @@ export async function applyViewedFilesToggle(
       Object.freeze({ paths: Object.freeze(nextPaths), isLoading: entry.snapshot.isLoading })
     );
   }
-  await toggleViewedFile({ ...ref, headSha, path });
-  revalidateAllViewedFiles();
+  try {
+    await toggleViewedFile({ ...ref, headSha, path });
+  } finally {
+    if (entry) {
+      entry.writes -= 1;
+    }
+    revalidateAllViewedFiles();
+  }
 }
 
 /** For tests: drop every entry so a swapped fake store gets a fresh read. */

@@ -3640,6 +3640,8 @@
       "available": "Meeshaalee jiran: {{count}}",
       "none": "Meeshaalee hin jiran",
       "noneDescription": "Sarvariin Kilo meeshaa tokkollee hin deebisne.",
+      "notApplied": "Meeshaaleen Kilo marii kanatti hin dabalamne",
+      "notAppliedDescription": "Filannoon kee olkaa'ameera. Amma marii kana keessatti itti fayyadamuuf irra deebi'ii yaali.",
       "unreachable": "Meeshaalee Kilo bira ga'uun hin danda'amne",
       "unreachableDescription": "Sarvariin hin deebisne. Walqunnamtii kee ilaali, sana booda ammas yaali.",
       "unauthorized": "Meeshaaleen Kilo marii kana didaniiru",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Repo hiikuu hin dandeenye",
       "repoValue": "Kuusaa: {{name}}",
       "profileValue": "Profaayilii: {{name}}",
+      "profileUnavailable": "Profaayiliin kun kana booda hin argamu. Kan biraa filadhu.",
       "pickerEmptyDescriptionOrganization": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii dhaabbataa uumi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Abbaan dhaabbataa yookiin bulchaan dhaabbataa piroofaayilii dhaabbataa uumuu danda'a."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Yeroon isaa {{duration}} keessatti xumurama",
     "neverExpires": "Yeroon isaa gonkumaa hin xumuramu",
     "includesNewMessages": "Ergaawwan haaraan ni dabalamu.",
-    "excludesNewMessages": "Ergaawwan haaraan hin dabalaman."
+    "excludesNewMessages": "Ergaawwan haaraan hin dabalaman.",
+    "superseded": "Liinkiin kun bakka biraatti bakka buufameera, kanaaf kana booda hin hojjetu."
   },
   "sharedSession": {
     "title": "Seshinii qoodame",

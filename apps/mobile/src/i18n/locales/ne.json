@@ -3640,6 +3640,8 @@
       "available": "उपलब्ध उपकरण: {{count}}",
       "none": "कुनै उपकरण उपलब्ध छैन",
       "noneDescription": "Kilo सर्भरले कुनै उपकरण फर्काएन।",
+      "notApplied": "यो कुराकानीमा Kilo उपकरणहरू थपिएका छैनन्",
+      "notAppliedDescription": "तपाईंको छनोट सुरक्षित गरिएको छ। यसलाई अहिले यो कुराकानीमा प्रयोग गर्न फेरि प्रयास गर्नुहोस्।",
       "unreachable": "Kilo उपकरणसम्म पुग्न सकिएन",
       "unreachableDescription": "सर्भरले जवाफ दिएन। आफ्नो जडान जाँच्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
       "unauthorized": "Kilo उपकरणले यो सत्र अस्वीकार गरे",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "रिपो अनबाइन्ड गर्न सकेन",
       "repoValue": "भण्डार: {{name}}",
       "profileValue": "प्रोफाइल: {{name}}",
+      "profileUnavailable": "यो प्रोफाइल अब उपलब्ध छैन। अर्को छान्नुहोस्।",
       "pickerEmptyDescriptionOrganization": "वातावरण चरहरू, सेटअप आदेशहरू, र सत्रहरूमा सीपहरू पुन: प्रयोग गर्न संगठन प्रोफाइल सिर्जना गर्नुहोस्।",
       "pickerEmptyDescriptionOrganizationReadOnly": "संगठनको मालिक वा प्रशासकले संगठन प्रोफाइल सिर्जना गर्न सक्छ।"
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "{{duration}} मा म्याद सकिन्छ",
     "neverExpires": "म्याद कहिल्यै सकिँदैन",
     "includesNewMessages": "नयाँ सन्देशहरू समावेश छन्।",
-    "excludesNewMessages": "नयाँ सन्देशहरू समावेश छैनन्।"
+    "excludesNewMessages": "नयाँ सन्देशहरू समावेश छैनन्।",
+    "superseded": "यो लिङ्क अन्यत्रबाट बदलिएको छ, त्यसैले यसले अब काम गर्दैन।"
   },
   "sharedSession": {
     "title": "सेयर गरिएको सत्र",

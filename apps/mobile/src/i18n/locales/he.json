@@ -3694,6 +3694,8 @@
       "available": "כלים זמינים: {{count}}",
       "none": "אין כלים זמינים",
       "noneDescription": "השרת של Kilo לא החזיר כלים.",
+      "notApplied": "כלי Kilo לא נוספו לשיחה הזו",
+      "notAppliedDescription": "הבחירה שלך נשמרה. לחץ על ניסיון חוזר כדי להשתמש בה עכשיו בשיחה הזו.",
       "unreachable": "לא ניתן היה להגיע לכלי Kilo",
       "unreachableDescription": "השרת לא הגיב. בדוק את החיבור שלך ונסה שוב.",
       "unauthorized": "כלי Kilo דחו את ההפעלה הזו",
@@ -4220,6 +4222,7 @@
       "unbindFailed": "לא ניתן היה לבטל את קשירת המאגר",
       "repoValue": "מאגר: {{name}}",
       "profileValue": "פרופיל: {{name}}",
+      "profileUnavailable": "הפרופיל הזה כבר לא זמין. בחר פרופיל אחר.",
       "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
       "pickerEmptyDescriptionOrganizationReadOnly": "בעלים של ארגון או מנהל יכולים ליצור פרופיל ארגוני."
     },
@@ -4544,7 +4547,8 @@
     "expiresIn": "התוקף יפוג בעוד {{duration}}",
     "neverExpires": "ללא תפוגה",
     "includesNewMessages": "הודעות חדשות נכללות.",
-    "excludesNewMessages": "הודעות חדשות אינן נכללות."
+    "excludesNewMessages": "הודעות חדשות אינן נכללות.",
+    "superseded": "הקישור הזה הוחלף במכשיר אחר, ולכן הוא כבר לא עובד."
   },
   "sharedSession": {
     "title": "סשן משותף",

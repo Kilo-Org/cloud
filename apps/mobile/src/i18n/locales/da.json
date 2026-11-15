@@ -3640,6 +3640,8 @@
       "available": "Tilgængelige værktøjer: {{count}}",
       "none": "Ingen værktøjer tilgængelige",
       "noneDescription": "Kilo-serveren svarede uden værktøjer.",
+      "notApplied": "Kilo-værktøjer blev ikke føjet til denne chat",
+      "notAppliedDescription": "Dit valg er gemt. Prøv igen for at bruge det i denne chat nu.",
       "unreachable": "Kunne ikke nå Kilo-værktøjer",
       "unreachableDescription": "Serveren svarede ikke. Tjek din forbindelse, og prøv igen.",
       "unauthorized": "Kilo-værktøjer afviste denne session",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Repo kunne ikke ophæves",
       "repoValue": "Lager: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Denne profil er ikke længere tilgængelig. Vælg en anden.",
       "pickerEmptyDescriptionOrganization": "Opret en organisationsprofil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
       "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsejer eller administrator kan oprette en organisationsprofil."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Udløber om {{duration}}",
     "neverExpires": "Udløber aldrig",
     "includesNewMessages": "Nye beskeder medtages.",
-    "excludesNewMessages": "Nye beskeder medtages ikke."
+    "excludesNewMessages": "Nye beskeder medtages ikke.",
+    "superseded": "Dette link blev erstattet et andet sted, så det virker ikke længere."
   },
   "sharedSession": {
     "title": "Delt session",

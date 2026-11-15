@@ -3640,6 +3640,8 @@
       "available": "利用可能なツール：{{count}}",
       "none": "利用可能なツールはありません",
       "noneDescription": "Kiloサーバーはツールを返しませんでした。",
+      "notApplied": "このチャットにKiloツールが追加されていません",
+      "notAppliedDescription": "選択内容は保存されています。このチャットで今すぐ使用するには、再試行してください。",
       "unreachable": "Kiloツールに接続できませんでした",
       "unreachableDescription": "サーバーが応答しませんでした。接続を確認して、もう一度お試しください。",
       "unauthorized": "Kiloツールがこのセッションを拒否しました",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "リポジトリのバインドを解除できませんでした",
       "repoValue": "リポジトリ: {{name}}",
       "profileValue": "プロフィール: {{name}}",
+      "profileUnavailable": "このプロフィールは使用できなくなりました。別のプロフィールを選択してください。",
       "pickerEmptyDescriptionOrganization": "組織プロフィールを作成して、セッション間で環境変数、セットアップコマンド、スキルを再利用します。",
       "pickerEmptyDescriptionOrganizationReadOnly": "組織のオーナーまたは管理者が組織プロフィールを作成できます。"
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "あと{{duration}}で期限切れ",
     "neverExpires": "無期限",
     "includesNewMessages": "新しいメッセージが含まれます。",
-    "excludesNewMessages": "新しいメッセージは含まれません。"
+    "excludesNewMessages": "新しいメッセージは含まれません。",
+    "superseded": "このリンクは別のデバイスで置き換えられたため、使用できなくなりました。"
   },
   "sharedSession": {
     "title": "共有セッション",

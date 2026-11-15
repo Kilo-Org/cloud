@@ -3640,6 +3640,8 @@
       "available": "Nutsmiddels beskikbaar: {{count}}",
       "none": "Geen nutsmiddels beskikbaar nie",
       "noneDescription": "Die Kilo-bediener het geen nutsmiddels teruggegee nie.",
+      "notApplied": "Kilo-nutsmiddels is nie by hierdie klets gevoeg nie",
+      "notAppliedDescription": "Jou keuse is gestoor. Probeer weer om dit nou in hierdie klets te gebruik.",
       "unreachable": "Kon nie Kilo-nutsmiddels bereik nie",
       "unreachableDescription": "Die bediener het nie geantwoord nie. Kontroleer jou verbinding en probeer weer.",
       "unauthorized": "Kilo-nutsmiddels het hierdie sessie geweier",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Kon nie repo ontbind nie",
       "repoValue": "Bewaarplek: {{name}}",
       "profileValue": "Profiel: {{name}}",
+      "profileUnavailable": "Hierdie profiel is nie meer beskikbaar nie. Kies 'n ander een.",
       "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Die eienaar of admin van 'n organisasie kan 'n organisasieprofiel skep."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Verval oor {{duration}}",
     "neverExpires": "Verval nooit",
     "includesNewMessages": "Nuwe boodskappe is ingesluit.",
-    "excludesNewMessages": "Nuwe boodskappe is uitgesluit."
+    "excludesNewMessages": "Nuwe boodskappe is uitgesluit.",
+    "superseded": "Hierdie skakel is elders vervang en werk dus nie meer nie."
   },
   "sharedSession": {
     "title": "Gedeelde sessie",

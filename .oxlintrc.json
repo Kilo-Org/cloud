@@ -21,7 +21,7 @@
     "**/dist/**",
     "**/.wrangler/**",
     "supabase/functions/**",
-    "**/types/opencode.gen.ts"
+    "**/opencode.gen.ts"
   ],
   "rules": {
     "constructor-super": "off",

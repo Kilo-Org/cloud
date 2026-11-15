@@ -19,6 +19,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { canConnectAnyProvider } from '@/lib/code-reviewer-status';
+import { isPersonal } from '@/lib/code-reviewer-config';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import {
   useBitbucketReadiness,
@@ -160,11 +161,20 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   // state must paint its final form once: a button that appears and then leaves
   // moves the centered stack by its own height. Keep the loading body until all
   // inputs settle, as the manual-review screen does for the same reason.
+  // A query with no data and no error has not answered yet: it is paused
+  // (offline, unknown connectivity) or still fetching, so the empty state must
+  // not paint a state it may replace. The classifiers treat that case as
+  // loading; a failed read is settled, because the role and connection answers
+  // are then both final for this visit.
+  const providerUnresolved = (status: { data?: unknown; isError?: boolean }) =>
+    status.data === undefined && status.isError !== true;
   const emptyStateSettled =
     permission.status !== 'loading' &&
-    !githubStatus.isLoading &&
-    !gitlabStatus.isLoading &&
-    !bitbucketReadiness.isLoading;
+    !providerUnresolved(githubStatus) &&
+    !providerUnresolved(gitlabStatus) &&
+    // The Bitbucket readiness query is disabled for a personal scope, so its
+    // empty cache there is a final answer, not a pending one.
+    (isPersonal(scope) || !providerUnresolved(bitbucketReadiness));
 
   const pages = data?.pages;
   const firstPage = pages?.[0];

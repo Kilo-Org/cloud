@@ -185,6 +185,7 @@ export function classifyPermission(input: {
   isLoading: boolean;
   isError: boolean;
   isFetching: boolean;
+  hasData: boolean;
   role: string | undefined;
   refetch: () => void;
 }): PermissionState {
@@ -196,6 +197,13 @@ export function classifyPermission(input: {
   }
   if (input.isError) {
     return { status: 'error', refetch: input.refetch, isRetrying: input.isFetching };
+  }
+  // A paused query (offline or unknown connectivity, empty cache) is pending but
+  // not fetching, so `isLoading` is false while the role is still unknown. The
+  // role must stay unresolved rather than read as "neither capability", or an
+  // owner on a cold launch would be treated as a plain member.
+  if (!input.hasData) {
+    return { status: 'loading' };
   }
   return {
     status: 'ready',

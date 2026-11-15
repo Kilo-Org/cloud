@@ -230,6 +230,7 @@ describe('classifyPermission', () => {
         isLoading: true,
         isError: true,
         isFetching: true,
+        hasData: true,
         role: undefined,
         refetch: vi.fn<() => void>(),
       })
@@ -243,6 +244,7 @@ describe('classifyPermission', () => {
         isLoading: true,
         isError: false,
         isFetching: true,
+        hasData: true,
         role: undefined,
         refetch: vi.fn<() => void>(),
       })
@@ -256,6 +258,7 @@ describe('classifyPermission', () => {
       isLoading: false,
       isError: true,
       isFetching: false,
+      hasData: true,
       role: undefined,
       refetch,
     });
@@ -274,6 +277,7 @@ describe('classifyPermission', () => {
           isLoading: false,
           isError: false,
           isFetching: false,
+          hasData: true,
           role,
           refetch: vi.fn<() => void>(),
         })
@@ -289,6 +293,7 @@ describe('classifyPermission', () => {
           isLoading: false,
           isError: false,
           isFetching: false,
+          hasData: true,
           role,
           refetch: vi.fn<() => void>(),
         })
@@ -301,6 +306,7 @@ describe('classifyPermission', () => {
           isLoading: false,
           isError: false,
           isFetching: false,
+          hasData: true,
           role,
           refetch: vi.fn<() => void>(),
         })
@@ -308,25 +314,15 @@ describe('classifyPermission', () => {
     }
   });
 
-  it('denies edit for member role or an unresolved org', () => {
+  it('denies edit for a member role', () => {
     expect(
       classifyPermission({
         isPersonal: false,
         isLoading: false,
         isError: false,
         isFetching: false,
+        hasData: true,
         role: 'member',
-        refetch: vi.fn<() => void>(),
-      })
-    ).toEqual({ status: 'ready', canEdit: false, canManage: false });
-
-    expect(
-      classifyPermission({
-        isPersonal: false,
-        isLoading: false,
-        isError: false,
-        isFetching: false,
-        role: undefined,
         refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'ready', canEdit: false, canManage: false });

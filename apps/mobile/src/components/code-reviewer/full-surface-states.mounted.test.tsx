@@ -260,6 +260,7 @@ vi.mock('@/lib/hooks/use-reviewer-permission', async () => {
         isLoading: false,
         isError: false,
         isFetching: false,
+        hasData: true,
         role: state.organizations.find(org => org.organizationId === scope)?.role,
         refetch: () => undefined,
       });

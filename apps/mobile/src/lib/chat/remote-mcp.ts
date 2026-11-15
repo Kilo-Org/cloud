@@ -271,50 +271,34 @@ function failOffline(servers: readonly StoredRemoteMcpServer[]): readonly Remote
 }
 
 /**
- * Discovers the enabled servers' tools, reusing the answers already made for the
- * same config and account.
+ * The pass an ask gets: the one already running for this key, or a new one.
  *
- * A discovery that failed is not an answer: asking again reconnects, which is
- * what a Retry and the next chat both are. Neither is an answer with no tools in
- * it, because the next ask is what makes a transient empty catalog recoverable.
- * A call made while one is already running for the same key joins it rather
- * than opening a second connection.
- *
- * After a cold start the stored list may not have been read yet, and an empty
- * list then means "not read" rather than "none": the ask waits for it, or a
- * chat opened at launch would discover nothing. An automatic ask made while
- * the app has confirmed it is offline connects to nothing, so a chat opens at
- * once rather than after the deadline. An unknown state, as at boot before
- * NetInfo settles, still connects; a person's Retry always tries.
+ * An automatic ask is answered by the pass it joins. A person's Retry is about a
+ * row that has already failed, so it waits for that pass and then asks again —
+ * and the recursive call checks admission again with the start that follows it
+ * in the same turn, so two retries that waited on one pass cannot both start a
+ * discovery for the same generation.
  */
-export async function ensureRemoteMcp(
-  place: ChatPlace,
-  request: RemoteMcpRequest = {}
+async function ensurePass(
+  key: string,
+  request: RemoteMcpRequest
 ): Promise<readonly RemoteMcpServerState[]> {
-  if (!getRemoteMcpServersHasLoaded()) {
-    await whenRemoteMcpServersLoaded();
-  }
-  const key = keyFor(place);
-  if (key !== cacheKey) {
-    /* The config or the account changed, so a discovery started for the old one
-       is no longer the answer: bumping the generation stops it publishing its
-       server's tools over the discovery the new key now runs, and stops it
-       clearing that discovery's `pending`. */
-    generation += 1;
-    cacheKey = key;
-    discovered = new Map();
-    forgetCallResults();
-    pending.clear();
-    publish();
+  if (inFlight?.key === key) {
+    await inFlight.promise;
+    /* The config, the account or the place can change while this ask waits, and
+       a change installs its own pass under the new key. A pass started here
+       would belong to the old key yet capture the new generation, so it would
+       publish over the pass the new key is running: answer with what the state
+       holds for the new key instead. */
+    if (key !== cacheKey || request.retry !== true) {
+      return snapshot;
+    }
+    return ensurePass(key, request);
   }
   const missing = listRemoteMcpServers()
     .filter(server => server.enabled)
     .filter(server => !reusable(discovered.get(server.id)));
   if (missing.length === 0) {
-    return snapshot;
-  }
-  if (inFlight?.key === key) {
-    await inFlight.promise;
     return snapshot;
   }
   if (request.retry !== true && connectionRefusesWrites()) {
@@ -343,6 +327,49 @@ export async function ensureRemoteMcp(
     }
   }
   return snapshot;
+}
+
+/**
+ * Discovers the enabled servers' tools, reusing the answers already made for the
+ * same config and account.
+ *
+ * A discovery that failed is not an answer: asking again reconnects, which is
+ * what a Retry and the next chat both are. Neither is an answer with no tools in
+ * it, because the next ask is what makes a transient empty catalog recoverable.
+ * One discovery pass runs per key at a time: an automatic ask made while one is
+ * running joins it rather than opening a second connection, while a person's
+ * Retry waits for it to settle and then asks again for whatever is still
+ * missing, so a running pass can never answer a Retry with its own deadline's
+ * failure.
+ *
+ * After a cold start the stored list may not have been read yet, and an empty
+ * list then means "not read" rather than "none": the ask waits for it, or a
+ * chat opened at launch would discover nothing. An automatic ask made while
+ * the app has confirmed it is offline connects to nothing, so a chat opens at
+ * once rather than after the deadline. An unknown state, as at boot before
+ * NetInfo settles, still connects; a person's Retry always tries.
+ */
+export async function ensureRemoteMcp(
+  place: ChatPlace,
+  request: RemoteMcpRequest = {}
+): Promise<readonly RemoteMcpServerState[]> {
+  if (!getRemoteMcpServersHasLoaded()) {
+    await whenRemoteMcpServersLoaded();
+  }
+  const key = keyFor(place);
+  if (key !== cacheKey) {
+    /* The config or the account changed, so a discovery started for the old one
+       is no longer the answer: bumping the generation stops it publishing its
+       server's tools over the discovery the new key now runs, and stops it
+       clearing that discovery's `pending`. */
+    generation += 1;
+    cacheKey = key;
+    discovered = new Map();
+    forgetCallResults();
+    pending.clear();
+    publish();
+  }
+  return ensurePass(key, request);
 }
 
 /** The snapshot a screen draws: one entry per stored server, whether or not it is discovered. */

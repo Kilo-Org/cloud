@@ -5,14 +5,14 @@
  * A ceremony that failed has no half-written credential to clean up, so the
  * same control is a working retry. An `unsupported` result removes the control
  * instead, because a device that has just refused the ceremony cannot create
- * one, and so does `unavailable`, because the account cannot add a passkey from
- * this app; repeating either request cannot change the answer.
+ * one, and so does `device-unsupported`, because this sign-in cannot manage
+ * passkeys at all; repeating either request cannot change the answer.
  */
-export type AddFailure = 'unsupported' | 'unavailable' | 'failed';
+export type AddFailure = 'unsupported' | 'device-unsupported' | 'failed';
 
 /** The catalog keys the screen can show in place of, or beside, the control. */
 export type AddFailureNoticeKey =
-  | 'profile.passkeyAddUnavailable'
+  | 'profile.passkeyManagementUnavailable'
   | 'profile.passkeyAddUnsupported'
   | 'profile.passkeyAddFailed';
 
@@ -31,8 +31,8 @@ export function addFailureNoticeKey(
   failure: AddFailure | null
 ): AddFailureNoticeKey | null {
   if (!canCreate) {
-    return failure === 'unavailable'
-      ? 'profile.passkeyAddUnavailable'
+    return failure === 'device-unsupported'
+      ? 'profile.passkeyManagementUnavailable'
       : 'profile.passkeyAddUnsupported';
   }
   return failure === 'failed' ? 'profile.passkeyAddFailed' : null;

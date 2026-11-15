@@ -168,7 +168,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - The per-chat web search and Kilo MCP choices belong to the chat registry. Change them only through `setChatFlag` and `retryChatFlag` in `@/lib/chat/registry`. Other stored values stay with the store that owns them; a component must not keep its own optimistic copy beside it.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
-- A UI attempt fences admission and publication, not effects after an await. Recheck resource ownership and auth epoch before closing a form or changing account-bound UI. Retained merge keys retire only when the fingerprint and captured key both still match; at capacity refuse new intents without evicting unresolved ones.
+- Retained merge keys retire only when the fingerprint and the captured key both still match. At capacity, refuse new intents; never evict an unresolved one.
 
 ## State Machines
 
@@ -179,8 +179,8 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
 - For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
   - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
-  - Settle the attempt once, with `succeed()`, `fail(failure)`, or `abandon()` when there is no outcome. If nothing on the surface renders the failure (for example, a toast already reports it), use `abandon()`: a settled keyed entry stays until the surface unmounts.
-  - After an `await`, check `attempt.owns()` before any effect outside the phase, such as closing a sheet, clearing a draft, or posting.
+  - Settle the attempt once, with `succeed()`, `fail(failure)`, or `abandon()` when there is no outcome. `abandon()` removes the key's entry. `succeed()` and `fail()` keep it until the next `begin()` for that key or until the surface unmounts; `clearWhere` retires only a failure. If nothing on the surface renders the failure (for example, a toast already reports it), use `abandon()`.
+  - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
   - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
 - Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
 - A purchase keeps its own request and transaction records. Never settle one by looking it up by product id.

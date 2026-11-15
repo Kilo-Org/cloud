@@ -16,31 +16,92 @@ const intentSchema = z.object({
 });
 export type CreditPurchaseIntent = z.infer<typeof intentSchema>;
 
+/**
+ * The stored admission cannot be parsed. It is a barrier, not a discardable
+ * record: only explicit consent may erase it, and this error carries no raw
+ * value so a corrupt record never travels through telemetry.
+ */
+export class MalformedCreditPurchaseIntentError extends Error {
+  constructor() {
+    super('The stored credit purchase intent cannot be read.');
+    this.name = 'MalformedCreditPurchaseIntentError';
+  }
+}
+
 let intent: CreditPurchaseIntent | null = null;
 let loaded: Promise<void> | null = null;
+let malformed: string | null = null;
 
 export function resetCreditPurchaseIntentForTests(): void {
   intent = null;
   loaded = null;
+  malformed = null;
 }
 
 export async function restoreCreditPurchaseIntent(): Promise<CreditPurchaseIntent | null> {
-  loaded ??= (async () => {
-    const saved = await getItem(SCOPE, KEY);
-    if (saved !== null) {
-      // Corrupt admission must fail closed, never silently authorize another charge.
-      intent = intentSchema.parse(JSON.parse(saved));
-      const normalized = JSON.stringify(intent);
-      if (normalized !== saved) {
-        await setItem(SCOPE, KEY, normalized);
-      }
-      if (!intent.dispatched) {
-        await retireCreditPurchaseIntent(intent);
-      }
+  loaded ??= loadCreditPurchaseIntent();
+  const pending = loaded;
+  try {
+    await pending;
+  } catch (error) {
+    // A rejected read or migration write must not poison every later attempt:
+    // the stored record stays in place and the next restore retries it.
+    if (loaded === pending) {
+      loaded = null;
     }
-  })();
-  await loaded;
+    throw error;
+  }
   return intent;
+}
+
+async function loadCreditPurchaseIntent(): Promise<void> {
+  const saved = await getItem(SCOPE, KEY);
+  if (saved === null) {
+    return;
+  }
+  // Corrupt admission must fail closed, never silently authorize another charge.
+  const parsed = parseCreditPurchaseIntent(saved);
+  malformed = null;
+  intent = parsed;
+  const normalized = JSON.stringify(parsed);
+  if (normalized !== saved) {
+    await setItem(SCOPE, KEY, normalized);
+  }
+  if (!parsed.dispatched) {
+    await retireCreditPurchaseIntent(parsed);
+  }
+}
+
+function parseCreditPurchaseIntent(saved: string): CreditPurchaseIntent {
+  try {
+    const parsed = intentSchema.safeParse(JSON.parse(saved));
+    if (parsed.success) {
+      return parsed.data;
+    }
+  } catch {
+    // Text that is not JSON is malformed too; both reach the consent barrier.
+  }
+  malformed = saved;
+  throw new MalformedCreditPurchaseIntentError();
+}
+
+/**
+ * Erases the captured malformed record only while it is still the stored value.
+ * Returns true when it was removed or is already absent; a newer value is never
+ * deleted.
+ */
+export async function consentToReplaceMalformedCreditPurchaseIntent(): Promise<boolean> {
+  const captured = malformed;
+  if (captured === null) {
+    return false;
+  }
+  if (!(await removeItemIfValue(SCOPE, KEY, captured)) && (await getItem(SCOPE, KEY)) !== null) {
+    return false;
+  }
+  malformed = null;
+  intent = null;
+  loaded = null;
+  return true;
 }
 
 export async function admitCreditPurchaseIntent(
@@ -81,7 +142,9 @@ export function matchesCreditPurchaseIntent(record: CreditPurchaseIntent, purcha
   return record.transactionIds.includes(getPurchaseCompletionId(purchase));
 }
 
-export async function markCreditPurchaseIntentDispatched(record: CreditPurchaseIntent): Promise<void> {
+export async function markCreditPurchaseIntentDispatched(
+  record: CreditPurchaseIntent
+): Promise<void> {
   if (intent !== record) {
     throw new Error('The purchase admission no longer belongs to this request.');
   }
@@ -117,7 +180,7 @@ export async function retireCreditPurchaseIntent(record: CreditPurchaseIntent): 
     intent = null;
     return;
   }
-  const stored = intentSchema.parse(JSON.parse(saved));
+  const stored = parseCreditPurchaseIntent(saved);
   if (
     stored.id !== record.id ||
     stored.accountToken !== record.accountToken ||

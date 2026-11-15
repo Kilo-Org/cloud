@@ -253,7 +253,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <Section title={analysisSection}>
           <ToggleRow
-            title={t('securityAgent.automation.autoAnalysisDescription')}
+            title={t('securityAgent.automation.analyzeNewFindings')}
+            subtitle={t('securityAgent.automation.autoAnalysisDescription')}
             value={autoAnalysisEnabled}
             disabled={!canManage}
             onValueChange={setAutoAnalysisEnabled}
@@ -290,7 +291,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <Section title={remediationSection}>
           <ToggleRow
-            title={t('securityAgent.automation.autoRemediationDescription')}
+            title={t('securityAgent.automation.openFixPrs')}
+            subtitle={t('securityAgent.automation.autoRemediationDescription')}
             value={autoRemediationEnabled}
             disabled={!canManage}
             onValueChange={handleAutoRemediationToggle}
@@ -332,7 +334,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <Section title={t('securityAgent.automation.autoDismiss')}>
           <ToggleRow
-            title={t('securityAgent.automation.autoDismissDescription')}
+            title={t('securityAgent.automation.dismissNonExploitable')}
+            subtitle={t('securityAgent.automation.autoDismissDescription')}
             value={autoDismissEnabled}
             disabled={!canManage}
             onValueChange={setAutoDismissEnabled}

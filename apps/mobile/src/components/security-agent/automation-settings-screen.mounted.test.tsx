@@ -259,7 +259,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     expect(new Set(names).size).toBe(4);
   });
 
-  it('titles each section switch with its description, named by the visible title alone', () => {
+  it('titles each section switch briefly with its description as muted copy', () => {
     config.data = enabledConfig();
     renderScreen();
 
@@ -268,24 +268,42 @@ describe('AutomationSettingsScreen approval gate', () => {
       'securityAgent.automation.autoRemediation',
       'securityAgent.automation.autoDismiss',
     ].map(key => i18n.t(key));
-    const descriptions = [
-      'securityAgent.automation.autoAnalysisDescription',
-      'securityAgent.automation.autoRemediationDescription',
-      'securityAgent.automation.autoDismissDescription',
-    ].map(key => i18n.t(key));
+    const sections = [
+      {
+        title: i18n.t('securityAgent.automation.analyzeNewFindings'),
+        description: i18n.t('securityAgent.automation.autoAnalysisDescription'),
+      },
+      {
+        title: i18n.t('securityAgent.automation.openFixPrs'),
+        description: i18n.t('securityAgent.automation.autoRemediationDescription'),
+      },
+      {
+        title: i18n.t('securityAgent.automation.dismissNonExploitable'),
+        description: i18n.t('securityAgent.automation.autoDismissDescription'),
+      },
+    ];
 
-    const sectionRows = toggleRows.rows.filter(row => descriptions.includes(row.title));
-    expect(sectionRows.map(row => row.title)).toEqual(descriptions);
-    expect(new Set(sectionRows.map(row => row.title)).size).toBe(3);
+    for (const section of sections) {
+      const row = toggleRows.rows.find(candidate => candidate.title === section.title);
+      if (!row) {
+        throw new Error(`section toggle row ${section.title} not found`);
+      }
 
-    for (const row of sectionRows) {
-      // Label in name: the switch is named by the text the row shows, so no
-      // second name repeats the setting and nothing is drawn under the row.
-      expect(row.accessibilityLabel).toBeUndefined();
-      expect(row.subtitle).toBeUndefined();
+      // Each short title keeps its own description under it, so the three rows
+      // cannot swap copy between sections.
+      expect(row.subtitle).toBe(section.description);
+
+      // A title names the setting, not the section it sits under.
       for (const sectionName of sectionNames) {
         expect(row.title).not.toContain(sectionName);
       }
+      expect(row.title.endsWith('.')).toBe(false);
+
+      // Label in name: the switch is named by the text the row shows, and each
+      // title is unique on the screen, so no second name repeats the setting.
+      expect(row.accessibilityLabel).toBeUndefined();
     }
+
+    expect(new Set(sections.map(section => section.title)).size).toBe(3);
   });
 });

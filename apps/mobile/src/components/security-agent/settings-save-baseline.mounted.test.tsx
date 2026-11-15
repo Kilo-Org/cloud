@@ -115,10 +115,10 @@ function renderScreen() {
 }
 
 function autoDismissRow() {
-  // The section switch is titled with its description, which is also the name
-  // its switch reports.
+  // The section switch is titled briefly, with its description as the muted
+  // copy under the title, and its switch reports that title.
   const row = toggleRows.rows.find(
-    r => r.title === i18n.t('securityAgent.automation.autoDismissDescription')
+    r => r.title === i18n.t('securityAgent.automation.dismissNonExploitable')
   );
   if (!row) {
     throw new Error('auto-dismiss toggle row not found');

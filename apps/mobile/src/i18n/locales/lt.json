@@ -1186,8 +1186,8 @@
       "title": "Pasirinktinės instrukcijos",
       "deprecation": "Pasirinktinių instrukcijų funkcijos planuojama atsisakyti. Perkelk šias gaires į saugyklos REVIEW.md failą.",
       "placeholder": "pvz., tikrinti, ar laikomasi mūsų klaidų apdorojimo taisyklių…",
-      "clearTitle": "Pašalinti individualias instrukcijas?",
-      "clearMessage": "Išsaugojus tuščią lauką bus ištrintos šiam tikrintuvui saugomos individualios instrukcijos."
+      "clearTitle": "Pašalinti pasirinktines instrukcijas?",
+      "clearMessage": "Išsaugojus tuščią lauką bus ištrintos šiam tikrintuvui saugomos pasirinktinės instrukcijos."
     },
     "repos": {
       "unavailable": "Saugyklos nepasiekiamos. Užbaik Bitbucket sąranką svetainėje kilo.ai.",
@@ -1378,7 +1378,7 @@
       "githubError": "Nepavyko atidaryti GitHub sąrankos. Bandyk dar kartą.",
       "gitlabAccount": "GitLab paskyra",
       "gitlabError": "Nepavyko atidaryti GitLab sąrankos. Bandyk dar kartą.",
-      "description": "Prijunk „Kilo“ {{label}}, kad PR būtų peržiūrimi automatiškai.",
+      "description": "Prijunk Kilo, kad {{label}} automatiškai peržiūrėtų PR.",
       "bitbucketError": "Nepavyko atidaryti Bitbucket sąrankos. Bandyk dar kartą."
     },
     "overview": {

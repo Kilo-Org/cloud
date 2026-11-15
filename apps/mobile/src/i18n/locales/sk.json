@@ -4386,6 +4386,7 @@
     "unresolvedPurchaseNotFound": "Obchod nenašiel váš predchádzajúci nákup, no ešte sa môže dokončiť a kredity z neho sa vám môžu pridať; ak kúpite znova, začnete ďalší samostatný nákup a môže vám byť znova účtovaná platba.",
     "unresolvedPurchaseRefused": "Obchod našiel váš predchádzajúci nákup, no kredity z neho nemožno pridať; ak kúpite znova, začnete ďalší samostatný nákup a môže vám byť znova účtovaná platba.",
     "waitingForStore": "Čaká sa na odpoveď obchodu. Môže to chvíľu trvať.",
+    "pickPackToBuyAgain": "Ak chcete začať nový nákup, vyberte balík vyššie.",
     "buyAgain": "Kúpiť znova",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."

@@ -117,11 +117,13 @@ function NoticeCopy({
       ) : (
         <Text className="text-sm text-warn">{warning}</Text>
       )}
-      {packCopy.length > 0 && (
+      {packCopy.length > 0 ? (
         <View className="gap-1">
           <Text className="font-semibold text-foreground">{packLabel}</Text>
           <Text className="text-sm text-muted-foreground">{priceLabel}</Text>
         </View>
+      ) : (
+        <Text className="text-sm text-muted-foreground">{t('credits.pickPackToBuyAgain')}</Text>
       )}
       <View className="flex-row flex-wrap gap-3">{showBuyAgain ? actions : reconcile}</View>
     </View>

@@ -730,6 +730,33 @@ describe('CreditNativeIapOwner', () => {
     }
   });
 
+  it("consents to the pack a row tap selects, not the earlier request's id", async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [
+        { appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' },
+        { appleProductId: CREDIT_PACK_50, googleProductId: 'credits_usd50' },
+      ],
+    };
+    // A receipt the backend refuses for good: the charge can never be credited.
+    mockedQuery.completePurchase.mockRejectedValue(
+      new Error('This store purchase has been refunded, so Kilo cannot credit it.')
+    );
+    const { handle } = await mountOwner();
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+
+    // The person picks another pack; consent names that pack from then on.
+    expect(await handle.value?.purchase(creditPack50)).toBe(false);
+    await flushPromises();
+    expect(handle.value?.buyAgainProductId).toBe(CREDIT_PACK_50);
+    await handle.value?.buyAgain(creditPack50);
+    await flushPromises();
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
   it('names a pending payment instead of a store timeout', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

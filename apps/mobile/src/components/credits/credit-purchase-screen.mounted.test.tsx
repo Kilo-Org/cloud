@@ -1322,9 +1322,7 @@ describe('CreditPurchaseScreen', () => {
     // The restored charge names a Play SKU the catalog no longer sells, so no
     // row can price it and the earlier id alone could never reach consent.
 
-    const { renderer, queryClient, unmount } = await renderWithProviders(
-      createElement(CreditPurchaseScreen)
-    );
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
 
     expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
@@ -1339,31 +1337,11 @@ describe('CreditPurchaseScreen', () => {
     expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
     expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
 
-    // The owner followed a normal row tap: it reconciled the earlier SKU and
-    // selected the replacement the person picked as the consent target.
-    owner.buyAgainProductId = 'credits_usd100';
-    await act(async () => {
-      redraw(renderer, queryClient);
-      await Promise.resolve();
-    });
-
-    const consented = unresolvedNotice(renderer);
-    const buyAgain = testId(consented, 'credit-unresolved-buy-again');
-    if (!buyAgain) {
-      throw new Error('expected a Buy again action');
-    }
-    expect(labelOf(buyAgain)).toContain(BUY_AGAIN_LABEL);
-    expect(labelOf(buyAgain)).toContain(packAmount('$100.00'));
-    expect(labelOf(buyAgain)).toContain('$109.99');
-    expect(textWithin(consented)).toContain(packAmount('$100.00'));
-    expect(textWithin(consented)).not.toContain('250');
-
-    await press(buyAgain);
-    expect(owner.buyAgain).toHaveBeenCalledTimes(1);
-    expect(owner.buyAgain.mock.calls[0]?.[0]).toMatchObject({
-      storeProductId: 'credits_usd100',
-    });
-    expect(owner.purchase).not.toHaveBeenCalled();
+    // Without a target the notice names none and says what to do instead; the
+    // person's own row tap is what selects the pack, and the owner is the one
+    // that turns it into consent.
+    expect(textWithin(live)).toContain(i18n.t('credits.pickPackToBuyAgain'));
+    expect(testId(live, 'credit-unresolved-buy-again')).toBeUndefined();
 
     // A replacement pack stays an ordinary row: the owner decides whether that
     // tap reconciles the earlier charge, the screen never bypasses it.

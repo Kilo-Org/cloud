@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "Pembelian Anda sebelumnya tidak ditemukan di toko, tetapi masih mungkin selesai nanti dan menambahkan kredit, sedangkan membeli lagi memulai pembelian terpisah dan Anda mungkin akan dikenai biaya lagi.",
     "unresolvedPurchaseRefused": "Pembelian Anda sebelumnya ditemukan di toko, tetapi kreditnya tidak dapat ditambahkan, sedangkan membeli lagi memulai pembelian terpisah dan Anda mungkin akan dikenai biaya lagi.",
     "waitingForStore": "Menunggu respons dari toko; ini mungkin memerlukan beberapa saat.",
+    "pickPackToBuyAgain": "Pilih paket di atas untuk memulai pembelian baru.",
     "buyAgain": "Beli lagi",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."

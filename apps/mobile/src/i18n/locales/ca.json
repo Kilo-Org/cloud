@@ -4324,6 +4324,7 @@
     "unresolvedPurchaseNotFound": "No s'ha trobat la teva compra anterior a la botiga, però es pot completar més endavant i afegir els crèdits; si tornes a comprar, iniciaràs una nova compra i se't podria tornar a cobrar.",
     "unresolvedPurchaseRefused": "S'ha trobat la teva compra anterior a la botiga, però no se'n poden abonar els crèdits; si tornes a comprar, iniciaràs una nova compra i se't podria tornar a cobrar.",
     "waitingForStore": "S'està esperant la resposta de la botiga; pot trigar una estona.",
+    "pickPackToBuyAgain": "Tria un paquet de dalt per iniciar una compra nova.",
     "buyAgain": "Torna a comprar",
     "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
     "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."

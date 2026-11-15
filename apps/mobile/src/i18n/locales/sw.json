@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "Ununuzi wako wa awali haujapatikana dukani, lakini unaweza kukamilika baadaye na kuongeza salio lake; kununua tena huanzisha ununuzi mwingine na unaweza kutozwa tena.",
     "unresolvedPurchaseRefused": "Ununuzi wako wa awali umepatikana dukani, lakini salio lake haliwezi kuongezwa; kununua tena huanzisha ununuzi mwingine na unaweza kutozwa tena.",
     "waitingForStore": "Inasubiri jibu la duka. Hii inaweza kuchukua muda kidogo.",
+    "pickPackToBuyAgain": "Chagua kifurushi hapo juu ili kuanza ununuzi mpya.",
     "buyAgain": "Nunua tena",
     "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
     "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."

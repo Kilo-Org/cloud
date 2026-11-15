@@ -4329,6 +4329,7 @@
     "unresolvedPurchaseNotFound": "Your earlier purchase was not found at the store, but it may still complete later and add its credits. Buying again starts another purchase and may charge you again.",
     "unresolvedPurchaseRefused": "Your earlier purchase was found at the store, but it cannot be credited. Buying again starts another purchase and may charge you again.",
     "waitingForStore": "Waiting for the store to answer. This can take a moment.",
+    "pickPackToBuyAgain": "Choose a pack above to start a new purchase.",
     "buyAgain": "Buy again",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."

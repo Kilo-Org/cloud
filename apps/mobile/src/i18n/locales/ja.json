@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "前回の購入はストアで確認できませんでしたが、後から完了してその分のクレジットが残高に追加される可能性があり、もう一度購入すると別の購入が開始され、再度料金が請求される可能性があります。",
     "unresolvedPurchaseRefused": "前回の購入はストアで確認されましたが、その分のクレジットを残高に追加することはできず、もう一度購入すると別の購入が開始され、再度料金が請求される可能性があります。",
     "waitingForStore": "ストアからの応答を待っています（少し時間がかかる場合があります）。",
+    "pickPackToBuyAgain": "新しい購入を開始するには、上のパックを選択してください。",
     "buyAgain": "もう一度購入",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"

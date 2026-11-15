@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "Dendan ez da zure aurreko erosketa aurkitu, baina baliteke gero burutzea eta kredituak gehitzea; berriro erosiz gero, beste erosketa bat hasiko da eta baliteke berriro kobratzea.",
     "unresolvedPurchaseRefused": "Dendan zure aurreko erosketa aurkitu da, baina ezin dira dagozkion kredituak gehitu; berriro erosiz gero, beste erosketa bat hasiko da eta baliteke berriro kobratzea.",
     "waitingForStore": "Dendaren erantzunaren zain; une bat behar izan dezake.",
+    "pickPackToBuyAgain": "Aukeratu goiko pakete bat erosketa berri bat hasteko.",
     "buyAgain": "Erosi berriro",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."

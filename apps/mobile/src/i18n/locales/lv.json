@@ -4324,6 +4324,7 @@
     "unresolvedPurchaseNotFound": "Veikalā nav atrasts tavs iepriekšējais pirkums, taču tas vēl var tikt pabeigts un tā kredīti pievienoti tavai bilancei; pērkot vēlreiz, sāksi jaunu pirkumu, par kuru tev var atkārtoti iekasēt maksu.",
     "unresolvedPurchaseRefused": "Veikalā atrasts tavs iepriekšējais pirkums, taču par to nevar piešķirt kredītus; pērkot vēlreiz, sāksi jaunu pirkumu, par kuru tev var atkārtoti iekasēt maksu.",
     "waitingForStore": "Gaidām veikala atbildi. Tas var aizņemt brīdi.",
+    "pickPackToBuyAgain": "Izvēlieties paketi augstāk, lai sāktu jaunu pirkumu.",
     "buyAgain": "Pirkt vēlreiz",
     "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
     "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."

@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "የቀደመው ግዢዎ በመደብሩ አልተገኘም፣ ግን በኋላ ተጠናቆ ክሬዲቱን ወደ ቀሪ ሂሳብዎ ሊጨምር ይችላል፤ እንደገና መግዛት ሌላ ግዢ ይጀምራል፣ እንደገናም ሊያስከፍልዎ ይችላል።",
     "unresolvedPurchaseRefused": "የቀደመው ግዢዎ በመደብሩ ተገኝቷል፣ ግን ክሬዲቱ ወደ ቀሪ ሂሳብዎ ሊጨመር አይችልም፤ እንደገና መግዛት ሌላ ግዢ ይጀምራል፣ እንደገናም ሊያስከፍልዎ ይችላል።",
     "waitingForStore": "ከመደብሩ ምላሽ እየተጠበቀ ነው፤ ይህ ትንሽ ጊዜ ሊወስድ ይችላል።",
+    "pickPackToBuyAgain": "አዲስ ግዢ ለመጀመር ከላይ ካሉት ጥቅሎች አንዱን ይምረጡ።",
     "buyAgain": "እንደገና ይግዙ",
     "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው ክሬዲት የሌላ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።",
     "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው ክሬዲት የተለየ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።"

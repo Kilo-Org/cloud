@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "Dein vorheriger Kauf wurde im Store nicht gefunden, kann aber später noch abgeschlossen werden und Guthaben hinzufügen; erneutes Kaufen startet einen separaten Kauf und kann erneut berechnet werden.",
     "unresolvedPurchaseRefused": "Dein vorheriger Kauf wurde im Store gefunden, sein Guthaben kann aber nicht gutgeschrieben werden; erneutes Kaufen startet einen separaten Kauf und kann erneut berechnet werden.",
     "waitingForStore": "Warten auf eine Antwort des Stores, das kann einen Moment dauern.",
+    "pickPackToBuyAgain": "Wähle oben ein Paket aus, um einen neuen Kauf zu starten.",
     "buyAgain": "Erneut kaufen",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."

@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "商店未找到你先前的購買紀錄，但該次購買仍可能於稍後完成，並將點數加入你的餘額；再次購買會建立另一筆購買，並可能再次向你收費。",
     "unresolvedPurchaseRefused": "商店已找到你先前的購買紀錄，但無法為該次購買發放點數；再次購買會建立另一筆購買，並可能再次向你收費。",
     "waitingForStore": "正在等待商店回應，這可能需要一點時間。",
+    "pickPackToBuyAgain": "請在上方選擇一個方案以開始新的購買。",
     "buyAgain": "再次購買",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"

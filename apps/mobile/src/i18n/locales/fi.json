@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "Aiempaa ostostasi ei löytynyt kaupasta, mutta se voi vielä toteutua ja lisätä krediitit saldoosi; ostamalla uudelleen aloitat uuden ostoksen, josta sinua voidaan veloittaa uudelleen.",
     "unresolvedPurchaseRefused": "Aiempi ostoksesi löytyi kaupasta, mutta sen krediittejä ei voida lisätä saldoosi; ostamalla uudelleen aloitat uuden ostoksen, josta sinua voidaan veloittaa uudelleen.",
     "waitingForStore": "Odotetaan kaupan vastausta, tämä voi kestää hetken.",
+    "pickPackToBuyAgain": "Aloita uusi osto valitsemalla paketti yläpuolelta.",
     "buyAgain": "Osta uudelleen",
     "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
     "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille."

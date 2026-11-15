@@ -4330,6 +4330,7 @@
     "unresolvedPurchaseNotFound": "A sua compra anterior não foi encontrada na loja, mas ainda pode ser concluída e adicionar os respetivos créditos; comprar novamente inicia outra compra e pode resultar numa nova cobrança.",
     "unresolvedPurchaseRefused": "A sua compra anterior foi encontrada na loja, mas não é possível adicionar os respetivos créditos; comprar novamente inicia outra compra e pode resultar numa nova cobrança.",
     "waitingForStore": "A aguardar a resposta da loja. Isto pode demorar um pouco.",
+    "pickPackToBuyAgain": "Escolha um pacote acima para iniciar uma nova compra.",
     "buyAgain": "Comprar novamente",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencem a outra conta Kilo. Inicia sessão nessa conta Kilo para os usares.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta do Google Play pertencem a uma conta Kilo diferente. Inicie sessão nessa conta Kilo para os usar."

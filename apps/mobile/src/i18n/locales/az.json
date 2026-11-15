@@ -4262,6 +4262,7 @@
     "unresolvedPurchaseNotFound": "Əvvəlki alışınız mağazada tapılmadı, amma sonradan tamamlanıb kreditləri balansınıza əlavə oluna bilər; yenidən almaq isə ayrıca alış əməliyyatı başladır və sizdən yenidən ödəniş tutula bilər.",
     "unresolvedPurchaseRefused": "Əvvəlki alışınız mağazada tapıldı, amma kreditləri balansınıza əlavə oluna bilməz; yenidən almaq isə ayrıca alış əməliyyatı başladır və sizdən yenidən ödəniş tutula bilər.",
     "waitingForStore": "Mağazanın cavabı gözlənilir, bu bir az vaxt ala bilər.",
+    "pickPackToBuyAgain": "Yeni alışa başlamaq üçün yuxarıdan bir paket seçin.",
     "buyAgain": "Yenidən al",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."

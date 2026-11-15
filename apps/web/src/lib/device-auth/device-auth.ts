@@ -185,7 +185,7 @@ export async function createDeviceAuthRequest(params: {
             and(
               eq(device_auth_requests.ip_address, ipAddress),
               eq(device_auth_requests.status, 'pending'),
-              gt(device_auth_requests.expires_at, new Date().toISOString())
+              requestIsLiveAt(new Date().toISOString())
             )
           );
 
@@ -285,8 +285,9 @@ type DeviceAuthRequestStatus = DeviceAuthRequestRow['status'];
 
 /**
  * The one device-request expiry rule: a request is live while its deadline is
- * after the instant, so it expires at the deadline. The approval action, both
- * redemption predicates, the approval page and cleanup compare with it.
+ * after the instant, so it expires at the deadline. The approval action, the
+ * pending-request count, both redemption predicates, the approval page and
+ * cleanup compare with it.
  */
 function isExpiredAt(expiresAt: string, now = new Date().toISOString()): boolean {
   return new Date(expiresAt).getTime() <= Date.parse(now);

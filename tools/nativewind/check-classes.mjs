@@ -25,9 +25,10 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { walk } from '../lib/ast.mjs';
+import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
@@ -492,8 +493,4 @@ function run() {
   console.log('check-classes: no dropped classes, stray raw Text or hand-built formatters');
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly) {
-  run();
-}
+runIfMain(run, import.meta.url);

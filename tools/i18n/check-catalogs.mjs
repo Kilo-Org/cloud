@@ -21,7 +21,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join, relative as relativePath } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
@@ -32,6 +32,7 @@ import {
   pluralFamilyBases,
   pluralParts,
 } from '../lib/catalogs.mjs';
+import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -2025,8 +2026,4 @@ function run() {
   console.log(`check-catalogs: ${languages} languages, every catalog matches en.json`);
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly) {
-  run();
-}
+runIfMain(run, import.meta.url);

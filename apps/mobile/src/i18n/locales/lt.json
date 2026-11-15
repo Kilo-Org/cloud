@@ -4385,6 +4385,7 @@
     "unresolvedPurchaseFound": "Parduotuvėje rastas ankstesnis jūsų pirkimas, kurį užbaigus jo kreditai bus pridėti prie jūsų balanso, o pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
     "unresolvedPurchaseNotFound": "Ankstesnis jūsų pirkimas parduotuvėje nerastas, bet jis dar gali būti užbaigtas ir jo kreditai pridėti, o pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
     "unresolvedPurchaseRefused": "Ankstesnis jūsų pirkimas parduotuvėje rastas, bet jo kreditai negali būti pridėti, o pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
+    "waitingForStore": "Laukiama parduotuvės atsakymo. Tai gali šiek tiek užtrukti.",
     "buyAgain": "Pirkti dar kartą",
     "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
     "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."

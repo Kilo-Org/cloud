@@ -272,6 +272,7 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
       // The completing state keeps the first pack's purchase open, which is the
       // only way to render its in-flight label without a store.
       completingProductId: state === 'completing' ? (fixtureListings[0]?.id ?? null) : null,
+      purchaseWait: null,
       errorMessageKey: state === 'failed' ? 'credits.storeTimedOut' : null,
       completedPurchaseCount: 0,
       clearError: () => undefined,

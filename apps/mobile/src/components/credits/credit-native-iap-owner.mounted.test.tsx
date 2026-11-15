@@ -646,10 +646,86 @@ describe('CreditNativeIapOwner', () => {
       await vi.advanceTimersByTimeAsync(16_000);
       await flushPromises();
       expect(handle.value?.completingProductId).toBeNull();
-      expect(handle.value?.errorMessageKey).toBe('credits.storeTimedOut');
+      // The sheet can still be open, so the row waits instead of failing.
+      expect(handle.value?.errorMessageKey).toBeNull();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'store',
+      });
       await handle.value?.purchase(creditPack);
       expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for a sheet that outlives the deadline, then credits it once', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const native = Promise.withResolvers<Purchase | null>();
+    mockedIap.requestPurchase.mockReturnValueOnce(native.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      const initial = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await initial).toBe(false);
+      await flushPromises();
+
+      // The sheet may still be open: the screen says so and nothing failed.
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'store',
+      });
+      expect(handle.value?.errorMessageKey).toBeNull();
+
+      native.resolve(createPurchase());
+      await flushPromises();
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      expect(handle.value?.completedPurchaseCount).toBe(1);
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.purchaseWait).toBeNull();
+      expect(handle.value?.errorMessageKey).toBeNull();
+    } finally {
+      native.resolve(null);
+      await flushPromises();
+      vi.useRealTimers();
+    }
+  });
+
+  it('releases a request the store cancels after the deadline without leaving an error', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const native = Promise.withResolvers<Purchase | null>();
+    mockedIap.requestPurchase.mockReturnValueOnce(native.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+      const initial = handle.value?.purchase(creditPack);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await initial).toBe(false);
+      await flushPromises();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'store',
+      });
+
+      native.reject({ code: 'user-cancelled', message: 'the sheet was cancelled late' });
+      await flushPromises();
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.purchaseWait).toBeNull();
+      expect(handle.value?.errorMessageKey).toBeNull();
+      expect(handle.value?.hasUnresolvedPurchase).toBe(false);
+    } finally {
+      native.resolve(null);
+      await flushPromises();
       vi.useRealTimers();
     }
   });
@@ -793,7 +869,7 @@ describe('CreditNativeIapOwner', () => {
     expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
   });
 
-  it('a store call that never settles releases the row after the deadline and shows the timeout copy', async () => {
+  it('a store call that never settles releases the row after the deadline and waits instead of failing', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       mockedQuery.serverProductsData = {
@@ -814,9 +890,14 @@ describe('CreditNativeIapOwner', () => {
       });
       expect(await started).toBe(false);
 
-      // The row is released and the person is told the store did not answer.
+      // The row is released, and the screen says the store has not answered:
+      // no failure, because the sheet can still be open.
       expect(handle.value?.completingProductId).toBeNull();
-      expect(handle.value?.errorMessageKey).toBe('credits.storeTimedOut');
+      expect(handle.value?.errorMessageKey).toBeNull();
+      expect(handle.value?.purchaseWait).toEqual({
+        productId: APPLE_PRODUCT_ID,
+        kind: 'store',
+      });
     } finally {
       vi.useRealTimers();
     }

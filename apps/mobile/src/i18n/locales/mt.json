@@ -4447,6 +4447,7 @@
     "unresolvedPurchaseFound": "Ix-xiri preċedenti tiegħek instab fil-ħanut u l-krediti tiegħu jiżdiedu meta jitlesta; jekk terġa' tixtri, tibda xiri ieħor u tista' terġa' tiġi ċċarġjat.",
     "unresolvedPurchaseNotFound": "Ix-xiri preċedenti tiegħek ma nstabx fil-ħanut, iżda xorta jista' jitlesta aktar tard u jżid il-krediti tiegħu; jekk terġa' tixtri, tibda xiri ieħor u tista' terġa' tiġi ċċarġjat.",
     "unresolvedPurchaseRefused": "Ix-xiri preċedenti tiegħek instab fil-ħanut, iżda l-krediti tiegħu ma jistgħux jiżdiedu; jekk terġa' tixtri, tibda xiri ieħor u tista' terġa' tiġi ċċarġjat.",
+    "waitingForStore": "Qed nistennew it-tweġiba tal-ħanut. Dan jista' jieħu ftit ħin.",
     "buyAgain": "Ixtri mill-ġdid",
     "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
     "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."

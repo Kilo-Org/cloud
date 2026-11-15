@@ -97,6 +97,19 @@ async function fetchCreditStoreProducts(
   return listings;
 }
 
+/**
+ * The request the store has not finished, and why.
+ *
+ * `store` is a request that outlived its deadline without an answer: the native
+ * sheet can still be open, so its row and the status region say the store has
+ * not answered instead of reporting a failure. `pending` is a payment the store
+ * itself reported as pending or deferred, which no retry can hurry.
+ */
+export type CreditPurchaseWait = {
+  readonly productId: string;
+  readonly kind: 'store' | 'pending';
+};
+
 export type CreditNativeIapContextValue = {
   connected: boolean;
   fetchStoreProducts: (
@@ -127,6 +140,8 @@ export type CreditNativeIapContextValue = {
   buyAgainProductId: string | null;
   /** Store product id whose purchase or backend completion is in flight. */
   completingProductId: string | null;
+  /** What that request is waiting for, if anything, and the pack whose row says it. */
+  purchaseWait: CreditPurchaseWait | null;
   /** Catalog key of the last purchase error, or null. The screen translates it. */
   errorMessageKey: string | null;
   /**
@@ -222,12 +237,21 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const [purchaseResolution, setPurchaseResolution] = useState<CreditPurchaseResolution>('unknown');
   const [hasUnresolvedPurchase, setHasUnresolvedPurchase] = useState(false);
   const buyAgainConsentRef = useRef<BuyAgainConsent | null>(null);
+  const [purchaseWait, setPurchaseWait] = useState<CreditPurchaseWait | null>(null);
+  const purchaseWaitRef = useRef<CreditPurchaseWait | null>(null);
+  const markPurchaseWait = useCallback((wait: CreditPurchaseWait | null) => {
+    purchaseWaitRef.current = wait;
+    if (mountedRef.current && isCurrentAuthEpoch(authEpochRef.current)) {
+      setPurchaseWait(wait);
+    }
+  }, []);
   const clearBlockedPurchase = useCallback(() => {
     setBuyAgainProductId(null);
     setPurchaseResolution('unknown');
     setHasUnresolvedPurchase(false);
     buyAgainConsentRef.current = null;
-  }, []);
+    markPurchaseWait(null);
+  }, [markPurchaseWait]);
   /**
    * An admission still owns a charge, so the screen must say so before offering
    * another. The resolution is what the store answered for that earlier request;
@@ -334,6 +358,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       }
       pendingPurchaseRef.current = null;
       record.settle();
+      markPurchaseWait(null);
       if (ownsCreditPurchaseIntent(record.intent)) {
         markUnresolvedPurchase(
           completion.status === 'terminal-refusal' ? 'terminal-refusal' : 'found'
@@ -344,7 +369,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       }
       record.attempt.abandon();
     },
-    [clearBlockedPurchase, markUnresolvedPurchase, offerBuyAgain]
+    [clearBlockedPurchase, markPurchaseWait, markUnresolvedPurchase, offerBuyAgain]
   );
 
   const completeAppStorePurchase = useMutation(
@@ -458,13 +483,22 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             if (isStoreNotReadyError(error) && isCurrentAuthEpoch(record.epoch)) {
               await reconnectStore();
             }
-            if (
-              canAttributeNativePurchaseOutcome(record.intent) &&
-              !isStorePendingPurchaseError(error) &&
-              !isCreditPurchaseTransportDisconnection(error)
-            ) {
+            const attributable = canAttributeNativePurchaseOutcome(record.intent);
+            const pending = isStorePendingPurchaseError(error);
+            if (attributable && !pending && !isCreditPurchaseTransportDisconnection(error)) {
               retireCreditPurchaseIntent(record.intent);
               record.settle();
+            }
+            // An answer that arrives after the deadline is the sheet closing:
+            // when the outcome is this request's, the wait and its barrier end
+            // even if the person cancelled.
+            if (
+              attributable &&
+              purchaseWaitRef.current?.kind === 'store' &&
+              mountedRef.current &&
+              isCurrentAuthEpoch(record.epoch)
+            ) {
+              clearBlockedPurchase();
             }
             settleCreditPurchaseDispatch(record.intent);
             throw error;
@@ -538,6 +572,8 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       }),
     [
       appAccountToken,
+      clearBlockedPurchase,
+      markPurchaseWait,
       completeAppStorePurchase.mutateAsync,
       completePlayPurchase.mutateAsync,
       creditPackAppleProductIds,
@@ -864,17 +900,23 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
           try {
             await withStoreDeadline(settlement.promise, 'the purchase outcome');
           } catch {
+            // The SDK cannot cancel a request, so the sheet may still be open
+            // when the deadline passes. Keep the request and its barrier and
+            // say the store has not answered: a failure here would be copy the
+            // person cannot act on, for a charge that may still land.
             if (
               pendingPurchaseRef.current === record &&
               attempt.owns() &&
               isCurrentAuthEpoch(epoch)
             ) {
+              // The request keeps its barrier, but not the row: the store can
+              // still answer, and a sheet that is open must not read as a
+              // failure the person cannot act on.
               pendingPurchaseRef.current = null;
+              record.settle();
               markUnresolvedPurchase('unknown');
-              attempt.fail({
-                kind: 'store-timeout',
-                messageKey: creditStoreTimeoutKey(storefront),
-              });
+              markPurchaseWait({ productId: record.intent.productId, kind: 'store' });
+              attempt.abandon();
             }
           }
         })();
@@ -888,6 +930,11 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         }
         if (outcome.started) {
           return true;
+        }
+        if (outcome.failure?.kind === 'store-timeout') {
+          // The deadline path above already released the row and kept the
+          // barrier; this only reports that nothing started.
+          return false;
         }
         if (outcome.failure === null && ownsCreditPurchaseIntent(record.intent)) {
           return false;
@@ -926,6 +973,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       beginPurchase,
       clearBlockedPurchase,
       clearError,
+      markPurchaseWait,
       markUnresolvedPurchase,
       reconcilePurchaseIntent,
       storefront,
@@ -1162,6 +1210,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       hasUnresolvedPurchase,
       purchaseResolution,
       completingProductId,
+      purchaseWait,
       errorMessageKey,
       completedPurchaseCount,
       clearError,
@@ -1174,6 +1223,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       clearError,
       completedPurchaseCount,
       completingProductId,
+      purchaseWait,
       connected,
       errorMessageKey,
       fetchStoreProducts,

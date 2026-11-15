@@ -4261,6 +4261,7 @@
     "unresolvedPurchaseFound": "Pood leidis sinu varasema ostu ja selle lõpule jõudes lisandub krediit sinu saldole; uuesti ostes alustad eraldi ostu ja sinult võidakse uuesti tasu võtta.",
     "unresolvedPurchaseNotFound": "Pood ei leidnud sinu varasemat ostu, kuid see võib veel lõpule jõuda ja krediit sinu saldole lisanduda; uuesti ostes alustad eraldi ostu ja sinult võidakse uuesti tasu võtta.",
     "unresolvedPurchaseRefused": "Pood leidis sinu varasema ostu, kuid selle krediiti ei saa sinu saldole lisada; uuesti ostes alustad eraldi ostu ja sinult võidakse uuesti tasu võtta.",
+    "waitingForStore": "Ootame poe vastust, see võib veidi aega võtta.",
     "buyAgain": "Osta uuesti",
     "purchaseOwnedByAnotherAccount": "Selle Apple Accountiga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellele Kilo kontole.",
     "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellele Kilo kontole."

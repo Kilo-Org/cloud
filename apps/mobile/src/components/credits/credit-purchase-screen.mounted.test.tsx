@@ -29,6 +29,7 @@ const owner = vi.hoisted(() => ({
   reconnectStore: vi.fn(),
   purchase: vi.fn(),
   completingProductId: null as string | null,
+  purchaseWait: null as { productId: string; kind: 'store' | 'pending' } | null,
   errorMessageKey: null as string | null,
   completedPurchaseCount: 0,
   clearError: vi.fn(),
@@ -373,6 +374,7 @@ describe('CreditPurchaseScreen', () => {
     owner.reconnectStore.mockResolvedValue(true);
     owner.purchase.mockResolvedValue(true);
     owner.completingProductId = null;
+    owner.purchaseWait = null;
     owner.errorMessageKey = null;
     owner.completedPurchaseCount = 0;
     owner.buyAgainProductId = null;
@@ -1044,6 +1046,29 @@ describe('CreditPurchaseScreen', () => {
             ?.disabled === true
       )
     ).toBe(true);
+    unmount();
+  });
+
+  it('waits neutrally on the row and in the status region while the store has not answered', async () => {
+    owner.completingProductId = null;
+    owner.purchaseWait = { productId: 'credits.usd10.v1', kind: 'store' };
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const waiting = i18n.t('credits.waitingForStore');
+    expect(allText(renderer)).toContain(waiting);
+    expect(allText(renderer)).not.toContain(i18n.t('credits.storeTimedOut'));
+    const waitingRow = packRows(renderer).find(row =>
+      ((row.props as { accessibilityLabel?: string }).accessibilityLabel ?? '').includes(waiting)
+    );
+    // The waiting row is not busy: the request's row was released, and the
+    // store's answer is still owed.
+    expect(
+      (waitingRow?.props as { accessibilityState?: { busy?: boolean } } | undefined)
+        ?.accessibilityState?.busy
+    ).toBe(false);
+    expect(textWithin(statusRegionOrThrow(renderer))).toContain(waiting);
     unmount();
   });
 

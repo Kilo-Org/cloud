@@ -4323,6 +4323,7 @@
     "unresolvedPurchaseFound": "Magazinul a găsit achiziția ta anterioară și vei primi creditele la finalizare; dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
     "unresolvedPurchaseNotFound": "Magazinul nu a găsit achiziția ta anterioară, dar se poate finaliza ulterior și îți poate adăuga creditele; dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
     "unresolvedPurchaseRefused": "Magazinul a găsit achiziția ta anterioară, dar creditele aferente nu pot fi acordate; dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
+    "waitingForStore": "Se așteaptă răspunsul magazinului. Poate dura câteva momente.",
     "buyAgain": "Cumpără din nou",
     "purchaseOwnedByAnotherAccount": "Creditele asociate acestui Apple Account aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi.",
     "purchaseOwnedByAnotherAccountPlay": "Creditele de pe acest cont Google Play aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi."

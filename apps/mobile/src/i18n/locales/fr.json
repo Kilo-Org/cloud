@@ -4323,6 +4323,7 @@
     "unresolvedPurchaseFound": "La boutique a retrouvé votre achat précédent, dont les crédits seront ajoutés une fois finalisé ; acheter à nouveau lance un achat distinct et peut entraîner une nouvelle facturation.",
     "unresolvedPurchaseNotFound": "La boutique n’a pas retrouvé votre achat précédent, mais il peut encore être finalisé et ajouter ses crédits ; acheter à nouveau lance un achat distinct et peut entraîner une nouvelle facturation.",
     "unresolvedPurchaseRefused": "La boutique a retrouvé votre achat précédent, mais ses crédits ne peuvent pas être accordés ; acheter à nouveau lance un achat distinct et peut entraîner une nouvelle facturation.",
+    "waitingForStore": "En attente de la réponse de la boutique ; cela peut prendre un moment.",
     "buyAgain": "Acheter à nouveau",
     "purchaseOwnedByAnotherAccount": "Les crédits sur ce compte Apple appartiennent à un autre compte Kilo. Connectez-vous à cet autre compte Kilo pour les utiliser.",
     "purchaseOwnedByAnotherAccountPlay": "Les crédits sur ce compte Google Play appartiennent à un autre compte Kilo. Connectez-vous à ce compte Kilo pour les utiliser."

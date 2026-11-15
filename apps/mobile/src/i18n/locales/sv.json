@@ -4261,6 +4261,7 @@
     "unresolvedPurchaseFound": "Butiken hittade ditt tidigare köp och krediterna läggs till när det slutförs; om du köper igen påbörjas ett separat köp och du kan debiteras igen.",
     "unresolvedPurchaseNotFound": "Butiken hittade inte ditt tidigare köp, men det kan fortfarande slutföras senare och ge dig krediterna; om du köper igen påbörjas ett separat köp och du kan debiteras igen.",
     "unresolvedPurchaseRefused": "Butiken hittade ditt tidigare köp, men krediterna kan inte läggas till; om du köper igen påbörjas ett separat köp och du kan debiteras igen.",
+    "waitingForStore": "Väntar på svar från butiken. Det kan ta en stund.",
     "buyAgain": "Köp igen",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."

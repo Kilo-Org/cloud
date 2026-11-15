@@ -4261,6 +4261,7 @@
     "unresolvedPurchaseFound": "스토어에서 이전 구매가 확인되었으며 완료되면 해당 크레딧이 잔액에 추가되고, 다시 구매하면 별도의 구매가 시작되어 요금이 한 번 더 청구될 수 있습니다.",
     "unresolvedPurchaseNotFound": "스토어에서 이전 구매가 확인되지 않았지만 나중에 완료되어 해당 크레딧이 잔액에 추가될 수 있으며, 다시 구매하면 별도의 구매가 시작되어 요금이 한 번 더 청구될 수 있습니다.",
     "unresolvedPurchaseRefused": "스토어에서 이전 구매가 확인되었지만 해당 크레딧을 잔액에 추가할 수 없으며, 다시 구매하면 별도의 구매가 시작되어 요금이 한 번 더 청구될 수 있습니다.",
+    "waitingForStore": "스토어의 응답을 기다리는 중이며, 잠시 시간이 걸릴 수 있습니다.",
     "buyAgain": "다시 구매",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."

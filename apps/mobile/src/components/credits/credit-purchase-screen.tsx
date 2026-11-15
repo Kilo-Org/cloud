@@ -30,12 +30,18 @@ import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { useTRPC } from '@/lib/trpc';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
-import { useCreditNativeIap } from './credit-native-iap-owner';
+import { type CreditPurchaseWait, useCreditNativeIap } from './credit-native-iap-owner';
 import { CreditExpiryNote } from './credit-expiry-note';
 import { CreditUnresolvedPurchaseNotice } from './credit-unresolved-purchase-notice';
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
+
+/** The row and the status region say the same thing about a waiting request. */
+const WAIT_COPY_KEYS = {
+  store: 'credits.waitingForStore',
+  pending: 'common.pending',
+} as const satisfies Record<CreditPurchaseWait['kind'], string>;
 
 /**
  * One-off credit packs bought with the store's own purchase sheet.
@@ -60,6 +66,7 @@ export function CreditPurchaseScreen() {
     purchaseResolution,
     reconnectStore,
     completingProductId,
+    purchaseWait,
     errorMessageKey: purchaseErrorMessageKey,
     completedPurchaseCount,
     clearError,
@@ -104,6 +111,7 @@ export function CreditPurchaseScreen() {
   }, [completedPurchaseCount, refetchBalance, t]);
 
   const purchasing = completingProductId !== null;
+  const waitCopy = purchaseWait === null ? null : t(WAIT_COPY_KEYS[purchaseWait.kind]);
   // Only a catalog the backend answered as empty is the empty state: a store
   // query that is pending, paused or failed must not hide the packs the backend
   // catalog named.
@@ -280,7 +288,14 @@ export function CreditPurchaseScreen() {
               // The row's state copy takes its one fixed-height line under the
               // title, in place of the expiry note, and keeps the full row
               // width instead of squeezing the title.
-              const completingLabel = rowCompleting ? t('kiloPass.completingPurchase') : null;
+              const rowWaiting =
+                purchaseWait !== null && purchaseWait.productId === pack.storeProductId;
+              let completingLabel: string | null = null;
+              if (rowWaiting) {
+                completingLabel = waitCopy;
+              } else if (rowCompleting) {
+                completingLabel = t('kiloPass.completingPurchase');
+              }
               // A status phrase takes the same line, so the title keeps one
               // line at the compact width and the row keeps the height of its
               // priced neighbours. The store-unavailable card above already
@@ -360,11 +375,11 @@ export function CreditPurchaseScreen() {
               error is rendered inline (the store sheet has just dismissed), so no
               toast accompanies it; AccessibleStatus is the one announcement
               channel that survives that. */}
-          {(purchaseErrorMessageKey !== null || hasUnresolvedPurchase) && (
+          {(purchaseErrorMessageKey !== null || waitCopy !== null || hasUnresolvedPurchase) && (
             <View testID="credit-purchase-status-region">
               <AccessibleStatus
                 className="px-1 text-sm"
-                message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
+                message={waitCopy ?? (purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null)}
               />
               {hasUnresolvedPurchase && (
                 <CreditUnresolvedPurchaseNotice

@@ -105,7 +105,6 @@ export const BYOKKeyTestResultSchema = z.discriminatedUnion('outcome', [
   }),
   z.object({
     outcome: z.literal('rejected'),
-    detail: z.string().optional(),
     success: z.boolean(),
     message: z.string(),
   }),

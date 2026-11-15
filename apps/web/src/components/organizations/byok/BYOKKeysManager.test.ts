@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { BYOKApiKeyResponse } from '@/lib/byok/types';
-import { VERCEL_BYOK_PROVIDER_NAMES } from '@/lib/byok/provider-names';
+import { getByokProviderDisplayName, VERCEL_BYOK_PROVIDER_NAMES } from '@/lib/byok/provider-names';
 import { BYOKKeysManager, getStructuredCredentialKind } from './BYOKKeysManager';
 
 type ListInput = { organizationId?: string };
@@ -282,12 +282,12 @@ describe('BYOK stored-key test toasts', () => {
     jest.mocked(toast.success).mockClear();
   });
 
-  async function mount() {
+  async function mount(providerId = 'anthropic') {
     mockKeys = [
       {
         id: 'anthropic-key',
-        provider_id: 'anthropic',
-        provider_name: 'Anthropic',
+        provider_id: providerId,
+        provider_name: getByokProviderDisplayName(providerId),
         management_source: 'user',
         is_enabled: true,
         serve_catalog_models: false,
@@ -312,23 +312,48 @@ describe('BYOK stored-key test toasts', () => {
     return mockTestApiKeyOptions.onSuccess;
   }
 
-  it('reports a rejected key without the gateway setup text the payload carries', async () => {
+  it('names the stored provider that rejected the key', async () => {
     const onSuccess = await mount();
 
     await act(async () => {
       onSuccess(
-        {
-          outcome: 'rejected',
-          detail: 'To authenticate, set the AI_GATEWAY_API_KEY environment variable.',
-          success: false,
-          message: 'legacy sentence',
-        },
+        { outcome: 'rejected', success: false, message: 'legacy sentence' },
         { id: 'anthropic-key' }
       );
     });
 
     expect(toast.error).toHaveBeenCalledWith(
-      'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.'
+      'API key test failed: Anthropic rejected this API key. Check that the key is correct and has not been revoked.'
+    );
+  });
+
+  it('reports a rejected key without naming a provider when the key is not in the list', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'rejected', success: false, message: 'legacy sentence' },
+        { id: 'gone-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'API key test failed: the provider rejected this API key. Check that the key is correct and has not been revoked.'
+    );
+  });
+
+  it('names the stored provider of a deprecated key', async () => {
+    const onSuccess = await mount('codestral');
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'deprecated-provider', success: false, message: 'legacy sentence' },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'Legacy Codestral-only key is deprecated and its API key can no longer be tested.'
     );
   });
 

@@ -1,3 +1,4 @@
+import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
@@ -32,7 +33,10 @@ const ProviderParamSchema = z.object({ provider: z.string().min(1) });
 /**
  * Why the server refused the key, in the app's own words. Its message can quote
  * the provider's response, which names things this form does not show and does
- * not translate, so only the code decides the copy.
+ * not translate, so the code decides the copy. The unavailable-provider
+ * refusal is the one exception: `FORBIDDEN` alone also covers other denials, so
+ * it is recognised by the code and the sentence together, where the sentence is
+ * the constant both sides import.
  */
 function refusedKeyMessage(error: unknown): string {
   const code = readTrpcErrorField(error, 'code');
@@ -48,7 +52,10 @@ function refusedKeyMessage(error: unknown): string {
   // The server refuses a provider it has not opened for this account. Retrying
   // the same request cannot change that verdict, so the copy must not ask for
   // one.
-  if (code === 'FORBIDDEN') {
+  if (
+    code === 'FORBIDDEN' &&
+    readTrpcErrorField(error, 'message') === BYOK_PROVIDER_UNAVAILABLE_MESSAGE
+  ) {
     return i18n.t('profile.providerKeys.providerUnavailable');
   }
   return i18n.t('profile.providerKeys.keyStoreFailed');

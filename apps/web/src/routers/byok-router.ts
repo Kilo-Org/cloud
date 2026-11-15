@@ -6,6 +6,7 @@ import {
   type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -156,29 +157,6 @@ function testResultWithLegacyCopy(
   }
 }
 
-/**
- * A gateway authentication error words its message as SDK setup instructions
- * and keeps what the provider answered on the cause. The test reports the
- * provider's own sentence, so no client shows the setup instructions.
- */
-function gatewayProviderMessage(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('cause' in error)) return undefined;
-  const { cause } = error;
-  if (typeof cause !== 'object' || cause === null || !('data' in cause)) return undefined;
-  const { data } = cause;
-  if (typeof data !== 'object' || data === null || !('error' in data)) return undefined;
-  const { error: providerError } = data;
-  if (
-    typeof providerError !== 'object' ||
-    providerError === null ||
-    !('message' in providerError) ||
-    typeof providerError.message !== 'string'
-  ) {
-    return undefined;
-  }
-  return providerError.message.trim() ? providerError.message : undefined;
-}
-
 const EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS = {
   'bedrock-byok': parseAwsBedrockCredentials,
   'vertex-byok': parseGcpVertexCredentials,
@@ -286,9 +264,13 @@ async function rejectUnavailableExperimentalProvider(
     isExperimentalByokProviderId(providerId) &&
     !(await isExperimentalByokEnabled(organizationId))
   ) {
+    logByokWriteWarning('BYOK key write refused: provider is not available for this account', {
+      providerId,
+      organizationId: organizationId ?? null,
+    });
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: `Provider ${providerId} is not available yet.`,
+      message: BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
     });
   }
 }
@@ -1019,10 +1001,7 @@ export const byokRouter = createTRPCRouter({
           decryptedKey.providerId === GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway'] &&
           GatewayAuthenticationError.isInstance(e)
         ) {
-          return testResultWithLegacyCopy({
-            outcome: 'rejected',
-            detail: gatewayProviderMessage(e),
-          });
+          return testResultWithLegacyCopy({ outcome: 'rejected' });
         }
         return testResultWithLegacyCopy(
           message ? { outcome: 'failed', detail: message } : { outcome: 'failed' }

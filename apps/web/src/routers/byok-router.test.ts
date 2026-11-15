@@ -36,6 +36,7 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   ai_gateway_config,
@@ -1990,7 +1991,6 @@ describe('BYOK Router', () => {
       try {
         await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
           outcome: 'rejected',
-          detail: 'Invalid API key',
           success: false,
           message:
             'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
@@ -2193,14 +2193,14 @@ describe('BYOK Router', () => {
           provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
-      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
+      ).rejects.toThrow(BYOK_PROVIDER_UNAVAILABLE_MESSAGE);
       await expect(
         caller.byok.create({
           organizationId: organizationA.id,
           provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
-      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
+      ).rejects.toThrow(BYOK_PROVIDER_UNAVAILABLE_MESSAGE);
       await expect(
         caller.byok.create({ provider_id: 'nvidia-byok', api_key: 'nvidia-key' })
       ).resolves.toMatchObject({ provider_id: 'nvidia-byok' });

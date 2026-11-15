@@ -288,9 +288,11 @@ function stripAnsi(text: string): string {
 /**
  * The stored-key test reports an outcome rather than a message, so this copy
  * lives here. `rejected` names the credential problem itself and drops the
- * provider's `detail`, which is SDK setup text for a different audience.
+ * provider's own error text, which is SDK setup for a different audience.
  * `failed` keeps the provider's own sentence, which is where its reason lives,
  * with any terminal colour codes removed: a toast renders them as characters.
+ * The outcome is generic, so a sentence that names the provider takes that name
+ * from the stored key, and stays neutral when the key is not known yet.
  */
 function byokKeyTestMessage(result: BYOKKeyTestResult, providerId: string | undefined): string {
   switch (result.outcome) {
@@ -305,9 +307,13 @@ function byokKeyTestMessage(result: BYOKKeyTestResult, providerId: string | unde
     case 'unreadable-key':
       return 'API key test failed: the stored key could not be read. Try again later.';
     case 'deprecated-provider':
-      return 'Codestral is deprecated and its API key can no longer be tested.';
+      return providerId
+        ? `${getByokProviderDisplayName(providerId)} is deprecated and its API key can no longer be tested.`
+        : 'This provider is deprecated and its API key can no longer be tested.';
     case 'rejected':
-      return 'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
+      return providerId
+        ? `API key test failed: ${getByokProviderDisplayName(providerId)} rejected this API key. Check that the key is correct and has not been revoked.`
+        : 'API key test failed: the provider rejected this API key. Check that the key is correct and has not been revoked.';
     case 'failed':
       return result.detail
         ? `API key test failed: ${stripAnsi(result.detail)}`

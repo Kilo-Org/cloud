@@ -32,6 +32,7 @@
     "./approval-key": "./src/approval-key.ts",
     "./cloud-agent-error": "./src/cloud-agent-error.ts",
     "./byok-credentials": "./src/byok-credentials.ts",
+    "./byok-errors": "./src/byok-errors.ts",
     "./home-widget": "./src/home-widget.ts",
     "./display-text": "./src/display-text.ts",
     "./tool-detail": "./src/tool-detail/index.ts",

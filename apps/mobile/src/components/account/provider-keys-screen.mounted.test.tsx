@@ -222,7 +222,7 @@ describe('ProviderKeysScreen', () => {
     await mount();
 
     act(() => {
-      testMutation().onSuccess?.({ outcome: 'rejected', detail: 'upstream 401' });
+      testMutation().onSuccess?.({ outcome: 'rejected' });
     });
 
     expect(announcingToast.error).toHaveBeenCalledWith(

@@ -1,6 +1,8 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
+import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
+
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -230,16 +232,26 @@ describe('ProviderKeyNewScreen', () => {
     submit(root, 'sk-test-123');
 
     act(() => {
-      // The server's own text names an internal provider the form does not show,
-      // so the code, not the message, decides the copy.
-      state.mutations[0]?.onError?.(
-        serverRefusal('FORBIDDEN', 'Provider bedrock is not available yet.')
-      );
+      // The refusal is matched on the sentence both sides share, so the screen
+      // needs no provider id of its own to recognise it.
+      state.mutations[0]?.onError?.(serverRefusal('FORBIDDEN', BYOK_PROVIDER_UNAVAILABLE_MESSAGE));
     });
 
     expect(statusMessages(root)).toEqual([
       'This provider is not available yet, so you cannot add a key for it.',
     ]);
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('keeps the generic copy for a permission denial that is not the unavailable provider', async () => {
+    const root = await mount();
+    submit(root, 'sk-test-123');
+
+    act(() => {
+      state.mutations[0]?.onError?.(serverRefusal('FORBIDDEN', 'You cannot write this key'));
+    });
+
+    expect(statusMessages(root)).toEqual(['The key could not be saved. Try again.']);
     expect(state.dismissTo).not.toHaveBeenCalled();
   });
 

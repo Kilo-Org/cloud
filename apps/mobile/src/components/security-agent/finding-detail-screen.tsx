@@ -31,7 +31,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
-import { useBillingAction } from '@/lib/trial-refusal';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
@@ -86,9 +86,13 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const capability = useSecurityAgentCapability(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
   const { refresh: refreshDismissDraft } = dismissDraft;
-  // The step a stored trial refusal offers this reader. The draft keeps the
-  // copy key, so the card re-translates the sentence and this decides whether
-  // the same reader is offered the plan step under it.
+  // One role answer decides both the sentence a stored refusal paints and the
+  // step under it: the draft records which refusal it was, not which reader saw
+  // it, so `useCanManageBilling` is handed to the copy resolver while the step
+  // comes from the same predicate inside `useBillingAction`. A draft written for
+  // a member therefore reads the billing sentence with the step when a billing
+  // role opens it, and the reverse keeps the ask-an-owner sentence with no step.
+  const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
 
   // The detail screen stays mounted while the dismiss sheet is open, so
@@ -235,7 +239,6 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // A pre-accept dismissal failure (no command id) leaves a durable draft; the
   // retry card restores it until the user retries or discards it.
   const draft = dismissDraft.draft;
-  const dismissFailure = draft?.lastError != null ? securityDismissFailureCopy(draft) : null;
 
   return (
     <View className="flex-1 bg-background">
@@ -277,16 +280,12 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
-      {dismissFailure !== null && dismissDraft.draft ? (
+      {draft?.lastError != null ? (
         <View className="px-6 pb-2">
           <SecurityCommandRetryCard
-            lastError={dismissFailure}
-            retryable={dismissDraft.draft.retryable === true}
-            action={
-              isSecurityTrialRefusalCopyKey(dismissDraft.draft.lastErrorKey)
-                ? billingAction
-                : undefined
-            }
+            lastError={securityDismissFailureCopy(draft, canManageBilling)}
+            retryable={draft.retryable === true}
+            action={isSecurityTrialRefusalCopyKey(draft.lastErrorKey) ? billingAction : undefined}
             onRetry={() => {
               pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
             }}

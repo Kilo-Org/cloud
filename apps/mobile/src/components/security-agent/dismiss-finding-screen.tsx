@@ -67,10 +67,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const commentRef = useRef('');
   const dismissFinding = useDismissSecurityFinding(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
-  // The step a refused dismissal offers this reader, and the role its stored
-  // failure is keyed by. The mapping that built `dismissFinding.error` took the
-  // same role read, so the sentence, the step and the key it survives by all
-  // describe one reader.
+  // The reader's role, read once: the mapping that built `dismissFinding.error`
+  // took the same role read, and the draft records which refusal it was rather
+  // than which reader saw it, so the stored sentence is re-translated for this
+  // reader while `useBillingAction` offers the step from the same predicate.
   const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
 
@@ -233,7 +233,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   const dismissFailure: DismissFailure | null = resolveDismissFailure(
     dismissFinding.isError ? dismissFinding.error : null,
-    dismissDraft.draft
+    dismissDraft.draft,
+    canManageBilling
   );
   // A terminal rejection ended the intent, so disable the CTA and let the
   // inline copy explain the outcome. The lapsed-trial refusal is the one where

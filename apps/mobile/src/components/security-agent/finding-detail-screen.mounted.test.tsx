@@ -119,9 +119,13 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
   useSecurityAnalysis: () => analysis,
 }));
+const dismissFailureCopy = vi.hoisted(() =>
+  vi.fn((draft: { lastError: string | null }) => draft.lastError ?? '')
+);
+
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
-  securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
+  securityDismissFailureCopy: dismissFailureCopy,
 }));
 vi.mock('./security-command-retry-card', () => ({ SecurityCommandRetryCard: 'RetryCard' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -334,6 +338,48 @@ describe('FindingDetailScreen dismiss retry card states', () => {
     const card = renderScreen().root.findByType(SecurityCommandRetryCard);
 
     expect(card.props.action).toBeUndefined();
+  });
+
+  // The stored key names which refusal the draft recorded, not which reader saw
+  // it: a draft written while the role read was unresolved gains the sentence
+  // and the step together when a billing role opens it, and a draft written by
+  // a billing role keeps the ask-an-owner copy, without a step, for a member.
+  it('gives a billing role the step under a refusal stored with the ask-an-owner key', () => {
+    trialRole.role = 'owner';
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: 'The organization trial has ended.',
+      lastErrorKey: TRIAL_ENDED_COPY_KEY,
+      retryable: false,
+    };
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+
+    expect(card.props.action).toMatchObject({ label: 'organization.hub.manageBilling' });
+    // The sentence is re-translated from the same role answer that built the
+    // step, never from the reader the draft was written for.
+    expect(dismissFailureCopy).toHaveBeenCalledWith(
+      expect.objectContaining({ lastErrorKey: TRIAL_ENDED_COPY_KEY }),
+      true
+    );
+  });
+
+  it('keeps a member on the ask-an-owner copy with no step for a billing-keyed draft', () => {
+    trialRole.role = 'member';
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: 'The organization trial has ended.',
+      lastErrorKey: TRIAL_ENDED_BILLING_COPY_KEY,
+      retryable: false,
+    };
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+
+    expect(card.props.action).toBeUndefined();
+    expect(dismissFailureCopy).toHaveBeenCalledWith(
+      expect.objectContaining({ lastErrorKey: TRIAL_ENDED_BILLING_COPY_KEY }),
+      false
+    );
   });
 
   it('adds no step to a stored failure that is not the trial refusal', () => {

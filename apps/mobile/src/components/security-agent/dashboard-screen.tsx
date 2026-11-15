@@ -69,7 +69,7 @@ import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { type SinglePushRoute, useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { useBillingAction } from '@/lib/trial-refusal';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
@@ -341,9 +341,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const scopeTitle = useSecurityScopeTitle(scope);
-  // The step a trial refusal offers, for the reader who can take it. The copy
-  // is mapped with the same role read in the mutation hooks, so the sentence
-  // and the step always describe the same reader.
+  // The step a trial refusal offers, for the reader who can take it. A stored
+  // dismissal failure records which refusal it was, not which reader saw it, so
+  // this one role answer feeds both the sentence a failure card paints and the
+  // step under it, which `useBillingAction` builds from the same predicate; the
+  // two cannot describe different readers.
+  const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -908,7 +911,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         {dismissFailures.failures.map(failure => (
           <SecurityCommandRetryCard
             key={failure.findingId}
-            lastError={securityDismissFailureCopy(failure)}
+            lastError={securityDismissFailureCopy(failure, canManageBilling)}
             retryable={failure.retryable === true}
             action={isSecurityTrialRefusalCopyKey(failure.lastErrorKey) ? billingAction : undefined}
             onRetry={() => {

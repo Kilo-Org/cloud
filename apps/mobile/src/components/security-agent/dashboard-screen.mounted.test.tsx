@@ -18,7 +18,7 @@ import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 import { i18n } from '@/i18n';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
-import { ORGANIZATION_BILLING_HREF } from '@/lib/trial-refusal';
+import { billingHrefFor } from '@/lib/trial-refusal';
 import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 import {
   mapSecuritySyncOperationError,
@@ -2247,7 +2247,7 @@ describe('DashboardScreen trial refusal (reader role)', () => {
     act(() => {
       (step.props.onPress as () => void)();
     });
-    expect(router.push).toHaveBeenCalledWith(ORGANIZATION_BILLING_HREF);
+    expect(router.push).toHaveBeenCalledWith(billingHrefFor(ORG_SCOPE));
   });
 
   it('keeps every other role on the owner-naming sentence, with no step', () => {

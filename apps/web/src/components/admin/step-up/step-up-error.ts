@@ -2,6 +2,7 @@ import * as z from 'zod';
 import {
   PRIVILEGED_ACTION_CLASSES,
   type PrivilegedActionClass,
+  type PrivilegedTargetKind,
   type StepUpErrorCode,
   type StepUpOperationBinding,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
@@ -91,6 +92,22 @@ export function stepUpDialogTitle(requirement: StepUpRequirement): string {
   }
 }
 
+const stepUpTargetNouns = {
+  user: 'account',
+  organization: 'organization',
+  service: 'service',
+  none: 'target',
+} satisfies Record<PrivilegedTargetKind, string>;
+
+/** Name the operation an operation-class proof is minted for. */
+function stepUpOperationSentence(binding: StepUpOperationBinding): string {
+  const target =
+    binding.targetId === null
+      ? ''
+      : ` for ${stepUpTargetNouns[binding.targetKind]} ${binding.targetId}`;
+  return `This confirmation covers ${binding.method.toUpperCase()} ${binding.route}${target}.`;
+}
+
 export function stepUpDialogDescription(requirement: StepUpRequirement): string {
   switch (requirement.code) {
     case 'NOT_ENROLLED':
@@ -104,9 +121,12 @@ export function stepUpDialogDescription(requirement: StepUpRequirement): string 
     case 'STEP_UP_UNAVAILABLE':
       return 'MFA verification could not be checked. Try again in a moment. If it keeps failing, contact support.';
     case 'MFA_EXPIRED':
-      return 'Confirm it is you with your passkey to continue.';
-    case 'MFA_REQUIRED':
-      return 'Confirm it is you with your passkey to continue.';
+    case 'MFA_REQUIRED': {
+      const prompt = 'Confirm it is you with your passkey to continue.';
+      const binding = requirement.binding;
+      if (!binding || requirement.purpose === 'session') return prompt;
+      return `${prompt} ${stepUpOperationSentence(binding)}`;
+    }
   }
 }
 

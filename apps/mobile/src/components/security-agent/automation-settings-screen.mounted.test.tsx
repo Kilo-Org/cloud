@@ -31,6 +31,7 @@ const toggleRows = vi.hoisted(() => ({
   rows: [] as {
     title: string;
     accessibilityLabel?: string;
+    subtitle?: string;
     value: boolean;
     disabled: boolean;
     onValueChange: (value: boolean) => void;
@@ -87,6 +88,7 @@ vi.mock('@/components/security-agent/settings-toggle-row', () => ({
   ToggleRow: (props: {
     title: string;
     accessibilityLabel?: string;
+    subtitle?: string;
     value: boolean;
     disabled: boolean;
     onValueChange: (value: boolean) => void;
@@ -278,8 +280,9 @@ describe('AutomationSettingsScreen approval gate', () => {
 
     for (const row of sectionRows) {
       // Label in name: the switch is named by the text the row shows, so no
-      // second name and no muted copy beneath it repeat the setting.
+      // second name repeats the setting and nothing is drawn under the row.
       expect(row.accessibilityLabel).toBeUndefined();
+      expect(row.subtitle).toBeUndefined();
       for (const sectionName of sectionNames) {
         expect(row.title).not.toContain(sectionName);
       }

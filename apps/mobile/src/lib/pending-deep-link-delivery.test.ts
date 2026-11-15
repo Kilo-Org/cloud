@@ -27,6 +27,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: SESSION_HREF,
         atLandingRoute: false,
         segments: ACCOUNT_SEGMENTS,
+        fromLaunchCapture: false,
       })
     ).toBe(true);
     expect(
@@ -35,17 +36,49 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: SESSION_HREF,
         atLandingRoute: true,
         segments: HOME_TAB_SEGMENTS,
+        fromLaunchCapture: false,
       })
     ).toBe(true);
   });
 
-  it('delivers a recovered destination while the app is on its landing route', () => {
+  it('delivers the cold-launch capture at the landing route', () => {
+    // The link this process was launched into: nobody has chosen a screen yet,
+    // and this is the one the launch asked for.
     expect(
       shouldDeliverPendingDeepLink({
         arrival: 'restored',
         href: SESSION_HREF,
         atLandingRoute: true,
         segments: HOME_TAB_SEGMENTS,
+        fromLaunchCapture: true,
+      })
+    ).toBe(true);
+  });
+
+  it('drops the durable restart record at the landing route', () => {
+    // Written by an earlier process and stale by construction: this launch did
+    // not name it, so it must not open over Home.
+    expect(
+      shouldDeliverPendingDeepLink({
+        arrival: 'restored',
+        href: SESSION_HREF,
+        atLandingRoute: true,
+        segments: HOME_TAB_SEGMENTS,
+        fromLaunchCapture: false,
+      })
+    ).toBe(false);
+  });
+
+  it('delivers a restart record already showing at the landing route', () => {
+    // The destination is the route on screen: the navigation only inserts the
+    // layout anchors beneath it.
+    expect(
+      shouldDeliverPendingDeepLink({
+        arrival: 'restored',
+        href: '/(app)/(tabs)/(0_home)',
+        atLandingRoute: true,
+        segments: HOME_TAB_SEGMENTS,
+        fromLaunchCapture: false,
       })
     ).toBe(true);
   });
@@ -59,6 +92,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: '/(app)/agent-chat/ses_1?at=msg_2',
         atLandingRoute: false,
         segments: SESSION_SEGMENTS,
+        fromLaunchCapture: true,
       })
     ).toBe(true);
     // A destination inside a tab: the href carries both the app group and the
@@ -69,6 +103,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: ACCOUNT_HREF,
         atLandingRoute: false,
         segments: ACCOUNT_SEGMENTS,
+        fromLaunchCapture: false,
       })
     ).toBe(true);
   });
@@ -80,6 +115,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: SESSION_HREF,
         atLandingRoute: false,
         segments: ACCOUNT_SEGMENTS,
+        fromLaunchCapture: false,
       })
     ).toBe(false);
     expect(
@@ -88,6 +124,21 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: '/(app)/agent-chat/ses_2',
         atLandingRoute: false,
         segments: SESSION_SEGMENTS,
+        fromLaunchCapture: false,
+      })
+    ).toBe(false);
+  });
+
+  it('drops the cold-launch capture once the person is on another screen', () => {
+    // The producer split does not weaken the rule away from the landing route:
+    // the launch capture is stale by then too.
+    expect(
+      shouldDeliverPendingDeepLink({
+        arrival: 'restored',
+        href: SESSION_HREF,
+        atLandingRoute: false,
+        segments: ACCOUNT_SEGMENTS,
+        fromLaunchCapture: true,
       })
     ).toBe(false);
   });
@@ -102,6 +153,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: '/(app)/code-reviewer/personal/github/instructions',
         atLandingRoute: false,
         segments: ['(app)', 'code-reviewer', 'personal', 'github', '(edit)', 'instructions'],
+        fromLaunchCapture: false,
       })
     ).toBe(true);
   });
@@ -115,6 +167,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: '/(app)/(tabs)/(3_profile)',
         atLandingRoute: false,
         segments: HOME_TAB_SEGMENTS,
+        fromLaunchCapture: false,
       })
     ).toBe(false);
     expect(
@@ -123,6 +176,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         href: '/(app)/(tabs)/(3_profile)',
         atLandingRoute: false,
         segments: PROFILE_TAB_SEGMENTS,
+        fromLaunchCapture: false,
       })
     ).toBe(true);
   });

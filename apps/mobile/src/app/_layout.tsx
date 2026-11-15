@@ -1085,12 +1085,19 @@ function RootLayoutNav({
     // not open over a screen the person has since reached. The consume above
     // already cleared the slot and its persisted mirror, so a dropped
     // destination cannot come back on a later launch.
+    //
+    // At the landing route the two recovered producers part company: only a
+    // launch into this href still opens, while a durable restart record written
+    // by an earlier process is dropped there. Same comparison as the relaunch
+    // repair above — slot and capture come from the same launch Intent.
+    const launchCaptured = wasLaunchLinkHandled();
     if (
       !shouldDeliverPendingDeepLink({
         arrival: pendingArrival,
         href: pending.href,
         atLandingRoute: isAppLandingSegments(segments),
         segments,
+        fromLaunchCapture: launchCaptured !== null && launchCaptured === pending.href,
       })
     ) {
       return;

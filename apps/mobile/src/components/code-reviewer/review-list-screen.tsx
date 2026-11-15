@@ -18,9 +18,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { canConnectAnyProvider } from '@/lib/code-reviewer-status';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
+import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
@@ -134,6 +136,13 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const gitlabStatus = useGitLabStatus(scope);
   const hasConnectedProvider =
     githubStatus.data?.connected === true || gitlabStatus.data?.connected === true;
+  const permission = useReviewerPermission(scope);
+  // The Configure button opens the platform list, where each platform's connect
+  // card is per-role: GitHub's needs an organization-manage role and GitLab's a
+  // billing-level edit role, so a plain member would land on a screen whose
+  // actions all refuse them. An unresolved permission keeps the button — the
+  // provider procedures stay server-authorized.
+  const canConnect = permission.status !== 'ready' || canConnectAnyProvider(permission);
 
   const pages = data?.pages;
   const firstPage = pages?.[0];
@@ -153,28 +162,35 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   let body: ReactNode = null;
   if (!isLoading && firstPage?.success && reviews.length === 0) {
+    const offersAction = hasConnectedProvider || canConnect;
     body = (
       <EmptyState
         icon={GitPullRequest}
         title={t('codeReviewer.reviewList.noReviews')}
-        description={t('codeReviewer.reviewList.noReviewsDescription')}
+        description={
+          offersAction
+            ? t('codeReviewer.reviewList.noReviewsDescription')
+            : t('codeReviewer.reviewList.connectOwnerOnly')
+        }
         action={
-          <Button
-            className={STATE_ACTION_CLASS}
-            onPress={() => {
-              pushOnce(
-                (hasConnectedProvider
-                  ? `/(app)/code-reviewer/${scope}/manual-review`
-                  : `/(app)/code-reviewer/${scope}`) as Href
-              );
-            }}
-          >
-            <Text>
-              {hasConnectedProvider
-                ? t('codeReviewer.reviewList.startManualReview')
-                : t('codeReviewer.reviewList.configureProvider')}
-            </Text>
-          </Button>
+          offersAction ? (
+            <Button
+              className={STATE_ACTION_CLASS}
+              onPress={() => {
+                pushOnce(
+                  (hasConnectedProvider
+                    ? `/(app)/code-reviewer/${scope}/manual-review`
+                    : `/(app)/code-reviewer/${scope}`) as Href
+                );
+              }}
+            >
+              <Text>
+                {hasConnectedProvider
+                  ? t('codeReviewer.reviewList.startManualReview')
+                  : t('codeReviewer.reviewList.configureProvider')}
+              </Text>
+            </Button>
+          ) : undefined
         }
       />
     );

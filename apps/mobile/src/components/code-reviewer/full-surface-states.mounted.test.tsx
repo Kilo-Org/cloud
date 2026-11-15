@@ -3,7 +3,7 @@ import { createElement, type ReactElement, type ReactNode, type Ref } from 'reac
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
 import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
@@ -41,7 +41,11 @@ const state = vi.hoisted(() => ({
   platform: 'gitlab',
   connected: false,
   scope: 'personal',
-  organizations: [] as { organizationId: string; organizationName: string }[],
+  organizations: [] as {
+    organizationId: string;
+    organizationName: string;
+    role?: string;
+  }[],
   repositories: {
     data: { repositories: [] } as unknown,
     isLoading: false,
@@ -785,6 +789,102 @@ describe('Recent review header', () => {
     expect(node.props.eyebrow).toBe('Recent reviews');
     expect(node.props.titleNumberOfLines).toBe(1);
     expect(node.props.reserveTitleSpace).toBe(false);
+    unmount();
+  });
+});
+
+// The empty list's Configure button opens the platform list, and each platform's
+// connect card there is per-role: GitHub's needs an organization-manage role,
+// GitLab's a billing-level edit role. A plain member would land on a screen with
+// no action of their own, so the scope-level screen replaces the button with a
+// role notice — while a connected scope keeps the manual-review destination for
+// every role.
+describe('empty reviews connect action', () => {
+  const SCOPE = 'org-1';
+  const ORG_NAME = 'Drain Labs';
+
+  function emptyState(renderer: RenderWithProvidersResult['renderer']) {
+    return renderer.root.find(node => String(node.type) === 'EmptyState');
+  }
+
+  /**
+   * The scope title paints from the same `organizations.list` read the role
+   * comes from, so reading the name means the role has settled too.
+   */
+  async function settled(renderer: RenderWithProvidersResult['renderer']) {
+    await waitFor(
+      () =>
+        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.title) ===
+        ORG_NAME
+    );
+  }
+
+  function pressAction(renderer: RenderWithProvidersResult['renderer']) {
+    const action = emptyState(renderer).props.action as ReactElement<{ onPress: () => void }>;
+    action.props.onPress();
+  }
+
+  function actionLabel(renderer: RenderWithProvidersResult['renderer']) {
+    const action = emptyState(renderer).props.action as ReactElement<{
+      children: ReactElement<{ children: string }>;
+    }>;
+    return action.props.children.props.children;
+  }
+
+  it('replaces the button with a role notice for a plain member', async () => {
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.connectOwnerOnly'));
+    unmount();
+  });
+
+  it('offers the platform list to an owner', async () => {
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'owner' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    expect(empty.props.action).toBeDefined();
+    pressAction(renderer);
+    expect(state.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${SCOPE}`);
+    unmount();
+  });
+
+  it('offers the platform list to a billing manager, who can connect GitLab', async () => {
+    state.organizations = [
+      { organizationId: SCOPE, organizationName: ORG_NAME, role: 'billing_manager' },
+    ];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    expect(empty.props.action).toBeDefined();
+    unmount();
+  });
+
+  it('keeps the manual-review action for a member once a provider is connected', async () => {
+    state.connected = true;
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    expect(actionLabel(renderer)).toBe(i18n.t('codeReviewer.reviewList.startManualReview'));
+    pressAction(renderer);
+    expect(state.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${SCOPE}/manual-review`);
     unmount();
   });
 });

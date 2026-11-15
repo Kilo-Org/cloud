@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  canConnectAnyProvider,
   classifyConfigBody,
   classifyPermission,
   classifyProviderErrorCode,
@@ -135,6 +136,20 @@ describe('classifyProviderState', () => {
         refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'loading' });
+  });
+});
+
+describe('canConnectAnyProvider', () => {
+  it('is true for an owner/admin, who can connect GitHub', () => {
+    expect(canConnectAnyProvider({ canEdit: true, canManage: true })).toBe(true);
+  });
+
+  it('is true for a billing manager, who can connect GitLab', () => {
+    expect(canConnectAnyProvider({ canEdit: true, canManage: false })).toBe(true);
+  });
+
+  it('is false for a plain member, who can connect neither platform', () => {
+    expect(canConnectAnyProvider({ canEdit: false, canManage: false })).toBe(false);
   });
 });
 

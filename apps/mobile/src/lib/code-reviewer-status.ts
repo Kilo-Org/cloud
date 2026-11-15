@@ -111,6 +111,21 @@ export function canConnectProvider(
 }
 
 /**
+ * Whether a scope-level screen may offer its one connect action, which opens the
+ * platform list rather than a single platform's card. Each platform's overview
+ * offers its connect card per {@link canConnectProvider}: GitHub's card needs an
+ * organization-manage role and GitLab's a billing-level edit role, so a role that
+ * can connect neither (a plain member) gets that screen's read-only notice
+ * instead of a button whose destination has no action of its own.
+ */
+export function canConnectAnyProvider(capabilities: {
+  canEdit: boolean;
+  canManage: boolean;
+}): boolean {
+  return canConnectProvider('github', capabilities) || canConnectProvider('gitlab', capabilities);
+}
+
+/**
  * Discriminated status for a reviewer config read's body, so a screen always
  * has exactly one surface to paint. The overview screens used to compose the
  * body from separate `isLoading` / `isError` / `paused` tests, and a config

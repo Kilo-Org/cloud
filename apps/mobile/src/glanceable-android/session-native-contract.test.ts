@@ -4,6 +4,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '@/lib/android-notification-channels';
+
 /**
  * The session notification path is Kotlin plus a JS bridge, and only an Android
  * build compiles the Kotlin half. Two defects shipped that a compiler or an
@@ -151,13 +153,21 @@ describe('SessionNotifications', () => {
     expect(build).toContain('.setSound(null)');
     expect(build).toContain('.setVibrate(null)');
     expect(build).toContain('.setOnlyAlertOnce(true)');
-    expect(NOTIFICATIONS).toContain('CHANNEL_ID = "followed-sessions-lock-screen"');
+  });
+
+  it('posts the followed card on the channel the JS side creates silent', () => {
+    // The channel id exists in two languages. Reading the Kotlin literal into the
+    // JS list is what fails when either side renames the channel.
+    const channelId = /private const val CHANNEL_ID = "([^"]+)"/.exec(NOTIFICATIONS)?.[1];
+    expect(channelId).toBeDefined();
+    expect(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS).toContain(channelId);
   });
 });
 
 describe('the shared card helpers', () => {
   const GATE = kotlin('PromotionGate.kt');
   const STYLE = kotlin('CardStyle.kt');
+  const BUILDERS = kotlin('CardBuilders.kt');
 
   it('asks the promotion question in the gate alone, never in either card', () => {
     // A capability tested twice can promote one card and fall back on the other.
@@ -184,6 +194,15 @@ describe('the shared card helpers', () => {
     expect((MODULE + NOTIFICATIONS + STYLE).match(/#4F5A10/g)).toHaveLength(1);
     expect(body(NOTIFICATIONS, 'fun post(')).toContain('commitOrReport(');
     expect(body(NOTIFICATIONS, 'fun cancel(')).toContain('commitOrReport(');
+  });
+
+  it('builds both cards through one builder fork and one action record', () => {
+    // A second copy of the fork can correct the legacy branch on one card only.
+    expect(BUILDERS).toContain('Notification.Builder(context, channelId)');
+    expect(BUILDERS).toContain('Notification.Action.Builder(');
+    expect(BUILDERS).toContain('Build.VERSION.SDK_INT >= 26');
+    expect(MODULE + NOTIFICATIONS).not.toContain('Notification.Builder(');
+    expect(MODULE + NOTIFICATIONS).not.toContain('Notification.Action.Builder(');
   });
 });
 

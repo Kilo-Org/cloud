@@ -528,12 +528,12 @@ describe('rejectDisallowedUpstreamUrls', () => {
       })
     ).resolves.toEqual({
       rejected: null,
-      allowed: [
-        {
-          url: 'https://first.example.com/v1',
-          hostname: 'first.example.com',
-          addresses: ['104.18.2.115'],
-        },
+      dialed: {
+        url: 'https://first.example.com/v1',
+        hostname: 'first.example.com',
+        addresses: ['104.18.2.115'],
+      },
+      relayed: [
         {
           url: 'https://second.example.com/v1',
           hostname: 'second.example.com',

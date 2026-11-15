@@ -25,7 +25,10 @@ import {
   rejectDisallowedUpstreamUrls,
   rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
-import { upstreamDispatcherFor } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-connection';
+import {
+  UpstreamAddressUnverifiedError,
+  upstreamDispatcherFor,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-connection';
 import type { Dispatcher } from 'undici';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
@@ -181,6 +184,21 @@ function createLoggedFetchFailure(errorName: string, errorMessage: string): Erro
   const loggedError = new Error(errorMessage);
   loggedError.name = errorName;
   return loggedError;
+}
+
+/**
+ * The gateway refuses a connection whose target it could not verify (see
+ * `upstream-connection.ts`): before the fetch, or inside the connection when the
+ * pinned address is gone. undici reports the second as a fetch error whose cause
+ * is the refusal, so the cause chain is followed.
+ */
+function findUpstreamAddressUnverified(error: unknown): UpstreamAddressUnverifiedError | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth += 1) {
+    if (current instanceof UpstreamAddressUnverifiedError) return current;
+    current = 'cause' in current ? current.cause : undefined;
+  }
+  return undefined;
 }
 
 function classifyUpstreamFetchFailure({
@@ -402,18 +420,8 @@ export async function upstreamRequest({
     // addresses the policy checked for that exact URL. The secure-proxy
     // `targetUrl` is a body field the relay dials itself, so only the policy
     // check applies to it.
-    const dialedHop = urlPolicy?.allowed.find(entry => entry.url === outgoing.url);
-    if (urlPolicy && !dialedHop) {
-      // The policy checks every URL it is given, and `outgoing.url` is one of
-      // them; an allowed list without it sends nothing.
-      budgetSignal.removeEventListener('abort', onBudgetExceeded);
-      return {
-        type: 'error',
-        response: upstreamFetchFailureResponse('unknown', vercelRequestId, reasoningEffort),
-      };
-    }
-    const dispatcher = dialedHop
-      ? upstreamDispatcherFor(dialedHop.hostname, dialedHop.addresses)
+    const dispatcher = urlPolicy
+      ? upstreamDispatcherFor(urlPolicy.dialed.hostname, urlPolicy.dialed.addresses)
       : undefined;
 
     const requestOptions: RequestInit & { duplex: 'half'; dispatcher?: Dispatcher } = {
@@ -452,6 +460,37 @@ export async function upstreamRequest({
     // No response body to bound; a later fallback attempt must not be blamed
     // for this attempt's budget.
     budgetSignal.removeEventListener('abort', onBudgetExceeded);
+    // A refused connection is the gateway's own decision, not a provider fault,
+    // so it is reported apart from the upstream fetch failures. The client
+    // answer stays the generic upstream failure response.
+    const unverified = findUpstreamAddressUnverified(error);
+    if (unverified) {
+      try {
+        const metadata = {
+          providerId: provider.type,
+          targetHost: getProviderTargetHost(apiUrl),
+          path,
+          code: unverified.code,
+          ...(vercelRequestId && { vercelRequestId }),
+        };
+        errorExceptInTest('AI gateway upstream connection refused', metadata);
+        captureException(unverified, {
+          level: 'error',
+          tags: {
+            source: 'ai-gateway-upstream-connection',
+            provider: provider.type,
+            code: unverified.code,
+          },
+          extra: metadata,
+        });
+      } catch {
+        // The failure must remain caller-visible even when reporting fails.
+      }
+      return {
+        type: 'error',
+        response: upstreamFetchFailureResponse('unknown', vercelRequestId, reasoningEffort),
+      };
+    }
     // The caller passes the incoming request signal, so a client that goes away
     // aborts this fetch as well. Those aborts are client-side cancellations and
     // must not be reported (or alerted on) as upstream failures.

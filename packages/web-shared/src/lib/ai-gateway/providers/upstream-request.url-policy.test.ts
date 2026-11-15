@@ -1,8 +1,10 @@
 import { lookup } from 'node:dns/promises';
 import type { LookupAddress } from 'node:dns';
 import type { Dispatcher } from 'undici';
+import { captureException } from '@sentry/nextjs';
 import { buildDirectProvider } from './build-direct-provider';
 import {
+  UpstreamAddressUnverifiedError,
   clearUpstreamConnectionCache,
   lookupPinnedUpstreamAddress,
   upstreamDispatcherFor,
@@ -97,6 +99,7 @@ describe('upstreamRequest upstream URL policy', () => {
     clearUpstreamUrlPolicyCache();
     clearUpstreamConnectionCache();
     lookupMock.mockReset();
+    jest.mocked(captureException).mockReset();
   });
 
   afterEach(() => {
@@ -135,6 +138,29 @@ describe('upstreamRequest upstream URL policy', () => {
       // symbols, so the pool's identity is the public proof that this request
       // dials the checked host with the address pinned above.
       expect(dispatcher).toBe(upstreamDispatcherFor('llm.example.com', ['104.18.2.115']));
+    });
+
+    it('reports a refused connection apart from an upstream failure', async () => {
+      lookupMock.mockResolvedValue([{ address: '104.18.2.115', family: 4 }]);
+      const refusal = new UpstreamAddressUnverifiedError('llm.example.com', 'no live pin');
+      // A refused pin reaches the request as a fetch error whose cause is the
+      // refusal, which `upstream-connection.test.ts` shows on this runtime.
+      mockFetch().mockRejectedValue(
+        Object.assign(new TypeError('fetch failed'), { cause: refusal })
+      );
+
+      const result = await send(directProvider('https://llm.example.com/v1'));
+
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      expect((await result.response.json()).error_type).toBe('upstream_disconnect');
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        refusal,
+        expect.objectContaining({
+          tags: expect.objectContaining({ source: 'ai-gateway-upstream-connection' }),
+        })
+      );
     });
 
     it('pins the proxy host for a secure proxy request', async () => {

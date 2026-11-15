@@ -400,20 +400,28 @@ function rejectionResponse({
 }
 
 /**
- * An allowed URL and the checked addresses its host resolves to, in the same
- * order as `urls`. The addresses are the only ones the caller may dial.
+ * An allowed URL and the checked addresses its host resolves to. The addresses
+ * are the only ones the caller may dial.
  */
 export type AllowedUpstreamUrl = { url: string; hostname: string; addresses: string[] };
 
 export type UpstreamUrlPolicyResult =
   | { rejected: NextResponse }
-  | { rejected: null; allowed: AllowedUpstreamUrl[] };
+  | {
+      rejected: null;
+      /** The checked entry for `urls[0]`, the hop the caller dials itself. */
+      dialed: AllowedUpstreamUrl;
+      /** The checked entries for the remaining URLs, which a relay dials. */
+      relayed: AllowedUpstreamUrl[];
+    };
 
 /**
  * Returns the error response for the first URL that violates the policy, or the
- * allowed URLs with their checked addresses. Rejects with the abort reason when
- * `signal` aborts, exactly like the upstream fetch would, so the caller's
- * fetch-failure handling applies.
+ * checked entry of every URL with its addresses. Position, not the URL string,
+ * names each entry: `dialed` is the first URL the caller passed and `relayed`
+ * holds the rest in order. Rejects with the abort reason when `signal` aborts,
+ * exactly like the upstream fetch would, so the caller's fetch-failure handling
+ * applies.
  */
 export async function rejectDisallowedUpstreamUrls({
   urls,
@@ -421,13 +429,14 @@ export async function rejectDisallowedUpstreamUrls({
   vercelRequestId,
   signal,
 }: {
-  urls: string[];
+  /** The hop the caller dials first, then any URL a relay dials itself. */
+  urls: [string, ...string[]];
   providerId: string;
   vercelRequestId: string | null | undefined;
   signal: AbortSignal;
 }): Promise<UpstreamUrlPolicyResult> {
   const decisions = await Promise.all(urls.map(url => findUpstreamUrlViolation(url, { signal })));
-  const allowed: AllowedUpstreamUrl[] = [];
+  const checked: AllowedUpstreamUrl[] = [];
   for (const [index, decision] of decisions.entries()) {
     if (!decision.allowed) {
       return {
@@ -439,9 +448,12 @@ export async function rejectDisallowedUpstreamUrls({
         }),
       };
     }
-    allowed.push({ url: urls[index], hostname: decision.hostname, addresses: decision.addresses });
+    checked.push({ url: urls[index], hostname: decision.hostname, addresses: decision.addresses });
   }
-  return { rejected: null, allowed };
+  // `urls` always holds at least the dialled hop, so every decision above was
+  // allowed and the first checked entry exists.
+  const [dialed, ...relayed] = checked;
+  return { rejected: null, dialed, relayed };
 }
 
 /**

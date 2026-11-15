@@ -1623,7 +1623,7 @@
       "prefillRepoUnavailable": "{{repo}} artık kullanılamıyor. Aşağıdan bir depo seç.",
       "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modelin kullanılıyor.",
       "couldNotReadPendingSessions": "Bekleyen oturumlar okunamadı. Tekrar dene.",
-      "failedToCreate": "Oturum oluşturulamadı.",
+      "failedToCreate": "Oturum oluşturulamadı",
       "checkOrganizationAccess": "Bu kuruluşa erişiminizi kontrol edin, ardından tekrar deneyin.",
       "couldNotRefreshRepositories": "Depolar yenilenemedi. Tekrar dene.",
       "discardDraftTitle": "Taslak silinsin mi?",
@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "Yüklenen geçmişle ilişkilendirilemeyen maliyet",
       "ofWindowTokens": "/ {{window}} token",
       "tokens": "belirteç",
+      "tokens_one": "belirteç",
+      "tokens_other": "belirteç",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} adım",
       "stepsCount": "{{steps}} adım",
@@ -2319,7 +2321,7 @@
     "markdownImage": {
       "load": "Yükle",
       "loadWithHost": "{{host}} adresinden yükle",
-      "httpsOnly": "Yalnızca HTTPS üzerinden sunulan görseller yüklenebilir.",
+      "httpsOnly": "Yalnızca HTTPS üzerinden sunulan görseller",
       "trustTitle": "{{host}} adresinden görsel yüklensin mi?",
       "trustMessage": "{{host}} sunucusuna güvenmek, görsellerini her seferinde sormadan yükler. Bunu daha sonra Güvenilen sunucular altından kaldırabilirsin.",
       "loadOnce": "Bir kez yükle"

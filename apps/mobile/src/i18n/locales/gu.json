@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} હવે ઉપલબ્ધ નથી. નીચે રિપોઝિટરી પસંદ કરો.",
       "prefillModelUnavailable": "{{model}} હવે ઉપલબ્ધ નથી. તમારા ડિફોલ્ટ મોડલનો ઉપયોગ થઈ રહ્યો છે.",
       "couldNotReadPendingSessions": "બાકી રહેલાં સત્રો વાંચી શકાયાં નહીં. ફરી પ્રયાસ કરો.",
-      "failedToCreate": "સત્ર બનાવી શકાયું નહીં.",
+      "failedToCreate": "સત્ર બનાવી શકાયું નહીં",
       "checkOrganizationAccess": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ છે કે નહીં તે તપાસો, પછી ફરી પ્રયાસ કરો.",
       "couldNotRefreshRepositories": "રિપોઝિટરીઓ રિફ્રેશ કરી શકાઈ નહીં. ફરી પ્રયાસ કરો.",
       "discardDraftTitle": "ડ્રાફ્ટ કાઢી નાખવો?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "લોડ થયેલા ઇતિહાસ સાથે જોડાયેલો ન હોય તેવો ખર્ચ",
       "ofWindowTokens": "કુલ {{window}} ટોકનમાંથી",
       "tokens": "ટોકન",
+      "tokens_one": "ટોકન",
+      "tokens_other": "ટોકન્સ",
       "tokensWithPercentage": "ટોકન ({{percentage}})",
       "stepsCount_one": "{{steps}} પગલું",
       "stepsCount": "{{steps}} પગલાં",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "લોડ કરો",
       "loadWithHost": "{{host}} લોડ કરો",
-      "httpsOnly": "માત્ર HTTPS છબીઓ જ લોડ કરી શકાય છે.",
+      "httpsOnly": "માત્ર HTTPS છબીઓ",
       "trustTitle": "{{host}} પરથી છબી લોડ કરવી?",
       "trustMessage": "{{host}} પર ભરોસો કરવાથી તેની છબીઓ દર વખતે પૂછ્યા વિના લોડ થશે. તમે પછીથી વિશ્વસનીય હોસ્ટમાં તે રદ કરી શકો છો.",
       "loadOnce": "એક વાર લોડ કરો"

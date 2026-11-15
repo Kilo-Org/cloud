@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} چیتر بەردەست نییە. لە خوارەوە کۆگایەک هەڵبژێرە.",
       "prefillModelUnavailable": "{{model}} چیتر بەردەست نییە. مۆدێلی بنەڕەتیت بەکار دەهێنرێت.",
       "couldNotReadPendingSessions": "نەتوانرا سێشنە چاوەڕوانەکان بخوێنرێنەوە. دووبارە هەوڵ بدەرەوە.",
-      "failedToCreate": "نەتوانرا سێشنێک دروست بکرێت.",
+      "failedToCreate": "نەتوانرا سێشنێک دروست بکرێت",
       "checkOrganizationAccess": "تکایە دەستپێگەیشتنی خۆت بۆ ئەم ڕێکخراوە پشکنین بکە و دووبارە هەوڵ بدەرەوە.",
       "couldNotRefreshRepositories": "نەتوانرا کۆگاکان نوێ بکرێنەوە. تکایە دووبارە هەوڵ بدەرەوە.",
       "discardDraftTitle": "سڕینەوەی ڕەشنووس؟",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "تێچوونی دەرەوەی مێژووی بارکراو",
       "ofWindowTokens": "لە {{window}} تۆکن",
       "tokens": "تۆکن",
+      "tokens_one": "تۆکن",
+      "tokens_other": "تۆکن",
       "tokensWithPercentage": "تۆکن ({{percentage}})",
       "stepsCount_one": "{{steps}} هەنگاو",
       "stepsCount": "{{steps}} هەنگاو",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "بارکردن",
       "loadWithHost": "بارکردنی {{host}}",
-      "httpsOnly": "تەنها وێنەکان بە HTTPS بار دەکرێن.",
+      "httpsOnly": "تەنها وێنەکان بە HTTPS",
       "trustTitle": "وێنە لە {{host}}ەوە بار بکرێت؟",
       "trustMessage": "متمانەکردن بە {{host}} وێنەکانی بەبێ پرسیارکردن لە هەموو جارێک بار دەکات. دەتوانیت دواتر لە خانەخوێ متمانەپێکراوەکان هەڵیوەشێنیتەوە.",
       "loadOnce": "جارێک بار بکە"

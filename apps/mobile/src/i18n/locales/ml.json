@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ഇനി ലഭ്യമല്ല. താഴെ ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക.",
       "prefillModelUnavailable": "{{model}} ഇനി ലഭ്യമല്ല. നിങ്ങളുടെ ഡിഫോൾട്ട് മോഡൽ ഉപയോഗിക്കുന്നു.",
       "couldNotReadPendingSessions": "കാത്തിരിക്കുന്ന സെഷനുകൾ വായിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
-      "failedToCreate": "സെഷൻ സൃഷ്ടിക്കാൻ കഴിഞ്ഞില്ല.",
+      "failedToCreate": "സെഷൻ സൃഷ്ടിക്കാൻ കഴിഞ്ഞില്ല",
       "checkOrganizationAccess": "ഈ സംഘടനയിലേക്കുള്ള നിങ്ങളുടെ പ്രവേശനം പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "couldNotRefreshRepositories": "റിപ്പോസിറ്ററികൾ പുതുക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "discardDraftTitle": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കണോ?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ലോഡ് ചെയ്ത ചരിത്രത്തിൽ ഉൾപ്പെടാത്ത ചെലവ്",
       "ofWindowTokens": "{{window}} ടോക്കണുകളിൽ",
       "tokens": "ടോക്കണുകൾ",
+      "tokens_one": "ടോക്കൺ",
+      "tokens_other": "ടോക്കണുകൾ",
       "tokensWithPercentage": "ടോക്കണുകൾ ({{percentage}})",
       "stepsCount_one": "{{steps}} ഘട്ടം",
       "stepsCount": "{{steps}} ഘട്ടങ്ങൾ",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ലോഡ് ചെയ്യുക",
       "loadWithHost": "{{host}} ലോഡ് ചെയ്യുക",
-      "httpsOnly": "HTTPS ചിത്രങ്ങൾ മാത്രമേ അനുവദിക്കൂ.",
+      "httpsOnly": "HTTPS ചിത്രങ്ങൾ മാത്രമേ",
       "trustTitle": "{{host}}-ൽ നിന്ന് ചിത്രം ലോഡ് ചെയ്യണോ?",
       "trustMessage": "{{host}}-നെ വിശ്വസിച്ചാൽ അതിന്റെ ചിത്രങ്ങൾ ഓരോ തവണയും ചോദിക്കാതെ ലോഡ് ചെയ്യും. പിന്നീട് വിശ്വസനീയ ഹോസ്റ്റുകളിൽ നിന്ന് ഇത് പിൻവലിക്കാം.",
       "loadOnce": "ഒരിക്കൽ ലോഡ് ചെയ്യുക"

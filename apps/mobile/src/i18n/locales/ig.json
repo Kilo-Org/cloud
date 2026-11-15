@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} adịkwaghị. Họrọ ebe nchekwa koodu n'okpuru.",
       "prefillModelUnavailable": "{{model}} adịkwaghị. A na-eji ihe nlereanya ndabara gị.",
       "couldNotReadPendingSessions": "Enweghị ike ịgụ nnọkọ ndị na-echere. Nwaa ọzọ.",
-      "failedToCreate": "Enweghị ike ịmepụta nnọkọ.",
+      "failedToCreate": "Enweghị ike ịmepụta nnọkọ",
       "checkOrganizationAccess": "Nyochaa ma ị nwere ohere ịnweta òtù a, ma nwaa ọzọ.",
       "couldNotRefreshRepositories": "Enweghị ike ibugharịa ebe nchekwa koodu. Biko nwaa ọzọ.",
       "discardDraftTitle": "Tụfuo ozi a na-ede?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Ọnụ ahịa na-esiteghị na ndekọ e budatara",
       "ofWindowTokens": "n'ime tokin {{window}}",
       "tokens": "tokin",
+      "tokens_one": "tokin",
+      "tokens_other": "tokin",
       "tokensWithPercentage": "tokin ({{percentage}})",
       "stepsCount_one": "nzọụkwụ {{steps}}",
       "stepsCount": "nzọụkwụ {{steps}}",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Budata",
       "loadWithHost": "Budata {{host}}",
-      "httpsOnly": "A na-anabata naanị onyonyo HTTPS.",
+      "httpsOnly": "Naanị onyonyo HTTPS",
       "trustTitle": "Budata onyonyo site na {{host}}?",
       "trustMessage": "Ịtụkwasị {{host}} obi na-ebudata onyonyo ya na-enweghị ịjụ ajụjụ oge ọ bụla. Ị nwere ike ịkagbu ya ma emesịa na Saịtị a tụkwasịrị obi.",
       "loadOnce": "Budata otu ugboro"

@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "无法归入已加载历史记录的费用",
       "ofWindowTokens": "／ {{window}} 个词元",
       "tokens": "词元",
+      "tokens_other": "词元",
+      "tokens_one": "词元",
       "tokensWithPercentage": "个词元（{{percentage}}）",
       "stepsCount_one": "{{steps}} 步",
       "stepsCount": "{{steps}} 步",
@@ -2319,7 +2321,7 @@
     "markdownImage": {
       "load": "加载",
       "loadWithHost": "加载 {{host}}",
-      "httpsOnly": "仅支持通过 HTTPS 加载图片",
+      "httpsOnly": "仅 HTTPS 图片",
       "trustTitle": "从 {{host}} 加载图片？",
       "trustMessage": "信任 {{host}} 后，其图片将不再每次询问即可加载。你可以稍后在受信任的主机中撤销。",
       "loadOnce": "仅加载一次"

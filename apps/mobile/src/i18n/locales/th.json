@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ค่าใช้จ่ายที่ไม่อยู่ในประวัติที่โหลดมา",
       "ofWindowTokens": "จาก {{window}} โทเคน",
       "tokens": "โทเคน",
+      "tokens_other": "โทเค็น",
+      "tokens_one": "โทเค็น",
       "tokensWithPercentage": "โทเคน ({{percentage}})",
       "stepsCount_one": "{{steps}} ขั้นตอน",
       "stepsCount": "{{steps}} ขั้นตอน",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "โหลด",
       "loadWithHost": "โหลด {{host}}",
-      "httpsOnly": "โหลดได้เฉพาะรูปภาพผ่าน HTTPS",
+      "httpsOnly": "เฉพาะรูปภาพผ่าน HTTPS",
       "trustTitle": "โหลดรูปภาพจาก {{host}} หรือไม่?",
       "trustMessage": "การเชื่อถือ {{host}} จะโหลดรูปภาพโดยไม่ถามทุกครั้ง คุณสามารถยกเลิกได้ภายหลังในโฮสต์ที่เชื่อถือ",
       "loadOnce": "โหลดครั้งเดียว"

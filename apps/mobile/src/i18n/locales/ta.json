@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} இனி கிடைக்கவில்லை. கீழே ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
       "prefillModelUnavailable": "{{model}} இனி கிடைக்கவில்லை. உங்கள் இயல்புநிலை மாதிரி பயன்படுத்தப்படுகிறது.",
       "couldNotReadPendingSessions": "நிலுவையில் உள்ள அமர்வுகளைப் படிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "failedToCreate": "அமர்வை உருவாக்க முடியவில்லை.",
+      "failedToCreate": "அமர்வை உருவாக்க முடியவில்லை",
       "checkOrganizationAccess": "இந்த நிறுவனத்திற்கான உங்கள் அணுகலைச் சரிபார்த்து, மீண்டும் முயற்சிக்கவும்.",
       "couldNotRefreshRepositories": "களஞ்சியங்களைப் புதுப்பிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "discardDraftTitle": "வரைவை நீக்கவா?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ஏற்றப்பட்ட வரலாற்றிற்கு ஒதுக்கப்படாத செலவு",
       "ofWindowTokens": "{{window}} டோக்கன்களில்",
       "tokens": "டோக்கன்கள்",
+      "tokens_one": "டோக்கன்",
+      "tokens_other": "டோக்கன்கள்",
       "tokensWithPercentage": "டோக்கன்கள் ({{percentage}})",
       "stepsCount_one": "{{steps}} படி",
       "stepsCount": "{{steps}} படிகள்",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ஏற்றவும்",
       "loadWithHost": "{{host}}-இலிருந்து ஏற்றவும்",
-      "httpsOnly": "HTTPS வழியாக வரும் படங்கள் மட்டுமே அனுமதிக்கப்படும்.",
+      "httpsOnly": "HTTPS படங்கள் மட்டுமே",
       "trustTitle": "{{host}} இலிருந்து படத்தை ஏற்றவா?",
       "trustMessage": "{{host}} தளத்தை நம்பினால், அதன் படங்கள் ஒவ்வொரு முறையும் கேட்காமல் ஏற்றப்படும். பின்னர் நம்பகமான தளங்களில் இதை ரத்து செய்யலாம்.",
       "loadOnce": "ஒரு முறை ஏற்று"

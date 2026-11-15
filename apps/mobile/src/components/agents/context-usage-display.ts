@@ -166,6 +166,8 @@ export function getHeaderPillContent({
 type ContextSheetContent = {
   /** `null` until a usage report arrives, so the sheet paints no unit beside it. */
   usedTokens: string | null;
+  /** Raw token count for the unit label's plural category; `null` alongside `usedTokens`. */
+  usedTokensCount: number | null;
   windowTokens: string | null;
   windowUnavailable: boolean;
   windowUnavailableLabel: string;
@@ -187,6 +189,7 @@ export function getContextSheetContent(
   if (info?.contextWindow === undefined) {
     return {
       usedTokens,
+      usedTokensCount: info ? info.contextTokens : null,
       windowTokens: null,
       windowUnavailable: true,
       windowUnavailableLabel: i18n.t('agentChat.contextUsage.windowUnavailable'),
@@ -206,6 +209,7 @@ export function getContextSheetContent(
   const remainingPercentage = realPercentage >= 100 ? 0 : Math.max(0, 100 - realPercentage);
   return {
     usedTokens,
+    usedTokensCount: info ? info.contextTokens : null,
     windowTokens: formatExactTokens(info.contextWindow),
     windowUnavailable: false,
     windowUnavailableLabel: i18n.t('agentChat.contextUsage.windowUnavailable'),

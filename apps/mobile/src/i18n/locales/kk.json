@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} енді қолжетімсіз. Төменде репозиторий таңдаңыз.",
       "prefillModelUnavailable": "{{model}} енді қолжетімсіз. Әдепкі моделіңіз қолданылуда.",
       "couldNotReadPendingSessions": "Кезектегі сессияларды оқу мүмкін болмады. Қайталап көріңіз.",
-      "failedToCreate": "Сессияны жасау мүмкін болмады.",
+      "failedToCreate": "Сессияны жасау мүмкін болмады",
       "checkOrganizationAccess": "Осы ұйымға кіру рұқсатын тексеріп, қайталап көріңіз.",
       "couldNotRefreshRepositories": "Репозиторийлерді жаңарту мүмкін болмады. Қайталап көріңіз.",
       "discardDraftTitle": "Нобайды жою керек пе?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Жүктелген тарихқа жатқызылмаған шығын",
       "ofWindowTokens": "барлығы {{window}} токен",
       "tokens": "токен",
+      "tokens_one": "токен",
+      "tokens_other": "токен",
       "tokensWithPercentage": "токен ({{percentage}})",
       "stepsCount_one": "{{steps}} қадам",
       "stepsCount": "{{steps}} қадам",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Жүктеу",
       "loadWithHost": "{{host}} сайтынан жүктеу",
-      "httpsOnly": "Тек HTTPS арқылы берілетін суреттерге рұқсат етіледі.",
+      "httpsOnly": "Тек HTTPS арқылы берілетін суреттер",
       "trustTitle": "{{host}} сайтынан суретті жүктеу керек пе?",
       "trustMessage": "{{host}} сайтына сенім артсаңыз, оның суреттері әр жолы сұраусыз жүктеледі. Кейін оны Сенімді хосттар бөлімінен қайтарып ала аласыз.",
       "loadOnce": "Бір рет жүктеу"

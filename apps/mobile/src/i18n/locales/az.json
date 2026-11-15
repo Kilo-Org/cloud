@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} artıq əlçatan deyil. Aşağıdan repozitoriya seç.",
       "prefillModelUnavailable": "{{model}} artıq əlçatan deyil. Standart modelindən istifadə olunur.",
       "couldNotReadPendingSessions": "Gözləyən sessiyaları oxumaq mümkün olmadı. Yenidən cəhd et.",
-      "failedToCreate": "Sessiya yaratmaq mümkün olmadı.",
+      "failedToCreate": "Sessiya yaratmaq mümkün olmadı",
       "checkOrganizationAccess": "Təşkilata giriş icazəni yoxla və yenidən cəhd et.",
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Yüklənmiş tarixçəyə aid edilməyən xərc",
       "ofWindowTokens": "{{window}} tokendən",
       "tokens": "token",
+      "tokens_one": "token",
+      "tokens_other": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} addım",
       "stepsCount": "{{steps}} addım",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Yüklə",
       "loadWithHost": "{{host}} ünvanından yüklə",
-      "httpsOnly": "Yalnız HTTPS üzərindən şəkil yükləmək olar.",
+      "httpsOnly": "Yalnız HTTPS üzərindən şəkil",
       "trustTitle": "{{host}} ünvanından şəkil yüklənsin?",
       "trustMessage": "{{host}} saytına etibar etsəniz, şəkilləri hər dəfə soruşmadan yüklənir. Sonradan Etibarlı saytlar bölməsindən etibarı ləğv edə bilərsiniz.",
       "loadOnce": "Bir dəfə yüklə"

@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} mar dambe lama heli karo. Hoos ka dooro kayd.",
       "prefillModelUnavailable": "{{model}} mar dambe lama heli karo. Waxaa la isticmaalayaa moodeelkaaga caadiga ah.",
       "couldNotReadPendingSessions": "Kalfadhiyada sugaya lama akhrin karin. Mar kale isku day.",
-      "failedToCreate": "Kalfadhiga lama abuuri karin.",
+      "failedToCreate": "Kalfadhiga lama abuuri karin",
       "checkOrganizationAccess": "Hubi gelitaankaada ururkan, markaa mar kale isku day.",
       "couldNotRefreshRepositories": "Kaydadka lama cusboonaysiin karin. Fadlan mar kale isku day.",
       "discardDraftTitle": "Ma tirtiraysaa qabyada?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kharash aan loo nisbayn taariikhda la soo shubay",
       "ofWindowTokens": "ka mid ah {{window}} halbeeg qoraal",
       "tokens": "tokenno",
+      "tokens_one": "tokenno",
+      "tokens_other": "tokenno",
       "tokensWithPercentage": "halbeeg qoraal ({{percentage}})",
       "stepsCount_one": "{{steps}} tallaabo",
       "stepsCount": "{{steps}} tallaabo",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Soo shub",
       "loadWithHost": "Soo shub {{host}}",
-      "httpsOnly": "Sawirrada HTTPS oo keliya ayaa la oggol yahay.",
+      "httpsOnly": "Sawirrada HTTPS oo keliya",
       "trustTitle": "Soo shub sawirka ka yimid {{host}}?",
       "trustMessage": "Aaminka {{host}} wuxuu soo shubaa sawirradiisa adigoon mar walba weydiin. Waxaad mar dambe ka noqon kartaa Martigeliyeyaasha la aaminay.",
       "loadOnce": "Soo shub hal mar"

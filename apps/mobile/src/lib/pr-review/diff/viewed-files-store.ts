@@ -93,7 +93,7 @@ async function loadViewedFiles(key: string, entry: ViewedFilesEntry): Promise<vo
   /* A read taken while this key's toggle is still writing holds the set from
      before that write, so publishing it would take the tick back off the path
      the person just ticked. The toggle's own revalidation publishes the durable
-     truth once the write has landed. */
+     truth once the write has settled. */
   if (entry.writes > 0) {
     return;
   }
@@ -191,8 +191,8 @@ export async function applyViewedFilesToggle(
     if (entry) {
       entry.writes -= 1;
     }
+    revalidateAllViewedFiles();
   }
-  revalidateAllViewedFiles();
 }
 
 /** For tests: drop every entry so a swapped fake store gets a fresh read. */

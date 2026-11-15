@@ -305,6 +305,38 @@ describe('viewed-files-store', () => {
     expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
   });
 
+  it.each([false, true])('reconciles rejection with the initial read loaded: %s', async loaded => {
+    const initialRead = Promise.withResolvers<string[]>();
+    storeMocks.getViewedFiles.mockReturnValueOnce(initialRead.promise).mockResolvedValue([]);
+    subscribeViewedFiles(REF, SHA1, listenerStub());
+    subscribeViewedFiles(OTHER_REF, SHA1, listenerStub());
+    await waitFor(() => !getViewedFilesSnapshot(OTHER_REF, SHA1).isLoading);
+    if (loaded) {
+      initialRead.resolve([]);
+      await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
+    }
+    const write = Promise.withResolvers<undefined>();
+    storeMocks.toggleViewedFile.mockReturnValueOnce(write.promise);
+    const toggling = applyViewedFilesToggle(REF, SHA1, 'a.ts');
+    const refused = expect(toggling).rejects.toThrow('write failed');
+    if (!loaded) {
+      initialRead.resolve([]);
+    }
+    await flushTurn();
+    expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({
+      paths: ['a.ts'],
+      isLoading: !loaded,
+    });
+    storeMocks.getViewedFiles.mockClear();
+    write.reject(new Error('write failed'));
+    await refused;
+    await flushTurn();
+
+    expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: false });
+    expect(storeMocks.getViewedFiles).toHaveBeenCalledWith(REF, SHA1);
+    expect(storeMocks.getViewedFiles).toHaveBeenCalledWith(OTHER_REF, SHA1);
+  });
+
   it('resetViewedFilesStoreForTests clears every entry', async () => {
     storeMocks.getViewedFiles.mockResolvedValue(['a.ts']);
     subscribeViewedFiles(REF, SHA1, listenerStub());

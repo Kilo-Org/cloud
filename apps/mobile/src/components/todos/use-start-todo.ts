@@ -20,7 +20,11 @@ import { useTRPC } from '@/lib/trpc';
 type StartableTodo = { id: string; title: string; notes: string | null };
 type StartDefaults = Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'>;
 
-/** The refusal a start publishes; the toast owns the copy, the row only its spinner. */
+/**
+ * The adapter's failure type. A refused start is never filed: the toast owns the
+ * copy and the row renders only its pending phase, so the admission is released
+ * instead of settled.
+ */
 type StartTodoFailure = { readonly kind: 'start-failed' };
 
 /** What the to-do screens get from `useStartTodo`. */
@@ -89,7 +93,10 @@ export function useStartTodo(): StartTodoControls {
           organizationId: list.organizationId ?? undefined,
         });
         if (!result.ok || !result.sessionId) {
-          attempt.fail({ kind: 'start-failed' });
+          // The toast owns the refusal copy and nothing renders a phase on the
+          // row, so the admission is released below rather than settled as a
+          // failure: a settled entry would stay in the store for the life of
+          // this surface.
           toast.error(result.message);
           return;
         }
@@ -115,13 +122,12 @@ export function useStartTodo(): StartTodoControls {
         navigateToSession(result.sessionId, list.organizationId);
       } catch {
         // Callers fire this without awaiting, so a failure has to be reported
-        // here rather than escape as an unhandled rejection.
-        attempt.fail({ kind: 'start-failed' });
+        // here rather than escape as an unhandled rejection. The toast owns the
+        // copy; the admission is released by the `finally` below.
         toast.error(i18n.t('common.somethingWentWrong'));
       } finally {
-        // One settlement per start: the arms above already settled a refused
-        // start, so this releases only the admission of the start that reached
-        // the session it opens.
+        // One release per start: the row's spinner ends here whether the start
+        // reached a session or was refused, and no phase is left behind.
         attempt.abandon();
       }
     },

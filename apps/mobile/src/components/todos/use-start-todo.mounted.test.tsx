@@ -1,6 +1,8 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SurfaceFeedbackModule from '@/lib/surface-feedback';
+
 import { i18n } from '@/i18n';
 import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { type TodoList } from '@/lib/todos/todo-types';
@@ -42,6 +44,25 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 vi.mock('@/lib/trpc', () => ({ useTRPC: () => ({}) }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 
+/** The one part of a surface store a case can read from outside the hook. */
+type RecordedSnapshot = { readonly states: ReadonlyMap<string, unknown> };
+type RecordedStore = { getSnapshot: () => RecordedSnapshot };
+
+/** Every surface store the adapters created, so a case can see what a settle left. */
+const stores = vi.hoisted(() => ({ all: [] as RecordedStore[] }));
+
+vi.mock('@/lib/surface-feedback', async importOriginal => {
+  const actual = await importOriginal<typeof SurfaceFeedbackModule>();
+  return {
+    ...actual,
+    createSurfaceFeedbackStore: () => {
+      const created: RecordedStore = actual.createSurfaceFeedbackStore();
+      stores.all.push(created);
+      return created;
+    },
+  };
+});
+
 const todo = { id: 'todo-1', title: 'Ship the fix', notes: null };
 const list: Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'> = {
   organizationId: 'organization-1',
@@ -79,6 +100,7 @@ beforeEach(async () => {
   state.toastError.mockReset();
   state.link.mockResolvedValue(undefined);
   state.invalidate.mockResolvedValue(undefined);
+  stores.all.length = 0;
   act(() => {
     renderer = TestRenderer.create(createElement(Probe, { holder }));
   });
@@ -140,6 +162,21 @@ describe('useStartTodo start now', () => {
 
     expect(state.navigate).not.toHaveBeenCalled();
     expect(state.toastError).toHaveBeenCalledExactlyOnceWith(i18n.t('common.somethingWentWrong'));
+    expect(mounted().isStarting(todo.id)).toBe(false);
+  });
+
+  it('leaves no entry behind after a refused start', async () => {
+    state.startAgent.mockResolvedValue({ ok: false, message: 'No credits left' });
+
+    await start();
+
+    // The toast owns the refusal copy and the row reads only a pending phase, so
+    // a settled failure would sit in the store for the life of this surface.
+    expect(stores.all.map(store => store.getSnapshot().states.size)).toEqual([0]);
+
+    state.startAgent.mockRejectedValue(new Error('exploded'));
+    await start();
+    expect(stores.all.map(store => store.getSnapshot().states.size)).toEqual([0]);
     expect(mounted().isStarting(todo.id)).toBe(false);
   });
 

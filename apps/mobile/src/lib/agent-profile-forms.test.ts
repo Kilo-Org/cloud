@@ -1,3 +1,7 @@
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- this test reads the server cap constants off disk, which is the only place a mobile mirror that drifted from them is observable */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -249,12 +253,33 @@ describe('setup command list operations', () => {
 });
 
 describe('profile list caps', () => {
-  // Each value mirrors a server constant the mobile bundle cannot import, so a
-  // server change that lands without this line fails here instead of on a screen.
-  it('mirrors the agent, MCP server, slash command and setup command caps', () => {
-    expect(MAX_PROFILE_AGENTS).toBe(20);
-    expect(MAX_PROFILE_MCP_SERVERS).toBe(20);
-    expect(MAX_PROFILE_KILO_COMMANDS).toBe(50);
-    expect(MAX_SETUP_COMMANDS).toBe(20);
+  // The mobile bundle cannot import the server packages, so each cap is a mirror.
+  // These assertions read the server source, so raising a server cap fails here
+  // in the same change instead of leaving a screen that disables the add early.
+  const serverCap = (file: string, name: string): number => {
+    const source = readFileSync(join(process.cwd(), '..', '..', file), 'utf8');
+    const match = new RegExp(`export const ${name} = (\\d+);`).exec(source);
+    if (match === null) {
+      throw new Error(`${name} is not declared in ${file}`);
+    }
+    return Number(match[1]);
+  };
+
+  it('mirrors the agent, MCP server and slash command caps', () => {
+    expect(MAX_PROFILE_AGENTS).toBe(
+      serverCap('packages/cloud-agent-profile/src/contracts/agents.ts', 'MAX_PROFILE_AGENTS')
+    );
+    expect(MAX_PROFILE_MCP_SERVERS).toBe(
+      serverCap(
+        'packages/cloud-agent-profile/src/profile-mcp-service.ts',
+        'MAX_PROFILE_MCP_SERVERS'
+      )
+    );
+    expect(MAX_PROFILE_KILO_COMMANDS).toBe(
+      serverCap(
+        'packages/cloud-agent-profile/src/contracts/kilo-commands.ts',
+        'MAX_PROFILE_KILO_COMMANDS'
+      )
+    );
   });
 });

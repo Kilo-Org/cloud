@@ -850,9 +850,11 @@ describe('ProfileKiloCommandsScreen command cap', () => {
     const { renderer, unmount } = await mountScreen();
 
     // One pre-order walk, so the indexes compare the footer's own order.
-    const ordered = renderer.root.findAll(node => node.type === 'Text' || node.type === 'Button');
-    const noticeIndex = ordered.findIndex(isCapLine);
-    const addIndex = ordered.findIndex(node => node.type === 'Button');
+    const ordered = renderer.root.findAll(
+      node => String(node.type) === 'Text' || String(node.type) === 'Button'
+    );
+    const noticeIndex = ordered.findIndex(node => isCapLine(node));
+    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
 
     expect(noticeIndex).toBeGreaterThan(-1);
     expect(addIndex).toBeGreaterThan(-1);
@@ -867,7 +869,7 @@ describe('ProfileKiloCommandsScreen command cap', () => {
     h.query.data = commandsAt(MAX_PROFILE_KILO_COMMANDS - 1);
     const { renderer, unmount } = await mountScreen();
 
-    expect(findAll(renderer.root, 'Text').some(isCapLine)).toBe(false);
+    expect(findAll(renderer.root, 'Text').some(node => isCapLine(node))).toBe(false);
     expect(findOne(renderer.root, 'Button').props.disabled).toBe(false);
 
     unmount();
@@ -887,8 +889,8 @@ describe('ProfileKiloCommandsScreen command cap', () => {
     changeText(renderer.root, 'Template', 'Do it');
     pressSheetDone(renderer.root);
 
-    await waitFor(() => findAll(renderer.root, 'Text').some(isCapLine));
-    const status = findAll(renderer.root, 'Text').find(isCapLine);
+    await waitFor(() => findAll(renderer.root, 'Text').some(node => isCapLine(node)));
+    const status = findAll(renderer.root, 'Text').find(node => isCapLine(node));
     expect(status?.props.className).toContain('text-warn');
     expect(
       findAll(renderer.root, 'Text').some(

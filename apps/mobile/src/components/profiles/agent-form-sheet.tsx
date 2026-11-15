@@ -183,6 +183,17 @@ export function AgentFormSheet({
     onSave(buildAgentPayload(state, agent?.config));
   };
 
+  // The one refusal line: a create past the cap names the cap as a warning, and
+  // any other refusal keeps the error tone.
+  let refusalMessage: string | null = null;
+  let refusalTone: 'warn' | 'error' = 'error';
+  if (saveFailure?.kind === 'limit') {
+    refusalMessage = t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS });
+    refusalTone = 'warn';
+  } else if (saveFailure?.kind === 'refused') {
+    refusalMessage = t('profiles.agents.saveFailed');
+  }
+
   return (
     <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
@@ -201,17 +212,7 @@ export function AgentFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <AccessibleStatus
-          message={
-            saveFailure?.kind === 'limit'
-              ? t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS })
-              : saveFailure?.kind === 'refused'
-                ? t('profiles.agents.saveFailed')
-                : null
-          }
-          tone={saveFailure?.kind === 'limit' ? 'warn' : 'error'}
-          className="text-sm"
-        />
+        <AccessibleStatus message={refusalMessage} tone={refusalTone} className="text-sm" />
         <FormField
           label={t('profiles.agents.slug')}
           defaultValue={slugRef.current}

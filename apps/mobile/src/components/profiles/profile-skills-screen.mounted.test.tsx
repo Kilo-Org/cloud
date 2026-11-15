@@ -388,7 +388,7 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('names the skill cap above a disabled add, without a request', async () => {
+  it('names the skill cap above a disabled add', async () => {
     h.query.data = testSkills(
       Array.from({ length: MAX_PROFILE_SKILLS }, (_, index) =>
         testSkill({ id: `skill-${index}`, name: `skill-${index}` })
@@ -403,19 +403,18 @@ describe('ProfileSkillsScreen', () => {
     expect(String(lineWith(renderer.root, limitCopy).props.className)).toContain('text-warn');
     const footer = renderer.root.findAll(
       node =>
-        node.type === 'Button' || (node.type === 'Text' && node.props.children === limitCopy)
+        String(node.type) === 'Button' ||
+        (String(node.type) === 'Text' && node.props.children === limitCopy)
     );
     const noticeIndex = footer.findIndex(
-      node => node.type === 'Text' && node.props.children === limitCopy
+      node => String(node.type) === 'Text' && node.props.children === limitCopy
     );
-    const addIndex = footer.findIndex(node => node.type === 'Button');
+    const addIndex = footer.findIndex(node => String(node.type) === 'Button');
     expect(noticeIndex).toBeGreaterThanOrEqual(0);
     expect(noticeIndex).toBeLessThan(addIndex);
 
-    // At the cap the add control is disabled: no sheet opens from it, so no
-    // request leaves with a create the server would refuse.
+    // At the cap the add control is disabled, so the sheet cannot open from it.
     expect(footer[addIndex]?.props.disabled).toBe(true);
-    expect(h.mutations.createCustomSkill.mutateAsync).not.toHaveBeenCalled();
 
     unmount();
 

@@ -789,7 +789,7 @@ describe('ProfileMcpScreen server cap', () => {
       node => String(node.type) === 'Text' || String(node.type) === 'Button'
     );
     const noticeIndex = ordered.findIndex(node => node.props.children === capMessage());
-    const addIndex = ordered.findIndex(node => node.type === 'Button');
+    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
 
     expect(noticeIndex).toBeGreaterThan(-1);
     expect(addIndex).toBeGreaterThan(-1);
@@ -804,9 +804,9 @@ describe('ProfileMcpScreen server cap', () => {
     h.query.data = testProfile(serversAt(MAX_PROFILE_MCP_SERVERS - 1));
     const { renderer, unmount } = await mountScreen();
 
-    expect(
-      findAll(renderer.root, 'Text').some(node => node.props.children === capMessage())
-    ).toBe(false);
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === capMessage())).toBe(
+      false
+    );
     expect(findOne(renderer.root, 'Button').props.disabled).toBe(false);
 
     unmount();

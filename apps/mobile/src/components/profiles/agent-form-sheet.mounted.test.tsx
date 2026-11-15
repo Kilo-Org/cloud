@@ -187,9 +187,21 @@ function modelOption(id: string, variants: string[]) {
 function mountSheet(
   agent: AgentSource | null,
   existingSlugs: readonly string[] = [],
-  draftScope?: string,
-  saveFailure: AgentSaveFailure | null = null
+  draftScope?: string
 ) {
+  return mountSheetWith(agent, { existingSlugs, draftScope });
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
+function mountSheetWith(
+  agent: AgentSource | null,
+  options: {
+    existingSlugs?: readonly string[];
+    draftScope?: string;
+    saveFailure?: AgentSaveFailure | null;
+  } = {}
+) {
+  const { existingSlugs = [], draftScope, saveFailure = null } = options;
   return renderWithProviders(
     createElement(AgentFormSheet, {
       draftScope,
@@ -507,7 +519,7 @@ describe('AgentFormSheet save refusal copy', () => {
   });
 
   it('names the cap in the warn tone when a create is refused past it', async () => {
-    const { renderer, unmount } = await mountSheet(null, [], undefined, { kind: 'limit' });
+    const { renderer, unmount } = await mountSheetWith(null, { saveFailure: { kind: 'limit' } });
 
     const cap = i18n.t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS });
     const status = findAll(renderer.root, 'Text').find(node => node.props.children === cap);
@@ -519,7 +531,7 @@ describe('AgentFormSheet save refusal copy', () => {
   });
 
   it('shows any other refused create in the destructive tone', async () => {
-    const { renderer, unmount } = await mountSheet(null, [], undefined, { kind: 'refused' });
+    const { renderer, unmount } = await mountSheetWith(null, { saveFailure: { kind: 'refused' } });
 
     const failed = i18n.t('profiles.agents.saveFailed');
     const status = findAll(renderer.root, 'Text').find(node => node.props.children === failed);

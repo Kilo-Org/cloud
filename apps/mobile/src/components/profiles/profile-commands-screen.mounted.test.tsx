@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- one cohesive mounted suite: rendering states, reorder and delete labels, and the save/reconcile paths share the screen's mock harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import {
   changeRowText,
   commitRow,
@@ -638,7 +637,8 @@ describe('ProfileCommandsScreen', () => {
     const capCopy = i18n.t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS });
     const footer = atCap.renderer.root.findAll(
       node =>
-        node.type === 'Button' || (node.type === 'Text' && node.props.children === capCopy)
+        String(node.type) === 'Button' ||
+        (String(node.type) === 'Text' && node.props.children === capCopy)
     );
     // The notice holds the slot's first line, above the add control.
     expect(footer).toHaveLength(2);

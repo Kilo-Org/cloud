@@ -503,7 +503,7 @@ describe('ProfileAgentsScreen agent cap', () => {
       node => String(node.type) === 'Text' || String(node.type) === 'Button'
     );
     const noticeIndex = ordered.findIndex(node => node.props.children === capMessage());
-    const addIndex = ordered.findIndex(node => node.type === 'Button');
+    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
 
     expect(noticeIndex).toBeGreaterThan(-1);
     expect(addIndex).toBeGreaterThan(-1);

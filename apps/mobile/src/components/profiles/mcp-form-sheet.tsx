@@ -179,6 +179,17 @@ export function McpFormSheet({
     { value: 'remote' as const, label: t('profiles.mcp.remoteType') },
   ];
 
+  // The one refusal line: a create past the cap names the cap as a warning, and
+  // any other refusal keeps the error tone.
+  let refusalMessage: string | null = null;
+  let refusalTone: 'warn' | 'error' = 'error';
+  if (saveFailure?.kind === 'limit') {
+    refusalMessage = t('profiles.mcp.limitReached', { max: MAX_PROFILE_MCP_SERVERS });
+    refusalTone = 'warn';
+  } else if (saveFailure?.kind === 'refused') {
+    refusalMessage = t('profiles.mcp.saveFailed');
+  }
+
   return (
     <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
@@ -197,17 +208,7 @@ export function McpFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <AccessibleStatus
-          message={
-            saveFailure?.kind === 'limit'
-              ? t('profiles.mcp.limitReached', { max: MAX_PROFILE_MCP_SERVERS })
-              : saveFailure?.kind === 'refused'
-                ? t('profiles.mcp.saveFailed')
-                : null
-          }
-          tone={saveFailure?.kind === 'limit' ? 'warn' : 'error'}
-          className="text-sm"
-        />
+        <AccessibleStatus message={refusalMessage} tone={refusalTone} className="text-sm" />
         {server === null ? (
           <View className="gap-1.5">
             <Text className="text-sm font-medium text-foreground">{t('profiles.mcp.type')}</Text>

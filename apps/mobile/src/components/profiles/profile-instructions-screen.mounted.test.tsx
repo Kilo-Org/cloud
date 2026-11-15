@@ -298,7 +298,7 @@ describe('ProfileInstructionsScreen instruction cap', () => {
 
     const atCap = await mountScreen();
     const footer = atCap.renderer.root.findAll(
-      node => node.type === 'AccessibleStatus' || node.type === 'Button'
+      node => String(node.type) === 'AccessibleStatus' || String(node.type) === 'Button'
     );
     expect(footer.map(node => node.type)).toEqual(['AccessibleStatus', 'Button']);
     expect(footer[0]?.props.message).toBe(capCopy);

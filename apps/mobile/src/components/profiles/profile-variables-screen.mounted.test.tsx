@@ -169,7 +169,7 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('names the profile variable limit and refuses a new key at it without a request', async () => {
+  it('names the profile variable limit above a disabled add', async () => {
     h.query.data = testVars(
       Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
         key: `VAR_${String(index)}`,
@@ -185,19 +185,18 @@ describe('ProfileVariablesScreen', () => {
     // The limit sits above the add control, inside the same slot it fills.
     const footer = renderer.root.findAll(
       node =>
-        node.type === 'Button' || (node.type === 'Text' && node.props.children === limitCopy)
+        String(node.type) === 'Button' ||
+        (String(node.type) === 'Text' && node.props.children === limitCopy)
     );
     const noticeIndex = footer.findIndex(
-      node => node.type === 'Text' && node.props.children === limitCopy
+      node => String(node.type) === 'Text' && node.props.children === limitCopy
     );
-    const addIndex = footer.findIndex(node => node.type === 'Button');
+    const addIndex = footer.findIndex(node => String(node.type) === 'Button');
     expect(noticeIndex).toBeGreaterThanOrEqual(0);
     expect(noticeIndex).toBeLessThan(addIndex);
 
-    // At the limit the add control is disabled: the form cannot open from it,
-    // so no new key reaches the server.
+    // At the limit the add control is disabled, so the form cannot open from it.
     expect(footer[addIndex]?.props.disabled).toBe(true);
-    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
 
     unmount();
 

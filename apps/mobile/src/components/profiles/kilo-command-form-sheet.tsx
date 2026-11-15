@@ -182,6 +182,16 @@ export function KiloCommandFormSheet({
   };
 
   const nameError = nameErrorMessage(t, error, saveFailure?.kind === 'name-conflict');
+  // The one refusal line: a create past the cap names the cap as a warning, and
+  // any other refusal keeps the error tone.
+  let refusalMessage: string | null = null;
+  let refusalTone: 'warn' | 'error' = 'error';
+  if (saveFailure?.kind === 'limit') {
+    refusalMessage = t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS });
+    refusalTone = 'warn';
+  } else if (saveFailure?.kind === 'refused') {
+    refusalMessage = t('profiles.slashCommands.saveFailed');
+  }
 
   return (
     <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
@@ -201,17 +211,7 @@ export function KiloCommandFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <AccessibleStatus
-          message={
-            saveFailure?.kind === 'limit'
-              ? t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS })
-              : saveFailure?.kind === 'refused'
-                ? t('profiles.slashCommands.saveFailed')
-                : null
-          }
-          tone={saveFailure?.kind === 'limit' ? 'warn' : 'error'}
-          className="text-sm"
-        />
+        <AccessibleStatus message={refusalMessage} tone={refusalTone} className="text-sm" />
         <FormField
           label={t('profiles.slashCommands.name')}
           defaultValue={nameRef.current}

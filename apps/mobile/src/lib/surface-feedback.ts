@@ -15,6 +15,11 @@
  * `succeeded` is kept because a surface may show a completed outcome that
  * persists. A surface whose success renders as its own new state (a cleared
  * field, fresh rows, a dismissed sheet) calls `attempt.abandon()` instead.
+ *
+ * `abandon()` removes the key's entry. `succeed()` and `fail()` keep it until
+ * the next `begin()` for that key or until the surface unmounts; `clearWhere`
+ * retires only a failure. A failure nothing on the surface renders (a toast
+ * already reports it) settles with `abandon()`.
  */
 export type SurfaceFailure = { readonly kind: string };
 

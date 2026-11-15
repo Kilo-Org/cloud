@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "商店已找到你之前的购买记录，购买完成后，相应额度将添加到你的余额；再次购买会发起一笔新的购买，并可能再次向你收费。",
     "unresolvedPurchaseNotFound": "商店未找到你之前的购买记录，但该笔购买仍可能稍后完成，并将相应额度添加到你的余额；再次购买会发起一笔新的购买，并可能再次向你收费。",
     "unresolvedPurchaseRefused": "商店已找到你之前的购买记录，但无法发放相应额度；再次购买会发起一笔新的购买，并可能再次向你收费。",
-    "unreadablePurchaseRecord": "无法读取已保存的积分购买记录，因此暂时无法购买积分。替换该记录后即可再次购买；此前的任何扣款仍由商店处理，不会自动计入积分。",
-    "replacePurchaseRecord": "替换记录",
     "buyAgain": "再次购买",
     "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"

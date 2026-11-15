@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "Fyrri kaup þín fundust hjá versluninni og inneignin bætist við þegar þau ganga í gegn, en ef þú kaupir aftur stofnarðu til nýrra kaupa og gætir þurft að greiða aftur.",
     "unresolvedPurchaseNotFound": "Þótt fyrri kaup þín hafi ekki fundist hjá versluninni gætu þau síðar gengið í gegn og inneignin bæst við, en ef þú kaupir aftur stofnarðu til nýrra kaupa og gætir þurft að greiða aftur.",
     "unresolvedPurchaseRefused": "Fyrri kaup þín fundust hjá versluninni en ekki er hægt að veita inneign fyrir þau, og ef þú kaupir aftur stofnarðu til nýrra kaupa og gætir þurft að greiða aftur.",
-    "unreadablePurchaseRecord": "Ekki er hægt að lesa vistaða færslu um inneignarkaup og því er áfram lokað fyrir kaup á inneign. Ef þú skiptir færslunni út geturðu keypt aftur; hugsanleg fyrri gjaldfærsla verður áfram hjá versluninni og er ekki sjálfkrafa færð sem inneign.",
-    "replacePurchaseRecord": "Skipta út færslu",
     "buyAgain": "Kaupa aftur",
     "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
     "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."

@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "Avvalgi xaridingiz do'konda topildi va yakunlangach kreditlari balansingizga qo'shiladi; yana sotib olish alohida xaridni boshlaydi va sizdan yana to'lov olinishi mumkin.",
     "unresolvedPurchaseNotFound": "Avvalgi xaridingiz do'konda topilmadi, ammo keyinroq yakunlanib, kreditlari balansingizga qo'shilishi mumkin; yana sotib olish alohida xaridni boshlaydi va sizdan yana to'lov olinishi mumkin.",
     "unresolvedPurchaseRefused": "Avvalgi xaridingiz do'konda topildi, ammo uning kreditlarini balansingizga qo'shib bo'lmaydi; yana sotib olish alohida xaridni boshlaydi va sizdan yana to'lov olinishi mumkin.",
-    "unreadablePurchaseRecord": "Saqlangan kredit xaridi yozuvini o‘qib bo‘lmayapti, shuning uchun kredit sotib olish bloklangan holda qoladi. Yozuvni almashtirsangiz, yana sotib olishingiz mumkin bo‘ladi. Avvalgi har qanday to‘lov do‘konda qoladi va hisobingizga avtomatik qo‘shilmaydi.",
-    "replacePurchaseRecord": "Yozuvni almashtirish",
     "buyAgain": "Yana sotib olish",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."

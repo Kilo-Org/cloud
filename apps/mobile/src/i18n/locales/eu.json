@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "Dendan zure aurreko erosketa aurkitu da eta burutzean dagozkion kredituak gehituko dira; berriro erosiz gero, beste erosketa bat hasiko da eta baliteke berriro kobratzea.",
     "unresolvedPurchaseNotFound": "Dendan ez da zure aurreko erosketa aurkitu, baina baliteke gero burutzea eta kredituak gehitzea; berriro erosiz gero, beste erosketa bat hasiko da eta baliteke berriro kobratzea.",
     "unresolvedPurchaseRefused": "Dendan zure aurreko erosketa aurkitu da, baina ezin dira dagozkion kredituak gehitu; berriro erosiz gero, beste erosketa bat hasiko da eta baliteke berriro kobratzea.",
-    "unreadablePurchaseRecord": "Ezin da irakurri gordetako kreditu-erosketa baten erregistroa; beraz, kredituak erostea blokeatuta dago. Erregistroa ordezten baduzu, berriro erosi ahal izango duzu; aurreko edozein kobrantza dendaren esku geratuko da, eta ez da automatikoki kreditu gisa gehituko.",
-    "replacePurchaseRecord": "Ordeztu erregistroa",
     "buyAgain": "Erosi berriro",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."

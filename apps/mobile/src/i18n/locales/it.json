@@ -4323,8 +4323,6 @@
     "unresolvedPurchaseFound": "Il tuo acquisto precedente risulta nello store e i relativi crediti saranno aggiunti al completamento; acquistando di nuovo avvii un altro acquisto e potresti ricevere un nuovo addebito.",
     "unresolvedPurchaseNotFound": "Il tuo acquisto precedente non risulta nello store, ma potrebbe ancora completarsi e aggiungere i relativi crediti; acquistando di nuovo avvii un altro acquisto e potresti ricevere un nuovo addebito.",
     "unresolvedPurchaseRefused": "Il tuo acquisto precedente risulta nello store, ma i relativi crediti non possono essere aggiunti; acquistando di nuovo avvii un altro acquisto e potresti ricevere un nuovo addebito.",
-    "unreadablePurchaseRecord": "Non è possibile leggere un record salvato relativo a un acquisto di crediti, quindi l'acquisto di crediti resta bloccato. Se lo sostituisci potrai acquistare di nuovo; eventuali addebiti precedenti restano presso lo store e non vengono accreditati automaticamente.",
-    "replacePurchaseRecord": "Sostituisci record",
     "buyAgain": "Acquista di nuovo",
     "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
     "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."

@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "A tenda atopou a túa compra anterior e engadiranse os seus créditos cando se complete; se mercas de novo, iniciarás outra compra e poderías recibir outro cargo.",
     "unresolvedPurchaseNotFound": "A tenda non atopou a túa compra anterior, pero aínda pode completarse e engadir os seus créditos; se mercas de novo, iniciarás outra compra e poderías recibir outro cargo.",
     "unresolvedPurchaseRefused": "A tenda atopou a túa compra anterior, pero non se poden engadir os seus créditos; se mercas de novo, iniciarás outra compra e poderías recibir outro cargo.",
-    "unreadablePurchaseRecord": "Non se pode ler un rexistro gardado dunha compra de créditos, polo que a compra de créditos segue bloqueada. Se o substitúes, poderás volver comprar; calquera cobro anterior queda na tenda e os seus créditos non se engaden automaticamente.",
-    "replacePurchaseRecord": "Substituír rexistro",
     "buyAgain": "Mercar de novo",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta de Google Play pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos."

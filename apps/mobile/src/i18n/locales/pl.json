@@ -4385,8 +4385,6 @@
     "unresolvedPurchaseFound": "Sklep potwierdził Twój wcześniejszy zakup, a kredyty zostaną dodane po jego realizacji; kupując ponownie, rozpoczynasz osobny zakup, który może wiązać się z kolejną opłatą.",
     "unresolvedPurchaseNotFound": "Sklep nie znalazł Twojego wcześniejszego zakupu, ale może on jeszcze zostać zrealizowany, a kredyty dodane do salda; kupując ponownie, rozpoczynasz osobny zakup, który może wiązać się z kolejną opłatą.",
     "unresolvedPurchaseRefused": "Sklep potwierdził Twój wcześniejszy zakup, ale nie można przyznać za niego kredytów; kupując ponownie, rozpoczynasz osobny zakup, który może wiązać się z kolejną opłatą.",
-    "unreadablePurchaseRecord": "Nie można odczytać zapisu zakupu kredytów, więc kupowanie kredytów pozostaje zablokowane. Zastąpienie zapisu pozwoli kupić ponownie; ewentualne wcześniejsze obciążenie pozostaje w sklepie i nie zostanie automatycznie zaliczone.",
-    "replacePurchaseRecord": "Zastąp zapis",
     "buyAgain": "Kup ponownie",
     "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
     "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."

@@ -4447,8 +4447,6 @@
     "unresolvedPurchaseFound": "Fuarthas do cheannachán roimhe seo sa siopa agus cuirfear a chreidmheasanna leis nuair a bheidh sé críochnaithe; má cheannaíonn tú arís, tosófar ceannachán eile agus d’fhéadfaí táille eile a ghearradh ort.",
     "unresolvedPurchaseNotFound": "Ní bhfuarthas do cheannachán roimhe seo sa siopa ach d’fhéadfadh sé dul i gcrích fós agus a chreidmheasanna a chur leis; má cheannaíonn tú arís, tosófar ceannachán eile agus d’fhéadfaí táille eile a ghearradh ort.",
     "unresolvedPurchaseRefused": "Fuarthas do cheannachán roimhe seo sa siopa ach ní féidir a chreidmheasanna a chur leis; má cheannaíonn tú arís, tosófar ceannachán eile agus d’fhéadfaí táille eile a ghearradh ort.",
-    "unreadablePurchaseRecord": "Ní féidir taifead sábháilte ar cheannach creidmheasanna a léamh, mar sin fanann ceannach creidmheasanna bactha. Má ionadaíonn tú é, beidh tú in ann ceannach arís; fanann aon mhuirear níos luaithe leis an siopa agus ní thugtar creidmheasanna ina leith go huathoibríoch.",
-    "replacePurchaseRecord": "Ionadaigh an taifead",
     "buyAgain": "Ceannaigh arís",
     "purchaseOwnedByAnotherAccount": "Baineann na creidmheasanna ar an Apple Account seo le cuntas Kilo eile. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid.",
     "purchaseOwnedByAnotherAccountPlay": "Baineann na creidmheasanna ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid."

@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "Je eerdere aankoop is gevonden bij de winkel en de credits worden na afronding toegevoegd; opnieuw kopen start een aparte aankoop waarvoor je mogelijk opnieuw betaalt.",
     "unresolvedPurchaseNotFound": "Je eerdere aankoop is niet gevonden bij de winkel, maar kan later alsnog worden afgerond en credits opleveren; opnieuw kopen start een aparte aankoop waarvoor je mogelijk opnieuw betaalt.",
     "unresolvedPurchaseRefused": "Je eerdere aankoop is gevonden bij de winkel, maar de credits kunnen niet worden toegekend; opnieuw kopen start een aparte aankoop waarvoor je mogelijk opnieuw betaalt.",
-    "unreadablePurchaseRecord": "Opgeslagen aankoopgegevens van credits kunnen niet worden gelezen, waardoor het kopen van credits geblokkeerd blijft. Als je ze vervangt, kun je weer kopen; een eventuele eerdere afschrijving blijft bij de store en wordt niet automatisch bijgeschreven.",
-    "replacePurchaseRecord": "Aankoopgegevens vervangen",
     "buyAgain": "Opnieuw kopen",
     "purchaseOwnedByAnotherAccount": "De credits op deze Apple Account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken.",
     "purchaseOwnedByAnotherAccountPlay": "De credits op dit Google Play-account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken."

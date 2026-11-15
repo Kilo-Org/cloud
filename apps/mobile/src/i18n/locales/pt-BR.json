@@ -4329,8 +4329,6 @@
     "unresolvedPurchaseFound": "Sua compra anterior foi encontrada na loja e os créditos serão adicionados quando ela for concluída; comprar novamente inicia outra compra e pode gerar uma nova cobrança.",
     "unresolvedPurchaseNotFound": "Sua compra anterior não foi encontrada na loja, mas ainda pode ser concluída mais tarde e adicionar os créditos; comprar novamente inicia outra compra e pode gerar uma nova cobrança.",
     "unresolvedPurchaseRefused": "Sua compra anterior foi encontrada na loja, mas seus créditos não podem ser adicionados; comprar novamente inicia outra compra e pode gerar uma nova cobrança.",
-    "unreadablePurchaseRecord": "Não é possível ler um registro salvo de compra de créditos, por isso a compra de créditos continua bloqueada. Substituir o registro permite comprar novamente; qualquer cobrança anterior permanece na loja e não é creditada automaticamente.",
-    "replacePurchaseRecord": "Substituir registro",
     "buyAgain": "Comprar novamente",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Conta Apple pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos nesta conta do Google Play pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los."

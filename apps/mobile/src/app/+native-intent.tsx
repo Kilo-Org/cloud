@@ -180,9 +180,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
       return profilePickerRoute;
     }
     // Dev-only Buy credits rows against fixed store answers
-    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|hydrating|hydration-failed|hydration-malformed>`).
+    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|failed>`).
     const creditsPackPrices =
-      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|hydrating|hydration-failed|hydration-malformed)\/?$/.exec(
+      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|failed)\/?$/.exec(
         path
       );
     if (creditsPackPrices) {

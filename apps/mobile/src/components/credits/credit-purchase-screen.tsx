@@ -54,12 +54,9 @@ export function CreditPurchaseScreen() {
     fetchStoreProducts,
     purchase,
     reconcilePurchase,
-    replaceMalformedPurchaseAdmission,
     buyAgain,
     buyAgainProductId,
     hasUnresolvedPurchase,
-    malformedPurchaseAdmission,
-    purchaseHydration,
     purchaseResolution,
     reconnectStore,
     completingProductId,
@@ -107,18 +104,10 @@ export function CreditPurchaseScreen() {
   }, [completedPurchaseCount, refetchBalance, t]);
 
   const purchasing = completingProductId !== null;
-  // Whether an earlier charge is unresolved is read from durable admission, so
-  // the rows and the status region wait for that read: a row exposed first could
-  // take a charge before the earlier one is accounted for. An admission that
-  // cannot be read hides the rows for good, because no new charge may start
-  // while the earlier store state is unknown.
-  const hydrationReady = purchaseHydration === 'ready';
-  const layoutPending = isLoading || purchaseHydration === 'loading';
-  const rowsHidden = layoutPending || purchaseHydration === 'failed';
   // Only a catalog the backend answered as empty is the empty state: a store
   // query that is pending, paused or failed must not hide the packs the backend
   // catalog named.
-  const packsEmpty = !rowsHidden && catalogEmpty;
+  const packsEmpty = !isLoading && catalogEmpty;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so
@@ -163,12 +152,6 @@ export function CreditPurchaseScreen() {
     selectionHaptic();
     clearError();
     void buyAgain(buyAgainTarget);
-  };
-
-  const handleReplaceRecordPress = () => {
-    selectionHaptic();
-    clearError();
-    void replaceMalformedPurchaseAdmission();
   };
 
   // One label source for the row and the notice: the pack amount reads the same
@@ -272,7 +255,7 @@ export function CreditPurchaseScreen() {
             </View>
           )}
 
-          {layoutPending &&
+          {isLoading &&
             Array.from({ length: PACK_SKELETON_ROWS }, (_, index) => (
               <View key={index} className="rounded-xl border border-border bg-card p-5">
                 <View className="flex-row items-start justify-between gap-4">
@@ -283,7 +266,7 @@ export function CreditPurchaseScreen() {
               </View>
             ))}
 
-          {!rowsHidden &&
+          {!isLoading &&
             products.map(pack => {
               // The pack names a credit amount in the same shape as the balance
               // above it. The store's own localized price stays as the store
@@ -383,66 +366,21 @@ export function CreditPurchaseScreen() {
               them: a timeout or a restored admission can turn it on or off at
               any time, and a card inserted above the rows would move every row
               mid-session. Nothing above this point depends on it. */}
-          {(purchaseHydration === 'failed' || (hydrationReady && hasUnresolvedPurchase)) && (
+          {hasUnresolvedPurchase && (
             <View testID="credit-purchase-status-region">
-              {purchaseHydration === 'failed' && (
-                <View className="gap-3 rounded-xl border border-border bg-card p-5">
-                  <AccessibleStatus
-                    className="text-sm"
-                    message={t('common.couldnTLoad')}
-                    tone="warn"
-                  />
-                  {/* An unreadable record cannot be repaired by waiting, so the
-                      only way out is the person's explicit consent to replace
-                      it: until then, buying stays blocked. */}
-                  {malformedPurchaseAdmission && (
-                    <Text className="text-sm text-muted-foreground">
-                      {t('credits.unreadablePurchaseRecord')}
-                    </Text>
-                  )}
-                  <View className="flex-row flex-wrap gap-3">
-                    <Button
-                      accessibilityLabel={t('common.tryAgain')}
-                      accessibilityState={{ disabled: statusActionsDisabled }}
-                      disabled={statusActionsDisabled}
-                      onPress={handleReconcilePress}
-                      size="action"
-                      testID="credit-purchase-hydration-try-again"
-                      variant={malformedPurchaseAdmission ? 'outline' : 'default'}
-                    >
-                      <Text>{t('common.tryAgain')}</Text>
-                    </Button>
-                    {malformedPurchaseAdmission && (
-                      <Button
-                        accessibilityLabel={t('credits.replacePurchaseRecord')}
-                        accessibilityState={{ disabled: statusActionsDisabled }}
-                        disabled={statusActionsDisabled}
-                        onPress={handleReplaceRecordPress}
-                        size="action"
-                        testID="credit-purchase-replace-record"
-                        variant="default"
-                      >
-                        <Text>{t('credits.replacePurchaseRecord')}</Text>
-                      </Button>
-                    )}
-                  </View>
-                </View>
-              )}
-              {hydrationReady && hasUnresolvedPurchase && (
-                <CreditUnresolvedPurchaseNotice
-                  actionsDisabled={statusActionsDisabled}
-                  buyAgainAvailable={buyAgainAvailable}
-                  onBuyAgain={handleBuyAgainPress}
-                  onReconcile={handleReconcilePress}
-                  packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
-                  priceLabel={
-                    buyAgainTarget !== null
-                      ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
-                      : null
-                  }
-                  resolution={purchaseResolution}
-                />
-              )}
+              <CreditUnresolvedPurchaseNotice
+                actionsDisabled={statusActionsDisabled}
+                buyAgainAvailable={buyAgainAvailable}
+                onBuyAgain={handleBuyAgainPress}
+                onReconcile={handleReconcilePress}
+                packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
+                priceLabel={
+                  buyAgainTarget !== null
+                    ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
+                    : null
+                }
+                resolution={purchaseResolution}
+              />
             </View>
           )}
 

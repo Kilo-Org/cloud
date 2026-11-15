@@ -4328,8 +4328,6 @@
     "unresolvedPurchaseFound": "Your earlier purchase was found at the store. Its credits will be added when it completes. Buying again starts another purchase and may charge you again.",
     "unresolvedPurchaseNotFound": "Your earlier purchase was not found at the store, but it may still complete later and add its credits. Buying again starts another purchase and may charge you again.",
     "unresolvedPurchaseRefused": "Your earlier purchase was found at the store, but it cannot be credited. Buying again starts another purchase and may charge you again.",
-    "unreadablePurchaseRecord": "A saved credit purchase record can't be read, so buying credits stays blocked. Replacing it lets you buy again; any earlier charge stays with the store and is not credited automatically.",
-    "replacePurchaseRecord": "Replace record",
     "buyAgain": "Buy again",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."

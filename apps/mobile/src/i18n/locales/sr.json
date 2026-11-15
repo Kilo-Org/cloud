@@ -4323,8 +4323,6 @@
     "unresolvedPurchaseFound": "Tvoja prethodna kupovina je pronađena u prodavnici i krediti će biti dodati kad se dovrši; ako ponovo kupiš, započinješ novu kupovinu koja može ponovo da ti bude naplaćena.",
     "unresolvedPurchaseNotFound": "Tvoja prethodna kupovina nije pronađena u prodavnici, ali može kasnije da se dovrši i doda kredite; ako ponovo kupiš, započinješ novu kupovinu koja može ponovo da ti bude naplaćena.",
     "unresolvedPurchaseRefused": "Tvoja prethodna kupovina je pronađena u prodavnici, ali za nju ne možeš dobiti kredite; ako ponovo kupiš, započinješ novu kupovinu koja može ponovo da ti bude naplaćena.",
-    "unreadablePurchaseRecord": "Sačuvani zapis o kupovini kredita nije moguće pročitati, pa kupovina kredita ostaje blokirana. Ako ga zameniš, možeš ponovo da kupuješ; svaka ranija naplata ostaje kod prodavnice i krediti za nju se neće automatski dodati.",
-    "replacePurchaseRecord": "Zameni zapis",
     "buyAgain": "Kupi ponovo",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom nalogu Apple Account pripadaju drugom Kilo nalogu. Prijavi se na taj Kilo nalog da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."

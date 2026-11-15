@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "Cửa hàng đã tìm thấy giao dịch mua trước đó của bạn và sẽ cộng tín dụng khi giao dịch hoàn tất; mua lần nữa sẽ tạo giao dịch mua riêng và có thể khiến bạn bị tính phí lần nữa.",
     "unresolvedPurchaseNotFound": "Cửa hàng không tìm thấy giao dịch mua trước đó của bạn nhưng giao dịch vẫn có thể hoàn tất sau và cộng tín dụng; mua lần nữa sẽ tạo giao dịch mua riêng và có thể khiến bạn bị tính phí lần nữa.",
     "unresolvedPurchaseRefused": "Cửa hàng đã tìm thấy giao dịch mua trước đó của bạn nhưng không thể cộng tín dụng cho giao dịch này; mua lần nữa sẽ tạo giao dịch mua riêng và có thể khiến bạn bị tính phí lần nữa.",
-    "unreadablePurchaseRecord": "Không thể đọc bản ghi giao dịch mua tín dụng đã lưu, nên việc mua tín dụng vẫn bị chặn. Thay thế bản ghi này sẽ cho phép bạn mua lại; mọi khoản phí trước đó vẫn nằm ở phía cửa hàng và sẽ không được tự động cộng tín dụng.",
-    "replacePurchaseRecord": "Thay thế bản ghi",
     "buyAgain": "Mua lần nữa",
     "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
     "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."

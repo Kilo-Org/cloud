@@ -38,11 +38,8 @@ const owner = vi.hoisted(() => ({
   // from, and the fakes prove which callback a tap reaches, never a store call.
   buyAgainProductId: null as string | null,
   hasUnresolvedPurchase: false,
-  purchaseHydration: 'ready',
   purchaseResolution: 'unknown' as 'unknown' | 'found' | 'not-found' | 'terminal-refusal',
-  malformedPurchaseAdmission: false,
   reconcilePurchase: vi.fn(),
-  replaceMalformedPurchaseAdmission: vi.fn(),
   buyAgain: vi.fn(),
 }));
 
@@ -391,11 +388,8 @@ describe('CreditPurchaseScreen', () => {
     owner.completedPurchaseCount = 0;
     owner.buyAgainProductId = null;
     owner.hasUnresolvedPurchase = false;
-    owner.purchaseHydration = 'ready';
     owner.purchaseResolution = 'unknown';
-    owner.malformedPurchaseAdmission = false;
     owner.reconcilePurchase.mockResolvedValue(true);
-    owner.replaceMalformedPurchaseAdmission.mockResolvedValue(true);
     owner.buyAgain.mockResolvedValue(true);
     balance.balance = 1234;
     creditBlocks.entries = [];
@@ -1434,84 +1428,6 @@ describe('CreditPurchaseScreen', () => {
       expect(resolved.content.children[index]).toBe(resolved.rows[offset]);
     }
     expect(statusRegion(renderer)).toBeUndefined();
-    unmount();
-  });
-
-  it('hydration: the pack rows and the status region wait for the admission read', async () => {
-    owner.purchaseHydration = 'loading';
-    owner.hasUnresolvedPurchase = true;
-
-    const { renderer, queryClient, unmount } = await renderWithProviders(
-      createElement(CreditPurchaseScreen)
-    );
-    await settleCatalog(queryClient);
-
-    // The catalog is answered, yet the final purchase layout stays hidden: a
-    // row shown first could take a charge before admission is known.
-    expect(packRows(renderer)).toHaveLength(0);
-    expect(placeholderShells(renderer)).toHaveLength(4);
-    expect(statusRegion(renderer)).toBeUndefined();
-    expect(testId(renderer.root, 'credit-unresolved-purchase')).toBeUndefined();
-
-    owner.purchaseHydration = 'ready';
-    await act(async () => {
-      redraw(renderer, queryClient);
-      await Promise.resolve();
-    });
-    await waitFor(() => packRows(renderer).length === 4);
-
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
-    expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
-    expect(statusRegion(renderer)).toBeDefined();
-    unmount();
-  });
-
-  it('hydration failed: the status region retries without a pack and exposes no row', async () => {
-    owner.purchaseHydration = 'failed';
-
-    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => statusRegion(renderer) !== undefined);
-
-    expect(packRows(renderer)).toHaveLength(0);
-    const region = statusRegionOrThrow(renderer);
-    expect(textWithin(region)).toContain("Couldn't load");
-    expect(textWithin(region)).not.toContain(UNRESOLVED_PURCHASE_WARNING);
-    // A read that failed for a transient reason is not a record to replace: the
-    // retry is the only action, so nothing can erase an admission by accident.
-    expect(testId(region, 'credit-purchase-replace-record')).toBeUndefined();
-
-    await press(testId(renderer.root, 'credit-purchase-hydration-try-again'));
-    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
-    expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
-    expect(owner.purchase).not.toHaveBeenCalled();
-    expect(owner.buyAgain).not.toHaveBeenCalled();
-    unmount();
-  });
-
-  it('hydration malformed: only explicit consent replaces the unreadable record', async () => {
-    owner.purchaseHydration = 'failed';
-    owner.malformedPurchaseAdmission = true;
-
-    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => statusRegion(renderer) !== undefined);
-
-    // Nothing may be bought while the stored admission is unknown, and the card
-    // states what replacing it means before offering that consent.
-    expect(packRows(renderer)).toHaveLength(0);
-    const region = statusRegionOrThrow(renderer);
-    expect(textWithin(region)).toContain(i18n.t('credits.unreadablePurchaseRecord'));
-
-    const replace = testId(region, 'credit-purchase-replace-record');
-    if (!replace) {
-      throw new Error('expected the record replacement action');
-    }
-    expect(labelOf(replace)).toBe(i18n.t('credits.replacePurchaseRecord'));
-    expect(owner.replaceMalformedPurchaseAdmission).not.toHaveBeenCalled();
-
-    await press(replace);
-    expect(owner.replaceMalformedPurchaseAdmission).toHaveBeenCalledTimes(1);
-    expect(owner.purchase).not.toHaveBeenCalled();
-    expect(owner.buyAgain).not.toHaveBeenCalled();
     unmount();
   });
 

@@ -11,8 +11,8 @@ import {
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
+  currentCreditPurchaseIntent,
   resetCreditPurchaseIntentForTests,
-  restoreCreditPurchaseIntent,
 } from '@/lib/credits/credit-purchase-intent';
 import { resetCreditPurchaseAuthorityForTests } from '@/lib/credits/credit-purchase-authority';
 import {
@@ -29,7 +29,6 @@ import {
 
 const APPLE_PRODUCT_ID = 'credits.usd10.v1';
 const APP_ACCOUNT_TOKEN = '550e8400-e29b-41d4-a716-446655440000';
-const persistedIntent = vi.hoisted(() => new Map<string, string>());
 const nativeRequestCounts = new Map<string, number>();
 
 const mockedIap = vi.hoisted(() => ({
@@ -130,21 +129,6 @@ vi.mock('@/lib/trpc', () => ({
       getCreditBlocks: { pathFilter: () => ({ queryKey: ['credits'] }) },
     },
   }),
-}));
-
-vi.mock('@/lib/persist/encrypted-kv', () => ({
-  getItem: async (_scope: string, key: string) => {
-    await Promise.resolve();
-    return persistedIntent.get(key) ?? null;
-  },
-  setItem: async (_scope: string, key: string, value: string) => {
-    persistedIntent.set(key, value);
-    await Promise.resolve();
-  },
-  removeItemIfValue: async (_scope: string, key: string, value: string) => {
-    await Promise.resolve();
-    return persistedIntent.get(key) === value && persistedIntent.delete(key);
-  },
 }));
 
 vi.mock('sonner-native', () => ({ toast: mockedToasts }));
@@ -253,7 +237,6 @@ beforeEach(() => {
   resetInlinePurchaseErrorOwnership();
   resetPurchaseErrorToastDedup();
   resetTerminalPurchaseRejections();
-  persistedIntent.clear();
   nativeRequestCounts.clear();
   mockedPlatform.OS = 'ios';
   mockedIap.connected = false;
@@ -415,26 +398,6 @@ describe('CreditNativeIapOwner', () => {
     expect(mockedToasts.error).not.toHaveBeenCalled();
   });
 
-  it('allows a never-dispatched reservation to be replaced after restart', async () => {
-    mockedQuery.serverProductsData = {
-      appAccountToken: APP_ACCOUNT_TOKEN,
-      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
-    };
-    persistedIntent.set(
-      'unresolved',
-      JSON.stringify({
-        productId: APPLE_PRODUCT_ID,
-        accountToken: APP_ACCOUNT_TOKEN,
-        startedAt: Date.now(),
-        transactionIds: [],
-        dispatched: false,
-      })
-    );
-    const { handle } = await mountOwner();
-    expect(await handle.value?.purchase(creditPack)).toBe(true);
-    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
-  });
-
   it('requires explicit Buy again consent after an empty iOS reconciliation', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,
@@ -453,28 +416,6 @@ describe('CreditNativeIapOwner', () => {
     const consented = reopened.handle.value?.buyAgain(creditPack);
     expect(await reopened.handle.value?.buyAgain(creditPack)).toBe(false);
     await consented;
-    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
-  });
-
-  it('retires consented admission by request identity even when stored transaction metadata lags', async () => {
-    mockedQuery.serverProductsData = {
-      appAccountToken: APP_ACCOUNT_TOKEN,
-      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
-    };
-    const first = await mountOwner();
-    await first.handle.value?.purchase(creditPack);
-    const intent = await restoreCreditPurchaseIntent();
-    if (intent === null) {
-      throw new Error('the fake purchase has no retained intent');
-    }
-    persistedIntent.set('unresolved', JSON.stringify({ ...intent, transactionIds: [] }));
-    await act(async () => {
-      first.renderer.unmount();
-      await Promise.resolve();
-    });
-    const reopened = await mountOwner();
-    await reopened.handle.value?.reconcilePurchase();
-    await reopened.handle.value?.buyAgain(creditPack);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
   });
 
@@ -590,31 +531,6 @@ describe('CreditNativeIapOwner', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('restores a dispatched barrier across process restart while late credit recovery stays independent', async () => {
-    mockedQuery.serverProductsData = {
-      appAccountToken: APP_ACCOUNT_TOKEN,
-      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
-    };
-    const first = await mountOwner();
-    await first.handle.value?.purchase(creditPack);
-    await act(async () => {
-      first.renderer.unmount();
-      await Promise.resolve();
-    });
-    resetCreditPurchaseIntentForTests();
-    resetCreditPurchaseAuthorityForTests();
-    const second = await mountOwner();
-    expect(second.handle.value?.errorMessageKey).toBe('credits.storeTimedOut');
-    await second.handle.value?.purchase(creditPack50);
-    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
-    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
-    await flushPromises();
-    await second.handle.value?.purchase(creditPack);
-    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
-    await second.handle.value?.buyAgain(creditPack);
-    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
   });
 
   it('binds the native returned transaction to the captured request', async () => {

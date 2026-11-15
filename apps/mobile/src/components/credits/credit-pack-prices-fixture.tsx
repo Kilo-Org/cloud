@@ -27,10 +27,7 @@ import {
 // money-safety surfaces with inert exits: `unresolved` restores an earlier
 // charge on a current SKU, `legacy-unresolved` restores a retired Play SKU whose
 // replacement is the consent target, `refused-unresolved` restores a charge the
-// backend will never credit, `hydrating` keeps the admission read open so the
-// final purchase layout must stay hidden, and `hydration-failed` and
-// `hydration-malformed` show the retry and the consent that replace a record
-// which cannot be read.
+// backend will never credit, and `failed` shows the inline error beside it.
 
 export type CreditPackPricesFixtureState =
   | 'priced'
@@ -39,8 +36,7 @@ export type CreditPackPricesFixtureState =
   | 'unresolved'
   | 'legacy-unresolved'
   | 'refused-unresolved'
-  | 'hydrating'
-  | 'hydration-failed'
+  | 'failed'
   | 'hydration-malformed';
 
 const FIXTURE_STATES = [
@@ -50,9 +46,7 @@ const FIXTURE_STATES = [
   'unresolved',
   'legacy-unresolved',
   'refused-unresolved',
-  'hydrating',
-  'hydration-failed',
-  'hydration-malformed',
+  'failed',
 ] as const satisfies readonly CreditPackPricesFixtureState[];
 
 export function isCreditPackPricesFixtureState(
@@ -231,14 +225,6 @@ function FixtureSession({ state }: { state: CreditPackPricesFixtureState }) {
 export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixtureState }) {
   const store = useMemo<CreditNativeIapContextValue>(() => {
     const fixtureListings = listings(state);
-    // The admission read is what the rows wait for, so a state can hold it open,
-    // fail it, or fail it on a record only consent can replace.
-    let purchaseHydration: CreditNativeIapContextValue['purchaseHydration'] = 'ready';
-    if (state === 'hydrating') {
-      purchaseHydration = 'loading';
-    } else if (state === 'hydration-failed' || state === 'hydration-malformed') {
-      purchaseHydration = 'failed';
-    }
     // An earlier charge the emulator cannot produce. `legacy-unresolved` keeps a
     // retired Play SKU as the earlier request and names a current replacement as
     // the consent target, which no row could ever name by itself.
@@ -273,10 +259,6 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
         await Promise.resolve();
         return false;
       },
-      replaceMalformedPurchaseAdmission: async () => {
-        await Promise.resolve();
-        return false;
-      },
       buyAgain: async () => {
         await Promise.resolve();
         return false;
@@ -287,12 +269,10 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
           : null,
       hasUnresolvedPurchase,
       purchaseResolution,
-      purchaseHydration,
-      malformedPurchaseAdmission: state === 'hydration-malformed',
       // The completing state keeps the first pack's purchase open, which is the
       // only way to render its in-flight label without a store.
       completingProductId: state === 'completing' ? (fixtureListings[0]?.id ?? null) : null,
-      errorMessageKey: null,
+      errorMessageKey: state === 'failed' ? 'credits.storeTimedOut' : null,
       completedPurchaseCount: 0,
       clearError: () => undefined,
     };

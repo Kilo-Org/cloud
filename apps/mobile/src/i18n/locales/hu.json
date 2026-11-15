@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "Az áruházban megtaláltuk a korábbi vásárlásodat, és teljesülésekor megkapod a krediteket; ha újra vásárolsz, külön vásárlást indítasz, amelyért ismét fizetned kellhet.",
     "unresolvedPurchaseNotFound": "Az áruházban nem találtuk a korábbi vásárlásodat, de az még teljesülhet, és megkaphatod a krediteket; ha újra vásárolsz, külön vásárlást indítasz, amelyért ismét fizetned kellhet.",
     "unresolvedPurchaseRefused": "Az áruházban megtaláltuk a korábbi vásárlásodat, de a kreditjei nem írhatók jóvá; ha újra vásárolsz, külön vásárlást indítasz, amelyért ismét fizetned kellhet.",
-    "unreadablePurchaseRecord": "Egy mentett kreditvásárlási bejegyzés nem olvasható, ezért a kreditvásárlás zárolva marad. A bejegyzés lecserélésével újra vásárolhatsz; az esetleges korábbi terhelés az áruháznál marad, és nem íródik jóvá automatikusan.",
-    "replacePurchaseRecord": "Bejegyzés cseréje",
     "buyAgain": "Vásárolj újra",
     "purchaseOwnedByAnotherAccount": "Az ezen Apple-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
     "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."

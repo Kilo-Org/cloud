@@ -4261,8 +4261,6 @@
     "unresolvedPurchaseFound": "Butikken fant det tidligere kjøpet ditt, og kredittene legges til når det er fullført; hvis du kjøper igjen, starter du et nytt kjøp og kan bli belastet på nytt.",
     "unresolvedPurchaseNotFound": "Butikken fant ikke det tidligere kjøpet ditt, men det kan fortsatt fullføres senere og gi deg kredittene; hvis du kjøper igjen, starter du et nytt kjøp og kan bli belastet på nytt.",
     "unresolvedPurchaseRefused": "Butikken fant det tidligere kjøpet ditt, men kredittene kan ikke legges til; hvis du kjøper igjen, starter du et nytt kjøp og kan bli belastet på nytt.",
-    "unreadablePurchaseRecord": "En lagret kjøpsoppføring for kreditter kan ikke leses, så kjøp av kreditter forblir blokkert. Hvis du erstatter den, kan du kjøpe igjen. Eventuelle tidligere belastninger blir værende hos butikken og godskrives ikke automatisk.",
-    "replacePurchaseRecord": "Erstatt kjøpsoppføring",
     "buyAgain": "Kjøp igjen",
     "purchaseOwnedByAnotherAccount": "Kredittene på denne Apple-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kredittene på denne Google Play-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem."

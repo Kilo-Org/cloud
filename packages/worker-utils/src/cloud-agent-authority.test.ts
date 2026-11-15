@@ -891,13 +891,7 @@ describe('scoped JWT policy', () => {
 
 describe('organization binding parity', () => {
   type Verdict = 'accepted' | 'refused';
-  type OrganizationVariant =
-    | 'omitted'
-    | 'own'
-    | 'other'
-    | 'null'
-    | 'empty string'
-    | 'non-string';
+  type OrganizationVariant = 'omitted' | 'own' | 'other' | 'null' | 'empty string' | 'non-string';
   type OrganizationBindingRow = {
     authority: 'personal' | 'organization';
     authorityValue: CloudAgentAuthority;

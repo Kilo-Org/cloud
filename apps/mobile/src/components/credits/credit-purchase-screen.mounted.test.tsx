@@ -1431,6 +1431,41 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('layout: the error line and the notice share the status region below the rows', async () => {
+    const { renderer, queryClient, unmount } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const absent = rowPlacement(renderer);
+    expect(statusRegion(renderer)).toBeUndefined();
+
+    owner.errorMessageKey = 'credits.storeTimedOut';
+    await act(async () => {
+      redraw(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    // The error appears below the pack rows, in the same region the notice
+    // uses, so no row moves when it shows or clears.
+    const withError = rowPlacement(renderer);
+    expect(withError.indices).toEqual(absent.indices);
+    expect(textWithin(statusRegionOrThrow(renderer))).toContain(i18n.t('credits.storeTimedOut'));
+
+    owner.hasUnresolvedPurchase = true;
+    await act(async () => {
+      redraw(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    const withBoth = rowPlacement(renderer);
+    expect(withBoth.indices).toEqual(absent.indices);
+    const region = statusRegionOrThrow(renderer);
+    expect(textWithin(region)).toContain(i18n.t('credits.storeTimedOut'));
+    expect(testId(renderer.root, 'credit-unresolved-purchase')).toBeDefined();
+    unmount();
+  });
+
   it('resolution found: names the found charge and keeps the query retry primary', async () => {
     owner.hasUnresolvedPurchase = true;
     owner.purchaseResolution = 'found';

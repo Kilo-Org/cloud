@@ -126,7 +126,9 @@ export function CreditPurchaseScreen() {
       : (products.find(pack => pack.storeProductId === buyAgainProductId) ?? null);
   // Buy again names one exact charge only once the store priced that pack.
   const buyAgainAvailable = buyAgainTarget !== null && buyAgainTarget.displayPrice !== null;
-  const statusActionsDisabled = purchasing || !connected;
+  // The status region's retry is a store query and its consent is a row tap:
+  // neither needs the store connection the rows do, so it must not be gated on it.
+  const statusActionsDisabled = purchasing;
 
   const handlePackPress = (pack: StoreCreditProduct) => {
     selectionHaptic();
@@ -217,16 +219,6 @@ export function CreditPurchaseScreen() {
               />
             )}
           </View>
-
-          {/* The purchase error is rendered inline (the store sheet has just
-              dismissed), so no toast accompanies it. AccessibleStatus is the
-              one announcement channel that survives that: a polite live
-              region on Android and an imperative announcement on iOS. A plain
-              Text left a screen-reader user with no failure feedback at all. */}
-          <AccessibleStatus
-            message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
-            className="px-1 text-sm"
-          />
 
           {storeUnavailable && (
             <View className="gap-3 rounded-xl border border-border bg-card p-5">
@@ -362,25 +354,33 @@ export function CreditPurchaseScreen() {
               );
             })}
 
-          {/* The unresolved state is presented after the pack rows, not above
-              them: a timeout or a restored admission can turn it on or off at
-              any time, and a card inserted above the rows would move every row
-              mid-session. Nothing above this point depends on it. */}
-          {hasUnresolvedPurchase && (
+          {/* Everything that can appear after a purchase lives in one region below
+              the rows: the error line and the unresolved notice both turn on and
+              off mid-session, and nothing above them may move when they do. The
+              error is rendered inline (the store sheet has just dismissed), so no
+              toast accompanies it; AccessibleStatus is the one announcement
+              channel that survives that. */}
+          {(purchaseErrorMessageKey !== null || hasUnresolvedPurchase) && (
             <View testID="credit-purchase-status-region">
-              <CreditUnresolvedPurchaseNotice
-                actionsDisabled={statusActionsDisabled}
-                buyAgainAvailable={buyAgainAvailable}
-                onBuyAgain={handleBuyAgainPress}
-                onReconcile={handleReconcilePress}
-                packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
-                priceLabel={
-                  buyAgainTarget !== null
-                    ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
-                    : null
-                }
-                resolution={purchaseResolution}
+              <AccessibleStatus
+                className="px-1 text-sm"
+                message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
               />
+              {hasUnresolvedPurchase && (
+                <CreditUnresolvedPurchaseNotice
+                  actionsDisabled={statusActionsDisabled}
+                  buyAgainAvailable={buyAgainAvailable}
+                  onBuyAgain={handleBuyAgainPress}
+                  onReconcile={handleReconcilePress}
+                  packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
+                  priceLabel={
+                    buyAgainTarget !== null
+                      ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
+                      : null
+                  }
+                  resolution={purchaseResolution}
+                />
+              )}
             </View>
           )}
 

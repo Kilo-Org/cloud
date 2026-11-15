@@ -577,15 +577,29 @@ export const byokRouter = createTRPCRouter({
         if (isUniqueViolation(error)) {
           // A coding-plan row owns the provider for this owner, so the refusal
           // names the plan instead of asking for a removal the owner cannot do.
-          const [existingKey] = await db
-            .select({ management_source: byok_api_keys.management_source })
-            .from(byok_api_keys)
-            .where(
-              and(
-                ownedKeys(byokOwner(ctx.user.id, organizationId)),
-                eq(byok_api_keys.provider_id, provider_id)
-              )
-            );
+          // This lookup can fail on its own, and a failure here would put the
+          // driver's message on the wire, so it answers the generic sentence.
+          let existingKey: { management_source: string } | undefined;
+          try {
+            [existingKey] = await db
+              .select({ management_source: byok_api_keys.management_source })
+              .from(byok_api_keys)
+              .where(
+                and(
+                  ownedKeys(byokOwner(ctx.user.id, organizationId)),
+                  eq(byok_api_keys.provider_id, provider_id)
+                )
+              );
+          } catch (lookupError) {
+            logByokWriteWarning('BYOK key conflict lookup failed', {
+              providerId: provider_id,
+              message: lookupError instanceof Error ? lookupError.message : undefined,
+            });
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'The key could not be stored. Try again.',
+            });
+          }
           if (existingKey?.management_source === 'coding_plan') {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',

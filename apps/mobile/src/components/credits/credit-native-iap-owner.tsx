@@ -31,8 +31,8 @@ import {
 } from '@/lib/credits/credit-purchase-authority';
 import {
   admitCreditPurchaseIntent,
-  type CreditPurchaseIntent,
   consumeForeignCreditPurchaseIntentDrop,
+  type CreditPurchaseIntent,
   currentCreditPurchaseIntent,
   currentCreditPurchaseIntentFor,
   identifyCreditPurchaseTransaction,

@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Hindi naitala ang repository",
       "reasonUnknown": "Hindi nakikilalang dahilan",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Buod ng ulat",
       "title": "Ulat ng audit",
       "unavailable": "Hindi makuha ang ulat ng audit",

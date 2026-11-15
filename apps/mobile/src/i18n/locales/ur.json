@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "ریپوزٹری درج نہیں",
       "reasonUnknown": "ناقابلِ شناخت وجہ",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "رپورٹ کا خلاصہ",
       "title": "آڈٹ رپورٹ",
       "unavailable": "آڈٹ رپورٹ دستیاب نہیں",

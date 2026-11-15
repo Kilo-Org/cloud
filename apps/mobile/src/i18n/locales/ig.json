@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Edekọghị ebe nchekwa",
       "reasonUnknown": "Ihe kpatara a na-amataghị",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Nchịkọta akụkọ",
       "title": "Akụkọ nyocha",
       "unavailable": "Akụkọ nyocha adịghị",

@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "রিপোজিটরি রেকর্ড করা হয়নি",
       "reasonUnknown": "অপরিচিত কারণ",
       "severityCount": "{{displayCount}}টি {{label}}",
+      "severityCount_one": "{{displayCount}}টি {{label}}",
+      "severityCount_other": "{{displayCount}}টি {{label}}",
       "summary": "রিপোর্টের সারাংশ",
       "title": "অডিট রিপোর্ট",
       "unavailable": "অডিট রিপোর্ট পাওয়া যাচ্ছে না",

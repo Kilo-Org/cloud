@@ -1023,6 +1023,8 @@
       "repositoryNotRecorded": "未记录仓库",
       "reasonUnknown": "未识别的原因",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "报告摘要",
       "title": "审计报告",
       "unavailable": "审计报告不可用",

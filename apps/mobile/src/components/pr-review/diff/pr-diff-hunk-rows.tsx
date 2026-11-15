@@ -239,12 +239,12 @@ export function PaginationRow({
     return (
       <View className="flex-row items-center justify-center gap-3 py-4">
         <Text variant="muted" className="text-xs">
-          {/* i18n-dup-ok: 'prReview.hunkRows.loadedOfTotalFiles_one' and 'prReview.hunkRows.loadedOfTotalFiles_other' are this counted message's plural categories, not two keys for one string — English reads the same at every count, but fr and zu inflect the one-form, so the family stays. */}
+          {/* i18n-dup-ok: 'prReview.hunkRows.loadedOfTotalFiles_one' and 'prReview.hunkRows.loadedOfTotalFiles_other' are this counted message's plural categories, not two keys for one string — the label reads the same at every count, but Zulu leads its noun before the numbers and inflects the one-form, so the family stays. */}
           {t('prReview.hunkRows.loadedOfTotalFiles', {
-            // The loaded count drives the plural category: a catalog inflects
-            // the participle on the number of files actually loaded
-            // ("1 fichier chargé sur 5"). English carries the plural noun
-            // because the page set, not the loaded page, names the files.
+            // The loaded count still selects the plural category, although the
+            // copy leads the file noun so that no numeral governs it: the
+            // total is the page set, and a catalog whose noun inflects on the
+            // trailing total would otherwise read a plural noun at 1.
             count: loadedFiles,
             loaded: formatNumber(loadedFiles, i18n.language),
             total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),

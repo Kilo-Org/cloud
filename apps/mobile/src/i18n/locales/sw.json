@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Hazina haikurekodiwa",
       "reasonUnknown": "Sababu isiyotambulika",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Muhtasari wa ripoti",
       "title": "Ripoti ya ukaguzi",
       "unavailable": "Ripoti ya ukaguzi haipatikani",

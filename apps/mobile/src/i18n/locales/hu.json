@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Nincs rögzített adattár",
       "reasonUnknown": "Nem felismert indok",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Jelentés összefoglalója",
       "title": "Auditjelentés",
       "unavailable": "Az auditjelentés nem érhető el",

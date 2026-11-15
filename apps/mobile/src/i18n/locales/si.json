@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "ගබඩාව වාර්තා කර නැත",
       "reasonUnknown": "හඳුනා නොගත් හේතුව",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "වාර්තා සාරාංශය",
       "title": "විගණන වාර්තාව",
       "unavailable": "විගණන වාර්තාව ලබාගත නොහැක",

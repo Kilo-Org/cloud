@@ -5351,7 +5351,7 @@
       "properties": {
         "session_id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[A-Za-z0-9_-]{1,255}$"
         },
         "limit": {
           "default": 50,

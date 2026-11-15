@@ -1023,6 +1023,8 @@
       "repositoryNotRecorded": "Repository niet vastgelegd",
       "reasonUnknown": "Onbekende reden",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Rapportsamenvatting",
       "title": "Auditrapport",
       "unavailable": "Auditrapport niet beschikbaar",
@@ -2940,7 +2942,7 @@
       "hunkHeader": "Kop van wijzigingsblok {{header}}",
       "loadAll": "Alles laden",
       "loadAllFiles": "Alle bestanden laden",
-      "loadedOfTotalFiles": "{{loaded}} van {{total}} bestanden geladen",
+      "loadedOfTotalFiles": "Bestanden geladen: {{loaded}} van {{total}}",
       "loadingAllFiles": "Alle bestanden laden — {{loaded}}…",
       "loadingAllFilesOf": "Alle bestanden laden — {{loaded}} van {{total}}…",
       "loadingContext": "Context laden…",
@@ -2956,8 +2958,8 @@
       "expandLinesOfContext_other": "{{displayCount}} contextregels tonen",
       "expandMoreLines_one": "Nog {{displayCount}} regel tonen ({{start}}–{{end}})",
       "expandMoreLines_other": "Nog {{displayCount}} regels tonen ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} van {{total}} bestanden geladen",
-      "loadedOfTotalFiles_other": "{{loaded}} van {{total}} bestanden geladen"
+      "loadedOfTotalFiles_one": "Bestanden geladen: {{loaded}} van {{total}}",
+      "loadedOfTotalFiles_other": "Bestanden geladen: {{loaded}} van {{total}}"
     },
     "inbox": {
       "couldNotLoad": "Het postvak IN kon niet worden geladen.",

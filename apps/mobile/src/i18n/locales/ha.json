@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Ba a rubuta ma'ajiya ba",
       "reasonUnknown": "Dalilin da ba a gane ba",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Taƙaitaccen rahoto",
       "title": "Rahoton bincike",
       "unavailable": "Ba a iya samun rahoton bincike",

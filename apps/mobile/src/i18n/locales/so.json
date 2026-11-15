@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Kaydka lama diiwaangelin",
       "reasonUnknown": "Sabab aan la aqoonsan",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Soo koobidda warbixinta",
       "title": "Warbixinta hanti-dhawrka",
       "unavailable": "Warbixinta hanti-dhawrka lama heli karo",

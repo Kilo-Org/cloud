@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "A kò ṣe àkọsílẹ̀ ibi ìpamọ́",
       "reasonUnknown": "Ìdí tí a kò mọ̀",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Àkótán ìròyìn",
       "title": "Ìròyìn àyẹ̀wò",
       "unavailable": "Ìròyìn àyẹ̀wò kò sí",

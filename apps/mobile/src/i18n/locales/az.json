@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Repozitoriya qeyd olunmayıb",
       "reasonUnknown": "Tanınmayan səbəb",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Hesabatın xülasəsi",
       "title": "Audit hesabatı",
       "unavailable": "Audit hesabatı mövcud deyil",

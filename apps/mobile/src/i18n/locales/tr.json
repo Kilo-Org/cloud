@@ -1023,6 +1023,8 @@
       "repositoryNotRecorded": "Depo kaydedilmedi",
       "reasonUnknown": "Tanınmayan neden",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Rapor özeti",
       "title": "Denetim raporu",
       "unavailable": "Denetim raporu kullanılamıyor",

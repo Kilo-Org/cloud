@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "ບໍ່ໄດ້ບັນທຶກຄັງໂຄ້ດ",
       "reasonUnknown": "ເຫດຜົນທີ່ບໍ່ຮູ້ຈັກ",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "ສະຫຼຸບລາຍງານ",
       "title": "ລາຍງານການກວດສອບ",
       "unavailable": "ບໍ່ສາມາດເບິ່ງລາຍງານການກວດສອບໄດ້",

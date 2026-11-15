@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Tsy voarakitra ny tahirin-kaody",
       "reasonUnknown": "Antony tsy fantatra",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Famintinana ny tatitra",
       "title": "Tatitra fanaraha-maso",
       "unavailable": "Tsy azo jerena ny tatitra fanaraha-maso",

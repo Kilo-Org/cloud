@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Repozitoriya qayd etilmagan",
       "reasonUnknown": "Tanilmagan sabab",
       "severityCount": "{{displayCount}} ta {{label}}",
+      "severityCount_one": "{{displayCount}} ta {{label}}",
+      "severityCount_other": "{{displayCount}} ta {{label}}",
       "summary": "Hisobot xulosasi",
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",

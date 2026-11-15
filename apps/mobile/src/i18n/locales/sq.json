@@ -554,7 +554,7 @@
       "retryLoadingContext": "Riprovo ngarkimin e kontekstit",
       "failedToLoadContext": "Konteksti nuk u ngarkua — prek për të provuar përsëri",
       "loadingContext": "Po ngarkohet konteksti…",
-      "loadingLines": "Po ngarkohen {{loaded}} nga {{total}} rreshta…",
+      "loadingLines": "Po ngarkohen rreshtat: {{loaded}} nga {{total}}…",
       "expandContext": "Shfaq kontekstin",
       "expandMoreContext": "Shfaq më shumë kontekst",
       "expandLines": "Shfaq {{displayCount}} rreshta ({{start}}–{{end}})",
@@ -567,7 +567,7 @@
       "failedToLoadMoreFiles": "Nuk u ngarkuan më shumë skedarë — prek për të provuar përsëri",
       "loadingAllFiles": "Po ngarkohen të gjithë skedarët — {{loaded}}…",
       "loadingAllFilesOf": "Po ngarkohen të gjithë skedarët — {{loaded}} nga {{total}}…",
-      "loadedOfTotalFiles": "{{loaded}} nga {{total}} skedarë të ngarkuar",
+      "loadedOfTotalFiles": "Skedarë të ngarkuar: {{loaded}} nga {{total}}",
       "loadAllFiles": "Ngarko të gjithë skedarët",
       "loadAll": "Ngarko të gjithë",
       "fileLoadedCount_one": "{{displayCount}} skedar i ngarkuar",
@@ -587,8 +587,8 @@
       "expandLinesOfContext_other": "Shfaq {{displayCount}} rreshta konteksti",
       "expandMoreLines_one": "Shfaq edhe {{displayCount}} rresht ({{start}}–{{end}})",
       "expandMoreLines_other": "Shfaq edhe {{displayCount}} rreshta ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} nga {{total}} skedarë të ngarkuar",
-      "loadedOfTotalFiles_other": "{{loaded}} nga {{total}} skedarë të ngarkuar"
+      "loadedOfTotalFiles_one": "Skedarë të ngarkuar: {{loaded}} nga {{total}}",
+      "loadedOfTotalFiles_other": "Skedarë të ngarkuar: {{loaded}} nga {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "mungon rreshti i ri në fund të skedarit.",
@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Depoja nuk është regjistruar",
       "reasonUnknown": "Arsye e panjohur",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Përmbledhja e raportit",
       "title": "Raporti i auditimit",
       "unavailable": "Raporti i auditimit nuk është i disponueshëm",

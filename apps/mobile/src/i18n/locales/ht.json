@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Depo pa anrejistre",
       "reasonUnknown": "Rezon pa rekonèt",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Rezime rapò",
       "title": "Rapò odit",
       "unavailable": "Rapò odit la pa disponib",

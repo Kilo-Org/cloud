@@ -554,7 +554,7 @@
       "retryLoadingContext": "Yritä ladata ympäröivät rivit uudelleen",
       "failedToLoadContext": "Ympäröivien rivien lataus epäonnistui – yritä uudelleen napauttamalla",
       "loadingContext": "Ladataan ympäröiviä rivejä…",
-      "loadingLines": "Ladataan {{loaded}}/{{total}} riviä…",
+      "loadingLines": "Ladataan rivejä: {{loaded}}/{{total}}…",
       "expandContext": "Näytä ympäröivät rivit",
       "expandMoreContext": "Näytä lisää ympäröiviä rivejä",
       "expandLines": "Näytä {{displayCount}} riviä ({{start}}–{{end}})",
@@ -567,7 +567,7 @@
       "failedToLoadMoreFiles": "Lisää tiedostoja ei voitu ladata – yritä uudelleen napauttamalla",
       "loadingAllFiles": "Ladataan kaikkia tiedostoja – {{loaded}}…",
       "loadingAllFilesOf": "Ladataan kaikkia tiedostoja – {{loaded}}/{{total}}…",
-      "loadedOfTotalFiles": "{{loaded}}/{{total}} tiedostoa ladattu",
+      "loadedOfTotalFiles": "Ladatut tiedostot: {{loaded}}/{{total}}",
       "loadAllFiles": "Lataa kaikki tiedostot",
       "loadAll": "Lataa kaikki",
       "fileLoadedCount_one": "{{displayCount}} tiedosto ladattu",
@@ -587,8 +587,8 @@
       "expandLinesOfContext_other": "Näytä {{displayCount}} ympäröivää riviä",
       "expandMoreLines_one": "Näytä vielä {{displayCount}} rivi ({{start}}–{{end}})",
       "expandMoreLines_other": "Näytä vielä {{displayCount}} riviä ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} tiedostoa ladattu",
-      "loadedOfTotalFiles_other": "{{loaded}}/{{total}} tiedostoa ladattu"
+      "loadedOfTotalFiles_one": "Ladatut tiedostot: {{loaded}}/{{total}}",
+      "loadedOfTotalFiles_other": "Ladatut tiedostot: {{loaded}}/{{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ tiedoston lopusta puuttuu rivinvaihto",
@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Koodivarastoa ei ole kirjattu",
       "reasonUnknown": "Tunnistamaton syy",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Raportin yhteenveto",
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",

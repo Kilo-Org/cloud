@@ -1023,6 +1023,8 @@
       "repositoryNotRecorded": "未記錄存放庫",
       "reasonUnknown": "無法辨識的原因",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "報告摘要",
       "title": "稽核報告",
       "unavailable": "無法取得稽核報告",

@@ -554,7 +554,7 @@
       "retryLoadingContext": "Опитай отново да заредиш контекста",
       "failedToLoadContext": "Не можахме да заредим контекста — докосни, за да опиташ отново",
       "loadingContext": "Зареждане на контекста…",
-      "loadingLines": "Зареждане на {{loaded}} от {{total}} реда…",
+      "loadingLines": "Зареждане на редове: {{loaded}} от {{total}}…",
       "expandContext": "Покажи контекста",
       "expandMoreContext": "Покажи още контекст",
       "expandLines": "Покажи {{displayCount}} реда ({{start}}–{{end}})",
@@ -567,7 +567,7 @@
       "failedToLoadMoreFiles": "Не можахме да заредим още файлове — докосни, за да опиташ отново",
       "loadingAllFiles": "Зареждане на всички файлове — {{loaded}}…",
       "loadingAllFilesOf": "Зареждане на всички файлове — {{loaded}} от {{total}}…",
-      "loadedOfTotalFiles": "заредени {{loaded}} от {{total}} файла",
+      "loadedOfTotalFiles": "Файлове заредени: {{loaded}} от {{total}}",
       "loadAllFiles": "Зареди всички файлове",
       "loadAll": "Зареди всичко",
       "fileLoadedCount_one": "{{displayCount}} зареден файл",
@@ -587,8 +587,8 @@
       "expandLinesOfContext_other": "Покажи {{displayCount}} реда от контекста",
       "expandMoreLines_one": "Покажи още {{displayCount}} ред ({{start}}–{{end}})",
       "expandMoreLines_other": "Покажи още {{displayCount}} реда ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "заредени {{loaded}} от {{total}} файла",
-      "loadedOfTotalFiles_other": "заредени {{loaded}} от {{total}} файла"
+      "loadedOfTotalFiles_one": "Файлове заредени: {{loaded}} от {{total}}",
+      "loadedOfTotalFiles_other": "Файлове заредени: {{loaded}} от {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ няма нов ред в края на файла",
@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Хранилището не е записано",
       "reasonUnknown": "Неразпозната причина",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Резюме на доклада",
       "title": "Одитен доклад",
       "unavailable": "Одитният доклад не е достъпен",

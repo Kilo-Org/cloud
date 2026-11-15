@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Репозиторий тіркелмеген",
       "reasonUnknown": "Танылмаған себеп",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Есептің қысқаша мазмұны",
       "title": "Аудит есебі",
       "unavailable": "Аудит есебі қолжетімсіз",

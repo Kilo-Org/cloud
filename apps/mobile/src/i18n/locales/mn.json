@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Репозиторийг бүртгээгүй",
       "reasonUnknown": "Танигдаагүй шалтгаан",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Тайлангийн хураангуй",
       "title": "Аудитын тайлан",
       "unavailable": "Аудитын тайланг үзэх боломжгүй",

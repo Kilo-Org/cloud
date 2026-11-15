@@ -554,7 +554,7 @@
       "retryLoadingContext": "Probeer weer om die konteks te laai",
       "failedToLoadContext": "Kon nie konteks laai nie — tik om weer te probeer",
       "loadingContext": "Laai konteks…",
-      "loadingLines": "Laai {{loaded}} van {{total}} reëls…",
+      "loadingLines": "Laai reëls: {{loaded}} van {{total}}…",
       "expandContext": "Vou konteks uit",
       "expandMoreContext": "Vou meer konteks uit",
       "expandLines": "Vou {{displayCount}} reëls uit ({{start}}–{{end}})",
@@ -567,7 +567,7 @@
       "failedToLoadMoreFiles": "Kon nie meer lêers laai nie — tik om weer te probeer",
       "loadingAllFiles": "Laai alle lêers — {{loaded}}…",
       "loadingAllFilesOf": "Laai alle lêers — {{loaded}} van {{total}}…",
-      "loadedOfTotalFiles": "{{loaded}} van {{total}} lêers gelaai",
+      "loadedOfTotalFiles": "Lêers gelaai: {{loaded}} van {{total}}",
       "loadAllFiles": "Laai alle lêers",
       "loadAll": "Laai alles",
       "fileLoadedCount_one": "{{displayCount}} lêer gelaai",
@@ -587,8 +587,8 @@
       "expandLinesOfContext_other": "Vou {{displayCount}} reëls konteks uit",
       "expandMoreLines_one": "Vou nog {{displayCount}} reël uit ({{start}}–{{end}})",
       "expandMoreLines_other": "Vou nog {{displayCount}} reëls uit ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} van {{total}} lêers gelaai",
-      "loadedOfTotalFiles_other": "{{loaded}} van {{total}} lêers gelaai"
+      "loadedOfTotalFiles_one": "Lêers gelaai: {{loaded}} van {{total}}",
+      "loadedOfTotalFiles_other": "Lêers gelaai: {{loaded}} van {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ die lêer eindig nie met 'n reëleinde nie.",
@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "Bewaarplek nie aangeteken nie",
       "reasonUnknown": "Onherkende rede",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Verslagoorsig",
       "title": "Ouditverslag",
       "unavailable": "Ouditverslag onbeskikbaar",

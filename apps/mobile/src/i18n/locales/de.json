@@ -1023,6 +1023,8 @@
       "repositoryNotRecorded": "Repository nicht erfasst",
       "reasonUnknown": "Unbekannter Grund",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",
@@ -2940,7 +2942,7 @@
       "hunkHeader": "Kopfzeile des Änderungsblocks {{header}}",
       "loadAll": "Alle laden",
       "loadAllFiles": "Alle Dateien laden",
-      "loadedOfTotalFiles": "{{loaded}} von {{total}} Dateien geladen",
+      "loadedOfTotalFiles": "Dateien geladen: {{loaded}} von {{total}}",
       "loadingAllFiles": "Alle Dateien werden geladen: {{loaded}} …",
       "loadingAllFilesOf": "Alle Dateien werden geladen: {{loaded}} von {{total}} …",
       "loadingContext": "Kontext wird geladen …",
@@ -2956,8 +2958,8 @@
       "expandLinesOfContext_other": "{{displayCount}} Kontextzeilen einblenden",
       "expandMoreLines_one": "{{displayCount}} weitere Zeile einblenden ({{start}}–{{end}})",
       "expandMoreLines_other": "{{displayCount}} weitere Zeilen einblenden ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} von {{total}} Dateien geladen",
-      "loadedOfTotalFiles_other": "{{loaded}} von {{total}} Dateien geladen"
+      "loadedOfTotalFiles_one": "Dateien geladen: {{loaded}} von {{total}}",
+      "loadedOfTotalFiles_other": "Dateien geladen: {{loaded}} von {{total}}"
     },
     "inbox": {
       "couldNotLoad": "Der Posteingang konnte nicht geladen werden.",

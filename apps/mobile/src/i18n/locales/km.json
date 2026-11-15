@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "មិនបានកត់ត្រាឃ្លាំងកូដ",
       "reasonUnknown": "ហេតុផលមិនស្គាល់",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "សេចក្តីសង្ខេបរបាយការណ៍",
       "title": "របាយការណ៍សវនកម្ម",
       "unavailable": "មិនអាចមើលរបាយការណ៍សវនកម្មបានទេ",

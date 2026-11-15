@@ -569,7 +569,7 @@
       "failedToLoadMoreFiles": "Neizdevās ielādēt papildu failus — pieskaries, lai mēģinātu vēlreiz",
       "loadingAllFiles": "Tiek ielādēti visi faili — {{loaded}}…",
       "loadingAllFilesOf": "Tiek ielādēti visi faili — {{loaded}} no {{total}}…",
-      "loadedOfTotalFiles": "ielādēti {{loaded}} no {{total}} failiem",
+      "loadedOfTotalFiles": "Ielādētie faili: {{loaded}} no {{total}}",
       "loadAllFiles": "Ielādēt visus failus",
       "loadAll": "Ielādēt visu",
       "fileLoadedCount_one": "ielādēts {{displayCount}} fails",
@@ -595,9 +595,9 @@
       "expandMoreLines_one": "Izvērst papildu rindas: {{displayCount}} ({{start}}–{{end}})",
       "expandMoreLines_other": "Izvērst papildu rindas: {{displayCount}} ({{start}}–{{end}})",
       "expandMoreLines_zero": "Izvērst papildu rindas: {{displayCount}} ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "ielādēti {{loaded}} no {{total}} failiem",
-      "loadedOfTotalFiles_other": "ielādēti {{loaded}} no {{total}} failiem",
-      "loadedOfTotalFiles_zero": "ielādēti {{loaded}} no {{total}} failiem"
+      "loadedOfTotalFiles_one": "Ielādētie faili: {{loaded}} no {{total}}",
+      "loadedOfTotalFiles_other": "Ielādētie faili: {{loaded}} no {{total}}",
+      "loadedOfTotalFiles_zero": "Ielādētie faili: {{loaded}} no {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "faila beigās nav rindas pārtraukuma.",
@@ -1844,6 +1844,9 @@
       "repositoryNotRecorded": "Repozitorijs nav reģistrēts",
       "reasonUnknown": "Neatpazīts iemesls",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_zero": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Ziņojuma kopsavilkums",
       "title": "Audita ziņojums",
       "unavailable": "Audita ziņojums nav pieejams",

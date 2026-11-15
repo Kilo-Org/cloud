@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "റിപ്പോസിറ്ററി രേഖപ്പെടുത്തിയിട്ടില്ല",
       "reasonUnknown": "തിരിച്ചറിയാത്ത കാരണം",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "റിപ്പോർട്ട് സംഗ്രഹം",
       "title": "ഓഡിറ്റ് റിപ്പോർട്ട്",
       "unavailable": "ഓഡിറ്റ് റിപ്പോർട്ട് ലഭ്യമല്ല",

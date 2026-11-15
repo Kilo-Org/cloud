@@ -1807,6 +1807,8 @@
       "repositoryNotRecorded": "ማከማቻው አልተመዘገበም",
       "reasonUnknown": "ያልታወቀ ምክንያት",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "የሪፖርት ማጠቃለያ",
       "title": "የኦዲት ሪፖርት",
       "unavailable": "የኦዲት ሪፖርት አይገኝም",

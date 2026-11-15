@@ -1589,6 +1589,56 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     }
   });
 
+  it('refuses a downloaded snapshot that names a different session', async () => {
+    const snapshot = makeSnapshot(
+      [{ file: 'from-other-session.txt', after: 'other session content', status: 'modified' }],
+      'ses_other_session'
+    );
+    mockFetchOk(snapshot);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const byteLength = new TextEncoder().encode(snapshot).byteLength;
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: `snapshot belongs to a different session (${byteLength} bytes)`,
+      code: null,
+      step: 'download',
+    });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(fs.existsSync(path.join(workspace, 'from-other-session.txt'))).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it('refuses a provided snapshot file that names a different session', async () => {
+    const provided = makeSnapshot(
+      [{ file: 'from-other-session.txt', after: 'other session content', status: 'modified' }],
+      'ses_other_session'
+    );
+    const providedPath = path.join(tmpDir, 'provided.json');
+    fs.writeFileSync(providedPath, provided);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace, providedPath);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'snapshot belongs to a different session',
+      code: null,
+      step: 'download',
+    });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(fs.existsSync(path.join(workspace, 'from-other-session.txt'))).toBe(false);
+    // No sanitized copy is produced: the refusal happens before sanitization.
+    expect(fs.readdirSync(tmpDir).filter(entry => entry.startsWith('.kilo-sanitized-'))).toEqual(
+      []
+    );
+  });
+
   it.each([
     JSON.stringify({ info: {}, messages: [], sessionDiff: [] }),
     JSON.stringify({ info: {}, messages: [], sessionDiff: [], subagents: [] }),
@@ -1652,15 +1702,18 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     mockFetchOk(
       JSON.stringify({ info: { id: 'ses_different_session' }, messages: [], sessionDiff: [] })
     );
-    writeMockKilo(binDir, 1);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
 
     const result = await restoreSession(SESSION_ID, workspace);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBeNull();
-      expect(result.step).toBe('import');
+      expect(result.step).toBe('download');
+      expect(result).not.toHaveProperty('emptySnapshot');
     }
+    expect(fs.existsSync(capturePath)).toBe(false);
   });
 
   for (const [description, snapshot] of [

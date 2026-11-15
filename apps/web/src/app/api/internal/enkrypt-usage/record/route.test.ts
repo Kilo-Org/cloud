@@ -8,10 +8,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { queueWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
-import {
-  MAX_ENKRYPT_CREDITS_PER_CALL,
-  type EnkryptUsageWrite,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+import { MAX_ENKRYPT_CREDITS_PER_CALL, type EnkryptUsageWrite } from '@kilocode/usage-contracts';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { POST } from './route';

@@ -43,6 +43,16 @@ type UseNewSessionReposResult = {
   isRetrying: boolean;
   /** True once every provider query has settled without error and at least one repo is visible. */
   reposSettled: boolean;
+  /**
+   * True once every provider query has finished its first load.
+   *
+   * `isLoading` is false for a query that is paused or disabled, so a screen
+   * that is offline (or a personal scope, where the Bitbucket query is
+   * disabled) still settles and never withholds the form's rows. This
+   * deliberately does not read `resolveProviderStatus`, which reports
+   * `'loading'` whenever a paused query has no data.
+   */
+  providerQueriesResolved: boolean;
   openIntegration: (platform: RepositoryPlatform) => void;
   /**
    * The provider whose connect flow is running, or null. A control that opens
@@ -415,6 +425,9 @@ export function useNewSessionRepos({
     isRefreshingGitHub ||
     isRefreshingProviders;
 
+  const providerQueriesResolved =
+    !githubQuery.isLoading && !gitlabQuery.isLoading && !bitbucketQuery.isLoading;
+
   const reposSettled =
     !githubQuery.isLoading &&
     !gitlabQuery.isLoading &&
@@ -430,6 +443,7 @@ export function useNewSessionRepos({
     groups,
     isRetrying,
     reposSettled,
+    providerQueriesResolved,
     openIntegration,
     connectingProvider,
     refreshReposForceFresh,
@@ -539,31 +553,59 @@ export function useRepositoryBranches(
   // A request can stay pending forever — a stalled connection, a paused query,
   // a provider that never answers. Loading is therefore a bounded state: after
   // `BRANCH_SETTLE_BOUND_MS` the row stops presenting a request that may never
-  // land as progress and offers the retry instead. The expiry records the
-  // question it was armed for, so a repository or scope change starts loading
-  // again without a frame of the previous expiry. The query itself keeps
-  // running, and the retry cancels it before starting a fresh request.
+  // land as progress and offers the retry instead. The bound belongs to one
+  // question and one request: `attempt` names the question it was counted for,
+  // so a repository or scope change — including a return to a question that was
+  // pending before — cannot match the previous question's expiry, and a retry or
+  // any new request is a new attempt for the same reason. An earlier expiry can
+  // therefore never present a request that is in flight as stuck.
+  // The query itself keeps running, and the retry cancels it before starting a
+  // fresh request.
   const isPending = isEnabled && branchQuery.isPending;
   const isFetching = isEnabled && branchQuery.isFetching;
-  const [expiredFor, setExpiredFor] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState({ settleKey, count: 0 });
+  const [expiry, setExpiry] = useState<{ settleKey: string; attempt: number } | null>(null);
+  // Records the question a frame renders for and counts each request it makes.
+  // It runs after the frame, which is why `overBound` also compares the attempt's
+  // question with this render's: the frame that changes the question is already
+  // clean, not the frame after it.
+  useEffect(() => {
+    setAttempt(current =>
+      current.settleKey === settleKey && !isPending && !isFetching
+        ? current
+        : { settleKey, count: current.count + 1 }
+    );
+  }, [settleKey, isPending, isFetching]);
   useEffect(() => {
     if (!isPending && !isFetching) {
       return undefined;
     }
+    const armed = { settleKey, attempt: attempt.count };
     const timer = setTimeout(() => {
-      setExpiredFor(settleKey);
+      setExpiry(armed);
     }, BRANCH_SETTLE_BOUND_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [settleKey, isPending, isFetching]);
-  const overBound = isPending && expiredFor === settleKey;
+  }, [attempt, settleKey, isPending, isFetching]);
+  // `attempt` names the question it was counted for, so a frame that returns to
+  // a repository another question replaced cannot match the expiry that
+  // repository's previous visit armed, not even before the effect above records
+  // the change.
+  const overBound =
+    isPending &&
+    attempt.settleKey === settleKey &&
+    expiry?.settleKey === settleKey &&
+    expiry.attempt === attempt.count;
 
   const retry = useCallback(() => {
+    // The retry owns a fresh bound now, so the row returns to the skeleton
+    // instead of the retry row it was tapped on.
+    setAttempt(current => ({ settleKey, count: current.count + 1 }));
     // A refetch cancels the request that is still running, so the retry works
     // while the bounded request is stuck instead of waiting behind it.
     void branchQuery.refetch();
-  }, [branchQuery]);
+  }, [branchQuery, settleKey]);
 
   return {
     defaultBranch: branchQuery.data?.defaultBranch ?? null,

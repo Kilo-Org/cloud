@@ -4,6 +4,7 @@ import m0001 from './0001_lean_redwing.sql';
 import m0002 from './0002_nosy_alice.sql';
 import m0003 from './0003_slimy_doctor_spectrum.sql';
 import m0004 from './0004_session_roles.sql';
+import m0005 from './0005_session_status.sql';
 
 export default {
   journal,
@@ -13,5 +14,6 @@ export default {
     m0002,
     m0003,
     m0004,
+    m0005,
   },
 };

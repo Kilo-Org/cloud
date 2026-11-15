@@ -350,6 +350,26 @@ describe('agent attachment picker (document MIME derivation)', () => {
     expect(await pickWithSheetSelection(2)).toEqual([]);
   });
 
+  // DocumentsUI answers a tap on a row it cannot open with the same result a
+  // Back produces, so the picker cannot tell them apart. A launch that fails in
+  // the app — a pending picker, or the copy into the app cache — is the one
+  // Files failure the app still sees, and it must never end in silence.
+  it('announces a retryable failure when the document picker rejects', async () => {
+    announcingToastMock.error.mockClear();
+    const failure = new Error('Different document picking in progress');
+    getDocumentAsyncMock.mockRejectedValueOnce(failure);
+
+    await expect(pickWithSheetSelection(2)).resolves.toEqual([]);
+
+    expect(announcingToastMock.error).toHaveBeenCalledTimes(1);
+    expect(announcingToastMock.error).toHaveBeenCalledWith(
+      'Failed to open file. Please try again.'
+    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(failure, {
+      tags: { 'error.subsystem': 'agent-attachments', 'error.operation': 'pick-agent-documents' },
+    });
+  });
+
   // KILO-APP-3BF: a picker presented before the sheet's modal closes is
   // dismissed with the modal, and every later Files tap fails.
   it('opens the document picker only after the sheet has closed', async () => {

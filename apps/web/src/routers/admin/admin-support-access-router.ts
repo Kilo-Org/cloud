@@ -60,6 +60,9 @@ export const adminSupportAccessRouter = createTRPCRouter({
         actionClass: ActionClassSchema,
         reason: ReasonSchema,
         ticketReference: TicketReferenceSchema,
+        // Both classes share this bound. clampDuration in
+        // support-access-service.ts limits a support_write grant to
+        // SUPPORT_WRITE_MAX_DURATION_SECONDS before it is stored.
         durationSeconds: z
           .number()
           .int()

@@ -24,9 +24,14 @@ vi.mock('@sentry/react-native', () => ({
   captureException: vi.fn(),
 }));
 
+// `openExternalUrl` reads the build-time `__DEV__` global this node project does
+// not define; the browser handoff only needs the call it makes.
+vi.mock('./external-link', () => ({ openExternalUrl: vi.fn() }));
+
 /* eslint-disable import/first */
 import * as Sentry from '@sentry/react-native';
 import { PENDING_DEEP_LINK_KEY } from '@/lib/storage-keys';
+import { openExternalUrl } from './external-link';
 import { resolvePendingNavigation } from './pending-navigation';
 import { isShellReadyForShare } from './pending-share-navigation';
 import {
@@ -1037,4 +1042,25 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLinkSnapshot()).toBe('/dest');
     });
   });
+});
+
+// Cold-launch half of the same Android limitation: the org-root filter also
+// delivers the web create pages, so capture must open them instead of stashing
+// a route the app cannot build.
+describe('organization create pages from the org-root Android filter', () => {
+  it.each(['new', 'create'])(
+    'opens /organizations/%s in the browser instead of stashing it',
+    async page => {
+      _resetDeepLinkLaunchForTests();
+      vi.mocked(openExternalUrl).mockClear();
+      _setGetLinkingURLForTests(() => `https://app.kilo.ai/organizations/${page}`);
+
+      captureLaunchDeepLink();
+
+      await vi.waitFor(() => {
+        expect(openExternalUrl).toHaveBeenCalledWith(`https://app.kilo.ai/organizations/${page}`);
+      });
+      expect(getPendingDeepLink()).toBeNull();
+    }
+  );
 });

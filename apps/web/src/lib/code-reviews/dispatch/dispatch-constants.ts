@@ -6,15 +6,27 @@ export const MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER = 3;
 export const MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER = 1;
 export const FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS = 5_000_000;
 
+const PENDING_CODE_REVIEW_STATUS = 'pending' as const;
+const QUEUED_CODE_REVIEW_STATUS = 'queued' as const;
+const RUNNING_CODE_REVIEW_STATUS = 'running' as const;
+
 /**
  * Statuses a review can hold while it still has work outstanding.
  *
  * A review in one of these states can still move; the states it can move to are
- * {@link TERMINAL_CODE_REVIEW_STATUSES}. Callers that select or guard on "still
- * in flight" reference this rather than repeating the literals, so adding or
- * renaming a status is a single edit.
+ * {@link TERMINAL_CODE_REVIEW_STATUSES}. In-flight predicates reference the
+ * per-status members above instead of repeating their literals, so renaming a
+ * status is a single edit. A new in-flight status still needs its own predicate
+ * in the dispatch conditions, because each status is compared on a different
+ * timestamp.
  */
-export const NON_TERMINAL_CODE_REVIEW_STATUSES = ['pending', 'queued', 'running'] as const;
+export const NON_TERMINAL_CODE_REVIEW_STATUSES = [
+  PENDING_CODE_REVIEW_STATUS,
+  QUEUED_CODE_REVIEW_STATUS,
+  RUNNING_CODE_REVIEW_STATUS,
+] as const;
+
+type NonTerminalCodeReviewStatus = (typeof NON_TERMINAL_CODE_REVIEW_STATUSES)[number];
 
 export function isNonTerminalCodeReviewStatus(status: string): boolean {
   return (NON_TERMINAL_CODE_REVIEW_STATUSES as readonly string[]).includes(status);
@@ -45,6 +57,14 @@ export function isTerminalCodeReviewStatus(status: string): status is TerminalCo
  */
 export function nonTerminalCodeReviewStatusListSql(): SQL {
   return sql.raw(NON_TERMINAL_CODE_REVIEW_STATUSES.map(status => `'${status}'`).join(', '));
+}
+
+/**
+ * Matches one in-flight status, so a renamed member of
+ * {@link NON_TERMINAL_CODE_REVIEW_STATUSES} reaches these predicates too.
+ */
+function inFlightCodeReviewStatusSql(status: NonTerminalCodeReviewStatus): SQL {
+  return sql`${cloud_agent_code_reviews.status} = ${status}`;
 }
 
 export const STALE_QUEUED_CODE_REVIEW_MINUTES = 5;
@@ -78,16 +98,16 @@ export function reconsiderableCodeReviewWorkCondition(
 ) {
   const pendingClause = pendingCreatedAtWindow
     ? sql`(
-        ${cloud_agent_code_reviews.status} = 'pending'
+        ${inFlightCodeReviewStatusSql(PENDING_CODE_REVIEW_STATUS)}
         AND ${cloud_agent_code_reviews.created_at} >= ${pendingCreatedAtWindow.createdAtAfter}
         AND ${cloud_agent_code_reviews.created_at} <= ${pendingCreatedAtWindow.createdAtBefore}
       )`
-    : sql`${cloud_agent_code_reviews.status} = 'pending'`;
+    : inFlightCodeReviewStatusSql(PENDING_CODE_REVIEW_STATUS);
 
   return sql`(
     ${pendingClause}
     OR (
-      ${cloud_agent_code_reviews.status} = 'queued'
+      ${inFlightCodeReviewStatusSql(QUEUED_CODE_REVIEW_STATUS)}
       AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}
     )
   )`;
@@ -99,7 +119,7 @@ export function activeCodeReviewWorkCondition(
 ) {
   return sql`(
     (
-      ${cloud_agent_code_reviews.status} = 'running'
+      ${inFlightCodeReviewStatusSql(RUNNING_CODE_REVIEW_STATUS)}
       AND COALESCE(
         ${cloud_agent_code_reviews.started_at},
         ${cloud_agent_code_reviews.updated_at},
@@ -107,7 +127,7 @@ export function activeCodeReviewWorkCondition(
       ) >= ${staleRunningCutoff}
     )
     OR (
-      ${cloud_agent_code_reviews.status} = 'queued'
+      ${inFlightCodeReviewStatusSql(QUEUED_CODE_REVIEW_STATUS)}
       AND ${cloud_agent_code_reviews.updated_at} >= ${staleQueuedCutoff}
     )
   )`;

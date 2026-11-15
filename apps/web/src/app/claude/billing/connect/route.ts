@@ -3,8 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
-import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ensureClaudeBillingProfile } from '@/lib/claude-billing/profile';
 import { saveClaudeBillingPending } from '@/lib/claude-billing/pending';
@@ -28,6 +27,16 @@ function outcomeRedirect(
   const url = new URL(returnPath, APP_URL);
   url.searchParams.set(claudeBillingOutcomeParam(owner), outcome);
   return NextResponse.redirect(url);
+}
+
+/**
+ * The scope the person asked for, used only to report a refusal: `personal`
+ * cannot be told apart from `member` before the owner resolves, so a refusal
+ * reports under the organization queries unless shared services was requested.
+ */
+function requestedOwnerKind(request: NextRequest): Pick<ClaudeBillingOwner, 'kind'> {
+  const shared = request.nextUrl.searchParams.get('scope') === 'shared_services';
+  return { kind: shared ? 'shared_services' : 'member' };
 }
 
 /**
@@ -55,30 +64,30 @@ async function resolveOwner(
 export async function GET(request: NextRequest) {
   const returnPath =
     validateReturnPath(request.nextUrl.searchParams.get('return') ?? '/byok') ?? '/byok';
-  const session = await getUserFromSession();
-  if (!session) {
+  // The standard authorized session: an existing account whose recorded session
+  // pepper still matches, that a block and the domain blacklist admit. A refused
+  // person is reported before any billing write or upstream authorization push.
+  const { user, authFailedResponse, authorizationRefused } = await getUserFromAuth({
+    adminOnly: false,
+  });
+  if (authFailedResponse || !user) {
+    if (authorizationRefused) {
+      return outcomeRedirect(returnPath, requestedOwnerKind(request), 'forbidden');
+    }
     return NextResponse.redirect(
       new URL(`/users/sign_in?callbackPath=${encodeURIComponent(returnPath)}`, APP_URL)
     );
   }
-  const owner = await resolveOwner(request, session.id);
+  const owner = await resolveOwner(request, user.id);
   if (!owner) {
-    const requestedKind =
-      request.nextUrl.searchParams.get('scope') === 'shared_services'
-        ? 'shared_services'
-        : 'member';
-    return outcomeRedirect(returnPath, { kind: requestedKind }, 'forbidden');
+    return outcomeRedirect(returnPath, requestedOwnerKind(request), 'forbidden');
   }
-  const user = await findUserById(session.id);
-  if (!(await isClaudePlatformOAuthEnabled(user?.google_user_email))) {
+  if (!(await isClaudePlatformOAuthEnabled(user.google_user_email))) {
     return outcomeRedirect(returnPath, owner, 'forbidden');
   }
 
   try {
-    const { userProfileId, connectionVersion } = await ensureClaudeBillingProfile(
-      owner,
-      session.id
-    );
+    const { userProfileId, connectionVersion } = await ensureClaudeBillingProfile(owner, user.id);
     const state = randomBytes(32).toString('base64url');
     const codeVerifier = randomBytes(64).toString('base64url');
     const authorizeUrl = await pushClaudeAuthorizationRequest({
@@ -88,7 +97,7 @@ export async function GET(request: NextRequest) {
       codeChallenge: createHash('sha256').update(codeVerifier).digest('base64url'),
     });
     await saveClaudeBillingPending({
-      kiloUserId: session.id,
+      kiloUserId: user.id,
       owner,
       returnPath,
       state,

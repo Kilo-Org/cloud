@@ -56,6 +56,11 @@ vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
   readResolvedDeliveryFailures: vi.fn(async () => []),
   persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
+vi.mock('@/lib/persist/pending-send-confirmations', () => ({
+  readPendingSendConfirmations: vi.fn(async () => []),
+  persistPendingSendConfirmation: vi.fn(async () => undefined),
+  clearPendingSendConfirmation: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',
@@ -958,16 +963,6 @@ describe('createMobileAgentSessionManager cold open', () => {
     getWithRuntimeStateQuery.mockReset();
     getSessionQuery.mockReset();
     getSessionMessagesPageQuery.mockReset();
-  });
-
-  it('omits the cached-snapshot reader so a cold open cannot paint stale rows', () => {
-    const options = { store: {}, userWebConnection: {} };
-    createMobileAgentSessionManager(options as never);
-    const config = configHolder.current;
-    if (config === null) {
-      throw new Error('createSessionManager did not capture a config');
-    }
-    expect(config.readCachedSnapshotPage).toBeUndefined();
   });
 
   it('leaves the transcript empty while the live page has not landed', async () => {

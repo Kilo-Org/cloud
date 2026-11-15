@@ -25,6 +25,7 @@ import {
   DENSE_ROW_FRAME_DP,
   DENSE_ROW_HIT_SLOP,
   DENSE_ROW_HIT_SLOP_DP,
+  FIELD_CLEAR_BOX_CLASS,
   HEADER_TITLE_TARGET_CLASS,
   ICON_TARGET_BOX_CLASS,
   ICON_TARGET_DP,
@@ -53,6 +54,8 @@ import {
   tapTargetReachDp,
   textActionTargetClass,
   TOUCH_TARGET_DP,
+  UNDER_COPY_ACTION_BOX_CLASS,
+  UNDER_COPY_ACTION_HIT_SLOP,
 } from './tap-target';
 
 // `inlineLinkHitSlop` resolves the sentence's ends through the interface
@@ -97,25 +100,55 @@ async function compiledDp(className: string, property: string): Promise<number> 
 }
 
 describe('shared tap-target geometry', () => {
-  it('keeps the control-size audit floor below the design touch target', () => {
-    expect(MIN_TAP_TARGET_DP).toBe(28);
-    expect(TOUCH_TARGET_DP).toBe(44);
-    expect(COMPACT_CONTROL_HIT_SLOP_DP).toBe(8);
-    expect(INLINE_LINK_FACING_HIT_SLOP_DP).toBe(4);
-    expect(INLINE_LINK_OUTER_HIT_SLOP_DP).toBe(12);
-    expect(INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBe(8);
-  });
-
-  it('renders the compact control box from whole pixels that clear the audit floor', () => {
-    expect(COMPACT_CONTROL_BOX_CLASS).toContain('h-[32px]');
-    expect(COMPACT_CONTROL_BOX_CLASS).toContain('w-[32px]');
+  it('renders the compact control box from whole pixels that clear the audit floor', async () => {
+    // The box is measured through the app's own pipeline, so a utility the
+    // compiler fails to extract is caught, and the floor is the exported
+    // constant rather than a second copy of the class's text.
+    const height = await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'height');
+    const width = await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'width');
+    // Whole pixels: the box lays out on the target's own edges, and a
+    // fractional utility is the retune this name rules out.
+    expect(Number.isInteger(height)).toBe(true);
+    expect(Number.isInteger(width)).toBe(true);
+    expect(height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    // Centring has no dp value to compile, so it stays a class check.
     expect(COMPACT_CONTROL_BOX_CLASS).toContain('items-center');
   });
 
-  it('renders the icon target box at Android 48dp minimum from whole pixels', () => {
-    expect(ICON_TARGET_DP).toBe(48);
-    expect(ICON_TARGET_BOX_CLASS).toContain('h-[48px]');
-    expect(ICON_TARGET_BOX_CLASS).toContain('w-[48px]');
+  it('renders the field clear target on its own node instead of a slop into the field', async () => {
+    // The in-field clear control sits inside the field's content box beside its
+    // `TextInput`, so the frame an audit reads is the control's own: `hitSlop`
+    // never widens that frame, and a reach toward the input would take taps the
+    // field should get. The box is the icon target rather than the 44pt design
+    // target, because whole-pixel layout on Android lands a 44pt box under it.
+    // Placement (the call site's logical trailing margin) stays out of this box.
+    expect(await compiledDp(FIELD_CLEAR_BOX_CLASS, 'height')).toBe(ICON_TARGET_DP);
+    expect(await compiledDp(FIELD_CLEAR_BOX_CLASS, 'width')).toBe(ICON_TARGET_DP);
+    // Centring has no dp value to compile, so it stays a class check.
+    expect(FIELD_CLEAR_BOX_CLASS).toContain('items-center');
+    expect(FIELD_CLEAR_BOX_CLASS).toContain('justify-center');
+    // The box is taller than the shared input's 44pt floor, so it cancels the
+    // difference in layout with the field's own `py-2` (7pt a side at the app's
+    // 14pt rem) and the field keeps its height while the box still paints and
+    // hit-tests its whole height inside the field's frame.
+    const cancel = await compiledDp(FIELD_CLEAR_BOX_CLASS, 'marginBlock');
+    expect(cancel).toBe(-7);
+    expect(ICON_TARGET_DP + 2 * cancel).toBeLessThan(TOUCH_TARGET_DP);
+    // One size pair only. A second `h-*`/`w-*` token would set the same
+    // property and leave the real size to the order Tailwind emits its rules
+    // in, so the control's size would no longer be this box.
+    expect(FIELD_CLEAR_BOX_CLASS.match(/(?:^|\s)h-/g)).toHaveLength(1);
+    expect(FIELD_CLEAR_BOX_CLASS.match(/(?:^|\s)w-/g)).toHaveLength(1);
+  });
+
+  it('renders the icon target box at Android 48dp minimum from whole pixels', async () => {
+    const height = await compiledDp(ICON_TARGET_BOX_CLASS, 'height');
+    const width = await compiledDp(ICON_TARGET_BOX_CLASS, 'width');
+    expect(Number.isInteger(height)).toBe(true);
+    expect(Number.isInteger(width)).toBe(true);
+    expect(height).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
     expect(ICON_TARGET_BOX_CLASS).toContain('items-center');
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
   });
@@ -139,6 +172,29 @@ describe('shared tap-target geometry', () => {
     expect(await compiledDp(android, 'minWidth')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
     platform.OS = 'ios';
+  });
+
+  it('cancels the action box slack under the copy it sits below', async () => {
+    // The regression this guards: the box centres one label line, so a tile
+    // that pads its edges evenly showed a wider gap under its action than above
+    // its copy. The margin removes that slack from the layout, so the tile pads
+    // the same on both edges while the box stays above the audit floor and
+    // never reaches the message above it.
+    const height = await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'minHeight');
+    expect(height).toBe(32);
+    expect(height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    // A short label in another language keeps the audit floor on both axes.
+    expect(await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'minWidth')).toBe(48);
+    const margin = await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'marginBlock');
+    expect(margin).toBe(-7);
+    // What is left is the label line itself, so the box adds no room of its own
+    // above the copy or below the label.
+    expect(Math.abs(height - 2 * Math.abs(margin) - INLINE_LINK_SENTENCE_LINE_DP)).toBeLessThan(1);
+    // The slop carries the reach the shortened box gives up on its own node.
+    expect(tapTargetReachDp(height - 0.2, UNDER_COPY_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(UNDER_COPY_ACTION_HIT_SLOP.top).toBe(UNDER_COPY_ACTION_HIT_SLOP.bottom);
   });
 
   it('renders a state surface action on the Android 48dp minimum', async () => {
@@ -175,10 +231,15 @@ describe('shared tap-target geometry', () => {
     expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
-  it('reaches the design touch target with the compact box plus its slop', () => {
+  it('reaches the design touch target with the compact box plus its slop', async () => {
+    // The policy the two exports encode: the audit floor sits below the design
+    // target, and the box plus its per-side slop carries the reach to it.
+    expect(MIN_TAP_TARGET_DP).toBeLessThan(TOUCH_TARGET_DP);
     expect(tapTargetReachDp(32, 8)).toBe(48);
-    expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBe(48);
-    expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
+    // The compiled height is what the layout uses, so the reach is measured
+    // from the class rather than from a second copy of its height.
+    const height = await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'height');
+    expect(tapTargetReachDp(height, COMPACT_CONTROL_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
       TOUCH_TARGET_DP
     );
   });

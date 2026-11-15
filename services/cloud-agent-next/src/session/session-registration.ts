@@ -51,6 +51,7 @@ import {
   type CloudAgentWorktreeId,
   type CreateSessionForCloudAgentParams,
   type CreateSessionForCloudAgentResult,
+  type SessionCloneRejectionCode,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
@@ -544,6 +545,22 @@ async function createIngestOwnershipRow(
   }
 }
 
+/**
+ * Turn an ingest rejection into the error the caller's surface shows. A refused
+ * organization is a permanent authorization answer, so it keeps the same
+ * forbidden message as the preflight membership check; every other rejection
+ * carries its stable code.
+ */
+function ingestRejectionError(code: SessionCloneRejectionCode): TRPCError {
+  if (code === 'organization_access_denied') {
+    return new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have access to this organization',
+    });
+  }
+  return new TRPCError({ code: 'BAD_REQUEST', message: code });
+}
+
 async function recordPostSetupFailure(record: () => Promise<void>): Promise<void> {
   try {
     await record();
@@ -979,7 +996,7 @@ async function allocateNewSession(
   // it or saved settings resolved it, so a pinned retry cannot outlive the
   // owner's access to sandbox selection.
   if (requestedAllocation !== undefined) {
-    assertSandboxAllocationAvailable(
+    await assertSandboxAllocationAvailable(
       ctx.env,
       { userId: ctx.userId, orgId },
       requestedAllocation,
@@ -1228,7 +1245,7 @@ async function allocateNewSession(
         await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
         await ledger.onFailure('ownership_row', 'session_clone_failed');
       }
-      throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+      throw ingestRejectionError(ingestResult.code);
     }
     if (ingestResult.status === 'in_progress') {
       if (ledger) {
@@ -1246,7 +1263,7 @@ async function allocateNewSession(
       await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
       await ledger.onFailure('ownership_row', ingestResult.code);
     }
-    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+    throw ingestRejectionError(ingestResult.code);
   }
 
   return {
@@ -1823,7 +1840,7 @@ async function registerAllocatedSession(
     throw error;
   }
 
-  if (!registerResult.success && registerResult.error !== 'Session already registered') {
+  if (!registerResult.success) {
     const failure = { stage: 'registration', code: 'do_registration_rejected' } as const;
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -1848,19 +1865,8 @@ async function registerAllocatedSession(
     });
   }
 
-  // `Session already registered` means the registration already committed on a
-  // prior attempt whose response was lost. The DO method is not idempotent, so
-  // the retry returns this rejection; treat it as idempotent success instead of
-  // rolling back a live clone, tombstoning its IDs, or settling the row failed.
-  //
-  // The rejection can only come from this caller's own retry, because the DO name
-  // `${userId}:${cloudAgentSessionId}` is request-identity bound on both entries:
-  // a first attempt allocates a fresh random `cloudAgentSessionId`
-  // (`generateSessionId`), so only `withDORetry` can reach that DO again; a
-  // same-operationKey replay rebuilds the ID from `row.canonical_result` in
-  // `rebuildRecordedSessionAllocation`, so the DO belongs to the same ledger row. Keep that
-  // property if either entry changes; otherwise an unrelated conflict would be
-  // swallowed as success here.
+  // The registration RPC replays a repeated call with the stored intent, so a
+  // retry whose first response was lost recovers here as a success.
   await recordParentChildSession(input, ctx, {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
     ...(allocation.initialTurn === undefined
@@ -1942,7 +1948,15 @@ async function withLedgerSavedAllocation(
   }
   // Admission always writes a canonical result, so its presence no longer means
   // progress was recorded; only a fresh admission may still read owner settings.
-  if (freshAdmission) return withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+  if (freshAdmission) {
+    try {
+      return await withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+    } catch (error) {
+      const hooks = await buildLedgerHooks(input, ctx, options, getPgDb(ctx.env), row, 'new');
+      await hooks.onFailure('sandbox', 'sandbox');
+      throw error;
+    }
+  }
   return { ...input, savedSandboxAllocation: null };
 }
 
@@ -2242,7 +2256,7 @@ export async function createSessionWithLedger(
     const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
     const capability = allocationCapabilityFor(input, options.billingOrigin);
     const available = isSandboxAllocationAvailable(
-      getSandboxSelectionCapabilities(ctx.env, owner, {
+      await getSandboxSelectionCapabilities(ctx.env, owner, {
         repositoryType: input.repository.type,
         ...(capability ? { capability } : {}),
       }),
@@ -2261,7 +2275,7 @@ export async function createSessionWithLedger(
         )
         .limit(1);
       if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
-        assertSandboxAllocationAvailable(
+        await assertSandboxAllocationAvailable(
           ctx.env,
           owner,
           allocation,
@@ -2660,7 +2674,7 @@ async function resumeCloneCreate(
   if (ingestResult.status === 'rejected') {
     await recordCloneTombstone(hooks, ids);
     await hooks.onFailure('ownership_row', 'session_clone_failed');
-    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+    throw ingestRejectionError(ingestResult.code);
   }
   if (ingestResult.status === 'in_progress') {
     await hooks.onTransportFailure();
@@ -2715,7 +2729,7 @@ async function resumeFirstWorktreeCreate(
         });
       }
       await hooks.onFailure('ownership_row', ingestResult.code);
-      throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+      throw ingestRejectionError(ingestResult.code);
     }
     if (ingestResult?.status === 'in_progress') {
       await hooks.onTransportFailure();

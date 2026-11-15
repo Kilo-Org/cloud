@@ -1,4 +1,4 @@
-jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromSession: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('./pending', () => ({
   consumeClaudeBillingPending: jest.fn(),
   saveClaudeBillingPending: jest.fn(),
@@ -27,18 +27,23 @@ jest.mock('./protocol', () => {
   };
 });
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { claude_billing_connections, byok_api_keys } from '@kilocode/db/schema';
+import { claude_billing_connections, byok_api_keys, type User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { consumeClaudeBillingPending, saveClaudeBillingPending } from './pending';
 import { canManageClaudeBillingOrganization, isClaudeBillingOrganizationMember } from './access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
-import { exchangeClaudeBillingCode, ClaudeBillingExchangeError } from './protocol';
+import {
+  exchangeClaudeBillingCode,
+  pushClaudeAuthorizationRequest,
+  ClaudeBillingExchangeError,
+} from './protocol';
 import { GET } from '@/app/claude/billing/callback/route';
 import { GET as connect } from '@/app/claude/billing/connect/route';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -52,6 +57,9 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 
 beforeEach(() => {
+  jest.mocked(getUserFromAuth).mockReset();
+  jest.mocked(saveClaudeBillingPending).mockClear();
+  jest.mocked(pushClaudeAuthorizationRequest).mockClear();
   jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest.mocked(canManageClaudeBillingOrganization).mockReset().mockResolvedValue(true);
   jest.mocked(isClaudeBillingOrganizationMember).mockReset().mockResolvedValue(true);
@@ -59,6 +67,34 @@ beforeEach(() => {
 });
 
 type Scope = 'personal' | 'member' | 'shared_services';
+
+/** A session the standard authorized path accepts. */
+function signedIn(user: User) {
+  jest.mocked(getUserFromAuth).mockResolvedValue({ user, authFailedResponse: null });
+}
+
+/** A request with no usable session: signed out, or a revoked web session. */
+function signedOut() {
+  jest.mocked(getUserFromAuth).mockResolvedValue({
+    user: null,
+    authFailedResponse: NextResponse.json<FailureResult<string>>(
+      { success: false, error: 'Reauthentication required' },
+      { status: 401 }
+    ),
+  });
+}
+
+/** A session the standard authorized path refuses: a blocked or blacklisted account. */
+function refusedAccount() {
+  jest.mocked(getUserFromAuth).mockResolvedValue({
+    user: null,
+    authFailedResponse: NextResponse.json<FailureResult<string>>(
+      { success: false, error: 'Access denied (R1)' },
+      { status: 403 }
+    ),
+    authorizationRefused: true,
+  });
+}
 
 async function seed(scope: Scope = 'personal') {
   const user = await insertTestUser();
@@ -99,7 +135,7 @@ async function seed(scope: Scope = 'personal') {
         ]
       : []),
   ]);
-  jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+  signedIn(user);
   jest.mocked(consumeClaudeBillingPending).mockResolvedValue({
     kiloUserId: user.id,
     owner,
@@ -161,7 +197,7 @@ describe('Claude billing callback', () => {
 
   it('refuses a callback completed in another Kilo session', async () => {
     await seed();
-    jest.mocked(getUserFromSession).mockResolvedValue({ id: 'another-user' });
+    signedIn(await insertTestUser());
     expect((await callback()).headers.get('location')).toContain('claude_billing=failed');
     expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
   });
@@ -179,7 +215,7 @@ describe('Claude billing callback', () => {
     const nextAdmin = await insertTestUser();
     const pending = await consumeClaudeBillingPending();
     if (!pending) throw new Error('Missing pending fixture');
-    jest.mocked(getUserFromSession).mockResolvedValue({ id: nextAdmin.id });
+    signedIn(nextAdmin);
     jest.mocked(consumeClaudeBillingPending).mockResolvedValue({
       ...pending,
       kiloUserId: nextAdmin.id,
@@ -215,30 +251,71 @@ describe('Claude billing callback', () => {
   });
 
   it.each(['connect', 'callback'])(
-    'refuses %s when the session user has no database email',
+    'refuses %s when the session has no authorized account',
     async flow => {
       const { row } = await seed();
-      const missingUserId = 'missing-claude-billing-user';
-      jest.mocked(getUserFromSession).mockResolvedValue({ id: missingUserId });
-      const pending = await consumeClaudeBillingPending();
-      if (!pending) throw new Error('Missing pending fixture');
-      jest.mocked(consumeClaudeBillingPending).mockResolvedValue({
-        ...pending,
-        kiloUserId: missingUserId,
-        owner: { kind: 'personal', kiloUserId: missingUserId },
-      });
-      jest.mocked(isClaudePlatformOAuthEnabled).mockImplementation(async email => Boolean(email));
+      signedOut();
 
       const response =
         flow === 'connect'
-          ? await connect(new NextRequest('http://localhost/claude/billing/connect'))
+          ? await connect(new NextRequest('http://localhost/claude/billing/connect?return=%2Fbyok'))
           : await callback();
-      expect(response.headers.get('location')).toContain('claude_billing=forbidden');
-      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(undefined);
+      const location = new URL(response.headers.get('location') ?? '');
+      if (flow === 'connect') {
+        expect(location.pathname).toBe('/users/sign_in');
+        expect(location.searchParams.get('callbackPath')).toBe('/byok');
+        expect(saveClaudeBillingPending).not.toHaveBeenCalled();
+      } else {
+        expect(location.searchParams.get('claude_billing')).toBe('failed');
+      }
       expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
       expect(await state(row.id)).toMatchObject({ status: 'pending', connection_id: null });
     }
   );
+
+  it('does not create a profile or start an authorization push for a refused account', async () => {
+    const user = await insertTestUser();
+    refusedAccount();
+
+    const response = await connect(new NextRequest('http://localhost/claude/billing/connect'));
+
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('claude_billing')).toBe(
+      'forbidden'
+    );
+    expect(saveClaudeBillingPending).not.toHaveBeenCalled();
+    expect(pushClaudeAuthorizationRequest).not.toHaveBeenCalled();
+    const rows = await db
+      .select()
+      .from(claude_billing_connections)
+      .where(eq(claude_billing_connections.kilo_user_id, user.id));
+    expect(rows).toEqual([]);
+  });
+
+  it('does not exchange the code or write the connection for a refused account', async () => {
+    const { row } = await seed();
+    refusedAccount();
+
+    const response = await callback();
+
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('claude_billing')).toBe(
+      'forbidden'
+    );
+    expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
+    expect(await state(row.id)).toMatchObject({ status: 'pending', connection_id: null });
+  });
+
+  it('reports a refused shared-services callback under the shared-services query', async () => {
+    const { row } = await seed('shared_services');
+    refusedAccount();
+
+    const response = await callback();
+
+    expect(
+      new URL(response.headers.get('location') ?? '').searchParams.get('claude_billing_shared')
+    ).toBe('forbidden');
+    expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
+    expect(await state(row.id)).toMatchObject({ status: 'pending' });
+  });
 
   it.each(['access_denied', 'user_profile_already_linked'])(
     'does not change a connection for callback error %s',
@@ -351,8 +428,7 @@ describe('Claude billing callback', () => {
       organizationId: org.id,
     };
     await shareClaudeBillingConnection(personal, member, user.id);
-    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
-    jest.mocked(saveClaudeBillingPending).mockClear();
+    signedIn(user);
 
     await connect(
       new NextRequest('http://localhost/claude/billing/connect?owner=personal&return=%2Fbyok')
@@ -395,8 +471,7 @@ describe('Claude billing callback', () => {
     };
     await shareClaudeBillingConnection(personal, member, user.id);
     await removeClaudeBillingGrant(personal);
-    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
-    jest.mocked(saveClaudeBillingPending).mockClear();
+    signedIn(user);
 
     await connect(
       new NextRequest('http://localhost/claude/billing/connect?owner=personal&return=%2Fbyok')
@@ -431,7 +506,7 @@ describe('Claude billing callback', () => {
   it('starts only a shared-services link for an organization manager', async () => {
     const user = await insertTestUser();
     const org = await createTestOrganization('Claude connect', user.id, 0);
-    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+    signedIn(user);
     jest.mocked(consumeClaudeBillingPending).mockResolvedValue(null);
 
     await connect(
@@ -449,7 +524,7 @@ describe('Claude billing callback', () => {
   it('starts a member link for an organization member', async () => {
     const user = await insertTestUser();
     const org = await createTestOrganization('Claude member', user.id, 0);
-    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+    signedIn(user);
     jest.mocked(consumeClaudeBillingPending).mockResolvedValue(null);
 
     await connect(
@@ -465,7 +540,7 @@ describe('Claude billing callback', () => {
   it('refuses a shared-services link from a person who does not manage the organization', async () => {
     const user = await insertTestUser();
     const org = await createTestOrganization('Claude refused', user.id, 0);
-    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+    signedIn(user);
     jest.mocked(canManageClaudeBillingOrganization).mockResolvedValue(false);
 
     const response = await connect(

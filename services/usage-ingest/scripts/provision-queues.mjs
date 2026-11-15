@@ -24,16 +24,23 @@ export async function prepareQueues(
   const queues = selected?.queues;
   const source = queues?.producers?.find(p => p.binding === 'USAGE_INGEST_QUEUE')?.queue;
   const dlq = queues?.producers?.find(p => p.binding === 'USAGE_INGEST_DLQ')?.queue;
+  const hedge = queues?.producers?.find(p => p.binding === 'USAGE_INGEST_HEDGE_QUEUE')?.queue;
+  const hedged = hedge !== undefined;
   const eu = source === `${globalSource}-eu`;
   const worker = selected?.name;
   if (
     source !== (eu ? `${globalSource}-eu` : globalSource) ||
     dlq !== (eu ? `${globalDlq}-eu` : globalDlq) ||
     worker !== `usage-ingest${suffix}` ||
-    queues.producers.length !== 2 ||
-    queues.consumers?.length !== 1 ||
+    queues.producers.length !== (hedged ? 3 : 2) ||
+    queues.consumers?.length !== (hedged ? 2 : 1) ||
     queues.consumers[0].queue !== source ||
     queues.consumers[0].dead_letter_queue !== dlq ||
+    (hedged &&
+      (!eu ||
+        hedge !== globalSource ||
+        queues.consumers[1].queue !== globalSource ||
+        queues.consumers[1].dead_letter_queue !== globalDlq)) ||
     !/^[a-f0-9]{32}$/.test(config.account_id)
   ) {
     throw new Error(`Expected matching ${environment} source/DLQ bindings and Worker name.`);
@@ -101,13 +108,17 @@ export async function prepareQueues(
     if (queue?.jurisdiction !== 'eu')
       throw new Error(`Queue ${name} is not verified EU; preserve it.`);
   };
-  // Inspect both before creating either; then create/read back the DLQ first.
+  // The stall hedge keeps the global pair attached as a second source with its own DLQ.
+  const hedgeNames = hedged ? [globalDlq, globalSource] : [];
+  const hedgeExisting = [];
+  // Inspect every queue before creating any; then create/read back each DLQ first.
   for (const name of names) {
     const queue = await find(name);
     if (queue && eu) verify(queue, name);
     if (!queue && !eu) throw new Error(`Rollback queue ${name} is missing; preserve resources.`);
     existing.push(queue);
   }
+  for (const name of hedgeNames) hedgeExisting.push(await find(name));
   const verifyConsumer = async queue => {
     if (!queue) return;
     if (!Array.isArray(queue.consumers) || queue.consumers.length > 1)
@@ -138,17 +149,18 @@ export async function prepareQueues(
   };
   // Validate the selected slot before changing the old attachment.
   await verifyConsumer(existing[1]);
-  const obsolete = await find(eu ? globalSource : `${globalSource}-eu`);
+  if (hedged) await verifyConsumer(hedgeExisting[1]);
+  const obsolete = hedged ? undefined : await find(eu ? globalSource : `${globalSource}-eu`);
   const consumer = await verifyConsumer(obsolete);
   // The API does not document whether PATCH keeps omitted settings, so resend them all.
-  const retainDlqMessages = async queue => {
+  const retainDlqMessages = async (queue, name) => {
     const settings = queue.settings;
     if (!Number.isFinite(settings?.message_retention_period))
-      throw new Error(`Cannot read ${dlq} message retention; stop deployment.`);
+      throw new Error(`Cannot read ${name} message retention; stop deployment.`);
     if (settings.message_retention_period >= DLQ_MESSAGE_RETENTION_SECONDS) return;
     const expected = { ...settings, message_retention_period: DLQ_MESSAGE_RETENTION_SECONDS };
     await api(`/queues/${queue.queue_id}`, { settings: expected }, 'PATCH');
-    const updated = await find(dlq);
+    const updated = await find(name);
     if (
       !updated ||
       updated.jurisdiction !== queue.jurisdiction ||
@@ -156,7 +168,7 @@ export async function prepareQueues(
         ([key, value]) => !isDeepStrictEqual(updated.settings?.[key], value)
       )
     )
-      throw new Error(`${dlq} retention update was not confirmed; stop deployment.`);
+      throw new Error(`${name} retention update was not confirmed; stop deployment.`);
   };
   for (const [index, name] of names.entries()) {
     let queue = existing[index];
@@ -172,7 +184,22 @@ export async function prepareQueues(
       verify(queue, name);
       if (name === source) await verifyConsumer(queue);
     }
-    if (name === dlq) await retainDlqMessages(queue);
+    if (name === dlq) await retainDlqMessages(queue, name);
+  }
+  for (const [index, name] of hedgeNames.entries()) {
+    let queue = hedgeExisting[index];
+    if (!queue) {
+      await api('/queues', {
+        queue_name: name,
+        ...(name === globalDlq
+          ? { settings: { message_retention_period: DLQ_MESSAGE_RETENTION_SECONDS } }
+          : {}),
+      });
+      queue = await find(name);
+      if (!queue) throw new Error(`Created queue ${name} was not read back; stop deployment.`);
+      if (name === globalSource) await verifyConsumer(queue);
+    }
+    if (name === globalDlq) await retainDlqMessages(queue, name);
   }
   // Traffic must already be paused/drained. This detaches, never deletes a queue.
   if (consumer) {

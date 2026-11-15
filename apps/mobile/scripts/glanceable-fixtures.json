@@ -99,6 +99,10 @@
       "description": "Waiting and scheduled rows without titles use a localized generic label."
     },
     {
+      "name": "placeholder-title",
+      "description": "Sessions still on the backend creation title: the generic agent label, never the machine text."
+    },
+    {
       "name": "stale-idle",
       "description": "Old idle work remains useful without claiming current confirmation."
     },

@@ -38,6 +38,19 @@ describe('buildSlackMessage — SLO error_rate alert', () => {
     expect(fieldTexts.some(t => t.includes('openai'))).toBe(true);
     expect(fieldTexts.some(t => t.includes('gpt-4'))).toBe(true);
   });
+
+  it('renders provider and model as plain text', () => {
+    const msg = buildSlackMessage({
+      ...alert,
+      provider: 'custom-public',
+      model: 'vendor/family-latest',
+    }) as {
+      blocks: Array<{ fields?: Array<{ type: string; text: string }> }>;
+    };
+    const [providerField, modelField] = msg.blocks[1].fields ?? [];
+    expect(providerField).toEqual({ type: 'plain_text', text: 'Provider:\ncustom-public' });
+    expect(modelField).toEqual({ type: 'plain_text', text: 'Model:\nvendor/family-latest' });
+  });
 });
 
 describe('buildSlackMessage — SLO ttfb alert', () => {
@@ -93,6 +106,9 @@ describe('buildSlackMessage — queue_backlog alert', () => {
     expect(allText.some(text => text.includes('50,000'))).toBe(true);
     expect(allText.some(text => text.includes('12,345,678'))).toBe(true);
     expect(allText.some(text => text.includes('2026-06-04T08:00:00.000Z'))).toBe(true);
+    const queueIdField = msg.blocks[1].fields?.[0] as { type?: string; text?: string };
+    expect(queueIdField.type).toBe('plain_text');
+    expect(queueIdField.text).toBe('Queue ID:\n965459cfc1a349c190bb813855a65b02');
   });
 });
 
@@ -128,6 +144,24 @@ describe('buildSlackMessage — container_capacity alert', () => {
       ...(b.fields?.map(f => f.text) ?? []),
     ]);
     expect(allText.some(t => t.includes('cloud-agent-next-sandbox'))).toBe(true);
+  });
+
+  it('renders application and container names as plain text', () => {
+    const msg = buildSlackMessage({
+      ...alert,
+      model: 'cloud-agent-next-sandbox',
+      clientName: 'pool-a',
+    }) as {
+      blocks: Array<{
+        fields?: Array<{ type: string; text: string }>;
+        text?: { type: string; text: string };
+      }>;
+    };
+    expect(msg.blocks[1].fields?.[0]).toEqual({
+      type: 'plain_text',
+      text: 'Application:\ncloud-agent-next-sandbox',
+    });
+    expect(msg.blocks[2].text).toEqual({ type: 'plain_text', text: 'Container: pool-a' });
   });
 
   it('includes used/max instances', () => {

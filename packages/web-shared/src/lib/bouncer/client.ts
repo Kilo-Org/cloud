@@ -61,7 +61,7 @@ type CreditSubject = {
   /** For a webhook, the Stripe `event.created` time. */
   occurredAt?: Date;
   userId: string;
-  /** Send it for an org charge. The org is then the payer. */
+  /** Send it for an org charge. The event is reported against the root of the org's family. */
   orgId?: string | null;
   cardFingerprint?: string | null;
   /** The client IP. Omit it for an off-session charge. */
@@ -93,7 +93,7 @@ type StoreSubject = {
   /** When the store sent the event, for example the Apple `signedDate`. */
   occurredAt?: Date | string;
   userId: string;
-  /** Send it for an org purchase. The org is then the payer. */
+  /** Send it for an org purchase. The event is reported against the root of the org's family. */
   orgId?: string | null;
   provider: StoreProvider;
   /**
@@ -214,11 +214,11 @@ export type DecideRequest =
        * Kilo's edge, not a person or device.
        */
       ja4?: string | null;
-      /** `created_at` of the paying user, or of the organization for an `org:` account. */
+      /** `created_at` of the paying user, or of the family's root organization for an `org:` account. */
       accountCreatedAt?: Date | string | null;
-      /** `microdollars_used` of the paying user or organization. */
+      /** `microdollars_used` of the paying user, or summed over the organization family. */
       usedMicrodollars?: number | null;
-      /** `total_microdollars_acquired` of the paying user or organization. */
+      /** `total_microdollars_acquired` of the paying user, or summed over the organization family. */
       acquiredMicrodollars?: number | null;
     };
 
@@ -375,7 +375,11 @@ export type BouncerDeliveryResult =
       error: string;
     };
 
-/** The payer key bouncer uses for an account: the org for an org request, else the user. */
+/**
+ * The payer key bouncer uses for an account: the organization bouncer should treat as the payer, else
+ * the user. An organization request passes the root of its organization family, so a member of a
+ * sub-organization is judged as the family's payer.
+ */
 export function bouncerAccountId(userId: string, organizationId?: string | null): string {
   return organizationId ? `org:${organizationId}` : `user:${userId}`;
 }

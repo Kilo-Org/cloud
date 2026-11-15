@@ -17,6 +17,8 @@ type ShareSessionDialogProps = {
   onOpenChange: (open: boolean) => void;
   onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
   kiloSessionId?: string;
+  cloudAgentSessionId?: string | null;
+  organizationId?: string;
 };
 
 export function ShareSessionDialog({
@@ -24,6 +26,8 @@ export function ShareSessionDialog({
   onOpenChange,
   onCloseAutoFocus,
   kiloSessionId,
+  cloudAgentSessionId,
+  organizationId,
 }: ShareSessionDialogProps) {
   const [isSharing, setIsSharing] = useState(false);
 
@@ -47,6 +51,9 @@ export function ShareSessionDialog({
         </DialogHeader>
         <SessionSharePanel
           kiloSessionId={kiloSessionId}
+          cloudAgentSessionId={cloudAgentSessionId}
+          organizationId={organizationId}
+          open={open}
           isSharing={isSharing}
           onSharingChange={setIsSharing}
         />

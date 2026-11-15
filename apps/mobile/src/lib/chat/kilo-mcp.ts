@@ -10,7 +10,8 @@ import {
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { KILO_MCP_URL } from '@/lib/config';
-import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { getItem, removeItem, setItem, setItemWithSignal } from '@/lib/persist/encrypted-kv';
+import { KILO_MCP_SERVER_ID } from './mcp-server-namespace';
 import { type ChatPlace } from './scope';
 
 /**
@@ -34,9 +35,6 @@ export type KiloMcpState =
   | { readonly status: 'connecting' }
   | { readonly status: 'ready'; readonly tools: readonly Tool[] }
   | { readonly status: 'failed'; readonly kind: RemoteMcpFailure; readonly retryable: boolean };
-
-/** The id the server's tools are named under: `mcp_kilo_<tool>`. */
-const SERVER_ID = 'kilo';
 
 /**
  * How long a *discovery* may take, chosen by the caller. A chat opening bounds
@@ -65,7 +63,7 @@ const OFF = 'off';
  */
 function kiloServer(url: string): RemoteMcpServer {
   return {
-    id: SERVER_ID,
+    id: KILO_MCP_SERVER_ID,
     name: 'Kilo tools',
     url: `${url}/mcp`,
     auth: { type: 'bearer' },
@@ -87,7 +85,8 @@ const kiloToken = (): Effect.Effect<string, RemoteMcpError> =>
       }
       return token;
     },
-    catch: cause => new RemoteMcpError({ serverId: SERVER_ID, kind: 'unauthorized', cause }),
+    catch: cause =>
+      new RemoteMcpError({ serverId: KILO_MCP_SERVER_ID, kind: 'unauthorized', cause }),
   });
 
 const ready = (tools: readonly Tool[]): KiloMcpState => ({ status: 'ready', tools });
@@ -114,8 +113,18 @@ function publish(state: KiloMcpState): void {
   }
 }
 
-/** The answer already discovered for one account and one auth epoch. */
-let cached: { readonly key: string; readonly state: KiloMcpState } | undefined = undefined;
+/** The answer already discovered for one account and one auth epoch, and the discovery that produced it. */
+let cached:
+  | { readonly key: string; readonly discovery: number; readonly state: KiloMcpState }
+  | undefined = undefined;
+
+/**
+ * The discovery that owns the state the screens draw, so a call failure can
+ * invalidate only its own answer: a tool call keeps the deps it was discovered
+ * with (`packages/harness-sdk/src/plugins/remote-mcp/client.ts:124-130`), so an
+ * outstanding call from a replaced discovery outlives its replacement.
+ */
+let published: { readonly key: string; readonly discovery: number } | undefined = undefined;
 
 /**
  * The discovery already running for one key and one deadline, so two callers
@@ -157,12 +166,19 @@ const keyFor = (place: ChatPlace): string =>
  * failure is not published under the new one, exactly as its tools are not.
  */
 const lostConnection =
-  (started: number) =>
+  (started: number, discovery: number) =>
   (error: RemoteMcpError): void => {
+    /* A sign-out of the account that made the call wins. */
     if (started !== generation) {
       return;
     }
+    /* A replacement discovery owns the screens now: its answer is not the one
+       this call contradicts, so the failure is not published for it. */
+    if (published === undefined || published.discovery !== discovery) {
+      return;
+    }
     cached = undefined;
+    published = undefined;
     publish(failed(error));
   };
 
@@ -196,12 +212,12 @@ async function connect(place: ChatPlace, timeoutMs: number, id: number): Promise
       fetch,
       token: kiloToken,
       discoverTimeoutMs: timeoutMs,
-      onCallFailure: lostConnection(started),
+      onCallFailure: lostConnection(started, id),
     }).pipe(
       Effect.match({ onFailure: failed, onSuccess: ready }),
       Effect.catchCause(cause =>
         Effect.succeed(
-          failed(new RemoteMcpError({ serverId: SERVER_ID, kind: 'unreachable', cause }))
+          failed(new RemoteMcpError({ serverId: KILO_MCP_SERVER_ID, kind: 'unreachable', cause }))
         )
       )
     )
@@ -211,7 +227,8 @@ async function connect(place: ChatPlace, timeoutMs: number, id: number): Promise
      A later discovery answers for the screen now, so this one answers only its
      own caller. */
   if (started === generation && id === nextAttempt) {
-    cached = reusable(state) ? { key, state } : undefined;
+    cached = reusable(state) ? { key, discovery: id, state } : undefined;
+    published = { key, discovery: id };
     publish(state);
   }
   return state;
@@ -224,6 +241,7 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
        discovery may have published over it since, so the answer served is
        published too. */
     if (snapshot !== cached.state) {
+      published = { key: cached.key, discovery: cached.discovery };
       publish(cached.state);
     }
     return cached.state;
@@ -238,6 +256,7 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
     return { status: 'idle' };
   }
   publish({ status: 'connecting' });
+  published = undefined;
   const id = (nextAttempt += 1);
   const promise = connect(place, timeoutMs, id);
   const entry = { id, key, timeoutMs, promise };
@@ -321,6 +340,7 @@ export function watchKiloMcp(listener: () => void): () => void {
 export function forgetKiloMcp(): void {
   generation += 1;
   cached = undefined;
+  published = undefined;
   inFlight = undefined;
   publish({ status: 'idle' });
 }
@@ -333,15 +353,32 @@ export function forgetKiloMcp(): void {
  * value is written under the session id, exactly as the unanswered question is.
  */
 export async function mcpEnabledFor(sessionId: string): Promise<boolean> {
-  return (await getItem(PREFERENCE_SCOPE, sessionId)) !== OFF;
+  return (await mcpChoiceFor(sessionId)) !== false;
 }
 
-export async function setMcpEnabled(sessionId: string, enabled: boolean): Promise<void> {
+/**
+ * The choice on disk, or null when the person never made one.
+ *
+ * Null is not "off": the switch draws its own default for a chat nobody chose
+ * for, and the default is on, so a chat with no stored value must not read as
+ * an off choice.
+ */
+export async function mcpChoiceFor(sessionId: string): Promise<boolean | null> {
+  return (await getItem(PREFERENCE_SCOPE, sessionId)) === OFF ? false : null;
+}
+
+export async function setMcpEnabled(
+  sessionId: string,
+  enabled: boolean,
+  signal?: AbortSignal
+): Promise<void> {
   if (enabled) {
-    await removeItem(PREFERENCE_SCOPE, sessionId);
+    await removeItem(PREFERENCE_SCOPE, sessionId, signal);
     return;
   }
-  await setItem(PREFERENCE_SCOPE, sessionId, OFF);
+  await (signal === undefined
+    ? setItem(PREFERENCE_SCOPE, sessionId, OFF)
+    : setItemWithSignal(PREFERENCE_SCOPE, sessionId, { value: OFF, signal }));
 }
 
 /** Carries the setting across a model switch, which opens a new session. */

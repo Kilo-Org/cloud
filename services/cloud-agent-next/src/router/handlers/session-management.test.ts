@@ -3,6 +3,7 @@ import type { WorkerDb } from '@kilocode/db/client';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import type { TRPCContext } from '../../types.js';
+import type { ControlPlaneSessionMetadataSummary } from '../../control-plane/session/session-do.js';
 
 const { access, getPgDb } = vi.hoisted(() => ({ access: vi.fn(), getPgDb: vi.fn() }));
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
@@ -62,6 +63,15 @@ function setup(createdOnPlatform: string | undefined = 'slack', id = sessionId) 
     lifecycle: { timestamp: 1, version: 1 },
   });
   const stub = {
+    kiloRequest: vi.fn().mockResolvedValue({
+      ok: true,
+      result: {
+        sessionID: kiloSessionId,
+        jobs: [],
+        sessions: [{ id: kiloSessionId }],
+        waits: [],
+      },
+    }),
     getMetadata: vi.fn().mockResolvedValue(metadata),
     getSession: vi.fn().mockResolvedValue({
       type: 'found',
@@ -72,6 +82,21 @@ function setup(createdOnPlatform: string | undefined = 'slack', id = sessionId) 
       title: 'Native title',
       totalCostMicrodollars: 123456,
     }),
+    getSessionMetadataSummary: vi
+      .fn<() => Promise<ControlPlaneSessionMetadataSummary>>()
+      .mockResolvedValue({
+        metadata,
+        snapshot: {
+          type: 'found',
+          sessionId: id,
+          route: { state: 'ready', attemptId: 'attempt-test' },
+          latestEventId: 5,
+          updateCursor: 9,
+          title: 'Native title',
+          totalCostMicrodollars: 123456,
+        },
+        currentMessage: null,
+      }),
     getCurrentMessageWork: vi.fn().mockResolvedValue(null),
     getLatestEventId: vi.fn().mockResolvedValue(null),
   };
@@ -91,6 +116,50 @@ beforeEach(() => {
   vi.clearAllMocks();
   access.mockResolvedValue({ kiloSessionId, organizationId: null });
   getPgDb.mockReturnValue(database().db);
+});
+
+describe('background activity authorization', () => {
+  it('reads only the registered session through the named operation', async () => {
+    const harness = setup();
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).resolves.toMatchObject({ sessionID: kiloSessionId, jobs: [] });
+    expect(access).toHaveBeenCalledWith(
+      expect.objectContaining({ kiloUserId: userId, cloudAgentSessionId: sessionId })
+    );
+    expect(harness.stub.kiloRequest).toHaveBeenCalledWith({ name: 'session.background' });
+  });
+  it('does not read a foreign chat or accept a native session selector', async () => {
+    const harness = setup();
+    access.mockRejectedValueOnce(new Error('denied'));
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toThrow('denied');
+    expect(harness.stub.kiloRequest).not.toHaveBeenCalled();
+    await expect(
+      harness.caller.getBackgroundActivity({
+        cloudAgentSessionId: sessionId,
+        sessionID: 'ses_sibling',
+      } as never)
+    ).rejects.toThrow();
+  });
+  it('does not present an unavailable runtime as an empty inventory', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'not_ready', message: 'No runtime', retryable: true },
+    });
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toThrow('unavailable');
+  });
+  it('reports an invalid native inventory as unavailable rather than an internal error', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: { jobs: 'invalid' } });
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
 });
 
 describe('getSession runtime agents', () => {
@@ -234,6 +303,7 @@ describe('getSession safe auxiliary metadata', () => {
     );
     expect(getPgDb).not.toHaveBeenCalled();
     expect(harness.stub.getMetadata).not.toHaveBeenCalled();
+    expect(harness.stub.getSessionMetadataSummary).not.toHaveBeenCalled();
   });
 
   it('rejects retired session IDs before any catalog or DO reads', async () => {
@@ -244,6 +314,44 @@ describe('getSession safe auxiliary metadata', () => {
     );
     expect(getPgDb).not.toHaveBeenCalled();
     expect(harness.stub.getSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('getSession read concurrency', () => {
+  it('starts optional enrichment before the DO read resolves, using only one DO RPC', async () => {
+    const harness = setup();
+    const result = await harness.stub.getSessionMetadataSummary();
+    harness.stub.getSessionMetadataSummary.mockClear();
+    let resolve!: (value: typeof result) => void;
+    harness.stub.getSessionMetadataSummary.mockReturnValueOnce(
+      new Promise(done => {
+        resolve = done;
+      })
+    );
+    const pg = database();
+    getPgDb.mockReturnValue(pg.db);
+    const reading = harness.caller.getSession({ cloudAgentSessionId: sessionId });
+    await vi.waitFor(() => expect(pg.limit).toHaveBeenCalledTimes(1));
+    expect(harness.stub.getSessionMetadataSummary).toHaveBeenCalledTimes(1);
+    resolve(result);
+    await reading;
+    expect(harness.stub.getMetadata).not.toHaveBeenCalled();
+    expect(harness.stub.getSession).not.toHaveBeenCalled();
+  });
+
+  it('reports missing metadata without waiting for a hung optional read', async () => {
+    const harness = setup();
+    harness.stub.getSessionMetadataSummary.mockResolvedValueOnce({
+      metadata: null,
+      snapshot: { type: 'session-not-found' },
+      currentMessage: null,
+    });
+    const pg = database();
+    pg.limit.mockReturnValueOnce(new Promise(() => {}));
+    getPgDb.mockReturnValue(pg.db);
+    await expect(
+      harness.caller.getSession({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
 

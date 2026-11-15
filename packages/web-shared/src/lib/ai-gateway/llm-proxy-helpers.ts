@@ -600,12 +600,12 @@ export function claudeBillingReconnectResponse(
   );
 }
 
-export function modelDoesNotExistOnOpenRouterResponse(model: string) {
+export function unknownModelResponse(model: string) {
   const error =
     `The requested model '${model}' does not exist. ` +
     `Please use an exact model id as listed on /api/gateway/models. ` +
     `If this is a newly released model, please try again in a few minutes.`;
-  errorExceptInTest(`[modelDoesNotExistOnOpenRouterResponse] ${error}`);
+  errorExceptInTest(`[unknownModelResponse] ${error}`);
   return NextResponse.json(
     {
       error,

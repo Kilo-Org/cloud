@@ -12,13 +12,6 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
-const RN_URL_HOSTNAME_REGEX = /^https?:\/\/(?:[^@]+@)?([^:/?#]+)/;
-
-/** React Native's polyfilled URL.hostname, reproduced. */
-function rnUrlHostname(url: string): string {
-  return RN_URL_HOSTNAME_REGEX.exec(url)?.[1] ?? '';
-}
-
 describe('formatTrustedImageHost', () => {
   it('keys a plain HTTPS host by its lowercased hostname', () => {
     expect(formatTrustedImageHost('https://Example.COM/a.png')).toBe('example.com');
@@ -46,10 +39,10 @@ describe('formatTrustedImageHost', () => {
   });
 
   it('does not key a path @ as the host', () => {
-    // React Native's URL.hostname lets [^@]+ cross the path separator, so the
-    // polyfill reads this URL as trusted.com while the native client fetches
-    // from attacker.com. The key must name the host the request reaches.
-    expect(rnUrlHostname('https://attacker.com/x@trusted.com/p.png')).toBe('trusted.com');
+    // React Native's polyfilled URL.hostname lets the userinfo match cross the
+    // path separator, so it can read such a URL as trusted.com while the native
+    // client fetches from attacker.com. The key must name the host the request
+    // reaches.
     expect(formatTrustedImageHost('https://attacker.com/x@trusted.com/p.png')).toBe('attacker.com');
   });
 

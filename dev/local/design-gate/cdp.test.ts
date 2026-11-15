@@ -142,6 +142,85 @@ test('probe client evaluates over the selected page and parses dumps', async () 
   assert.equal(urls.filter(url => url.endsWith('/json/list')).length, 2);
 });
 
+test('probe client waits for the page an app reload drops, then connects', async () => {
+  const delays: number[] = [];
+  let listCalls = 0;
+  const client = createProbeClient({
+    metro: 'http://127.0.0.1:8081',
+    names: ['Pixel'],
+    // A matrix language switch restarts the runtime: Metro lists no page for a
+    // moment, and the run must wait rather than fail as infrastructure.
+    pageWaitMs: 5_000,
+    sleep: async ms => delays.push(ms),
+    fetch: (async () => {
+      listCalls += 1;
+      return Response.json(listCalls <= 2 ? [] : [page('p-1', 'Pixel')]);
+    }) as typeof fetch,
+    createSocket: () =>
+      fakeSocket(message => {
+        const expression = String(message.params.expression);
+        if (expression.includes('ready')) return { result: { result: { value: true } } };
+        return { result: { result: { value: JSON.stringify({}) } } };
+      }).socket,
+  });
+  assert.equal(await client.ready(), true);
+  assert.equal(listCalls, 3);
+  assert.deepEqual(delays, [500, 500]);
+});
+
+test('probe client spends one page window across its reconnect attempts', async () => {
+  const delays: number[] = [];
+  let clockMs = 0;
+  let listCalls = 0;
+  const client = createProbeClient({
+    metro: 'http://127.0.0.1:8081',
+    names: ['Pixel'],
+    pageWaitMs: 5_000,
+    now: () => clockMs,
+    sleep: async ms => {
+      delays.push(ms);
+      clockMs += ms;
+    },
+    fetch: (async () => {
+      listCalls += 1;
+      return Response.json([]);
+    }) as typeof fetch,
+  });
+  await assert.rejects(client.ready(), (error: unknown) => error instanceof InfraError);
+  // Ten 500 ms polls fill the window, and the spent window ends the chain, so
+  // the retry backoff is not paid again: 5 s, not 11 s or 20 s.
+  assert.equal(listCalls, 11);
+  assert.deepEqual(delays, Array<number>(10).fill(500));
+  assert.equal(clockMs, 5_000);
+});
+
+test('probe client caps the page wait by the budget its caller declares', async () => {
+  const delays: number[] = [];
+  let clockMs = 0;
+  let listCalls = 0;
+  const client = createProbeClient({
+    metro: 'http://127.0.0.1:8081',
+    names: ['Pixel'],
+    pageWaitMs: 5_000,
+    now: () => clockMs,
+    sleep: async ms => {
+      delays.push(ms);
+      clockMs += ms;
+    },
+    fetch: (async () => {
+      listCalls += 1;
+      return Response.json([]);
+    }) as typeof fetch,
+  });
+  // waitForApp() passes its remaining app-wait budget here, so a 700 ms wait
+  // does not spend the probe's 5 s reload window, and the spent budget is the
+  // real bound: no retry backoff is added after it.
+  await assert.rejects(client.dump(700), (error: unknown) => error instanceof InfraError);
+  assert.equal(clockMs, 1_000);
+  assert.deepEqual(delays, [500, 500]);
+  assert.equal(listCalls, 3);
+});
+
 test('probe client retries Metro and socket failures with backoff, re-listing pages', async () => {
   const delays: number[] = [];
   let listCalls = 0;
@@ -191,6 +270,84 @@ test('probe client raises InfraError after three retries', async () => {
   });
   await assert.rejects(client.ready(), (error: unknown) => error instanceof InfraError);
   assert.deepEqual(delays, [2_000, 2_000, 2_000]);
+});
+
+test('a failing readiness probe in the reload window closes its session', async () => {
+  const opened: { closed: boolean }[] = [];
+  const realNow = Date.now;
+  let now = 0;
+  const answers = (index: number, expression: string) => {
+    // The first session dies with the reload.
+    if (index === 0) return 'close';
+    // Inside the reload window the re-opened target is listed but its runtime
+    // has not attached yet, so the readiness probe times out.
+    if (index === 1 && expression.includes('ready')) return 'silent';
+    return expression.includes('ready');
+  };
+  try {
+    Date.now = () => now;
+    const client = createProbeClient({
+      metro: 'http://127.0.0.1:8081',
+      names: ['Pixel'],
+      timeoutMs: 5,
+      sleep: async ms => {
+        now += ms;
+      },
+      fetch: (async () => Response.json([page('p-1', 'Pixel')])) as typeof fetch,
+      createSocket: () => {
+        const index = opened.length;
+        const entry = { closed: false };
+        opened.push(entry);
+        const fake = fakeSocket(message => {
+          const answer = answers(index, String(message.params.expression));
+          if (answer === 'close') queueMicrotask(() => fake.socket.close());
+          if (answer === 'silent') return undefined;
+          return { result: { result: { value: answer } } };
+        });
+        return {
+          send: fake.socket.send,
+          addEventListener: fake.socket.addEventListener,
+          close: () => {
+            entry.closed = true;
+            fake.socket.close();
+          },
+        };
+      },
+    });
+    assert.equal(await client.ready(), true);
+  } finally {
+    Date.now = realNow;
+  }
+  // One session per reload-window iteration: a readiness probe that fails must
+  // not leave the socket open while the loop opens the next one.
+  assert.deepEqual(
+    opened.map(entry => entry.closed),
+    [true, true, true, false]
+  );
+});
+
+test('a caller budget bounds the reload wait too', async () => {
+  let clockMs = 0;
+  const client = createProbeClient({
+    metro: 'http://127.0.0.1:8081',
+    names: ['Pixel'],
+    now: () => clockMs,
+    sleep: async ms => {
+      clockMs += ms;
+    },
+    fetch: (async () => Response.json([page('p-1', 'Pixel')])) as typeof fetch,
+    createSocket: () => {
+      const fake = fakeSocket(() => {
+        queueMicrotask(() => fake.socket.close());
+        return undefined;
+      });
+      return fake.socket;
+    },
+  });
+  // A caller that declares 700 ms waits that long, not the 20 s reload window,
+  // so an app that is gone still fails inside the caller's own deadline.
+  await assert.rejects(client.dump(700), (error: unknown) => error instanceof InfraError);
+  assert.ok(clockMs < 10_000, `the call spent ${clockMs} ms on a 700 ms budget`);
 });
 
 test('parseSamples validates in-app samples and expandSamples repeats them', () => {

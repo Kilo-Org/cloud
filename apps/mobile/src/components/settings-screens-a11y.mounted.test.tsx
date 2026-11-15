@@ -69,20 +69,26 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  Ban: 'Ban',
   Bell: 'Bell',
+  Cpu: 'Cpu',
+  FileText: 'FileText',
   Globe: 'Globe',
   History: 'History',
   KeyRound: 'KeyRound',
+  Lock: 'Lock',
   Mic: 'Mic',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
+  UserRound: 'UserRound',
   Wallet: 'Wallet',
   WandSparkles: 'WandSparkles',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'DirectionalChevronLeft',
   DirectionalChevronRight: 'DirectionalChevronRight',
+  DirectionalLogOut: 'DirectionalLogOut',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The appearance control is mounted for real below, so its selection haptic is
@@ -108,6 +114,20 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
 vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
 vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
+}));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn() },
+}));
+// The confirmation surfaces pull a portal primitive the node environment cannot
+// load; the screens only read the hook.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    user: { signOutBrowserSessions: { mutationOptions: (options: unknown) => options } },
+  }),
 }));
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;

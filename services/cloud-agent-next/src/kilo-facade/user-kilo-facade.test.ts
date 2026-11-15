@@ -2901,6 +2901,26 @@ describe('hosted native routes', () => {
     expect(sandboxGet).not.toHaveBeenCalled();
   });
 
+  it('answers a hosted session status with only the requested session', async () => {
+    const nativeLiveRead = vi.fn(async () => ({
+      ok: true as const,
+      result: {
+        [siblingKiloSessionId]: { type: 'idle' },
+        [kiloSessionId]: { type: 'busy', directory: '/workspace/private' },
+      },
+    }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/session/status?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({ nativeLiveRead }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ [kiloSessionId]: { type: 'busy' } });
+  });
+
   it('requires the hosted directory selector for collection reads', async () => {
     const nativeLiveRead = vi.fn();
     const response = await handleKiloFacadeRequest({

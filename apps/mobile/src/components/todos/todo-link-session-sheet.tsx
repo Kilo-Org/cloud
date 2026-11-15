@@ -15,6 +15,9 @@ import { buildStoredSessionsQueryOptions } from '@/lib/agent-session-queries';
 import { todoLinkCandidates } from '@/lib/todos/todo-model';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
+
+import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
 
 type TodoLinkSessionSheetProps = {
   visible: boolean;
@@ -57,7 +60,7 @@ export function TodoLinkSessionSheet({
   let body: ReactNode = null;
   if (sessions.isPending) {
     body = (
-      <View className="items-center py-8">
+      <View className={cn('items-center', TODO_SHEET_STATE_BODY_CLASS)}>
         <ActivityIndicator />
       </View>
     );
@@ -71,7 +74,9 @@ export function TodoLinkSessionSheet({
     );
   } else if (candidates.length === 0) {
     body = (
-      <Text className="px-5 py-8 text-center text-sm text-muted-foreground">
+      <Text
+        className={cn(TODO_SHEET_STATE_BODY_CLASS, 'text-center text-sm text-muted-foreground')}
+      >
         {list.gitUrl
           ? t('todos.linkSession.emptyInRepository', { repository: list.gitUrl })
           : t('todos.linkSession.empty')}

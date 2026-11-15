@@ -1,3 +1,7 @@
+import {
+  canManageOrganization,
+  canManageOrganizationOwners,
+} from '@kilocode/app-shared/organizations';
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { UserPlus, Users } from '@/components/ui/icons';
@@ -97,8 +101,14 @@ export function OrganizationMembersScreen() {
   const isLoading = orgWithMembers.isLoading;
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
+  // Web's member card only pairs spend with the limit for a sales-demo
+  // organization, so the row takes the same flag rather than deciding itself.
+  const isSalesDemo = orgWithMembers.data?.settings.is_sales_demo === true;
   const canInvite = isMoneyRole(role);
-  const isOwner = role === 'owner';
+  // Membership management is owner-and-admin; owner management stays owner-only,
+  // mirroring the server's `assertOwnerAuthority` and the web's role dropdowns.
+  const canManageMembers = canManageOrganization(role);
+  const canManageOwners = canManageOrganizationOwners(role);
 
   const errorView = isError ? selectOrgListErrorView(orgWithMembers.error) : null;
 
@@ -151,8 +161,15 @@ export function OrganizationMembersScreen() {
           >
             <MemberRow
               member={item.member}
-              canManage={isOwner && item.member.id !== currentUserId}
+              canManage={
+                canManageMembers &&
+                item.member.id !== currentUserId &&
+                (item.member.role !== 'owner' || canManageOwners)
+              }
+              canManageLimit={canManageMembers && item.member.id !== currentUserId}
+              callerRole={role}
               enableUsageLimits={enableUsageLimits}
+              isSalesDemo={isSalesDemo}
               organizationId={organizationId}
               last={item.last}
             />
@@ -171,7 +188,7 @@ export function OrganizationMembersScreen() {
           >
             <InvitedMemberRow
               invite={item.invite}
-              canManage={isOwner}
+              canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}
               organizationId={organizationId}
               last={item.last}
             />

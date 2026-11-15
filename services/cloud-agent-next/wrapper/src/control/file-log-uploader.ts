@@ -1,17 +1,14 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
-import path from 'node:path';
 import {
   CONTROL_LOG_ARCHIVE_NAME,
-  CONTROL_LOG_MAX_ARCHIVE_BYTES,
   controlUploadFailureStartsEpisode,
   type ControlDiagnosticProjector,
   type ControlDiagnosticReporter,
   type ControlLogUploadResult,
   type ControlUploadFailureSample,
 } from '../../../src/shared/control-diagnostics.js';
-import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
-import { defaultHomeRoots } from '../control-plane/workspace-home.js';
+import { createSecretRedactor } from '../redact-output.js';
+import { collectControlFileLogArchive, defaultControlHomeRoots } from './file-log-archive.js';
 
 export type ControlFileLogUploader = {
   start: (intervalMs?: number) => void;
@@ -24,8 +21,8 @@ type Options = {
   uploadUrl?: string;
   uploadGrant?: string;
   wrapperLogPath?: string;
-  /** Roots whose `<home>/.local/share/kilo/log` directories are archived. */
   homeRoots?: readonly string[];
+  environment?: Record<string, string | undefined>;
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   onDiagnostic?: ControlDiagnosticReporter;
   projector?: ControlDiagnosticProjector;
@@ -33,132 +30,21 @@ type Options = {
   uploadTimeoutMs?: number;
 };
 
-const KILO_LOG_RELATIVE = path.join('.local', 'share', 'kilo', 'log');
 const DEFAULT_WRAPPER_LOG_PATH = '/tmp/kilocode-control-wrapper.log';
 const UPLOAD_TIMEOUT_MS = 15_000;
 const FINAL_UPLOAD_TIMEOUT_MS = 5_000;
 const INTERVAL_MS = 30_000;
-
-/**
- * The directory-keyed home root and the per-session root that allocations
- * created before it still use. Both are read while such allocations exist.
- */
-export function defaultControlHomeRoots(): string[] {
-  const roots = defaultHomeRoots();
-  return [roots.legacy, roots.directory];
-}
-
-/** Kilo log directories under each home of each root; nothing else is collected. */
-export function listControlKiloLogDirs(
-  homeRoots: readonly string[] = defaultControlHomeRoots()
-): string[] {
-  const dirs: string[] = [];
-  for (const homeRoot of homeRoots) {
-    if (!existsSync(homeRoot)) continue;
-    for (const entry of readdirSync(homeRoot, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
-      const logDir = path.join(homeRoot, entry.name, KILO_LOG_RELATIVE);
-      if (existsSync(logDir)) dirs.push(logDir);
-    }
-  }
-  return dirs;
-}
-
-export function selectControlFileLogPaths(input: {
-  wrapperLogPath: string;
-  kiloLogDirs: string[];
-  maxBytes?: number;
-}): string[] {
-  const maxBytes = input.maxBytes ?? CONTROL_LOG_MAX_ARCHIVE_BYTES;
-  const selected: string[] = [];
-  let used = 0;
-  const add = (filePath: string, size: number): void => {
-    if (size > maxBytes - used) return;
-    selected.push(filePath);
-    used += size;
-  };
-  if (existsSync(input.wrapperLogPath)) {
-    const st = statSync(input.wrapperLogPath);
-    if (st.isFile()) add(input.wrapperLogPath, st.size);
-  }
-  const kiloFiles: Array<{ path: string; size: number; mtime: number }> = [];
-  for (const dir of input.kiloLogDirs) {
-    if (!existsSync(dir)) continue;
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (!entry.isFile() || entry.isSymbolicLink()) continue;
-      const filePath = path.join(dir, entry.name);
-      const st = statSync(filePath);
-      if (!st.isFile()) continue;
-      kiloFiles.push({ path: filePath, size: st.size, mtime: st.mtimeMs });
-    }
-  }
-  kiloFiles.sort((left, right) => right.mtime - left.mtime || left.path.localeCompare(right.path));
-  for (const file of kiloFiles) add(file.path, file.size);
-  return selected;
-}
-
-/**
- * Archive entries named relative to the home root that contains each file. Home
- * names are hashes, so two roots never produce the same relative name.
- */
-function archiveEntries(
-  files: string[],
-  wrapperLogPath: string,
-  homeRoots: readonly string[]
-): TarArchiveEntry[] {
-  const entries: TarArchiveEntry[] = [];
-  for (const filePath of files) {
-    if (filePath === wrapperLogPath) {
-      entries.push({ directory: path.dirname(filePath), name: path.basename(filePath) });
-      continue;
-    }
-    for (const homeRoot of homeRoots) {
-      const relative = path.relative(homeRoot, filePath);
-      if (relative.startsWith('..') || path.isAbsolute(relative)) continue;
-      entries.push({ directory: homeRoot, name: relative });
-      break;
-    }
-  }
-  return entries;
-}
-
-async function collectArchive(
-  entries: TarArchiveEntry[],
-  maxBytes: number
-): Promise<Uint8Array | undefined> {
-  const tar = createTarStream(entries);
-  if (!tar) return undefined;
-  try {
-    const reader = tar.stream.getReader();
-    const chunks: Uint8Array[] = [];
-    let length = 0;
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      length += value.byteLength;
-      if (length > maxBytes) {
-        tar.kill();
-        return undefined;
-      }
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return bytes;
-  } finally {
-    tar.kill();
-  }
-}
 
 export function createControlFileLogUploader(options: Options): ControlFileLogUploader {
   type Upload = { promise: Promise<void>; abort: AbortController };
   const upload = options.fetch ?? fetch;
   const wrapperLogPath = options.wrapperLogPath ?? DEFAULT_WRAPPER_LOG_PATH;
   const homeRoots = options.homeRoots ?? defaultControlHomeRoots();
+  const redact = createSecretRedactor(
+    options.environment ?? process.env,
+    [{ CONTROL_LOG_UPLOAD_GRANT: options.uploadGrant }],
+    ['CONTROL_LOG_UPLOAD_GRANT']
+  );
   let intervalId: ReturnType<typeof setInterval> | undefined;
   let activeUpload: Upload | undefined;
   let queuedUpload: Upload | undefined;
@@ -224,20 +110,14 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
             if (queuedUpload === next) queuedUpload = undefined;
             activeUpload = next;
 
-            const files = [
-              ...selectControlFileLogPaths({
-                wrapperLogPath,
-                kiloLogDirs: listControlKiloLogDirs(homeRoots),
-              }),
-            ];
-            const entries = archiveEntries(files, wrapperLogPath, homeRoots);
-            if (entries.length === 0) return;
-            const body = await collectArchive(entries, CONTROL_LOG_MAX_ARCHIVE_BYTES);
+            const body = await collectControlFileLogArchive({
+              wrapperLogPath,
+              homeRoots,
+              redact,
+              signal: abort.signal,
+            });
             abort.signal.throwIfAborted();
-            if (!body) {
-              logToFile('Control file log archive exceeded the upload cap');
-              return;
-            }
+            if (!body) return;
 
             const payload = new ArrayBuffer(body.byteLength);
             new Uint8Array(payload).set(body);

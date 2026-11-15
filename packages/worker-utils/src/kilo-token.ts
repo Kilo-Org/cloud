@@ -4,6 +4,7 @@ import {
   CloudAgentAuthoritySchema,
   validateCloudAgentAuthorityClaims,
 } from './cloud-agent-authority';
+import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
 
 export const KILO_TOKEN_VERSION = 3;
 const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
@@ -11,11 +12,6 @@ const runtimeAdmission = z.object({
   source: z.enum(['user', 'automation']),
   authorizationUserId: z.string().min(1),
   authorizationPepper: z.string().nullable(),
-});
-const runtimeAuthorization = z.object({
-  id: z.string().uuid(),
-  resourceKind: z.literal('cloud-agent-next'),
-  resourceId: z.string().min(1),
 });
 
 /**
@@ -43,7 +39,7 @@ export const kiloTokenPayload = z.object({
   // Org memberships (baked into tokens to avoid DB lookups)
   orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRole })).optional(),
   runtimeAdmission: runtimeAdmission.optional(),
-  runtimeAuthorization: runtimeAuthorization.optional(),
+  runtimeAuthorization: CloudAgentNextRuntimeAuthorizationClaimSchema.optional(),
   cloudAgentAuthority: CloudAgentAuthoritySchema.optional(),
   // Standard JWT claims
   iat: z.number().optional(),

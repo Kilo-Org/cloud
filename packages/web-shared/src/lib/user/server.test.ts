@@ -466,6 +466,40 @@ describe('getUserFromAuth', () => {
     }
   );
 
+  test.each(['bearer', 'bEaReR'])(
+    'authenticates a %s scheme with a valid API token',
+    async scheme => {
+      const user = await insertTestUser({
+        google_user_email: `bearer-scheme-${crypto.randomUUID()}@example.com`,
+        api_token_pepper: 'bearer-scheme-pepper',
+      });
+      mockHeaders.mockResolvedValue(
+        new Headers({ authorization: `${scheme} ${generateApiToken(user)}` })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.user?.id).toBe(user.id);
+    }
+  );
+
+  test('refuses a valid API token with two spaces after the scheme', async () => {
+    const user = await insertTestUser({
+      google_user_email: `bearer-extra-space-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'bearer-extra-space-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ authorization: `Bearer  ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.credentialsRejected).toBe(true);
+  });
+
   test('returns 401 for a token with malformed JSON header', async () => {
     const header = Buffer.from('{').toString('base64url');
     const payload = Buffer.from(JSON.stringify({ kiloUserId: 'malformed-token-user' })).toString(

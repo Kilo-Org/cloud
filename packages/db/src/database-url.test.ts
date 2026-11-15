@@ -7,10 +7,18 @@ const originalEnv = {
   NODE_ENV: process.env.NODE_ENV,
   JEST_WORKER_ID: process.env.JEST_WORKER_ID,
   POSTGRES_URL: process.env.POSTGRES_URL,
+  POSTGRES_URL_PRODUCTION: process.env.POSTGRES_URL_PRODUCTION,
+  USE_PRODUCTION_DB: process.env.USE_PRODUCTION_DB,
 };
 
 function withEnv(name: string, value: string | undefined): void {
-  Object.defineProperty(process.env, name, { value, configurable: true });
+  // Next augments several process.env keys as readonly, so assignment through
+  // Reflect keeps the restore path type-safe.
+  if (value === undefined) {
+    Reflect.deleteProperty(process.env, name);
+  } else {
+    Reflect.set(process.env, name, value);
+  }
 }
 
 afterEach(() => {
@@ -22,9 +30,17 @@ afterEach(() => {
   withEnv('NODE_ENV', originalEnv.NODE_ENV);
   withEnv('JEST_WORKER_ID', originalEnv.JEST_WORKER_ID);
   withEnv('POSTGRES_URL', originalEnv.POSTGRES_URL);
+  withEnv('POSTGRES_URL_PRODUCTION', originalEnv.POSTGRES_URL_PRODUCTION);
+  withEnv('USE_PRODUCTION_DB', originalEnv.USE_PRODUCTION_DB);
 });
 
 describe('computeDatabaseUrl', () => {
+  beforeEach(() => {
+    withEnv('NODE_ENV', 'development');
+    withEnv('USE_PRODUCTION_DB', undefined);
+    withEnv('POSTGRES_URL_PRODUCTION', undefined);
+  });
+
   it('appends the jest worker id to the database name, not the query string', () => {
     withEnv('NODE_ENV', 'test');
     withEnv('JEST_WORKER_ID', '3');
@@ -42,6 +58,28 @@ describe('computeDatabaseUrl', () => {
     expect(computeDatabaseUrl()).toBe(
       'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
     );
+  });
+
+  it('uses POSTGRES_URL_PRODUCTION and ignores POSTGRES_URL in production mode', () => {
+    withEnv('USE_PRODUCTION_DB', 'true');
+    withEnv('POSTGRES_URL', 'postgres://dev:secret@db.example.com:5432/dev');
+    withEnv('POSTGRES_URL_PRODUCTION', 'postgres://prod:secret@prod.example.com:5432/prod');
+
+    expect(computeDatabaseUrl()).toBe('postgres://prod:secret@prod.example.com:5432/prod');
+  });
+
+  it('names POSTGRES_URL when the default mode has no URL', () => {
+    withEnv('POSTGRES_URL', undefined);
+
+    expect(() => computeDatabaseUrl()).toThrow('POSTGRES_URL not configured');
+  });
+
+  it('names POSTGRES_URL_PRODUCTION when production mode has no URL', () => {
+    withEnv('USE_PRODUCTION_DB', 'true');
+    withEnv('POSTGRES_URL', 'postgres://dev:secret@db.example.com:5432/dev');
+    withEnv('POSTGRES_URL_PRODUCTION', undefined);
+
+    expect(() => computeDatabaseUrl()).toThrow('POSTGRES_URL_PRODUCTION not configured');
   });
 });
 
@@ -152,6 +190,46 @@ describe('getDatabaseClientConfig', () => {
     });
   });
 
+  describe('with percent-encoded credentials', () => {
+    beforeEach(() => {
+      delete process.env.DATABASE_CA;
+    });
+
+    it('decodes escaped characters in the user, password and database name', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://us%40er:p%40ss@db.example.com:5432/db%2Fname?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'us@er',
+        password: 'p@ss',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'db/name',
+      });
+    });
+
+    it('decodes escaped characters in the host', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://us%40er:p%40ss@db%2Eexample.com:5432/db%2Fname?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'us@er',
+        password: 'p@ss',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'db/name',
+      });
+    });
+
+    it('rejects a malformed escape instead of passing it through', () => {
+      expect(() =>
+        getDatabaseClientConfig('postgres://us%40er:p%zz@db.example.com:5432/mydb')
+      ).toThrow(URIError);
+    });
+  });
+
   describe('with DATABASE_CA set', () => {
     const pem = '-----BEGIN CERTIFICATE-----\\nabc\\n-----END CERTIFICATE-----';
 
@@ -177,6 +255,14 @@ describe('getDatabaseClientConfig', () => {
       );
 
       expect(config.ssl).toMatchObject({ rejectUnauthorized: true });
+    });
+
+    it('uses the decoded host as the TLS servername', () => {
+      process.env.DATABASE_CA = pem;
+
+      const config = getDatabaseClientConfig('postgres://user:secret@db%2Eexample.com:5432/mydb');
+
+      expect(config.ssl).toMatchObject({ servername: 'db.example.com' });
     });
 
     it('expands escaped newlines in the CA', () => {

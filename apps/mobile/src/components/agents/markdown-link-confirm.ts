@@ -67,6 +67,8 @@ export function confirmAndOpenMarkdownLink(href: string, { label }: { label?: st
           void openExternalUrl(href, { label, retryOnError: true });
         },
       },
-    ]
+    ],
+    // Android back dismisses, which equals Cancel: nothing opens and no host is trusted.
+    { cancelable: true }
   );
 }

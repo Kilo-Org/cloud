@@ -3,6 +3,7 @@ import {
   CodeReviewCouncilConfigSchema,
   EnkryptInputGuardrailSettingsSchema,
   ModelsSchema,
+  VercelModelsSchema,
   OpenRouterPricing,
   OpenRouterProvider,
   OrganizationSettingsSchema,
@@ -111,6 +112,27 @@ describe('OrganizationSettingsSchema org_auto_model', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('VercelModelsSchema', () => {
+  it('drops malformed description fields without rejecting the model', () => {
+    const result = VercelModelsSchema.parse({
+      data: [
+        {
+          id: 'vendor/model',
+          name: 'Model',
+          type: 'language',
+          context_window: '128k',
+          modalities: { input: ['text'] },
+          pricing: { input: 1 },
+          deprecated_at: 'soon',
+          reasoning_options: [{ type: 'effort', values: ['low'] }, { values: ['high'] }],
+        },
+      ],
+    });
+
+    expect(result.data[0]).toEqual({ id: 'vendor/model', name: 'Model', type: 'language' });
   });
 });
 

@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { createHmac } from 'node:crypto';
+import { callerAddressFromHeaders } from '@/lib/auth/caller-address';
 import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
@@ -32,22 +33,6 @@ function getMagicLinkEmailRateLimitKey(email: string): string {
 }
 
 /**
- * The caller address the firewall rule counts against. `x-vercel-forwarded-for`
- * is the header Vercel's edge sets for the request's source address, so it is
- * read first, matching `clientIpFromHeaders` in
- * packages/web-shared/src/lib/admin/admin-access-log.ts. `x-real-ip` covers
- * requests that arrive without the edge header, and `unknown` keeps the bucket
- * key non-empty.
- */
-function clientIpAddress(request: NextRequest): string {
-  const forwarded = request.headers.get('x-vercel-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0]?.trim() || 'unknown';
-  }
-  return request.headers.get('x-real-ip') || 'unknown';
-}
-
-/**
  * Applies the per-address and per-caller firewall rules and reports whether the
  * send is refused. Every rule must answer `allowed`: an exhausted budget, a
  * rule that is not configured, and a limiter that cannot answer all refuse, so
@@ -63,7 +48,7 @@ async function isSendBudgetRefused(email: string, request: NextRequest): Promise
     },
     {
       id: SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID,
-      key: `${SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID}:${clientIpAddress(request)}`,
+      key: `${SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID}:${callerAddressFromHeaders(request.headers)}`,
     },
   ] as const;
 

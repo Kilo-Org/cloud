@@ -295,6 +295,35 @@ describe('pushDataSchema cloud_agent_session', () => {
     };
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });
+
+  it('parses the raiseId an attention push presents, and keeps it absent when the producer has none', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+      raiseId: '2026-09-18T21:00:00.000Z',
+    };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+
+    const withoutRaise = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+    };
+    expect('raiseId' in pushDataSchema.parse(withoutRaise)).toBe(false);
+  });
+
+  it('rejects an empty raiseId', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      raiseId: '',
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
 });
 
 describe('pushDataSchema unknown type', () => {
@@ -424,5 +453,31 @@ describe('pushDataSchema active_agents_glanceable snapshot shape', () => {
     });
     expect('organizationBound' in parsed).toBe(true);
     expect('accountEpoch' in parsed).toBe(false);
+  });
+});
+
+describe('pushDataSchema session_live_update approvalKey', () => {
+  const sessionLiveUpdate = (approvalKey: unknown) => ({
+    type: 'session_live_update',
+    schemaVersion: 1,
+    event: 'update',
+    content: {
+      sessionId: 'session-1',
+      title: null,
+      statusKind: 'needsInput',
+      statusSince: '2026-11-12T09:00:00.000Z',
+      scheduledAt: null,
+      awaitingPermission: approvalKey !== null,
+      approvalKey,
+      updatedAt: '2026-11-12T09:01:00.000Z',
+    },
+  });
+
+  it('accepts lowercase SHA-256 hex and null, and nothing else', () => {
+    expect(pushDataSchema.safeParse(sessionLiveUpdate('a'.repeat(64))).success).toBe(true);
+    expect(pushDataSchema.safeParse(sessionLiveUpdate(null)).success).toBe(true);
+    for (const key of ['a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'per_raw_permission', '']) {
+      expect(pushDataSchema.safeParse(sessionLiveUpdate(key)).success).toBe(false);
+    }
   });
 });

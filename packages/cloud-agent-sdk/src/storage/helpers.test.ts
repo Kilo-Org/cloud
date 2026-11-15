@@ -134,13 +134,98 @@ describe('orderMessageIds', () => {
   });
 
   test('never drops rows from invalid parent cycles', () => {
-    const ids = ['a', 'b', 'c'];
+    const ids = ['c', 'a', 'b'];
     const messages = new Map([
       ['a', message('a', 'b')],
       ['b', message('b', 'a')],
       ['c', message('c')],
     ]);
-    expect(orderMessageIds(ids, messages)).toEqual(['c', 'a', 'b']);
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  describe('turns', () => {
+    function unconfirmed(id: string, created: number, queuedAt?: number): MessageInfo {
+      return {
+        ...timed(id, created),
+        synthetic: true,
+        ...(queuedAt === undefined ? {} : { queuedAt }),
+      } as MessageInfo;
+    }
+
+    function order(ids: string[], infos: MessageInfo[]): readonly string[] {
+      return orderMessageIds(ids, new Map(infos.map(info => [info.id, info])));
+    }
+
+    test('keeps a prompt queued mid-turn below later steps of the running turn', () => {
+      const infos = [
+        timed('prompt', 900),
+        timed('step-1', 1000, 'prompt'),
+        unconfirmed('queued', 1500, 1500),
+        timed('step-2', 2000, 'prompt'),
+      ];
+      expect(order(['prompt', 'queued', 'step-1', 'step-2'], infos)).toEqual([
+        'prompt',
+        'step-1',
+        'step-2',
+        'queued',
+      ]);
+    });
+
+    test('places a queued row by its server queue time, not its device time', () => {
+      const infos = [
+        unconfirmed('failed', 60_000, 100),
+        timed('retry', 200),
+        timed('answer', 300, 'retry'),
+      ];
+      expect(order(['answer', 'failed', 'retry'], infos)).toEqual(['failed', 'retry', 'answer']);
+    });
+
+    test('keeps a row without a server time after every placed turn', () => {
+      const infos = [
+        unconfirmed('sending', 5),
+        unconfirmed('queued', 9_000, 400),
+        timed('prompt', 100),
+        timed('step', 500, 'prompt'),
+      ];
+      expect(order(['sending', 'queued', 'prompt', 'step'], infos)).toEqual([
+        'prompt',
+        'step',
+        'queued',
+        'sending',
+      ]);
+    });
+
+    test('keeps a reply under its unconfirmed prompt', () => {
+      const infos = [unconfirmed('sending', 5), timed('reply', 1, 'sending'), timed('older', 2)];
+      expect(order(['older', 'reply', 'sending'], infos)).toEqual(['older', 'sending', 'reply']);
+    });
+
+    test('orders a later prompt after a turn whose steps it answers', () => {
+      // A prompt delivered between steps: the native runtime parents the later
+      // steps to it, so they belong to its turn.
+      const infos = [
+        timed('a', 100),
+        timed('a-1', 200, 'a'),
+        timed('b', 300),
+        timed('b-1', 400, 'b'),
+      ];
+      expect(order(['b-1', 'a', 'b', 'a-1'], infos)).toEqual(['a', 'a-1', 'b', 'b-1']);
+    });
+
+    test('orders the rows of a turn by time after the prompt', () => {
+      const infos = [
+        timed('p', 100),
+        timed('s-2', 300, 'p'),
+        timed('s-1', 200, 'p'),
+        timed('q', 250),
+      ];
+      expect(order(['p', 'q', 's-1', 's-2'], infos)).toEqual(['p', 's-1', 's-2', 'q']);
+    });
+
+    test('opens a turn for a reply whose prompt is on an older page', () => {
+      const infos = [timed('reply', 100, 'missing'), timed('next', 200), timed('late', 50)];
+      expect(order(['next', 'reply', 'late'], infos)).toEqual(['late', 'reply', 'next']);
+    });
   });
 });
 

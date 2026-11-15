@@ -24,6 +24,7 @@ export type CapabilityName =
   | 'deployedHttpAuthBoundary'
   | 'callbacks'
   | 'gates'
+  | 'kilo2Drain'
   | 'sandboxFaults'
   | 'controlPlaneV2'
   | 'controlPlaneRuntime'
@@ -298,6 +299,7 @@ export type SandboxFaultObservation = {
   captureWrapperIdentity(
     allocation: SandboxFaultAllocation
   ): Promise<{ instanceId: string; pid: number }>;
+  /** Kill the proven primary only; its `-proxy` sidecar stays, as after a real loss. */
   killOwnedContainer(
     target: SandboxFaultTarget
   ): Promise<{ killed: boolean; observedRef: string; detail: string }>;
@@ -422,10 +424,9 @@ export type SandboxFaultObservation = {
 };
 
 /**
- * Physical cleanup a profile owns once a scenario has released its sessions:
- * stop the sandboxes those sessions owned. It is not a scenario requirement, so
- * it is not a `CapabilityName`. Only a profile with a sandbox it may stop
- * (`local`) provides it. It reports problems and never throws.
+ * Physical cleanup after a scenario, before deletion removes its native roots
+ * and their ownership proof. Not a scenario requirement or a `CapabilityName`.
+ * Only the local profile provides it. It reports problems and never throws.
  */
 export type SandboxReclaim = (
   sessions: ReadonlyArray<{ sessionId: string; kiloSessionId?: string }>
@@ -442,6 +443,8 @@ export type ScenarioEnvironment = {
   deployedHttpAuthBoundary?: DeployedAuthBoundaryObservation;
   callbacks?: CallbackObservation;
   gates?: GatesObservation;
+  /** Explicit opt-in for a local stack prepared with the drain-capable Kilo v2 image. */
+  kilo2Drain?: { ready: true };
   sandboxFaults?: SandboxFaultObservation;
   controlPlaneV2?: ControlPlaneV2Observation;
   controlPlaneRuntime?: ControlPlaneRuntimeObservation;
@@ -568,11 +571,10 @@ export function isScenarioSupported(
  *    because it observes identity through the e2e surface;
  * 4. a declared or profile-mandatory capability that is absent → explicit
  *    `unsupported`;
- * 5. otherwise run the scenario. The gate owns teardown for every profile: the
- *    run receives a composed config that records every id a create reports, the
- *    ids are released after the run (interrupt then delete, newest first), and
- *    the profile's `reclaimSessions` then stops the sandboxes they owned, so a
- *    finished scenario does not hold memory until the idle stop.
+ * 5. otherwise run with a config that records every created session. In teardown,
+ *    reclaim exclusively owned local sandboxes while native roots still prove
+ *    ownership, then interrupt and delete sessions newest first. Finished
+ *    scenarios do not hold container memory until the idle stop.
  */
 export async function runSharedScenario(
   def: RunnableSharedScenario,
@@ -616,11 +618,14 @@ export async function runSharedScenario(
   try {
     return await def.run({ ...args, api: resolvedApi.api, config: owned.config }, env);
   } finally {
-    await owned.cleanup(def.name);
-    await env.reclaimSessions?.(owned.entries()).catch(error => {
-      console.warn(
-        `${def.name}: sandbox reclaim failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    });
+    try {
+      await env.reclaimSessions?.(owned.entries()).catch(error => {
+        console.warn(
+          `${def.name}: sandbox reclaim failed: ${error instanceof Error ? error.message : String(error)}`
+        );
+      });
+    } finally {
+      await owned.cleanup(def.name);
+    }
   }
 }

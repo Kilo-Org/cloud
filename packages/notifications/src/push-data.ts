@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { HOME_WIDGET_TITLE_LIMIT, homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 import {
@@ -13,12 +14,13 @@ import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import {
   instanceLifecycleEventSchema,
   scheduledActionEventSchema,
-  securityLifecycleEventSchema,
+  securityLifecyclePayloadShape,
 } from './notification-events';
 import { SESSION_CARD_STATUS_KINDS, sessionLiveOutcomeSchema } from './session-live-content';
-import { refineSpendAlertScope } from './spend-alert-scope';
+import { nonEmptyStringSchema } from './non-empty-string';
+import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
-const nonEmptyStringSchema = z.string().min(1);
+export { nonEmptyStringSchema };
 
 // Discriminates between attention-requiring and status-only cloud agent
 // session notifications. Optional everywhere it appears so old producers
@@ -46,7 +48,7 @@ export const sessionLiveActivityContentStateSchema = z.object({
   /** True only when Approve can answer the waiting permission request. */
   awaitingPermission: z.boolean(),
   /** SHA-256 hex of `JSON.stringify([sessionId, permissionId])`, else null. */
-  approvalKey: z.string().nullable(),
+  approvalKey: approvalKeySchema,
   /** ISO 8601; when the server confirmed this content. */
   updatedAt: z.string(),
   /** The step the agent is on; null when the session is not working. */
@@ -100,6 +102,16 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // Needs-input raise detail: which answer the waiting agent wants, and the
     // PR that can be opened from the notification. Absent on status pushes.
     attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+    /**
+     * The one raise this attention push presents: the waiting session's own
+     * status time (`cli_sessions_v2.status_updated_at`), in the payload's ISO
+     * form. The app answers the raise this id names and nothing else, so a
+     * notification left over from a raise that already moved cannot answer the
+     * session's current one. Absent on status pushes, on a producer that
+     * cannot name the raise, and on a payload posted before this field
+     * existed — the app then keeps its previous behaviour.
+     */
+    raiseId: nonEmptyStringSchema.optional(),
     prUrl: nonEmptyStringSchema.optional(),
     // The session's organization, so a tap can land the app in the context
     // the session belongs to. Optional so a push from an older producer in a
@@ -124,8 +136,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('spend_alert'),
-      scope: z.enum(['personal', 'organization']),
-      organizationId: nonEmptyStringSchema.optional(),
+      ...spendAlertScopeShape,
     })
     .superRefine(refineSpendAlertScope),
   z.object({
@@ -138,11 +149,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // for the event-to-action mapping and the FindingCreated rationale.
   z.object({
     type: z.literal('security_lifecycle'),
-    event: securityLifecycleEventSchema,
-    findingId: nonEmptyStringSchema,
-    scope: nonEmptyStringSchema,
-    remediationId: nonEmptyStringSchema.optional(),
-    prUrl: nonEmptyStringSchema.optional(),
+    ...securityLifecyclePayloadShape,
   }),
   // Aggregate snapshot remains privacy-minimal. Optional Home-only details
   // travel beside it for background Home widget updates and are never copied

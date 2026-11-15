@@ -86,8 +86,9 @@ export type ControlPlaneTimers = {
 // scaled) because they bound provider and container work.
 const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
 const PROVIDER_CREATE_RETRY_MS = 10_000;
-// Environment snapshot starts use `DEADLINE_MS.repositoryStartup`; this module
-// also ships in the wrapper without the worker sources.
+const PROVIDER_STOP_ATTEMPT_MS = 30_000;
+// Snapshot starts use `DEADLINE_MS.repositoryStartup` for each launch attempt;
+// this module also ships in the wrapper without the worker sources.
 const PREPARATION_CREATE_MS = 5 * MINUTE_MS;
 const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
 const WRAPPER_HELLO_MS = 30_000;
@@ -97,12 +98,15 @@ const CAPTURE_MS = 5 * MINUTE_MS + 10_000;
 const KILO_RUNTIME_START_MS = 2 * MINUTE_MS;
 const KILO_SESSION_MS = 2 * MINUTE_MS;
 
-// Fixed preparation work includes one create retry and one retry each for
-// runtime start and session import. Setup retains its per-command bounds;
-// the attempt deadline is its aggregate stop.
+// Fixed preparation work includes one create retry, one snapshot launch retry
+// (a confirmed stop, then its own launch bound) and one retry each for runtime
+// start and session import. Setup retains its per-command bounds; the attempt
+// deadline is its aggregate stop.
 const ROUTE_PREPARATION_MS =
   PREPARATION_CREATE_MS +
   PROVIDER_CREATE_RETRY_MS +
+  PREPARATION_CREATE_MS +
+  PROVIDER_STOP_ATTEMPT_MS +
   PREPARATION_CREATE_MS +
   WRAPPER_FIRST_CONNECT_MS +
   WRAPPER_HELLO_MS +
@@ -151,7 +155,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     organizationMembershipReadMs: 3_000,
     organizationMembershipReadAttempts: 3,
     organizationMembershipReadRetryMs: 1_000,
-    providerStopAttemptMs: 30_000,
+    providerStopAttemptMs: PROVIDER_STOP_ATTEMPT_MS,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };
   const wrapper = {

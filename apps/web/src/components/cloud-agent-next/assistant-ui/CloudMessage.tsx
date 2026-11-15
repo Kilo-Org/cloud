@@ -3,6 +3,7 @@ import React from 'react';
 
 import { AlertCircle } from 'lucide-react';
 import { MessagePrimitive } from '@assistant-ui/react';
+import { isCompactionSummaryPart } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,7 @@ import { ChildSessionCallbackCard } from '../ChildSessionCallbackCard';
 import { WorktreeReviewMessageCard } from '../WorktreeReviewMessageCard';
 import { PreparationRow } from '../PreparationRow';
 import { CommitCard } from '../CommitCard';
+import { CompactionSummary } from '../CompactionSummary';
 import { MessageErrorBoundary } from '../MessageErrorBoundary';
 import { CloudMessagePartByIndex, CloudMessageParts } from './CloudMessageParts';
 import {
@@ -42,6 +44,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
   const isUser = first.info.role === 'user';
   const text = isUser ? getUserTextContent(parts) : getAssistantTextContent(parts);
   const compaction = parts.find(isCompactionPart);
+  const compactionSummary = parts.find(isCompactionSummaryPart);
   const error = first.info.role === 'assistant' ? first.info.error : undefined;
   const showError = !presentation.isStreaming && error != null;
   const interrupted = error != null && isAssistantInterruptError(error);
@@ -92,11 +95,14 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
                         : 'completed'
                 }
               />
+              {first.info.role === 'assistant' &&
+                first.info.time.completed !== undefined &&
+                !error && <CompactionSummary text={compactionSummary?.text} />}
               {errorMessage && errorMessage !== 'Context compaction failed' && (
                 <p className="text-destructive text-sm">{errorMessage}</p>
               )}
               {(isUser ? parts : getVisibleAssistantParts(parts)).map((part, index) =>
-                isCompactionPart(part) ? null : (
+                isCompactionPart(part) || isCompactionSummaryPart(part) ? null : (
                   <CloudMessagePartByIndex key={part.id} index={index} />
                 )
               )}

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { SECURITY_LIFECYCLE_EVENTS } from '@kilocode/notifications/schemas';
 
-import { notificationPathForData, prPathForData } from './notification-path';
+import {
+  notificationDestinationForData,
+  notificationPathForData,
+  prPathForData,
+} from './notification-path';
 
 describe('prPathForData', () => {
   it('routes a GitHub PR payload to the PR review route with via=push', () => {
@@ -71,8 +75,46 @@ describe('notificationPathForData', () => {
     },
     { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sandbox-1' },
     { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sandbox-1' },
-  ] as const)('ignores retired notification destination $type', data => {
+  ] as const)('keeps KiloClaw $type off the app router', data => {
+    // KiloClaw has no mobile screen, so it has no app href; its tap opens the
+    // matching web page instead.
     expect(notificationPathForData(data)).toBeNull();
+    expect(notificationDestinationForData(data, 'https://app.example.com')).toMatchObject({
+      kind: 'external',
+    });
+  });
+
+  it('opens a KiloClaw conversation on its web chat', () => {
+    expect(
+      notificationDestinationForData(
+        {
+          type: 'chat.message',
+          sandboxId: 'sandbox-1',
+          conversationId: 'conv_1',
+          messageId: 'm1',
+        },
+        'https://app.kilo.ai'
+      )
+    ).toEqual({ kind: 'external', url: 'https://app.kilo.ai/claw/chat/conv_1' });
+  });
+
+  it.each([
+    { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sandbox-1' },
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sandbox-1' },
+  ] as const)('opens a KiloClaw $type push on the instance page', data => {
+    expect(notificationDestinationForData(data, 'https://app.kilo.ai')).toEqual({
+      kind: 'external',
+      url: 'https://app.kilo.ai/claw',
+    });
+  });
+
+  it('leaves an app destination alone and ignores the web origin', () => {
+    expect(
+      notificationDestinationForData(
+        { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+        'https://app.kilo.ai'
+      )
+    ).toEqual({ kind: 'app', href: '/(app)/agent-chat/ses_1?via=push' });
   });
 
   it('routes cloud agent notifications to the matching agent session', () => {

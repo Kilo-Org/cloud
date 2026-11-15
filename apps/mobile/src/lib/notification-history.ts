@@ -6,7 +6,7 @@ import {
   translatePush,
 } from '@kilocode/notifications';
 
-import { notificationPathForData } from './notification-path';
+import { type NotificationDestination, notificationDestinationForData } from './notification-path';
 
 /**
  * Pure logic for the Notification history screen: how a recorded row is read
@@ -81,7 +81,7 @@ export function notificationHistoryCopy(
 
 export type NotificationHistoryTarget = Readonly<{
   data: PushData;
-  href: string;
+  destination: NotificationDestination;
 }>;
 
 /**
@@ -107,19 +107,29 @@ function withoutPushOrigin(href: string): string {
 /**
  * Where a row's tap goes, or null when the stored payload no longer resolves to
  * a destination or belongs to a retired product.
+ *
+ * `webBaseUrl` is the Kilo web origin a row that opens a web page — a KiloClaw
+ * conversation, which has no mobile screen — uses. An app route ignores it.
  */
 export function notificationHistoryTarget(
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  webBaseUrl: string
 ): NotificationHistoryTarget | null {
   const parsed = pushDataSchema.safeParse(payload);
   if (!parsed.success) {
     return null;
   }
-  const href = notificationPathForData(parsed.data);
-  if (href === null) {
+  const destination = notificationDestinationForData(parsed.data, webBaseUrl);
+  if (destination === null) {
     return null;
   }
-  return { data: parsed.data, href: withoutPushOrigin(href) };
+  return {
+    data: parsed.data,
+    destination:
+      destination.kind === 'app'
+        ? { kind: 'app', href: withoutPushOrigin(destination.href) }
+        : destination,
+  };
 }
 
 export type NotificationHistoryFilter = Readonly<{

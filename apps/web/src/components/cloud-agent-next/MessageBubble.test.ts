@@ -156,7 +156,15 @@ describe('MessageBubble', () => {
       expect(html).toContain(label);
       expect(html).toContain('Before compaction');
       expect(html).toContain('Compaction detail');
-      expect(html).not.toContain('Internal context summary');
+      if (status === 'completed') {
+        expect(html).not.toContain('Internal context summary');
+        expect(html).toContain('Context summary');
+        expect(html).toContain('Compaction replaces older model context with a summary.');
+        expect(html).toContain('aria-expanded="false"');
+      } else {
+        expect(html).not.toContain('Internal context summary');
+        expect(html).not.toContain('No summary is available');
+      }
       expect(html.split(label)).toHaveLength(2);
       expect(html).not.toContain('Raw abort text');
       expect(html.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
@@ -209,6 +217,39 @@ describe('MessageBubble', () => {
       expect(nestedHtml).not.toContain('Unknown part type');
     }
   );
+
+  it('explains a completed V2 compaction that has no saved summary', () => {
+    const messages = readKilo2Messages(
+      { id: 'ses-1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+      [{ id: 'msg_compaction', type: 'compaction', status: 'completed', time: { created: 2 } }]
+    );
+    const html = renderToStaticMarkup(React.createElement(CloudSharedTranscript, { messages }));
+    expect(html).toContain('No summary is available for this compaction.');
+    expect(html).not.toContain('aria-label="Context summary"');
+  });
+
+  it('keeps a summary-only V2 compaction collapsed by default without requiring streamed content', () => {
+    const messages = readKilo2Messages(
+      { id: 'ses-1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+      [
+        {
+          id: 'msg_compaction',
+          type: 'compaction',
+          status: 'completed',
+          reason: 'auto',
+          summary: 'Keep the task and the next step.',
+          time: { created: 2 },
+        },
+      ]
+    );
+    const html = renderToStaticMarkup(React.createElement(CloudSharedTranscript, { messages }));
+    expect(html).toContain('Context compacted');
+    expect(html).toContain('(auto)');
+    expect(html).not.toContain('Keep the task and the next step.');
+    expect(html).toContain('aria-label="Context summary"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('No summary is available');
+  });
 
   it('keeps one resume anchor for a compaction-only group', () => {
     const message = userMessage('');

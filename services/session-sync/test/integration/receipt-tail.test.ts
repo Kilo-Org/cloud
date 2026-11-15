@@ -51,7 +51,7 @@ it('retains the exact accepted tail across retries, rollback, migration and rest
             ]
       );
       cursors.length = 0;
-      const receipt = state.storage.transactionSync(() =>
+      const { receipt } = state.storage.transactionSync(() =>
         apply(db, principal, sessionID, packet, `digest-${ordinal}`, ordinal)
       );
       accepted.push({ packet, receipt });
@@ -97,7 +97,7 @@ it('retains the exact accepted tail across retries, rollback, migration and rest
       state.storage.transactionSync(() =>
         apply(db, principal, sessionID, latest.packet, 'digest-600', 999)
       )
-    ).toEqual(latest.receipt);
+    ).toEqual({ receipt: latest.receipt });
     expect(cursors.reduce((sum, row) => sum + row.cursor.rowsWritten, 0)).toBe(0);
     expect(() =>
       state.storage.transactionSync(() =>

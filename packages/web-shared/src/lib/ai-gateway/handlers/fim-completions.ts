@@ -181,17 +181,23 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     user_byok: !!userByokEntry,
     has_tools: false,
     feature,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: false,
-      samples: null,
-      // FIM feeds volume rules only, which do not read a prompt hash.
-      promptSimHash: null,
-    }),
+  };
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: false,
+    samples: null,
+    // FIM feeds volume rules only, which do not read a prompt hash.
+    promptSimHash: null,
   };
 
   setTag('ui.ai_model', requestBody.model);
+  // This one call is the route's whole access decision. It answers the paid-usage gate, then
+  // the caller's organization model-access policy: the member grant, the enterprise
+  // organization's model deny list, and its provider allow-list, matched against the provider
+  // this route selected for the model. A denial returns `modelNotAllowedResponse` before any
+  // upstream request. Do not resolve that policy again here; `direct-provider-access.ts` is the
+  // single source, so a second resolution can only disagree with it.
   const accessResult = await checkDirectProviderAccess({
     user,
     organizationId,
@@ -202,6 +208,10 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   });
   if (accessResult.rejection) return accessResult.rejection;
   const { balance, plan, payer } = accessResult.access;
+
+  // The usage row reports the payer the balance check resolved: the root organization for an
+  // organization member.
+  usageContext.bouncer = await bouncer.usage(bouncerUsageFields, payer);
 
   // Data-use contract for this route: FIM goes straight to the provider, and the supported
   // providers are classified by the gateway's provider data policy as not training on prompts

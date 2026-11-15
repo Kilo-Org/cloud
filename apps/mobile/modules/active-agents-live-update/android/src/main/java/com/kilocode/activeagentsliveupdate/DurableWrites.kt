@@ -1,6 +1,7 @@
 package com.kilocode.activeagentsliveupdate
 
 import android.content.BroadcastReceiver
+import android.content.SharedPreferences
 import android.util.Log
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -64,6 +65,22 @@ internal object DurableWrites {
     } catch (error: Throwable) {
       Log.e(ACTIVE_AGENTS_TAG, "Active agents live update failed", error)
     }
+  }
+}
+
+/**
+ * Commit an editor and report a refused write through [ACTIVE_AGENTS_TAG]
+ * instead of dropping its result.
+ *
+ * The receivers and the session card cannot throw: a broadcast's exception takes
+ * the process down, and a module entry point's promise is never consumed by the
+ * JS bridge. A refused commit therefore stays logged, and the caller carries on
+ * with the notification it was going to post, exactly as
+ * `ActiveAgentsDeadlineReceiver` does for its own stores.
+ */
+internal fun SharedPreferences.Editor.commitOrReport(failure: String) {
+  if (!commit()) {
+    Log.e(ACTIVE_AGENTS_TAG, failure)
   }
 }
 

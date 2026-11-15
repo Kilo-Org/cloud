@@ -654,6 +654,38 @@ describe('spokenJoiner', () => {
     ).toBe('ርዕስ፣ CLI፣ ከ40 ደቂቃ በፊት');
   });
 
+  it('keeps the Arabic word space after the pause mark before the origin', async () => {
+    // The Arabic list formatter spells its conjunction as a prefix (`" و"`),
+    // so its separator carries no trailing space. A pause mark is not that
+    // prefix: the label must still separate it from the next word, or it reads
+    // `…أشهر،من …` as one run-on token.
+    await i18n.changeLanguage('ar');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'الجلسة الأولى',
+        needsInput: false,
+        badge: 'CLOUD AGENT',
+        meta: 'التكلفة 18 سنتًا، قبل 3 أشهر',
+        platform: 'cloud-agent',
+      })
+    ).toBe('الجلسة الأولى وCLOUD AGENT والتكلفة 18 سنتًا، قبل 3 أشهر، من CLOUD AGENT');
+  });
+
+  it('leaves a script that writes no space after its pause mark unchanged', async () => {
+    // Japanese `、` binds the next clause directly; adding a space would put
+    // one where the script never writes it.
+    await i18n.changeLanguage('ja');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'セッション',
+        needsInput: false,
+        badge: 'CLI',
+        meta: '40分前',
+        platform: 'cloud-agent',
+      })
+    ).toBe('セッション、CLI、40分前、CLOUD AGENTから');
+  });
+
   it('states a pause, never a bare conjunction, in every catalog', async () => {
     const bare: string[] = [];
     for (const tag of SUPPORTED_LANGUAGES) {

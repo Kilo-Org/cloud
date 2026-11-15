@@ -57,6 +57,14 @@ export const controlPlanePrepareInputWithSelectionSchema = z
     sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
     /** The admitted repository environment; DO-private like `credentials`. */
     environment: environmentReferenceSchema.optional(),
+    /**
+     * The newest workspace stop this session observed. A prepare that names an
+     * older epoch than the Sandbox's current one is stale work and must not
+     * revive the workspace.
+     */
+    stopEpoch: z.number().int().nonnegative().optional(),
+    /** When the oldest queued message was created; new intent after a Stop. */
+    intentAt: z.number().int().nonnegative().optional(),
   })
   .strict();
 

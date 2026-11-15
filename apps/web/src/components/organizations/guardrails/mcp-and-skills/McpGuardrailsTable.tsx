@@ -19,7 +19,7 @@ import {
   GUARDRAIL_TYPE_LABELS,
   configIdentity,
   configKindLabel,
-  minVersionLabel,
+  versionSpecLabel,
   sourceLabel,
 } from './guardrail-display';
 import type { OrganizationGuardrailRow } from './guardrail-types';
@@ -73,7 +73,7 @@ export function McpGuardrailsTable({
             <TableHead>MCP server</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Source</TableHead>
-            <TableHead>Minimum version</TableHead>
+            <TableHead>Allowed versions</TableHead>
             <TableHead className="w-24">
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -103,7 +103,7 @@ export function McpGuardrailsTable({
                 </TableCell>
                 <TableCell>{GUARDRAIL_TYPE_LABELS[guardrail.type]}</TableCell>
                 <TableCell>{sourceLabel(guardrail.source)}</TableCell>
-                <TableCell className="tabular-nums">{minVersionLabel(guardrail.config)}</TableCell>
+                <TableCell>{versionSpecLabel(guardrail.config)}</TableCell>
                 <TableCell>
                   <div className="flex justify-end">
                     {guardrail.source.registry === 'custom' && (

@@ -29,6 +29,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type * as GitLabService from './gitlab-service';
 import type { fetchGitLabCredential as FetchGitLabCredential } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
+import { isPlatformIntegrationSuspended } from './core/health';
 
 const mockValidatePersonalAccessToken = jest.fn<typeof GitLabAdapter.validatePersonalAccessToken>();
 const mockFetchGitLabProjects = jest.fn<typeof GitLabAdapter.fetchGitLabProjects>();
@@ -2415,6 +2416,41 @@ describe('GitLab encrypted credential persistence', () => {
     expect(integration.auth_invalid_at).toBeNull();
     expect(integration.auth_invalid_reason).toBeNull();
     expect(credential.authorized_by_user_id).toBe(user.id);
+  });
+
+  it('clears the suspension markers when a PAT reconnect reactivates the row', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user', id: user.id } as const;
+    const initial = await connectWithPAT(
+      owner,
+      'glpat-initial-token',
+      'https://gitlab.com',
+      user.id
+    );
+    await db
+      .update(platform_integrations)
+      .set({
+        suspended_at: new Date().toISOString(),
+        suspended_by: 'suspension-writer',
+      })
+      .where(eq(platform_integrations.id, initial.integration.id));
+
+    const result = await connectWithPAT(
+      owner,
+      'glpat-replacement-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+
+    expect(result.success).toBe(true);
+    expect(integration.integration_status).toBe('active');
+    expect(integration.suspended_at).toBeNull();
+    expect(integration.suspended_by).toBeNull();
+    expect(isPlatformIntegrationSuspended(integration)).toBe(false);
   });
 
   it('discards the previous instance cache when the repository list cannot be loaded', async () => {

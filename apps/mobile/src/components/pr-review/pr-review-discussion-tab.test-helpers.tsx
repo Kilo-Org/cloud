@@ -135,6 +135,7 @@ vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
 // sonner-native, neither of which this node-environment suite can resolve.
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => hoisted.connectivity.value,
+  connectionRefusesWrites: () => hoisted.connectivity.value === 'offline',
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {

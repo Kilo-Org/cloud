@@ -5,11 +5,11 @@ import { randomUUID } from 'crypto';
 import { TRPCError } from '@trpc/server';
 
 import {
-  bouncerAccountId,
   chargeDecide,
   type ChargeDecideResponse,
   type CreditFlow,
 } from '@kilocode/web-shared/lib/bouncer/client';
+import { organizationBouncerAccountId } from '@kilocode/web-shared/lib/bouncer/credit-events';
 
 /**
  * The refusal a checkout procedure returns when bouncer's charge standing blocks the payer. It says
@@ -22,7 +22,7 @@ export type ChargeStandingRequest = {
   stage: 'checkout' | 'failure';
   /** An id for bouncer's audit log: the checkout attempt, or the charge id on a failure. */
   requestId: string;
-  /** `user:<id>` or `org:<id>`, the same payer key the credit events use. */
+  /** `user:<id>`, or `org:<root id>` for an organization payer: the same key the credit events use. */
   accountId: string;
   userId?: string;
   ip?: string | null;
@@ -75,7 +75,7 @@ export async function decideCheckoutCharge(
   return chargeStanding({
     stage: 'checkout',
     requestId: params.requestId ?? `checkout:${randomUUID()}`,
-    accountId: bouncerAccountId(params.userId, params.organizationId),
+    accountId: await organizationBouncerAccountId(params.userId, params.organizationId),
     userId: params.userId,
     ip: params.ip,
     ja4: params.ja4,

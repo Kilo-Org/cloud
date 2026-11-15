@@ -41,7 +41,7 @@ export const EXA_USAGE_TYPE_MAX_LENGTH = 128;
  */
 export const ExaUsageRecordSchema = z.strictObject({
   id: z.string().uuid(),
-  occurredAt: z.string().datetime({ offset: true }),
+  occurredAt: z.iso.datetime({ offset: true }),
   userId: z.string().min(1),
   organizationId: z.string().uuid().nullable(),
   path: z.enum(EXA_ALLOWED_PATHS),
@@ -64,3 +64,15 @@ export const ExaUsageWriteResponseSchema = z.strictObject({
 });
 
 export type ExaUsageWriteResponse = z.infer<typeof ExaUsageWriteResponseSchema>;
+
+/**
+ * Body of an Exa usage message on the shared usage queue. The kind tag is what separates it from
+ * an LLM usage message, which is always sent untagged.
+ */
+export const ExaUsageQueueMessageSchema = z.strictObject({
+  kind: z.literal('exa_usage'),
+  v: z.literal(1),
+  record: ExaUsageRecordSchema,
+});
+
+export type ExaUsageQueueMessage = z.infer<typeof ExaUsageQueueMessageSchema>;

@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectHiddenReservedBox, info, render } from './session-context-metrics-test-helpers';
+import {
+  expectHiddenPill,
+  info,
+  pillOf,
+  propsOf,
+  render,
+} from './session-context-metrics-test-helpers';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -9,10 +15,10 @@ vi.mock('./context-usage-ring', () => ({ ContextUsageRing: 'ContextUsageRing' })
 
 describe('SessionContextMetrics nothing to report', () => {
   // A settled empty stored session reports no usage ever, and its sheet has no
-  // permission settings: the dash value slots would read as a permanent
-  // placeholder, so the pill paints nothing while it keeps its reserved box.
-  it('hides the reserved box for a settled session with no usage and no sheet', () => {
-    expectHiddenReservedBox(
+  // permission settings: a dash value slot would read as a permanent
+  // placeholder, so the pill hides while the row keeps its space.
+  it('hides the pill for a settled session with no usage and no sheet', () => {
+    expectHiddenPill(
       render({
         info: undefined,
         totalCostMicrodollars: null,
@@ -33,14 +39,15 @@ describe('SessionContextMetrics nothing to report', () => {
       onNothingToReport: true,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as { className?: string; onPress?: () => void };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
     expect(onPress).toHaveBeenCalledOnce();
   });
 
-  it('keeps the reserved box live while nothing-to-report is still pending', () => {
+  it('keeps the pill live while nothing-to-report is still pending', () => {
     const onPress = vi.fn<() => void>();
     const root = render({
       info: undefined,
@@ -51,8 +58,9 @@ describe('SessionContextMetrics nothing to report', () => {
       onNothingToReport: false,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as { className?: string; onPress?: () => void };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
     expect(onPress).toHaveBeenCalledOnce();

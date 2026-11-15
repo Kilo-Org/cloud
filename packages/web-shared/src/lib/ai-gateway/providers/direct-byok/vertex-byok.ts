@@ -10,6 +10,7 @@ import type {
   DirectByokProvider,
   DirectByokUpstream,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { credentialHeaders } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   ReasoningDetailsTransform,
   type GatewayChatApiKind,
@@ -259,6 +260,7 @@ export default {
     }
   },
   models: cachedDirectByokModelList('vertex-byok'),
+  chatCompletionsHeaders: credentialHeaders,
   async resolveUpstream({ credential, model, stream }) {
     return resolveGcpVertexUpstream(credential, model, stream);
   },

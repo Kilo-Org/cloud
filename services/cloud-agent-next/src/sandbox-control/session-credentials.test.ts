@@ -85,7 +85,11 @@ describe('Vercel credentials with private control-plane upstreams', () => {
     expect(JSON.stringify(payload)).not.toContain(input.source.kiloToken);
     const policy = buildControlNetworkPolicy([grant]);
     expect(policy.allow['worker.example.com'].length).toBeGreaterThan(0);
-    expect(Object.keys(policy.allow)).toEqual(['worker.example.com', '*']);
+    expect(Object.keys(policy.allow)).toEqual([
+      'session-sync.kiloapps.io',
+      'worker.example.com',
+      '*',
+    ]);
     expect(JSON.stringify(policy)).not.toContain('localhost');
   });
 

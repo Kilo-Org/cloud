@@ -208,7 +208,23 @@ describe('worktree-scoped saved changes and file hooks', () => {
   });
 
   it.each([undefined, 'organization-a'])(
-    'reuses sibling caches and propagates newer revisions in scope %s using the selected session for access',
+    'reuses fresh sibling summaries without another read in scope %s',
+    async organizationId => {
+      const first = { ...scope, organizationId };
+      const sibling = { ...first, cloudAgentSessionId: 'workspace-chat-b' };
+      render([first]);
+      await settle();
+      render([first, sibling]);
+      await settle();
+
+      expect(results.get(sibling.cloudAgentSessionId)?.state).toEqual(file(3));
+      expect(readChanges).toHaveBeenCalledTimes(1);
+      expect(readFile).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([undefined, 'organization-a'])(
+    'refreshes stale sibling summaries and propagates newer revisions in scope %s using the selected session for access',
     async organizationId => {
       const first = { ...scope, organizationId };
       const sibling = { ...first, cloudAgentSessionId: 'workspace-chat-b' };
@@ -219,6 +235,9 @@ describe('worktree-scoped saved changes and file hooks', () => {
 
       const latest = Promise.withResolvers<GetWorktreeChangesOutput>();
       readChanges.mockReturnValueOnce(latest.promise);
+      queryClient.setQueryData(getWorktreeChangesQueryKey(first), saved(3), {
+        updatedAt: Date.now() - 5001,
+      });
       render([first, sibling]);
       expect(results.get(sibling.cloudAgentSessionId)?.state).toEqual(file(3));
       expect(readChanges).toHaveBeenLastCalledWith(

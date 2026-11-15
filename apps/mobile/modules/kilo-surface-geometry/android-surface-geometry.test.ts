@@ -8,10 +8,13 @@ import { describe, expect, it } from 'vitest';
 /**
  * The observer runs on the Android UI thread, so no host without a device can
  * execute it. This guard reads the Kotlin source and asserts the shape the
- * allocation fix requires: the per-frame pre-draw pass reuses preallocated
- * scratch objects, compares the six measured values through a mutable holder
- * instead of building a map, and runs the full measurement only when a cheap
- * signal changed. A return to per-frame allocation or per-frame measurement
+ * per-frame work fix requires: the layout and pre-draw passes gate on one cheap
+ * signal so a traversal measures at most once, the measurement reuses the
+ * display frame the signal read, the clip walk collects the ancestor path once
+ * instead of walking to the window root per ancestor, and the passes reuse
+ * preallocated scratch objects and compare the six measured values through a
+ * mutable holder instead of building a map. A return to per-frame allocation,
+ * per-traversal measurement, a second frame query or a quadratic clip walk
  * fails here instead of on a device.
  *
  * The JS contract is unchanged: `snapshot()` still returns the six-field map
@@ -63,6 +66,11 @@ const MEASURE = functionBody(SOURCE, 'measure');
 const LOCAL_TO_SCREEN = functionBody(SOURCE, 'localToScreen');
 const SNAPSHOT = functionBody(SOURCE, 'snapshot');
 const PRE_DRAW = functionBody(SOURCE, 'onPreDraw');
+const LAYOUT = functionBody(SOURCE, 'onGlobalLayout');
+const ATTACH = functionBody(SOURCE, 'onViewAttachedToWindow');
+const DETACH = functionBody(SOURCE, 'onViewDetachedFromWindow');
+const REFRESH_FRAME = functionBody(SOURCE, 'refreshDisplayFrame');
+const STOP = functionBody(SOURCE, 'stop');
 const SIGNAL = functionBody(SOURCE, 'signalChanged');
 const COMPARE = functionBody(SOURCE, 'sameAs');
 
@@ -104,15 +112,36 @@ describe('the surface-geometry pre-draw observer', () => {
     expect(MEASURE, 'the measured values are written into the running holder').toContain('result.');
   });
 
-  it('maps each ancestor clip through the preallocated matrix', () => {
-    const walk = /localToScreen\(ancestor, (\w+)\)/.exec(MEASURE);
-    expect(walk, 'the clip walk hands its matrix to localToScreen').not.toBeNull();
+  it('maps each ancestor clip through one collected path', () => {
+    expect(MEASURE, 'the path is collected once').toMatch(/chain\[depth\] = ancestor\b/);
+    expect(MEASURE, 'the descent starts at the collected window root').toMatch(
+      /localToScreen\(chain\[depth - 1\]!!, ancestorMatrix\)/
+    );
+    expect(MEASURE, 'no ancestor-to-window walk per clipping ancestor').not.toMatch(
+      /localToScreen\(ancestor\b/
+    );
+    expect(MEASURE, 'each level prepends its matrix to the parent transform').toMatch(
+      /ancestorMatrix\.preConcat\(view\.matrix\)/
+    );
+    expect(MEASURE, 'each level prepends its parent scroll').toMatch(
+      /ancestorMatrix\.preTranslate\(-parent\.scrollX\.toFloat\(\), -parent\.scrollY\.toFloat\(\)\)/
+    );
     expect(MEASURE, 'no per-ancestor matrix').not.toMatch(/Matrix\(\)/);
     expect(MEASURE, 'no per-ancestor clip rect').not.toMatch(/RectF\(clip\)/);
     expect(MEASURE, 'the clip is mapped through a scratch rect').toMatch(/\w+\.mapRect\(/);
-    expect(scratchFields('Matrix'), 'the walk matrix is an observer field').toContain(
-      walk?.[1] ?? ''
+    expect(SOURCE, 'the path buffer is a reused observer field').toMatch(
+      /private var chain = arrayOfNulls<View>\(0\)/
     );
+    expect(MEASURE, 'the path buffer grows by doubling').toMatch(/chain = chain\.copyOf\(/);
+    expect(MEASURE, 'the tail past the collected path is released').toMatch(
+      /releaseChain\(depth\)/
+    );
+    for (const [name, body] of [
+      ['detach', DETACH],
+      ['stop', STOP],
+    ] as const) {
+      expect(body, `${name} releases the collected path`).toMatch(/releaseChain\(0\)/);
+    }
   });
 
   it('compares the six values and builds the emit map only on a change', () => {
@@ -156,6 +185,24 @@ describe('the surface-geometry pre-draw observer', () => {
     }
   });
 
+  it('gates the layout pass on the same signal so a traversal measures once', () => {
+    // The layout pass and the pre-draw pass of one traversal run in that order,
+    // so the layout pass writes the baselines it measured with and the pre-draw
+    // pass then finds nothing changed. A layout pass that measured
+    // unconditionally measured twice per traversal.
+    expect(LAYOUT, 'the layout pass reads the cheap signal').toMatch(/signalChanged\(view\)/);
+    expect(LAYOUT, 'the measurement is behind the gate').toMatch(/if \([^\n]*\) snapshot\(\)/);
+    expect(LAYOUT, 'the layout pass measures nothing by itself').not.toMatch(/^\s*snapshot\(\)$/m);
+    expect(ATTACH, 'an attach still measures through the dirty pass').toContain('snapshot()');
+    expect(DETACH, 'a detach still measures through the dirty pass').toContain('snapshot()');
+  });
+
+  it('keeps the dirty pass for the first pass, attach and detach', () => {
+    expect(SOURCE, 'the first pass starts dirty').toMatch(/private var dirty = true/);
+    expect(ATTACH, 'an attach marks the state dirty').toContain('dirty = true');
+    expect(DETACH, 'a detach marks the state dirty').toContain('dirty = true');
+  });
+
   it('covers every ancestor input measure reads in the changed signal', () => {
     // The gate may only skip a pass when nothing measure() reads changed, so the
     // signal covers the ancestor walk too: the alpha product, the ancestors'
@@ -184,9 +231,6 @@ describe('the surface-geometry pre-draw observer', () => {
     // insets can change without a layout pass: the gate must observe all three.
     expect(SIGNAL, 'the window insets are signalled').toContain('rootWindowInsets');
     expect(SIGNAL, 'the insets are compared with the last pass').toContain('lastWindowInsets');
-    expect(SIGNAL, 'the visible display frame is signalled').toContain(
-      'getWindowVisibleDisplayFrame'
-    );
     expect(SIGNAL, 'the display frame is compared with the last pass').toContain(
       'lastDisplayFrame'
     );
@@ -196,10 +240,24 @@ describe('the surface-geometry pre-draw observer', () => {
     );
   });
 
-  it('marks the next measurement dirty on layout, attach and detach', () => {
-    expect(functionBody(SOURCE, 'onGlobalLayout')).toContain('dirty = true');
-    expect(functionBody(SOURCE, 'onViewAttachedToWindow')).toContain('dirty = true');
-    expect(functionBody(SOURCE, 'onViewDetachedFromWindow')).toContain('dirty = true');
+  it('reads the window display frame only on a pass that can move it', () => {
+    // The frame is a window-session query, so the pass reads it once and the
+    // measurement reads the cached rect: a per-draw query plus a second query
+    // per measurement was the alternative.
+    expect(REFRESH_FRAME, 'the cached rect is the one the window session fills').toContain(
+      'getWindowVisibleDisplayFrame'
+    );
+    expect(MEASURE, 'the measurement reuses the cached frame').not.toContain(
+      'getWindowVisibleDisplayFrame'
+    );
+    expect(SIGNAL, 'the signal refreshes the first pass and an insets change').toMatch(
+      /if \(!frameFresh \|\| insetsChanged\) refreshDisplayFrame\(root\)/
+    );
+    expect(SNAPSHOT, 'a measurement never runs on a stale frame').toMatch(
+      /if \(!frameFresh\) refreshDisplayFrame\(root\)/
+    );
+    expect(LAYOUT, 'a layout pass can move the frame').toContain('frameFresh = false');
+    expect(ATTACH, 'a new window carries a new frame').toContain('frameFresh = false');
   });
 
   it('adds no logging to the steady-state path', () => {

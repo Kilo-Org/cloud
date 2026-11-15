@@ -4,14 +4,7 @@ import type {
   OpenRouterModelsResponse,
   OpenRouterProvidersResponse,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
-import {
-  OpenRouterProvidersResponseSchema,
-  OpenRouterModelsResponseSchema,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
-import {
-  NormalizedOpenRouterResponse,
-  type OpenRouterModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
 import {
   organizationModelsPath,
@@ -88,6 +81,8 @@ export function useOpenRouterModels() {
         throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
       }
       const body = await response.json();
+      const { OpenRouterModelsResponseSchema } =
+        await import('@kilocode/web-shared/lib/organizations/organization-types');
       return OpenRouterModelsResponseSchema.parse(body);
     },
   });
@@ -102,6 +97,8 @@ export function useOpenRouterProviders() {
         throw new Error(`Failed to fetch providers: ${response.status} ${response.statusText}`);
       }
       const data = await response.json();
+      const { OpenRouterProvidersResponseSchema } =
+        await import('@kilocode/web-shared/lib/organizations/organization-types');
       return OpenRouterProvidersResponseSchema.parse(data);
     },
   });
@@ -124,7 +121,10 @@ export function useModelSelectorList(
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
       }
-      const parsedResponse = OpenRouterModelsResponseSchema.safeParse(await response.json());
+      const body: unknown = await response.json();
+      const { OpenRouterModelsResponseSchema } =
+        await import('@kilocode/web-shared/lib/organizations/organization-types');
+      const parsedResponse = OpenRouterModelsResponseSchema.safeParse(body);
       if (!parsedResponse.success) {
         throw new Error('Failed to parse response: ' + z.prettifyError(parsedResponse.error));
       }
@@ -147,7 +147,10 @@ export function useOpenRouterModelsAndProviders() {
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
       }
-      const parsedResponse = NormalizedOpenRouterResponse.safeParse(await response.json());
+      const body: unknown = await response.json();
+      const { NormalizedOpenRouterResponse } =
+        await import('@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types');
+      const parsedResponse = NormalizedOpenRouterResponse.safeParse(body);
       if (!parsedResponse.success) {
         throw new Error('Failed to parse response:\n' + z.prettifyError(parsedResponse.error));
       }

@@ -1,3 +1,7 @@
+import { QueryClient } from '@tanstack/react-query';
+import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
+import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,7 +12,6 @@ import {
   mergeSnapshotForActiveSessions,
   removeActiveSessionsForConnection,
 } from '@/lib/active-sessions-live';
-import { buildActiveSessionsInput } from '@/lib/agent-session-input';
 
 function makeCached(over: Partial<CachedActiveSession> = {}): CachedActiveSession {
   return {
@@ -130,19 +133,35 @@ describe('cloud sentinel merge (wipe guard)', () => {
 });
 
 describe('buildActiveSessionsTrayInput', () => {
-  it('wraps buildActiveSessionsInput and opts into cloud merge', () => {
+  it('builds the tray input literally and opts into cloud merge', () => {
     expect(buildActiveSessionsTrayInput(null)).toEqual({
-      ...buildActiveSessionsInput(null),
+      organizationId: null,
       includeCloudAgentSessions: true,
     });
     expect(buildActiveSessionsTrayInput('org-1')).toEqual({
-      ...buildActiveSessionsInput('org-1'),
+      organizationId: 'org-1',
       includeCloudAgentSessions: true,
     });
     expect(buildActiveSessionsTrayInput(undefined)).toEqual({
-      ...buildActiveSessionsInput(undefined),
+      organizationId: null,
       includeCloudAgentSessions: true,
     });
+  });
+
+  it('registers the activeSessions.list key both call sites read', () => {
+    // active-sessions-live-sync-mount.tsx and hooks/use-agent-sessions.ts both
+    // register trpc.activeSessions.list.queryKey(buildActiveSessionsTrayInput(org)).
+    // Rebuild that proxy locally: @/lib/trpc cannot load in a node suite.
+    const trpc = createTRPCOptionsProxy<MobileRouter>({
+      client: createTRPCClient<MobileRouter>({
+        links: [httpBatchLink({ url: 'http://127.0.0.1:3000/api/trpc' })],
+      }),
+      queryClient: new QueryClient(),
+    });
+    expect(trpc.activeSessions.list.queryKey(buildActiveSessionsTrayInput('org-1'))).toEqual([
+      ['activeSessions', 'list'],
+      { input: { organizationId: 'org-1', includeCloudAgentSessions: true }, type: 'query' },
+    ]);
   });
 
   it('collapses absent org context to personal (parity with buildActiveSessionsInput)', () => {

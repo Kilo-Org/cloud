@@ -56,6 +56,7 @@ import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config'
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { user_auth_provider } from '@kilocode/db/schema';
+import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
@@ -374,6 +375,32 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     } as never);
 
     expect(result).toContain('/users/sign_in?domain=example.com');
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a passkey sign-in for an account whose deletion is in progress', async () => {
+    // The shape `disableUserAccessForDeletion` writes.
+    const deletingUser = await insertTestUser({
+      blocked_reason: createDeletionInProgressBlockedReason(),
+      blocked_at: new Date().toISOString(),
+    });
+
+    const result = await signIn({
+      user: {
+        id: deletingUser.id,
+        email: deletingUser.google_user_email,
+        name: deletingUser.google_user_name,
+        image: '',
+      },
+      account: {
+        provider: 'passkey',
+        providerAccountId: deletingUser.id,
+        type: 'credentials',
+      },
+      profile: undefined,
+    } as never);
+
+    expect(result).toContain('/users/sign_in?error=BLOCKED');
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 

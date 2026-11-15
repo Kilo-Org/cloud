@@ -6,6 +6,11 @@ export type SessionStatusIndicator = {
   timestamp: number;
   commitHash?: string;
   code?: SdkStatusMessageCode;
+  /**
+   * The server's own reason when `code` is a generic one the SDK has no copy
+   * for. Optional: clients that render `message` alone keep their exact text.
+   */
+  detail?: string;
 };
 
 export function indicatorForCloudStatus(cs: CloudStatus): SessionStatusIndicator | null {

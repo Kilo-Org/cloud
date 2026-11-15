@@ -83,7 +83,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   const list = lists.data?.find(candidate => candidate.id === listId);
   const items = useTodoItems(listId);
   const { create, update, move, removeWithUndo } = useTodoItemMutations(listId);
-  const { review, startNow, startingTodoId } = useStartTodo();
+  const { review, startNow, isStarting } = useStartTodo();
   const [showCompleted, setShowCompleted] = useState(false);
   const scrollRef = useAnimatedRef<ScrollViewInstance>();
 
@@ -137,7 +137,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
       <TodoItemRow
         item={item}
         sortable
-        starting={startingTodoId === item.id}
+        starting={isStarting(item.id)}
         onOpen={handleOpen}
         onToggleDone={handleToggleDone}
         onDelete={removeWithUndo}
@@ -145,7 +145,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
         onStartNow={handleStartNow}
       />
     ),
-    [handleOpen, handleStart, handleStartNow, handleToggleDone, removeWithUndo, startingTodoId]
+    [handleOpen, handleStart, handleStartNow, handleToggleDone, isStarting, removeWithUndo]
   );
 
   const notFound = lists.isSuccess && !list;

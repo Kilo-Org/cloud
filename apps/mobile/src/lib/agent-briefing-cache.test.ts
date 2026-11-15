@@ -1,12 +1,19 @@
 import { type BriefingPreferences, type BriefingReport } from '@kilocode/app-shared/agent-briefing';
 import { QueryClient } from '@tanstack/react-query';
-import { persistQueryClientRestore } from '@tanstack/react-query-persist-client';
+import {
+  persistQueryClientRestore,
+  persistQueryClientSave,
+} from '@tanstack/react-query-persist-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { purgeInaccessibleBriefingCache } from './agent-briefing-cache';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
-import { createReadCachePersister, readCacheScope } from '@/lib/persist/read-cache';
+import {
+  createReadCachePersister,
+  readCacheScope,
+  shouldPersistReadCacheQuery,
+} from '@/lib/persist/read-cache';
 
 const storage = vi.hoisted(() => {
   const values = new Map<string, string>();
@@ -147,7 +154,7 @@ describe('scoped briefing cache access loss', () => {
     setSignOutActive(false);
   });
 
-  it('preserves Personal, accessible organizations, and unrelated cached data through encrypted save and restore', async () => {
+  it('preserves Personal and unrelated cached data through encrypted save and restore', async () => {
     const personal = report('personal-report', null);
     const allowed = report('allowed-report', 'allowed');
     const denied = report('denied-report', 'denied');
@@ -175,7 +182,11 @@ describe('scoped briefing cache access loss', () => {
     ).toEqual([null, 'allowed']);
     const persisted = storage.values.get(`${readCacheScope('user-1')}/read-cache`);
     expect(persisted).toBeDefined();
+    expect(persisted).toContain('personal-report-private-summary');
     expect(persisted).not.toContain('denied-report-private-summary');
+    // An organization payload is read from the server after a cold start, so it
+    // is never part of the restored snapshot.
+    expect(persisted).not.toContain('allowed-report-private-summary');
     const restored = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
     await persistQueryClientRestore({
       queryClient: restored,
@@ -186,11 +197,67 @@ describe('scoped briefing cache access loss', () => {
       }),
     });
     expect(restored.getQueryData(reportKey(personal.id))).toEqual(personal);
-    expect(restored.getQueryData(reportKey(allowed.id))).toEqual(allowed);
+    expect(restored.getQueryData(reportKey(allowed.id))).toBeUndefined();
     expect(restored.getQueryData(reportKey(denied.id))).toBeUndefined();
     expect(restored.getQueryData(repositoriesKey)).toEqual([
       { gitUrl: 'https://example.test/keep-this-repository' },
     ]);
+    client.clear();
+    restored.clear();
+  });
+
+  it('restores a saved snapshot whose briefing rows all belong to personal context', async () => {
+    const personal = report('personal-report', null);
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+    client.setQueryData(userKey, { id: 'user-1' });
+    client.setQueryData(listKey, { reports: [personal], nextCursor: null });
+    client.setQueryData(reportKey(personal.id), personal);
+    client.setQueryData<BriefingPreferences>(preferencesKey, {
+      timezone: 'UTC',
+      nightStart: '22:00',
+      morningStart: '08:00',
+      morningEnd: '12:00',
+      language: 'en',
+      notificationsEnabled: false,
+      defaultModel: 'model',
+      contexts: [
+        {
+          context: personal.context,
+          enabled: true,
+          model: 'model',
+          maxDurationSeconds: 600,
+          maxSpendMicrodollars: 2_000_000,
+        },
+      ],
+    });
+    await persistQueryClientSave({
+      queryClient: client,
+      persister: createReadCachePersister({
+        queryClient: client,
+        userId: 'user-1',
+        epoch: currentAuthEpoch(),
+      }),
+      dehydrateOptions: {
+        shouldDehydrateQuery: shouldPersistReadCacheQuery,
+        shouldDehydrateMutation: () => false,
+      },
+    });
+    const restored = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+    await persistQueryClientRestore({
+      queryClient: restored,
+      persister: createReadCachePersister({
+        queryClient: restored,
+        userId: 'user-1',
+        epoch: currentAuthEpoch(),
+      }),
+    });
+    expect(restored.getQueryData(listKey)).toEqual({ reports: [personal], nextCursor: null });
+    expect(restored.getQueryData(reportKey(personal.id))).toEqual(personal);
+    expect(
+      restored
+        .getQueryData<BriefingPreferences>(preferencesKey)
+        ?.contexts.map(item => item.context.organizationId)
+    ).toEqual([null]);
     client.clear();
     restored.clear();
   });

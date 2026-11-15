@@ -78,6 +78,16 @@ vi.mock('react-native-keyboard-controller', () => ({
 vi.mock('@/components/keyboard-motion-provider', () => ({
   KeyboardMotionProvider: 'KeyboardMotionProvider',
   useKeyboardMotionProgress: () => ({ value: 0 }),
+  useKeyboardMotionHeight: () => ({ value: 0 }),
+}));
+
+// `KeyboardFollowPane` reads the keyboard's shared values and reanimated's
+// `useAnimatedStyle`. Hosts that mount `ChatComposer` outside the pane only need
+// the answer to "am I inside one"; a test that wants the inside path registers
+// its own mock, which wins.
+vi.mock('@/components/keyboard-follow-pane', () => ({
+  KeyboardFollowPane: 'KeyboardFollowPane',
+  useInsideKeyboardFollowPane: () => false,
 }));
 
 // `react-native-enriched-markdown` and `react-native-webview` are native views.

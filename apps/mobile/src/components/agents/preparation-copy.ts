@@ -1,5 +1,5 @@
 import { type TFunction } from 'i18next';
-import { type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
+import { isPreparationCancellation, type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -45,9 +45,9 @@ const STEP_LABEL_KEYS = {
 const MESSAGE_KEYS = {
   'Preparing environment': 'agentChat.preparation.preparingEnvironment',
   'Creating sandbox': 'agentChat.preparation.detailCreatingSandbox',
-  'Starting sandbox': 'agentChat.preparation.stepSandboxBoot',
+  'Starting sandbox': 'agentChat.preparation.detailStartingSandbox',
   'Retrying without a snapshot': 'agentChat.preparation.stepSnapshotFallback',
-  'Cloning repository': 'agentChat.preparation.stepCloning',
+  'Cloning repository': 'agentChat.preparation.detailCloningRepository',
   'Updating repository': 'agentChat.preparation.detailUpdatingRepository',
   'Checking out branch': 'agentChat.preparation.detailCheckingOutBranch',
   'Running setup commands': 'agentChat.preparation.detailRunningSetupCommands',
@@ -56,7 +56,7 @@ const MESSAGE_KEYS = {
   'Running start commands': 'agentChat.computeStatus.runningCommands',
   'Saving repository for faster starts': 'agentChat.preparation.detailSavingRepository',
   'Starting Kilo runtime': 'agentChat.preparation.detailStartingKiloRuntime',
-  'Starting Kilo': 'agentChat.preparation.stepKiloServer',
+  'Starting Kilo': 'agentChat.preparation.detailStartingKilo',
   'Preparing Kilo session': 'agentChat.preparation.detailPreparingKiloSession',
   'Waiting for the previous sandbox to stop':
     'agentChat.preparation.detailWaitingForPreviousSandbox',
@@ -68,7 +68,7 @@ const MESSAGE_KEYS = {
   'Starting sandbox without a snapshot':
     'agentChat.preparation.detailStartingSandboxWithoutSnapshot',
   'Setting up workspace': 'agentChat.preparation.detailSettingUpWorkspace',
-  'Setting up branch': 'agentChat.preparation.stepBranch',
+  'Setting up branch': 'agentChat.preparation.detailSettingUpBranch',
   'Restoring session': 'agentChat.preparation.detailRestoringSession',
   'Importing session': 'agentChat.newSession.importingSession',
   'Warm workspace reused': 'agentChat.preparation.detailWarmWorkspaceReused',
@@ -179,6 +179,9 @@ export function preparationDetailText(detail: string, t: TFunction): string {
  * failure title.
  */
 export function preparationErrorText(error: string, t: TFunction): string {
+  if (isPreparationCancellation(error)) {
+    return t('agentChat.session.stopped');
+  }
   return resolvePreparationText(error, t) ?? t('agentChat.preparation.preparationFailed');
 }
 

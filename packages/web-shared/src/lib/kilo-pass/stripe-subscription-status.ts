@@ -1,3 +1,5 @@
+import { isKiloPassSubscriptionEndedStatus } from '@kilocode/worker-utils/kilo-pass-bonus-projection';
+
 export function isStripeSubscriptionEnded(status: string): boolean {
-  return status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired';
+  return isKiloPassSubscriptionEndedStatus(status);
 }

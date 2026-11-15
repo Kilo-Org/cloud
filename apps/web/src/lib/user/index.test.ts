@@ -5474,7 +5474,7 @@ describe('User', () => {
             kind: 'package',
             ecosystem: 'npm',
             identifier: 'example-server',
-            min_version: null,
+            version_spec: null,
           },
           source: { registry: 'custom', id: null },
           created_by_kilo_user_id: actor.id,

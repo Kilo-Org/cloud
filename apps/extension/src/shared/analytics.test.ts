@@ -34,9 +34,12 @@ vi.mock('posthog-js/dist/module.no-external', () => ({
 
 // eslint-disable-next-line import/first
 import {
+  ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY,
   ANALYTICS_OPT_OUT_STORAGE_KEY,
+  ANALYTICS_SURFACE,
+  EXTENSION_ACTIVE_EVENT,
   EXTENSION_SIGNED_OUT_EVENT,
-  __setFirefoxPermissionsReaderForTests,
+  captureDailyActive,
   captureEvent,
   getFirefoxUsageDataGranted,
   initAnalytics,
@@ -46,10 +49,16 @@ import {
   shouldStartAnalytics,
 } from './analytics';
 // eslint-disable-next-line import/first
+import {
+  __setExtensionVersionReaderForTests,
+  __setFirefoxPermissionsReaderForTests,
+} from './analytics-environment';
+// eslint-disable-next-line import/first
 import type { AnalyticsStorageArea } from './analytics';
 
 const API_KEY = 'phc_test_key';
 const EMAIL = 'user@kilo.ai';
+const EXTENSION_VERSION = '1.0.3';
 
 const EXPECTED_INIT_OPTIONS = {
   advanced_disable_flags: true,
@@ -62,7 +71,14 @@ const EXPECTED_INIT_OPTIONS = {
   persistence: 'localStorage',
 } as const;
 
+/** Every key the analytics module may touch; anything else is a bug. */
+const ANALYTICS_STORAGE_KEY_ALLOWLIST: Record<string, true> = {
+  [ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY]: true,
+  [ANALYTICS_OPT_OUT_STORAGE_KEY]: true,
+};
+
 const ALLOWED_STRING_ENUMS = new Set([
+  'agents',
   'dangerous',
   'device_auth',
   'expired',
@@ -72,47 +88,51 @@ const ALLOWED_STRING_ENUMS = new Set([
   'stored_session',
 ]);
 
-const createStorage = (initial?: unknown): AnalyticsStorageArea & { value: unknown } => {
-  let storedValue = initial;
+const createStorage = (
+  initial?: unknown
+): AnalyticsStorageArea & { readonly lastActiveDay: unknown; readonly value: unknown } => {
+  const values = new Map<string, unknown>();
+  if (initial !== undefined) {
+    values.set(ANALYTICS_OPT_OUT_STORAGE_KEY, initial);
+  }
 
   return {
     getItem: key => {
-      expect(key).toBe(ANALYTICS_OPT_OUT_STORAGE_KEY);
-      return storedValue;
+      expect(ANALYTICS_STORAGE_KEY_ALLOWLIST[key]).toBe(true);
+      return values.get(key);
+    },
+    get lastActiveDay() {
+      return values.get(ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY);
     },
     setItem: (key, value) => {
-      expect(key).toBe(ANALYTICS_OPT_OUT_STORAGE_KEY);
-      storedValue = value;
+      expect(ANALYTICS_STORAGE_KEY_ALLOWLIST[key]).toBe(true);
+      values.set(key, value);
     },
     get value() {
-      return storedValue;
+      return values.get(ANALYTICS_OPT_OUT_STORAGE_KEY);
     },
   };
 };
 
 const createDeferredStorage = (): AnalyticsStorageArea & {
   resolveGet: (value: unknown) => void;
-  value: unknown;
+  readonly value: unknown;
 } => {
   let storedValue: unknown = false;
-  let resolveGet: ((value: unknown) => void) | undefined = undefined;
-  // eslint-disable-next-line promise/avoid-new
-  const getPromise = new Promise<unknown>(resolve => {
-    resolveGet = resolve;
-  });
+  const { promise: gate, resolve: openGate } = Promise.withResolvers<void>();
 
   return {
     getItem: key => {
-      expect(key).toBe(ANALYTICS_OPT_OUT_STORAGE_KEY);
+      expect(ANALYTICS_STORAGE_KEY_ALLOWLIST[key]).toBe(true);
       // eslint-disable-next-line promise/prefer-await-to-then
-      return getPromise.then(() => storedValue);
+      return gate.then(() => storedValue);
     },
     resolveGet: (value: unknown) => {
       storedValue = value;
-      resolveGet?.(value);
+      openGate();
     },
     setItem: (key, value) => {
-      expect(key).toBe(ANALYTICS_OPT_OUT_STORAGE_KEY);
+      expect(ANALYTICS_STORAGE_KEY_ALLOWLIST[key]).toBe(true);
       storedValue = value;
     },
     get value() {
@@ -182,6 +202,7 @@ const assertCapturedPropertiesAreEnums = (): void => {
 
 const resetModule = async (): Promise<void> => {
   __setFirefoxPermissionsReaderForTests();
+  __setExtensionVersionReaderForTests();
   vi.unstubAllEnvs();
   await resetAnalyticsUser({ reason: 'explicit' });
   mocks.clients.length = 0;
@@ -321,16 +342,56 @@ describe('firefox usage data grant', () => {
 });
 
 describe('analytics client lifecycle', () => {
-  it('starts client, registers platform, and identifies on pass', async () => {
+  it('starts client, registers super properties, and identifies on pass', async () => {
     await resetModule();
+    __setExtensionVersionReaderForTests(() => EXTENSION_VERSION);
     await withEnv(productionEnv, async () => {
       const storage = createStorage(false);
       await expect(initAnalytics(storage, EMAIL)).resolves.toBe(true);
 
       expect(mocks.clients).toHaveLength(1);
       expect(mocks.clients[0]?.init).toHaveBeenCalledWith(API_KEY, EXPECTED_INIT_OPTIONS);
-      expect(mocks.clients[0]?.register).toHaveBeenCalledWith({ platform: 'extension' });
+      expect(mocks.clients[0]?.register).toHaveBeenCalledWith({
+        browser: 'chrome',
+        extension_version: EXTENSION_VERSION,
+        platform: 'extension',
+        surface: ANALYTICS_SURFACE,
+      });
       expect(mocks.clients[0]?.identify).toHaveBeenCalledWith(EMAIL, { email: EMAIL });
+    });
+  });
+
+  it('registers the firefox browser super property on Firefox builds', async () => {
+    await resetModule();
+    __setExtensionVersionReaderForTests(() => EXTENSION_VERSION);
+    __setFirefoxPermissionsReaderForTests(() => ({ data_collection: ['technicalAndInteraction'] }));
+
+    await withEnv({ ...productionEnv, FIREFOX: 'true' }, async () => {
+      await expect(initAnalytics(createStorage(false), EMAIL)).resolves.toBe(true);
+
+      expect(mocks.clients[0]?.register).toHaveBeenCalledWith({
+        browser: 'firefox',
+        extension_version: EXTENSION_VERSION,
+        platform: 'extension',
+        surface: ANALYTICS_SURFACE,
+      });
+    });
+  });
+
+  it('omits extension_version when the manifest version is unreadable', async () => {
+    await resetModule();
+    __setExtensionVersionReaderForTests(() => {
+      throw new Error('no manifest');
+    });
+
+    await withEnv(productionEnv, async () => {
+      await expect(initAnalytics(createStorage(false), EMAIL)).resolves.toBe(true);
+
+      expect(mocks.clients[0]?.register).toHaveBeenCalledWith({
+        browser: 'chrome',
+        platform: 'extension',
+        surface: ANALYTICS_SURFACE,
+      });
     });
   });
 
@@ -486,6 +547,144 @@ describe('analytics capture', () => {
         { send_instantly: true }
       );
       assertCapturedPropertiesAreEnums();
+    });
+  });
+});
+
+describe('analytics daily active heartbeat', () => {
+  it('captures once per local day and stays silent on a same-day reopen', async () => {
+    await resetModule();
+    await withEnv(productionEnv, async () => {
+      const storage = createStorage(false);
+      await initAnalytics(storage, EMAIL);
+      const client = mocks.clients[0]!;
+      client.capture.mockClear();
+
+      // Local month is 0-based: 10 is November. 09:00 local must not roll to UTC tomorrow.
+      await expect(captureDailyActive(storage, new Date(2026, 10, 12, 9, 0, 0))).resolves.toBe(
+        true
+      );
+      expect(client.capture).toHaveBeenCalledWith(
+        EXTENSION_ACTIVE_EVENT,
+        {},
+        { send_instantly: true }
+      );
+      expect(storage.lastActiveDay).toMatch(/^2026-11-12:[\da-f]{8}$/u);
+
+      await expect(captureDailyActive(storage, new Date(2026, 10, 12, 23, 59, 0))).resolves.toBe(
+        false
+      );
+      expect([client.capture.mock.calls.length, allCaptureCalls().length]).toStrictEqual([1, 1]);
+    });
+  });
+
+  it('captures again once the local day rolls over', async () => {
+    await resetModule();
+    await withEnv(productionEnv, async () => {
+      const storage = createStorage(false);
+      await initAnalytics(storage, EMAIL);
+      const client = mocks.clients[0]!;
+      client.capture.mockClear();
+
+      await captureDailyActive(storage, new Date(2026, 10, 12, 23, 0, 0));
+      await expect(captureDailyActive(storage, new Date(2026, 10, 13, 0, 1, 0))).resolves.toBe(
+        true
+      );
+
+      expect(client.capture).toHaveBeenCalledTimes(2);
+      expect(storage.lastActiveDay).toMatch(/^2026-11-13:[\da-f]{8}$/u);
+    });
+  });
+
+  it('counts a second account on the same browser and local day', async () => {
+    await resetModule();
+    await withEnv(productionEnv, async () => {
+      const storage = createStorage(false);
+      const day = new Date(2026, 10, 12, 9, 0, 0);
+      const firstEmail = EMAIL;
+      const secondEmail = 'other@kilo.ai';
+
+      await initAnalytics(storage, firstEmail);
+      const client = mocks.clients[0]!;
+      client.capture.mockClear();
+      await expect(captureDailyActive(storage, day)).resolves.toBe(true);
+
+      // A different signed-in user must not be swallowed by the first user's day.
+      await initAnalytics(storage, secondEmail);
+      await expect(captureDailyActive(storage, day)).resolves.toBe(true);
+      expect(client.capture).toHaveBeenCalledTimes(2);
+
+      // The second user's own day is still deduped.
+      await expect(captureDailyActive(storage, day)).resolves.toBe(false);
+      expect(client.capture).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('still fires when extension storage throws', async () => {
+    await resetModule();
+    await withEnv(productionEnv, async () => {
+      await initAnalytics(createStorage(false), EMAIL);
+      const client = mocks.clients[0]!;
+      client.capture.mockClear();
+      const brokenStorage: AnalyticsStorageArea = {
+        getItem: () => {
+          throw new Error('storage detached');
+        },
+        setItem: () => {
+          throw new Error('quota exceeded');
+        },
+      };
+
+      await expect(
+        captureDailyActive(brokenStorage, new Date(2026, 10, 12, 9, 0, 0))
+      ).resolves.toBe(true);
+      // eslint-disable-next-line vitest/prefer-called-once -- the installed linter also requires CalledTimes
+      expect(client.capture).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('is a no-op that leaves the day unset without an active client', async () => {
+    await resetModule();
+    const storage = createStorage(false);
+
+    await expect(captureDailyActive(storage, new Date(2026, 10, 12, 9, 0, 0))).resolves.toBe(false);
+
+    expect(storage.lastActiveDay).toBeUndefined();
+    expect(allCaptureCalls()).toHaveLength(0);
+  });
+
+  it('leaves the day unset when the user is opted out', async () => {
+    await resetModule();
+    await withEnv(productionEnv, async () => {
+      const storage = createStorage(true);
+      await expect(initAnalytics(storage, EMAIL)).resolves.toBe(false);
+
+      await expect(captureDailyActive(storage, new Date(2026, 10, 12, 9, 0, 0))).resolves.toBe(
+        false
+      );
+
+      expect(storage.lastActiveDay).toBeUndefined();
+      expect(allCaptureCalls()).toHaveLength(0);
+    });
+  });
+
+  it('collapses concurrent calls into a single capture', async () => {
+    await resetModule();
+    await withEnv(productionEnv, async () => {
+      const storage = createStorage(false);
+      await initAnalytics(storage, EMAIL);
+      const client = mocks.clients[0]!;
+      client.capture.mockClear();
+      const day = new Date(2026, 10, 12, 9, 0, 0);
+
+      const results = await Promise.all([
+        captureDailyActive(storage, day),
+        captureDailyActive(storage, day),
+      ]);
+
+      expect(results).toStrictEqual([true, true]);
+      // eslint-disable-next-line vitest/prefer-called-once -- the installed linter also requires CalledTimes
+      expect(client.capture).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -3,6 +3,7 @@ import {
   historyEmptyMessage,
   mapActiveSessionRow,
   mapHistorySessionRow,
+  queryErrorStatus,
   sessionStatusBadge,
 } from './agents-session-list';
 
@@ -171,5 +172,21 @@ describe('historyEmptyMessage()', () => {
     expect(historyEmptyMessage({ hasActiveSessions: false, isSearching: false })).toBe(
       'No sessions yet. Start your first session above.'
     );
+  });
+});
+
+describe('queryErrorStatus()', () => {
+  it('reads the status a tRPC client error carries on data', () => {
+    expect(queryErrorStatus({ data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 } })).toBe(402);
+  });
+
+  it('reads the status a tRPC client error carries on shape.data', () => {
+    expect(queryErrorStatus({ message: 'boom', shape: { data: { httpStatus: 500 } } })).toBe(500);
+  });
+
+  it('returns undefined when the error carries no status', () => {
+    expect(queryErrorStatus(new TypeError('Failed to fetch'))).toBeUndefined();
+    expect(queryErrorStatus(null)).toBeUndefined();
+    expect(queryErrorStatus({ message: 'Failed to fetch' })).toBeUndefined();
   });
 });

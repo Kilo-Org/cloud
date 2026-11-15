@@ -1,33 +1,44 @@
-import { type Href, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
+import {
+  KiloPassBillingHistorySection,
+  KiloPassCreditHistorySection,
+} from '@/components/kilo-pass/kilo-pass-history-sections';
+import {
+  KiloPassManagementSections,
+  type KiloPassScheduledChange,
+} from '@/components/kilo-pass/kilo-pass-management';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Crown } from '@/components/ui/icons';
+import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { openExternalUrl } from '@/lib/external-link';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
-import { useTRPC } from '@/lib/trpc';
 import {
-  KILO_PASS_TITLE,
-  type PurchasePresentationKind,
-  type PurchaseStatusClass,
-} from '@kilocode/app-shared/commerce';
+  type KiloPassBillingHistory,
+  type KiloPassCreditHistory,
+  useKiloPassBillingHistory,
+  useKiloPassCreditHistory,
+} from '@/lib/hooks/use-kilo-pass-history';
+import { isStoreManagedPass, type KiloPassSubscriptionState } from '@/lib/kilo-pass/management';
+import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/state';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 /**
- * The screen's frame: one header for every presentation kind, above the body it
- * owns. The route presents as a full-screen modal on Android, so the sheet edge
- * reaches the window top there and this frame clears the status-bar inset
- * itself; the iOS page sheet presents below the status bar, reserves nothing,
- * and the header keeps its own grabber clearance.
+ * The screen's frame: one header for every state, above the body it owns. The
+ * route presents as a full-screen modal on Android, so the sheet edge reaches
+ * the window top there and this frame clears the status-bar inset itself; the
+ * iOS page sheet presents below the status bar, reserves nothing, and the
+ * header keeps its own grabber clearance.
  */
 function KiloPassFrame({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -35,6 +46,8 @@ function KiloPassFrame({ children }: { children: ReactNode }) {
   const surfaceOwnsWindowTop = windowTopClearance > 0;
   return (
     <View className="flex-1 bg-background">
+      {/* `safeAreaTop` only draws the inset inside the header, so the surface
+          that owns the window top pads it here instead. */}
       <View style={surfaceOwnsWindowTop ? { paddingTop: windowTopClearance } : undefined}>
         <ScreenHeader
           title={t('kiloPass.title')}
@@ -52,22 +65,32 @@ function KiloPassLoadingScreen() {
   return (
     <KiloPassFrame>
       <View className="flex-1 px-5">
+        {/* The scroller applies the landscape side insets, so a cutout window
+            cannot paint the reserved blocks under the sensor area. */}
         <DetailScreenScrollView
           className="-mx-1 flex-1"
-          contentContainerClassName="gap-3 px-1"
+          contentContainerClassName="grow gap-5 px-1 py-4"
           showsVerticalScrollIndicator={false}
         >
-          <Skeleton className="h-4 w-64 rounded" />
-          {[0, 1, 2].map(index => (
-            <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
-          ))}
+          {/* The page prints once, at its final height: every block the pass
+              state introduces is held until it has one answer, so this
+              skeleton stands in for a page that would otherwise grow under
+              the reader and push the ledgers down. */}
+          <View className="gap-1">
+            <Skeleton className="h-5 w-40 rounded" />
+            <Skeleton className="h-4 w-24 rounded" />
+          </View>
+          <Skeleton className="h-[132px] w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-[104px] w-full rounded-lg" />
+          <Skeleton className="h-[104px] w-full rounded-lg" />
         </DetailScreenScrollView>
       </View>
     </KiloPassFrame>
   );
 }
 
-function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
+function KiloPassErrorScreen({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation();
   return (
     <KiloPassFrame>
@@ -92,118 +115,149 @@ function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-type PresentationProps = {
-  presentation: {
-    kind: PurchasePresentationKind;
-    statusClass: PurchaseStatusClass;
-    webUrl: string | null;
-  };
-};
-
 /**
- * Shows the server presentation: web management opens the web console, and the
- * non-retryable unavailable kind is a finished state with its own way out.
+ * A resolved pass: the same details the web console prints, the actions the
+ * subscriber can take from the phone, and both ledgers.
  */
-function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
-  const { t } = useTranslation();
-  const router = useRouter();
-
-  if (presentation.kind === 'unavailable') {
-    return (
-      <KiloPassFrame>
-        {/* This screen owns the body below the header, so the state centres in
-            it directly. The measured placement would start at the window's
-            centre and lift by half the header, a jump on every open. */}
-        <View className="flex-1 justify-center">
-          <EmptyState
-            placement="static"
-            icon={Crown}
-            title={t('kiloPass.purchaseUnavailableTitle')}
-            // Only a pass the server reports as ended has something the title does
-            // not say; the plain kind would restate the title, which the state's
-            // own guide forbids.
-            description={
-              presentation.statusClass === 'terminal'
-                ? t('kiloPass.purchaseUnavailableEnded')
-                : undefined
-            }
-            action={
-              <Button
-                accessibilityLabel={t('credits.title')}
-                className={STATE_ACTION_CLASS}
-                onPress={() => {
-                  // Replacing the dead-end modal keeps one sheet on screen.
-                  router.replace('/(app)/credits' as Href);
-                }}
-              >
-                <Text>{t('credits.title')}</Text>
-              </Button>
-            }
-          />
-        </View>
-      </KiloPassFrame>
-    );
-  }
-
+function KiloPassDetailBody({
+  subscription,
+  detail,
+  scheduledChange,
+  creditHistory,
+  billingHistory,
+}: Readonly<{
+  subscription: KiloPassSubscriptionState;
+  detail: Extract<KiloPassDetail, { kind: 'active' }>;
+  scheduledChange: KiloPassScheduledChange | null;
+  creditHistory: KiloPassCreditHistory;
+  billingHistory: KiloPassBillingHistory;
+}>) {
   return (
     <KiloPassFrame>
-      <CenteredState>
-        <View className="items-center gap-3 px-6">
-          <Text className="text-center text-sm leading-[1.25rem] text-muted-foreground">
-            {t('kiloPass.subscriptionHeaderDescription')}
+      <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
+        <View className="gap-1">
+          <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
+          <Text
+            className={cn(
+              'text-sm',
+              detail.statusTone === 'danger' ? 'text-destructive' : 'text-muted-foreground'
+            )}
+          >
+            {detail.statusLabel}
           </Text>
-          <Text className="text-center font-semibold text-foreground">{KILO_PASS_TITLE}</Text>
-          <Text className="text-center text-sm text-muted-foreground">
-            {t('kiloPass.managedOnWeb')}
-          </Text>
-          {presentation.webUrl ? (
-            // The lone centered CTA: 48dp keeps the whole pressable above the
-            // Android minimum without hitSlop, since nothing sits beside it.
-            <Button
-              accessibilityLabel={t('kiloPass.manage')}
-              className="min-h-[48px]"
-              onPress={() => {
-                if (!presentation.webUrl) {
-                  return;
-                }
-                void openExternalUrl(presentation.webUrl, {
-                  label: t('kiloPass.kiloPassManagement'),
-                });
-              }}
-              variant="outline"
-            >
-              <Text>{t('kiloPass.manage')}</Text>
-            </Button>
-          ) : null}
         </View>
-      </CenteredState>
+        {detail.rows.length > 0 ? (
+          <View className="rounded-lg bg-secondary px-3">
+            {detail.rows.map((row, index) => (
+              <KvRow
+                key={row.id}
+                label={row.label}
+                value={row.value}
+                last={index === detail.rows.length - 1}
+                valueFace={row.id === 'renewal' ? 'text' : 'numeric'}
+                valueDirection={row.id === 'renewal' ? undefined : 'ltr'}
+              />
+            ))}
+          </View>
+        ) : null}
+        <KiloPassManagementSections subscription={subscription} scheduledChange={scheduledChange} />
+        <KiloPassCreditHistorySection history={creditHistory} />
+        {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
+        {!isStoreManagedPass(subscription) && (
+          <KiloPassBillingHistorySection history={billingHistory} />
+        )}
+      </DetailScreenScrollView>
+    </KiloPassFrame>
+  );
+}
+
+function KiloPassMessageBody({ message }: { message: string }) {
+  return (
+    <KiloPassFrame>
+      <View className="flex-1 justify-center">
+        <EmptyState placement="static" icon={Crown} title={message} />
+      </View>
+    </KiloPassFrame>
+  );
+}
+
+/**
+ * A lapsed pass is one of the screen's centered states — crown, the plan it
+ * was, the day it stopped — so the reader sees where their pass stands instead
+ * of a bare line floating in an otherwise empty body.
+ */
+function KiloPassEndedBody({ detail }: { detail: Extract<KiloPassDetail, { kind: 'ended' }> }) {
+  return (
+    <KiloPassFrame>
+      <EmptyState icon={Crown} title={detail.planLabel} description={detail.endedLabel} />
     </KiloPassFrame>
   );
 }
 
 export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
-  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-  const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
-  const presentationQuery = useQuery(
-    trpc.kiloPass.getPurchasePresentation.queryOptions({
-      platform,
-      storefront,
-      product: 'kilo_pass',
-    })
-  );
+  const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
+  const subscription = stateQuery.data?.subscription;
+  const detail = getKiloPassDetailState({
+    subscription,
+    isError: stateQuery.isError,
+    isPending: stateQuery.isPending,
+  });
+  const { t } = useTranslation();
 
-  if (presentationQuery.isPending) {
+  // The pass state introduces three more reads, and each one adds or removes
+  // height below the state rows. Hold the page until all three answer so its
+  // first frame is its last: a ledger or a scheduled plan change that landed
+  // afterwards would push the blocks under it.
+  const isDetail = detail.kind === 'active' && subscription != null;
+  const storeManaged = subscription != null && isStoreManagedPass(subscription);
+  const creditHistory = useKiloPassCreditHistory(isDetail);
+  const billingHistory = useKiloPassBillingHistory(isDetail && !storeManaged);
+  // The page waits on this read before it prints, so it must settle even while
+  // the online manager reports offline: a paused query never errors and never
+  // answers, and the screen would hold its loading state with no retry.
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: isDetail && !storeManaged,
+    ...SETTLE_WHILE_OFFLINE,
+  });
+  // A store-managed pass has neither a Stripe schedule nor invoices, so those
+  // two stay disabled and their pending status says nothing.
+  const blocksPending =
+    isDetail &&
+    (creditHistory.query.isPending ||
+      (!storeManaged && (billingHistory.query.isPending || scheduledChangeQuery.isPending)));
+
+  if (detail.kind === 'loading' || blocksPending) {
     return <KiloPassLoadingScreen />;
   }
-  if (!presentationQuery.data) {
+  if (detail.kind === 'error') {
     return (
-      <KiloPassPresentationErrorScreen
+      <KiloPassErrorScreen
         onRetry={() => {
-          void presentationQuery.refetch();
+          void stateQuery.refetch();
         }}
       />
     );
   }
-  return <KiloPassUnavailableScreen presentation={presentationQuery.data} />;
+  if (detail.kind === 'none') {
+    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+  }
+  if (detail.kind === 'ended') {
+    return <KiloPassEndedBody detail={detail} />;
+  }
+  if (subscription == null) {
+    // An active detail is derived from a subscription, so this only narrows the
+    // type; the message keeps the screen total rather than throwing on it.
+    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+  }
+  return (
+    <KiloPassDetailBody
+      subscription={subscription}
+      detail={detail}
+      scheduledChange={scheduledChangeQuery.data?.scheduledChange ?? null}
+      creditHistory={creditHistory}
+      billingHistory={billingHistory}
+    />
+  );
 }

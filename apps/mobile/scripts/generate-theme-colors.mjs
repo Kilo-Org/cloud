@@ -18,6 +18,7 @@ export const TOKEN_KEYS = [
   ['primary', '--primary'],
   ['primaryForeground', '--primary-foreground'],
   ['primaryDisabled', '--primary-disabled'],
+  ['primaryDisabledAction', '--primary-disabled-action'],
   ['secondary', '--secondary'],
   ['secondaryForeground', '--secondary-foreground'],
   ['secondaryFill', '--secondary-fill'],
@@ -57,6 +58,7 @@ export const TOKEN_KEYS = [
   ['rowSage', '--row-sage'],
   ['rowMoss', '--row-moss'],
   ['rowFern', '--row-fern'],
+  ['rowPine', '--row-pine'],
 ];
 
 function collectDeclarations(rule) {

@@ -9,6 +9,9 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   composeFailureLabel,
+  CREDITS_DELIVERY_REASON,
+  isGenericResponseFailure,
+  type MessageDeliveryStatement,
   messageFailureLabel,
   NON_RETRYABLE_ASSISTANT_ERRORS,
   selectMessageFailure,
@@ -206,7 +209,6 @@ describe('selectMessageFailure', () => {
     it('derives a fixed detail line from every classified error name and never emits provider text', () => {
       const cases = [
         ['ProviderAuthError', 'The provider rejected the request.'],
-        ['MessageAbortedError', 'The response was stopped.'],
         ['ContextOverflowError', 'The conversation is too long for the model.'],
         ['APIError', 'The provider returned an error.'],
         ['MessageOutputLengthError', "The response reached the model's output limit."],
@@ -229,6 +231,24 @@ describe('selectMessageFailure', () => {
       const result = selectMessageFailure({ info: assistantInfo('UnknownError') });
       expect(result?.title).toBe('Response failed');
       expect(result?.detail).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
+    });
+
+    it('states a stopped generation as a neutral status, with no error title and no action', () => {
+      const result = selectMessageFailure({ info: assistantInfo('MessageAbortedError') });
+      expect(result).not.toBeNull();
+      expect(result?.kind).toBe('assistant');
+      expect(result?.side).toBe('assistant');
+      // Stopping is not a failure: no marker, no error heading, and the stop is
+      // the action the person already took, so nothing offers another one.
+      expect(result?.error).toBe(false);
+      expect(result?.titleKey).toBe('agentChat.messageFailure.assistantStopped');
+      expect(result?.title).toBe('The response was stopped.');
+      expect(result?.title).not.toBe('Response failed');
+      expect(result?.detail).toBeNull();
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canAddCredits).toBe(false);
+      expect(result?.canCopy).toBe(false);
       expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
     });
 
@@ -397,6 +417,50 @@ describe('selectMessageFailure', () => {
 });
 
 /**
+ * A failed preparation states its own cause in the group it renders, so the
+ * question's row keeps only its actions where its statement would repeat the
+ * same failed turn. Only the statement with no cause of its own is that
+ * generic; every classified cause stays readable in the row.
+ */
+describe('isGenericResponseFailure', () => {
+  const failureFor = (input: { deliveryState?: MessageDeliveryStatement; info?: MessageInfo }) =>
+    selectMessageFailure({
+      info: input.info ?? userInfo(),
+      ...(input.deliveryState === undefined ? {} : { deliveryState: input.deliveryState }),
+    });
+
+  it('reads a failed run and an unclassified assistant error as generic', () => {
+    const execution = failureFor({
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+    });
+    expect(execution).not.toBeNull();
+    expect(execution && isGenericResponseFailure(execution)).toBe(true);
+
+    const unknown = failureFor({ info: assistantInfo('UnknownError') });
+    expect(unknown).not.toBeNull();
+    expect(unknown && isGenericResponseFailure(unknown)).toBe(true);
+  });
+
+  it('keeps every classified cause, and every failure of the send itself', () => {
+    const cases: (MessageInfo | MessageDeliveryStatement)[] = [
+      { status: 'failed', error: '', reason: CREDITS_DELIVERY_REASON },
+      { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'exhausted' },
+      { status: 'failed', error: '', reason: 'interrupted' },
+      assistantInfo('ProviderAuthError'),
+      assistantInfo('ContextOverflowError'),
+      assistantInfo('APIError'),
+    ];
+
+    for (const entry of cases) {
+      const failure =
+        'status' in entry ? failureFor({ deliveryState: entry }) : failureFor({ info: entry });
+      expect(failure, JSON.stringify(entry)).not.toBeNull();
+      expect(failure && isGenericResponseFailure(failure), JSON.stringify(entry)).toBe(false);
+    }
+  });
+});
+
+/**
  * The failed row's label is the one place the footer copy and a failure title
  * meet, and the titles end their own sentence in most catalogs. Every language
  * is checked here because the doubled stop was a per-catalog property: `de`
@@ -427,7 +491,7 @@ describe('messageFailureLabel', () => {
         ]) {
           for (const canRetry of [true, false]) {
             const where = `${language} ${titleKey} canRetry=${canRetry}`;
-            const label = messageFailureLabel({ titleKey, canRetry });
+            const label = messageFailureLabel({ titleKey, canRetry, error: true });
             expect(label, where).not.toMatch(ADJACENT_TERMINATORS);
 
             const template = catalogString(
@@ -460,6 +524,30 @@ describe('messageFailureLabel', () => {
     }
   });
 
+  it('speaks a neutral status as its own title in every catalog', async () => {
+    try {
+      for (const language of SUPPORTED_LANGUAGES) {
+        // eslint-disable-next-line no-await-in-loop
+        await i18n.changeLanguage(language);
+        const catalog: unknown = CATALOG_LOADERS[language]();
+        for (const titleKey of [
+          'agentChat.messageFailure.deliveryInterrupted',
+          'agentChat.messageFailure.assistantStopped',
+        ]) {
+          for (const canRetry of [true, false]) {
+            const where = `${language} ${titleKey} canRetry=${canRetry}`;
+            const label = messageFailureLabel({ titleKey, canRetry, error: false });
+            // The row draws one line and speaks it: no failure template, so no
+            // catalog can open the stop with an error word.
+            expect(label, where).toBe(catalogString(catalog, titleKey));
+          }
+        }
+      }
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('keeps the German delivery failure to one full stop', async () => {
     await i18n.changeLanguage('de');
     try {
@@ -467,14 +555,24 @@ describe('messageFailureLabel', () => {
         messageFailureLabel({
           titleKey: 'agentChat.messageFailure.deliveryTitle',
           canRetry: true,
+          error: true,
         })
       ).toBe('Die Zustellung ist fehlgeschlagen. Du kannst es erneut versuchen.');
       expect(
         messageFailureLabel({
           titleKey: 'agentChat.messageFailure.assistantTitle',
           canRetry: false,
+          error: true,
         })
       ).toBe('Die Antwort konnte nicht erstellt werden.');
+      // A stop is a status, so the label is the title alone.
+      expect(
+        messageFailureLabel({
+          titleKey: 'agentChat.messageFailure.assistantStopped',
+          canRetry: false,
+          error: false,
+        })
+      ).toBe('Die Erstellung der Antwort wurde abgebrochen.');
     } finally {
       await i18n.changeLanguage('en');
     }

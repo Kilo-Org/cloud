@@ -42,6 +42,7 @@ import {
   useSaveReviewConfig,
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
+import { useCouncilUiEnabled } from '@/lib/hooks/use-reviewer-council';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -63,6 +64,7 @@ export function PlatformOverviewScreen({
   const canEdit = permission.status === 'ready' && permission.canEdit;
   const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
+  const councilUiEnabled = useCouncilUiEnabled(scope);
   const { reducedMotion } = useMotionPolicy();
   // The body of the config read has exactly one surface: rows from cache, an
   // error with retry, or a loading state. Bitbucket renders its own overview,
@@ -126,6 +128,10 @@ export function PlatformOverviewScreen({
 
   const isLoading = providerState.status === 'loading' || permission.status === 'loading';
   const connected = providerState.status === 'connected';
+  // The account line under the Automatic reviews label is optional: a provider
+  // that reports no login paints the label alone, so the row keeps one line and
+  // matches the sibling Follow REVIEW.md row.
+  const autoReviewsAccount = status.data?.integration?.accountLogin;
 
   // A connected provider whose config read failed (no cache to fall back on),
   // or whose idle read could not be restarted, has nothing to show: surface a
@@ -209,6 +215,12 @@ export function PlatformOverviewScreen({
                   pushOnce(`/(app)/code-reviewer/${scope}/review-memory` as Href);
                 }
               : undefined,
+          onOpenCouncil:
+            capabilities.council && councilUiEnabled
+              ? () => {
+                  pushField('council');
+                }
+              : undefined,
         });
 
   return (
@@ -238,9 +250,13 @@ export function PlatformOverviewScreen({
                     variant="outline"
                     size="sm"
                     className={cn(STATE_ACTION_CLASS, 'flex-row gap-2')}
-                    disabled={save.isPending}
+                    disabled={!canEdit || save.isPending}
                     onPress={() => {
-                      save.mutate({});
+                      // The PATCH routers re-sync project hooks only for a
+                      // patch that carries the repository selection, so the
+                      // retry re-sends the current one. An empty patch neither
+                      // syncs nor proves the hooks healthy.
+                      save.mutate({ selectedRepositoryIds: data.selectedRepositoryIds });
                     }}
                   >
                     {save.isPending ? (
@@ -265,9 +281,11 @@ export function PlatformOverviewScreen({
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
-                    <Text variant="muted" className="text-xs">
-                      {status.data?.integration?.accountLogin ?? ''}
-                    </Text>
+                    {autoReviewsAccount ? (
+                      <Text variant="muted" className="text-xs">
+                        {autoReviewsAccount}
+                      </Text>
+                    ) : null}
                   </View>
                   <Switch
                     accessibilityLabel={t('codeReviewer.autoReviews')}
@@ -321,6 +339,21 @@ export function PlatformOverviewScreen({
                   disabled={!canEdit || save.isPending}
                   onValueChange={value => {
                     save.mutate({ disableReviewMd: !value });
+                  }}
+                />
+              )}
+
+              {/* Bot detection relies on GitHub's authoritative user type, which
+                  GitLab and Bitbucket webhooks do not provide, so this setting
+                  exists on GitHub only (same gate as the web form). */}
+              {capabilities.skipBotPullRequests && (
+                <ToggleRow
+                  title={t('codeReviewer.skipBotPullRequests.title')}
+                  subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
+                  value={data.skipBotPullRequests}
+                  disabled={!canEdit || save.isPending}
+                  onValueChange={value => {
+                    save.mutate({ skipBotPullRequests: value });
                   }}
                 />
               )}

@@ -212,8 +212,8 @@ function environmentReferenceFromRegistration(
 
 /**
  * Builds and validates the grouped `SessionMetadata` a registration persists.
- * The error strings match the legacy `registerSession` rejections exactly so the
- * Worker maps a rejection to the same failure as before.
+ * The error strings match the validation rejections the registration path
+ * produced before, so the Worker maps a rejection to the same failure.
  */
 export async function buildSessionMetadataFromRegistration(
   input: GroupedRegisterSessionInput,

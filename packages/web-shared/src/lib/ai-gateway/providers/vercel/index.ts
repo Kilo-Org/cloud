@@ -117,6 +117,18 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  if (!(await isVercelRoutingEnabledForModel(requestedModel))) {
+    return false;
+  }
+
+  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+}
+
+/**
+ * Whether Kilo's routing config sends the model to Vercel: Vercel routing is on and the model is
+ * not opted out. Vercel must still serve the model.
+ */
+export async function isVercelRoutingEnabledForModel(requestedModel: string) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (!routingConfig.vercelEnabled) {
     return false;
@@ -127,7 +139,26 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+  return true;
+}
+
+/** Whether Vercel serves the model, regardless of the request's routing settings. */
+export async function isVercelModel(requestedModel: string) {
+  const [vercelModels, vercelModelId] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    mapModelIdToVercel(requestedModel),
+  ]);
+  return vercelModels.has(vercelModelId);
+}
+
+/**
+ * Whether a request to Vercel may name the model. Like `isValidOpenRouterModelId`, it assumes the
+ * model is valid while Vercel's model list is unavailable, so requests through a user's own Vercel
+ * key keep working during a metadata outage.
+ */
+export async function isValidVercelModelId(requestedModel: string) {
+  const vercelModels = await getVercelModelsFromDatabase();
+  return vercelModels.size === 0 || vercelModels.has(await mapModelIdToVercel(requestedModel));
 }
 
 /**
@@ -212,6 +243,31 @@ function convertProviderSort(
   }
 }
 
+/**
+ * The request-level fields both routing paths forward: the caller's sort
+ * preference, data-handling choices, fallback models and session affinity.
+ */
+function getSharedGatewayOptions(
+  request: GatewayRequest
+): Pick<
+  NonNullable<VercelProviderConfig['gateway']>,
+  | 'sort'
+  | 'zeroDataRetention'
+  | 'disallowPromptTraining'
+  | 'models'
+  | 'sessionId'
+  | 'sessionAffinity'
+> {
+  const provider = request.body.provider;
+  return {
+    sort: convertProviderSort(provider?.sort),
+    zeroDataRetention: provider?.zdr,
+    disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
+    models: request.body.models,
+    ...getSessionAffinityOptions(request),
+  };
+}
+
 export function convertProviderOptions(
   requestToMutate: GatewayRequest,
   vercelInferenceProviders: string[] | null
@@ -239,12 +295,8 @@ export function convertProviderOptions(
     gateway: {
       only,
       order: provider?.order?.map(openRouterToVercelInferenceProviderId),
-      sort: convertProviderSort(provider?.sort),
-      zeroDataRetention: provider?.zdr,
-      disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
-      models: requestToMutate.body.models,
       serviceTier: serviceTier === 'flex' || serviceTier === 'priority' ? serviceTier : undefined,
-      ...getSessionAffinityOptions(requestToMutate),
+      ...getSharedGatewayOptions(requestToMutate),
     },
   };
 }
@@ -353,16 +405,12 @@ export async function applyVercelSettings(
     // https://anaconda.slack.com/archives/C0BQLEKUCV9/p1792652138592319
     // Request-level data handling preferences travel with the request on every routing path,
     // so upstream providers receive the caller's retention and training choices consistently.
+    // `order` and `serviceTier` apply to the managed path only.
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),
-        sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
-        models: requestToMutate.body.models,
-        zeroDataRetention: requestToMutate.body.provider?.zdr,
-        disallowPromptTraining:
-          requestToMutate.body.provider?.data_collection === 'deny' || undefined,
-        ...getSessionAffinityOptions(requestToMutate),
+        ...getSharedGatewayOptions(requestToMutate),
       },
     };
   } else {

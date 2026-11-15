@@ -235,20 +235,24 @@ export async function handleAudioTranscriptionsRequest(
     user_byok: !!userByok,
     has_tools: false,
     feature,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: false,
-      samples: null,
-      // Audio carries no user text, so there is no prompt to hash.
-      promptSimHash: null,
-    }),
+  };
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: false,
+    samples: null,
+    // Audio carries no user text, so there is no prompt to hash.
+    promptSimHash: null,
   };
 
   setTag('ui.ai_model', requestedModel);
 
   const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
   const { balance, settings, plan, payer } = account;
+
+  // The usage row reports the payer the balance check resolved: the root organization for an
+  // organization member.
+  usageContext.bouncer = await bouncer.usage(bouncerUsageFields, payer);
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).

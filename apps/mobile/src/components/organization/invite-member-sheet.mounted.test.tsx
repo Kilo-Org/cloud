@@ -10,14 +10,26 @@ import { InviteMemberSheet } from './invite-member-sheet';
 type Boundary = {
   organizationId: string | null;
   role: string;
-  org: { organizationId: string } | null;
+  org: {
+    organizationId: string;
+    plan: string;
+    requireSeats: boolean;
+    seatCount: { used: number; total: number };
+  } | null;
   isResolving: boolean;
 };
 
 const boundary = vi.hoisted((): Boundary => ({
   organizationId: 'org-1',
   role: 'owner',
-  org: { organizationId: 'org-1' },
+  // Seat enforcement is off, so the role suites exercise the form, not the
+  // capacity gate; the seats suite turns it on.
+  org: {
+    organizationId: 'org-1',
+    plan: 'teams',
+    requireSeats: false,
+    seatCount: { used: 1, total: 5 },
+  },
   isResolving: false,
 }));
 const invite = vi.hoisted(() => ({
@@ -109,7 +121,12 @@ vi.mock('@/lib/hooks/use-organization-mutations', () => ({
 
 beforeEach(() => {
   boundary.organizationId = 'org-1';
-  boundary.org = { organizationId: 'org-1' };
+  boundary.org = {
+    organizationId: 'org-1',
+    plan: 'teams',
+    requireSeats: false,
+    seatCount: { used: 1, total: 5 },
+  };
   boundary.role = 'owner';
   boundary.isResolving = false;
   invite.isPending = false;
@@ -233,8 +250,9 @@ describe('InviteMemberSheet reopen', () => {
     const rendered = await openSheet();
     expect(guard.isDirty()).toBe(false);
 
+    // The first row is owner: leaving the default member role makes the form dirty.
     act(() => {
-      roleRowProps(rendered, 2).onPress();
+      roleRowProps(rendered, 0).onPress();
     });
     expect(guard.isDirty()).toBe(true);
 
@@ -343,7 +361,12 @@ describe('InviteMemberSheet reopen', () => {
   });
 });
 
-const ROLE_TEXTS: Record<string, true> = { member: true, billing_manager: true, owner: true };
+const ROLE_TEXTS: Record<string, true> = {
+  owner: true,
+  admin: true,
+  member: true,
+  billing_manager: true,
+};
 
 function isRoleLabel(child: unknown): child is string {
   return typeof child === 'string' && ROLE_TEXTS[child] === true;
@@ -358,11 +381,11 @@ function roleLabels(rendered: RenderWithProvidersResult): string[] {
 }
 
 describe('InviteMemberSheet roles', () => {
-  it('offers an owner the owner row', async () => {
+  it('offers an owner every role, owner first as the web does', async () => {
     boundary.role = 'owner';
     const rendered = await openSheet();
 
-    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager', 'owner']);
+    expect(roleLabels(rendered)).toEqual(['owner', 'admin', 'member', 'billing_manager']);
     rendered.unmount();
   });
 
@@ -370,7 +393,7 @@ describe('InviteMemberSheet roles', () => {
     boundary.role = 'admin';
     const rendered = await openSheet();
 
-    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager']);
+    expect(roleLabels(rendered)).toEqual(['admin', 'member', 'billing_manager']);
     rendered.unmount();
   });
 
@@ -396,7 +419,7 @@ describe('InviteMemberSheet roles', () => {
     boundary.role = 'owner';
     const rendered = await openSheet();
     act(() => {
-      roleRowProps(rendered, 2).onPress();
+      roleRowProps(rendered, 0).onPress();
     });
     expect(roleLabels(rendered)).toContain('owner');
 
@@ -406,7 +429,7 @@ describe('InviteMemberSheet roles', () => {
     act(() => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
-    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager']);
+    expect(roleLabels(rendered)).toEqual(['admin', 'member', 'billing_manager']);
 
     act(() => {
       headerProps(rendered).onDone();
@@ -416,6 +439,73 @@ describe('InviteMemberSheet roles', () => {
       { email: 'dev@example.com', role: 'member' },
       expect.anything()
     );
+    rendered.unmount();
+  });
+});
+
+describe('InviteMemberSheet seats', () => {
+  const fullOrganization = {
+    organizationId: 'org-1',
+    plan: 'teams',
+    requireSeats: true,
+    seatCount: { used: 2, total: 2 },
+  };
+
+  /** The warning sentence the sheet paints, if any. */
+  function warningText(rendered: RenderWithProvidersResult): string | undefined {
+    return rendered.renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .map(node => node.props.children)
+      .find(child => typeof child === 'string' && child.startsWith('All seats are in use'));
+  }
+
+  it('explains a full organization, names the billing-manager escape, and frees the form for that role', async () => {
+    boundary.org = fullOrganization;
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+
+    // The numbers ride in an LTR isolate so a right-to-left screen cannot mirror
+    // "2/2" into the wrong pair.
+    const numbers = { used: '\u20662\u2069', total: '\u20662\u2069' };
+    expect(warningText(rendered)).toBe(
+      i18n.t('organization.inviteMember.seatsFullCanInviteBilling', numbers)
+    );
+    expect(headerProps(rendered).doneDisabled).toBe(true);
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+    expect(invite.mutate).not.toHaveBeenCalled();
+
+    // A billing manager takes no seat, so choosing that role re-enables Send.
+    act(() => {
+      roleRowProps(rendered, 3).onPress();
+    });
+    expect(warningText(rendered)).toBeUndefined();
+    expect(headerProps(rendered).doneDisabled).toBe(false);
+
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+    expect(invite.mutate).toHaveBeenCalledWith(
+      { email: 'dev@example.com', role: 'billing_manager' },
+      expect.anything()
+    );
+    rendered.unmount();
+  });
+
+  it('tells a billing manager who cannot assign that role to ask for seats', async () => {
+    boundary.role = 'billing_manager';
+    boundary.org = fullOrganization;
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+
+    const numbers = { used: '\u20662\u2069', total: '\u20662\u2069' };
+    expect(warningText(rendered)).toBe(i18n.t('organization.inviteMember.seatsFull', numbers));
+    expect(headerProps(rendered).doneDisabled).toBe(true);
     rendered.unmount();
   });
 });

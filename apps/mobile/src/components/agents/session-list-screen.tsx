@@ -21,6 +21,7 @@ import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionListHeader } from '@/components/agents/session-list-header';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { sessionListNoMatchDescription } from '@/components/agents/session-list-empty-copy';
 import { SessionStatusFilterBar } from '@/components/agents/session-status-filter-bar';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
 import { SessionListTouchGate } from '@/components/session-list-touch-gate';
@@ -36,7 +37,7 @@ import {
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
-import { OwnedKeyboardLift } from '@/components/agents/owned-keyboard-lift';
+import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { IconButton } from '@/components/ui/icon-button';
@@ -109,12 +110,22 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   // and so does the load-failure body, whose FAB is the only creation
   // affordance while the list is failing.
   const noMatchBody = hasLiveRows && visibleSessions.length === 0;
+  // The persisted filters and the transient status filter both narrow the list
+  // as filters: the no-match body names them in one "Clear filters" action that
+  // never touches the search text.
+  const filtersNarrow = query.activeFilterCount > 0 || statusKind !== null;
   const showFab = context.isReady && content !== 'empty' && !noMatchBody;
   const keyboard = useOwnedKeyboard();
+  // The pad the body frame takes. It equals the keyboard height whenever the
+  // window can hold the whole band, and only falls short in a window too short
+  // for it — where the FAB's band must not subtract height the body never gave
+  // up. Both read the same value in the same render, so the reserved band
+  // cannot fall a commit behind the pad.
+  const keyboardLift = useKeyboardLiftPad(keyboard.occlusion);
   const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(
     tabBarHeight,
     showFab,
-    keyboard.occlusion
+    keyboardLift.pad
   );
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -284,7 +295,14 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
     centeredBottomInset,
     compactEmptyState,
     compactLiveEmptyState,
-  } = useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
+  } = useAgentsListChrome({
+    showFab,
+    tabBarHeight,
+    fontScale,
+    left,
+    right,
+    noMatchSecondaryAction: isSearching && filtersNarrow,
+  });
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
   // content must clear them. The tab bar keeps its viewport inset as the list
@@ -325,33 +343,19 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const keyboardRowsInsets = useSessionListInsets({ bottomBand: rowsFrameBand, left, right });
   const rowsInsets = keyboardUp ? keyboardRowsInsets : listInsets;
 
-  // The no-match body's Clear action retires everything that emptied the list.
-  // A status filter always reads as a filter, so the copy and the action agree
-  // even when a search is also active. With a status filter set, the search and
-  // any persisted filters still narrow the list, so the action drops all three;
-  // clearing only the status would land on the same empty body.
-  //
-  // Every branch replaces the body in place, so the press also holds the list
-  // for the settle window: the rows mount under the finger that released the
-  // action, and a repeat tap would open the row there.
-  const emptyCopyIsSearch = isSearching && statusKind === null;
+  // Every no-match clear branch replaces the body in place, so the press holds
+  // the list for the settle window: the rows mount under the finger that
+  // released the action, and a repeat tap would open the row there.
   const { handleClearSearch, handleClearFilters } = query;
-  const clearStatusAndFilters = useCallback(() => {
+  const clearNoMatchSearch = useCallback(() => {
+    holdSessionListTouch();
     handleClearSearch();
+  }, [handleClearSearch]);
+  const clearNoMatchFilters = useCallback(() => {
+    holdSessionListTouch();
     handleClearFilters();
     clearStatusFilter();
-  }, [handleClearSearch, handleClearFilters, clearStatusFilter]);
-  let clearNoMatch = query.handleClearFilters;
-  if (statusKind !== null) {
-    clearNoMatch =
-      isSearching || query.activeFilterCount > 0 ? clearStatusAndFilters : clearStatusFilter;
-  } else if (isSearching) {
-    clearNoMatch = query.handleClearSearch;
-  }
-  const handleClearNoMatch = useCallback(() => {
-    holdSessionListTouch();
-    clearNoMatch();
-  }, [clearNoMatch]);
+  }, [handleClearFilters, clearStatusFilter]);
   // The status bar's own Clear control sits above the list, so the rows it
   // brings back land under the point it released too: it holds the list for the
   // same window as the no-match action.
@@ -359,6 +363,39 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
     holdSessionListTouch();
     clearStatusFilter();
   }, [clearStatusFilter]);
+
+  // The search field and the filter badge stay visible above this body, so the
+  // copy names every cause the way the actions do.
+  const noMatchDescription = sessionListNoMatchDescription(t, {
+    isSearching,
+    hasActiveFilters: filtersNarrow,
+  });
+  const noMatchActions = (
+    <View className="flex-row flex-wrap items-center justify-center gap-2">
+      {isSearching ? (
+        <Button
+          variant="outline"
+          size={compactEmptyState ? 'sm' : 'default'}
+          testID="agents-clear-search"
+          onPress={clearNoMatchSearch}
+          className={STATE_ACTION_CLASS}
+        >
+          <Text>{t('common.clearSearch')}</Text>
+        </Button>
+      ) : null}
+      {filtersNarrow ? (
+        <Button
+          variant="outline"
+          size={compactEmptyState ? 'sm' : 'default'}
+          testID="agents-clear-filters"
+          onPress={clearNoMatchFilters}
+          className={STATE_ACTION_CLASS}
+        >
+          <Text>{t('common.clearFilters')}</Text>
+        </Button>
+      ) : null}
+    </View>
+  );
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -383,21 +420,8 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         title={t('agents.sessionList.noMatches')}
         compact={compactEmptyState}
         refreshControl={rowsControl}
-        description={
-          emptyCopyIsSearch
-            ? t('agents.sessionList.tryDifferentSearch')
-            : t('agents.sessionList.tryAdjustFilters')
-        }
-        action={
-          <Button
-            variant="outline"
-            size={compactEmptyState ? 'sm' : 'default'}
-            onPress={handleClearNoMatch}
-            className={STATE_ACTION_CLASS}
-          >
-            <Text>{emptyCopyIsSearch ? t('common.clearSearch') : t('common.clearFilters')}</Text>
-          </Button>
-        }
+        description={noMatchDescription}
+        action={noMatchActions}
       />
     );
   } else if (content === 'empty') {
@@ -522,9 +546,13 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         ) : null}
         {/* Android runs edge-to-edge and never resizes the window for the IME,
             so the body clears the IME natively: the shared lift pads by the
-            keyboard this screen's own field raised. */}
+            keyboard this screen's own field raised. The pad is clamped in a
+            window too short to hold the whole band, and the FAB's band above
+            reads the same value in this render. */}
         <SessionListTouchGate>
-          <OwnedKeyboardLift occlusion={keyboard.occlusion}>{region}</OwnedKeyboardLift>
+          <OwnedKeyboardLift pad={keyboardLift.pad} onLayout={keyboardLift.handleLayout}>
+            {region}
+          </OwnedKeyboardLift>
         </SessionListTouchGate>
         {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}

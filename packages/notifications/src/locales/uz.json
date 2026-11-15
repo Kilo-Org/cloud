@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Faol agentlarda yangilanish bor"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Vazifa yakunlandi"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Amalga oshmadi: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Uzildi: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

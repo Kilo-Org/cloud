@@ -340,7 +340,6 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               currentStep,
               attachments: params.attachments,
               payerUserId: params.user.id,
-              requesterUserId: params.user.id,
               actorLogin: params.actorLogin,
               threadRepository: getGitHubRepositoryFullNameFromThread(params.thread.id),
             }

@@ -1,5 +1,5 @@
 import { ChevronsUpDown, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
@@ -10,6 +10,7 @@ import {
 } from '@/src/shared/model-picker-rows';
 import { ModelPickerModelRow } from './model-picker-row';
 import { useModelPreferences } from './use-model-preferences';
+import { useModalDialog } from './use-dismiss';
 
 const triggerClassName =
   'flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-border-strong bg-input-bg px-2 type-label text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:text-foreground-subtle';
@@ -57,6 +58,12 @@ export const ModelPicker = ({
     [favorites, modelOptions, search]
   );
 
+  const closeOverlay = useCallback((): void => {
+    setIsOpen(false);
+    setSearch('');
+  }, []);
+  const dialogRef = useModalDialog({ onClose: closeOverlay, open: isOpen });
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -65,11 +72,6 @@ export const ModelPicker = ({
     searchInputRef.current?.focus();
     selectedRowRef.current?.scrollIntoView({ block: 'nearest' });
   }, [isOpen]);
-
-  const closeOverlay = (): void => {
-    setIsOpen(false);
-    setSearch('');
-  };
 
   const handleSelect = (modelId: string): void => {
     onModelChange(modelId);
@@ -102,7 +104,9 @@ export const ModelPicker = ({
           aria-label="Select model"
           aria-modal="true"
           className="agent-conversation-scrollbar fixed inset-0 z-30 flex flex-col overflow-y-auto bg-surface-background"
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-4">
             <div className="min-w-0">

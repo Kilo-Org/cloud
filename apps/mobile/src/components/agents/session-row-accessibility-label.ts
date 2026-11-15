@@ -244,7 +244,18 @@ export function sessionRowAccessibilityLabel({
   // space of its own.
   const separator = tokens.find(token => token.type === 'literal');
   const spacing = pausesFragments ? (separator?.value ?? literal) : literal;
-  const trailing = joiner.endsWith('-') ? '' : (/\s*$/u.exec(spacing)?.[0] ?? '');
+  // That first separator spells this locale's word space in one of two
+  // positions: after the pause (`", "` in most locales) or, where its
+  // conjunction word is a prefix that attaches to the next word, before it
+  // (`" و"` in Arabic, `" ו-"` in Hebrew). A pause mark is not that prefix, so
+  // it still needs the locale's word space, which is the literal's leading half
+  // when the trailing half is empty. A literal with neither half writes no
+  // space after its pause (the CJK `、` and `，`), so those locales keep their
+  // current output.
+  const trailingWhitespace = /\s*$/u.exec(spacing)?.[0] ?? '';
+  const prefixSpacing = /\p{P}$/u.test(joiner) ? (/\s*/u.exec(spacing)?.[0] ?? '') : '';
+  const wordSpace = trailingWhitespace || prefixSpacing;
+  const trailing = joiner.endsWith('-') ? '' : wordSpace;
   tokens[lastLiteral] = { type: 'literal', value: `${leading ?? ''}${joiner}${trailing}` };
   return tokens.map(token => token.value).join('');
 }

@@ -1,5 +1,5 @@
 {
-  "id": "13a45121-8539-4c4f-929f-21e5296656af",
+  "id": "efb5d168-03bc-4923-891b-f73b1edaaa52",
   "prevId": "38a2d04e-5314-49eb-a993-75d1e108d394",
   "version": "7",
   "dialect": "postgresql",
@@ -4049,12 +4049,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "encrypted_api_key": {
-          "name": "encrypted_api_key",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
         },
         "encrypted_api_key_envelope": {
           "name": "encrypted_api_key_envelope",
@@ -34839,33 +34833,6 @@
             },
             {
               "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_proofs_user_session_binding": {
-          "name": "idx_session_step_up_proofs_user_session_binding",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "action_binding_hash",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

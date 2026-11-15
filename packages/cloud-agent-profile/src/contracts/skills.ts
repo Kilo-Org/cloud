@@ -1,5 +1,7 @@
 import * as z from 'zod';
+import { locateFrontmatterBlock } from '../frontmatter-block';
 import { overLimitMessage, overTotalMessage } from './limit-copy';
+import { skillCompanionFileIssues } from './skill-companion-files';
 
 export const MAX_PROFILE_SKILLS = 50;
 export const MAX_SKILL_NAME_LENGTH = 100;
@@ -12,7 +14,6 @@ export const MAX_SKILL_COMPANION_FILES_TOTAL = 500_000;
 export const MAX_SKILL_COMPANION_PATH_LENGTH = 200;
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
-const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
 
 export const skillNameSchema = z
   .string()
@@ -28,56 +29,29 @@ export const skillNameSchema = z
  * directory, values are the file contents. `SKILL.md` itself is stored in
  * `raw_markdown` and must not appear here.
  */
-export const skillFilesSchema = z
-  .record(z.string(), z.string())
-  .refine(
-    files => Object.keys(files).length <= MAX_SKILL_COMPANION_FILES,
-    `Skill may have at most ${MAX_SKILL_COMPANION_FILES} companion files`
-  )
-  .superRefine((files, ctx) => {
-    let total = 0;
-    for (const [path, content] of Object.entries(files)) {
-      if (path.length === 0 || path.length > MAX_SKILL_COMPANION_PATH_LENGTH) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `Invalid skill file path length: ${path.slice(0, 80)}`,
-        });
-        return;
-      }
-      if (!SKILL_FILE_PATH_PATTERN.test(path)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `Skill file path contains invalid characters: ${path}`,
-        });
-        return;
-      }
-      if (path.startsWith('/') || path.includes('..') || path.includes('//')) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
-      if (path === 'SKILL.md' || path.toLowerCase() === 'skill.md') {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'SKILL.md must be supplied as rawMarkdown, not in files',
-        });
-        return;
-      }
-      if (content.length > MAX_SKILL_COMPANION_FILE_SIZE) {
-        ctx.addIssue({
-          code: 'custom',
-          message: overLimitMessage(`Skill companion file ${path}`, MAX_SKILL_COMPANION_FILE_SIZE),
-        });
-        return;
-      }
-      total += content.length;
-    }
-    if (total > MAX_SKILL_COMPANION_FILES_TOTAL) {
-      ctx.addIssue({
-        code: 'custom',
-        message: overTotalMessage('Skill companion files', total, MAX_SKILL_COMPANION_FILES_TOTAL),
-      });
-    }
-  });
+export const skillFilesSchema = z.record(z.string(), z.string()).superRefine((files, ctx) => {
+  skillCompanionFileIssues(
+    files,
+    {
+      maxFiles: MAX_SKILL_COMPANION_FILES,
+      maxFileSize: MAX_SKILL_COMPANION_FILE_SIZE,
+      maxTotalSize: MAX_SKILL_COMPANION_FILES_TOTAL,
+      pathLength: {
+        max: MAX_SKILL_COMPANION_PATH_LENGTH,
+        tooLong: path => `Invalid skill file path length: ${path.slice(0, 80)}`,
+      },
+      tooManyFiles: `Skill may have at most ${MAX_SKILL_COMPANION_FILES} companion files`,
+      pathInvalidCharacters: path => `Skill file path contains invalid characters: ${path}`,
+      pathRejected: path => `Skill file path rejected: ${path}`,
+      manifestInFiles: 'SKILL.md must be supplied as rawMarkdown, not in files',
+      fileTooLarge: path =>
+        overLimitMessage(`Skill companion file ${path}`, MAX_SKILL_COMPANION_FILE_SIZE),
+      totalTooLarge: total =>
+        overTotalMessage('Skill companion files', total, MAX_SKILL_COMPANION_FILES_TOTAL),
+    },
+    message => ctx.addIssue({ code: 'custom', message })
+  );
+});
 
 /** Input for creating a custom skill by pasting SKILL.md directly. */
 export const skillCustomInputSchema = z.object({
@@ -140,21 +114,6 @@ function getFrontmatterValue(frontmatter: string, key: string): string | null {
   return null;
 }
 
-function isFrontmatterDelimiterLine(line: string): boolean {
-  if (!line.startsWith('---')) {
-    return false;
-  }
-
-  for (let index = 3; index < line.length; index += 1) {
-    const char = line[index];
-    if (char !== ' ' && char !== '\t') {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 /**
  * Extract YAML frontmatter `name` and `description` from SKILL.md.
  * Supports both --- and +++ delimiters. Returns `null` if no frontmatter.
@@ -163,43 +122,14 @@ export function parseSkillFrontmatter(rawMarkdown: string): {
   name: string | null;
   description: string | null;
 } {
-  const firstLineEnd = rawMarkdown.indexOf('\n');
-  if (firstLineEnd === -1) {
+  const located = locateFrontmatterBlock(rawMarkdown);
+  if (located.status !== 'ok') {
     return { name: null, description: null };
   }
 
-  const firstRawLine = rawMarkdown.slice(0, firstLineEnd);
-  const firstLine = firstRawLine.endsWith('\r') ? firstRawLine.slice(0, -1) : firstRawLine;
-  if (!isFrontmatterDelimiterLine(firstLine)) {
-    return { name: null, description: null };
-  }
-
-  let lineStart = firstLineEnd + 1;
-  let frontmatterEnd: number | null = null;
-  while (lineStart < rawMarkdown.length) {
-    const lineEnd = rawMarkdown.indexOf('\n', lineStart);
-    if (lineEnd === -1) {
-      break;
-    }
-
-    const rawLine = rawMarkdown.slice(lineStart, lineEnd);
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
-    if (isFrontmatterDelimiterLine(line)) {
-      frontmatterEnd =
-        lineStart > 0 && rawMarkdown[lineStart - 1] === '\r' ? lineStart - 1 : lineStart;
-      break;
-    }
-
-    lineStart = lineEnd + 1;
-  }
-
-  if (frontmatterEnd === null) {
-    return { name: null, description: null };
-  }
-
-  const frontmatter = rawMarkdown.slice(firstLineEnd + 1, frontmatterEnd);
-  const name = getFrontmatterValue(frontmatter, 'name');
-  const description = getFrontmatterValue(frontmatter, 'description');
+  const block = located.block;
+  const name = getFrontmatterValue(block, 'name');
+  const description = getFrontmatterValue(block, 'description');
   const stripQuotes = (v: string): string => {
     const trimmed = v.trim();
     if (

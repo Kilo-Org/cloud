@@ -1,4 +1,5 @@
 import { readProfileBundle } from '../../session-profile.js';
+import { commandsPayloadSchema } from '../../session/ingest-handlers/commands-available.js';
 import { z } from 'zod';
 import type { SessionAttachPayload } from '../../shared/sandbox-control-protocol.js';
 import {
@@ -65,6 +66,7 @@ export const controlPlaneSessionRegisterInputSchema = z
   .object({
     metadata: CurrentSessionMetadataSchema,
     sandboxSelection: controlPlaneSandboxSelectionSchema,
+    initialCommands: commandsPayloadSchema.optional(),
     runtimeAuthorizationSeal: z
       .string()
       .min(1)

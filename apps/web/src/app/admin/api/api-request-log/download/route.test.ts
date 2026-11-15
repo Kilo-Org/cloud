@@ -478,6 +478,60 @@ describe('GET /admin/api/api-request-log/download', () => {
     expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
   });
 
+  it('exports chunked Enkrypt calls with their chunk and calls from before chunking', async () => {
+    const key = '2026-08-01/chunked/log.json';
+    const request = { request: true };
+    const response = '{"response":true}';
+    const inputRequest = {
+      text: 'first chunk',
+      detectors: { injection_attack: { enabled: true } },
+      user_metadata: { organization_id: 'org' },
+    };
+    const enkrypt: EnkryptRequestLog[] = [
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'system',
+        chunk: { index: 0, count: 2 },
+        request: inputRequest,
+        response: '{"summary":{"injection_attack":0}}',
+        status_code: 200,
+        error: null,
+      },
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'system',
+        chunk: { index: 1, count: 2 },
+        request: { ...inputRequest, text: 'second chunk' },
+        response: null,
+        status_code: null,
+        error: 'Enkrypt request timed out',
+      },
+      {
+        guardrail: 'input',
+        scan: 'log_only',
+        part: 'conversation',
+        request: inputRequest,
+        response: '{"summary":{"injection_attack":0}}',
+        status_code: 200,
+        error: null,
+      },
+    ];
+    const body = JSON.stringify({ version: 1, request, response, enkrypt });
+    fakeR2.objects.set(`${BUCKET}/${key}`, body);
+    expect(apiRequestLogBlobSchema.parse(JSON.parse(body)).enkrypt).toEqual(enkrypt);
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+      .returning({ id: api_request_log.id });
+
+    const entries = await downloadEntries();
+
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
+  });
+
   it('omits the response file for a combined log with a null response', async () => {
     const key = '2026-08-01/no-response/log.json';
     fakeR2.objects.set(

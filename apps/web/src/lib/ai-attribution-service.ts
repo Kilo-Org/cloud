@@ -48,8 +48,8 @@ const DebugDataResponse = z.discriminatedUnion('success', [
       doKey: z.string(),
       attributions: z.array(AttributionRecord),
       summary: DebugDataSummary,
-      // Optional while a deploy promotes the web app before the workers: the
-      // previous worker answers without it.
+      // Optional because a Worker deploy that fails or runs late leaves the
+      // previous worker answering this route without it.
       instance_summary: DebugDataSummary.optional(),
     }),
   }),

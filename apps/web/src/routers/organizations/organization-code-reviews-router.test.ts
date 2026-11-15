@@ -931,6 +931,49 @@ describe('organization review agent router: skip bot pull requests', () => {
     });
     expect(cfg.skipBotPullRequests).toBe(false);
   });
+
+  it('persists skipBotPullRequests from a patch and keeps the stored value when a patch omits it', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'anthropic/claude-sonnet-5',
+      skipBotPullRequests: true,
+    });
+
+    // The mobile overview's toggle sends only this field.
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      skipBotPullRequests: false,
+    });
+    expect(
+      (
+        await caller.organizations.reviewAgent.getReviewConfig({
+          organizationId: organization.id,
+          platform: 'github',
+        })
+      ).skipBotPullRequests
+    ).toBe(false);
+
+    // A patch that does not carry it must not reset it to the default.
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'strict',
+    });
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        skip_bot_pull_requests: false,
+      })
+    );
+  });
 });
 
 describe('organization review agent router: getGitHubStatus connection rule', () => {

@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
+import { useModalSurfaceHold } from '@/lib/modal-surface-veil';
 import { cn } from '@/lib/utils';
 
 /**
@@ -38,6 +39,10 @@ export function DialogCard({
   placement = 'centred',
   children,
 }: Readonly<DialogCardProps>) {
+  // A portal card renders inside the app window, so the screen it covers must be
+  // taken out of the app's own tree by the root: Android ignores
+  // `accessibilityViewIsModal`, which is set on the card's content below.
+  useModalSurfaceHold();
   return (
     <Root
       open

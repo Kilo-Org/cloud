@@ -132,21 +132,21 @@ async function applySessionCardFixture(input: {
               facts?.activityAgo === undefined
                 ? row.statusUpdatedAt
                 : new Date(now - facts.activityAgo * 60_000).toISOString(),
-            currentStep: facts?.step ?? null,
-            plan: facts?.plan ?? null,
-            changes: facts?.changes ?? null,
-            permissionCommand: facts?.permissionCommand ?? null,
+            currentStep: facts?.step,
+            plan: facts?.plan,
+            changes: facts?.changes,
+            permissionCommand: facts?.permissionCommand,
             lastActivityAt:
               facts?.activityAgo === undefined
-                ? null
+                ? undefined
                 : new Date(now - facts.activityAgo * 60_000).toISOString(),
-            costMicrodollars: facts?.costMicrodollars ?? null,
-            outcome: facts?.outcome ?? null,
+            costMicrodollars: facts?.costMicrodollars,
+            outcome: facts?.outcome,
             failure: facts?.failure ?? null,
             prOpened: facts?.outcome === 'pr_opened',
             startedAt:
               facts?.startedAgo === undefined
-                ? null
+                ? undefined
                 : new Date(now - facts.startedAgo * 60_000).toISOString(),
           },
           {

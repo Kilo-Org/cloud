@@ -264,10 +264,10 @@ function resolveComposerBlockedReason(
  * needs a prompt or a file.
  *
  * The other preconditions that block Start are named too, wherever they own
- * the blocker: a failed or in-flight attachment, and a still-loading profile,
- * each says what the user waits for or fixes. Creating/submitting and an
- * unavailable model stay `null`, because no copy can tell the user what to do
- * about them.
+ * the blocker: a failed or in-flight attachment, a still-loading profile, an
+ * empty model, and a repository key that no longer resolves each say what the
+ * user waits for, picks, or fixes. Creating and submitting stay `null`, because
+ * no copy can tell the user what to do about a request already in flight.
  */
 export function resolveNewSessionStartBlockedReason(
   input: NewSessionStartBlockedReasonInput

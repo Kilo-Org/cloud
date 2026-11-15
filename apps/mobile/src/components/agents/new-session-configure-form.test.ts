@@ -477,10 +477,11 @@ describe('NewSessionConfigureForm', () => {
     });
     expect(reason).toBe('attachment-uploading');
 
-    // The screen maps the reason to the composer's own copy, so the footer and
-    // a refused send name the same wait in the same words.
-    const copy = appI18n.t('agentChat.composer.waitForUploads');
-    expect(copy).toBe('Wait for attachments to finish uploading.');
+    // The footer names the escape the chip offers — dropping the attachment
+    // starts the session without it — while the composer keeps its own copy for
+    // the send it refuses to make.
+    const copy = appI18n.t('agentChat.newSession.attachmentUploadingToStart');
+    expect(copy).toBe('An attachment is still uploading. Remove it to start without it.');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({

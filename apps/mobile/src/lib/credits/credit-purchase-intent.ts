@@ -16,8 +16,6 @@ export type CreditPurchaseIntent = {
   readonly id: string;
   readonly productId: string;
   readonly accountToken: string;
-  /** The auth epoch that admitted it, kept for diagnostics: the account token is what scopes inheritance. */
-  readonly epoch: number;
   readonly transactionIds: string[];
   dispatched: boolean;
 };
@@ -62,7 +60,7 @@ export function currentCreditPurchaseIntentFor(accountToken: string) {
  * dropped first: the barrier belongs to the account that admitted it, and the
  * same account keeps it across an auth epoch change.
  */
-export function admitCreditPurchaseIntent(productId: string, accountToken: string, epoch: number) {
+export function admitCreditPurchaseIntent(productId: string, accountToken: string) {
   // A session that did not admit this request never inherits it. The account
   // token is the identity that matters: an empty one means the catalogue has not
   // answered yet and says nothing about whose request this is, while two
@@ -84,7 +82,6 @@ export function admitCreditPurchaseIntent(productId: string, accountToken: strin
     id: `purchase-request-${String(sequence)}`,
     productId,
     accountToken,
-    epoch,
     transactionIds: [],
     dispatched: false,
   };

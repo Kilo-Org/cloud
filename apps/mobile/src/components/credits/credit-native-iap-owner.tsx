@@ -984,7 +984,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         if (!attempt.owns() || !isCurrentAuthEpoch(epoch) || !isStillMounted(mountedRef)) {
           return false;
         }
-        const admitted = admitCreditPurchaseIntent(storeProductId, appAccountToken, epoch);
+        const admitted = admitCreditPurchaseIntent(storeProductId, appAccountToken);
         reservedIntent = admitted.intent;
         if (!attempt.owns() || !isCurrentAuthEpoch(epoch)) {
           if (admitted.created) {

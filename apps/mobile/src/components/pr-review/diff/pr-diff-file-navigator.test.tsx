@@ -14,8 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
+import { type PageRunFailure } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { type SurfaceFeedback } from '@/lib/surface-feedback';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
@@ -137,10 +139,10 @@ type ViewedResult = {
 
 type FetchAllResult = {
   run: () => unknown;
-  isRunning: boolean;
   loadedFiles: number;
   totalFiles: null;
-  error: unknown;
+  feedback: SurfaceFeedback<PageRunFailure>;
+  failure: PageRunFailure | null;
 };
 
 let listQueryResult: ListQueryResult = {
@@ -163,10 +165,10 @@ let viewedResult: ViewedResult = {
 };
 let fetchAllResult: FetchAllResult = {
   run: fetchAllRunMock,
-  isRunning: false,
+  feedback: { status: 'idle' },
   loadedFiles: 0,
   totalFiles: null,
-  error: null,
+  failure: null,
 };
 
 vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
@@ -265,10 +267,10 @@ describe('PrDiffFileNavigator later-page retry (finding 1)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -322,10 +324,10 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -410,10 +412,10 @@ describe('PrDiffFileNavigator onEndReached gating (finding 3)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -460,10 +462,10 @@ describe('PrDiffFileNavigator active-search fetch-to-completion (finding 4)', ()
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -481,10 +483,10 @@ describe('PrDiffFileNavigator active-search fetch-to-completion (finding 4)', ()
   it('shows the load-all retry when fetch-to-completion has an error', async () => {
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'failed', failure: { kind: 'load-all-failed', at: 1 } },
       loadedFiles: 1,
       totalFiles: null,
-      error: new Error('page failed'),
+      failure: { kind: 'load-all-failed', at: 1 },
     };
     const { renderer } = await mountNavigator();
 
@@ -516,10 +518,10 @@ describe('PrDiffFileNavigator stale row callbacks (finding 5)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -573,10 +575,10 @@ describe('PrDiffFileNavigator list bottom inset (plan §6)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -643,10 +645,10 @@ describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -734,10 +736,10 @@ describe('PrDiffFileNavigator provider wording', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -833,10 +835,10 @@ describe('PrDiffFileNavigator listed-file progress', () => {
     viewedResult = { isViewed: () => true, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
     await i18n.changeLanguage('fr');
   });

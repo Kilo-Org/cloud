@@ -202,7 +202,7 @@ export function PrReviewFileList({
         isFetchingNextPage: query.isFetchingNextPage,
         hasNextPage: query.hasNextPage,
         laterPageError: query.isError && files.length > 0,
-        fetchToCompletionRunning: fetchToCompletion.isRunning,
+        fetchToCompletionRunning: fetchToCompletion.feedback.status === 'pending',
         fetchToCompletionLoaded: fetchToCompletion.loadedFiles,
         totalFiles: changedFiles,
       }),
@@ -216,7 +216,7 @@ export function PrReviewFileList({
       query.hasNextPage,
       query.isError,
       files.length,
-      fetchToCompletion.isRunning,
+      fetchToCompletion.feedback.status,
       fetchToCompletion.loadedFiles,
       changedFiles,
     ]
@@ -307,7 +307,7 @@ export function PrReviewFileList({
     );
   }
 
-  const isTruncated = query.hasNextPage || Boolean(fetchToCompletion.error);
+  const isTruncated = query.hasNextPage || fetchToCompletion.failure !== null;
   // First page still in flight: keep FlashList unmounted. A list that first
   // lays out a single loading pagination-row and later receives the real file
   // rows can measure full content height without mounting cells until scroll.

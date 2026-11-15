@@ -1389,7 +1389,7 @@
       "set": "Definido",
       "notSet": "Não definido",
       "nSelected": "{{displayCount}} selecionados",
-      "nSelected_one": "{{displayCount}} selecionados",
+      "nSelected_one": "{{displayCount}} selecionado",
       "nSelected_other": "{{displayCount}} selecionados",
       "nSelected_many": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o ficheiro REVIEW.md"

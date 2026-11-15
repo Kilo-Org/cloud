@@ -4112,7 +4112,7 @@
     "skillNameRequired": "Įveskite įgūdžio pavadinimą",
     "skillNameTooLong": "Įgūdžio pavadinimas turi būti ne ilgesnis kaip {{max}} simbolių",
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
-    "skillContentRequired": "Reikalingas įgūdžių turinys",
+    "skillContentRequired": "Reikalingas įgūdžio turinys",
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžio. Bandykite dar kartą.",
     "skillDeleteFailed": "Nepavyko ištrinti įgūdžio. Bandykite dar kartą.",
     "skillToggleFailed": "Nepavyko atnaujinti įgūdžio. Bandykite dar kartą.",

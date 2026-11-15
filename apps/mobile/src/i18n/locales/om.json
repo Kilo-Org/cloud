@@ -4232,6 +4232,11 @@
     "storeTimedOut": "App Store yeroo kessatti hin deebine. Irra deebi'ii yaali.",
     "storeTimedOutPlay": "Google Play yeroo kessatti hin deebine. Irra deebi'ii yaali.",
     "unresolvedPurchase": "Bittaan kee duraanii ammas xumuramee kireedita isaa baalansii kee irratti dabaluu danda'a. Irra deebi'anii bituun bittaa biraa jalqaba, akkasumas ammas si kaffalchiisuu danda'a.",
+    "unresolvedPurchaseFound": "Bittaan kee duraanii suuqicha keessatti argameera, yommuu xumuramu kireeditiin isaa ni dabalama; irra deebi'anii bituun bittaa biraa jalqaba, ammas si kaffalchiisuu danda'a.",
+    "unresolvedPurchaseNotFound": "Bittaan kee duraanii suuqicha keessatti hin argamne, garuu booda xumuramee kireedita isaa dabaluu danda'a; irra deebi'anii bituun bittaa biraa jalqaba, ammas si kaffalchiisuu danda'a.",
+    "unresolvedPurchaseRefused": "Bittaan kee duraanii suuqicha keessatti argameera, garuu kireeditiin isaa kennamuu hin danda'u; irra deebi'anii bituun bittaa biraa jalqaba, ammas si kaffalchiisuu danda'a.",
+    "unreadablePurchaseRecord": "Galmeen bittaa kireeditii kuufame dubbifamuu hin danda'u, kanaaf kireeditii bituun dhorkamee tura. Galmee kana bakka buusuun akka irra deebitee bitattu si dandeessisa; kaffaltiin kanaan dura sirraa fudhatame kamiyyuu mana gurgurtaa biratti hafa, ofumaanis kireeditiin siif hin dabalamu.",
+    "replacePurchaseRecord": "Galmee bakka buusi",
     "buyAgain": "Irra deebi'ii biti",
     "purchaseOwnedByAnotherAccount": "Kireeditiin Apple Account kana irratti jiru kan herrega Kilo biraati. Fayyadamuuf herrega Kilo sanatti seeni.",
     "purchaseOwnedByAnotherAccountPlay": "Kireeditiin akaawuntii Google Play kana irratti jiru akaawuntii Kilo adda tokko kan ta'e dha. Fayyadamuuf akaawuntii Kilo sana seeni."

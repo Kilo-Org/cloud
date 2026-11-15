@@ -4232,6 +4232,11 @@
     "storeTimedOut": "App Store wakhtigii ma jawaabin. Mar kale isku day.",
     "storeTimedOutPlay": "Google Play wakhtigii ma jawaabin. Mar kale isku day.",
     "unresolvedPurchase": "Iibsigaagii hore ayaa weli dhammaystirmi kara oo lacagtiisa adeeg ku dari kara dheelitirkaaga. Iibsashada mar kale waxay bilaabaysaa iibsi cusub oo gooni ah, waxaana laga yaabaa in mar kale lacag lagaa qaado.",
+    "unresolvedPurchaseFound": "Iibsigaagii hore dukaanka waa laga helay, lacagtiisa adeegna waa lagu dari doonaa marka uu dhammaystirmo; iibsashada mar kale waa iibsi cusub oo laga yaabo in mar kale lacag lagaa qaado.",
+    "unresolvedPurchaseNotFound": "Iibsigaagii hore dukaanka lagama helin, balse mar dambe wuu dhammaystirmi karaa oo lacagtiisa adeeg ku dari karaa dheelitirkaaga; iibsashada mar kale waa iibsi cusub oo laga yaabo in mar kale lacag lagaa qaado.",
+    "unresolvedPurchaseRefused": "Iibsigaagii hore dukaanka waa laga helay, balse lacagtiisa adeeg laguma dari karo dheelitirkaaga; iibsashada mar kale waa iibsi cusub oo laga yaabo in mar kale lacag lagaa qaado.",
+    "unreadablePurchaseRecord": "Diiwaan iibsi kiredit oo la keydiyay lama akhriyi karo, sidaas darteed iibsashada kiredit way xannibnaanaysaa. Beddelidda diiwaanka waxay kuu oggolaanaysaa inaad mar kale iibsato; lacag kasta oo hore lagaa jaray waxay ku haraysaa dukaanka, si toos ahna kiredit ahaan laguuguma darayo.",
+    "replacePurchaseRecord": "Beddel diiwaanka",
     "buyAgain": "Mar kale iibso",
     "purchaseOwnedByAnotherAccount": "Lacagta adeeg ee ku jirta Apple Account-kan waxaa leh akoon kale oo Kilo ah. Isticmaalka, soo gal akoonkaas Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Lacagta adeeg ee ku yaal xisaabtan Google Play waxaa leh koonto Kilo oo kale. Isticmaalka, ku saxiix bax koontada Kilo-ga ah."

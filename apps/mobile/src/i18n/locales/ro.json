@@ -4294,6 +4294,11 @@
     "storeTimedOut": "App Store nu a răspuns la timp. Încearcă din nou.",
     "storeTimedOutPlay": "Google Play nu a răspuns la timp. Încearcă din nou.",
     "unresolvedPurchase": "Achiziția ta anterioară se poate finaliza în continuare și poate adăuga creditele aferente la soldul tău. Dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
+    "unresolvedPurchaseFound": "Magazinul a găsit achiziția ta anterioară și vei primi creditele la finalizare; dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
+    "unresolvedPurchaseNotFound": "Magazinul nu a găsit achiziția ta anterioară, dar se poate finaliza ulterior și îți poate adăuga creditele; dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
+    "unresolvedPurchaseRefused": "Magazinul a găsit achiziția ta anterioară, dar creditele aferente nu pot fi acordate; dacă cumperi din nou, inițiezi o achiziție separată și este posibil să plătești din nou.",
+    "unreadablePurchaseRecord": "O înregistrare salvată a unei achiziții de credite nu poate fi citită, așa că cumpărarea de credite rămâne blocată. Dacă o înlocuiești, poți cumpăra din nou; orice plată anterioară rămâne la magazin și nu este creditată automat.",
+    "replacePurchaseRecord": "Înlocuiește înregistrarea",
     "buyAgain": "Cumpără din nou",
     "purchaseOwnedByAnotherAccount": "Creditele asociate acestui Apple Account aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi.",
     "purchaseOwnedByAnotherAccountPlay": "Creditele de pe acest cont Google Play aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi."

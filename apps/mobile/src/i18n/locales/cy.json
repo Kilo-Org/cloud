@@ -4480,6 +4480,11 @@
     "storeTimedOut": "Ni ymatebodd yr App Store mewn amser. Rhoi cynnig eto.",
     "storeTimedOutPlay": "Ni ymatebodd Google Play mewn amser. Rhoi cynnig eto.",
     "unresolvedPurchase": "Mae’n bosibl y bydd eich pryniant blaenorol yn cael ei gwblhau o hyd ac y caiff ei gredydau eu hychwanegu. Mae prynu eto’n dechrau pryniant arall a gall olygu y codir tâl arnoch eto.",
+    "unresolvedPurchaseFound": "Canfu’r siop eich pryniant blaenorol a chaiff ei gredydau eu hychwanegu pan fydd wedi’i gwblhau; mae prynu eto’n dechrau pryniant arall a gall olygu y codir tâl arnoch eto.",
+    "unresolvedPurchaseNotFound": "Ni chanfu’r siop eich pryniant blaenorol, ond mae’n bosibl y caiff ei gwblhau a’i gredydau eu hychwanegu’n hwyrach; mae prynu eto’n dechrau pryniant arall a gellid codi tâl arnoch eto.",
+    "unresolvedPurchaseRefused": "Canfu’r siop eich pryniant blaenorol, ond ni ellir ychwanegu ei gredydau; mae prynu eto’n dechrau pryniant arall a gall olygu y codir tâl arnoch eto.",
+    "unreadablePurchaseRecord": "Does dim modd darllen cofnod sydd wedi'i gadw o brynu credydau, felly mae prynu credydau wedi'i rwystro o hyd. Bydd disodli'r cofnod yn gadael i chi brynu eto; bydd unrhyw dâl blaenorol yn aros gyda'r siop ac ni chaiff ei gredydu'n awtomatig.",
+    "replacePurchaseRecord": "Disodli'r cofnod",
     "buyAgain": "Prynu eto",
     "purchaseOwnedByAnotherAccount": "Mae'r credydau ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio.",
     "purchaseOwnedByAnotherAccountPlay": "Mae'r credydau ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio."

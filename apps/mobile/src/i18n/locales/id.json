@@ -4232,6 +4232,11 @@
     "storeTimedOut": "App Store tidak merespons tepat waktu. Coba lagi.",
     "storeTimedOutPlay": "Google Play tidak merespons tepat waktu. Coba lagi.",
     "unresolvedPurchase": "Pembelian Anda sebelumnya mungkin masih akan selesai dan menambahkan kredit dari pembelian tersebut. Membeli lagi akan memulai pembelian terpisah dan Anda mungkin akan dikenai biaya lagi.",
+    "unresolvedPurchaseFound": "Pembelian Anda sebelumnya ditemukan di toko dan kreditnya akan ditambahkan setelah selesai, sedangkan membeli lagi memulai pembelian terpisah dan Anda mungkin akan dikenai biaya lagi.",
+    "unresolvedPurchaseNotFound": "Pembelian Anda sebelumnya tidak ditemukan di toko, tetapi masih mungkin selesai nanti dan menambahkan kredit, sedangkan membeli lagi memulai pembelian terpisah dan Anda mungkin akan dikenai biaya lagi.",
+    "unresolvedPurchaseRefused": "Pembelian Anda sebelumnya ditemukan di toko, tetapi kreditnya tidak dapat ditambahkan, sedangkan membeli lagi memulai pembelian terpisah dan Anda mungkin akan dikenai biaya lagi.",
+    "unreadablePurchaseRecord": "Catatan pembelian kredit yang tersimpan tidak dapat dibaca, jadi pembelian kredit tetap diblokir. Jika catatan ini diganti, Anda dapat membeli lagi; tagihan sebelumnya tetap ada di toko aplikasi dan tidak otomatis ditambahkan ke kredit Anda.",
+    "replacePurchaseRecord": "Ganti catatan",
     "buyAgain": "Beli lagi",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."

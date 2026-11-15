@@ -4232,6 +4232,11 @@
     "storeTimedOut": "App Store nuk u përgjigj në kohë. Provo përsëri.",
     "storeTimedOutPlay": "Google Play nuk u përgjigj në kohë. Provoni përsëri.",
     "unresolvedPurchase": "Blerja juaj e mëparshme mund të përfundojë më vonë dhe të shtojë kreditet e saj. Nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
+    "unresolvedPurchaseFound": "Blerja juaj e mëparshme u gjet në dyqan dhe kreditet e saj do të shtohen kur të përfundojë; nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
+    "unresolvedPurchaseNotFound": "Blerja juaj e mëparshme nuk u gjet në dyqan, por mund të përfundojë më vonë dhe të shtojë kreditet e saj; nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
+    "unresolvedPurchaseRefused": "Blerja juaj e mëparshme u gjet në dyqan, por kreditet e saj nuk mund të shtohen; nëse blini sërish, nisni një blerje të re dhe mund të tarifoheni sërish.",
+    "unreadablePurchaseRecord": "Një regjistrim i ruajtur i blerjes së krediteve nuk mund të lexohet, ndaj blerja e krediteve mbetet e bllokuar. Nëse e zëvendëson, mund të blesh përsëri. Çdo tarifim i mëparshëm mbetet te dyqani dhe nuk shtohet automatikisht si kredite.",
+    "replacePurchaseRecord": "Zëvendëso regjistrimin",
     "buyAgain": "Bli sërish",
     "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."

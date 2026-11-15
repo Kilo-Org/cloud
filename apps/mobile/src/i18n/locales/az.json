@@ -4232,6 +4232,11 @@
     "storeTimedOut": "App Store vaxtında cavab vermədi. Yenidən cəhd et.",
     "storeTimedOutPlay": "Google Play vaxtında cavab vermədi. Yenidən cəhd et.",
     "unresolvedPurchase": "Əvvəlki alışınız hələ də tamamlana və həmin alışın kreditləri balansınıza əlavə oluna bilər. Yenidən aldıqda ayrıca alış əməliyyatı başlayır və sizdən yenidən ödəniş tutula bilər.",
+    "unresolvedPurchaseFound": "Əvvəlki alışınız mağazada tapıldı və tamamlandıqda kreditləri balansınıza əlavə olunacaq; yenidən almaq isə ayrıca alış əməliyyatı başladır və sizdən yenidən ödəniş tutula bilər.",
+    "unresolvedPurchaseNotFound": "Əvvəlki alışınız mağazada tapılmadı, amma sonradan tamamlanıb kreditləri balansınıza əlavə oluna bilər; yenidən almaq isə ayrıca alış əməliyyatı başladır və sizdən yenidən ödəniş tutula bilər.",
+    "unresolvedPurchaseRefused": "Əvvəlki alışınız mağazada tapıldı, amma kreditləri balansınıza əlavə oluna bilməz; yenidən almaq isə ayrıca alış əməliyyatı başladır və sizdən yenidən ödəniş tutula bilər.",
+    "unreadablePurchaseRecord": "Saxlanmış kredit alışı qeydini oxumaq mümkün deyil, buna görə kredit alışı bloklanmış qalır. Qeydi əvəz etsəniz, yenidən ala bilərsiniz; əvvəlki hər hansı ödəniş mağazada qalır və avtomatik olaraq hesabınıza yazılmır.",
+    "replacePurchaseRecord": "Qeydi əvəz et",
     "buyAgain": "Yenidən al",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."

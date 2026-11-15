@@ -4232,6 +4232,11 @@
     "storeTimedOut": "App Store kò dáhùn ní àkókò tó yẹ. Tún gbìyànjú.",
     "storeTimedOutPlay": "Google Play kò dáhùn ní àkókò tó yẹ. Tún gbìyànjú.",
     "unresolvedPurchase": "Rírà tí o ṣe tẹ́lẹ̀ ṣì lè parí, kí a sì fi kírẹ́dítì rẹ̀ kún iwọntunwọnsi rẹ. Tí o bá tún rà, ìyẹn bẹ̀rẹ̀ rírà mìíràn lọ́tọ̀, a sì lè tún gba owó lọ́wọ́ rẹ.",
+    "unresolvedPurchaseFound": "A rí rírà tí o ṣe tẹ́lẹ̀ ní ilé ìtajà, a ó sì fún ọ ní kírẹ́dítì rẹ̀ nígbà tí ó bá parí; títún rà bẹ̀rẹ̀ rírà mìíràn, a sì lè tún gba owó lọ́wọ́ rẹ.",
+    "unresolvedPurchaseNotFound": "A kò rí rírà tí o ṣe tẹ́lẹ̀ ní ilé ìtajà, ṣùgbọ́n ó ṣì lè parí lẹ́yìn náà kí o sì gba kírẹ́dítì rẹ̀; títún rà bẹ̀rẹ̀ rírà mìíràn, a sì lè tún gba owó lọ́wọ́ rẹ.",
+    "unresolvedPurchaseRefused": "A rí rírà tí o ṣe tẹ́lẹ̀ ní ilé ìtajà, ṣùgbọ́n a kò lè fún ọ ní kírẹ́dítì rẹ̀; títún rà bẹ̀rẹ̀ rírà mìíràn, a sì lè tún gba owó lọ́wọ́ rẹ.",
+    "unreadablePurchaseRecord": "A kò lè ka àkọsílẹ̀ ìrajà kírẹ́dìtì kan tí a fipamọ́, nítorí náà ríra kírẹ́dìtì ṣì wà ní títìpa. Tí o bá rọ́pò àkọsílẹ̀ náà, o lè tún rà; owó èyíkéyìí tí a ti gbà lọ́wọ́ rẹ tẹ́lẹ̀ yóò wà lọ́dọ̀ ilé ìtajà, a kò sì ní fi í kún kírẹ́dìtì rẹ láìfọwọ́yí.",
+    "replacePurchaseRecord": "Rọ́pò àkọsílẹ̀",
     "buyAgain": "Tún rà",
     "purchaseOwnedByAnotherAccount": "Kírẹ́dítì lórí Apple Account yìí jẹ́ ti àkọọ́lẹ̀ Kilo mìíràn. Wọlé sí àkọọ́lẹ̀ Kilo yẹn láti lò ó.",
     "purchaseOwnedByAnotherAccountPlay": "Kírẹ́dítì lori Google Play àkọọ́lẹ̀ yii jẹ ti Kilo àkọọ́lẹ̀ miiran. Wọle si Kilo àkọọ́lẹ̀ yẹn lati lo o."

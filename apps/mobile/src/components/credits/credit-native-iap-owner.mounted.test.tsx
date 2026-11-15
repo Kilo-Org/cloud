@@ -365,6 +365,35 @@ describe('CreditNativeIapOwner', () => {
     }
   });
 
+  it('offers consent for a terminally refused transaction that stays in the store queue', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const transaction = createPurchase({ transactionId: 'queued-refunded-receipt' });
+    mockedIap.requestPurchase.mockResolvedValueOnce({ ...transaction, purchaseState: 'pending' });
+    const first = await mountOwner();
+    await first.handle.value?.purchase(creditPack);
+    await act(async () => {
+      first.renderer.unmount();
+      await Promise.resolve();
+    });
+    mockedQuery.completePurchase.mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'This store purchase has been refunded, so Kilo cannot credit it.',
+      },
+    });
+    mockedIap.getAvailablePurchases.mockResolvedValue([transaction]);
+    const reopened = await mountOwner();
+    await reopened.handle.value?.purchase(creditPack);
+    expect(reopened.handle.value?.completingProductId).toBeNull();
+    expect(reopened.handle.value?.buyAgainProductId).toBe(APPLE_PRODUCT_ID);
+    expect(reopened.handle.value?.purchaseResolution).toBe('terminal-refusal');
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+  });
+
   it('does not publish a completion refusal after same-account unmount', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,
@@ -391,13 +420,16 @@ describe('CreditNativeIapOwner', () => {
       appAccountToken: APP_ACCOUNT_TOKEN,
       products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
     };
-    persistedIntent.set('unresolved', JSON.stringify({
-      productId: APPLE_PRODUCT_ID,
-      accountToken: APP_ACCOUNT_TOKEN,
-      startedAt: Date.now(),
-      transactionIds: [],
-      dispatched: false,
-    }));
+    persistedIntent.set(
+      'unresolved',
+      JSON.stringify({
+        productId: APPLE_PRODUCT_ID,
+        accountToken: APP_ACCOUNT_TOKEN,
+        startedAt: Date.now(),
+        transactionIds: [],
+        dispatched: false,
+      })
+    );
     const { handle } = await mountOwner();
     expect(await handle.value?.purchase(creditPack)).toBe(true);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
@@ -441,7 +473,7 @@ describe('CreditNativeIapOwner', () => {
       await Promise.resolve();
     });
     const reopened = await mountOwner();
-    await reopened.handle.value?.reconcilePurchase(creditPack);
+    await reopened.handle.value?.reconcilePurchase();
     await reopened.handle.value?.buyAgain(creditPack);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
   });
@@ -452,9 +484,9 @@ describe('CreditNativeIapOwner', () => {
       products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
     };
     const { handle } = await mountOwner();
-    await handle.value?.reconcilePurchase(creditPack);
+    await handle.value?.reconcilePurchase();
     expect(mockedIap.requestPurchase).not.toHaveBeenCalled();
-    expect(handle.value?.unresolvedProductId).toBeNull();
+    expect(handle.value?.hasUnresolvedPurchase).toBe(false);
   });
 
   it('does not start a consented purchase if the auth epoch changes during retirement', async () => {
@@ -469,7 +501,7 @@ describe('CreditNativeIapOwner', () => {
       await Promise.resolve();
     });
     const reopened = await mountOwner();
-    await reopened.handle.value?.reconcilePurchase(creditPack);
+    await reopened.handle.value?.reconcilePurchase();
     const consented = reopened.handle.value?.buyAgain(creditPack);
     bumpAuthEpoch();
     expect(await consented).toBe(false);
@@ -625,10 +657,12 @@ describe('CreditNativeIapOwner', () => {
     };
     const { handle } = await mountOwner();
     await handle.value?.purchase(creditPack);
-    mockedIap.handlers?.onPurchaseSuccess(createPurchase({
-      transactionId: 'old-unrelated-transaction',
-      transactionDate: Date.now() + 1000,
-    }));
+    mockedIap.handlers?.onPurchaseSuccess(
+      createPurchase({
+        transactionId: 'old-unrelated-transaction',
+        transactionDate: Date.now() + 1000,
+      })
+    );
     await flushPromises();
     expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
     mockedIap.handlers?.onPurchaseError({ code: 'user-cancelled', productId: APPLE_PRODUCT_ID });
@@ -760,7 +794,10 @@ describe('CreditNativeIapOwner', () => {
   it('is the single useIAP call site and renders its children with a purchase callback', async () => {
     const { handle } = await mountOwner();
 
-    expect(mockedIap.useIAP).toHaveBeenCalledTimes(1);
+    // The provider owns the call site; it renders once per state update, and
+    // the admission read adds one after mount, so the count is not a mount count.
+    expect(mockedIap.useIAP).toHaveBeenCalled();
+    expect(mockedIap.handlers).not.toBeNull();
     expect(handle.value).not.toBeNull();
     expect(typeof handle.value?.purchase).toBe('function');
     expect(typeof handle.value?.fetchStoreProducts).toBe('function');
@@ -992,12 +1029,15 @@ describe('CreditNativeIapOwner', () => {
     expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
     expect(mockedQuery.invalidateQueries).toHaveBeenCalled();
 
-    // A second store lookup returning the same transaction must not complete it
-    // again: the recovered transaction id is remembered.
-    mockedQuery.serverProductsData = {
-      appAccountToken: APP_ACCOUNT_TOKEN,
-      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
-    };
+    // The store reconnects and its lookup still returns the same transaction:
+    // it must not be completed again, because the recovered transaction id is
+    // remembered. A render alone does not re-run the pass.
+    mockedIap.connected = false;
+    await act(async () => {
+      renderer.update(ownerElement(handle));
+      await Promise.resolve();
+    });
+    mockedIap.connected = true;
     await act(async () => {
       renderer.update(ownerElement(handle));
       await Promise.resolve();

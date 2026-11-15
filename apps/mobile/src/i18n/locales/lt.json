@@ -4356,6 +4356,11 @@
     "storeTimedOut": "App Store neatsakė laiku. Bandyti dar kartą.",
     "storeTimedOutPlay": "Google Play neatsakė laiku. Bandyti dar kartą.",
     "unresolvedPurchase": "Ankstesnis jūsų pirkimas dar gali būti užbaigtas, o už jį įsigyti kreditai – pridėti prie jūsų balanso. Pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
+    "unresolvedPurchaseFound": "Parduotuvėje rastas ankstesnis jūsų pirkimas, kurį užbaigus jo kreditai bus pridėti prie jūsų balanso, o pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
+    "unresolvedPurchaseNotFound": "Ankstesnis jūsų pirkimas parduotuvėje nerastas, bet jis dar gali būti užbaigtas ir jo kreditai pridėti, o pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
+    "unresolvedPurchaseRefused": "Ankstesnis jūsų pirkimas parduotuvėje rastas, bet jo kreditai negali būti pridėti, o pirkdami dar kartą pradėsite atskirą pirkimą ir galite būti apmokestinti dar kartą.",
+    "unreadablePurchaseRecord": "Nepavyksta nuskaityti išsaugoto kreditų pirkimo įrašo, todėl kreditų pirkimas lieka užblokuotas. Pakeitę įrašą vėl galėsite pirkti; bet koks ankstesnis mokėjimas lieka parduotuvėje ir nebus užskaitytas automatiškai.",
+    "replacePurchaseRecord": "Pakeisti įrašą",
     "buyAgain": "Pirkti dar kartą",
     "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
     "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."

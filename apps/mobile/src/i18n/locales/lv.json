@@ -4294,6 +4294,11 @@
     "storeTimedOut": "App Store neatbildēja laicīgi. Mēģināt vēlreiz.",
     "storeTimedOutPlay": "Google Play neatbildēja laicīgi. Mēģināt vēlreiz.",
     "unresolvedPurchase": "Tavs iepriekšējais pirkums vēl var tikt pabeigts, un par to iegādātie kredīti var tikt pievienoti tavai bilancei. Pērkot vēlreiz, tiek sākts atsevišķs pirkums, par kuru tev var tikt iekasēta maksa vēlreiz.",
+    "unresolvedPurchaseFound": "Veikalā atrasts tavs iepriekšējais pirkums, un pēc tā pabeigšanas kredīti tiks pievienoti tavai bilancei; pērkot vēlreiz, sāksi jaunu pirkumu, par kuru tev var atkārtoti iekasēt maksu.",
+    "unresolvedPurchaseNotFound": "Veikalā nav atrasts tavs iepriekšējais pirkums, taču tas vēl var tikt pabeigts un tā kredīti pievienoti tavai bilancei; pērkot vēlreiz, sāksi jaunu pirkumu, par kuru tev var atkārtoti iekasēt maksu.",
+    "unresolvedPurchaseRefused": "Veikalā atrasts tavs iepriekšējais pirkums, taču par to nevar piešķirt kredītus; pērkot vēlreiz, sāksi jaunu pirkumu, par kuru tev var atkārtoti iekasēt maksu.",
+    "unreadablePurchaseRecord": "Saglabātu kredītu pirkuma ierakstu nevar nolasīt, tāpēc kredītu pirkšana joprojām ir bloķēta. Ja to aizstāsiet, varēsiet pirkt atkārtoti; jebkurš iepriekšējais maksājums paliek veikalā un netiek automātiski ieskaitīts kredītos.",
+    "replacePurchaseRecord": "Aizstāt ierakstu",
     "buyAgain": "Pirkt vēlreiz",
     "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
     "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."

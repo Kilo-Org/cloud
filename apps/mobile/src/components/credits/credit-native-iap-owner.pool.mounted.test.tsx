@@ -84,7 +84,7 @@ describe('native purchase promise pool ownership', () => {
     emitNativeError({ code: 'user-cancelled', message: 'the current purchase was cancelled' });
     expect(await first).toBe(false);
     expect(ownerValue(owner).completingProductId).toBeNull();
-    expect(ownerValue(owner).unresolvedProductId).toBeNull();
+    expect(ownerValue(owner).hasUnresolvedPurchase).toBe(false);
     void ownerValue(owner).purchase(pack);
     await flushPool();
     expect(store.requestPurchase).toHaveBeenCalledTimes(2);

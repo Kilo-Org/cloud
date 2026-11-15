@@ -4232,6 +4232,11 @@
     "storeTimedOut": "App Store svarede ikke i tide. Prøv igen.",
     "storeTimedOutPlay": "Google Play svarede ikke i tide. Prøv igen.",
     "unresolvedPurchase": "Dit tidligere køb kan stadig blive gennemført og føje kreditterne til din saldo. Hvis du køber igen, starter du et separat køb og kan blive opkrævet betaling igen.",
+    "unresolvedPurchaseFound": "Dit tidligere køb blev fundet i butikken, og kreditterne tilføjes, når det gennemføres; hvis du køber igen, starter du et separat køb og kan blive opkrævet betaling igen.",
+    "unresolvedPurchaseNotFound": "Dit tidligere køb blev ikke fundet i butikken, men kan stadig gennemføres senere og give kreditter; hvis du køber igen, starter du et separat køb og kan blive opkrævet betaling igen.",
+    "unresolvedPurchaseRefused": "Dit tidligere køb blev fundet i butikken, men kreditterne kan ikke tilføjes; hvis du køber igen, starter du et separat køb og kan blive opkrævet betaling igen.",
+    "unreadablePurchaseRecord": "En gemt registrering af et køb af kreditter kan ikke læses, så køb af kreditter er fortsat blokeret. Hvis du erstatter den, kan du købe igen. En eventuel tidligere opkrævning forbliver hos butikken og giver ikke automatisk kreditter.",
+    "replacePurchaseRecord": "Erstat registrering",
     "buyAgain": "Køb igen",
     "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."

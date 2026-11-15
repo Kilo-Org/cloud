@@ -4232,6 +4232,11 @@
     "storeTimedOut": "App Store bai amsa a kan lokaci ba. Sake gwadawa.",
     "storeTimedOutPlay": "Google Play bai amsa a kan lokaci ba. Sake gwadawa.",
     "unresolvedPurchase": "Har yanzu sayayyar da ka yi a baya na iya kammaluwa, a kuma ƙara kuɗin amfaninta a ma'auninka. Idan ka sake saya, za ka fara wata sayayya dabam kuma ana iya sake cajinka.",
+    "unresolvedPurchaseFound": "An gano sayayyarka ta baya a shagon, za a ƙara kuɗin amfaninta da zarar ta kammalu, kuma sake saya zai fara wata sayayya dabam da ka iya sa a sake cajinka.",
+    "unresolvedPurchaseNotFound": "Ba a gano sayayyarka ta baya a shagon ba, amma tana iya kammaluwa daga baya a ƙara kuɗin amfaninta, kuma sake saya zai fara wata sayayya dabam da ka iya sa a sake cajinka.",
+    "unresolvedPurchaseRefused": "An gano sayayyarka ta baya a shagon, amma ba za a iya ƙara kuɗin amfaninta ba, kuma sake saya zai fara wata sayayya dabam da ka iya sa a sake cajinka.",
+    "unreadablePurchaseRecord": "Ba a iya karanta bayanan sayen kiredit da aka adana ba, don haka sayen kiredit zai kasance a toshe. Sauya bayanan zai ba ka damar sake saye; duk wani caji da aka yi a baya zai kasance a wurin shago, kuma ba za a ƙara maka kiredit ɗinsa kai tsaye ba.",
+    "replacePurchaseRecord": "Sauya bayanan",
     "buyAgain": "Sake saya",
     "purchaseOwnedByAnotherAccount": "Kuɗin amfani da ke kan wannan Apple Account na wani asusun Kilo ne daban. Shiga wancan asusun Kilo don amfani da shi.",
     "purchaseOwnedByAnotherAccountPlay": "Kuɗin amfani da ke kan wannan Google Play account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don amfani da shi."

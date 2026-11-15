@@ -4232,6 +4232,11 @@
     "storeTimedOut": "Tsy namaly tamin'ny fotoana ilay App Store. Andramo indray.",
     "storeTimedOutPlay": "Tsy namaly tamin'ny fotoana ilay Google Play. Andramo indray.",
     "unresolvedPurchase": "Mety mbola ho vita ny fividiananao teo aloha ka hampiana ao amin'ny balananao ny kireditra avy amin'izany. Ny fividianana indray dia manomboka fividianana vaovao misaraka amin'ilay teo aloha ary mety hampandoa vola anao indray.",
+    "unresolvedPurchaseFound": "Hitan'ny fivarotana ny fividiananao teo aloha ka hampiana ny kireditrany rehefa vita izany, fa ny fividianana indray dia fividianana vaovao ary mety hampandoa vola anao indray.",
+    "unresolvedPurchaseNotFound": "Tsy hitan'ny fivarotana ny fividiananao teo aloha nefa mety ho vita any aoriana ka hampiana ny kireditrany, fa ny fividianana indray dia fividianana vaovao ary mety hampandoa vola anao indray.",
+    "unresolvedPurchaseRefused": "Hitan'ny fivarotana ny fividiananao teo aloha nefa tsy azo ampiana ny kireditrany, fa ny fividianana indray dia fividianana vaovao ary mety hampandoa vola anao indray.",
+    "unreadablePurchaseRecord": "Tsy azo vakiana ny firaketana voatahiry momba ny fividianana crédit, ka mijanona ho voasakana ny fividianana crédit. Raha soloina izany dia afaka mividy indray ianao; izay vola efa nalaina teo aloha dia mijanona any amin'ny fivarotana ary tsy ampidirina ho crédit ho azy.",
+    "replacePurchaseRecord": "Soloy ny firaketana",
     "buyAgain": "Hividy indray",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."

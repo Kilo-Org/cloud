@@ -54,9 +54,13 @@ export function CreditPurchaseScreen() {
     fetchStoreProducts,
     purchase,
     reconcilePurchase,
+    replaceMalformedPurchaseAdmission,
     buyAgain,
-    unresolvedProductId,
     buyAgainProductId,
+    hasUnresolvedPurchase,
+    malformedPurchaseAdmission,
+    purchaseHydration,
+    purchaseResolution,
     reconnectStore,
     completingProductId,
     errorMessageKey: purchaseErrorMessageKey,
@@ -103,6 +107,10 @@ export function CreditPurchaseScreen() {
   }, [completedPurchaseCount, refetchBalance, t]);
 
   const purchasing = completingProductId !== null;
+  // Whether an earlier charge is unresolved is read from durable admission, so
+  // the status region waits for that read: a notice for a charge that is
+  // already settled would offer a charge nobody needs.
+  const hydrationReady = purchaseHydration === 'ready';
   // Only a catalog the backend answered as empty is the empty state: a store
   // query that is pending, paused or failed must not hide the packs the backend
   // catalog named.
@@ -115,22 +123,48 @@ export function CreditPurchaseScreen() {
   const storeUnavailableCopy = getStoreUnavailableCopyKeys(storefront);
   const storeBannerBodyKey = productsErrorMessageKey ?? storeUnavailableCopy.bodyKey;
 
+  // The consent target is the pack the owner selected from the current
+  // catalog, never the earlier request's own id: a retired SKU has no row to
+  // name and no price to show, while the replacement the person picked is the
+  // exact charge a second tap would start.
+  const buyAgainTarget =
+    buyAgainProductId === null
+      ? null
+      : (products.find(pack => pack.storeProductId === buyAgainProductId) ?? null);
+  // Buy again names one exact charge only once the store priced that pack.
+  const buyAgainAvailable = buyAgainTarget !== null && buyAgainTarget.displayPrice !== null;
+  const statusActionsDisabled = purchasing || !connected;
+
   const handlePackPress = (pack: StoreCreditProduct) => {
     selectionHaptic();
     clearError();
+    // A tap on a row while an earlier charge is unresolved is the owner's
+    // decision: it reconciles that charge first and only then asks for consent
+    // to buy this pack again.
     void purchase(pack);
   };
 
-  const handleReconcilePress = (pack: StoreCreditProduct) => {
+  const handleReconcilePress = () => {
     selectionHaptic();
     clearError();
-    void reconcilePurchase(pack);
+    // A query of what the store still holds: it names no pack, so it stays
+    // reachable when the earlier SKU is retired or cannot be resolved.
+    void reconcilePurchase();
   };
 
-  const handleBuyAgainPress = (pack: StoreCreditProduct) => {
+  const handleBuyAgainPress = () => {
+    if (buyAgainTarget === null) {
+      return;
+    }
     selectionHaptic();
     clearError();
-    void buyAgain(pack);
+    void buyAgain(buyAgainTarget);
+  };
+
+  const handleReplaceRecordPress = () => {
+    selectionHaptic();
+    clearError();
+    void replaceMalformedPurchaseAdmission();
   };
 
   // One label source for the row and the notice: the pack amount reads the same
@@ -139,18 +173,6 @@ export function CreditPurchaseScreen() {
     t('credits.packLabel', {
       amount: isolateLtrBidiText(formatPrefixedMoney(pack.backend.amountUsd, i18n.language)),
     });
-
-  const unresolvedPack =
-    unresolvedProductId === null
-      ? null
-      : (products.find(pack => pack.storeProductId === unresolvedProductId) ?? null);
-  // Buy again is offered for the one pack the warning names, and only once the
-  // store priced it: its label must name one exact charge.
-  const buyAgainAvailable =
-    unresolvedPack !== null &&
-    buyAgainProductId !== null &&
-    unresolvedPack.storeProductId === buyAgainProductId &&
-    unresolvedPack.displayPrice !== null;
 
   const renderBalanceValue = () => {
     if (balancePending) {
@@ -218,29 +240,6 @@ export function CreditPurchaseScreen() {
             message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
             className="px-1 text-sm"
           />
-
-          {unresolvedProductId !== null && (
-            <CreditUnresolvedPurchaseNotice
-              actionsDisabled={purchasing || !connected}
-              buyAgainAvailable={buyAgainAvailable}
-              onBuyAgain={() => {
-                if (unresolvedPack !== null) {
-                  handleBuyAgainPress(unresolvedPack);
-                }
-              }}
-              onReconcile={() => {
-                if (unresolvedPack !== null) {
-                  handleReconcilePress(unresolvedPack);
-                }
-              }}
-              packLabel={unresolvedPack !== null ? formatPackLabel(unresolvedPack) : null}
-              priceLabel={
-                unresolvedPack !== null
-                  ? (unresolvedPack.displayPrice ?? t('credits.priceUnavailable'))
-                  : null
-              }
-            />
-          )}
 
           {storeUnavailable && (
             <View className="gap-3 rounded-xl border border-border bg-card p-5">
@@ -375,6 +374,73 @@ export function CreditPurchaseScreen() {
                 </Pressable>
               );
             })}
+
+          {/* The unresolved state is presented after the pack rows, not above
+              them: a timeout or a restored admission can turn it on or off at
+              any time, and a card inserted above the rows would move every row
+              mid-session. Nothing above this point depends on it. */}
+          {(purchaseHydration === 'failed' || (hydrationReady && hasUnresolvedPurchase)) && (
+            <View testID="credit-purchase-status-region">
+              {purchaseHydration === 'failed' && (
+                <View className="gap-3 rounded-xl border border-border bg-card p-5">
+                  <AccessibleStatus
+                    className="text-sm"
+                    message={t('common.couldnTLoad')}
+                    tone="warn"
+                  />
+                  {/* An unreadable record cannot be repaired by waiting, so the
+                      only way out is the person's explicit consent to replace
+                      it: until then, buying stays blocked. */}
+                  {malformedPurchaseAdmission && (
+                    <Text className="text-sm text-muted-foreground">
+                      {t('credits.unreadablePurchaseRecord')}
+                    </Text>
+                  )}
+                  <View className="flex-row flex-wrap gap-3">
+                    <Button
+                      accessibilityLabel={t('common.tryAgain')}
+                      accessibilityState={{ disabled: statusActionsDisabled }}
+                      disabled={statusActionsDisabled}
+                      onPress={handleReconcilePress}
+                      size="action"
+                      testID="credit-purchase-hydration-try-again"
+                      variant={malformedPurchaseAdmission ? 'outline' : 'default'}
+                    >
+                      <Text>{t('common.tryAgain')}</Text>
+                    </Button>
+                    {malformedPurchaseAdmission && (
+                      <Button
+                        accessibilityLabel={t('credits.replacePurchaseRecord')}
+                        accessibilityState={{ disabled: statusActionsDisabled }}
+                        disabled={statusActionsDisabled}
+                        onPress={handleReplaceRecordPress}
+                        size="action"
+                        testID="credit-purchase-replace-record"
+                        variant="default"
+                      >
+                        <Text>{t('credits.replacePurchaseRecord')}</Text>
+                      </Button>
+                    )}
+                  </View>
+                </View>
+              )}
+              {hydrationReady && hasUnresolvedPurchase && (
+                <CreditUnresolvedPurchaseNotice
+                  actionsDisabled={statusActionsDisabled}
+                  buyAgainAvailable={buyAgainAvailable}
+                  onBuyAgain={handleBuyAgainPress}
+                  onReconcile={handleReconcilePress}
+                  packLabel={buyAgainTarget !== null ? formatPackLabel(buyAgainTarget) : null}
+                  priceLabel={
+                    buyAgainTarget !== null
+                      ? (buyAgainTarget.displayPrice ?? t('credits.priceUnavailable'))
+                      : null
+                  }
+                  resolution={purchaseResolution}
+                />
+              )}
+            </View>
+          )}
 
           <Text className="px-1 pt-1 text-xs text-muted-foreground">
             {t('credits.description')}

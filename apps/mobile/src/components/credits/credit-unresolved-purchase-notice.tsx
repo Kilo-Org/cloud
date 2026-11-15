@@ -5,14 +5,36 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
+/**
+ * What the store still holds for the request this owner is blocking on.
+ *
+ * `unknown` is admission restored from disk whose store lookup has not
+ * answered; `found` is a lookup that returned the transaction, which the
+ * completion may still post; `not-found` is a lookup that returned nothing, so
+ * only a later store delivery can settle the earlier charge; and
+ * `terminal-refusal` is a transaction the store keeps queuing but the backend
+ * will never credit. Only the last one is a dead end, and even it keeps the
+ * barrier until the person consents to another purchase.
+ */
+export type CreditPurchaseResolution = 'unknown' | 'found' | 'not-found' | 'terminal-refusal';
+
+const WARNING_KEYS = {
+  unknown: 'credits.unresolvedPurchase',
+  found: 'credits.unresolvedPurchaseFound',
+  'not-found': 'credits.unresolvedPurchaseNotFound',
+  'terminal-refusal': 'credits.unresolvedPurchaseRefused',
+} as const satisfies Record<CreditPurchaseResolution, string>;
+
 type CreditUnresolvedPurchaseNoticeProps = {
-  /** The pack both actions name, or null while the catalog has not resolved it. */
+  /** What the store holds for the earlier request, which picks the copy. */
+  resolution: CreditPurchaseResolution;
+  /** The selected current catalog pack consent would name, or null without one. */
   packLabel: string | null;
-  /** That pack's store price, or the price-unavailable copy. */
+  /** That pack's store price, or null while the store has not priced it. */
   priceLabel: string | null;
   /** A purchase is in flight or the store is disconnected, so no action may run. */
   actionsDisabled: boolean;
-  /** The owner reconciled empty and this pack is the consented retry target. */
+  /** The owner selected a priced pack as the consented retry target. */
   buyAgainAvailable: boolean;
   onReconcile: () => void;
   onBuyAgain: () => void;
@@ -24,6 +46,9 @@ type NoticeCopyProps = {
   priceLabel: string | null;
   actionsDisabled: boolean;
   showBuyAgain: boolean;
+  /** Consent is the primary action, so the store query takes the outline. */
+  buyAgainFirst: boolean;
+  /** Announce the warning through the status channel (the live copy only). */
   announce: boolean;
   onReconcile: () => void;
   onBuyAgain: () => void;
@@ -31,8 +56,9 @@ type NoticeCopyProps = {
 
 /**
  * One earlier purchase may still complete, so a second charge needs the person's
- * explicit consent. The retry is a store query: it can run whether or not the
- * pack is priced, because it never starts a purchase.
+ * explicit consent. The retry is a store query: it names no pack and needs no
+ * price, because it never starts a purchase — a retired or unidentifiable
+ * earlier SKU must still reach it.
  */
 function NoticeCopy({
   warning,
@@ -40,11 +66,41 @@ function NoticeCopy({
   priceLabel,
   actionsDisabled,
   showBuyAgain,
+  buyAgainFirst,
   announce,
   onReconcile,
   onBuyAgain,
 }: Readonly<NoticeCopyProps>) {
   const { t } = useTranslation();
+  const packCopy = packLabel !== null && priceLabel !== null ? [packLabel, priceLabel] : [];
+  const reconcile = (
+    <Button
+      key="reconcile"
+      accessibilityLabel={[t('common.tryAgain'), ...packCopy].join(', ')}
+      accessibilityState={{ disabled: actionsDisabled }}
+      disabled={actionsDisabled}
+      onPress={onReconcile}
+      size="action"
+      testID="credit-unresolved-try-again"
+      variant={buyAgainFirst ? 'outline' : 'default'}
+    >
+      <Text>{t('common.tryAgain')}</Text>
+    </Button>
+  );
+  const buyAgain = (
+    <Button
+      key="buy-again"
+      accessibilityLabel={[t('credits.buyAgain'), ...packCopy].join(', ')}
+      accessibilityState={{ disabled: actionsDisabled }}
+      disabled={actionsDisabled}
+      onPress={onBuyAgain}
+      size="action"
+      testID="credit-unresolved-buy-again"
+      variant={buyAgainFirst ? 'default' : 'outline'}
+    >
+      <Text>{t('credits.buyAgain')}</Text>
+    </Button>
+  );
   return (
     <View className="gap-3">
       {announce ? (
@@ -52,51 +108,29 @@ function NoticeCopy({
       ) : (
         <Text className="text-sm text-warn">{warning}</Text>
       )}
-      {packLabel !== null && priceLabel !== null && (
+      {packCopy.length > 0 && (
         <View className="gap-1">
           <Text className="font-semibold text-foreground">{packLabel}</Text>
           <Text className="text-sm text-muted-foreground">{priceLabel}</Text>
         </View>
       )}
-      {packLabel !== null && priceLabel !== null && (
-        <View className="flex-row flex-wrap gap-3">
-          <Button
-            accessibilityLabel={[t('common.tryAgain'), packLabel, priceLabel].join(', ')}
-            accessibilityState={{ disabled: actionsDisabled }}
-            disabled={actionsDisabled}
-            onPress={onReconcile}
-            size="action"
-            testID="credit-unresolved-try-again"
-            variant="default"
-          >
-            <Text>{t('common.tryAgain')}</Text>
-          </Button>
-          {showBuyAgain && (
-            <Button
-              accessibilityLabel={[t('credits.buyAgain'), packLabel, priceLabel].join(', ')}
-              accessibilityState={{ disabled: actionsDisabled }}
-              disabled={actionsDisabled}
-              onPress={onBuyAgain}
-              size="action"
-              testID="credit-unresolved-buy-again"
-              variant="outline"
-            >
-              <Text>{t('credits.buyAgain')}</Text>
-            </Button>
-          )}
-        </View>
-      )}
+      <View className="flex-row flex-wrap gap-3">
+        {showBuyAgain ? (buyAgainFirst ? [buyAgain, reconcile] : [reconcile, buyAgain]) : reconcile}
+      </View>
     </View>
   );
 }
 
 /**
- * The notice for a purchase the store has not settled. The copy is laid out
- * once in the flow and kept from every reader, then painted over by the live
- * copy, so the card's height is final on the first frame and the retry adds no
- * space when the store reports nothing to complete.
+ * The notice for a purchase the store has not settled.
+ *
+ * The card's height is fixed by a reserved copy of every resolution variant,
+ * painted over by the live one. The reserve is what a reader never sees: it
+ * keeps the card's final size from the first frame, so the retry, the consent
+ * target and the store's answer add no space and move nothing else on screen.
  */
 export function CreditUnresolvedPurchaseNotice({
+  resolution,
   packLabel,
   priceLabel,
   actionsDisabled,
@@ -105,7 +139,10 @@ export function CreditUnresolvedPurchaseNotice({
   onBuyAgain,
 }: Readonly<CreditUnresolvedPurchaseNoticeProps>) {
   const { t } = useTranslation();
-  const warning = t('credits.unresolvedPurchase');
+  // A lookup that found nothing to complete, or a transaction that can never
+  // complete, leaves the second charge as the person's only way forward: consent
+  // leads and the store query stays reachable as the secondary action.
+  const buyAgainFirst = resolution === 'not-found' || resolution === 'terminal-refusal';
   return (
     <View
       className="rounded-xl border border-border bg-card p-5"
@@ -122,24 +159,26 @@ export function CreditUnresolvedPurchaseNotice({
           <NoticeCopy
             announce={false}
             actionsDisabled={actionsDisabled}
+            buyAgainFirst={buyAgainFirst}
             onBuyAgain={onBuyAgain}
             onReconcile={onReconcile}
             packLabel={packLabel}
             priceLabel={priceLabel}
             showBuyAgain
-            warning={warning}
+            warning={t(WARNING_KEYS[resolution])}
           />
         </View>
         <View className="absolute inset-0" testID="credit-unresolved-purchase-live">
           <NoticeCopy
             announce
             actionsDisabled={actionsDisabled}
+            buyAgainFirst={buyAgainFirst}
             onBuyAgain={onBuyAgain}
             onReconcile={onReconcile}
             packLabel={packLabel}
             priceLabel={priceLabel}
             showBuyAgain={buyAgainAvailable}
-            warning={warning}
+            warning={t(WARNING_KEYS[resolution])}
           />
         </View>
       </View>

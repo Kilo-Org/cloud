@@ -1,13 +1,14 @@
 /* eslint-disable max-lines -- The Buy credits screen's state and retry-path tests share the same screen, query client and IAP-owner mocks; splitting them would duplicate that harness. */
-import { QueryClientProvider } from '@tanstack/react-query';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type * as SharedUtils from '@kilocode/app-shared/utils';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
 import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
+import { creditStoreProductsKey } from '@/lib/credits/use-store-credit-products';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
@@ -35,9 +36,13 @@ const owner = vi.hoisted(() => ({
   // The owner's money-path exits. The mock supplies them untyped-from-the-screen:
   // the screen reads them off the same context value every other field comes
   // from, and the fakes prove which callback a tap reaches, never a store call.
-  unresolvedProductId: null as string | null,
   buyAgainProductId: null as string | null,
+  hasUnresolvedPurchase: false,
+  purchaseHydration: 'ready',
+  purchaseResolution: 'unknown' as 'unknown' | 'found' | 'not-found' | 'terminal-refusal',
+  malformedPurchaseAdmission: false,
   reconcilePurchase: vi.fn(),
+  replaceMalformedPurchaseAdmission: vi.fn(),
   buyAgain: vi.fn(),
 }));
 
@@ -260,6 +265,87 @@ function reserveOf(renderer: TestRenderer.ReactTestRenderer): TestRenderer.React
   return reserve;
 }
 
+/** The warning paragraph the live copy announces, not the pack or the actions. */
+function warningOf(renderer: TestRenderer.ReactTestRenderer): string {
+  const warning = unresolvedNotice(renderer).findAll(node => String(node.type) === 'Text')[0];
+  const child = warning?.children[0];
+  return typeof child === 'string' ? child : '';
+}
+
+/** The live notice's actions in the order the layout paints them. */
+function liveActionIds(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return unresolvedNotice(renderer)
+    .findAll(node => String(node.type) === 'Button')
+    .map(node => String((node.props as { testID?: string }).testID));
+}
+
+/** The scroll content that holds the balance card, the pack rows and the status region. */
+function scrollContent(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const content = renderer.root.findAll(node => String(node.type) === 'DetailScreenScrollView')[0];
+  if (!content) {
+    throw new Error('expected the screen scroll content');
+  }
+  return content;
+}
+
+type RowPlacement = {
+  content: TestRenderer.ReactTestInstance;
+  rows: TestRenderer.ReactTestInstance[];
+  indices: number[];
+};
+
+/** Where each pack row sits in the scroll content, so a card cannot push the list. */
+function rowPlacement(renderer: TestRenderer.ReactTestRenderer): RowPlacement {
+  const content = scrollContent(renderer);
+  const rows = packRows(renderer);
+  return { content, rows, indices: rows.map(row => content.children.indexOf(row)) };
+}
+
+function statusRegion(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance | undefined {
+  return testId(renderer.root, 'credit-purchase-status-region');
+}
+
+function statusRegionOrThrow(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance {
+  const region = statusRegion(renderer);
+  if (!region) {
+    throw new Error('expected the credit-purchase status region');
+  }
+  return region;
+}
+
+/** Re-render the mounted screen after a change to the owner mock. */
+function redraw(renderer: TestRenderer.ReactTestRenderer, queryClient: QueryClient): void {
+  renderer.update(
+    createElement(QueryClientProvider, { client: queryClient }, createElement(CreditPurchaseScreen))
+  );
+}
+
+/** Wait until the store catalog answered, whatever the screen then shows. */
+async function settleCatalog(queryClient: QueryClient): Promise<void> {
+  await waitFor(
+    () => queryClient.getQueryState(creditStoreProductsKey('user-1'))?.status === 'success'
+  );
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
+async function press(instance: TestRenderer.ReactTestInstance | undefined): Promise<void> {
+  if (!instance) {
+    throw new Error('expected a control to press');
+  }
+  // Test-renderer props are an untyped bag; only onPress is read here.
+  const control = instance.props as { onPress?: () => void };
+  await act(async () => {
+    control.onPress?.();
+    await Promise.resolve();
+  });
+}
+
 /**
  * Flush effects and microtasks while fake timers are installed: `waitFor` polls
  * with a real `setTimeout`, which never fires under fake timers, so advance the
@@ -303,9 +389,13 @@ describe('CreditPurchaseScreen', () => {
     owner.completingProductId = null;
     owner.errorMessageKey = null;
     owner.completedPurchaseCount = 0;
-    owner.unresolvedProductId = null;
     owner.buyAgainProductId = null;
+    owner.hasUnresolvedPurchase = false;
+    owner.purchaseHydration = 'ready';
+    owner.purchaseResolution = 'unknown';
+    owner.malformedPurchaseAdmission = false;
     owner.reconcilePurchase.mockResolvedValue(true);
+    owner.replaceMalformedPurchaseAdmission.mockResolvedValue(true);
     owner.buyAgain.mockResolvedValue(true);
     balance.balance = 1234;
     creditBlocks.entries = [];
@@ -1089,7 +1179,11 @@ describe('CreditPurchaseScreen', () => {
   it('unresolved purchase: warns, then only Buy again charges after an empty reconciliation', async () => {
     // The state an empty reconciliation leaves on either store: the earlier
     // charge is still unresolved and the owner now offers the explicit retry.
-    owner.unresolvedProductId = 'credits.usd50.v1';
+    // The earlier request named the $10 pack while the consent target the owner
+    // selected is the $50 one: consent names the exact charge, so the target
+    // must win over the earlier request's own id.
+    owner.hasUnresolvedPurchase = true;
+
     owner.buyAgainProductId = 'credits.usd50.v1';
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
@@ -1109,6 +1203,8 @@ describe('CreditPurchaseScreen', () => {
     const live = unresolvedNotice(renderer);
     expect(textWithin(live)).toContain(`Add ${packAmount('$50.00')} of credits`);
     expect(textWithin(live)).toContain('$54.99');
+    // The earlier $10 identity does not name the charge consent would start.
+    expect(textWithin(live)).not.toContain(packAmount('$10.00'));
     expect(textWithin(live)).toContain('Try again');
     expect(textWithin(live)).toContain(BUY_AGAIN_LABEL);
 
@@ -1143,18 +1239,18 @@ describe('CreditPurchaseScreen', () => {
       await Promise.resolve();
     });
 
-    // Retry only asks the store what it still holds: no native request, no charge.
+    // Retry only asks the store what it still holds: no pack, no native
+    // request, no charge.
     expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
-    expect(owner.reconcilePurchase.mock.calls[0]?.[0]).toMatchObject({
-      storeProductId: 'credits.usd50.v1',
-    });
+    expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
     expect(owner.purchase).not.toHaveBeenCalled();
     expect(owner.buyAgain).toHaveBeenCalledTimes(1);
     unmount();
   });
 
   it('unresolved purchase: keeps a query-only retry and disables both actions in flight', async () => {
-    owner.unresolvedProductId = 'credits.usd10.v1';
+    owner.hasUnresolvedPurchase = true;
+
     owner.completingProductId = 'credits.usd10.v1';
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
@@ -1178,21 +1274,331 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('unresolved purchase: still warns when the store cannot price the pack', async () => {
-    owner.unresolvedProductId = 'credits.usd50.v1';
+  it('unresolved purchase: retries without a priced pack when the store cannot answer', async () => {
+    owner.hasUnresolvedPurchase = true;
+
     owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('App Store products unavailable'));
 
     // The warning is about money already in flight, so a store that cannot name
-    // the pack must not hide it; only the actions that need that pack wait.
+    // the pack must not hide it, and the retry needs no pack at all: it is a
+    // store query, never a purchase.
     expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
     const live = unresolvedNotice(renderer);
-    expect(testId(live, 'credit-unresolved-try-again')).toBeUndefined();
+    const retry = testId(live, 'credit-unresolved-try-again');
+    if (!retry) {
+      throw new Error('expected the query-only retry');
+    }
     expect(testId(live, 'credit-unresolved-buy-again')).toBeUndefined();
     expect(owner.reconcilePurchase).not.toHaveBeenCalled();
+
+    await press(retry);
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
     expect(owner.buyAgain).not.toHaveBeenCalled();
+    expect(owner.purchase).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('unresolved purchase: a retired earlier SKU retries and consents to the selected replacement', async () => {
+    mockedPlatform.OS = 'android';
+    owner.fetchStoreProducts.mockResolvedValue(
+      BACKEND_PRODUCTS.map((product, index) => ({
+        id: product.googleProductId,
+        displayPrice: STORE_LISTINGS[index]?.displayPrice ?? '',
+      }))
+    );
+    owner.hasUnresolvedPurchase = true;
+    // The restored charge names a Play SKU the catalog no longer sells, so no
+    // row can price it and the earlier id alone could never reach consent.
+
+    const { renderer, queryClient, unmount } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await waitFor(() => packRows(renderer).length === 4);
+
+    expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
+    const live = unresolvedNotice(renderer);
+    // Before consent there is no target to name, so only the query-only retry
+    // shows; the retired SKU never turns into a pack the store cannot charge.
+    expect(testId(live, 'credit-unresolved-buy-again')).toBeUndefined();
+    expect(textWithin(live)).not.toContain('250');
+
+    const retry = testId(live, 'credit-unresolved-try-again');
+    await press(retry);
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
+
+    // The owner followed a normal row tap: it reconciled the earlier SKU and
+    // selected the replacement the person picked as the consent target.
+    owner.buyAgainProductId = 'credits_usd100';
+    await act(async () => {
+      redraw(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    const consented = unresolvedNotice(renderer);
+    const buyAgain = testId(consented, 'credit-unresolved-buy-again');
+    if (!buyAgain) {
+      throw new Error('expected a Buy again action');
+    }
+    expect(labelOf(buyAgain)).toContain(BUY_AGAIN_LABEL);
+    expect(labelOf(buyAgain)).toContain(packAmount('$100.00'));
+    expect(labelOf(buyAgain)).toContain('$109.99');
+    expect(textWithin(consented)).toContain(packAmount('$100.00'));
+    expect(textWithin(consented)).not.toContain('250');
+
+    await press(buyAgain);
+    expect(owner.buyAgain).toHaveBeenCalledTimes(1);
+    expect(owner.buyAgain.mock.calls[0]?.[0]).toMatchObject({
+      storeProductId: 'credits_usd100',
+    });
+    expect(owner.purchase).not.toHaveBeenCalled();
+
+    // A replacement pack stays an ordinary row: the owner decides whether that
+    // tap reconciles the earlier charge, the screen never bypasses it.
+    const replacementRow = packRows(renderer).find(row =>
+      labelOf(row).startsWith(`Add ${packAmount('$100.00')} of credits`)
+    );
+    await press(replacementRow);
+    expect(owner.purchase).toHaveBeenCalledTimes(1);
+    expect(owner.purchase.mock.calls[0]?.[0]).toMatchObject({
+      storeProductId: 'credits_usd100',
+    });
+    unmount();
+  });
+
+  it('unresolved purchase: warns and retries when the earlier identity is unreadable', async () => {
+    owner.hasUnresolvedPurchase = true;
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    // A malformed stored admission still blocks a second charge; the warning
+    // and the query-only retry need no identity of their own.
+    expect(allText(renderer)).toContain(UNRESOLVED_PURCHASE_WARNING);
+    const live = unresolvedNotice(renderer);
+    expect(testId(live, 'credit-unresolved-buy-again')).toBeUndefined();
+
+    await press(testId(live, 'credit-unresolved-try-again'));
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
+    expect(owner.purchase).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('layout: the unresolved status region sits after the pack rows and never moves them', async () => {
+    const { renderer, queryClient, unmount } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const absent = rowPlacement(renderer);
+    expect(absent.rows).toHaveLength(4);
+    // The four rows are consecutive direct children of the scroll content.
+    expect(absent.indices).toEqual(
+      absent.indices.map((_, offset) => (absent.indices[0] ?? 0) + offset)
+    );
+    expect(statusRegion(renderer)).toBeUndefined();
+
+    owner.hasUnresolvedPurchase = true;
+    await act(async () => {
+      redraw(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    const unresolved = rowPlacement(renderer);
+    // Same slots in the same parent: the card cannot push a row down, so no
+    // row moves when a timeout or a restore turns the notice on.
+    expect(unresolved.indices).toEqual(absent.indices);
+    for (const [offset, index] of unresolved.indices.entries()) {
+      expect(unresolved.content.children[index]).toBe(unresolved.rows[offset]);
+    }
+    const region = statusRegionOrThrow(renderer);
+    const regionIndex = unresolved.content.children.indexOf(region);
+    expect(regionIndex).toBeGreaterThan(Math.max(...unresolved.indices));
+    expect(unresolved.content.children[regionIndex]).toBe(region);
+    expect(testId(renderer.root, 'credit-unresolved-purchase')).toBeDefined();
+
+    owner.hasUnresolvedPurchase = false;
+    await act(async () => {
+      redraw(renderer, queryClient);
+      await Promise.resolve();
+    });
+
+    const resolved = rowPlacement(renderer);
+    expect(resolved.indices).toEqual(absent.indices);
+    for (const [offset, index] of resolved.indices.entries()) {
+      expect(resolved.content.children[index]).toBe(resolved.rows[offset]);
+    }
+    expect(statusRegion(renderer)).toBeUndefined();
+    unmount();
+  });
+
+  it('hydration failed: the status region retries without a pack and exposes no row', async () => {
+    owner.purchaseHydration = 'failed';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => statusRegion(renderer) !== undefined);
+
+    expect(packRows(renderer)).toHaveLength(0);
+    const region = statusRegionOrThrow(renderer);
+    expect(textWithin(region)).toContain("Couldn't load");
+    expect(textWithin(region)).not.toContain(UNRESOLVED_PURCHASE_WARNING);
+    // A read that failed for a transient reason is not a record to replace: the
+    // retry is the only action, so nothing can erase an admission by accident.
+    expect(testId(region, 'credit-purchase-replace-record')).toBeUndefined();
+
+    await press(testId(renderer.root, 'credit-purchase-hydration-try-again'));
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
+    expect(owner.purchase).not.toHaveBeenCalled();
+    expect(owner.buyAgain).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('hydration malformed: only explicit consent replaces the unreadable record', async () => {
+    owner.purchaseHydration = 'failed';
+    owner.malformedPurchaseAdmission = true;
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => statusRegion(renderer) !== undefined);
+
+    // Nothing may be bought while the stored admission is unknown, and the card
+    // states what replacing it means before offering that consent.
+    expect(packRows(renderer)).toHaveLength(0);
+    const region = statusRegionOrThrow(renderer);
+    expect(textWithin(region)).toContain(i18n.t('credits.unreadablePurchaseRecord'));
+
+    const replace = testId(region, 'credit-purchase-replace-record');
+    if (!replace) {
+      throw new Error('expected the record replacement action');
+    }
+    expect(labelOf(replace)).toBe(i18n.t('credits.replacePurchaseRecord'));
+    expect(owner.replaceMalformedPurchaseAdmission).not.toHaveBeenCalled();
+
+    await press(replace);
+    expect(owner.replaceMalformedPurchaseAdmission).toHaveBeenCalledTimes(1);
+    expect(owner.purchase).not.toHaveBeenCalled();
+    expect(owner.buyAgain).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('resolution found: names the found charge and keeps the query retry primary', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const live = unresolvedNotice(renderer);
+    expect(warningOf(renderer)).toBe(i18n.t('credits.unresolvedPurchaseFound'));
+    // A found, retryable completion makes the query the safe first move, so it
+    // paints first and primary while the second charge stays secondary.
+    expect(liveActionIds(renderer)).toEqual([
+      'credit-unresolved-try-again',
+      'credit-unresolved-buy-again',
+    ]);
+    expect(testId(live, 'credit-unresolved-try-again')?.props.variant).toBe('default');
+    expect(testId(live, 'credit-unresolved-buy-again')?.props.variant).toBe('outline');
+
+    await press(testId(live, 'credit-unresolved-try-again'));
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
+    expect(owner.buyAgain).not.toHaveBeenCalled();
+
+    await press(testId(live, 'credit-unresolved-buy-again'));
+    expect(owner.buyAgain).toHaveBeenCalledTimes(1);
+    expect(owner.buyAgain.mock.calls[0]?.[0]).toMatchObject({ storeProductId: 'credits.usd50.v1' });
+    expect(owner.purchase).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('resolution not found: says the store did not find the charge and leads with Buy again', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'not-found';
+
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const live = unresolvedNotice(renderer);
+    expect(warningOf(renderer)).toBe(i18n.t('credits.unresolvedPurchaseNotFound'));
+    // Nothing was found to complete, so the replacement purchase leads and the
+    // store query moves to the secondary action without losing its reachability.
+    expect(liveActionIds(renderer)).toEqual([
+      'credit-unresolved-buy-again',
+      'credit-unresolved-try-again',
+    ]);
+    expect(testId(live, 'credit-unresolved-buy-again')?.props.variant).toBe('default');
+    expect(testId(live, 'credit-unresolved-try-again')?.props.variant).toBe('outline');
+
+    await press(testId(live, 'credit-unresolved-try-again'));
+    expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
+    expect(owner.reconcilePurchase.mock.calls[0]).toEqual([]);
+    expect(owner.purchase).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('resolution refused: states the terminal refusal instead of promising future credits', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'terminal-refusal';
+
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const live = unresolvedNotice(renderer);
+    expect(warningOf(renderer)).toBe(i18n.t('credits.unresolvedPurchaseRefused'));
+    expect(warningOf(renderer)).not.toBe(i18n.t('credits.unresolvedPurchase'));
+    expect(warningOf(renderer)).not.toBe(i18n.t('credits.unresolvedPurchaseFound'));
+    expect(warningOf(renderer)).not.toBe(i18n.t('credits.unresolvedPurchaseNotFound'));
+    expect(liveActionIds(renderer)).toEqual([
+      'credit-unresolved-buy-again',
+      'credit-unresolved-try-again',
+    ]);
+    expect(testId(live, 'credit-unresolved-buy-again')?.props.variant).toBe('default');
+    expect(testId(live, 'credit-unresolved-try-again')?.props.variant).toBe('outline');
+    unmount();
+  });
+
+  it('resolution: the hidden reserve covers every warning variant and keeps zero inline styles', async () => {
+    owner.hasUnresolvedPurchase = true;
+    owner.purchaseResolution = 'found';
+    owner.buyAgainProductId = 'credits.usd50.v1';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const reserve = reserveOf(renderer);
+    const reserveText = textWithin(reserve);
+    for (const key of [
+      'credits.unresolvedPurchase',
+      'credits.unresolvedPurchaseFound',
+      'credits.unresolvedPurchaseNotFound',
+      'credits.unresolvedPurchaseRefused',
+    ] as const) {
+      expect(reserveText).toContain(i18n.t(key));
+    }
+    // Every variant shares one full-width cell in a clipped row, so the row
+    // takes the height of the tallest variant and the card never resizes when
+    // the resolution changes.
+    expect(reserve.children).toHaveLength(4);
+    for (const cell of reserve.children) {
+      if (typeof cell === 'string') {
+        throw new Error('expected a reserved notice cell');
+      }
+      expect(classNameOf(cell)).toContain('w-full');
+      expect(classNameOf(cell)).toContain('shrink-0');
+      expect(cell.props.style).toBeUndefined();
+    }
+    expect(reserve.props.style).toBeUndefined();
     unmount();
   });
 });

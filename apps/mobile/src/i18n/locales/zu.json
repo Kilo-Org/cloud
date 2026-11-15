@@ -4232,6 +4232,11 @@
     "storeTimedOut": "I-App Store ayizange iphendle ngasikhathi. Zama futhi.",
     "storeTimedOutPlay": "I-Google Play ayizange iphendle ngasikhathi. Zama futhi.",
     "unresolvedPurchase": "Ukuthenga kwakho kwangaphambilini kusengaphothulwa bese kwengezwa amakhredithi alokho kuthenga kubhalansi yakho. Ukuthenga futhi kuqala ukuthenga okusha okuhlukile futhi ungase ukhokhiswe futhi.",
+    "unresolvedPurchaseFound": "Ukuthenga kwakho kwangaphambilini kwatholakala esitolo futhi amakhredithi azongezwa uma sekuqediwe; ukuthenga futhi kuqala ukuthenga okusha futhi ungase ukhokhiswe futhi.",
+    "unresolvedPurchaseNotFound": "Ukuthenga kwakho kwangaphambilini akutholakalanga esitolo kodwa kungaqedwa kamuva bese kwengezwa amakhredithi; ukuthenga futhi kuqala ukuthenga okusha futhi ungase ukhokhiswe futhi.",
+    "unresolvedPurchaseRefused": "Ukuthenga kwakho kwangaphambilini kwatholakala esitolo kodwa amakhredithi ako awanakwengezwa; ukuthenga futhi kuqala ukuthenga okusha futhi ungase ukhokhiswe futhi.",
+    "unreadablePurchaseRecord": "Irekhodi eligciniwe lokuthenga amakhredithi alikwazi ukufundwa, ngakho ukuthenga amakhredithi kuhlala kuvinjiwe. Ukulishintsha kukuvumela ukuthi uthenge futhi; noma iyiphi inkokhelo yangaphambilini ihlala esitolo futhi awunikezwa amakhredithi ngayo ngokuzenzakalelayo.",
+    "replacePurchaseRecord": "Shintsha irekhodi",
     "buyAgain": "Thenga futhi",
     "purchaseOwnedByAnotherAccount": "Amakhredithi kule Apple Account angeye-akhawunti ye-Kilo ehlukile. Ngena kuleyo akhawunti ye-Kilo ukuze uwasebenzise.",
     "purchaseOwnedByAnotherAccountPlay": "Amakhredithi kule akhawunti ye-Google Play angeye-akhawunti ye-Kilo ehlukile. Ngena kuleyo akhawunti ye-Kilo ukuze uwasebenzise."

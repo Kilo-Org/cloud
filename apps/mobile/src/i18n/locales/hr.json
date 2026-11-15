@@ -4294,6 +4294,11 @@
     "storeTimedOut": "App Store nije odgovorio na vrijeme. Pokušaj ponovno.",
     "storeTimedOutPlay": "Google Play nije odgovorio na vrijeme. Pokušaj ponovno.",
     "unresolvedPurchase": "Tvoja prethodna kupnja još se može dovršiti, a pripadajući krediti dodati na tvoj saldo. Ponovnom kupnjom pokrećeš zasebnu kupnju koja ti može biti ponovno naplaćena.",
+    "unresolvedPurchaseFound": "Trgovina je pronašla tvoju prethodnu kupnju i pripadajući krediti bit će dodani kad se dovrši; ponovnom kupnjom pokrećeš zasebnu kupnju koja ti može biti ponovno naplaćena.",
+    "unresolvedPurchaseNotFound": "Trgovina nije pronašla tvoju prethodnu kupnju, ali ona se može dovršiti kasnije i dodati ti kredite; ponovnom kupnjom pokrećeš zasebnu kupnju koja ti može biti ponovno naplaćena.",
+    "unresolvedPurchaseRefused": "Trgovina je pronašla tvoju prethodnu kupnju, ali za nju nije moguće dodijeliti kredite; ponovnom kupnjom pokrećeš zasebnu kupnju koja ti može biti ponovno naplaćena.",
+    "unreadablePurchaseRecord": "Spremljeni zapis o kupnji kredita ne može se pročitati pa je kupnja kredita i dalje onemogućena. Ako ga zamijenite, moći ćete ponovno kupovati; eventualna ranija naplata ostaje kod trgovine i za nju se krediti neće automatski dodati.",
+    "replacePurchaseRecord": "Zamijeni zapis",
     "buyAgain": "Kupi ponovno",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play računu pripadaju drugom Kilo računu. Prijavite se na taj Kilo račun da biste ih koristili."

@@ -4300,6 +4300,11 @@
     "storeTimedOut": "A App Store não respondeu a tempo. Tenta novamente.",
     "storeTimedOutPlay": "O Google Play não respondeu a tempo. Tenta novamente.",
     "unresolvedPurchase": "A sua compra anterior pode ainda ser concluída e adicionar os respetivos créditos. Comprar novamente inicia uma nova compra e pode resultar numa nova cobrança.",
+    "unresolvedPurchaseFound": "A sua compra anterior foi encontrada na loja e os créditos serão adicionados quando for concluída; comprar novamente inicia outra compra e pode resultar numa nova cobrança.",
+    "unresolvedPurchaseNotFound": "A sua compra anterior não foi encontrada na loja, mas ainda pode ser concluída e adicionar os respetivos créditos; comprar novamente inicia outra compra e pode resultar numa nova cobrança.",
+    "unresolvedPurchaseRefused": "A sua compra anterior foi encontrada na loja, mas não é possível adicionar os respetivos créditos; comprar novamente inicia outra compra e pode resultar numa nova cobrança.",
+    "unreadablePurchaseRecord": "Não é possível ler um registro salvo de compra de créditos, por isso a compra de créditos continua bloqueada. Ao substituí-lo, você poderá comprar novamente; qualquer cobrança anterior permanece na loja e não é creditada automaticamente.",
+    "replacePurchaseRecord": "Substituir registro",
     "buyAgain": "Comprar novamente",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencem a outra conta Kilo. Inicia sessão nessa conta Kilo para os usares.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta do Google Play pertencem a uma conta Kilo diferente. Inicie sessão nessa conta Kilo para os usar."

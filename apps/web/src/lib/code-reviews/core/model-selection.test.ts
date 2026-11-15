@@ -1,4 +1,9 @@
-import { resolveEffectiveModel, selectedModelFromReviewSources } from './model-selection';
+import {
+  resolveEffectiveModel,
+  selectDispatchModel,
+  selectedModelFromReviewSources,
+} from './model-selection';
+import { DEFAULT_CODE_REVIEW_MODEL } from './constants';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 
 const FALLBACK = 'anthropic/claude-sonnet-4.6';
@@ -151,5 +156,28 @@ describe('selectedModelFromReviewSources', () => {
         config: null,
       })
     ).toBeNull();
+  });
+});
+
+describe('selectDispatchModel', () => {
+  it('uses the configured model when the workspace can run it', () => {
+    expect(
+      selectDispatchModel('openai/gpt-5', new Set(['openai/gpt-5', DEFAULT_CODE_REVIEW_MODEL]))
+    ).toEqual({ source: 'configured', modelSlug: 'openai/gpt-5' });
+  });
+
+  it('falls back to the default model when the configured model is gone', () => {
+    expect(selectDispatchModel('openai/gpt-5', new Set([DEFAULT_CODE_REVIEW_MODEL]))).toEqual({
+      source: 'fallback',
+      modelSlug: DEFAULT_CODE_REVIEW_MODEL,
+      configuredModelSlug: 'openai/gpt-5',
+    });
+  });
+
+  it('refuses and reports the configured model when neither model is offered', () => {
+    expect(selectDispatchModel('openai/gpt-5', new Set(['anthropic/claude-opus-4.8']))).toEqual({
+      source: 'unavailable',
+      configuredModelSlug: 'openai/gpt-5',
+    });
   });
 });

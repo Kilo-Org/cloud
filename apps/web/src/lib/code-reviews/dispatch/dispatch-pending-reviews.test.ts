@@ -10,6 +10,36 @@ const mockHasPRCommentWithMarker = jest.fn();
 const mockSetCommitStatus = jest.fn();
 const mockCreateMRNote = jest.fn();
 const mockHasMRNoteWithMarker = jest.fn();
+const mockGetAvailableModelsForOrganization = jest.fn();
+const mockGetEnhancedOpenRouterModels = jest.fn();
+const mockGetDirectByokModelsForUser = jest.fn();
+const mockListCustomRouters = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/organizations/organization-models'),
+  getAvailableModelsForOrganization: (...args: unknown[]) =>
+    mockGetAvailableModelsForOrganization(...args),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
+  getEnhancedOpenRouterModels: (...args: unknown[]) => mockGetEnhancedOpenRouterModels(...args),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'),
+  getDirectByokModelsForUser: (...args: unknown[]) => mockGetDirectByokModelsForUser(...args),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/custom-routers'),
+  listCustomRouters: (...args: unknown[]) => mockListCustomRouters(...args),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-models', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/auto-routing-models'),
+  addAutoRoutingModels: async (models: unknown) => models,
+}));
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -71,6 +101,7 @@ import type { ManualCodeReviewConfig } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
 import { or } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
+import { DEFAULT_CODE_REVIEW_MODEL } from '../core/constants';
 import { cronPendingCodeReviewCreatedAtWindowSql } from './dispatch-constants';
 import {
   cancelSupersededReviewsForPR,
@@ -199,6 +230,14 @@ describe('tryDispatchPendingReviews', () => {
     mockSetCommitStatus.mockResolvedValue(undefined);
     mockCreateMRNote.mockResolvedValue(undefined);
     mockHasMRNoteWithMarker.mockResolvedValue(false);
+    const catalogModels = ['openai/gpt-5', 'kilo-auto/free', DEFAULT_CODE_REVIEW_MODEL].map(id => ({
+      id,
+      name: id,
+    }));
+    mockGetAvailableModelsForOrganization.mockResolvedValue({ data: catalogModels });
+    mockGetEnhancedOpenRouterModels.mockResolvedValue({ data: catalogModels });
+    mockGetDirectByokModelsForUser.mockResolvedValue([]);
+    mockListCustomRouters.mockResolvedValue([]);
   });
 
   afterEach(async () => {
@@ -225,6 +264,10 @@ describe('tryDispatchPendingReviews', () => {
     mockSetCommitStatus.mockReset();
     mockCreateMRNote.mockReset();
     mockHasMRNoteWithMarker.mockReset();
+    mockGetAvailableModelsForOrganization.mockReset();
+    mockGetEnhancedOpenRouterModels.mockReset();
+    mockGetDirectByokModelsForUser.mockReset();
+    mockListCustomRouters.mockReset();
 
     await setTestUserBalance(0);
     await db
@@ -705,6 +748,157 @@ describe('tryDispatchPendingReviews', () => {
     );
     expect(storedConfig?.is_enabled).toBe(false);
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to dispatch when the configured model and the default are both unavailable', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    const [agentConfig] = await db
+      .insert(agent_configs)
+      .values({
+        owned_by_user_id: testUser.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        config: { model_slug: 'openai/gpt-5' },
+        is_enabled: true,
+        runtime_state: {},
+        created_by: testUser.id,
+      })
+      .returning();
+    mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
+    mockGetEnhancedOpenRouterModels.mockResolvedValue({
+      data: [{ id: 'anthropic/claude-opus-4.8', name: 'Claude Opus' }],
+    });
+    mockGetIntegrationById.mockResolvedValue({
+      platform_installation_id: 'installation-1',
+      github_app_type: 'standard',
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          checkRunId: 42,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await getStoredReview(review.id);
+    const storedConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, agentConfig.id),
+    });
+    const [repoOwner, repoName] = REPO.split('/');
+
+    expect(result.dispatched).toBe(0);
+    expect(result.notDispatched).toBe(1);
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalled();
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(storedReview).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        terminalReason: 'selected_model_unavailable',
+        errorMessage: expect.stringContaining('openai/gpt-5'),
+        dispatchReservationId: null,
+      })
+    );
+    expect(storedConfig?.is_enabled).toBe(false);
+    expect(storedConfig?.runtime_state).toEqual(
+      expect.objectContaining({
+        code_review_action_required: expect.objectContaining({
+          reason: 'selected_model_unavailable',
+          triggeringReviewId: review.id,
+        }),
+      })
+    );
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      'installation-1',
+      repoOwner,
+      repoName,
+      42,
+      expect.objectContaining({
+        status: 'completed',
+        conclusion: 'action_required',
+        output: {
+          title: 'Code Reviewer disabled: model unavailable',
+          summary: expect.stringContaining('openai/gpt-5'),
+        },
+      }),
+      'standard'
+    );
+  });
+
+  it('dispatches on the default model when the configured model is no longer offered', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    const [agentConfig] = await db
+      .insert(agent_configs)
+      .values({
+        owned_by_user_id: testUser.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        config: { model_slug: 'openai/gpt-5' },
+        is_enabled: true,
+        runtime_state: {},
+        created_by: testUser.id,
+      })
+      .returning();
+    mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
+    mockGetEnhancedOpenRouterModels.mockResolvedValue({
+      data: [{ id: DEFAULT_CODE_REVIEW_MODEL, name: 'Claude Sonnet' }],
+    });
+    mockPrepareReviewPayload.mockImplementation(
+      (params: { reviewId: string; agentConfig: { config: { model_slug?: string } } }) => ({
+        reviewId: params.reviewId,
+        sessionInput: {
+          prompt: 'Review this change.',
+          model: params.agentConfig.config.model_slug,
+        },
+      })
+    );
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({ owner, status: 'pending', createdAt: timestamp, updatedAt: timestamp })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    expect(result.dispatched).toBe(1);
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentConfig: expect.objectContaining({
+          config: expect.objectContaining({ model_slug: DEFAULT_CODE_REVIEW_MODEL }),
+        }),
+      })
+    );
+    expect(mockDispatchReview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionInput: expect.objectContaining({ model: DEFAULT_CODE_REVIEW_MODEL }),
+      })
+    );
+    const storedConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, agentConfig.id),
+    });
+    expect(storedConfig?.is_enabled).toBe(true);
+    expect((await getStoredReview(review.id))?.model).toBe(DEFAULT_CODE_REVIEW_MODEL);
   });
 
   it('disables only the Bitbucket config after a Bitbucket action-required failure', async () => {

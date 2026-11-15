@@ -35,9 +35,18 @@ import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/uti
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '../core/schemas';
 import { DEFAULT_CODE_REVIEW_MODEL } from '../core/constants';
-import { resolveEffectiveModel } from '../core/model-selection';
+import { resolveEffectiveModel, selectDispatchModel } from '../core/model-selection';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  addAutoRoutingModels,
+  addCustomRouterModels,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
+import { listCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { enabledSpecialists, isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
 import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
@@ -113,6 +122,30 @@ class CodeReviewActionRequiredDispatchError extends Error {
 }
 
 /**
+ * The configured review model cannot run for this workspace and the shared
+ * default cannot either. Thrown before the worker call so no session is
+ * prepared, and carries the model to name in the review and its gate check.
+ */
+class CodeReviewModelUnavailableDispatchError extends Error {
+  readonly reason = 'selected_model_unavailable' satisfies CodeReviewActionRequiredReason;
+  readonly configuredModelSlug: string;
+
+  constructor(configuredModelSlug: string) {
+    super(unavailableReviewModelMessage(configuredModelSlug));
+    this.name = 'CodeReviewModelUnavailableDispatchError';
+    this.configuredModelSlug = configuredModelSlug;
+  }
+}
+
+/**
+ * The single sentence that names the model a review could not run, shown in the
+ * review's error message and in the published check summary.
+ */
+function unavailableReviewModelMessage(modelSlug: string): string {
+  return `The review did not run because the configured model ${modelSlug} is not available. Choose another model in Code Reviewer settings: ${APP_URL}/code-reviews`;
+}
+
+/**
  * The review's paying account cannot cover the worker's minimum admission
  * balance. Thrown before the worker call so no session is prepared.
  */
@@ -158,6 +191,53 @@ function collectCouncilReviewModels(
 }
 
 /**
+ * The model ids a review for this owner can run, read server-side from the same
+ * catalogs the Code Reviewer settings model selector reads. An organization
+ * review runs models for the organization's shared services rather than for one
+ * member, so it resolves the `shared_services` audience.
+ *
+ * Returns null when the catalog cannot be read: an unreadable catalog must not
+ * refuse reviews, because the worker still validates the model at session start.
+ */
+async function loadRunnableReviewModelIds(owner: Owner): Promise<ReadonlySet<string> | null> {
+  try {
+    const routers = await listCustomRouters([{ type: owner.type, id: owner.id }]);
+    let catalogModels: OpenRouterModel[];
+
+    if (owner.type === 'org') {
+      const catalog = await getAvailableModelsForOrganization(
+        owner.id,
+        { type: 'defaultAccess' },
+        'shared_services',
+        { countryCode: null }
+      );
+      if (!catalog || !Array.isArray(catalog.data)) return null;
+      catalogModels = catalog.data;
+    } else {
+      const [catalog, byokModels] = await Promise.all([
+        getEnhancedOpenRouterModels({ countryCode: null }),
+        getDirectByokModelsForUser(owner.id),
+      ]);
+      if (!Array.isArray(catalog.data)) return null;
+      catalogModels = [...catalog.data, ...byokModels];
+    }
+
+    const models = addCustomRouterModels(await addAutoRoutingModels(catalogModels), routers);
+    return new Set(models.map(model => model.id));
+  } catch (error) {
+    errorExceptInTest('[dispatchReview] Failed to read the review model catalog', {
+      owner,
+      error,
+    });
+    captureException(error, {
+      tags: { operation: 'dispatch-review-model-catalog' },
+      extra: { owner },
+    });
+    return null;
+  }
+}
+
+/**
  * True when a worker call failed because nothing was listening at the worker
  * URL (TCP connection refused). undici wraps that as a `fetch failed`
  * TypeError whose cause carries the ECONNREFUSED code. Unlike a timeout, a
@@ -185,6 +265,10 @@ function getActionRequiredReasonFromError(error: unknown): CodeReviewActionRequi
     return error.reason;
   }
 
+  if (error instanceof CodeReviewModelUnavailableDispatchError) {
+    return error.reason;
+  }
+
   return classifyCodeReviewActionRequiredFailure(getErrorMessage(error));
 }
 
@@ -198,7 +282,8 @@ function parseCodeReviewPlatform(platform: string): CodeReviewPlatform {
 
 async function finalizeActionRequiredGateCheck(
   review: CloudAgentCodeReview,
-  reason: CodeReviewActionRequiredReason
+  reason: CodeReviewActionRequiredReason,
+  summary?: string
 ): Promise<void> {
   if (!shouldPublishCodeReviewToProvider(review)) return;
   const platform = parseCodeReviewPlatform(review.platform);
@@ -221,7 +306,7 @@ async function finalizeActionRequiredGateCheck(
       detailsUrl: `${APP_URL}/code-reviews/${review.id}`,
       output: {
         title: copy.checkTitle,
-        summary: copy.checkSummary,
+        summary: summary ?? copy.checkSummary,
       },
     },
     integration.github_app_type ?? 'standard'
@@ -410,6 +495,8 @@ export async function tryDispatchPendingReviews(
         const actionRequiredReason = getActionRequiredReasonFromError(error);
         const actionRequiredStateAlreadyPresent =
           error instanceof CodeReviewActionRequiredDispatchError;
+        const unavailableModel =
+          error instanceof CodeReviewModelUnavailableDispatchError ? error : null;
         const manualConfig = getManualCodeReviewConfig(reservation.review);
         const isManualReview = manualConfig !== null;
 
@@ -450,7 +537,9 @@ export async function tryDispatchPendingReviews(
             await failReservedQueuedReview(
               reservation.review.id,
               reservation.dispatchReservationId,
-              `Dispatch failed: ${getCodeReviewActionRequiredCopy(actionRequiredReason).description}`,
+              unavailableModel
+                ? unavailableModel.message
+                : `Dispatch failed: ${getCodeReviewActionRequiredCopy(actionRequiredReason).description}`,
               actionRequiredReason
             );
           } catch (updateError) {
@@ -491,7 +580,11 @@ export async function tryDispatchPendingReviews(
 
           if (!isManualReview) {
             try {
-              await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
+              await finalizeActionRequiredGateCheck(
+                reservation.review,
+                actionRequiredReason,
+                unavailableModel?.message
+              );
             } catch (updateError) {
               errorExceptInTest(
                 '[tryDispatchPendingReviews] Failed to finalize action-required check run',
@@ -678,15 +771,12 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
   let reviewModel: string;
   const councilModels: string[] = [];
 
+  let councilConfig: CodeReviewAgentConfig['council'] | undefined | null;
+
   if (manualConfig) {
     agentConfig = { config: manualConfig.agentConfig };
     reviewModel = manualConfig.agentConfig.model_slug || DEFAULT_CODE_REVIEW_MODEL;
-    collectCouncilReviewModels(
-      manualConfig.agentConfig.council,
-      review.review_type,
-      reviewModel,
-      councilModels
-    );
+    councilConfig = manualConfig.agentConfig.council;
   } else {
     const persistedAgentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
     if (!persistedAgentConfig) {
@@ -718,12 +808,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       DEFAULT_CODE_REVIEW_MODEL
     );
     reviewModel = effectiveModel.modelSlug;
-    collectCouncilReviewModels(
-      persistedConfig.council,
-      review.review_type,
-      reviewModel,
-      councilModels
-    );
+    councilConfig = persistedConfig.council;
     if (effectiveModel.source === 'repository_override') {
       logExceptInTest('[dispatchReview] Applying per-repository model override', {
         reviewId: review.id,
@@ -742,6 +827,36 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       agentConfig = persistedAgentConfig;
     }
   }
+
+  const runnableModelIds = await loadRunnableReviewModelIds(owner);
+  if (runnableModelIds) {
+    const modelSelection = selectDispatchModel(reviewModel, runnableModelIds);
+    if (modelSelection.source === 'unavailable') {
+      logExceptInTest('[dispatchReview] Configured review model is not available', {
+        reviewId: review.id,
+        owner,
+        platform,
+        configuredModel: modelSelection.configuredModelSlug,
+      });
+      throw new CodeReviewModelUnavailableDispatchError(modelSelection.configuredModelSlug);
+    }
+    if (modelSelection.source === 'fallback') {
+      logExceptInTest('[dispatchReview] Replacing an unavailable review model with the default', {
+        reviewId: review.id,
+        owner,
+        platform,
+        configuredModel: modelSelection.configuredModelSlug,
+        model: modelSelection.modelSlug,
+      });
+      reviewModel = modelSelection.modelSlug;
+      agentConfig = {
+        ...agentConfig,
+        config: { ...agentConfig.config, model_slug: modelSelection.modelSlug },
+      };
+    }
+  }
+
+  collectCouncilReviewModels(councilConfig, review.review_type, reviewModel, councilModels);
 
   const billing = await resolveCodeReviewDispatchBilling({
     owner,

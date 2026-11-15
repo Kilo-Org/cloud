@@ -61,6 +61,40 @@ export function resolveEffectiveModel(
   };
 }
 
+/** The model a dispatch must run, and why it is that model. */
+export type DispatchModelSelection =
+  | { source: 'configured'; modelSlug: string }
+  | { source: 'fallback'; modelSlug: string; configuredModelSlug: string }
+  | { source: 'unavailable'; configuredModelSlug: string };
+
+/**
+ * Decide which model a review dispatch must run.
+ *
+ * A stored `model_slug` can outlive the catalog: a model can be retired or stop
+ * being offered to the workspace. The configured model wins when the workspace
+ * can run it; otherwise the shared default keeps reviews running; when neither
+ * is offered, no session may start and the result carries the configured slug
+ * so the caller can name it.
+ */
+export function selectDispatchModel(
+  configuredModelSlug: string,
+  availableModelIds: ReadonlySet<string>
+): DispatchModelSelection {
+  if (availableModelIds.has(configuredModelSlug)) {
+    return { source: 'configured', modelSlug: configuredModelSlug };
+  }
+
+  if (availableModelIds.has(DEFAULT_CODE_REVIEW_MODEL)) {
+    return {
+      source: 'fallback',
+      modelSlug: DEFAULT_CODE_REVIEW_MODEL,
+      configuredModelSlug,
+    };
+  }
+
+  return { source: 'unavailable', configuredModelSlug };
+}
+
 export function selectedModelFromReviewSources(params: {
   persistedModel: string | null | undefined;
   repoFullName: string | null | undefined;

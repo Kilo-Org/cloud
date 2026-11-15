@@ -6,6 +6,7 @@
  */
 export * from './badge-buckets';
 export * from './needs-input-actions';
+export * from './non-empty-string';
 export * from './notification-events';
 export * from './notification-history';
 export * from './push-data';

@@ -20,8 +20,6 @@ import { SESSION_CARD_STATUS_KINDS, sessionLiveOutcomeSchema } from './session-l
 import { nonEmptyStringSchema } from './non-empty-string';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
-export { nonEmptyStringSchema };
-
 // Discriminates between attention-requiring and status-only cloud agent
 // session notifications. Optional everywhere it appears so old producers
 // in a rolling deploy still validate; the default ('status') is applied

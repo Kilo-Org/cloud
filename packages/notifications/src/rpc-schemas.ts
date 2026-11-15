@@ -38,6 +38,18 @@ type DeliveryOutcomeReason = (typeof DELIVERY_OUTCOME_REASONS)[number];
 const CHANNEL_DELIVERY_OUTCOME_REASONS = ['suppressed_expired', 'suppressed_access'] as const;
 type ChannelDeliveryOutcomeReason = (typeof CHANNEL_DELIVERY_OUTCOME_REASONS)[number];
 
+// The cloud-agent and session-ready responses report the shared
+// `suppressed_preference` as-is, spell the shared `failed` outcome
+// `dispatch_failed`, and add `missing_session`, which no dispatch reports.
+// The `satisfies` keeps the shared member tied to the vocabulary above.
+const CLOUD_AGENT_MISSING_SESSION_REASON = 'missing_session' as const;
+const CLOUD_AGENT_DISPATCH_FAILED_REASON = 'dispatch_failed' as const;
+const CLOUD_AGENT_SESSION_REASONS = [
+  CLOUD_AGENT_MISSING_SESSION_REASON,
+  CLOUD_AGENT_DISPATCH_FAILED_REASON,
+  'suppressed_preference' satisfies DeliveryOutcomeReason,
+] as const;
+
 // Discriminated-union members that carry no payload. A generic parameter keeps
 // each variant's own `kind` literal so `DispatchPushOutcome` stays discriminated.
 function payloadFreeOutcome<
@@ -196,7 +208,7 @@ export type SendCloudAgentSessionNotificationParams = z.infer<
 
 export const sendCloudAgentSessionNotificationOutputSchema = z.object({
   dispatched: z.boolean(),
-  reason: z.enum(['missing_session', 'dispatch_failed', 'suppressed_preference']).optional(),
+  reason: z.enum(CLOUD_AGENT_SESSION_REASONS).optional(),
 });
 export type SendCloudAgentSessionNotificationResult = z.infer<
   typeof sendCloudAgentSessionNotificationOutputSchema

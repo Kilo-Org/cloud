@@ -240,6 +240,9 @@ export function CreditPurchaseScreen() {
               // drops them when initialization fails), so even a priced row
               // cannot complete: keep every row disabled until it reconnects.
               const disabled = purchasing || !connected || !hasStorePrice;
+              // The row's inactive cue is the title's and the price's ink, so
+              // the note under them keeps the ink it is read in.
+              const dimmedTextClass = disabled ? 'text-muted-foreground' : 'text-foreground';
               // The trailing slot holds the store price only: it keeps its one
               // line and its full width, so the title yields and a price a user
               // pays is never truncated.
@@ -278,26 +281,33 @@ export function CreditPurchaseScreen() {
                 .join(', ');
 
               return (
+                // A disabled row dims by token, not by row opacity: halving
+                // the row lands the already-muted expiry note at 2.2:1 on the
+                // dark card and 2.1:1 on the light one, so the title and the
+                // price take the muted ink instead, which keeps 4.94:1 dark
+                // and 5.37:1 light.
                 <Pressable
                   key={pack.backend.appleProductId}
                   accessibilityLabel={rowAccessibilityLabel}
                   accessibilityRole="button"
                   accessibilityState={{ busy: rowCompleting, disabled }}
-                  className={cn(
-                    'rounded-xl border border-border bg-card p-5 active:opacity-80',
-                    disabled && 'opacity-50'
-                  )}
+                  className="rounded-xl border border-border bg-card p-5 active:opacity-80"
                   disabled={disabled}
                   onPress={() => {
                     handlePackPress(pack);
                   }}
                 >
                   <View className="flex-row items-start justify-between gap-4">
-                    <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
+                    <Text className={cn('flex-1 font-semibold', dimmedTextClass)} numberOfLines={1}>
                       {packLabel}
                     </Text>
                     {storePrice !== null && (
-                      <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
+                      <Text
+                        className={cn(
+                          'shrink-0 text-base font-semibold tabular-nums',
+                          dimmedTextClass
+                        )}
+                      >
                         {storePrice}
                       </Text>
                     )}

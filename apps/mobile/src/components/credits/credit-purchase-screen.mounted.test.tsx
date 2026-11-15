@@ -732,10 +732,37 @@ describe('CreditPurchaseScreen', () => {
       `Add ${packAmount('$10.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
     );
     expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
+    // The row dims by token, not by row opacity: it keeps its shell and drops
+    // `opacity-50`, its title and its price take the muted ink, and its one
+    // note line keeps that same ink at full strength.
     expect(
       classNamesOf(rows).every(
-        classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
+        classes => classes.includes(PACK_ROW_SHELL) && !classes.includes('opacity-50')
       )
+    ).toBe(true);
+    const mutedInk = (instance: TestRenderer.ReactTestInstance): boolean => {
+      const className = classNameOf(instance);
+      return className.includes('text-muted-foreground') && !className.includes('text-foreground');
+    };
+    expect(
+      rows.every(row => {
+        const head = row.children[0];
+        const line = row.children[1];
+        if (head === undefined || line === undefined) {
+          return false;
+        }
+        if (typeof head === 'string' || typeof line === 'string') {
+          return false;
+        }
+        const headTexts = head.findAll(node => String(node.type) === 'Text');
+        const lineTexts = line.findAll(node => String(node.type) === 'Text');
+        return (
+          headTexts.length > 0 &&
+          headTexts.every(text => mutedInk(text)) &&
+          lineTexts.length === 1 &&
+          lineTexts.every(text => mutedInk(text))
+        );
+      })
     ).toBe(true);
     // No row keeps an empty band for a status it does not state: the title row
     // and the row's one note line are its only children. The note line keeps a

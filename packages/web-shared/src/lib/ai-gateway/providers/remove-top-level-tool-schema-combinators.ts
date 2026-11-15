@@ -1,5 +1,6 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 const COMBINATORS = [
   ['allOf', 'all of'],
@@ -8,10 +9,6 @@ const COMBINATORS = [
 ] as const;
 
 type Combinator = (typeof COMBINATORS)[number][0];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function requiredNames(branch: unknown): string[] {
   if (!isRecord(branch) || !Array.isArray(branch.required)) {

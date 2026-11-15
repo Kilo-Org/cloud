@@ -1000,19 +1000,15 @@ export function extractInferenceRegion(body: GatewayRequest['body']): string | n
   return inferenceRegion?.scope === 'zone' ? inferenceRegion.geoRegion : null;
 }
 
-function isReasoningObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /**
  * Bounded labels for requested thinking, effort, and reasoning (in that order).
  * Never persist client-provided strings. When effort aliases coexist, prefer
  * Anthropic output_config, then Chat Completions, then the reasoning object.
  */
 export function extractReasoningSetting(body: unknown): string | null {
-  if (!isReasoningObject(body)) return null;
+  if (!isRecord(body)) return null;
   const labels: string[] = [];
-  const thinking = isReasoningObject(body.thinking) ? body.thinking : undefined;
+  const thinking = isRecord(body.thinking) ? body.thinking : undefined;
   if (
     thinking?.type === 'enabled' ||
     thinking?.type === 'adaptive' ||
@@ -1022,8 +1018,8 @@ export function extractReasoningSetting(body: unknown): string | null {
     labels.push(`thinking:${thinking.type}${bucket ? `:${bucket}` : ''}`);
   }
 
-  const outputConfig = isReasoningObject(body.output_config) ? body.output_config : undefined;
-  const reasoning = isReasoningObject(body.reasoning) ? body.reasoning : undefined;
+  const outputConfig = isRecord(body.output_config) ? body.output_config : undefined;
+  const reasoning = isRecord(body.reasoning) ? body.reasoning : undefined;
   const effort = outputConfig?.effort ?? body.reasoning_effort ?? reasoning?.effort;
   if (typeof effort === 'string') {
     switch (effort) {

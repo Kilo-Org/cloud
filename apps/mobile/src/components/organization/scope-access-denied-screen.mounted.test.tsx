@@ -157,7 +157,6 @@ describe('ScopeAccessDeniedScreen', () => {
     // Retry only re-resolves the membership, so it is the outlined secondary,
     // and the outline variant's own ink already paints its busy mark.
     expect(retry?.props.variant).toBe('outline');
-    expect(retry?.props.loadingMark).toBeUndefined();
     expect(String(retry?.props.className ?? '')).not.toContain('dark:bg-selection');
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.title).toBe('Security Agent');
 

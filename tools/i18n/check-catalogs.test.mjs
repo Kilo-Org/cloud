@@ -20,7 +20,7 @@ import { checkCatalogs } from './check-catalogs.mjs';
 // The checker parses with oxc through the shared scanner, so the import-only
 // probe links the repository's dependency tree at its own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'source-files.mjs'];
+const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
 const WORDING_EXCEPTIONS = readFileSync(
   new URL('./wording-exceptions.json', import.meta.url),
   'utf8'

@@ -107,6 +107,33 @@ describe('SessionShareSection created link', () => {
     expect(textContent(renderer.root)).toContain('http://localhost:3000/s/tok_1');
   });
 
+  it.each(['session-share-copy', 'session-share-sheet'])(
+    'keeps the created URL after a failed refresh, but validates %s at press time',
+    async action => {
+      const renderer = await renderCreatedLink();
+      setReadState({
+        data: undefined,
+        isPending: false,
+        isError: true,
+        isFetching: false,
+        dataUpdatedAt: Date.now() + 1_000,
+      });
+      rerenderSection(renderer);
+
+      expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(1);
+      expect(findByTestID(renderer.root, 'session-share-state-error')).toHaveLength(0);
+      holder.refetchResult = { isError: true, data: undefined };
+      await pressAndSettle(findOne(renderer, action));
+
+      expect(holder.refetchCalls).toEqual([{ cancelRefetch: true }]);
+      expect(holder.clipboardWrites).toEqual([]);
+      expect(holder.shares).toEqual([]);
+      expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
+      expect(findByTestID(renderer.root, 'session-share-state-error')).toHaveLength(1);
+      expect(findByTestID(renderer.root, 'session-share-state-retry')).toHaveLength(1);
+    }
+  );
+
   it('keeps offering the link while a later read names the same capability', async () => {
     const renderer = await renderCreatedLink();
 

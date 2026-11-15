@@ -102,20 +102,16 @@ export function freshnessOf(created: CreatedLink, read: ShareIdentityRead): Shar
  * there is nothing to compare and the URL is shown as it always was.
  */
 function linkIsSuperseded(created: CreatedLink, read: ShareRead): boolean {
-  if (created.publicId === null || read.isPending || read.isFetching) {
+  if (created.publicId === null || read.isPending || read.isFetching || read.isError) {
     return false;
   }
   return read.dataUpdatedAt > created.at && (read.data?.public_id ?? null) !== created.publicId;
 }
 
 /**
- * Which of the sheet's six states to draw. A press-time read that found another
- * identity, or none, outranks everything: the URL cannot be handed out. A read
- * in error also outranks the created link, because it cannot vouch for a URL and
- * the link may be dead. Until the session row has been read, whether this
- * session already has a link is unknown — and treating that as "no link" offers
- * a create action whose mutation rotates the share generation and revokes the
- * previous link.
+ * Failed background reads do not invalidate a created capability. Distribution
+ * is gated by the press-time read. Without a created link, a failed session
+ * read offers Retry rather than rotating a link whose identity is unknown.
  */
 export function sharePanelOf(
   created: CreatedLink | null,
@@ -129,14 +125,12 @@ export function sharePanelOf(
     if (freshness.kind === 'readFailed') {
       return { kind: 'readFailed' };
     }
-  }
-  if (read.isError) {
-    return { kind: 'readFailed' };
-  }
-  if (created !== null) {
     return linkIsSuperseded(created, read)
       ? { kind: 'linkSuperseded' }
       : { kind: 'linkCreated', url: created.url, copy: created.copy };
+  }
+  if (read.isError) {
+    return { kind: 'readFailed' };
   }
   if (read.isPending) {
     return { kind: 'reading' };

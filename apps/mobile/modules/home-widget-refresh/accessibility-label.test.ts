@@ -51,10 +51,12 @@ it('keeps the builder free of UI, storage and formatter dependencies', () => {
 
 it('formats every number through the helper before it reaches the text', () => {
   expect(builderSource).not.toContain('joined(separator: ", ")');
-  const bodies = [...builderSource.matchAll(/\\\(([^()]*)\)/g)].map(match =>
+  // One nesting level, so the count call itself is inspected instead of being
+  // skipped for the parentheses of its own arguments.
+  const bodies = [...builderSource.matchAll(/\\\(((?:[^()]|\([^()]*\))*)\)/g)].map(match =>
     (match[1] ?? '').trim()
   );
-  expect(bodies.length).toBeGreaterThan(0);
+  expect(bodies.length).toBe(2);
   for (const body of bodies) {
     // A formatted count already is a String; every other interpolation must
     // read a String straight from the input.

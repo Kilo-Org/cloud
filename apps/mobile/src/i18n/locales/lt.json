@@ -38,7 +38,7 @@
     "device": "Įrenginys",
     "share": "Bendrinti {{title}}",
     "justNow": "Ką tik",
-    "couldNotSaveSetting": "Nepavyko išsaugoti nustatymo.",
+    "couldNotSaveSetting": "Nepavyko išsaugoti nustatymo",
     "apply": "Taikyti",
     "save": "Išsaugoti",
     "copy": "Kopijuoti",
@@ -48,7 +48,7 @@
     "openInBrowser": "Atidaryti naršyklėje",
     "openSettings": "Atidaryti nustatymus",
     "copiedToClipboard": "Nukopijuota į iškarpinę",
-    "couldNotCopyToClipboard": "Nepavyko nukopijuoti į iškarpinę.",
+    "couldNotCopyToClipboard": "Nepavyko nukopijuoti į iškarpinę",
     "required": "privaloma",
     "error": "klaida: {{error}}",
     "back": "Atgal",
@@ -79,8 +79,8 @@
     "close": "Uždaryti",
     "codeReviewer": "Kodo peržiūros agentas",
     "connected": "Prijungta",
-    "couldNotLoadModels": "Nepavyko įkelti modelių.",
-    "couldNotLoadRepositories": "Nepavyko įkelti saugyklų.",
+    "couldNotLoadModels": "Nepavyko įkelti modelių",
+    "couldNotLoadRepositories": "Nepavyko įkelti saugyklų",
     "noRepositoriesFound": "Saugyklų nerasta",
     "critical": "Kritinis",
     "delete": "Ištrinti",
@@ -120,9 +120,9 @@
     "connectProvider": "Prijungti paslaugų teikėją",
     "contentTruncated": "Turinys sutrumpintas",
     "copyLink": "Kopijuoti nuorodą",
-    "couldNotLoadOrganizations": "Nepavyko įkelti organizacijų.",
-    "couldNotLoadSessions": "Nepavyko įkelti sesijų.",
-    "couldnTLoad": "Nepavyko įkelti.",
+    "couldNotLoadOrganizations": "Nepavyko įkelti organizacijų",
+    "couldNotLoadSessions": "Nepavyko įkelti sesijų",
+    "couldnTLoad": "Nepavyko įkelti",
     "couldnTLoadMore": "Nepavyko įkelti daugiau",
     "deviceSessions": "Įrenginių sesijos",
     "disabled": "Išjungta",
@@ -155,7 +155,7 @@
     "remaining": "Liko",
     "rename": "Pervadinti",
     "reply": "Atsakyti",
-    "reportSubmittedReceipt": "Pranešimas pateiktas. Patvirtinimo numeris: {{receiptId}}.",
+    "reportSubmittedReceipt": "Pranešimas pateiktas. Patvirtinimo numeris: {{receiptId}}",
     "retryLoadingMore": "Dar kartą bandyti įkelti daugiau",
     "reviewPr": "Peržiūrėti PR",
     "role": "Vaidmuo",
@@ -509,7 +509,7 @@
       "filesList": "Failų sąrašas"
     },
     "fileNavigator": {
-      "couldNotLoadFiles": "Nepavyko įkelti failų.",
+      "couldNotLoadFiles": "Nepavyko įkelti failų",
       "retryLoadingFiles": "Bandyti įkelti failus dar kartą",
       "filterPlaceholder": "Failo kelias",
       "viewedCount": "peržiūrėta {{viewed}} iš {{total}}",
@@ -523,11 +523,11 @@
       "viewedOfListed_many": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
       "viewedOfListed_other": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
       "loadingFiles": "Įkeliama {{loaded}} iš {{total}}…",
-      "failedToLoadAllFiles": "Nepavyko įkelti visų failų.",
-      "couldNotLoadMoreFiles": "Nepavyko įkelti daugiau failų.",
+      "failedToLoadAllFiles": "Nepavyko įkelti visų failų",
+      "couldNotLoadMoreFiles": "Nepavyko įkelti daugiau failų",
       "retryLoadingAllFiles": "Bandyti įkelti visus failus dar kartą",
       "retryLoadingMoreFiles": "Bandyti įkelti daugiau failų dar kartą",
-      "noMatches": "Nėra failų, atitinkančių „{{query}}“.",
+      "noMatches": "Nėra failų, atitinkančių „{{query}}“",
       "diffTooLarge": "pakeitimų palyginimas per didelis",
       "openFile": "Atidaryti {{path}}",
       "openFileViewed": "Atidaryti {{path}} (peržiūrėtas)",
@@ -538,7 +538,7 @@
       "unmarkViewed": "Pašalinti {{path}} peržiūros žymą",
       "collapseFile": "Sutraukti failą",
       "expandFile": "Išskleisti failą",
-      "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti.",
+      "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti",
       "noPreview": "Šio failo peržiūra negalima",
       "openOnGitHub": "Atidaryti GitHub platformoje",
       "openDiffOnGitHub": "Atidaryti šio failo pakeitimų palyginimą GitHub platformoje",
@@ -553,7 +553,7 @@
     },
     "hunkRows": {
       "hunkHeader": "Pakeitimų bloko antraštė {{header}}",
-      "contextUnavailable": "Šios versijos kontekstas nepasiekiamas.",
+      "contextUnavailable": "Šios versijos kontekstas nepasiekiamas",
       "retryLoadingContext": "Bandyti įkelti kontekstą dar kartą",
       "failedToLoadContext": "Nepavyko įkelti konteksto — bakstelėk ir bandyk dar kartą",
       "loadingContext": "Įkeliamas kontekstas…",
@@ -608,7 +608,7 @@
       "loadedOfTotalFiles_many": "Įkelti failai: {{loaded}} iš {{total}}"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "⚠️ failo pabaigoje nėra naujos eilutės.",
+      "noNewlineAtEndOfFile": "⚠️ failo pabaigoje nėra naujos eilutės",
       "emptyDiffColumn": "tuščias pakeitimų palyginimo stulpelis",
       "oldNew": "Senoji versija: {{old}} | Naujoji versija: {{new}}",
       "oldOnly": "Tik senojoje versijoje: {{text}}",
@@ -660,10 +660,10 @@
         "closedMergeRequest": "Ši sujungimo užklausa uždaryta"
       },
       "partialSuccessBanner": {
-        "body": "Nepavyko ištrinti šakos: {{reason}}.",
+        "body": "Nepavyko ištrinti šakos: {{reason}}",
         "accessibility": "Sujungta. Nepavyko ištrinti šakos: {{reason}}"
       },
-      "loadFailedTitle": "Nepavyko įkelti sujungimo parinkčių.",
+      "loadFailedTitle": "Nepavyko įkelti sujungimo parinkčių",
       "blocked": {
         "unknownStateTitle": "GitHub dar nepranešė, ar galima sujungti",
         "unknownStateDetail": "Netrukus pabandyk atnaujinti apžvalgą.",
@@ -767,15 +767,15 @@
         }
       },
       "accessDeniedMessage": "Neturi teisės peržiūrėti šio PR diskusiją.",
-      "unavailable": "Diskusija nepasiekiama.",
+      "unavailable": "Diskusija nepasiekiama",
       "unavailableMessage": "Ši pakeitimų užklausa galėjo būti pašalinta.",
-      "couldNotLoad": "Nepavyko įkelti diskusijos.",
+      "couldNotLoad": "Nepavyko įkelti diskusijos",
       "loading": "Įkeliama diskusija",
       "noDiscussion": "Diskusijos dar nėra",
       "noDiscussionDescription": "Šioje pakeitimų užklausoje dar nėra peržiūros gijų ar diskusijos komentarų.",
       "reviewFiles": "Peržiūrėti failus",
       "quotedDiffSnippet": "Cituojamas pakeitimų palyginimo fragmentas",
-      "moreLinesAbove": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "moreLinesAbove": "… Daugiau eilučių aukščiau: {{displayCount}}",
       "termsAcceptRequired": "Kad galėtum skelbti, turi sutikti su paslaugų teikimo sąlygomis.",
       "termsOutdatedCopy": "Paslaugų teikimo sąlygos pasikeitė. Iš naujo atidaryk šį ekraną ir sutik su naujausia jų versija.",
       "termsCheckRetryCopy": "Nepavyko patikrinti paslaugų teikimo sąlygų. Patikrink ryšį ir bandyk dar kartą.",
@@ -802,10 +802,10 @@
       },
       "deletedUser": "ištrintas naudotojas",
       "replyForbiddenTerm": "Neturi teisės atsakyti šioje diskusijoje ({{term}}).",
-      "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}.",
-      "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}.",
-      "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}.",
-      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}",
+      "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}",
+      "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}",
+      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}",
       "deleteComment": "Ištrinti komentarą",
       "deleteCommentTitle": "Ištrinti komentarą?",
       "deleteCommentMessage": "Šis komentaras bus ištrintas iš pakeitimų užklausos.",
@@ -814,10 +814,10 @@
       "commentDeleteFailed": "Nepavyko ištrinti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
       "commentDeleteUnavailable": "Šio komentaro negalima ištrinti."
     },
-    "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
+    "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
     "checkConnection": "Patikrinti ryšį",
-    "couldNotLoadPullRequest": "Nepavyko įkelti pakeitimų užklausos.",
+    "couldNotLoadPullRequest": "Nepavyko įkelti pakeitimų užklausos",
     "reviewServiceUnavailable": "Paslauga neprieinama",
     "reviewServiceUnavailableDescription": "Paslauga laikinai neprieinama. Pabandykite dar kartą netrukus.",
     "description": "Aprašymas",
@@ -875,7 +875,7 @@
       "loading": "Įkeliamos gautos užklausos",
       "noReviewRequests": "Nėra prašymų peržiūrėti",
       "noReviewRequestsDescription": "Čia rodomos tavo peržiūros laukiančios pakeitimų užklausos.",
-      "couldNotLoad": "Nepavyko įkelti gautų užklausų.",
+      "couldNotLoad": "Nepavyko įkelti gautų užklausų",
       "accessLostTitle": "Nėra prieigos prie šios organizacijos",
       "accessLostDescription": "Tu nebesi šios organizacijos narys, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",
       "organizationUnavailableTitle": "Šios organizacijos nebėra",
@@ -892,7 +892,7 @@
       "unavailableTitle": "Komentaras nepasiekiamas",
       "unavailableMessage": "Šis nepateiktas komentaras jau ištrintas arba pateiktas.",
       "ok": "GERAI",
-      "loadFailedTitle": "Nepavyko įkelti komentaro rengyklės.",
+      "loadFailedTitle": "Nepavyko įkelti komentaro rengyklės",
       "discardTitle": "Atmesti komentarą?",
       "discardMessage": "Tavo juodraštis bus prarastas.",
       "comment": "Komentuoti",
@@ -903,10 +903,10 @@
       "tapDiffLineToSuggest": "Bakstelėk pakeitimų palyginimo eilutę, kad galėtum siūlyti pakeitimus."
     },
     "connect": {
-      "checkFailedTitle": "Nepavyko patikrinti GitHub ryšio.",
+      "checkFailedTitle": "Nepavyko patikrinti GitHub ryšio",
       "checkFailedMessage": "Nepavyko pasiekti GitHub. Patikrink ryšį ir bandyk dar kartą.",
-      "checkFailedTitleGitLab": "Nepavyko patikrinti GitLab ryšio.",
-      "checkFailedTitleBitbucket": "Nepavyko patikrinti Bitbucket ryšio.",
+      "checkFailedTitleGitLab": "Nepavyko patikrinti GitLab ryšio",
+      "checkFailedTitleBitbucket": "Nepavyko patikrinti Bitbucket ryšio",
       "providerCheckFailedMessage": "Nepavyko pasiekti tiekėjo. Patikrink ryšį ir bandyk dar kartą.",
       "reconnectTitle": "Prisijungti prie GitHub iš naujo",
       "reconnectTitleGitLab": "Prisijungti prie GitLab iš naujo",
@@ -929,7 +929,7 @@
       "shareA11y": "Bendrinti pakeitimų užklausą"
     },
     "submit": {
-      "loadFailedTitle": "Nepavyko įkelti peržiūros pateikimo formos.",
+      "loadFailedTitle": "Nepavyko įkelti peržiūros pateikimo formos",
       "deletePendingTitle": "Ištrinti nepateiktą komentarą?",
       "deletePendingMessage": "Šis komentaras bus pašalintas iš peržiūros eilės.",
       "summaryOptional": "Santrauka (neprivaloma)",
@@ -954,10 +954,10 @@
       "blockedComment": "Jei nori pateikti peržiūrą kaip komentarą, pridėk santrauką arba bent vieną komentarą."
     },
     "reconnectNotice": {
-      "title": "Baigėsi GitHub prieigos galiojimas.",
+      "title": "Baigėsi GitHub prieigos galiojimas",
       "message": "Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
-      "gitlabTitle": "Baigėsi GitLab prieigos galiojimas.",
-      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas."
+      "gitlabTitle": "Baigėsi GitLab prieigos galiojimas",
+      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas"
     },
     "eventChips": {
       "comment": "Komentuoti",
@@ -1022,17 +1022,17 @@
     "diff": {
       "selectedTapToChange": "Pažymėta: {{label}}, bakstelėk, kad pakeistum pažymėjimą",
       "tapToComment": "{{label}}, bakstelėk, kad pakomentuotum",
-      "truncationBanner": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
+      "truncationBanner": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}",
       "statusContext": "Kontekstas",
       "lineLabel": "{{status}}, {{line}} eilutė: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(tuščia)",
-      "truncationBanner_one": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
-      "truncationBanner_other": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
-      "truncationBanner_few": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
-      "truncationBanner_many": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}."
+      "truncationBanner_one": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}",
+      "truncationBanner_other": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}",
+      "truncationBanner_few": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}",
+      "truncationBanner_many": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}"
     },
-    "linkPasteClipboardEmpty": "Iškarpinė tuščia.",
+    "linkPasteClipboardEmpty": "Iškarpinė tuščia",
     "linkPasteDenied": "Prieiga prie įdėjimo buvo atmesta. Leiskite įdėti ir bandykite dar kartą.",
     "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos arba sujungimo užklausos nuoroda",
     "announce": {
@@ -1057,7 +1057,7 @@
       "mergeResultDefaultError": "GitHub neužbaigė sujungimo.",
       "mergeResultNotCompleted": "Ši {{term}} nebuvo sujungta. Patikrink būseną ir bandyk dar kartą.",
       "ambiguous": "Nepavyko patvirtinti rezultato — prieš bandydamas dar kartą patikrink PR.",
-      "forbidden": "Šis veiksmas neleidžiamas."
+      "forbidden": "Šis veiksmas neleidžiamas"
     },
     "capabilities": {
       "banner": {
@@ -1074,7 +1074,7 @@
       "mergeRequestUnavailable": "Sujungimo užklausa nepasiekiama",
       "unavailableDescription": "Ryšys galėjo nutrūkti, o įrašas galėjo būti ištrintas arba nepasiekiamas.",
       "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šios sujungimo užklausos.",
-      "couldNotLoadMergeRequest": "Nepavyko įkelti sujungimo užklausos.",
+      "couldNotLoadMergeRequest": "Nepavyko įkelti sujungimo užklausos",
       "discussionAccessDenied": "Neturi teisės peržiūrėti šios sujungimo užklausos diskusiją.",
       "discussionUnavailableMessage": "Ryšys galėjo nutrūkti, o sujungimo užklausa galėjo būti pašalinta.",
       "noDiscussionDescription": "Šioje sujungimo užklausoje nėra peržiūros gijų ar diskusijos komentarų.",
@@ -1159,7 +1159,7 @@
   },
   "chat": {
     "errors": {
-      "messageTooLong": "Žinutė per ilga. Joje turi būti mažiau nei {{limit}} simbolių."
+      "messageTooLong": "Žinutė per ilga. Joje turi būti mažiau nei {{limit}} simbolių"
     },
     "conversation": {
       "untitled": "Be pavadinimo",
@@ -1171,16 +1171,16 @@
       "older": "Senesni"
     },
     "attachment": {
-      "attachFailed": "Nepavyko pridėti failo.",
-      "classificationDenied": "Vykdomųjų failų pridėti negalima.",
-      "classificationEmpty": "Failas tuščias.",
-      "classificationTooLarge": "Failo dydis negali viršyti 20 MB.",
-      "classificationUnreadable": "Nepavyko perskaityti šio failo.",
+      "attachFailed": "Nepavyko pridėti failo",
+      "classificationDenied": "Vykdomųjų failų pridėti negalima",
+      "classificationEmpty": "Failas tuščias",
+      "classificationTooLarge": "Failo dydis negali viršyti 20 MB",
+      "classificationUnreadable": "Nepavyko perskaityti šio failo",
       "announceUploaded": "Priedas įkeltas",
       "cantUpload": "Šio failo įkelti negalima.",
-      "networkError": "Įvyko tinklo klaida.",
-      "uploadFailed": "Nepavyko įkelti.",
-      "nothingToPaste": "Nėra ko įklijuoti.",
+      "networkError": "Įvyko tinklo klaida",
+      "uploadFailed": "Nepavyko įkelti",
+      "nothingToPaste": "Nėra ko įklijuoti",
       "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
     },
     "attachmentPreview": {
@@ -1552,7 +1552,7 @@
     },
     "automation": {
       "title": "Automatizavimas",
-      "couldNotLoad": "Nepavyko įkelti automatizavimo nustatymų.",
+      "couldNotLoad": "Nepavyko įkelti automatizavimo nustatymų",
       "autoAnalysis": "Automatinė analizė",
       "autoRemediation": "Automatinis taisymas",
       "autoDismiss": "Automatinis atmetimas",
@@ -1586,9 +1586,9 @@
       "queued_many": "{{displayCount}} esamo radinio įtraukta į analizės eilę."
     },
     "analysis": {
-      "couldNotLoad": "Nepavyko įkelti analizės.",
+      "couldNotLoad": "Nepavyko įkelti analizės",
       "noAnalysisYet": "Analizės dar nėra",
-      "noAnalysisYetDescription": "Pradėk analizę skirtuke „Informacija“.",
+      "noAnalysisYetDescription": "Pradėk analizę skirtuke „Informacija“",
       "restartTitle": "Pakartoti šią analizę?",
       "restartMessage": "Saugos agentas nustos laukti vykdomos analizės ir įtrauks naują analizę į eilę. Vykdomos analizės rezultatai bus ignoruojami.",
       "keepWaiting": "Toliau laukti",
@@ -1598,7 +1598,7 @@
       "rerunAnalysis": "Paleisti analizę iš naujo",
       "capacityFull": "Pasiektas vienu metu vykdomų analizių limitas. Palauk, kol baigsis viena iš vykdomų analizių.",
       "couldNotCheckCapacity": "Nepavyko patikrinti, ar galima pradėti dar vieną analizę.",
-      "watchInCloudAgent": "Stebėti debesijos agente",
+      "watchInCloudAgent": "Stebėti „Cloud Agent“",
       "triageConfidence": "Pirminio vertinimo patikimumas",
       "suggestedAction": "Siūlomas veiksmas",
       "triageReasoning": "Pirminio vertinimo pagrindimas",
@@ -1657,7 +1657,7 @@
       "repoSummaryHigh_few": "didelio pavojingumo: {{displayCount}}",
       "repoSummaryHigh_many": "didelio pavojingumo: {{displayCount}}",
       "repoSummaryHigh_other": "didelio pavojingumo: {{displayCount}}",
-      "couldNotLoad": "Nepavyko įkelti apžvalgos duomenų.",
+      "couldNotLoad": "Nepavyko įkelti apžvalgos duomenų",
       "filterByRepository": "Filtruoti pagal saugyklą",
       "lastSynced": "Paskutinį kartą sinchronizuota {{time}}",
       "manageRepositories": "Tvarkyti saugyklas",
@@ -1668,7 +1668,7 @@
       "syncing": "Sinchronizuojama…",
       "syncNow": "Sinchronizuoti dabar",
       "syncQueued": "Sinchronizavimas įtrauktas į eilę",
-      "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos.",
+      "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos",
       "daysOverdue_one": "Pradelsta diena: {{displayCount}}",
       "daysOverdue_other": "Pradelsta dienų: {{displayCount}}",
       "daysOverdue_few": "Pradelsta dienos: {{displayCount}}",
@@ -1726,8 +1726,8 @@
       "commentPlaceholder": "Papildoma informacija apie atmetimą…",
       "notFoundTitle": "Problema nerasta",
       "notFoundDescription": "Šis radinys galėjo būti pašalintas arba nebeturi prieigos prie jo.",
-      "couldNotLoad": "Nepavyko įkelti šios problemos.",
-      "couldNotCheckPermissions": "Nepavyko patikrinti teisės atmesti radinius.",
+      "couldNotLoad": "Nepavyko įkelti šios problemos",
+      "couldNotCheckPermissions": "Nepavyko patikrinti teisės atmesti radinius",
       "cannotDismissTitle": "Šio radinio atmesti negalima",
       "cannotDismissDescription": "Radinius gali atmesti tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "alreadyResolvedDescription": "Šis radinys jau išspręstas, todėl jo atmesti nebegalima."
@@ -1756,8 +1756,8 @@
       "reasonAfterReview": "po peržiūros"
     },
     "settingsOverview": {
-      "couldNotLoadSettings": "Nepavyko įkelti saugos agento nustatymų.",
-      "couldNotLoadPermissions": "Nepavyko įkelti teisių.",
+      "couldNotLoadSettings": "Nepavyko įkelti saugos agento nustatymų",
+      "couldNotLoadPermissions": "Nepavyko įkelti teisių",
       "on": "Įjungta",
       "repositoriesCount_one": "Pasirinkta {{displayCount}} saugykla",
       "repositoriesCount": "Pasirinkta {{displayCount}} saugyklų",
@@ -1775,7 +1775,7 @@
     "remediation": {
       "cancellationRequested": "Paprašyta atšaukti",
       "cancelled": "Taisymas atšauktas",
-      "couldNotLoad": "Nepavyko įkelti taisymo būsenos.",
+      "couldNotLoad": "Nepavyko įkelti taisymo būsenos",
       "start": "Pradėti taisymą",
       "retry": "Pakartoti taisymą",
       "cancelTitle": "Atšaukti šį taisymą?",
@@ -1798,7 +1798,7 @@
     },
     "analysisSettings": {
       "title": "Modeliai ir analizė",
-      "couldNotLoad": "Nepavyko įkelti analizės nustatymų.",
+      "couldNotLoad": "Nepavyko įkelti analizės nustatymų",
       "depth": "Analizės išsamumas",
       "triageModel": "Pirminio vertinimo modelis",
       "analysisModel": "Analizės modelis",
@@ -1806,7 +1806,7 @@
     },
     "sla": {
       "title": "SLA politika",
-      "couldNotLoad": "Nepavyko įkelti SLA nustatymų.",
+      "couldNotLoad": "Nepavyko įkelti SLA nustatymų",
       "high": "Aukštas",
       "medium": "Vidutinis",
       "low": "Žemas",
@@ -1828,8 +1828,8 @@
       "tabRemediation": "Taisymas"
     },
     "findingList": {
-      "couldNotLoad": "Nepavyko įkelti radinių.",
-      "couldNotLoadMore": "Nepavyko įkelti daugiau radinių.",
+      "couldNotLoad": "Nepavyko įkelti radinių",
+      "couldNotLoadMore": "Nepavyko įkelti daugiau radinių",
       "noMatchesTitle": "Filtrus atitinkančių radinių nėra",
       "noMatchesDescription": "Pabandyk pakeisti arba išvalyti pasirinktus filtrus.",
       "emptyTitle": "Nėra atvirų radinių",
@@ -1864,7 +1864,7 @@
       "actorMaskedKiloAdmin": "Kilo administratorius",
       "actorMaskedUser": "Paslėptas naudotojas",
       "actorSystem": "Kilo sistema",
-      "couldNotLoad": "Nepavyko įkelti audito ataskaitos.",
+      "couldNotLoad": "Nepavyko įkelti audito ataskaitos",
       "events": "Įvykiai",
       "eventConfidence": "Pasitikėjimas: {{confidence}}",
       "eventReason": "Priežastis: {{reason}}",
@@ -1874,7 +1874,7 @@
       "eventsCount_few": "{{displayCount}} įvykiai",
       "eventsCount_many": "{{displayCount}} įvykio",
       "eventsCount_other": "{{displayCount}} įvykių",
-      "generated": "Ataskaita sugeneruota {{generatedAt}}.",
+      "generated": "Ataskaita sugeneruota {{generatedAt}}",
       "noActivity": "Užfiksuotos veiklos nėra",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Saugykla neužfiksuota",
@@ -1904,7 +1904,7 @@
       }
     },
     "notifications": {
-      "couldNotLoad": "Nepavyko įkelti pranešimų nustatymų.",
+      "couldNotLoad": "Nepavyko įkelti pranešimų nustatymų",
       "emailOwners": "Siųsti el. laiškus organizacijos savininkams",
       "newFindingPersonalTitle": "Pranešti man el. paštu apie naujus radinius",
       "newFindingSection": "Pranešimai apie naujus radinius",
@@ -1918,18 +1918,18 @@
       "slaSubtitle": "Pranešimai siunčiami artėjant radinių SLA terminui, jam suėjus ir jį praleidus."
     },
     "repositories": {
-      "couldNotLoad": "Nepavyko įkelti saugyklų nustatymų.",
+      "couldNotLoad": "Nepavyko įkelti saugyklų nustatymų",
       "githubAppSettings": "GitHub programėlės nustatymai",
       "manageAccess": "Tvarkyti GitHub programėlės prieigą",
       "noRepositories": "Nėra saugyklų",
-      "noRepositoriesDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų.",
+      "noRepositoriesDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų",
       "selectAtLeastOne": "Pasirink bent vieną saugyklą."
     },
     "scopeEntry": {
       "connectDescription": "Įdiek Kilo GitHub programėlę, kad automatiškai sinchronizuotum Dependabot įspėjimus ir tvarkytum saugos radinius visose savo saugyklose.",
       "connectOwnerOnly": "Paprašyk organizacijos savininko ar administratoriaus prijungti {{platform}}.",
       "connectTitle": "Prijunk GitHub ir pradėk",
-      "couldNotLoad": "Nepavyko įkelti saugos agento.",
+      "couldNotLoad": "Nepavyko įkelti saugos agento",
       "installApp": "Įdiegti GitHub programėlę",
       "reauthorizeButton": "Iš naujo suteikti teises GitHub programėlei",
       "reauthorizeDescription": "Saugos agentui reikia teisės skaityti Dependabot įspėjimus. Iš naujo autorizuok GitHub programėlę, kad ši teisė būtų suteikta.",
@@ -2081,14 +2081,14 @@
       "searchSessionsPlaceholder": "Ieškoti sesijų"
     },
     "sessionList": {
-      "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų.",
+      "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų",
       "couldNotRefresh": "Nepavyko atnaujinti",
       "noSessionsYetDescription": "Pradėk programavimo užduotį telefone.",
       "viewHistory": "Sesijų istorija",
       "noMatches": "Nėra paiešką atitinkančių sesijų",
       "tryDifferentSearch": "Bandyk ieškoti pagal kitą žodį.",
       "tryAdjustFilters": "Pabandyk pakeisti arba išvalyti filtrus.",
-      "couldNotSearch": "Nepavyko atlikti sesijų paieškos.",
+      "couldNotSearch": "Nepavyko atlikti sesijų paieškos",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
       "pastSessions": "Ankstesnės sesijos",
@@ -2099,10 +2099,10 @@
       "deleteTitle": "Ištrinti sesiją?",
       "deleteMessage": "To negalima atšaukti.",
       "deleteSession": "Ištrinti sesiją",
-      "renameMessage": "Įvesk naują šios sesijos pavadinimą.",
+      "renameMessage": "Įvesk naują šios sesijos pavadinimą",
       "copyId": "Kopijuoti sesijos ID",
       "idCopied": "Sesijos ID nukopijuotas",
-      "couldNotCopyId": "Nepavyko nukopijuoti sesijos ID.",
+      "couldNotCopyId": "Nepavyko nukopijuoti sesijos ID",
       "untitled": "Sesija be pavadinimo",
       "actions": "Sesijos veiksmai",
       "sessionDeleted": "Sesija ištrinta",
@@ -2161,7 +2161,7 @@
       "renameSession": "Pervadinti sesiją",
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
-      "readOnly": "Šią sesiją galima tik skaityti.",
+      "readOnly": "Šią sesiją galima tik skaityti",
       "continueInNewSession": "Tęsti naujoje sesijoje",
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
       "scrollToBottom": "Slinkti į apačią",
@@ -2182,15 +2182,15 @@
       "cancelQueuedUpgradeRequired": "Norint atšaukti eilėje esančias žinutes, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "remoteSession": {
-      "failedToCreate": "Nepavyko sukurti nuotolinės sesijos.",
-      "failedToExit": "Nepavyko baigti sesijos.",
+      "failedToCreate": "Nepavyko sukurti nuotolinės sesijos",
+      "failedToExit": "Nepavyko baigti sesijos",
       "exitTitle": "Baigti sesiją?",
       "exitMessage": "Vykdoma sesija bus sustabdyta, bet jos istorija liks išsaugota.",
       "keepSessionRunning": "Toliau vykdyti sesiją",
       "exitSession": "Baigti sesiją",
       "restartExitFailed": "Pradėta nauja sesija. Ankstesnė sesija vis dar atidaryta.",
-      "exitNotSupported": "Šios sesijos negalima baigti nuotoliniu būdu.",
-      "exitUnavailable": "Nuotolinis šios sesijos baigimas nepasiekiamas.",
+      "exitNotSupported": "Šios sesijos negalima baigti nuotoliniu būdu",
+      "exitUnavailable": "Nuotolinis šios sesijos baigimas nepasiekiamas",
       "exitNeedsNewerCli": "Norint nuotoliniu būdu vykdyti komandas su pasviruoju brūkšniu, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "sessionConnection": {
@@ -2225,9 +2225,9 @@
     },
     "newSession": {
       "recentlyUsed": "Neseniai naudota",
-      "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
-      "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų.",
-      "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų.",
+      "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų",
+      "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų",
+      "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų",
       "connectGithubDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite GitHub saugyklą.",
       "connectGitlabDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite GitLab saugyklą.",
       "connectBitbucketDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite Bitbucket saugyklą.",
@@ -2256,7 +2256,7 @@
       "runOnWithTarget": "Vykdymo vieta: {{target}}",
       "environment": "Aplinka",
       "cloudEnvironment": "Debesų aplinka",
-      "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos.",
+      "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos",
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",
       "environmentAccessibility": "Pasirinkite profilį: {{label}}",
@@ -2269,7 +2269,7 @@
       "enterPromptOrFileToStart": "Norėdami pradėti, pridėkite užklausą arba failą.",
       "connectProviderToStart": "Saugyklos gaunamos iš susietos GitHub, GitLab arba Bitbucket paskyros.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
-      "couldNotLoadModels": "Nepavyko įkelti modelių.",
+      "couldNotLoadModels": "Nepavyko įkelti modelių",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",
       "prefillRepoUnavailable": "Saugykla „{{repo}}“ nebepasiekiama. Pasirinkite kitą saugyklą žemiau.",
       "prefillModelUnavailable": "Modelis „{{model}}“ nebepasiekiamas. Naudojamas numatytasis modelis.",
@@ -2282,7 +2282,7 @@
       "discardWithUploadsMessage": "Jūsų užklausa ir visi prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",
       "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
       "remoteHint": "Norėdami vykdyti sesiją savo kompiuteryje, paleiskite ten Kilo ir palikite jį veikiantį.",
-      "continueFrom": "Tęsiama sesija „{{title}}“.",
+      "continueFrom": "Tęsiama sesija „{{title}}“",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
       "importFailed": "Nepavyko importuoti šios sesijos.",
@@ -2401,11 +2401,11 @@
       "snapshotCaptured": "Darbo srities momentinė kopija užfiksuota {{when}}"
     },
     "partRenderer": {
-      "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",
-      "updatedFileCount": "Atnaujinta {{displayCount}} failų.",
-      "updatedFileCount_other": "Atnaujinta {{displayCount}} failų.",
-      "updatedFileCount_few": "Atnaujinti {{displayCount}} failai.",
-      "updatedFileCount_many": "Atnaujinta {{displayCount}} failo."
+      "updatedFileCount_one": "Atnaujintas {{displayCount}} failas",
+      "updatedFileCount": "Atnaujinta {{displayCount}} failų",
+      "updatedFileCount_other": "Atnaujinta {{displayCount}} failų",
+      "updatedFileCount_few": "Atnaujinti {{displayCount}} failai",
+      "updatedFileCount_many": "Atnaujinta {{displayCount}} failo"
     },
     "toolCard": {
       "accessibility": "Įrankis „{{label}}“, {{status}}",
@@ -2439,17 +2439,17 @@
       "toolSendFileAction": "Siųsti failą",
       "readTodos": "Skaityti planą",
       "updateTodos": "Atnaujinti planą",
-      "linesBadge": "{{displayCount}} eil.",
+      "linesBadge": "{{displayCount}} eil",
       "filesBadge": "{{displayCount}} failų",
       "matchesBadge": "{{displayCount}} atitikčių",
       "filesBadge_one": "{{displayCount}} failas",
       "filesBadge_other": "{{displayCount}} failų",
       "filesBadge_few": "{{displayCount}} failai",
       "filesBadge_many": "{{displayCount}} failo",
-      "linesBadge_one": "{{displayCount}} eil.",
-      "linesBadge_other": "{{displayCount}} eil.",
-      "linesBadge_few": "{{displayCount}} eil.",
-      "linesBadge_many": "{{displayCount}} eil.",
+      "linesBadge_one": "{{displayCount}} eil",
+      "linesBadge_other": "{{displayCount}} eil",
+      "linesBadge_few": "{{displayCount}} eil",
+      "linesBadge_many": "{{displayCount}} eil",
       "matchesBadge_one": "{{displayCount}} atitiktis",
       "matchesBadge_other": "{{displayCount}} atitikčių",
       "matchesBadge_few": "{{displayCount}} atitiktys",
@@ -2537,7 +2537,7 @@
       "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} už {{million}} {{tokens}}"
     },
     "partDetail": {
-      "detailsUnavailable": "Informacija nepasiekiama.",
+      "detailsUnavailable": "Informacija nepasiekiama",
       "textDisplay": "Teksto rodymas",
       "thinking": "Mąstoma",
       "thought": "Mintis",
@@ -2560,14 +2560,14 @@
       }
     },
     "messageErrorBoundary": {
-      "failedToRender": "Nepavyko parodyti turinio."
+      "failedToRender": "Nepavyko parodyti turinio"
     },
     "messageFailure": {
       "deliveryTitle": "Žinutė neišsiųsta",
       "deliveryInterrupted": "Sustabdėte šios žinutės siuntimą.",
       "deliveryExhausted": "Net po kelių bandymų nepavyko pristatyti šios žinutės.",
       "deliveryExecution": "Agentui nepavyko apdoroti šios žinutės.",
-      "assistantTitle": "Nepavyko sugeneruoti atsakymo.",
+      "assistantTitle": "Nepavyko sugeneruoti atsakymo",
       "assistantProviderRejected": "Teikėjas atmetė užklausą.",
       "assistantStopped": "Atsakymo generavimas sustabdytas.",
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
@@ -2592,9 +2592,9 @@
       "couldNotLoadFileRetry": "Nepavyko įkelti šio failo. Bandykite dar kartą.",
       "retryLoadingFile": "Bandyti įkelti failą iš naujo",
       "fileEmpty": "Šis failas tuščias.",
-      "previewUnavailable": "Peržiūra nepasiekiama.",
+      "previewUnavailable": "Peržiūra nepasiekiama",
       "fileUnavailableInSession": "Failas šioje sesijoje nepasiekiamas.",
-      "shareFailed": "Nepavyko bendrinti.",
+      "shareFailed": "Nepavyko bendrinti",
       "sharingUnavailable": "Šiame įrenginyje negalima bendrinti failų.",
       "shareFailedRetry": "Nepavyko bendrinti failo. Bandykite dar kartą.",
       "openAsText": "Atidaryti kaip tekstą",
@@ -2602,7 +2602,7 @@
     },
     "preparation": {
       "exitCode": "Baigimo kodas: {{code}}",
-      "earlierOutputOmitted": "Ankstesnė išvestis praleista.",
+      "earlierOutputOmitted": "Ankstesnė išvestis praleista",
       "preparingEnvironment": "Rengiama aplinka",
       "preparationComplete": "Parengimas baigtas",
       "preparationFailed": "Parengimas nepavyko",
@@ -2738,8 +2738,8 @@
       "waitingForActivity": "Laukiama veiklos"
     },
     "childSessionSheet": {
-      "couldNotLoad": "Nepavyko įkelti subagento sesijos.",
-      "failed": "Subagento sesija baigėsi klaida.",
+      "couldNotLoad": "Nepavyko įkelti subagento sesijos",
+      "failed": "Subagento sesija baigėsi klaida",
       "noMessages": "Nėra subagento žinučių",
       "noMessagesDescription": "Ši subagento sesija baigėsi nesukūrusi pokalbio išrašo.",
       "loading": "Įkeliama subagento sesija",
@@ -2823,12 +2823,12 @@
       "photoLibrary": "Nuotraukų biblioteka",
       "files": "Failai",
       "couldNotOpenPhotoPicker": "Nepavyko atidaryti nuotraukų parinkiklio. Iš naujo paleiskite Kilo ir bandykite dar kartą.",
-      "maxFilesAllowed": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
       "onlyAddingFiles": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
-      "maxFilesAllowed_one": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
-      "maxFilesAllowed_other": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
-      "maxFilesAllowed_few": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
-      "maxFilesAllowed_many": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed_one": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
+      "maxFilesAllowed_other": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
+      "maxFilesAllowed_few": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
+      "maxFilesAllowed_many": "Didžiausias leidžiamas failų skaičius: {{displayCount}}",
       "onlyAddingFiles_one": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
       "onlyAddingFiles_other": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
       "onlyAddingFiles_few": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
@@ -2842,7 +2842,7 @@
       "waitForUploads": "Palaukite, kol bus įkelti visi priedai.",
       "pasteFromClipboard": "Įklijuoti iš iškarpinės",
       "stopGenerating": "Sustabdyti generavimą",
-      "selectModelBeforeSending": "Prieš siųsdami pasirinkite modelį.",
+      "selectModelBeforeSending": "Prieš siųsdami pasirinkite modelį",
       "preparingPlaceholder": "Rengiama aplinka…",
       "finalizingPlaceholder": "Baigiama…",
       "sessionLoadFailed": "Sesijos įkelti nepavyko. Pirmiausia bandykite dar kartą.",
@@ -2868,8 +2868,8 @@
       "share": "Bendrinti",
       "prLinkActions": "PR nuorodos veiksmai",
       "linkActions": "Nuorodos veiksmai",
-      "couldNotCopyLink": "Nepavyko nukopijuoti nuorodos.",
-      "couldNotShareLink": "Nepavyko bendrinti nuorodos.",
+      "couldNotCopyLink": "Nepavyko nukopijuoti nuorodos",
+      "couldNotShareLink": "Nepavyko bendrinti nuorodos",
       "showLinkActions": "Rodyti nuorodos veiksmus"
     },
     "compaction": {
@@ -3013,7 +3013,7 @@
       "fieldLabel": "Aplankas",
       "retryableDescription": "Patikrinkite ryšį ir bandykite dar kartą. Vis tiek galite patvirtinti šio aplanko pasirinkimą.",
       "retryableTitle": "Nepavyko parodyti aplankų",
-      "tapToListHint": "Bakstelėkite aplanką, kad pamatytumėte jo turinį.",
+      "tapToListHint": "Bakstelėkite aplanką, kad pamatytumėte jo turinį",
       "unsupportedDescription": "Ši CLI negali parodyti aplankų. Paspaudus „Baigti“, lieka paleidimo aplankas, o „Pradėti sesiją“ pradeda sesiją jame.",
       "unsupportedTitle": "Negalima parodyti aplankų"
     },
@@ -3040,7 +3040,7 @@
   },
   "deviceSessions": {
     "couldNotLoadDescription": "Kol duomenys neįkelti, aktyvių sesijų peržiūrėti negalima.",
-    "currentDeviceUnidentified": "Nepavyko atpažinti šio įrenginio.",
+    "currentDeviceUnidentified": "Nepavyko atpažinti šio įrenginio",
     "kiloApp": "Kilo programėlė",
     "kiloAppAndroid": "Kilo programėlė · Android",
     "kiloAppIos": "Kilo programėlė · iOS",
@@ -3068,7 +3068,7 @@
     "appStorePage": "programų parduotuvės puslapis"
   },
   "home": {
-    "couldNotLoadSessions": "Nepavyko įkelti sesijų.",
+    "couldNotLoadSessions": "Nepavyko įkelti sesijų",
     "couldNotLoadActiveSessions": "Nepavyko įkelti aktyvių sesijų",
     "agentSessions": "Vyksta dabar",
     "newCodingTask": "Nauja programavimo užduotis",
@@ -3095,17 +3095,17 @@
   },
   "queryError": {
     "neutralDescription": "Bandyk dar kartą.",
-    "offlineTitle": "Nepavyko įkelti.",
+    "offlineTitle": "Nepavyko įkelti",
     "permissionDescription": "Neturi teisės peržiūrėti šio turinio.",
     "notFoundDescription": "Galbūt šis turinys pašalintas arba nebepasiekiamas.",
-    "serverTitle": "Nepavyko įkelti.",
+    "serverTitle": "Nepavyko įkelti",
     "serverDescription": "Mūsų sistemoje įvyko klaida. Bandyk dar kartą.",
     "timeoutTitle": "Serveris per ilgai neatsako",
     "timeoutDescription": "Užklausa nebuvo atlikta per skirtąjį laiką. Bandyk dar kartą."
   },
   "screenHeader": {
     "openMenu": "Atidaryti meniu",
-    "openMenuFor": "Atidaryti {{title}} meniu"
+    "openMenuFor": "Atidaryti „{{title}}“ meniu"
   },
   "picker": {
     "optionsExpired": "Parinktys nebegalioja",
@@ -3166,7 +3166,7 @@
     "cliCantReceiveFilesTitle": "Ši sesija negali gauti failų",
     "cliCantReceiveFilesMessage": "Šią sesiją vykdanti Kilo CLI negali gauti failų. Atnaujink CLI tame įrenginyje arba bendrink turinį naujoje sesijoje.",
     "contentlessMessage": "Nėra ką bendrinti — nepridėta nei teksto, nei failų.",
-    "couldNotReadContent": "Nepavyko perskaityti bendrinamo turinio.",
+    "couldNotReadContent": "Nepavyko perskaityti bendrinamo turinio",
     "onlyFirstFilesAttached_one": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
     "onlyFirstFilesAttached_other": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
     "onlyFirstFilesAttached_few": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
@@ -3325,7 +3325,7 @@
     "who": "Kas gauna"
   },
   "feedback": {
-    "noEmailApp": "El. pašto programėlė nepasiekiama. Gali su mumis susisiekti adresu {{email}}.",
+    "noEmailApp": "El. pašto programėlė nepasiekiama. Gali su mumis susisiekti adresu {{email}}",
     "couldNotOpenStore": "Nepavyko atidaryti parduotuvės.",
     "emailSubject": "atsiliepimas apie mobiliąją programėlę",
     "neutralTitle": "Įvertink Kilo programėlę",
@@ -3453,10 +3453,10 @@
       "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas."
     },
     "inviteMember": {
-      "emailError": "Įveskite tinkamą el. pašto adresą.",
+      "emailError": "Įveskite tinkamą el. pašto adresą",
       "emailPlaceholder": "vardas@company.com",
       "permissionDenied": "Neturite leidimo kviesti narių.",
-      "roleMember": "Vaidmuo: narys.",
+      "roleMember": "Vaidmuo: narys",
       "sendInvite": "Siųsti kvietimą",
       "title": "Pakviesti narį",
       "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
@@ -3495,18 +3495,18 @@
       "saveEmailsError": "Kai kurie el. pašto adresai nebuvo priimti. Patikrinkite juos ir bandykite dar kartą.",
       "saveError": "Nepavyko išsaugoti pranešimo apie mažą likutį.",
       "thresholdPlaceholder": "Įveskite sumą",
-      "thresholdError": "Įveskite sumą, didesnę nei 0."
+      "thresholdError": "Įveskite sumą, didesnę nei 0"
     },
     "memberLimit": {
       "limitLabel": "Riba (USD per dieną)",
-      "memberNotFound": "Narys nerastas.",
+      "memberNotFound": "Narys nerastas",
       "noLimitPlaceholder": "Neribojama",
       "permissionDenied": "Tik organizacijos savininkas arba administratorius gali valdyti išlaidų ribas.",
       "removeLimit": "Panaikinti ribą",
       "title": "Dienos išlaidų riba",
-      "blankError": "Įveskite sumą arba žemiau panaikinkite ribą.",
-      "blankWithoutLimitError": "Įveskite dienos ribą nuo 0 iki {{max}}.",
-      "rangeError": "Įveskite sumą nuo 0 iki {{max}}."
+      "blankError": "Įveskite sumą arba žemiau panaikinkite ribą",
+      "blankWithoutLimitError": "Įveskite dienos ribą nuo 0 iki {{max}}",
+      "rangeError": "Įveskite sumą nuo 0 iki {{max}}"
     },
     "members": {
       "changeRole": "Pakeisti vaidmenį",
@@ -3620,8 +3620,8 @@
     "couldNotOpenBrowser": "Nepavyko atidaryti naršyklės. Bandyk dar kartą.",
     "signInTimedOut": "Prisijungimui skirtas laikas baigėsi. Bandyk dar kartą.",
     "networkError": "Tinklo klaida. Bandyk dar kartą.",
-    "accessDeniedByUser": "Naudotojas nesuteikė prieigos.",
-    "codeExpired": "Kodo galiojimas baigėsi.",
+    "accessDeniedByUser": "Naudotojas nesuteikė prieigos",
+    "codeExpired": "Kodo galiojimas baigėsi",
     "tooManySignInAttempts": "Per daug bandymų prisijungti. Palauk ir bandyk dar kartą."
   },
   "models": {
@@ -3635,7 +3635,7 @@
     },
     "dataCollected": "Duomenys renkami",
     "free": "Nemokama",
-    "couldNotUpdateFavorites": "Nepavyko atnaujinti mėgstamiausių modelių.",
+    "couldNotUpdateFavorites": "Nepavyko atnaujinti mėgstamiausių modelių",
     "thinkingEffort": {
       "none": "Nėra",
       "minimal": "Minimalus",

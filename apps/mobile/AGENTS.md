@@ -165,11 +165,9 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
 - Optimistic updates have one owner each. A value in the TanStack query cache belongs to its mutation: snapshot in `onMutate`, roll back in `onError` only while `isLatestMutationGeneration` says this mutation still owns the key, and reconcile in `onSettled`. Never add a second optimistic copy over a query-backed value.
-- The per-chat web search and Kilo MCP choices belong to the chat registry. Change them only through `setChatFlag` and `retryChatFlag` in `@/lib/chat/registry`. Other stored values stay with the store that owns them; a component must not keep its own optimistic copy beside it.
+- A stored value has one owner. Change it only through that owner's API, and never keep a second optimistic copy beside it in a component.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
-- A dispatched purchase admission lives for this process and the account that admitted it, never on disk: an empty account token is the catalogue still answering and says nothing about whose request this is, while two different non-empty tokens are an account change — the record is dropped, so a remount under another account inherits no barrier and posts none of its receipts. The SDK settles every promise of its pool together, so an outcome is attributable only while exactly one request waits and none is marked ambiguous, and the whole pool is marked ambiguous the moment a pooled promise settles with another request still waiting. Only a credited identified transaction, or informed “Buy again” consent, retires the barrier; a reserved never-dispatched request is released, and an empty store query never authorizes a charge. Progress UI never waits on attribution: a delivery ends its own row when its completion is completed or refused, and a pending or deferred delivery keeps its row busy until its deadline releases its row while the copy says the store is still processing the payment. The purchase state is its own slot after the pack rows, so it never moves a row. A deadline never reports a failure while the native sheet can still be open: the status card says the store has not answered, and the later answer — credited, refused or cancelled — ends that state with no failure left behind. A completion the backend refuses for good is reported as a terminal refusal with its own copy and a consent exit. A late event from a request a disconnection took out of the pool is recovery input only, never that request's outcome. A request retired by consent whose pooled promise had already settled can have a later event attributed to the next request; credits stay exactly once. Nothing survives a restart: the store's re-delivery is the only route to an earlier charge, and it credits once.
-- Retained merge keys retire only when the fingerprint and the captured key both still match. At capacity, refuse new intents; never evict an unresolved one.
 
 ## State Machines
 
@@ -184,8 +182,10 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
   - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
   - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
 - Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
-- A purchase keeps its own request and transaction records. Never settle one by looking it up by product id.
-- A regression test for one of these bugs must fail on the code before the fix. Prove that once before the fix lands.
+- Settle async work by its own request identity, never by a shared attribute such as a product id or a name.
+- When an outcome cannot be tied to one request, keep the safe state and give the person an explicit way out. Never leave a state with no exit.
+- Retire retained state only when its identity still matches. At capacity, refuse new entries; never evict an unresolved one.
+- A regression test must fail on the code before the fix. Prove that once before the fix lands.
 
 ## React Native Rules
 

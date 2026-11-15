@@ -10,6 +10,15 @@ import type * as ReactQuery from '@tanstack/react-query';
 
 const RECEIPT_ID = '11111111-1111-4111-8111-111111111111';
 
+// The four next-step sentences the screen may state, as the real catalog renders
+// them; a state that states none of them proves the line stayed silent.
+const NEXT_STEP_SENTENCES = [
+  'A moderator will review this report. The outcome will appear on this screen, and you can appeal after a decision.',
+  'A moderator is reviewing this report. The outcome will appear on this screen, and you can appeal after a decision.',
+  'Your appeal is in review. Its outcome will appear on this screen.',
+  'The appeal decision is final. No further appeal can be filed.',
+] as const;
+
 type MutationOptions = {
   onSuccess?: () => void;
   onError?: (error: Error) => void;
@@ -218,6 +227,55 @@ describe('ReportReceiptScreen', () => {
 
     expect(texts(root)).toContain('Appeal in review');
     expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('states that a moderator will review a report just received', async () => {
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[0]);
+    expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('states that a moderator is reviewing a report under review', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'open', appealStatus: 'none' };
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[1]);
+  });
+
+  it('states that a submitted appeal is in review', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'rejected', appealStatus: 'submitted' };
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[2]);
+    expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('states that an appeal decision is final', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'accepted' };
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[3]);
+    expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('says nothing beyond the appeal button when the appeal is the next step', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'none' };
+    const root = await mount();
+
+    for (const sentence of NEXT_STEP_SENTENCES) {
+      expect(texts(root)).not.toContain(sentence);
+    }
+    expect(appealButton(root)).toBeDefined();
+  });
+
+  it('says nothing about a next step for a status it does not know', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'escalated', appealStatus: 'none' };
+    const root = await mount();
+
+    for (const sentence of NEXT_STEP_SENTENCES) {
+      expect(texts(root)).not.toContain(sentence);
+    }
   });
 
   it('treats a receipt the server does not hold as an invalid link', async () => {

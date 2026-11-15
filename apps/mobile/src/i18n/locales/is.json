@@ -429,6 +429,10 @@
       "appealMessage": "Aðeins er hægt að senda inn áfrýjun einu sinni og ekki er hægt að draga hana til baka.",
       "appealConfirm": "Senda inn áfrýjun",
       "appealed": "Áfrýjun send inn",
+      "nextStepReceived": "Umsjónarmaður tekur þessa tilkynningu til yfirferðar. Niðurstaðan birtist á þessum skjá og þú getur áfrýjað eftir ákvörðun.",
+      "nextStepInReview": "Tilkynningin er í yfirferð hjá umsjónarmanni. Niðurstaðan birtist á þessum skjá og þú getur áfrýjað eftir ákvörðun.",
+      "nextStepAppeal": "Áfrýjun þín er í yfirferð. Niðurstaða hennar birtist á þessum skjá.",
+      "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
       "viewReceipt": "Skoða kvittun"
     },
     "changelog": "Nýjungar"

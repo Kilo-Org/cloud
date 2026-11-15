@@ -429,6 +429,10 @@
       "appealMessage": "O contestație poate fi trimisă o singură dată și nu poate fi retrasă.",
       "appealConfirm": "Trimite contestația",
       "appealed": "Contestație trimisă",
+      "nextStepReceived": "Un moderator va analiza acest raport. Rezultatul va apărea pe acest ecran, iar după decizie poți trimite o contestație.",
+      "nextStepInReview": "Un moderator analizează acest raport. Rezultatul va apărea pe acest ecran, iar după decizie poți trimite o contestație.",
+      "nextStepAppeal": "Contestația ta este în analiză. Rezultatul acesteia va apărea pe acest ecran.",
+      "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
       "viewReceipt": "Vezi confirmarea"
     },
     "changelog": "Noutăți"

@@ -429,6 +429,10 @@
       "appealMessage": "Enwere ike iziga mkpegharị naanị otu ugboro, enweghịkwa ike iwepụ ya.",
       "appealConfirm": "Zipu mkpegharị",
       "appealed": "E zigara mkpegharị",
+      "nextStepReceived": "Onye nlekọta ga-enyocha mkpesa a. Nsonaazụ ya ga-apụta na ihuenyo a, ị nwekwara ike ịkpegharịa mgbe emechara mkpebi.",
+      "nextStepInReview": "Onye nlekọta na-enyocha mkpesa a. Nsonaazụ ya ga-apụta na ihuenyo a, ị nwekwara ike ịkpegharịa mgbe emechara mkpebi.",
+      "nextStepAppeal": "A na-enyocha mkpegharị gị. Nsonaazụ ya ga-apụta na ihuenyo a.",
+      "nextStepFinal": "Mkpebi mkpegharị a bụ nke ikpeazụ. Enweghị ike iziga mkpegharị ọzọ.",
       "viewReceipt": "Lee akwụkwọ nnata"
     },
     "changelog": "Ihe ọhụrụ"

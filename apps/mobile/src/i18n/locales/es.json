@@ -429,6 +429,10 @@
       "appealMessage": "Solo se puede enviar una apelación y no se puede retirar.",
       "appealConfirm": "Enviar apelación",
       "appealed": "Apelación enviada",
+      "nextStepReceived": "Un moderador revisará este reporte. El resultado aparecerá en esta pantalla y podrás apelar tras la decisión.",
+      "nextStepInReview": "Un moderador está revisando este reporte. El resultado aparecerá en esta pantalla y podrás apelar tras la decisión.",
+      "nextStepAppeal": "Tu apelación está en revisión. El resultado aparecerá en esta pantalla.",
+      "nextStepFinal": "La decisión de la apelación es definitiva. No se puede presentar otra apelación.",
       "viewReceipt": "Ver comprobante"
     },
     "changelog": "Novedades"

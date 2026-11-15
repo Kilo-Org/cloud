@@ -429,6 +429,10 @@
       "appealMessage": "Bạn chỉ có thể gửi kháng nghị một lần và không thể rút lại.",
       "appealConfirm": "Gửi kháng nghị",
       "appealed": "Đã gửi kháng nghị",
+      "nextStepReceived": "Người kiểm duyệt sẽ xem xét báo cáo này. Kết quả sẽ xuất hiện trên màn hình này và bạn có thể kháng nghị sau khi có quyết định.",
+      "nextStepInReview": "Người kiểm duyệt đang xem xét báo cáo này. Kết quả sẽ xuất hiện trên màn hình này và bạn có thể kháng nghị sau khi có quyết định.",
+      "nextStepAppeal": "Kháng nghị của bạn đang được xem xét. Kết quả sẽ xuất hiện trên màn hình này.",
+      "nextStepFinal": "Quyết định kháng nghị là cuối cùng. Bạn không thể gửi thêm kháng nghị nào nữa.",
       "viewReceipt": "Xem biên nhận"
     },
     "changelog": "Có gì mới"

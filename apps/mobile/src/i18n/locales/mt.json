@@ -429,6 +429,10 @@
       "appealMessage": "Appell jista' jintbagħat darba biss u ma jistax jiġi rtirat.",
       "appealConfirm": "Ibgħat l-appell",
       "appealed": "L-appell intbagħat",
+      "nextStepReceived": "Moderatur se jirrieżamina dan ir-rapport. Ir-riżultat se jidher fuq dan l-iskrin, u tista' tappella wara deċiżjoni.",
+      "nextStepInReview": "Moderatur qed jirrieżamina dan ir-rapport. Ir-riżultat se jidher fuq dan l-iskrin, u tista' tappella wara deċiżjoni.",
+      "nextStepAppeal": "L-appell tiegħek qed jiġi rivedut. Ir-riżultat tiegħu se jidher fuq dan l-iskrin.",
+      "nextStepFinal": "Id-deċiżjoni tal-appell hija finali. Ma jistax jiġi ppreżentat appell ieħor.",
       "viewReceipt": "Ara l-irċevuta"
     },
     "changelog": "X'hemm ġdid"

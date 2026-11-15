@@ -429,6 +429,10 @@
       "appealMessage": "이의 제기는 한 번만 제출할 수 있으며 철회할 수 없습니다.",
       "appealConfirm": "이의 제기 제출",
       "appealed": "이의 제기가 제출됨",
+      "nextStepReceived": "검토자가 이 신고를 검토할 예정입니다. 결과는 이 화면에 표시되며, 결정 후 이의를 제기할 수 있습니다.",
+      "nextStepInReview": "검토자가 이 신고를 검토 중입니다. 결과는 이 화면에 표시되며, 결정 후 이의를 제기할 수 있습니다.",
+      "nextStepAppeal": "이의 제기 검토 중입니다. 결과는 이 화면에 표시됩니다.",
+      "nextStepFinal": "이의 제기 결정은 최종입니다. 더 이상 이의를 제기할 수 없습니다.",
       "viewReceipt": "접수증 보기"
     },
     "changelog": "새로운 기능"

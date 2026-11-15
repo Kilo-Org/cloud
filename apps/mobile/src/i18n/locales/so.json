@@ -429,6 +429,10 @@
       "appealMessage": "Rafcaan hal mar oo keliya ayaa la gudbin karaa, dibna looma celin karo.",
       "appealConfirm": "Gudbi rafcaanka",
       "appealed": "Rafcaanka waa la gudbiyay",
+      "nextStepReceived": "Dib-u-eegaha ayaa warbixinndan dib-u-eegis ku samayn doona. Natiijadu waxay ka muuqan doontaa shaashaddan, waxaadna rafcaan ka qaadan kartaa go'aan ka dib.",
+      "nextStepInReview": "Dib-u-eegaha ayaa warbixinndan dib-u-eegis ku samaynaya. Natiijadu waxay ka muuqan doontaa shaashaddan, waxaadna rafcaan ka qaadan kartaa go'aan ka dib.",
+      "nextStepAppeal": "Rafcaankaaga dib-u-eegis ayuu ku jiraa. Natiijadiisu waxay ka muuqan doontaa shaashaddan.",
+      "nextStepFinal": "Go'aanka rafcaanku waa kama dambays. Rafcaan kale lama gudbin karo.",
       "viewReceipt": "Eeg rasiidka"
     },
     "changelog": "Waxyaabaha cusub"

@@ -429,6 +429,10 @@
       "appealMessage": "Só se pode presentar un recurso unha vez e non se pode retirar.",
       "appealConfirm": "Presentar recurso",
       "appealed": "Recurso presentado",
+      "nextStepReceived": "Un moderador revisará esta denuncia. O resultado aparecerá nesta pantalla e poderás presentar un recurso unha vez tomada a decisión.",
+      "nextStepInReview": "Un moderador está revisando esta denuncia. O resultado aparecerá nesta pantalla e poderás presentar un recurso unha vez tomada a decisión.",
+      "nextStepAppeal": "O teu recurso está en revisión. O resultado aparecerá nesta pantalla.",
+      "nextStepFinal": "A decisión do recurso é definitiva. Non se pode presentar ningún recurso máis.",
       "viewReceipt": "Ver xustificante"
     },
     "changelog": "Novidades"

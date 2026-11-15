@@ -429,6 +429,10 @@
       "appealMessage": "Apskundimą galima pateikti tik kartą ir jo negalima atsiimti.",
       "appealConfirm": "Pateikti apskundimą",
       "appealed": "Apskundimas pateiktas",
+      "nextStepReceived": "Moderatorius peržiūrės šį pranešimą. Rezultatas pasirodys šiame ekrane, o priėmus sprendimą galėsite pateikti apskundimą.",
+      "nextStepInReview": "Moderatorius peržiūri šį pranešimą. Rezultatas pasirodys šiame ekrane, o priėmus sprendimą galėsite pateikti apskundimą.",
+      "nextStepAppeal": "Jūsų apskundimas peržiūrimas. Jo rezultatas pasirodys šiame ekrane.",
+      "nextStepFinal": "Sprendimas dėl apskundimo yra galutinis. Kito apskundimo pateikti negalima.",
       "viewReceipt": "Peržiūrėti patvirtinimą"
     },
     "changelog": "Kas naujo"

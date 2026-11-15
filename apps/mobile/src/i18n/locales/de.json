@@ -429,6 +429,10 @@
       "appealMessage": "Ein Einspruch kann nur einmal eingereicht und nicht zurückgezogen werden.",
       "appealConfirm": "Einspruch einreichen",
       "appealed": "Einspruch eingereicht",
+      "nextStepReceived": "Ein Moderator wird diese Meldung prüfen. Das Ergebnis erscheint auf diesem Bildschirm, und nach einer Entscheidung kannst du Einspruch einlegen.",
+      "nextStepInReview": "Ein Moderator prüft diese Meldung. Das Ergebnis erscheint auf diesem Bildschirm, und nach einer Entscheidung kannst du Einspruch einlegen.",
+      "nextStepAppeal": "Dein Einspruch wird geprüft. Das Ergebnis erscheint auf diesem Bildschirm.",
+      "nextStepFinal": "Die Entscheidung über den Einspruch ist endgültig. Ein weiterer Einspruch ist nicht möglich.",
       "viewReceipt": "Bestätigung anzeigen"
     },
     "changelog": "Neuigkeiten"

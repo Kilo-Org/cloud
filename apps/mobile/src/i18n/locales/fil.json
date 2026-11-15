@@ -429,6 +429,10 @@
       "appealMessage": "Isang beses lang maaaring magsumite ng apela at hindi na ito maaaring bawiin.",
       "appealConfirm": "Isumite ang apela",
       "appealed": "Naisumite ang apela",
+      "nextStepReceived": "Susuriin ng isang tagasuri ang ulat na ito. Lalabas ang resulta sa screen na ito, at maaari kang mag-apela pagkatapos ng desisyon.",
+      "nextStepInReview": "Sinusuri ng isang tagasuri ang ulat na ito. Lalabas ang resulta sa screen na ito, at maaari kang mag-apela pagkatapos ng desisyon.",
+      "nextStepAppeal": "Sinusuri ang iyong apela. Lalabas ang resulta nito sa screen na ito.",
+      "nextStepFinal": "Pinal na ang desisyon sa apela. Hindi na maaaring magsumite ng panibagong apela.",
       "viewReceipt": "Tingnan ang resibo"
     },
     "changelog": "Mga bago"

@@ -429,6 +429,10 @@
       "appealMessage": "Ana iya gabatar da ɗaukaka ƙara sau ɗaya kawai kuma ba za a iya janye shi ba.",
       "appealConfirm": "Gabatar da ɗaukaka ƙara",
       "appealed": "An gabatar da ɗaukaka ƙara",
+      "nextStepReceived": "Mai bita zai bita wannan rahoto. Sakamakon zai bayyana a wannan allon, kuma za ka iya ɗaukaka ƙara bayan an yanke hukunci.",
+      "nextStepInReview": "Mai bita yana bitar wannan rahoto. Sakamakon zai bayyana a wannan allon, kuma za ka iya ɗaukaka ƙara bayan an yanke hukunci.",
+      "nextStepAppeal": "Ana bitar ɗaukaka ƙararka. Sakamakonta zai bayyana a wannan allon.",
+      "nextStepFinal": "Hukuncin ɗaukaka ƙara ya zama na ƙarshe. Ba za a iya gabatar da wata ɗaukaka ƙara ba.",
       "viewReceipt": "Duba rasidi"
     },
     "changelog": "Sabbin abubuwa"

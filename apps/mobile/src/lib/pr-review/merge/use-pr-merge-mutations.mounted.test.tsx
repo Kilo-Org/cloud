@@ -223,6 +223,25 @@ describe('merge intent key across a dismissed merge screen', () => {
     expect(operationKeyAt(1)).not.toBe(first);
     renderer.unmount();
   });
+
+  it('retires the key after GitHub settles the merge row as a moved head', async () => {
+    // The GitHub reconcile settles `head_moved` / `already_closed` with
+    // `confirmed_absent` and throws its own message, so the GitHub arm retires
+    // exactly like the provider one (`github-pr-review-router.ts:1488`).
+    const settled = new Error('GitHub reported a conflict for this PR');
+    Object.assign(settled, { data: { code: 'CONFLICT' } });
+    transport.merge.mockRejectedValueOnce(settled);
+    const { renderer, handle } = mountMergeScreen();
+
+    await submit(handle);
+    const first = operationKeyAt(0);
+
+    transport.merge.mockRejectedValueOnce(settled);
+    await submit(handle);
+
+    expect(operationKeyAt(1)).not.toBe(first);
+    renderer.unmount();
+  });
 });
 
 describe('merge intent retirement across the account boundary', () => {

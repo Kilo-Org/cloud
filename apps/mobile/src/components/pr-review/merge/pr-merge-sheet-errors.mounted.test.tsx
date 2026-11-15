@@ -94,6 +94,26 @@ describe('PrMergeSheet mounted errors', () => {
     expect(button(renderer, 'Merge').props.disabled).toBe(true);
   });
 
+  it('shows GitHub’s settled-merge conflict and prevents resubmission', async () => {
+    // The GitHub reconcile settles the row as a moved head or a closed PR and
+    // throws this one message (`github-pr-review-router.ts:1488`).
+    const settled = 'GitHub reported a conflict for this PR';
+    state.merge.error = errorWithCode(settled, 'CONFLICT');
+    const renderer = await mount();
+    expect(visibleText(renderer)).toContain(settled);
+    expect(button(renderer, 'Merge').props.disabled).toBe(true);
+  });
+
+  it('keeps GitHub’s own conflict text retryable', async () => {
+    // A raw 405/409 arrives unchanged, and the same CONFLICT code also carries
+    // the live-lease and ambiguous markers, so the sheet must not block it.
+    const raw = 'Head branch was modified. Review and try the merge again.';
+    state.merge.error = errorWithCode(raw, 'CONFLICT');
+    const renderer = await mount();
+    expect(visibleText(renderer)).toContain(raw);
+    expect(button(renderer, 'Merge').props.disabled).toBe(false);
+  });
+
   it('renders an auto-merge mutation error and keeps the sheet open', async () => {
     const error = new Error('Unable to enable auto-merge');
     state.autoMerge.mutateAsync.mockRejectedValue(error);

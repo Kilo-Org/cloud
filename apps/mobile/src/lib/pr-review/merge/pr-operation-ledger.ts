@@ -70,18 +70,41 @@ export function isPrOperationPersistenceFailed(error: unknown): boolean {
 }
 
 /**
- * A head that moved, or a PR that closed, since the surface loaded it.
+ * The GitHub router's one message for a merge row it has already settled.
  *
- * The provider router settles such a ledger row as `head_moved` /
- * `already_closed` with `confirmed_absent`, so the intent is over even though
- * the tRPC code is a `CONFLICT`: the same key must never be retried, and a
- * generic conflict, e.g. a merge already running, stays retryable.
+ * `reconcileMergePrRow` reads authoritative PR state, settles `head_moved` /
+ * `already_closed` with `confirmed_absent` and throws this message, the only
+ * place it is thrown (`apps/web/src/routers/github-pr-review-router.ts:829`,
+ * `:1481-1488`). The row is over, so the retained key must not survive it. The
+ * provider arm settles the same way and throws its own copy instead.
+ */
+const SETTLED_MERGE_CONFLICT_MESSAGE = 'GitHub reported a conflict for this PR';
+
+/**
+ * A head that moved, or a PR that closed, since the surface loaded it: the
+ * router settled that ledger row, so the intent is over even though the tRPC
+ * code is a `CONFLICT`, and its key must be retired rather than retried.
+ *
+ * Neither router puts the settled outcome on the wire — both throw
+ * `TRPCError({ code: 'CONFLICT', message })` and keep the ledger's `outcomeCode`
+ * in the row (`github-pr-review-router.ts:953-960`, `:1488`;
+ * `provider-review-router.ts:895-899`) — so the settled marker is the strongest
+ * signal there is. It cannot be widened to every `CONFLICT`: the same code
+ * carries the live-lease marker (`OPERATION_IN_PROGRESS_MESSAGE`) and the
+ * ambiguous reconcile-pending marker (`provider-review-router.ts:477`), where a
+ * new key could re-execute a write that may already have committed. A raw
+ * conflict, e.g. GitHub's own 405/409 text passed through unchanged
+ * (`apps/web/src/lib/github-pr-review/errors.ts:162-163`), therefore keeps its
+ * intent.
  */
 export function staleHeadRejectionMessage(error: unknown): string | null {
   if (readTrpcErrorField(error, 'code') !== 'CONFLICT') {
     return null;
   }
   const message = error instanceof Error ? error.message : '';
+  if (message === SETTLED_MERGE_CONFLICT_MESSAGE) {
+    return message;
+  }
   return /changed since it was loaded|closed without merging/.test(message) ? message : null;
 }
 

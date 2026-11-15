@@ -160,6 +160,22 @@ describe('isPrMutationRetryable (operation-key rotation policy)', () => {
     expect(isPrMutationRetryable(trpcError('CONFLICT', 'A merge is already running'))).toBe(true);
   });
 
+  it('regenerates the key on the GitHub router’s settled-merge conflict', () => {
+    // The GitHub reconcile settles the row the same way and throws this one
+    // message (`github-pr-review-router.ts:829`, `:1481-1488`).
+    expect(
+      isPrMutationRetryable(trpcError('CONFLICT', 'GitHub reported a conflict for this PR'))
+    ).toBe(false);
+    // GitHub's own 405/409 text arrives unchanged (`errors.ts:162-163`) and the
+    // same CONFLICT code also carries the live-lease and ambiguous markers, so a
+    // raw conflict must keep its intent.
+    expect(
+      isPrMutationRetryable(
+        trpcError('CONFLICT', 'Head branch was modified. Review and try the merge again.')
+      )
+    ).toBe(true);
+  });
+
   it('regenerates the key on a refused admission, which no retry can satisfy', () => {
     const refusal = prOperationNotAdmittedError('Could not merge this pull request.');
     expect(isPrMutationRetryable(refusal)).toBe(false);

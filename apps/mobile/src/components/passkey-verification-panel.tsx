@@ -125,7 +125,7 @@ export function PasskeyVerificationPanel({
               </Text>
             )
           )}
-          {state.approvalUrl !== '' && (
+          {state.approvalUrl !== '' && state.error === null && (
             <Button variant="outline" onPress={onReopenApproval}>
               <Text>{t('profile.passkeyVerifySsoOpen')}</Text>
             </Button>

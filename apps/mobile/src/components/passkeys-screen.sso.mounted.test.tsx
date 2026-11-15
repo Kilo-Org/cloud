@@ -155,6 +155,7 @@ describe('PasskeysScreen SSO approval', () => {
     // collected, and the panel says so with a retry that is a real request.
     expect(list.collectSso).not.toHaveBeenCalled();
     expect(texts(view)).toContain('That approval expired or was cancelled. Try again.');
+    expect(hasButtonLabel(view, 'Open the approval page')).toBe(false);
 
     await press(buttonByLabel(view, 'Retry'));
     await settle();
@@ -244,15 +245,14 @@ describe('PasskeysScreen SSO approval', () => {
     view.unmount();
   });
 
-  it('names a browser that refuses to open and keeps the page reachable', async () => {
+  it('offers a fresh approval attempt when the browser refuses to open', async () => {
     browser.open.mockRejectedValue(new Error('no browser'));
     const view = await mountWithClock();
     await requestProof(view);
 
-    // The rejection is answered where the page is offered, so nothing stays
-    // unhandled and the same button is the retry.
     expect(texts(view)).toContain('Single sign-on approval is unavailable right now. Try again.');
-    expect(hasButtonLabel(view, 'Open the approval page')).toBe(true);
+    expect(hasButtonLabel(view, 'Retry')).toBe(true);
+    expect(hasButtonLabel(view, 'Open the approval page')).toBe(false);
     expect(list.register).not.toHaveBeenCalled();
     view.unmount();
   });
@@ -281,14 +281,14 @@ describe('PasskeysScreen SSO approval', () => {
     view.unmount();
   });
 
-  it('names a rejected poll and keeps the approval page reachable', async () => {
+  it('offers a fresh approval attempt after a rejected poll', async () => {
     list.collectSso.mockRejectedValue(new Error('offline'));
     const view = await mountWithClock();
     await requestProof(view);
 
     expect(texts(view)).toContain('Single sign-on approval is unavailable right now. Try again.');
     expect(hasButtonLabel(view, 'Retry')).toBe(true);
-    expect(hasButtonLabel(view, 'Open the approval page')).toBe(true);
+    expect(hasButtonLabel(view, 'Open the approval page')).toBe(false);
     view.unmount();
   });
 
@@ -357,7 +357,7 @@ describe('PasskeysScreen SSO approval', () => {
 
     expect(texts(view)).toContain('That approval expired or was cancelled. Try again.');
     expect(hasButtonLabel(view, 'Retry')).toBe(true);
-    expect(hasButtonLabel(view, 'Open the approval page')).toBe(true);
+    expect(hasButtonLabel(view, 'Open the approval page')).toBe(false);
     view.unmount();
   });
 });

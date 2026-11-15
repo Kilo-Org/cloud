@@ -96,7 +96,7 @@ type SlashCommandRow = typeof agent_environment_profile_kilo_commands.$inferInse
 type Section = {
   /** Result-key stem, e.g. `instructions`. */
   stem: string;
-  /** Route segment under `(app)/profile-management/[profileId]/`. */
+  /** Route segment under `(app)/(tabs)/(3_profile)/profiles/[profileId]/`. */
   segment: string;
   baseName: string;
   baseDescription: string;
@@ -307,7 +307,7 @@ function printUsage(): void {
   console.log('Re-running replaces the profiles of that owner and their children.');
   console.log('');
   console.log('It prints one deep link per profile, in the form:');
-  console.log('  kiloapp:///(app)/profile-management/<profileId>/<section>');
+  console.log('  kiloapp:///(app)/(tabs)/(3_profile)/profiles/<profileId>/<section>');
   console.log('');
   console.log('Example:');
   console.log('  pnpm dev:seed app:mobile-profile-caps --email ada@example.com');
@@ -471,8 +471,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const result: SeedResult = { userId: ownerId, email: trimmedEmail };
   for (const section of SECTIONS) {
-    const atCapLink = `kiloapp:///(app)/profile-management/${section.atCapProfileId}/${section.segment}`;
-    const belowCapLink = `kiloapp:///(app)/profile-management/${section.belowCapProfileId}/${section.segment}`;
+    const atCapLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${section.atCapProfileId}/${section.segment}`;
+    const belowCapLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${section.belowCapProfileId}/${section.segment}`;
     console.log(`Deep link (${section.stem}, ${AT_CAP}): ${atCapLink}`);
     console.log(`Deep link (${section.stem}, ${BELOW_CAP}): ${belowCapLink}`);
     Object.assign(result, {

@@ -92,7 +92,10 @@ module.exports = function withHomeWidgetRefresh(config) {
       for (const file of MODULE_FILES) {
         fs.copyFileSync(path.join(module, file), path.join(root, file));
       }
-      fs.copyFileSync(path.join(module, 'WidgetExtension', PROVIDER_FILE), path.join(root, PROVIDER_FILE));
+      fs.copyFileSync(
+        path.join(module, 'WidgetExtension', PROVIDER_FILE),
+        path.join(root, PROVIDER_FILE)
+      );
       const widgetPath = path.join(root, 'ActiveAgentsWidget.swift');
       fs.writeFileSync(widgetPath, integrateProvider(fs.readFileSync(widgetPath, 'utf8')));
       const infoPath = path.join(root, 'Info.plist');

@@ -1469,16 +1469,19 @@ describe('buildGlanceableViewProps', () => {
   });
 
   it('speaks the status word, numeric counts, then Open agents', () => {
+    // The keys stand in for translated copy, and the catalog joins a list with
+    // a comma, so this translator answers the joiner and echoes every other key.
+    const echo = (key: string): string => (key === 'common.listJoiner' ? ', ' : key);
     const stale = buildGlanceableViewProps(
       snapshotFor([{ status: 'busy' }, { status: 'busy' }, { status: 'question' }], 1, 'stale'),
       {},
-      key => key
+      echo
     );
     expect(stale.accessibilityLabel).toBe(
       'glanceable.stale, 1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
 
-    const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
+    const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, echo);
     expect(happy.accessibilityLabel).toBe('1 common.working, glanceable.openAgents');
 
     const empty = buildGlanceableSnapshot({
@@ -1488,7 +1491,7 @@ describe('buildGlanceableViewProps', () => {
       previousRevision: 1,
       status: 'empty',
     });
-    expect(buildGlanceableViewProps(empty, {}, key => key).accessibilityLabel).toBe(
+    expect(buildGlanceableViewProps(empty, {}, echo).accessibilityLabel).toBe(
       'glanceable.noneWaiting, glanceable.openAgents'
     );
   });

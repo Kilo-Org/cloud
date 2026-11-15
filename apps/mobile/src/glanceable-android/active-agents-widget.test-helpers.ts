@@ -34,6 +34,7 @@ const COPY: Record<string, string> = {
   'glanceable.answerNeeded': 'Answer needed',
   'glanceable.waitingToRetry': 'Waiting to retry',
   'glanceable.openAgents': 'Open agents',
+  'common.listJoiner': ', ',
 };
 export const translate = (key: string) => COPY[key] ?? key;
 

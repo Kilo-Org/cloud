@@ -37,11 +37,7 @@ import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import { getCurrentWidgetProps } from './widget-render';
 import { androidSink, handleAppStateActive, refreshPostedCardAction } from './android-sink';
-import {
-  formatGlanceableAgo,
-  formatGlanceableClock,
-  isWidgetRtl,
-} from './count-format';
+import { formatGlanceableAgo, formatGlanceableClock, isWidgetRtl } from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';
 import {
   type AndroidWidgetProps,

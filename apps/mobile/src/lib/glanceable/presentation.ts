@@ -138,6 +138,7 @@ export function glanceableSpokenLabelKeys(
  * The surface's own formatter draws the counts, and the catalog's list joiner
  * separates the parts.
  */
+// eslint-disable-next-line max-params -- the surface supplies its own translator and count formatter so a label cannot disagree with the row it describes
 export function glanceableSpokenLabel(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,

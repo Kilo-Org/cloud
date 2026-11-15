@@ -1,3 +1,4 @@
+/* eslint-disable import/no-nodejs-modules -- the compile check shells out to the Swift toolchain, which only a Node test can do */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,7 +8,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { expect, it } from 'vitest';
 
 const builderSource = readFileSync(
-  new URL('./ios/HomeWidgetAccessibilityLabel.swift', import.meta.url),
+  new URL('ios/HomeWidgetAccessibilityLabel.swift', import.meta.url),
   'utf8'
 );
 
@@ -24,10 +25,13 @@ const FORBIDDEN_MODULES = [
   'Bundle',
 ] as const;
 
-function swiftCompiler(): string[] | null {
-  for (const candidate of [['swiftc'], ['xcrun', 'swiftc']]) {
+const CANDIDATES: [string, ...string[]][] = [['swiftc'], ['xcrun', 'swiftc']];
+
+function swiftCompiler(): [string, ...string[]] | null {
+  for (const candidate of CANDIDATES) {
+    const [command, ...args] = candidate;
     try {
-      execFileSync(candidate[0], [...candidate.slice(1), '--version'], { stdio: 'ignore' });
+      execFileSync(command, [...args, '--version'], { stdio: 'ignore' });
       return candidate;
     } catch {
       // Try the next candidate.
@@ -47,7 +51,9 @@ it('keeps the builder free of UI, storage and formatter dependencies', () => {
 
 it('formats every number through the helper before it reaches the text', () => {
   expect(builderSource).not.toContain('joined(separator: ", ")');
-  const bodies = [...builderSource.matchAll(/\\\(([^()]*)\)/g)].map(match => (match[1] ?? '').trim());
+  const bodies = [...builderSource.matchAll(/\\\(([^()]*)\)/g)].map(match =>
+    (match[1] ?? '').trim()
+  );
   expect(bodies.length).toBeGreaterThan(0);
   for (const body of bodies) {
     // A formatted count already is a String; every other interpolation must
@@ -58,15 +64,18 @@ it('formats every number through the helper before it reaches the text', () => {
 
 it.runIf(compiler !== null)('formats the spoken label from the locale data in the input', () => {
   const swift = compiler;
-  if (!swift) throw new Error('no Swift compiler on PATH');
+  if (swift === null) {
+    throw new Error('no Swift compiler on PATH');
+  }
+  const [command, ...swiftArgs] = swift;
   const directory = mkdtempSync(join(tmpdir(), 'home-widget-label-'));
   const binary = join(directory, 'label-tests');
   try {
-    execFileSync(swift[0] ?? 'swiftc', [
-      ...swift.slice(1),
+    execFileSync(command, [
+      ...swiftArgs,
       '-parse-as-library',
-      fileURLToPath(new URL('./ios/HomeWidgetAccessibilityLabel.swift', import.meta.url)),
-      fileURLToPath(new URL('./tests/HomeWidgetAccessibilityLabelTests.swift', import.meta.url)),
+      fileURLToPath(new URL('ios/HomeWidgetAccessibilityLabel.swift', import.meta.url)),
+      fileURLToPath(new URL('tests/HomeWidgetAccessibilityLabelTests.swift', import.meta.url)),
       '-o',
       binary,
     ]);

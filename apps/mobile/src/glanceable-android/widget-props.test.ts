@@ -42,6 +42,7 @@ const COPY: Record<string, string> = {
   'glanceable.answerNeeded': 'Answer needed',
   'glanceable.waitingToRetry': 'Waiting to retry',
   'glanceable.scheduledWakes': 'wakes {{time}}',
+  'common.listJoiner': ', ',
 };
 const translate = (key: string) => COPY[key] ?? key;
 const clock = (at: string) => `clock:${at}`;
@@ -257,6 +258,24 @@ describe('shared Home presentation localization', () => {
     setSurfaceExtras({ newestSessionTitle: 'not Home data', actionFeedback: 'couldNotApprove' });
     expect(propsFor(MIXED).homeCopy?.accessibilityLabel).toContain('Could not approve');
     expect(propsFor(dataFor([], 'privacy')).homeCopy?.actionLine).toBeNull();
+  });
+
+  it('joins both Android spoken labels with the catalog list joiner', () => {
+    const ideographic = (key: string): string =>
+      key === 'common.listJoiner' ? '、' : translate(key);
+    const props = buildAndroidWidgetProps(
+      MIXED.snapshot,
+      {},
+      ideographic,
+      String,
+      String,
+      clock,
+      MIXED
+    );
+    expect(props.accessibilityLabel).toContain('、');
+    expect(props.accessibilityLabel).not.toContain(', ');
+    expect(props.homeCopy?.accessibilityLabel).toContain('、');
+    expect(props.homeCopy?.accessibilityLabel).not.toContain(', ');
   });
 
   it('does not attach private titles to the generic no-account fallback', () => {

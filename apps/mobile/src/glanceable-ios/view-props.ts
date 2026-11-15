@@ -205,10 +205,7 @@ export function buildGlanceableViewProps(
     primaryCount: primary === null ? 0 : primary.count,
     newestTitle,
     actionFeedback: home.status === 'content' ? extras.actionFeedback : null,
-    actions: {
-      approve: home.canApprove,
-      newAgent: home.canCreate,
-    },
+    actions: { approve: home.canApprove, newAgent: home.canCreate },
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
     // The shared helper decides the wake, so a scheduled count with no usable
     // time is represented the same way on this surface as on every other.

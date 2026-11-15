@@ -17,11 +17,7 @@ import {
 } from '@/lib/glanceable/home-widget-data';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import {
-  formatGlanceableAgo,
-  formatGlanceableClock,
-  isWidgetRtl,
-} from './count-format';
+import { formatGlanceableAgo, formatGlanceableClock, isWidgetRtl } from './count-format';
 import { getStoredWidgetSnapshot } from './live-update';
 import { type AndroidWidgetProps, buildCurrentWidgetProps } from './widget-props';
 

@@ -13,6 +13,7 @@ import {
   SESSION_INGEST_USER_DELETION_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import {
   buildModernKiloTokenPayload,
   isKiloResourceAudienceAllowed,
@@ -34,7 +35,12 @@ import {
 
 export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
-export const JWT_TOKEN_VERSION = 3;
+/**
+ * The wire version of every Kilo user JWT. It is declared once, beside the
+ * worker-side payload schema, and this name stays for the consumers that
+ * still import it from this module.
+ */
+export const JWT_TOKEN_VERSION = KILO_TOKEN_VERSION;
 
 const jwtSigningAlgorithm = 'HS256';
 
@@ -105,7 +111,7 @@ export function generateInternalServiceToken(
   return jwt.sign(
     {
       kiloUserId: userId,
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
     },
     NEXTAUTH_SECRET,
@@ -170,7 +176,7 @@ export function generateApiToken(
       env: process.env.NODE_ENV,
       kiloUserId: id,
       apiTokenPepper: api_token_pepper,
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       ...extraPayload,
     },
     NEXTAUTH_SECRET,
@@ -193,7 +199,7 @@ export function generateOrganizationApiToken(
       env: process.env.NODE_ENV,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       organizationId,
       organizationRole,
     },
@@ -307,7 +313,7 @@ export function validateAuthorizationHeader(
     };
   }
 
-  if (payload.version != JWT_TOKEN_VERSION) {
+  if (payload.version != KILO_TOKEN_VERSION) {
     warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, {
       version: payload.version,
       kiloUserId: payload.kiloUserId,
@@ -371,6 +377,16 @@ export function generateCloudAgentToken(user: User) {
   return generateApiToken(user, { tokenSource: 'cloud-agent' });
 }
 
+/**
+ * Refuses to mint while the account's current pepper is the empty string.
+ * A null pepper means the account has no pepper, which stays mintable.
+ */
+function assertCurrentPepper(pepper: string | null, message: string): void {
+  if (pepper !== null && !pepper) {
+    throw new Error(message);
+  }
+}
+
 export function generateCloudAgentWorkflowToken(
   user: User,
   options: {
@@ -394,17 +410,19 @@ export function generateCloudAgentWorkflowToken(
       { expiresIn: options.expiresIn }
     );
   }
-  if (user.api_token_pepper !== null && !user.api_token_pepper) {
-    throw new Error('Workflow control tokens require a current user pepper');
-  }
+  assertCurrentPepper(
+    user.api_token_pepper,
+    'Workflow control tokens require a current user pepper'
+  );
   const expiresIn = Math.min(options.expiresIn, 60 * 60);
   if (expiresIn <= 0) {
     throw new Error('Workflow control token expiry must be positive');
   }
   const authorizationUser = options.authorizationUser ?? user;
-  if (authorizationUser.api_token_pepper !== null && !authorizationUser.api_token_pepper) {
-    throw new Error('Workflow control tokens require a current authorization pepper');
-  }
+  assertCurrentPepper(
+    authorizationUser.api_token_pepper,
+    'Workflow control tokens require a current authorization pepper'
+  );
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = buildModernKiloTokenPayload({
     userId: user.id,
@@ -457,9 +475,10 @@ export function generateWorkflowGatewayToken(
       { expiresIn }
     );
   }
-  if (user.api_token_pepper !== null && !user.api_token_pepper) {
-    throw new Error('Workflow gateway tokens require a current user pepper');
-  }
+  assertCurrentPepper(
+    user.api_token_pepper,
+    'Workflow gateway tokens require a current user pepper'
+  );
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = buildModernKiloTokenPayload({
     userId: user.id,

@@ -36,8 +36,6 @@ import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-/** Each rule returns the problems it finds, and the audit concatenates them. */
-
 /**
  * The two catalogs the audit compares against their English files, with the
  * source trees whose calls and literals name their keys. The mobile app reads

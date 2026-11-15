@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "રિપોઝિટરી નોંધાયેલ નથી",
       "reasonUnknown": "અજાણ્યું કારણ",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "અહેવાલનો સારાંશ",
       "title": "ઑડિટ અહેવાલ",
       "unavailable": "ઑડિટ અહેવાલ ઉપલબ્ધ નથી",

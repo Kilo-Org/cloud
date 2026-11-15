@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Depoja nuk është regjistruar",
       "reasonUnknown": "Arsye e panjohur",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Përmbledhja e raportit",
       "title": "Raporti i auditimit",
       "unavailable": "Raporti i auditimit nuk është i disponueshëm",

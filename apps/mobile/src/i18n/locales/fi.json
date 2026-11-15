@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Koodivarastoa ei ole kirjattu",
       "reasonUnknown": "Tunnistamaton syy",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Raportin yhteenveto",
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",

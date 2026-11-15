@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "ರೆಪೊಸಿಟರಿ ದಾಖಲಾಗಿಲ್ಲ",
       "reasonUnknown": "ಗುರುತಿಸಲಾಗದ ಕಾರಣ",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "ವರದಿಯ ಸಾರಾಂಶ",
       "title": "ಆಡಿಟ್ ವರದಿ",
       "unavailable": "ಆಡಿಟ್ ವರದಿ ಲಭ್ಯವಿಲ್ಲ",

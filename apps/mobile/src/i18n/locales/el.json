@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Το αποθετήριο δεν καταγράφηκε",
       "reasonUnknown": "Μη αναγνωρισμένος λόγος",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Περίληψη αναφοράς",
       "title": "Αναφορά ελέγχου",
       "unavailable": "Η αναφορά ελέγχου δεν είναι διαθέσιμη",

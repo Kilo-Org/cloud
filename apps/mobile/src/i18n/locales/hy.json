@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Պահոցը չի գրանցվել",
       "reasonUnknown": "Չճանաչված պատճառ",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Հաշվետվության ամփոփում",
       "title": "Աուդիտի հաշվետվություն",
       "unavailable": "Աուդիտի հաշվետվությունն անհասանելի է",

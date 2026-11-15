@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Repositori tidak direkodkan",
       "reasonUnknown": "Sebab tidak dikenali",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",

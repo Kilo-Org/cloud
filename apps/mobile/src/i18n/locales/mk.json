@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Складиштето не е запишано",
       "reasonUnknown": "Непрепознаена причина",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Резиме на извештајот",
       "title": "Извештај за ревизија",
       "unavailable": "Извештајот за ревизија е недостапен",

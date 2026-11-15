@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "రిపోజిటరీ నమోదు కాలేదు",
       "reasonUnknown": "గుర్తించబడని కారణం",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "నివేదిక సారాంశం",
       "title": "ఆడిట్ నివేదిక",
       "unavailable": "ఆడిట్ నివేదిక అందుబాటులో లేదు",

@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Hoidlat pole salvestatud",
       "reasonUnknown": "Tuvastamata põhjus",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Aruande kokkuvõte",
       "title": "Auditiaruanne",
       "unavailable": "Auditiaruanne pole saadaval",

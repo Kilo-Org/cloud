@@ -1022,6 +1022,8 @@
       "repositoryNotRecorded": "Repository niet vastgelegd",
       "reasonUnknown": "Onbekende reden",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Rapportsamenvatting",
       "title": "Auditrapport",
       "unavailable": "Auditrapport niet beschikbaar",

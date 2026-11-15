@@ -1806,6 +1806,8 @@
       "repositoryNotRecorded": "Bewaarplek nie aangeteken nie",
       "reasonUnknown": "Onherkende rede",
       "severityCount": "{{displayCount}} {{label}}",
+      "severityCount_one": "{{displayCount}} {{label}}",
+      "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "Verslagoorsig",
       "title": "Ouditverslag",
       "unavailable": "Ouditverslag onbeskikbaar",

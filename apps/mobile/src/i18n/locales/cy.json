@@ -1458,7 +1458,7 @@
       "set": "Wedi'i osod",
       "notSet": "Heb ei osod",
       "nSelected": "{{displayCount}} wedi'u dewis",
-      "nSelected_one": "{{displayCount}} wedi'u dewis",
+      "nSelected_one": "{{displayCount}} wedi'i ddewis",
       "nSelected_other": "{{displayCount}} wedi'u dewis",
       "nSelected_few": "{{displayCount}} wedi'u dewis",
       "nSelected_many": "{{displayCount}} wedi'u dewis",

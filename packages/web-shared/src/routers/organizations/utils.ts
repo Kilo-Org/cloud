@@ -436,8 +436,9 @@ export async function resolveOrganizationAccess(
       const entry = key
         ? findSupportAllowEntry({ surface, key, actionClass: 'support_write' })
         : undefined;
+      let firstUseInRequest = true;
       if (entry?.stepUp === 'fresh') {
-        await requireSupportWriteUseStepUp({
+        firstUseInRequest = await requireSupportWriteUseStepUp({
           userId: ctx.user.id,
           organizationId,
           upstreamStepUpState: ctx.adminStepUpState,
@@ -450,13 +451,15 @@ export async function resolveOrganizationAccess(
           surface,
         });
       }
-      await recordSupportWriteUse({
-        grantId: evaluation.access.grantId,
-        actorKiloUserId: ctx.user.id,
-        grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
-        targetOrganizationId: organizationId,
-        supportActionId: evaluation.access.supportActionId,
-      });
+      if (firstUseInRequest) {
+        await recordSupportWriteUse({
+          grantId: evaluation.access.grantId,
+          actorKiloUserId: ctx.user.id,
+          grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
+          targetOrganizationId: organizationId,
+          supportActionId: evaluation.access.supportActionId,
+        });
+      }
     }
     await recordKiloAdminElevation(ctx, {
       reason: options.auditReason ?? 'organization_access',

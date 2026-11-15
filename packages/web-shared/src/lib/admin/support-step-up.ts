@@ -91,24 +91,28 @@ export async function requireSupportWriteUseStepUp(params: {
   route?: string | null;
   method?: string | null;
   surface?: SupportSurface;
-}): Promise<void> {
+}): Promise<boolean> {
   if (!isAdminStepUpEnabled()) {
     refuse('support_write');
   }
-  if (params.upstreamStepUpState?.status === 'fresh') return;
-  if (params.claimStore && params.claimKey && params.claimStore.has(params.claimKey)) return;
+  if (params.claimStore && params.claimKey && params.claimStore.has(params.claimKey)) {
+    return false;
+  }
 
-  await supportStepUpPort.requireFresh({
-    userId: params.userId,
-    action: 'support_write_use',
-    actionClass: 'support_write',
-    organizationId: params.organizationId,
-    credential: params.credential,
-    webSessionId: params.webSessionId ?? null,
-    route: params.route ?? null,
-    method: params.method ?? null,
-    surface: params.surface ?? 'trpc',
-  });
+  if (params.upstreamStepUpState?.status !== 'fresh') {
+    await supportStepUpPort.requireFresh({
+      userId: params.userId,
+      action: 'support_write_use',
+      actionClass: 'support_write',
+      organizationId: params.organizationId,
+      credential: params.credential,
+      webSessionId: params.webSessionId ?? null,
+      route: params.route ?? null,
+      method: params.method ?? null,
+      surface: params.surface ?? 'trpc',
+    });
+  }
 
   if (params.claimStore && params.claimKey) params.claimStore.add(params.claimKey);
+  return true;
 }

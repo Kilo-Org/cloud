@@ -869,7 +869,7 @@ describe('binary support organization access', () => {
   test('resolving organization access twice in one request', async () => {
     setSupportEnabled(true);
     const { organization, admin } = await orgAndAdmin();
-    await approveWriteGrant(admin.id, organization.id);
+    const grant = await approveWriteGrant(admin.id, organization.id);
     const middlewareCtx = await writeCtxWithStepUp(admin, organization.id);
     const handlerCtx: TRPCContext = { ...middlewareCtx, organizationAccess: undefined };
 
@@ -881,6 +881,17 @@ describe('binary support organization access', () => {
     } finally {
       requireFreshSpy.mockRestore();
     }
+
+    const uses = await db
+      .select()
+      .from(support_access_grant_events)
+      .where(
+        and(
+          eq(support_access_grant_events.grant_id, grant.id),
+          eq(support_access_grant_events.event_type, 'used_write')
+        )
+      );
+    expect(uses).toHaveLength(1);
   });
 
   test('resolving organization access in two requests', async () => {

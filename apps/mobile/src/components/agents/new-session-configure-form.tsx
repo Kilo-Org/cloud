@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { useKeyboardState, useWindowDimensions } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
@@ -176,6 +177,7 @@ export function NewSessionConfigureForm({
   // up at its first layout and never re-anchors, so the keyboard must be
   // dismissed before the sheet opens.)
   const bottomClearance = useDetailScreenBottomPadding();
+  const { bottom } = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
   const [containerHeight, setContainerHeight] = useState(0);
@@ -472,11 +474,16 @@ export function NewSessionConfigureForm({
 
   // Shrink the scroll viewport with the keyboard; a footer-only lift grows
   // below its full-height sibling and leaves Start behind the keyboard. The
-  // padding is the keyboard's own measured height, so it follows the keyboard
-  // and never depends on a frame the platform reported late.
+  // padding is the keyboard's own measured height, less the bottom inset the
+  // footer already pads, so the button sits just above the keyboard instead of
+  // a navigation-bar height above it. It follows the keyboard and never
+  // depends on a frame the platform reported late.
   return (
     <View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout}>
-      <KeyboardLiftView className="flex-1 bg-background" height={keyboardHeight}>
+      <KeyboardLiftView
+        className="flex-1 bg-background"
+        height={Math.max(0, keyboardHeight - bottom)}
+      >
         {body}
         {footer}
       </KeyboardLiftView>

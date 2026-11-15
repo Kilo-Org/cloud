@@ -336,8 +336,8 @@ export function resolveNewSessionStartBlockedReason(
 
   // Still disabled with a repository supplied: some other condition blocks
   // Start, so the missing repository is not the reason. Name the one the user
-  // can act on or wait out; creating/submitting and an unavailable model have
-  // no reach and stay silent.
+  // can act on or wait out; only a create or submit already in flight stays
+  // silent, because no copy can tell the user what to do about it.
   if (gateDisabledWithSyntheticRepo) {
     return resolveComposerBlockedReason(input);
   }

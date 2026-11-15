@@ -11,6 +11,7 @@ import {
   narrowProfileAgents,
   type PermissionMap,
 } from '../../../src/shared/profile-permission-policy.js';
+import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
 import { buildGitHubReviewBashRules } from '../github-review-publish-config.js';
 import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
 import { writeRuntimeInstructions } from '../runtime-instructions.js';
@@ -88,24 +89,30 @@ function stableValue(value: unknown): unknown {
 }
 
 /**
- * The permission map the written entries are composed against. A session
- * without a command guard states no command policy, and a review session also
- * carries the publisher refusals the runtime writes into the same map.
+ * The permission map the written entries are composed against: the map the
+ * route runs with, which is the platform baseline with the session command
+ * policy on top. A session without a command guard states no command policy,
+ * so it keeps its entries as written. A review session also carries the
+ * publisher refusals the runtime writes into the same map.
  */
 function composedPermissionMap(profile: RuntimeProfile): PermissionMap | undefined {
   const permission = profile.permission;
   if (permission === undefined || !isCommandGuardPermissionMap(permission)) return undefined;
-  if (profile.githubReviewTarget === undefined) return permission;
-  const bash = permission['bash'];
+  const enforced: PermissionMap = { ...CONTROL_PLANE_SANDBOX_PERMISSION, ...permission };
+  if (profile.githubReviewTarget === undefined) return enforced;
+  const bash = enforced['bash'];
   const bashRules: Record<string, 'allow' | 'ask' | 'deny'> = {
     ...(typeof bash === 'object' && bash !== null && !Array.isArray(bash) ? bash : {}),
     ...(typeof bash === 'string' ? { '*': bash } : {}),
     ...buildGitHubReviewBashRules(),
   };
-  return { ...permission, bash: bashRules };
+  return { ...enforced, bash: bashRules };
 }
 
-/** Apply the session command policy to the profile once, before it is keyed. */
+/**
+ * Apply the permission map the session runs with to the profile once, before
+ * it is keyed: the platform baseline with the session command policy on top.
+ */
 export function applySessionPermissionPolicy(profile: RuntimeProfile): RuntimeProfile {
   const permission = composedPermissionMap(profile);
   if (permission === undefined || profile.runtimeAgents === undefined) return profile;

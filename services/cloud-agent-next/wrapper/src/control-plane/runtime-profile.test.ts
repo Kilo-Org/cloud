@@ -880,4 +880,30 @@ describe('runtime profile permission narrowing', () => {
       await fs.rm(home, { recursive: true, force: true });
     }
   });
+
+  it('bounds an agent entry by the permission map the session runs with', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-permission-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        permission: { edit: 'deny', bash: { '*': 'deny', 'git log *': 'allow' } },
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: {
+              permission: { cron_create: 'allow', edit: 'allow', bash: { '*': 'allow' } },
+            },
+          },
+        ],
+      });
+      const entries = await readAgentEntries(home);
+      const permission = entries.reviewer?.permission as Record<string, unknown> | undefined;
+      expect(permission).not.toHaveProperty('cron_create');
+      expect(permission?.edit).not.toBe('allow');
+      const bash = permission?.bash as Record<string, unknown> | undefined;
+      expect(bash?.['*']).not.toBe('allow');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
 });

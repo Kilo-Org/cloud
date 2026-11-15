@@ -38,7 +38,10 @@ import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-pr
 import { sessionWorkspace } from './workspace-roots.js';
 import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session/command-guard.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
-import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
+import {
+  CONTROL_PLANE_SANDBOX_PERMISSION,
+  isInteractiveSessionOrigin,
+} from '../../shared/control-plane-permission.js';
 import { narrowProfileAgents, type PermissionMap } from '../../shared/profile-permission-policy.js';
 import { buildGitHubReviewBashRules } from '../../shared/github-review-bash-rules.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
@@ -301,18 +304,27 @@ export function buildControlPlaneSessionRegistration(
     ...(!isInteractiveSessionOrigin(createdOnPlatform) ? { question: 'deny' } : {}),
     ...(guardPermissions ?? {}),
   };
-  // A GitHub code-review session publishes through the trusted publisher, so
-  // the runtime also writes the publisher refusals into the map it composes the
-  // profile entries against. Compose the stored entry against that same map: the
-  // session policy plus the review publisher refusals. A plain code-review
-  // session without a GitHub target composes to the same refusals or stricter,
-  // never wider, so the stored route spec never carries a wider agent entry than
-  // the written `profile.json`.
+  // The route runs with the platform baseline (`CONTROL_PLANE_SANDBOX_PERMISSION`
+  // and the session policy on top, see `worktree-runtime.ts`), and the runtime
+  // rewrites the same map before it writes the profile entries. Compose the
+  // stored entry against that enforced map, plus the review publisher refusals
+  // when this session publishes through the trusted publisher. A plain
+  // code-review session without a GitHub target composes to the same refusals or
+  // stricter, never wider, so the stored route spec never carries a wider agent
+  // entry than the written `profile.json`. The spec's own `permission` field
+  // stays the session policy alone.
+  const enforcedPermission: PermissionMap = {
+    ...CONTROL_PLANE_SANDBOX_PERMISSION,
+    ...permission,
+  };
   const reviewPublisherRules =
     commandGuard?.policyName === 'code-review-read-only' && payload.git?.platform === 'github';
   const compositionPermission: PermissionMap = reviewPublisherRules
-    ? { ...permission, bash: { ...bashRulesOf(permission), ...buildGitHubReviewBashRules() } }
-    : permission;
+    ? {
+        ...enforcedPermission,
+        bash: { ...bashRulesOf(enforcedPermission), ...buildGitHubReviewBashRules() },
+      }
+    : enforcedPermission;
   const effectiveProfile =
     guardPermissions === undefined || runtimeProfile.runtimeAgents === undefined
       ? runtimeProfile

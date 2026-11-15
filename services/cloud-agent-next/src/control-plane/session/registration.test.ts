@@ -525,6 +525,29 @@ describe('migrated origin permissions', () => {
     expect(resolveBashPermission({ '*': 'deny' }, {}, '*')).toBe('deny');
   });
 
+  it('bounds an agent entry by the permission map the session runs with', () => {
+    const input = metadata({
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { cron_create: 'allow', suggest: 'allow' } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const permission = spec.runtimeAgents?.[0]?.config.permission as
+      | Record<string, unknown>
+      | undefined;
+    // The map the route runs with states these tools, so the agent entry that
+    // allowed them is not stored.
+    expect(permission ?? {}).not.toHaveProperty('cron_create');
+    expect(permission ?? {}).not.toHaveProperty('suggest');
+  });
+
   it('keeps a profile agent permission map unchanged without a command guard', () => {
     const input = metadata({ profile: { runtimeAgents: [unrestrictedAgent] } });
     input.identity.createdOnPlatform = 'cloud-agent-web';

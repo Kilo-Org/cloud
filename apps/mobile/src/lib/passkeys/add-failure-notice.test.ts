@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { addFailureNoticeKey } from './add-failure-notice';
 
 describe('addFailureNoticeKey', () => {
-  it('explains an unavailable add with the browser-only notice', () => {
-    // The account cannot enroll from the app, so the notice replaces the hint
-    // the withdrawn control would have named.
-    expect(addFailureNoticeKey(false, 'unavailable')).toBe('profile.passkeyAddUnavailable');
+  it('explains a sign-in that cannot manage passkeys', () => {
+    // The credential cannot manage passkeys at all, so the notice replaces the
+    // hint the withdrawn control would have named.
+    expect(addFailureNoticeKey(false, 'device-unsupported')).toBe(
+      'profile.passkeyManagementUnavailable'
+    );
   });
 
   it('explains a device that cannot create passkeys', () => {

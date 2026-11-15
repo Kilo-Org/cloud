@@ -41,6 +41,9 @@ const AUTH_TERMINAL_ROUTES = [
   STORED_CREDENTIAL_ROUTE,
   '/api/auth/passkey/authenticate',
   '/api/auth/passkey/register',
+  '/api/auth/passkey/management/authorize',
+  '/api/auth/passkey/management/sso/start',
+  '/api/auth/passkey/management/sso/collect',
 ] as const;
 
 export type AuthTerminalRoute = (typeof AUTH_TERMINAL_ROUTES)[number];

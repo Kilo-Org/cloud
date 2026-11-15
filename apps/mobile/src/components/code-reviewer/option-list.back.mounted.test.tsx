@@ -4,8 +4,8 @@
 //
 // Two windows cover the pair. While this screen is still mounted it answers the
 // Back itself; after the navigator removed the route — the exit animation's
-// remainder — the app-level settle listener answers it, because a screen-level
-// listener no longer exists to do so.
+// remainder and a short grace after it — the app-level settle listener answers
+// it, because a screen-level listener no longer exists to do so.
 
 import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -14,8 +14,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   armLeaveSettle,
   clearAcceptedBack,
-  endLeaveSettle,
+  insideLeaveSettle,
+  LEAVE_SETTLE_GRACE_MS,
   resetLeaveSettle,
+  settleLeaveWindow,
+  spendsLeaveBackPress,
 } from '@/lib/navigation/leave-settle';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { OptionList } from './option-list';
@@ -40,6 +43,14 @@ const routerBack = vi.hoisted(() => vi.fn());
 const focus = vi.hoisted(() => ({ focused: true }));
 // The navigator's blur event: what applying a Back emits.
 const listeners = vi.hoisted(() => new Map<string, Set<() => void>>());
+// The navigator this route reports: the state of its own stack, and the state
+// of the stack above it when the route sits in a nested one.
+type MockSceneState = { index: number; routes: { key: string }[] };
+type MockNavigator = { own: MockSceneState; parent: MockSceneState | undefined };
+const navigator = vi.hoisted((): MockNavigator => ({
+  own: { index: 1, routes: [{ key: 'scene-below' }, { key: 'route-this' }] },
+  parent: undefined,
+}));
 
 vi.mock('react-native', () => ({
   BackHandler: {
@@ -59,6 +70,16 @@ vi.mock('expo-router', () => ({
       return () => {
         set.delete(listener);
       };
+    },
+    // This route sits above one scene in its own stack, so a dismissal names
+    // that scene. A nested case may move the scene into the parent instead.
+    getState: () => navigator.own,
+    getParent: () => {
+      const parent = navigator.parent;
+      if (parent === undefined) {
+        return undefined;
+      }
+      return { getState: () => parent, getParent: () => undefined };
     },
   }),
 }));
@@ -153,11 +174,28 @@ async function settleSave(gate: PromiseWithResolvers<boolean>): Promise<void> {
   });
 }
 
+/**
+ * A screen whose save confirmed and left the tree: its dismissal ran once and
+ * only the leave window it opened is left behind.
+ */
+async function dismissedScreen(): Promise<void> {
+  const gate = Promise.withResolvers<boolean>();
+  const renderer = await mount(() => gate.promise);
+  await press(row(renderer, 'All'));
+  await settleSave(gate);
+  expect(routerBack).toHaveBeenCalledTimes(1);
+  act(() => {
+    renderer.unmount();
+  });
+}
+
 beforeEach(() => {
   resetLeaveSettle();
   backPress.listeners.clear();
   routerBack.mockReset();
   focus.focused = true;
+  navigator.own = { index: 1, routes: [{ key: 'scene-below' }, { key: 'route-this' }] };
+  navigator.parent = undefined;
 });
 
 describe('OptionList hardware Back during a save', () => {
@@ -188,24 +226,85 @@ describe('OptionList hardware Back during a save', () => {
   });
 
   it('spends a Back that arrives after the dismissed route was removed', async () => {
-    const gate = Promise.withResolvers<boolean>();
-    const renderer = await mount(() => gate.promise);
-    await press(row(renderer, 'All'));
-    await settleSave(gate);
-    expect(routerBack).toHaveBeenCalledTimes(1);
+    await dismissedScreen();
 
     // Android delivers the Back once the navigator already dropped the route —
     // the case the screen-level listener cannot see. Only the leftover exit
     // animation is between the reader and the screen beneath.
-    act(() => {
-      renderer.unmount();
-    });
 
     expect(backPress.press()).toBe(true);
     expect(routerBack).toHaveBeenCalledTimes(1);
   });
 
-  it('lets a Back through once the dismissed screen has finished leaving', async () => {
+  it('spends a Back that arrives while the grace after the dismissed screen runs', async () => {
+    await dismissedScreen();
+
+    // The scene the dismissal revealed reports its appearance transition, which
+    // is the end of the leave this window described.
+    act(() => {
+      settleLeaveWindow();
+    });
+
+    // The reader was still acting on the screen that went, so this press means
+    // that screen and the one beneath never receives it.
+    expect(backPress.press()).toBe(true);
+    expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles the leave when the scene the dismissal revealed appears', async () => {
+    await dismissedScreen();
+
+    // The scene below this route reports its appearance transition, and that is
+    // the name the dismissal derived from this route's own stack.
+    act(() => {
+      settleLeaveWindow('scene-below');
+    });
+
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(true);
+    // The grace still belongs to the leave, so this Back never reaches the
+    // screen beneath.
+    expect(backPress.press()).toBe(true);
+    expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the leave open when another scene appears first', async () => {
+    await dismissedScreen();
+
+    // A tab switch or a push reports another scene's end while this leave
+    // animates. That end is not this leave's end.
+    act(() => {
+      settleLeaveWindow('scene-other');
+    });
+
+    expect(insideLeaveSettle()).toBe(true);
+    expect(backPress.press()).toBe(true);
+    expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the scene the parent stack revealed when this route is its stack’s only one', async () => {
+    // The code reviewer's edit screens push their field route straight onto the
+    // stack above the overview, so this navigator holds one route and the scene
+    // the leave revealed sits in the navigator above it.
+    navigator.own = { index: 0, routes: [{ key: 'field-route' }] };
+    navigator.parent = { index: 1, routes: [{ key: 'scene-below' }, { key: 'edit-stack' }] };
+
+    await dismissedScreen();
+
+    // Another scene's end belongs to no leave this route opened.
+    act(() => {
+      settleLeaveWindow('scene-other');
+    });
+    expect(insideLeaveSettle()).toBe(true);
+
+    act(() => {
+      settleLeaveWindow('scene-below');
+    });
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(true);
+  });
+
+  it('lets a Back through once the grace after the dismissed screen ended', async () => {
     const gate = Promise.withResolvers<boolean>();
     const renderer = await mount(() => gate.promise);
     await press(row(renderer, 'All'));
@@ -214,14 +313,38 @@ describe('OptionList hardware Back during a save', () => {
       renderer.unmount();
     });
 
-    // The scene the dismissal revealed reports its appearance transition,
-    // which is the end of the leave this window described.
-    act(() => {
-      endLeaveSettle();
-    });
+    // Only the clock is faked: the mount helpers await real microtasks, and the
+    // window keeps the real backstop timer it armed.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      act(() => {
+        settleLeaveWindow();
+      });
+      // A deliberate press later is a press on the screen now shown.
+      vi.setSystemTime(Date.now() + LEAVE_SETTLE_GRACE_MS);
 
+      expect(backPress.press()).toBe(false);
+      expect(routerBack).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not spend a Back for a scene that appears with no leave open', async () => {
+    const pending = Promise.withResolvers<boolean>();
+    await mount(() => pending.promise);
+
+    // A push or a tab switch reports the arriving scene's transition end, and no
+    // dismissal of this app preceded it.
+    act(() => {
+      settleLeaveWindow();
+    });
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(false);
+
+    // The press belongs to the screen that push revealed.
     expect(backPress.press()).toBe(false);
-    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(routerBack).not.toHaveBeenCalled();
   });
 
   it('suppresses a save that resolves while the accepted Back is still committing', async () => {

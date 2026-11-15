@@ -44,6 +44,11 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import {
+  getCodeReviewerAnalyticsSelection,
+  setCodeReviewerAnalyticsPeriod,
+  setCodeReviewerAnalyticsPlatform,
+} from '@/lib/hooks/use-code-reviewer-analytics-filters';
+import {
   conversationRetentionKey,
   retainConversationAcrossMounts,
 } from '@/lib/pr-review/discussion/conversation-retention';
@@ -532,6 +537,24 @@ describe('clearSessionScopedState', () => {
     clearSessionScopedState();
 
     expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(false);
+  });
+
+  // The analytics filters store stays real as well: the next account must not
+  // open an organization on the previous account's platform and period.
+  it('drops the per-organization analytics selection on sign-out', () => {
+    setCodeReviewerAnalyticsPlatform('session-scoped-analytics-org', 'gitlab');
+    setCodeReviewerAnalyticsPeriod('session-scoped-analytics-org', 90);
+    expect(getCodeReviewerAnalyticsSelection('session-scoped-analytics-org')).toEqual({
+      platform: 'gitlab',
+      period: 90,
+    });
+
+    clearSessionScopedState();
+
+    expect(getCodeReviewerAnalyticsSelection('session-scoped-analytics-org')).toEqual({
+      platform: 'github',
+      period: 30,
+    });
   });
 
   it('drops the typed profile form drafts, including their secrets', () => {

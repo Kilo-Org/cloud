@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- one mounted case per slash-command screen state: list, add, duplicate, conflict, failure, and save */
 import { createElement, type ReactNode, type Ref } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ProfileKiloCommandsScreen } from '@/components/profiles/profile-kilo-commands-screen';
@@ -538,6 +538,43 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
     );
 
     unmount();
+  });
+});
+
+describe('ProfileKiloCommandsScreen open form draft', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    Object.assign(h.query, {
+      data: [testCommand()],
+      isError: false,
+      isPending: false,
+      isRefetching: false,
+    });
+    permissionState.permission = 'allowed';
+  });
+
+  afterEach(() => {
+    // The draft is module-level: a later case in this file must not reopen on it.
+    resetFormDraftsForTests();
+  });
+
+  it('reopens the add form on what was typed after a remount', async () => {
+    const first = await mountScreen();
+    pressAddButton(first.renderer.root);
+    changeText(first.renderer.root, 'Command name', 'summarize');
+    changeText(first.renderer.root, 'Template', 'Summarize the diff');
+    first.unmount();
+
+    // An Android activity recreation opens the same form again: the claim the
+    // screen's draft makes is that the reader's fields survive it.
+    const second = await mountScreen();
+    expect(findField(second.renderer.root, 'Command name').props.defaultValue).toBe('summarize');
+    expect(findField(second.renderer.root, 'Template').props.defaultValue).toBe(
+      'Summarize the diff'
+    );
+
+    second.unmount();
   });
 });
 

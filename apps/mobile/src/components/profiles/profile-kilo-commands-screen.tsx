@@ -264,6 +264,7 @@ export function ProfileKiloCommandsScreen({
 
       {form.isOpen ? (
         <KiloCommandFormSheet
+          draftScope={draftScope}
           command={form.editing}
           existingNames={commands
             .filter(candidate => candidate.id !== form.editing?.id)

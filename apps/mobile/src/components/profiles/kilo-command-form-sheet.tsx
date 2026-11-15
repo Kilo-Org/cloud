@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
@@ -71,6 +72,11 @@ export type KiloCommandSaveFailure =
   | { readonly kind: 'refused' };
 
 type KiloCommandFormSheetProps = Readonly<{
+  /**
+   * The scope this form's fields are drafted under, shared with the screen's
+   * `useProfileFormDraft`, so a remount reopens the form on what was typed.
+   */
+  draftScope?: string;
   command: KiloCommandSource | null;
   /** Names of the profile's other commands, so a duplicate fails validation inline. */
   existingNames?: readonly string[];
@@ -87,7 +93,11 @@ type KiloCommandFormSheetProps = Readonly<{
 /**
  * The add/edit slash command sheet. Mounted only while open, so every open
  * seeds fresh fields from the command it edits. Text fields are uncontrolled
- * (refs), per the app's iOS text-input rule; the subtask flag is state.
+ * (refs), per the app's iOS text-input rule; the subtask flag is state. Both the
+ * refs and the flag are drafts in `draftScope`, so a remount — Android activity
+ * recreation, or the route going away and coming back — reopens the form on what
+ * was typed rather than on the server's copy; the screen clears the scope when
+ * it opens or closes the form.
  *
  * Save validates through `validateKiloCommandForm`; a refused input shows the
  * matching `profiles.slashCommands.*` message under the field at fault. The
@@ -102,6 +112,7 @@ type KiloCommandFormSheetProps = Readonly<{
  * field clears.
  */
 export function KiloCommandFormSheet({
+  draftScope,
   command,
   existingNames = [],
   isSaving,
@@ -114,12 +125,13 @@ export function KiloCommandFormSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const initial = initialKiloCommandFormState(command ?? undefined);
-  const nameRef = useRef(initial.name);
-  const descriptionRef = useRef(initial.description);
-  const templateRef = useRef(initial.template);
-  const agentRef = useRef(initial.agent);
-  const modelRef = useRef(initial.model);
-  const [subtask, setSubtask] = useState(initial.subtask);
+  const scope = draftScope;
+  const nameRef = useFormDraftRef(scope, 'name', initial.name);
+  const descriptionRef = useFormDraftRef(scope, 'description', initial.description);
+  const templateRef = useFormDraftRef(scope, 'template', initial.template);
+  const agentRef = useFormDraftRef(scope, 'agent', initial.agent);
+  const modelRef = useFormDraftRef(scope, 'model', initial.model);
+  const [subtask, setSubtask] = useFormDraftState(scope, 'subtask', initial.subtask);
   const [error, setError] = useState<KiloCommandFormError | null>(null);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'template'>();
 
@@ -184,7 +196,7 @@ export function KiloCommandFormSheet({
         />
         <FormField
           label={t('profiles.slashCommands.name')}
-          defaultValue={initial.name}
+          defaultValue={nameRef.current}
           error={nameError}
           disabled={isSaving}
           required
@@ -201,7 +213,7 @@ export function KiloCommandFormSheet({
         />
         <FormField
           label={t('profiles.slashCommands.description')}
-          defaultValue={initial.description}
+          defaultValue={descriptionRef.current}
           disabled={isSaving}
           maxLength={MAX_KILO_COMMAND_DESCRIPTION_LENGTH}
           placeholder={t('profiles.descriptionPlaceholder')}
@@ -211,7 +223,7 @@ export function KiloCommandFormSheet({
         />
         <FormField
           label={t('profiles.slashCommands.template')}
-          defaultValue={initial.template}
+          defaultValue={templateRef.current}
           error={error === 'template-required' ? t(ERROR_KEYS[error]) : undefined}
           disabled={isSaving}
           required
@@ -230,7 +242,7 @@ export function KiloCommandFormSheet({
         />
         <FormField
           label={t('common.agent')}
-          defaultValue={initial.agent}
+          defaultValue={agentRef.current}
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}
@@ -241,7 +253,7 @@ export function KiloCommandFormSheet({
         />
         <FormField
           label={t('profiles.agents.model')}
-          defaultValue={initial.model}
+          defaultValue={modelRef.current}
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}

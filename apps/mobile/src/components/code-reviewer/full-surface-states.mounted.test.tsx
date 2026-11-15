@@ -42,6 +42,7 @@ const state = vi.hoisted(() => ({
   platform: 'gitlab',
   connected: false,
   githubError: false,
+  githubStaleError: false,
   gitlabError: false,
   scope: 'personal',
   organizations: [] as {
@@ -229,7 +230,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({
     data: state.githubError ? undefined : { connected: state.connected },
-    isError: state.githubError,
+    isError: state.githubError || state.githubStaleError,
   }),
   useGitLabStatus: () => ({
     data: state.gitlabError ? undefined : { connected: false },
@@ -299,6 +300,7 @@ beforeEach(() => {
   state.platform = 'gitlab';
   state.connected = false;
   state.githubError = false;
+  state.githubStaleError = false;
   state.gitlabError = false;
   state.scope = 'personal';
   state.organizations = [];
@@ -925,6 +927,22 @@ describe('empty reviews connect action', () => {
     const empty = emptyState(renderer);
     expect(empty.props.action).toBeUndefined();
     expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.noReviewsDescription'));
+    unmount();
+  });
+
+  it('keeps the role notice when a refetch failed over a cached disconnected answer', async () => {
+    // `isError` stays true for a failed background refetch, but the cached
+    // answer still says nothing is connected, so the notice is accurate.
+    state.githubStaleError = true;
+    state.organizations = [{ organizationId: SCOPE, organizationName: ORG_NAME, role: 'member' }];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: SCOPE })
+    );
+    await settled(renderer);
+
+    const empty = emptyState(renderer);
+    expect(empty.props.action).toBeUndefined();
+    expect(empty.props.description).toBe(i18n.t('codeReviewer.reviewList.connectOwnerOnly'));
     unmount();
   });
 

@@ -10,20 +10,25 @@ import { QueryError } from '@/components/query-error';
 import { RefusalStatus } from '@/components/refusal-status';
 import { ScreenHeader } from '@/components/screen-header';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
+import { DismissFindingSkeleton } from '@/components/security-agent/dismiss-finding-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import {
+  type DismissFailure,
+  isDismissFailureRetryable,
+  resolveDismissFailure,
+} from '@/components/security-agent/dismiss-finding-failure';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import {
-  isSecuritySyncRetryable,
   isSecurityTrialRefusal,
+  isSecurityTrialRefusalCopyKey,
   securityMutationCopyKey,
 } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
@@ -48,32 +53,11 @@ type DismissFindingScreenProps = {
   findingId: string;
 };
 
-function DismissFindingSkeleton() {
-  const { t } = useTranslation();
-  const modalTopInset = useFormSheetHeaderTopInset();
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        className="px-6"
-        title={t('securityAgent.dismiss.title')}
-        modal
-        modalTopInset={modalTopInset}
-      />
-      <View className="gap-6 px-6 pt-4">
-        {/* The identity card: p-3 plus a title line and the two meta lines. */}
-        <Skeleton className="h-[86px] w-full rounded-lg" />
-        <Skeleton className="h-[224px] w-full rounded-lg" />
-        <Skeleton className="h-24 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-md" />
-      </View>
-    </View>
-  );
-}
-
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   // This header is inside a formSheet route: the sheet edge owns the top
   // clearance unless the sheet is the stack's first screen.
   const modalTopInset = useFormSheetHeaderTopInset();
@@ -133,7 +117,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             comment,
             lastError: error.message,
             lastErrorKey: securityMutationCopyKey(error, canManageBilling),
-            retryable: isSecuritySyncRetryable(error),
+            retryable: isDismissFailureRetryable(error),
           });
         },
       }
@@ -247,14 +231,22 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     );
   }
 
+  const dismissFailure: DismissFailure | null = resolveDismissFailure(
+    dismissFinding.isError ? dismissFinding.error : null,
+    dismissDraft.draft
+  );
   // A terminal rejection ended the intent, so disable the CTA and let the
   // inline copy explain the outcome. The lapsed-trial refusal is the one where
   // the reader can end the state from here, so a reader who can change the plan
   // is offered that step under the sentence.
-  const dismissBlocked = dismissFinding.isError && !isSecuritySyncRetryable(dismissFinding.error);
-  const dismissRefusalAction = isSecurityTrialRefusal(dismissFinding.error)
-    ? billingAction
-    : undefined;
+  const dismissBlocked = dismissFailure?.kind === 'terminal';
+  // The sentence can come from the live rejection or from the draft that
+  // survives the sheet, so the ledger is asked about whichever one holds it:
+  // the raw error, or the key that names the copy the draft replays.
+  const dismissIsTrialRefusal = dismissFinding.isError
+    ? isSecurityTrialRefusal(dismissFinding.error)
+    : isSecurityTrialRefusalCopyKey(dismissDraft.draft?.lastErrorKey);
+  const dismissRefusalAction = dismissIsTrialRefusal ? billingAction : undefined;
 
   return (
     <View className="flex-1 bg-background">
@@ -326,12 +318,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           />
         </View>
 
-        {dismissFinding.isError &&
+        {dismissFailure !== null &&
           (dismissRefusalAction === undefined ? (
-            <Text className="text-sm text-destructive">{dismissFinding.error.message}</Text>
+            <Text className="text-sm text-destructive">{dismissFailure.message}</Text>
           ) : (
             <RefusalStatus
-              message={dismissFinding.error.message}
+              message={dismissFailure.message}
               action={dismissRefusalAction}
               className="text-sm"
             />
@@ -339,9 +331,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
         <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
           {dismissFinding.isPending ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
+            <ActivityIndicator size="small" color={mutedDisabledInk} />
           ) : null}
-          <Text className="text-primary-foreground">{t('securityAgent.dismiss.title')}</Text>
+          <Text>{t('securityAgent.dismiss.title')}</Text>
         </Button>
       </ScrollView>
     </View>

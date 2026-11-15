@@ -193,7 +193,7 @@ function LowBalanceAlertForm({
         loading={mutations.updateMinimumBalanceAlert.isPending}
         onPress={onSave}
       >
-        <Text className="text-primary-foreground">{t('common.save')}</Text>
+        <Text>{t('common.save')}</Text>
       </Button>
     </>
   );

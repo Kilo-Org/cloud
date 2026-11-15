@@ -19,9 +19,11 @@ import {
   setGlanceableActionNotice,
 } from './ios-sink';
 import {
+  beginSessionCardPress,
   findSessionCard,
   renderSessionCardPress,
   type SessionActivity,
+  sessionCardPressKey,
 } from './session-card-press';
 
 /**
@@ -228,14 +230,25 @@ async function approveFromSessionCard(activity: SessionActivity): Promise<Glance
   if (sessionId.length === 0 || approvalKey.length === 0 || props?.awaitingPermission !== true) {
     return { kind: 'none' };
   }
-  await renderSessionCardPress(activity, { approving: true });
+  // The request itself is the press key, so a second tap while this one is in
+  // flight is refused, and a later request starts from its own entry.
+  const key = sessionCardPressKey(sessionId, approvalKey);
+  const attempt = beginSessionCardPress(key);
+  if (attempt === null) {
+    return { kind: 'none' };
+  }
+  await renderSessionCardPress(activity, key);
   const result = await answerSessionCard(sessionId, approvalKey);
   if (result.kind === 'retryable') {
     toast.error(i18n.t(APPROVE_FAILED_KEY));
-    await renderSessionCardPress(activity, { notice: i18n.t(APPROVE_FAILED_KEY) });
+    // The entry stays: the card keeps its failure line while this request is
+    // the one it shows, and the next press replaces it with Approving…
+    attempt.fail({ kind: 'approve-failed', notice: i18n.t(APPROVE_FAILED_KEY) });
+    await renderSessionCardPress(activity, key);
     return result;
   }
-  await renderSessionCardPress(activity, null, result.kind !== 'none');
+  attempt.abandon();
+  await renderSessionCardPress(activity, key, result.kind !== 'none');
   return result;
 }
 

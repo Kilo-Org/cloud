@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Irċevuta tar-rapport",
-      "description": "L-irċevuta għar-rapport li bgħatt. Żomm dan l-id biex tirreferi għalih aktar tard.",
+      "description": "Żomm dan l-id biex tirreferi għalih aktar tard.",
       "receiptLabel": "Irċevuta",
       "copyReceiptId": "Ikkopja l-id tal-irċevuta",
       "appealLabel": "Appell",
@@ -3803,6 +3803,8 @@
       "available": "Għodod disponibbli: {{count}}",
       "none": "L-ebda għodda disponibbli",
       "noneDescription": "Is-server Kilo ma bagħat lura l-ebda għodda.",
+      "notApplied": "L-għodod Kilo ma ġewx miżjuda ma' dan il-chat",
+      "notAppliedDescription": "L-għażla tiegħek ġiet salvata. Erġa' pprova biex tużaha f'dan il-chat issa.",
       "unreachable": "Ma setax jintlaħaq l-għodod Kilo",
       "unreachableDescription": "Is-server ma weġibx. Iċċekkja l-konnessjoni tiegħek, imbagħad erġa' pprova.",
       "unauthorized": "L-għodod Kilo rrifjutaw din is-sessjoni",
@@ -4343,6 +4345,7 @@
       "unbindFailed": "Ma setgħetx tħoll repo",
       "repoValue": "Repożitorju: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Dan il-profil m'għadux disponibbli. Agħżel ieħor.",
       "pickerEmptyDescriptionOrganization": "Oħloq profil ta' organizzazzjoni biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Sid jew amministratur ta' organizzazzjoni jista' joħloq profil ta' organizzazzjoni."
     },
@@ -4675,7 +4678,8 @@
     "expiresIn": "Jiskadi fi {{duration}}",
     "neverExpires": "Qatt ma jiskadi",
     "includesNewMessages": "Il-messaġġi l-ġodda huma inklużi.",
-    "excludesNewMessages": "Il-messaġġi l-ġodda huma esklużi."
+    "excludesNewMessages": "Il-messaġġi l-ġodda huma esklużi.",
+    "superseded": "Dan il-link ġie sostitwit minn post ieħor, għalhekk m'għadux jaħdem."
   },
   "sharedSession": {
     "title": "Sessjoni kondiviża",

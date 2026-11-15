@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "إيصال البلاغ",
-      "description": "إيصال البلاغ الذي أرسلته. احتفظ بهذا المعرّف للرجوع إليه لاحقًا.",
+      "description": "احتفظ بهذا المعرّف للرجوع إليه لاحقًا.",
       "receiptLabel": "الإيصال",
       "copyReceiptId": "نسخ معرّف الإيصال",
       "appealLabel": "الطعن",
@@ -3857,6 +3857,8 @@
       "available": "الأدوات المتاحة: {{count}}",
       "none": "لا توجد أدوات متاحة",
       "noneDescription": "لم يُرجع خادم Kilo أي أدوات.",
+      "notApplied": "لم تتم إضافة أدوات Kilo إلى هذه المحادثة",
+      "notAppliedDescription": "تم حفظ اختيارك. اضغط على إعادة المحاولة لاستخدامه في هذه المحادثة الآن.",
       "unreachable": "تعذّر الوصول إلى أدوات Kilo",
       "unreachableDescription": "لم يستجب الخادم. تحقق من اتصالك ثم حاول مرة أخرى.",
       "unauthorized": "رفضت أدوات Kilo هذه الجلسة",
@@ -4404,6 +4406,7 @@
       "unbindFailed": "تعذر إلغاء ربط الريبو",
       "repoValue": "المستودع: {{name}}",
       "profileValue": "الملف الشخصي: {{name}}",
+      "profileUnavailable": "لم يعد هذا الملف الشخصي متاحًا. اختر ملفًا شخصيًا آخر.",
       "pickerEmptyDescriptionOrganization": "قم بإنشاء ملف شخصي للمؤسسة لإعادة استخدام متغيرات البيئة وأوامر الإعداد والمهارات عبر الجلسات.",
       "pickerEmptyDescriptionOrganizationReadOnly": "يمكن لمالك المؤسسة أو أحد مسؤوليها إنشاء ملف شخصي للمؤسسة."
     },
@@ -4740,7 +4743,8 @@
     "expiresIn": "تنتهي صلاحيته خلال {{duration}}",
     "neverExpires": "لا تنتهي صلاحيته",
     "includesNewMessages": "الرسائل الجديدة مُضمّنة.",
-    "excludesNewMessages": "الرسائل الجديدة مستبعدة."
+    "excludesNewMessages": "الرسائل الجديدة مستبعدة.",
+    "superseded": "تم استبدال هذا الرابط من جهاز آخر، لذا لم يعد يعمل."
   },
   "sharedSession": {
     "title": "جلسة مُشارَكة",

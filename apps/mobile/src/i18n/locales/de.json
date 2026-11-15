@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Meldebestätigung",
-      "description": "Die Bestätigung für deine eingereichte Meldung. Bewahre diese ID auf, um später darauf Bezug zu nehmen.",
+      "description": "Bewahre diese ID auf, um später darauf Bezug zu nehmen.",
       "receiptLabel": "Bestätigung",
       "copyReceiptId": "Bestätigungs-ID kopieren",
       "appealLabel": "Einspruch",
@@ -3641,6 +3641,8 @@
       "available": "Verfügbare Tools: {{count}}",
       "none": "Keine Tools verfügbar",
       "noneDescription": "Der Kilo-Server hat keine Tools zurückgegeben.",
+      "notApplied": "Kilo-Tools wurden diesem Chat nicht hinzugefügt",
+      "notAppliedDescription": "Deine Auswahl ist gespeichert. Tippe auf „Erneut versuchen“, um sie jetzt in diesem Chat zu verwenden.",
       "unreachable": "Kilo-Tools konnten nicht erreicht werden",
       "unreachableDescription": "Der Server hat nicht geantwortet. Prüfe deine Verbindung und versuche es erneut.",
       "unauthorized": "Kilo-Tools haben diese Sitzung abgelehnt",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Repo konnte nicht entbunden werden",
       "repoValue": "Repository: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Dieses Profil ist nicht mehr verfügbar. Wähle ein anderes aus.",
       "pickerEmptyDescriptionOrganization": "Erstelle ein Organisationsprofil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organisationsinhaber oder -administratoren können ein Organisationsprofil erstellen."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Läuft in {{duration}} ab",
     "neverExpires": "Läuft nie ab",
     "includesNewMessages": "Neue Nachrichten werden einbezogen.",
-    "excludesNewMessages": "Neue Nachrichten werden nicht einbezogen."
+    "excludesNewMessages": "Neue Nachrichten werden nicht einbezogen.",
+    "superseded": "Dieser Link wurde an anderer Stelle ersetzt und funktioniert daher nicht mehr."
   },
   "sharedSession": {
     "title": "Geteilte Sitzung",

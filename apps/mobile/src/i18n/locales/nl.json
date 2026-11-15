@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Ontvangstbewijs melding",
-      "description": "Het ontvangstbewijs voor de melding die je hebt ingediend. Bewaar dit ID om er later naar te verwijzen.",
+      "description": "Bewaar dit ID om er later naar te verwijzen.",
       "receiptLabel": "Ontvangstbewijs",
       "copyReceiptId": "Ontvangstbewijs-ID kopiëren",
       "appealLabel": "Bezwaar",
@@ -3641,6 +3641,8 @@
       "available": "Beschikbare tools: {{count}}",
       "none": "Geen tools beschikbaar",
       "noneDescription": "De Kilo-server heeft geen tools teruggegeven.",
+      "notApplied": "Kilo-tools zijn niet aan deze chat toegevoegd",
+      "notAppliedDescription": "Je keuze is opgeslagen. Tik op Opnieuw proberen om die nu in deze chat te gebruiken.",
       "unreachable": "Kilo-tools konden niet worden bereikt",
       "unreachableDescription": "De server heeft niet geantwoord. Controleer je verbinding en probeer het opnieuw.",
       "unauthorized": "Kilo-tools hebben deze sessie geweigerd",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Kan repository niet ongedaan maken",
       "repoValue": "Opslagplaats: {{name}}",
       "profileValue": "Profiel: {{name}}",
+      "profileUnavailable": "Dit profiel is niet meer beschikbaar. Kies een ander profiel.",
       "pickerEmptyDescriptionOrganization": "Maak een organisatieprofiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Een organisatie-eigenaar of beheerder kan een organisatieprofiel aanmaken."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Verloopt over {{duration}}",
     "neverExpires": "Verloopt nooit",
     "includesNewMessages": "Nieuwe berichten worden opgenomen.",
-    "excludesNewMessages": "Nieuwe berichten worden niet opgenomen."
+    "excludesNewMessages": "Nieuwe berichten worden niet opgenomen.",
+    "superseded": "Deze link is elders vervangen en werkt daarom niet meer."
   },
   "sharedSession": {
     "title": "Gedeelde sessie",

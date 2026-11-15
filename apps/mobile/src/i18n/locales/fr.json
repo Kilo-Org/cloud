@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Accusé de réception du signalement",
-      "description": "L'accusé de réception du signalement que vous avez envoyé. Conservez cet identifiant pour vous y référer plus tard.",
+      "description": "Conservez cet identifiant pour vous y référer plus tard.",
       "receiptLabel": "Accusé de réception",
       "copyReceiptId": "Copier l'identifiant de l'accusé de réception",
       "appealLabel": "Recours",
@@ -3695,6 +3695,8 @@
       "available": "Outils disponibles : {{count}}",
       "none": "Aucun outil disponible",
       "noneDescription": "Le serveur Kilo n'a renvoyé aucun outil.",
+      "notApplied": "Les outils Kilo n'ont pas été ajoutés à cette discussion",
+      "notAppliedDescription": "Votre choix est enregistré. Appuyez sur Réessayer pour l'appliquer à cette discussion maintenant.",
       "unreachable": "Impossible de joindre les outils Kilo",
       "unreachableDescription": "Le serveur n'a pas répondu. Vérifiez votre connexion, puis réessayez.",
       "unauthorized": "Les outils Kilo ont refusé cette session",
@@ -4221,6 +4223,7 @@
       "unbindFailed": "Impossible de dissocier le dépôt",
       "repoValue": "Dépôt : {{name}}",
       "profileValue": "Profil : {{name}}",
+      "profileUnavailable": "Ce profil n'est plus disponible. Choisissez-en un autre.",
       "pickerEmptyDescriptionOrganization": "Créez un profil d'organisation pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Un propriétaire ou un administrateur d'organisation peut créer un profil d'organisation."
     },
@@ -4545,7 +4548,8 @@
     "expiresIn": "Expire dans {{duration}}",
     "neverExpires": "N’expire jamais",
     "includesNewMessages": "Les nouveaux messages sont inclus.",
-    "excludesNewMessages": "Les nouveaux messages sont exclus."
+    "excludesNewMessages": "Les nouveaux messages sont exclus.",
+    "superseded": "Ce lien a été remplacé depuis un autre appareil et ne fonctionne plus."
   },
   "sharedSession": {
     "title": "Session partagée",

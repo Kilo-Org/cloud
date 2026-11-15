@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Risiti ya ripoti",
-      "description": "Risiti ya ripoti uliyowasilisha. Hifadhi kitambulisho hiki ili ukirejelee baadaye.",
+      "description": "Hifadhi kitambulisho hiki ili ukirejelee baadaye.",
       "receiptLabel": "Risiti",
       "copyReceiptId": "Nakili kitambulisho cha risiti",
       "appealLabel": "Rufaa",
@@ -3641,6 +3641,8 @@
       "available": "Zana zinazopatikana: {{count}}",
       "none": "Hakuna zana zinazopatikana",
       "noneDescription": "Seva ya Kilo haikurudisha zana yoyote.",
+      "notApplied": "Zana za Kilo hazikuongezwa kwenye mazungumzo haya",
+      "notAppliedDescription": "Chaguo lako limehifadhiwa. Jaribu tena ili kulitumia kwenye mazungumzo haya sasa.",
       "unreachable": "Imeshindwa kufikia zana za Kilo",
       "unreachableDescription": "Seva haikujibu. Angalia muunganisho wako, kisha ujaribu tena.",
       "unauthorized": "Zana za Kilo zilikataa kipindi hiki",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Haikuweza kubandua repo",
       "repoValue": "Hazina: {{name}}",
       "profileValue": "Wasifu: {{name}}",
+      "profileUnavailable": "Wasifu huu haupatikani tena. Chagua mwingine.",
       "pickerEmptyDescriptionOrganization": "Unda wasifu wa shirika ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Mmiliki au msimamizi wa shirika anaweza kuunda wasifu wa shirika."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Kinaisha baada ya {{duration}}",
     "neverExpires": "Hakiishi kamwe",
     "includesNewMessages": "Jumbe mpya zimejumuishwa.",
-    "excludesNewMessages": "Jumbe mpya hazijajumuishwa."
+    "excludesNewMessages": "Jumbe mpya hazijajumuishwa.",
+    "superseded": "Kiungo hiki kilibadilishwa na kingine mahali pengine, kwa hivyo hakifanyi kazi tena."
   },
   "sharedSession": {
     "title": "Kipindi kilichoshirikiwa",

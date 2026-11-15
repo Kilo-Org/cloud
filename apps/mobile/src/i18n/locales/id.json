@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Tanda terima laporan",
-      "description": "Tanda terima untuk laporan yang kamu kirim. Simpan ID ini untuk merujuknya nanti.",
+      "description": "Simpan ID ini untuk merujuknya nanti.",
       "receiptLabel": "Tanda terima",
       "copyReceiptId": "Salin ID tanda terima",
       "appealLabel": "Banding",
@@ -3641,6 +3641,8 @@
       "available": "Alat tersedia: {{count}}",
       "none": "Tidak ada alat tersedia",
       "noneDescription": "Server Kilo tidak mengembalikan alat apa pun.",
+      "notApplied": "Alat Kilo belum ditambahkan ke obrolan ini",
+      "notAppliedDescription": "Pilihan Anda tersimpan. Coba lagi untuk menggunakannya di obrolan ini sekarang.",
       "unreachable": "Tidak dapat menjangkau alat Kilo",
       "unreachableDescription": "Server tidak menjawab. Periksa koneksimu, lalu coba lagi.",
       "unauthorized": "Alat Kilo menolak sesi ini",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Tidak dapat melepaskan ikatan repo",
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Profil ini tidak lagi tersedia. Pilih profil lain.",
       "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau admin organisasi dapat membuat profil organisasi."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Kedaluwarsa dalam {{duration}}",
     "neverExpires": "Tidak pernah kedaluwarsa",
     "includesNewMessages": "Pesan baru disertakan.",
-    "excludesNewMessages": "Pesan baru tidak disertakan."
+    "excludesNewMessages": "Pesan baru tidak disertakan.",
+    "superseded": "Tautan ini telah diganti dari perangkat lain, sehingga tidak lagi berfungsi."
   },
   "sharedSession": {
     "title": "Sesi yang dibagikan",

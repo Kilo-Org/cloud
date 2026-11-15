@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Porofon'ny tatitra",
-      "description": "Ny porofon'ny tatitra nalefanao. Tehirizo ity id ity mba hanondroana azy any aoriana.",
+      "description": "Tehirizo ity id ity mba hanondroana azy any aoriana.",
       "receiptLabel": "Porofo",
       "copyReceiptId": "Adikao ny ID amin'ny porofo",
       "appealLabel": "Fampakarana",
@@ -3641,6 +3641,8 @@
       "available": "Fitaovana misy: {{count}}",
       "none": "Tsy misy fitaovana",
       "noneDescription": "Tsy nampodina fitaovana ny mpizara Kilo.",
+      "notApplied": "Tsy nampiana tao amin'ity resaka ity ny fitaovana Kilo",
+      "notAppliedDescription": "Voatahiry ny safidinao. Andramo indray mba hampiasana azy amin'ity resaka ity izao.",
       "unreachable": "Tsy tratra ny fitaovana Kilo",
       "unreachableDescription": "Tsy namaly ny mpizara. Hamarino ny fifandraisanao, dia andramo indray.",
       "unauthorized": "Nandà ity sesiona ity ny fitaovana Kilo",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Tsy afaka namaha ny repo",
       "repoValue": "Tahiry: {{name}}",
       "profileValue": "Mombamomba: {{name}}",
+      "profileUnavailable": "Tsy misy intsony ity mombamomba ity. Misafidiana iray hafa.",
       "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Ny tompon'ny fikambanana na ny mpandrindra dia afaka mamorona mombamomba momba ny fikambanana."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Lany daty afaka {{duration}}",
     "neverExpires": "Tsy lany daty mihitsy",
     "includesNewMessages": "Tafiditra ny hafatra vaovao.",
-    "excludesNewMessages": "Tsy tafiditra ny hafatra vaovao."
+    "excludesNewMessages": "Tsy tafiditra ny hafatra vaovao.",
+    "superseded": "Nosoloina tany an-kafa ity rohy ity, ka tsy miasa intsony."
   },
   "sharedSession": {
     "title": "Fotoam-piasana nozaraina",

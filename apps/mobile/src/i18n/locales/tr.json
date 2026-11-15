@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Bildirim alındısı",
-      "description": "Gönderdiğin bildirimin alındısı. Daha sonra başvurmak için bu kimliği sakla.",
+      "description": "Daha sonra başvurmak için bu kimliği sakla.",
       "receiptLabel": "Alındı",
       "copyReceiptId": "Alındı kimliğini kopyala",
       "appealLabel": "İtiraz",
@@ -3641,6 +3641,8 @@
       "available": "Kullanılabilir araçlar: {{count}}",
       "none": "Kullanılabilir araç yok",
       "noneDescription": "Kilo sunucusu hiçbir araç döndürmedi.",
+      "notApplied": "Kilo araçları bu sohbete eklenmedi",
+      "notAppliedDescription": "Seçiminiz kaydedildi. Şimdi bu sohbette kullanmak için tekrar deneyin.",
       "unreachable": "Kilo araçlarına ulaşılamadı",
       "unreachableDescription": "Sunucu yanıt vermedi. Bağlantını kontrol et ve tekrar dene.",
       "unauthorized": "Kilo araçları bu oturumu reddetti",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Deponun bağlantısı kaldırılamadı",
       "repoValue": "Depo: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Bu profil artık kullanılamıyor. Başka bir profil seçin.",
       "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Kuruluş sahibi veya yöneticisi bir kuruluş profili oluşturabilir."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "{{duration}} içinde sona erer",
     "neverExpires": "Süresi dolmaz",
     "includesNewMessages": "Yeni mesajlar dahildir.",
-    "excludesNewMessages": "Yeni mesajlar hariçtir."
+    "excludesNewMessages": "Yeni mesajlar hariçtir.",
+    "superseded": "Bu bağlantı başka bir cihazdan yenisiyle değiştirildiği için artık çalışmıyor."
   },
   "sharedSession": {
     "title": "Paylaşılan oturum",

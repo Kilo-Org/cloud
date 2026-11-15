@@ -46,6 +46,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff', Check: 'Check' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
     mutedForeground: '#000',
     primaryForeground: '#fff',

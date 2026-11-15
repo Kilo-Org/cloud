@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Admháil tuairisce",
-      "description": "An admháil don tuairisc a chuir tú isteach. Coinnigh an t-aitheantas seo chun tagairt di níos déanaí.",
+      "description": "Coinnigh an t-aitheantas seo chun tagairt di níos déanaí.",
       "receiptLabel": "Admháil",
       "copyReceiptId": "Cóipeáil aitheantas na hadmhála",
       "appealLabel": "Achomharc",
@@ -3803,6 +3803,8 @@
       "available": "Uirlisí ar fáil: {{count}}",
       "none": "Níl aon uirlis ar fáil",
       "noneDescription": "Níor chuir freastalaí Kilo aon uirlis ar ais.",
+      "notApplied": "Níor cuireadh uirlisí Kilo leis an gcomhrá seo",
+      "notAppliedDescription": "Tá do rogha sábháilte. Bain triail eile as chun í a úsáid sa chomhrá seo anois.",
       "unreachable": "Níorbh fhéidir uirlisí Kilo a shroicheadh",
       "unreachableDescription": "Níor fhreagair an freastalaí. Seiceáil do nasc, ansin bain triail eile as.",
       "unauthorized": "Dhiúltaigh uirlisí Kilo don seisiún seo",
@@ -4343,6 +4345,7 @@
       "unbindFailed": "Níorbh fhéidir repo a dhícheangal",
       "repoValue": "Stór: {{name}}",
       "profileValue": "Próifíl: {{name}}",
+      "profileUnavailable": "Níl an phróifíl seo ar fáil a thuilleadh. Roghnaigh ceann eile.",
       "pickerEmptyDescriptionOrganization": "Cruthaigh próifíl eagrais chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Is féidir le húinéir nó riarthóir eagrais próifíl eagrais a chruthú."
     },
@@ -4675,7 +4678,8 @@
     "expiresIn": "Rachaidh in éag i gceann {{duration}}",
     "neverExpires": "Ní rachaidh in éag go deo",
     "includesNewMessages": "Tá teachtaireachtaí nua san áireamh.",
-    "excludesNewMessages": "Níl teachtaireachtaí nua san áireamh."
+    "excludesNewMessages": "Níl teachtaireachtaí nua san áireamh.",
+    "superseded": "Cuireadh nasc nua in ionad an naisc seo in áit eile, mar sin ní oibríonn sé a thuilleadh."
   },
   "sharedSession": {
     "title": "Seisiún comhroinnte",

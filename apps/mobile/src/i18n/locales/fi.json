@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Ilmoituksen kuitti",
-      "description": "Lähettämäsi ilmoituksen kuitti. Säilytä tämä tunnus, jotta voit viitata siihen myöhemmin.",
+      "description": "Säilytä tämä tunnus, jotta voit viitata siihen myöhemmin.",
       "receiptLabel": "Kuitti",
       "copyReceiptId": "Kopioi kuitin tunnus",
       "appealLabel": "Valitus",
@@ -3641,6 +3641,8 @@
       "available": "Käytettävissä olevat työkalut: {{count}}",
       "none": "Työkaluja ei ole saatavilla",
       "noneDescription": "Kilo-palvelin ei palauttanut yhtään työkalua.",
+      "notApplied": "Kilo-työkaluja ei lisätty tähän keskusteluun",
+      "notAppliedDescription": "Valintasi on tallennettu. Yritä uudelleen ottaaksesi sen nyt käyttöön tässä keskustelussa.",
       "unreachable": "Kilon työkaluihin ei saatu yhteyttä",
       "unreachableDescription": "Palvelin ei vastannut. Tarkista yhteytesi ja yritä uudelleen.",
       "unauthorized": "Kilon työkalut hylkäsivät tämän istunnon",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Koodivaraston sidontaa ei voitu purkaa",
       "repoValue": "Koodivarasto: {{name}}",
       "profileValue": "Profiili: {{name}}",
+      "profileUnavailable": "Tämä profiili ei ole enää käytettävissä. Valitse toinen.",
       "pickerEmptyDescriptionOrganization": "Luo organisaatioprofiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organisaation omistaja tai ylläpitäjä voi luoda organisaatioprofiilin."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Vanhenee {{duration}} kuluttua",
     "neverExpires": "Ei vanhene",
     "includesNewMessages": "Uudet viestit sisällytetään.",
-    "excludesNewMessages": "Uusia viestejä ei sisällytetä."
+    "excludesNewMessages": "Uusia viestejä ei sisällytetä.",
+    "superseded": "Tämä linkki on korvattu muualla, joten se ei enää toimi."
   },
   "sharedSession": {
     "title": "Jaettu istunto",

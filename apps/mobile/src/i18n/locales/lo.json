@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "ໃບຮັບການລາຍງານ",
-      "description": "ໃບຮັບສຳລັບການລາຍງານທີ່ທ່ານສົ່ງ. ເກັບ ID ນີ້ໄວ້ເພື່ອອ້າງອີງໃນພາຍຫຼັງ.",
+      "description": "ເກັບ ID ນີ້ໄວ້ເພື່ອອ້າງອີງໃນພາຍຫຼັງ.",
       "receiptLabel": "ໃບຮັບ",
       "copyReceiptId": "ຄັດລອກ ID ຂອງໃບຮັບ",
       "appealLabel": "ການອຸທອນ",
@@ -3641,6 +3641,8 @@
       "available": "ເຄື່ອງມືທີ່ມີ: {{count}}",
       "none": "ບໍ່ມີເຄື່ອງມື",
       "noneDescription": "ເຊີບເວີ Kilo ບໍ່ໄດ້ສົ່ງເຄື່ອງມືກັບມາ.",
+      "notApplied": "ຍັງບໍ່ໄດ້ເພີ່ມເຄື່ອງມື Kilo ໃສ່ການສົນທະນານີ້",
+      "notAppliedDescription": "ບັນທຶກຕົວເລືອກຂອງທ່ານແລ້ວ. ລອງໃໝ່ເພື່ອນຳໃຊ້ໃນການສົນທະນານີ້ຕອນນີ້.",
       "unreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຄື່ອງມື Kilo ໄດ້",
       "unreachableDescription": "ເຊີບເວີບໍ່ຕອບສະໜອງ. ກວດສອບການເຊື່ອມຕໍ່ຂອງທ່ານ, ແລ້ວລອງອີກຄັ້ງ.",
       "unauthorized": "ເຄື່ອງມື Kilo ປະຕິເສດເຊສຊັນນີ້",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "ບໍ່ສາມາດຍົກເລີກການຜູກມັດ repo ໄດ້",
       "repoValue": "ບ່ອນເກັບມ້ຽນ: {{name}}",
       "profileValue": "ໂປຣໄຟລ໌: {{name}}",
+      "profileUnavailable": "ໂປຣໄຟລ໌ນີ້ບໍ່ມີໃຫ້ໃຊ້ອີກແລ້ວ. ເລືອກໂປຣໄຟລ໌ອື່ນ.",
       "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ.",
       "pickerEmptyDescriptionOrganizationReadOnly": "ເຈົ້າຂອງອົງກອນ ຫຼືຜູ້ບໍລິຫານສາມາດສ້າງໂປຣໄຟລ໌ຂອງອົງກອນໄດ້."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "ໝົດອາຍຸໃນ {{duration}}",
     "neverExpires": "ບໍ່ມີວັນໝົດອາຍຸ",
     "includesNewMessages": "ລວມຂໍ້ຄວາມໃໝ່ດ້ວຍ.",
-    "excludesNewMessages": "ບໍ່ລວມຂໍ້ຄວາມໃໝ່."
+    "excludesNewMessages": "ບໍ່ລວມຂໍ້ຄວາມໃໝ່.",
+    "superseded": "ລິ້ງນີ້ຖືກແທນທີ່ຈາກອຸປະກອນອື່ນແລ້ວ, ຈຶ່ງໃຊ້ບໍ່ໄດ້ອີກ."
   },
   "sharedSession": {
     "title": "ເຊດຊັນທີ່ແບ່ງປັນ",

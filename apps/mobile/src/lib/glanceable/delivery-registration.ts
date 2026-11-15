@@ -10,6 +10,8 @@ import {
   awaitLogoutReconciliationSettled,
   hasPendingActivityUnregister,
 } from '@/lib/auth/logout-reconciliation';
+import { readStoredValueSafe } from '@/lib/auth/secure-store-value';
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 import { trpcClient } from '@/lib/trpc';
 
 import {
@@ -30,6 +32,12 @@ import {
   _resetAndroidSessionTokensForTests,
   androidSessionActivityTokens,
 } from './session-activity-tokens-android';
+import {
+  _resetSessionTokenIdentityForTests,
+  readSessionTokenIdentitiesForScope,
+  retireSessionTokenIdentities,
+  type SessionTokenAccount,
+} from './session-token-identity';
 import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
 import {
   _resetUnregisterSessionForTests,
@@ -168,6 +176,17 @@ async function registerAndroidToken(target: Registration): Promise<void> {
   }
 }
 
+/**
+ * The account whose delivery records this teardown retires. The device's active
+ * user id still names the leaving account while the teardown runs (it is
+ * deleted later in the same sign-out); a keychain that cannot answer leaves the
+ * identities alone rather than attributing them to the wrong account.
+ */
+async function readRetiringAccount(): Promise<SessionTokenAccount | null> {
+  const userId = await readStoredValueSafe(ACTIVE_USER_ID_KEY);
+  return userId === null || userId.length === 0 ? null : { userId };
+}
+
 const delivery: GlanceableDelivery = {
   registerScopeTokens(organizationId, userId) {
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
@@ -250,13 +269,32 @@ const delivery: GlanceableDelivery = {
         sessionActivityTokens,
         androidSessionActivityTokens,
       ];
-      const tokens = unionTokens(includeScope ? records : [activityTokens]);
+      /* A row a previous process wrote is named only by its recorded token: the
+         sets above are this process's. Without these the teardown reports a
+         clean delete and erases the identity of a row it never touched. Only the
+         account being torn down is in scope: another account's rows cannot be
+         deleted with this account's credentials, and its identities must stay
+         able to name them. An account the keychain cannot name leaves every
+         identity alone, for a teardown that can. */
+      const retiringAccount = includeScope ? await readRetiringAccount() : null;
+      const recorded =
+        retiringAccount === null ? [] : await readSessionTokenIdentitiesForScope(retiringAccount);
+      const tokens = unionTokens(
+        includeScope
+          ? [...records, new Set(recorded.flatMap(identity => identity.tokens))]
+          : [activityTokens]
+      );
       // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
       const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;
       if (authToken === null) {
         return { ok: tokens.length === 0, tokens };
       }
       const failed = await deleteActivityTokens(tokens, authToken, records);
+      if (retiringAccount !== null) {
+        /* Retire only the identities whose rows this delete removed; one whose
+           token failed still names a row the next cleanup has to delete. */
+        retireSessionTokenIdentities(retiringAccount, new Set(failed));
+      }
       // Keep Android's existing successful-cleanup result contract.
       return {
         ok: failed.length === 0,
@@ -286,6 +324,7 @@ export function _resetDeliveryRegistrationForTests(): void {
   pushToStartToken = null;
   _resetSessionActivityTokensForTests();
   _resetAndroidSessionTokensForTests();
+  _resetSessionTokenIdentityForTests();
   resetTokenMutationQueue();
   _resetUnregisterSessionForTests();
   if (Platform.OS === 'ios') {

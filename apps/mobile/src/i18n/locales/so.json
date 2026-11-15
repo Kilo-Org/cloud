@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Rasiidka warbixinta",
-      "description": "Rasiidka warbixinta aad gudbisay. Kaydso aqoonsigan si aad mar dambe ugu tixraacdo.",
+      "description": "Kaydso aqoonsigan si aad mar dambe ugu tixraacdo.",
       "receiptLabel": "Rasiid",
       "copyReceiptId": "Koobi aqoonsiga rasiidka",
       "appealLabel": "Rafcaan",
@@ -3641,6 +3641,8 @@
       "available": "Qalabka la heli karo: {{count}}",
       "none": "Ma jiro qalab la heli karo",
       "noneDescription": "Serverka Kilo ma soo celin wax qalab ah.",
+      "notApplied": "Qalabka Kilo laguma darin sheekaysigan",
+      "notAppliedDescription": "Doorashadaada waa la kaydiyay. Mar kale isku day si aad hadda ugu isticmaasho sheekaysigan.",
       "unreachable": "Lama gaari karin qalabka Kilo",
       "unreachableDescription": "Serverku ma jawaabin. Hubi xiriirkaaga, kadib isku day mar kale.",
       "unauthorized": "Qalabka Kilo wuu diiday sheekaysigan",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Waa la furi waayay repo",
       "repoValue": "Kaydka: {{name}}",
       "profileValue": "Astaanta: {{name}}",
+      "profileUnavailable": "Astaantan hadda lama heli karo. Dooro mid kale.",
       "pickerEmptyDescriptionOrganization": "Abuur profile urur si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Milkiilaha ururka ama maamulaha ayaa abuuri kara profile urur."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Wuxuu dhacayaa {{duration}} gudahood",
     "neverExpires": "Marnaba ma dhaco",
     "includesNewMessages": "Fariimaha cusub waa lagu daray.",
-    "excludesNewMessages": "Fariimaha cusub lagama darin."
+    "excludesNewMessages": "Fariimaha cusub lagama darin.",
+    "superseded": "Xiriirkan meel kale ayaa lagu beddelay, sidaas darteed hadda ma shaqaynayo."
   },
   "sharedSession": {
     "title": "Fadhi la wadaagay",

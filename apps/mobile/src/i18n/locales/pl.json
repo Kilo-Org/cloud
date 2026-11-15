@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Potwierdzenie zgłoszenia",
-      "description": "Potwierdzenie przesłanego przez ciebie zgłoszenia. Zachowaj ten identyfikator, aby móc się do niego później odwołać.",
+      "description": "Zachowaj ten identyfikator, aby móc się do niego później odwołać.",
       "receiptLabel": "Potwierdzenie",
       "copyReceiptId": "Skopiuj identyfikator potwierdzenia",
       "appealLabel": "Odwołanie",
@@ -3749,6 +3749,8 @@
       "available": "Dostępne narzędzia: {{count}}",
       "none": "Brak dostępnych narzędzi",
       "noneDescription": "Serwer Kilo nie zwrócił żadnych narzędzi.",
+      "notApplied": "Narzędzia Kilo nie zostały dodane do tego czatu",
+      "notAppliedDescription": "Twój wybór został zapisany. Spróbuj ponownie, aby zastosować go teraz w tym czacie.",
       "unreachable": "Nie udało się połączyć z narzędziami Kilo",
       "unreachableDescription": "Serwer nie odpowiedział. Sprawdź połączenie i spróbuj ponownie.",
       "unauthorized": "Narzędzia Kilo odrzuciły tę sesję",
@@ -4282,6 +4284,7 @@
       "unbindFailed": "Nie można odłączyć repozytorium",
       "repoValue": "Repozytorium: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Ten profil nie jest już dostępny. Wybierz inny.",
       "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Właściciel lub administrator organizacji może utworzyć profil organizacji."
     },
@@ -4610,7 +4613,8 @@
     "expiresIn": "Wygasa za {{duration}}",
     "neverExpires": "Nie wygasa",
     "includesNewMessages": "Nowe wiadomości są uwzględniane.",
-    "excludesNewMessages": "Nowe wiadomości nie są uwzględniane."
+    "excludesNewMessages": "Nowe wiadomości nie są uwzględniane.",
+    "superseded": "Ten link został zastąpiony na innym urządzeniu, więc już nie działa."
   },
   "sharedSession": {
     "title": "Udostępniona sesja",

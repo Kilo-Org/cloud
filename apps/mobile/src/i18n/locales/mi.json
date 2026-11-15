@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Rīhīti pūrongo",
-      "description": "Te rīhīti mō te pūrongo i tukuna e koe. Puritia tēnei ID hei tohutoro ā muri ake.",
+      "description": "Puritia tēnei ID hei tohutoro ā muri ake.",
       "receiptLabel": "Rīhīti",
       "copyReceiptId": "Tāruatia te rīhīti ID",
       "appealLabel": "Pīra",
@@ -3641,6 +3641,8 @@
       "available": "Ngā taputapu e wātea ana: {{count}}",
       "none": "Kāore he taputapu e wātea ana",
       "noneDescription": "Kāore te tūmau Kilo i whakahoki taputapu.",
+      "notApplied": "Kāore ngā taputapu Kilo i tāpirihia ki tēnei kōrerorero",
+      "notAppliedDescription": "Kua tiakina tō kōwhiringa. Whakamātau anō hei whakamahi i taua kōwhiringa i tēnei kōrerorero ināianei.",
       "unreachable": "Kāore i taea te toro atu ki ngā taputapu Kilo",
       "unreachableDescription": "Kāore te tūmau i whakautu. Tirohia tō hononga, kātahi whakamātauria anō.",
       "unauthorized": "I whakakore ngā taputapu Kilo i tēnei wātū",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Kaore i taea te wete i te repo",
       "repoValue": "Rokiroki: {{name}}",
       "profileValue": "Kōtaha: {{name}}",
+      "profileUnavailable": "Kua kore tēnei kōtaha e wātea. Kōwhiria tētahi atu.",
       "pickerEmptyDescriptionOrganization": "Waihangatia he kōtaha umanga hei whakamahi ano i nga taurangi taiao, nga whakahau tatūnga, me nga pukenga puta noa i nga waahi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Ka taea e te rangatira o te umanga, te kaiwhakahaere ranei, te waihanga i tetahi kōtaha umanga."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Ka pau i roto i {{duration}}",
     "neverExpires": "Kore rawa e pau",
     "includesNewMessages": "Kua whakaurua ngā karere hou.",
-    "excludesNewMessages": "Kāore i whakaurua ngā karere hou."
+    "excludesNewMessages": "Kāore i whakaurua ngā karere hou.",
+    "superseded": "Kua whakakapia tēnei hono i wāhi kē, nō reira kua kore e mahi."
   },
   "sharedSession": {
     "title": "Wātū kua tiria",

@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Rasidin rahoto",
-      "description": "Rasidin rahoton da ka gabatar. Ajiye wannan id don komawa gare shi daga baya.",
+      "description": "Ajiye wannan id don komawa gare shi daga baya.",
       "receiptLabel": "Rasidi",
       "copyReceiptId": "Kwafi id ɗin rasidi",
       "appealLabel": "Ɗaukaka ƙara",
@@ -3641,6 +3641,8 @@
       "available": "Kayan aiki da suke akwai: {{count}}",
       "none": "Babu kayan aiki da suke akwai",
       "noneDescription": "Uwar garken Kilo bai mayar da wani kayan aiki ba.",
+      "notApplied": "Ba a ƙara kayan aikin Kilo zuwa wannan tattaunawa ba",
+      "notAppliedDescription": "An adana zaɓinka. Sake gwadawa don amfani da shi a cikin wannan tattaunawa yanzu.",
       "unreachable": "Ba a iya isa kayan aikin Kilo ba",
       "unreachableDescription": "Uwar garken ba ta amsa ba. Duba haɗin ka, sannan ka sake gwadawa.",
       "unauthorized": "Kayan aikin Kilo sun ƙi wannan zaman",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "An kasa kwance repo",
       "repoValue": "Wurin ajiya: {{name}}",
       "profileValue": "Bayanin martaba: {{name}}",
+      "profileUnavailable": "Wannan bayanin martaba ba ya samuwa kuma. Zaɓi wani.",
       "pickerEmptyDescriptionOrganization": "Ƙirƙirar bayanin martaban ƙungiya don sake amfani da masu canjin yanayi, umarnin saitin, da ƙwarewa a cikin zaman.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Ma'abucin ƙungiya ko mai gudanarwa na iya ƙirƙirar bayanin martaban ƙungiya."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Za ta ƙare cikin {{duration}}",
     "neverExpires": "Ba za ta taɓa ƙarewa ba",
     "includesNewMessages": "An haɗa da sababbin saƙonni.",
-    "excludesNewMessages": "Ba a haɗa da sababbin saƙonni ba."
+    "excludesNewMessages": "Ba a haɗa da sababbin saƙonni ba.",
+    "superseded": "An maye gurbin wannan hanyar haɗin a wani wuri, don haka ta daina aiki."
   },
   "sharedSession": {
     "title": "Zaman da aka raba",

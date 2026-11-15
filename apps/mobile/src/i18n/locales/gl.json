@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Xustificante da denuncia",
-      "description": "O xustificante da denuncia que enviaches. Garda este ID para consultala máis adiante.",
+      "description": "Garda este ID para consultala máis adiante.",
       "receiptLabel": "Xustificante",
       "copyReceiptId": "Copiar ID do xustificante",
       "appealLabel": "Recurso",
@@ -3641,6 +3641,8 @@
       "available": "Ferramentas dispoñibles: {{count}}",
       "none": "Non hai ferramentas dispoñibles",
       "noneDescription": "O servidor de Kilo non devolveu ningunha ferramenta.",
+      "notApplied": "Non se engadiron as ferramentas de Kilo a este chat",
+      "notAppliedDescription": "A túa elección está gardada. Tenta de novo para usala agora neste chat.",
       "unreachable": "Non se puido contactar coas ferramentas de Kilo",
       "unreachableDescription": "O servidor non respondeu. Comproba a túa conexión e volve intentalo.",
       "unauthorized": "As ferramentas de Kilo rexeitaron esta sesión",
@@ -4160,6 +4162,7 @@
       "unbindFailed": "Non se puido desvincular o repositorio",
       "repoValue": "Repositorio: {{name}}",
       "profileValue": "Perfil: {{name}}",
+      "profileUnavailable": "Este perfil xa non está dispoñible. Escolle outro.",
       "pickerEmptyDescriptionOrganization": "Crea un perfil de organización para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Un propietario ou administrador da organización pode crear un perfil de organización."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Caduca dentro de {{duration}}",
     "neverExpires": "Non caduca nunca",
     "includesNewMessages": "Inclúense as mensaxes novas.",
-    "excludesNewMessages": "Exclúense as mensaxes novas."
+    "excludesNewMessages": "Exclúense as mensaxes novas.",
+    "superseded": "Esta ligazón foi substituída desde outro dispositivo, polo que xa non funciona."
   },
   "sharedSession": {
     "title": "Sesión compartida",

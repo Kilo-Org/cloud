@@ -76,6 +76,7 @@ const dashboardStats = vi.hoisted(() => ({
   isLoading: false,
   isPending: false,
   isError: false,
+  dataUpdatedAt: 0,
   data: undefined as Record<string, unknown> | undefined,
   refetch: vi.fn(),
 }));
@@ -83,6 +84,7 @@ const lastSync = vi.hoisted(() => ({
   data: undefined as { lastSyncTime?: string | null } | undefined,
   isError: false,
   isPending: false,
+  dataUpdatedAt: 0,
   refetch: vi.fn(),
 }));
 const repositories = vi.hoisted(() => ({
@@ -2323,5 +2325,131 @@ describe('DashboardScreen trial refusal (reader role)', () => {
     renderScreen(ORG_SCOPE);
 
     expect(retryCards.cards[0]?.action).toBeUndefined();
+  });
+});
+
+// The warning a failed pull raises describes the reads that failed. A later
+// success of one of them must not retire it while the other is still stale —
+// that is the unrelated-success clear the old latched boolean could not avoid.
+describe('DashboardScreen pull-to-refresh failure retirement', () => {
+  const REFRESH_FAILED_COPY = i18n.t('securityAgent.dashboard.refreshFailed');
+
+  async function pull(root: R): Promise<void> {
+    const refreshControl = tabScreen.refreshControl as ReactElement<{ onRefresh: () => void }>;
+    await act(async () => {
+      refreshControl.props.onRefresh();
+      await Promise.resolve();
+    });
+    root.update(dashboardTree());
+  }
+
+  beforeEach(() => {
+    dashboardStats.dataUpdatedAt = 0;
+    lastSync.dataUpdatedAt = 0;
+    dashboardStats.isError = false;
+    lastSync.isError = false;
+    dashboardStats.isLoading = false;
+    dashboardStats.isPending = false;
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    sharedMetrics.build.mockReturnValue([]);
+    lastSync.data = { lastSyncTime: '2026-10-30T12:00:00.000Z' };
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.data = [];
+    dashboardStats.refetch.mockReset();
+    lastSync.refetch.mockReset();
+    repositories.refetch.mockReset();
+    repositories.refetch.mockResolvedValue({ isError: false, dataUpdatedAt: 0 });
+  });
+
+  it('keeps a sync-only failure through a stats-only success and retires it when the sync read advances', async () => {
+    dashboardStats.refetch.mockResolvedValue({ isError: false, dataUpdatedAt: 1 });
+    lastSync.refetch.mockResolvedValue({ isError: true, dataUpdatedAt: 7 });
+    const root = renderScreen();
+
+    await pull(root);
+    expect(renderedTexts(root.root)).toContain(REFRESH_FAILED_COPY);
+
+    // A foreground refresh advanced only the stats read.
+    dashboardStats.dataUpdatedAt = 1;
+    act(() => {
+      root.update(dashboardTree());
+    });
+    expect(renderedTexts(root.root)).toContain(REFRESH_FAILED_COPY);
+
+    // The read that actually failed succeeded.
+    lastSync.dataUpdatedAt = 8;
+    act(() => {
+      root.update(dashboardTree());
+    });
+    expect(renderedTexts(root.root)).not.toContain(REFRESH_FAILED_COPY);
+  });
+
+  it('keeps a stats-only failure through a sync-only success and retires it when the stats read advances', async () => {
+    dashboardStats.refetch.mockResolvedValue({ isError: true, dataUpdatedAt: 5 });
+    lastSync.refetch.mockResolvedValue({ isError: false, dataUpdatedAt: 9 });
+    const root = renderScreen();
+
+    await pull(root);
+    expect(renderedTexts(root.root)).toContain(REFRESH_FAILED_COPY);
+
+    lastSync.dataUpdatedAt = 9;
+    act(() => {
+      root.update(dashboardTree());
+    });
+    expect(renderedTexts(root.root)).toContain(REFRESH_FAILED_COPY);
+
+    dashboardStats.dataUpdatedAt = 6;
+    act(() => {
+      root.update(dashboardTree());
+    });
+    expect(renderedTexts(root.root)).not.toContain(REFRESH_FAILED_COPY);
+  });
+
+  it('retires a failure that is published after its own read already recovered', async () => {
+    // The third read stays in flight while the stats read recovers, so the
+    // warning is published only after the recovery has moved the timestamp the
+    // effect already saw.
+    const repositoriesRead = Promise.withResolvers<{ isError: boolean; dataUpdatedAt: number }>();
+    dashboardStats.refetch.mockResolvedValue({ isError: true, dataUpdatedAt: 5 });
+    lastSync.refetch.mockResolvedValue({ isError: false, dataUpdatedAt: 9 });
+    repositories.refetch.mockReturnValue(repositoriesRead.promise);
+    const root = renderScreen();
+
+    await pull(root);
+    expect(renderedTexts(root.root)).not.toContain(REFRESH_FAILED_COPY);
+
+    dashboardStats.dataUpdatedAt = 6;
+    act(() => {
+      root.update(dashboardTree());
+    });
+
+    await act(async () => {
+      repositoriesRead.resolve({ isError: false, dataUpdatedAt: 0 });
+      await Promise.resolve();
+    });
+
+    expect(renderedTexts(root.root)).not.toContain(REFRESH_FAILED_COPY);
+  });
+
+  it('requires both failed reads to advance when both failed', async () => {
+    dashboardStats.refetch.mockResolvedValue({ isError: true, dataUpdatedAt: 5 });
+    lastSync.refetch.mockResolvedValue({ isError: true, dataUpdatedAt: 7 });
+    const root = renderScreen();
+
+    await pull(root);
+    expect(renderedTexts(root.root)).toContain(REFRESH_FAILED_COPY);
+
+    dashboardStats.dataUpdatedAt = 6;
+    act(() => {
+      root.update(dashboardTree());
+    });
+    expect(renderedTexts(root.root)).toContain(REFRESH_FAILED_COPY);
+
+    lastSync.dataUpdatedAt = 8;
+    act(() => {
+      root.update(dashboardTree());
+    });
+    expect(renderedTexts(root.root)).not.toContain(REFRESH_FAILED_COPY);
   });
 });

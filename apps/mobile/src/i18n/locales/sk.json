@@ -413,7 +413,7 @@
     },
     "reportReceipt": {
       "title": "Potvrdenie o nahlásení",
-      "description": "Potvrdenie k nahláseniu, ktoré si odoslal. Uschovaj si toto ID, aby si sa naň mohol neskôr odvolávať.",
+      "description": "Uschovaj si toto ID, aby si sa naň mohol neskôr odvolávať.",
       "receiptLabel": "Potvrdenie",
       "copyReceiptId": "Kopírovať ID potvrdenia",
       "appealLabel": "Odvolanie",
@@ -3749,6 +3749,8 @@
       "available": "Dostupné nástroje: {{count}}",
       "none": "Nie sú dostupné žiadne nástroje",
       "noneDescription": "Server Kilo nevrátil žiadne nástroje.",
+      "notApplied": "Nástroje Kilo neboli pridané do tohto chatu",
+      "notAppliedDescription": "Vaša voľba je uložená. Ak ju chcete použiť hneď v tomto chate, klepnite na Skúsiť znova.",
       "unreachable": "Nepodarilo sa pripojiť k nástrojom Kilo",
       "unreachableDescription": "Server neodpovedal. Skontrolujte pripojenie a skúste to znova.",
       "unauthorized": "Nástroje Kilo odmietli túto reláciu",
@@ -4282,6 +4284,7 @@
       "unbindFailed": "Nepodarilo sa odpojiť repo",
       "repoValue": "Úložisko: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Tento profil už nie je k dispozícii. Vyberte iný.",
       "pickerEmptyDescriptionOrganization": "Vytvorte profil organizácie na opätovné použitie premenných prostredia, príkazov nastavenia a zručností v rámci relácií.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizácie môže vytvoriť vlastník alebo správca organizácie."
     },
@@ -4610,7 +4613,8 @@
     "expiresIn": "Vyprší o {{duration}}",
     "neverExpires": "Nikdy nevyprší",
     "includesNewMessages": "Nové správy sú zahrnuté.",
-    "excludesNewMessages": "Nové správy nie sú zahrnuté."
+    "excludesNewMessages": "Nové správy nie sú zahrnuté.",
+    "superseded": "Tento odkaz bol nahradený na inom zariadení, preto už nefunguje."
   },
   "sharedSession": {
     "title": "Zdieľaná relácia",

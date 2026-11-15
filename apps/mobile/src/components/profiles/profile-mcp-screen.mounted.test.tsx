@@ -23,6 +23,7 @@ import {
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 
 const h = vi.hoisted(() => ({
@@ -751,6 +752,117 @@ describe('ProfileMcpScreen delete confirmation', () => {
       profileId: 'profile-1',
       mcpServerId: 'mcp-1',
     });
+
+    unmount();
+  });
+});
+
+/** The translated cap line, as the footer and the sheet render it. */
+function capMessage(): string {
+  return i18n.t('profiles.mcp.limitReached', { max: MAX_PROFILE_MCP_SERVERS });
+}
+
+/** `length` distinct servers, so the list holds exactly the count the server caps. */
+function serversAt(length: number) {
+  return Array.from({ length }, (_, index) =>
+    testServer({ id: `mcp-${index}`, name: `server-${index}` })
+  );
+}
+
+describe('ProfileMcpScreen server cap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    Object.assign(h.query, { isError: false, isPending: false, isRefetching: false });
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('states the cap above the Add action and disables it at the cap', async () => {
+    h.query.data = testProfile(serversAt(MAX_PROFILE_MCP_SERVERS));
+    const { renderer, unmount } = await mountScreen();
+
+    // One pre-order walk, so the indexes compare the footer's own order.
+    const ordered = renderer.root.findAll(
+      node => String(node.type) === 'Text' || String(node.type) === 'Button'
+    );
+    const noticeIndex = ordered.findIndex(node => node.props.children === capMessage());
+    const addIndex = ordered.findIndex(node => node.type === 'Button');
+
+    expect(noticeIndex).toBeGreaterThan(-1);
+    expect(addIndex).toBeGreaterThan(-1);
+    expect(noticeIndex).toBeLessThan(addIndex);
+    expect(ordered[noticeIndex]?.props.className).toContain('text-warn');
+    expect(findOne(renderer.root, 'Button').props.disabled).toBe(true);
+
+    unmount();
+  });
+
+  it('offers the Add action without a notice one server below the cap', async () => {
+    h.query.data = testProfile(serversAt(MAX_PROFILE_MCP_SERVERS - 1));
+    const { renderer, unmount } = await mountScreen();
+
+    expect(
+      findAll(renderer.root, 'Text').some(node => node.props.children === capMessage())
+    ).toBe(false);
+    expect(findOne(renderer.root, 'Button').props.disabled).toBe(false);
+
+    unmount();
+  });
+
+  it('reports a create the cap refuses as the cap line, not a generic failure', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.mutations.createMcp.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Profiles are limited to 20 MCP servers'), {
+        data: { code: 'PRECONDITION_FAILED' },
+      })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer);
+    changeText(renderer.root, 'Server name', 'new-server');
+    changeText(renderer.root, 'Command line', 'npx some-mcp');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(node => node.props.children === capMessage())
+    );
+    const status = findAll(renderer.root, 'Text').find(
+      node => node.props.children === capMessage()
+    );
+    expect(status?.props.className).toContain('text-warn');
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.mcp.saveFailed')
+      )
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('reports any other refused create as a generic failure', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.mutations.createMcp.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Internal server error'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer);
+    changeText(renderer.root, 'Server name', 'new-server');
+    changeText(renderer.root, 'Command line', 'npx some-mcp');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.mcp.saveFailed')
+      )
+    );
+    const status = findAll(renderer.root, 'Text').find(
+      node => node.props.children === i18n.t('profiles.mcp.saveFailed')
+    );
+    expect(status?.props.className).toContain('text-destructive');
 
     unmount();
   });

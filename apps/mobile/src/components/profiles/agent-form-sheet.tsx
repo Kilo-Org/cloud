@@ -20,12 +20,14 @@ import {
   validateAgentForm,
 } from '@/components/profiles/profile-agents-model';
 import { SheetHeader } from '@/components/sheet-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
+import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
@@ -39,6 +41,15 @@ const ERROR_FIELDS = {
   'name-too-long': 'name',
   'description-too-long': 'description',
 } as const satisfies Record<AgentFormError, string>;
+
+/**
+ * The save's refusal: the per-profile agent cap, a slug the server already
+ * has, or any other refusal.
+ */
+export type AgentSaveFailure =
+  | { readonly kind: 'limit' }
+  | { readonly kind: 'slug-conflict' }
+  | { readonly kind: 'refused' };
 
 type AgentFormSheetProps = Readonly<{
   /**
@@ -54,8 +65,8 @@ type AgentFormSheetProps = Readonly<{
   isSaving: boolean;
   onClose: () => void;
   onSave: (payload: { slug: string; name: string; config: Record<string, unknown> }) => void;
-  /** A server-side slug conflict, shown on the slug field like a validation error. */
-  slugConflictFromServer?: boolean;
+  /** The last save refusal, each arm rendered where it belongs in the sheet. */
+  saveFailure?: AgentSaveFailure | null;
 }>;
 
 /**
@@ -68,6 +79,11 @@ type AgentFormSheetProps = Readonly<{
  * description, the `profiles.tooLong` bound — under the field at fault, and the
  * typed values stay in the sheet. Every tool is
  * allowed unless its switch is off, which writes `deny` for that tool only.
+ * A create the profile's cap refuses arrives as `limit` and renders the cap
+ * copy as a warning; any other refused save arrives as `refused` and renders
+ * one line inside the sheet, because a toast behind the open sheet is
+ * invisible. A slug only the server can detect arrives as `slug-conflict` and
+ * shows under the slug field.
  *
  * Sampling (max steps, temperature, top_p) mirrors the web editor. The effort
  * variant control appears only when the typed model's catalogue entry lists
@@ -82,10 +98,12 @@ export function AgentFormSheet({
   isSaving,
   onClose,
   onSave,
-  slugConflictFromServer = false,
+  saveFailure = null,
 }: Readonly<AgentFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  // A slug the server already has shows on the slug field like a validation error.
+  const slugConflictFromServer = saveFailure?.kind === 'slug-conflict';
   const initial = initialAgentFormState(agent ?? undefined);
   const scope = draftScope;
   const slugRef = useFormDraftRef(scope, 'slug', initial.slug);
@@ -183,6 +201,17 @@ export function AgentFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
+        <AccessibleStatus
+          message={
+            saveFailure?.kind === 'limit'
+              ? t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS })
+              : saveFailure?.kind === 'refused'
+                ? t('profiles.agents.saveFailed')
+                : null
+          }
+          tone={saveFailure?.kind === 'limit' ? 'warn' : 'error'}
+          className="text-sm"
+        />
         <FormField
           label={t('profiles.agents.slug')}
           defaultValue={slugRef.current}

@@ -2,11 +2,12 @@
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
+import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import { type AgentSource, PERMISSION_TOOLS } from '@/components/profiles/profile-agents-model';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
@@ -186,7 +187,8 @@ function modelOption(id: string, variants: string[]) {
 function mountSheet(
   agent: AgentSource | null,
   existingSlugs: readonly string[] = [],
-  draftScope?: string
+  draftScope?: string,
+  saveFailure: AgentSaveFailure | null = null
 ) {
   return renderWithProviders(
     createElement(AgentFormSheet, {
@@ -195,6 +197,7 @@ function mountSheet(
       existingSlugs,
       organizationId: undefined,
       isSaving: false,
+      saveFailure,
       onClose: () => {
         h.onClose();
       },
@@ -491,6 +494,37 @@ describe('AgentFormSheet refused save', () => {
 
     expect(h.scrollTo).toHaveBeenCalledWith({ y: 508, animated: true });
     expect(h.onSave).not.toHaveBeenCalled();
+
+    unmount();
+  });
+});
+
+describe('AgentFormSheet save refusal copy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.useAvailableModels.mockReturnValue({ models: [] });
+  });
+
+  it('names the cap in the warn tone when a create is refused past it', async () => {
+    const { renderer, unmount } = await mountSheet(null, [], undefined, { kind: 'limit' });
+
+    const cap = i18n.t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS });
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === cap);
+
+    expect(status?.props.className).toContain('text-warn');
+    expect(status?.props.className).not.toContain('text-destructive');
+
+    unmount();
+  });
+
+  it('shows any other refused create in the destructive tone', async () => {
+    const { renderer, unmount } = await mountSheet(null, [], undefined, { kind: 'refused' });
+
+    const failed = i18n.t('profiles.agents.saveFailed');
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === failed);
+
+    expect(status?.props.className).toContain('text-destructive');
 
     unmount();
   });

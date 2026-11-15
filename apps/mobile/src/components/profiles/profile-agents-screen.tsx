@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
-import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
+import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import {
   AGENT_VISIBILITY_LABEL_KEYS,
   agentRows,
@@ -16,6 +16,7 @@ import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profi
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Bot, Pencil, Trash2 } from '@/components/ui/icons';
@@ -29,9 +30,11 @@ import {
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
+import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -148,15 +151,18 @@ export function ProfileAgentsScreen({
 
   const agents = profileQuery.data ?? NO_AGENTS;
   const rows = agentRows(agents);
+  // The server counts every row this profile holds and the list returns every
+  // row unfiltered, so the loaded length is the count the cap compares.
+  const atAgentCap = agents.length >= MAX_PROFILE_AGENTS;
   // `null` = closed, the add form, or the agent being edited. The form and the
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
   // what was typed instead of dropping it.
   const draftScope = `profiles:agents:${profileId}`;
-  // A save the server rejected on the slug shows the inline conflict message
-  // instead of only a toast: the sheet stays open on the typed values, so the
-  // user can rename without retyping the form. The flag is the form's note, so
-  // opening or closing the form resets it with the rest of the draft.
-  const form = useProfileFormDraft(draftScope, agents, { slugConflict: false });
+  // A save the server refused leaves one note the sheet renders: a slug the
+  // profile already uses shows under the slug field, a create past the cap
+  // names the cap, and any other refusal is one line in the sheet. The note is
+  // the form's own, so opening or closing the form resets it with the draft.
+  const form = useProfileFormDraft<AgentSource, AgentSaveFailure | null>(draftScope, agents, null);
   // The list sits underneath the sheet, and a sheet dismisses natively, so the
   // second tap of a Save double tap would land on the row just saved.
   const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
@@ -174,6 +180,7 @@ export function ProfileAgentsScreen({
     // The form this save belongs to. A remount keeps it alive; a later open or
     // close replaces it, and this attempt must then leave the new form alone.
     const generation = form.generation();
+    form.setNotes(null);
     try {
       await (target === null
         ? createAgent.mutateAsync({ profileId, ...payload })
@@ -183,12 +190,16 @@ export function ProfileAgentsScreen({
         return;
       }
       if (isSlugConflict(error)) {
-        form.setNotes({ slugConflict: true });
+        form.setNotes({ kind: 'slug-conflict' });
         return;
       }
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.agents.saveFailed'));
+      // Only a create can pass the per-profile cap, and its service refuses it
+      // with this code and no other meaning on that path.
+      if (target === null && readTrpcErrorField(error, 'code') === 'PRECONDITION_FAILED') {
+        form.setNotes({ kind: 'limit' });
+        return;
       }
+      form.setNotes({ kind: 'refused' });
       return;
     }
     if (form.isCurrent(generation)) {
@@ -280,7 +291,14 @@ export function ProfileAgentsScreen({
           );
         })}
         <ProfileManageSlot permission={permission}>
-          <Button onPress={handleStartAdd}>
+          {atAgentCap ? (
+            <AccessibleStatus
+              message={t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+          <Button disabled={atAgentCap} onPress={handleStartAdd}>
             <Text>{t('profiles.agents.add')}</Text>
           </Button>
         </ProfileManageSlot>
@@ -314,7 +332,7 @@ export function ProfileAgentsScreen({
             .map(candidate => candidate.slug)}
           organizationId={organizationId}
           isSaving={createAgent.isPending || updateAgent.isPending}
-          slugConflictFromServer={form.notes.slugConflict}
+          saveFailure={form.notes}
           onClose={handleClose}
           onSave={payload => {
             void saveAgent(form.editing, payload);

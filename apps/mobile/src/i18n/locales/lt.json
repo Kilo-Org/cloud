@@ -1158,7 +1158,7 @@
       "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}. Būsena: {{status}}"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
       "edit": "Redaguoti"
@@ -2100,7 +2100,7 @@
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
       "couldNotOpenMessage": "Nepavyko pradėti GitHub programėlės sąrankos. Bandyk dar kartą.",
-      "installedTitle": "GitHub programėlė įdiegta",
+      "installedTitle": "GitHub App įdiegtas",
       "installedMessage": "Tavo saugyklos dabar prijungtos.",
       "pendingTitle": "Laukiama administratoriaus patvirtinimo",
       "pendingMessage": "Organizacijos administratorius turi patvirtinti diegimo užklausą.",
@@ -2109,13 +2109,13 @@
       "cannotCompleteTitle": "Nepavyksta užbaigti diegimo",
       "notAdminMessage": "Tik tos GitHub paskyros administratorius gali ją prijungti. Paprašyk organizacijos administratoriaus įdiegti Kilo.",
       "alreadyClaimedMessage": "Ši įdiegta GitHub programėlė jau susieta su kita Kilo paskyra. Pirmiausia atjunk ją toje paskyroje.",
-      "installationUnavailableMessage": "Šis GitHub App diegimas sustabdytas arba nebepasiekiamas. Atkurk jį arba įdiek iš naujo GitHub, tada pradėk iš naujo.",
+      "installationUnavailableMessage": "Šis GitHub App diegimas sustabdytas arba nebepasiekiamas. Atkurk jį arba įdiek iš naujo GitHub platformoje, tada pradėk iš naujo.",
       "multipleInstallationsMessage": "Ši Kilo organizacija šiuo metu gali prijungti tik vieną GitHub organizaciją.",
       "didNotCompleteTitle": "Diegimas neužbaigtas",
-      "didNotCompleteMessage": "GitHub programėlės diegimas neužbaigtas. Bandyk dar kartą programėlėje."
+      "didNotCompleteMessage": "GitHub App diegimas neužbaigtas. Bandyk dar kartą programėlėje."
     },
     "remoteSpawnRetryable": "Nepavyko pasiekti egzemplioriaus — jis galėjo atsijungti.",
-    "remoteSpawnNonRetryable": "Egzemplioriui nepavyko pradėti sesijos — patikrink įrenginį arba atnaujink CLI.",
+    "remoteSpawnNonRetryable": "Egzemplioriui nepavyko pradėti sesijos — patikrink kompiuterį arba atnaujink CLI.",
     "remoteSpawnInstanceDisconnected": "Pasirinktas egzempliorius atsijungė. Pradėk sesiją su Cloud Agent arba pasirink kitą egzempliorių."
   },
   "agentChat": {
@@ -2125,9 +2125,9 @@
       "backToSessions": "Grįžti į sesijas",
       "follow": "Sekti sesiją",
       "unfollow": "Nebesekti sesijos",
-      "couldNotLoad": "Nepavyko įkelti sesijos.",
-      "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
-      "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
+      "couldNotLoad": "Nepavyko įkelti sesijos",
+      "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos",
+      "failedToStopExecution": "Nepavyko sustabdyti vykdymo",
       "stopped": "Sesija sustabdyta",
       "committing": "Įrašoma…",
       "committed": "Įrašyta",
@@ -2143,13 +2143,13 @@
       "emptyReadOnlyTitle": "Šioje sesijoje nėra žinučių",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
-      "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos.",
+      "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
       "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
       "connectionTrouble": "Sutriko ryšys. Netrukus bandykite dar kartą.",
-      "modelUnavailable": "Šis modelis neveikia su „Cloud Agent“. Pasirinkite kitą modelį ir bandykite dar kartą.",
+      "modelUnavailable": "Šis modelis neprieinamas „Cloud Agent“. Pasirinkite kitą modelį ir bandykite dar kartą.",
       "cancelQueuedFailed": "Nepavyko atšaukti žinutės.",
       "cancelQueuedRestoreAvailable": "Žinutė atšaukta. Bakstelėkite atkūrimo mygtuką, kad grąžintumėte ją į žinutės įvesties lauką.",
       "cancelQueuedRestored": "Žinutė atšaukta. Užklausa grąžinta į žinutės įvesties lauką.",
@@ -2164,7 +2164,7 @@
       "exitSession": "Baigti sesiją",
       "restartExitFailed": "Pradėta nauja sesija. Ankstesnė sesija vis dar atidaryta.",
       "exitNotSupported": "Šios sesijos negalima baigti nuotoliniu būdu.",
-      "exitUnavailable": "Šiuo metu šios sesijos negalima baigti nuotoliniu būdu.",
+      "exitUnavailable": "Šios sesijos negalima baigti nuotoliniu būdu.",
       "exitNeedsNewerCli": "Norint nuotoliniu būdu vykdyti komandas su pasviruoju brūkšniu, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "sessionConnection": {
@@ -2410,24 +2410,24 @@
       "toolRepoOverview": "repozitorijos apžvalga",
       "toolSemanticSearch": "semantinė paieška",
       "toolSendFile": "Išsiųstas failas",
-      "toolSendFileAction": "siųsti failą",
+      "toolSendFileAction": "Siųsti failą",
       "readTodos": "Skaityti planą",
       "updateTodos": "Atnaujinti planą",
-      "linesBadge": "eil.: {{displayCount}}",
-      "filesBadge": "failų: {{displayCount}}",
-      "matchesBadge": "atitikčių: {{displayCount}}",
-      "filesBadge_one": "failas: {{displayCount}}",
-      "filesBadge_other": "failų: {{displayCount}}",
-      "filesBadge_few": "failai: {{displayCount}}",
-      "filesBadge_many": "failų: {{displayCount}}",
-      "linesBadge_one": "eil.: {{displayCount}}",
-      "linesBadge_other": "eil.: {{displayCount}}",
-      "linesBadge_few": "eil.: {{displayCount}}",
-      "linesBadge_many": "eil.: {{displayCount}}",
-      "matchesBadge_one": "atitiktis: {{displayCount}}",
-      "matchesBadge_other": "atitikčių: {{displayCount}}",
-      "matchesBadge_few": "atitiktys: {{displayCount}}",
-      "matchesBadge_many": "atitikčių: {{displayCount}}",
+      "linesBadge": "{{displayCount}} eil.",
+      "filesBadge": "{{displayCount}} failų",
+      "matchesBadge": "{{displayCount}} atitikčių",
+      "filesBadge_one": "{{displayCount}} failas",
+      "filesBadge_other": "{{displayCount}} failų",
+      "filesBadge_few": "{{displayCount}} failai",
+      "filesBadge_many": "{{displayCount}} failo",
+      "linesBadge_one": "{{displayCount}} eil.",
+      "linesBadge_other": "{{displayCount}} eil.",
+      "linesBadge_few": "{{displayCount}} eil.",
+      "linesBadge_many": "{{displayCount}} eil.",
+      "matchesBadge_one": "{{displayCount}} atitiktis",
+      "matchesBadge_other": "{{displayCount}} atitikčių",
+      "matchesBadge_few": "{{displayCount}} atitiktys",
+      "matchesBadge_many": "{{displayCount}} atitikties",
       "noOutput": "Nėra išvesties.",
       "translationFailed": "Vertimas nepavyko"
     },
@@ -2674,12 +2674,12 @@
       "unreadableBody": "Agentas laukia leidimo užklausos, kurios ši programa negali parodyti, todėl jai nerodoma jokia kortelė. Atnaujinkite programą arba CLI arba atsakykite į užklausą CLI, kad galėtumėte tęsti."
     },
     "questionCard": {
-      "title": "Agentui reikia atsakymo",
+      "title": "Agentas laukia jūsų įvesties",
       "skipQuestionsTitle": "Praleisti klausimus?",
       "skipQuestionsMessage": "Agentas praleis šį veiksmą.",
       "answerProgress": "Atsakyta {{answered}} iš {{total}}",
-      "selectAllThatApply": "Pasirinkite visus tinkamus variantus.",
-      "option": "Parinktis: {{label}}",
+      "selectAllThatApply": "Pasirinkite visus tinkamus variantus",
+      "option": "{{label}}",
       "optionSelected": "{{label}}, pasirinkta",
       "typeYourOwnAnswer": "Įvesti savo atsakymą",
       "typeYourOwnAnswerPlaceholder": "Jūsų atsakymas…",
@@ -2868,7 +2868,7 @@
       "exitSession": "Baigti sesiją",
       "clearSession": "Baigti šią sesiją ir pradėti naują",
       "compactDescription": "suspausti dabartinės sesijos kontekstą",
-      "goalDescription": "Toliau dirbk siekdamas sesijos tikslo. /goal <objective> arba pause, resume, clear",
+      "goalDescription": "Toliau dirbk siekdamas sesijos tikslo. /goal <objective> arba pause, resume, clear. Tikslas gali laukti suplanuoto pažadinimo, cron užduoties arba fono proceso: laukimas pristabdo tikslą, kol laukiamas įvykis suveikia, o paskui tikslas tęsiamas pats; /goal pause ir /goal clear atšaukia jo suplanuotus laikmačius. Jei tikslas yra laukti diegimo, kūrimo ar CI užduoties, suplanuok tą laukimą iš karto; pirmiau netyrinėk saugyklos.",
       "initDescription": "vedamas AGENTS.md nustatymas",
       "resumeClaudeDescription": "importuok Claude Code sesijos transkriptą",
       "resumeCodexDescription": "importuok OpenAI Codex sesijos transkriptą",
@@ -3001,8 +3001,8 @@
     }
   },
   "bootstrap": {
-    "couldNotLoadAccount": "Nepavyko įkelti tavo paskyros.",
-    "couldNotLoadPrivacy": "Nepavyko įkelti privatumo parinkčių.",
+    "couldNotLoadAccount": "Nepavyko įkelti tavo paskyros",
+    "couldNotLoadPrivacy": "Nepavyko įkelti privatumo parinkčių",
     "couldNotLoadPrivacyDescription": "Patikrink įrenginio saugos nustatymus ir bandyk dar kartą.",
     "contentReady": "Turinys paruoštas",
     "retryLoadingAccount": "Bandyti įkelti paskyrą dar kartą",
@@ -3995,7 +3995,7 @@
       "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
       "repositoryRequired": "Norint paleisti agentą, reikia saugyklos. Atsidaryk Kilo ir pasirink saugyklą, tada paleisk iš naujo.",
       "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
-      "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
+      "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — agentas jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
     }
   },
   "launcher": {

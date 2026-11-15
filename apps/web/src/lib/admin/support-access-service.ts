@@ -126,6 +126,24 @@ export function assertGrantApprovable(params: {
   assertAdminActor(params.requester);
 }
 
+/**
+ * Whether an organization is live, for a caller outside a transaction: the
+ * router reads this before it claims the single-use step-up proof. The write
+ * paths keep their own share-locked read inside the transaction.
+ */
+export async function assertSupportOrganizationLive(
+  organizationId: string,
+  fromDb: typeof db = db
+): Promise<void> {
+  const [organization] = await fromDb
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+}
+
 async function assertLiveOrganization(
   tx: DrizzleTransaction,
   organizationId: string

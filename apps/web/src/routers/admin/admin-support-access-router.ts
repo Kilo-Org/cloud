@@ -17,6 +17,7 @@ import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   approveSupportGrant,
   assertGrantApprovable,
+  assertSupportOrganizationLive,
   cancelSupportGrant,
   denySupportGrant,
   emergencyIssueSupportGrant,
@@ -132,6 +133,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
             actor_kilo_user_id: support_access_grants.actor_kilo_user_id,
             status: support_access_grants.status,
             action_class: support_access_grants.action_class,
+            request_expires_at: support_access_grants.request_expires_at,
           })
           .from(support_access_grants)
           .where(eq(support_access_grants.id, input.grantId))
@@ -150,6 +152,15 @@ export const adminSupportAccessRouter = createTRPCRouter({
           grant,
           requester,
         });
+        // The transaction marks an elapsed pending window expired, then answers
+        // the same conflict. Reading the window here keeps the proof unspent.
+        if (
+          grant.request_expires_at !== null &&
+          Date.parse(grant.request_expires_at) <= Date.now()
+        ) {
+          throw new TRPCError({ code: 'CONFLICT', message: 'Grant is not pending' });
+        }
+        await assertSupportOrganizationLive(grant.organization_id);
         await supportStepUpPort.requireFresh({
           userId: ctx.user.id,
           action: 'support_approval',

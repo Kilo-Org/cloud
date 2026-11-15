@@ -823,6 +823,77 @@ describe('support write step-up', () => {
       where: eq(support_access_grants.id, pending.id),
     });
     expect(stored?.status).toBe('pending');
+
+    // A pending request whose window has passed answers the conflict the
+    // transaction produces after its expiry sweep, before the proof is claimed.
+    const elapsedRequester = await insertRequester();
+    const elapsed = await (
+      await stepUpCaller(elapsedRequester.id, organization.id)
+    ).admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+    });
+    await db
+      .update(support_access_grants)
+      .set({ request_expires_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(support_access_grants.id, elapsed.id));
+    const elapsedBefore = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, elapsed.id),
+    });
+
+    const elapsedApprover = await insertRequester();
+    await expect(
+      (await stepUpCaller(elapsedApprover.id, organization.id)).admin.supportAccess.approve({
+        grantId: elapsed.id,
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Grant is not pending',
+    });
+    expect((await approvalProof(elapsedApprover.id, organization.id))?.consumed_at).toBeNull();
+    expect(
+      await db.query.support_access_grants.findFirst({
+        where: eq(support_access_grants.id, elapsed.id),
+      })
+    ).toEqual(elapsedBefore);
+
+    // A grant on a soft-deleted organization answers the transaction's own
+    // not-found before the proof is claimed.
+    const deletedRequester = await insertRequester();
+    const { organization: deletedOrganization } = await orgWithOwner();
+    const deletedPending = await (
+      await stepUpCaller(deletedRequester.id, deletedOrganization.id)
+    ).admin.supportAccess.request({
+      organizationId: deletedOrganization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+    });
+    await db
+      .update(organizations)
+      .set({ deleted_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(organizations.id, deletedOrganization.id));
+    const deletedBefore = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, deletedPending.id),
+    });
+
+    const deletedApprover = await insertRequester();
+    await expect(
+      (await stepUpCaller(deletedApprover.id, deletedOrganization.id)).admin.supportAccess.approve({
+        grantId: deletedPending.id,
+      })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Organization not found',
+    });
+    expect(
+      (await approvalProof(deletedApprover.id, deletedOrganization.id))?.consumed_at
+    ).toBeNull();
+    expect(
+      await db.query.support_access_grants.findFirst({
+        where: eq(support_access_grants.id, deletedPending.id),
+      })
+    ).toEqual(deletedBefore);
   });
 
   test('a read grant request needs a live session proof while step-up is on', async () => {

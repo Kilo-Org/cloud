@@ -83,7 +83,7 @@ jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }))
 const domRestores: (() => void)[] = [];
 
 afterAll(() => {
-  for (const restore of domRestores.splice(0)) {
+  for (const restore of domRestores.splice(0).reverse()) {
     restore();
   }
 });

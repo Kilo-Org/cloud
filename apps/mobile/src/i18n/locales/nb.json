@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Rapportkvittering",
-      "description": "Kvitteringen for rapporten du sendte inn. Ta vare på denne ID-en slik at du kan vise til den senere.",
+      "description": "Ta vare på denne ID-en slik at du kan vise til den senere.",
       "receiptLabel": "Kvittering",
       "copyReceiptId": "Kopier kvitterings-ID",
       "appealLabel": "Klage",
@@ -3640,6 +3640,8 @@
       "available": "Tilgjengelige verktøy: {{count}}",
       "none": "Ingen verktøy tilgjengelige",
       "noneDescription": "Kilo-serveren svarte uten verktøy.",
+      "notApplied": "Kilo-verktøy ble ikke lagt til i denne chatten",
+      "notAppliedDescription": "Valget ditt er lagret. Prøv igjen for å bruke det i denne chatten nå.",
       "unreachable": "Kunne ikke nå Kilo-verktøy",
       "unreachableDescription": "Serveren svarte ikke. Sjekk tilkoblingen og prøv igjen.",
       "unauthorized": "Kilo-verktøy avviste denne økten",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Kunne ikke løsne repoen",
       "repoValue": "Depot: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Denne profilen er ikke lenger tilgjengelig. Velg en annen.",
       "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
       "pickerEmptyDescriptionOrganizationReadOnly": "En organisasjonseier eller administrator kan opprette en organisasjonsprofil."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Utløper om {{duration}}",
     "neverExpires": "Utløper aldri",
     "includesNewMessages": "Nye meldinger er inkludert.",
-    "excludesNewMessages": "Nye meldinger er ikke inkludert."
+    "excludesNewMessages": "Nye meldinger er ikke inkludert.",
+    "superseded": "Denne lenken ble erstattet et annet sted, så den virker ikke lenger."
   },
   "sharedSession": {
     "title": "Delt økt",

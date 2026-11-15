@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Kvittun fyrir tilkynningu",
-      "description": "Kvittunin fyrir tilkynninguna sem þú sendir inn. Geymdu þetta auðkenni til að vísa í hana síðar.",
+      "description": "Geymdu þetta auðkenni til að vísa í hana síðar.",
       "receiptLabel": "Kvittun",
       "copyReceiptId": "Afrita auðkenni kvittunar",
       "appealLabel": "Áfrýjun",
@@ -3640,6 +3640,8 @@
       "available": "Verkfæri í boði: {{count}}",
       "none": "Engin verkfæri í boði",
       "noneDescription": "Kilo-þjónninn skilaði engum verkfærum.",
+      "notApplied": "Kilo-verkfærum var ekki bætt við þetta spjall",
+      "notAppliedDescription": "Valið þitt er vistað. Veldu „Reyna aftur“ til að nota það í þessu spjalli núna.",
       "unreachable": "Náði ekki sambandi við Kilo-verkfæri",
       "unreachableDescription": "Þjónninn svaraði ekki. Athugaðu tenginguna og reyndu aftur.",
       "unauthorized": "Kilo-verkfæri höfnuðu þessu setu",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Ekki tókst að aftengja geymslu",
       "repoValue": "Geymsla: {{name}}",
       "profileValue": "Prófíl: {{name}}",
+      "profileUnavailable": "Þessi prófíll er ekki lengur tiltækur. Veldu annan.",
       "pickerEmptyDescriptionOrganization": "Búðu til stofnunarprófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Eigandi stofnunar eða stjórnandi getur búið til stofnunarprófíl."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Rennur út eftir {{duration}}",
     "neverExpires": "Rennur aldrei út",
     "includesNewMessages": "Ný skilaboð eru tekin með.",
-    "excludesNewMessages": "Ný skilaboð eru ekki tekin með."
+    "excludesNewMessages": "Ný skilaboð eru ekki tekin með.",
+    "superseded": "Þessum tengli var skipt út annars staðar og því virkar hann ekki lengur."
   },
   "sharedSession": {
     "title": "Samnýtt lota",

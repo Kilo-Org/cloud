@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Resibo ng ulat",
-      "description": "Ang resibo para sa ulat na isinumite mo. Itago ang id na ito para magamit na sanggunian sa ibang pagkakataon.",
+      "description": "Itago ang id na ito para magamit na sanggunian sa ibang pagkakataon.",
       "receiptLabel": "Resibo",
       "copyReceiptId": "Kopyahin ang id ng resibo",
       "appealLabel": "Apela",
@@ -3640,6 +3640,8 @@
       "available": "Mga available na tool: {{count}}",
       "none": "Walang available na tool",
       "noneDescription": "Walang ibinalik na tool ang Kilo server.",
+      "notApplied": "Hindi naidagdag ang mga tool ng Kilo sa chat na ito",
+      "notAppliedDescription": "Naka-save ang pinili mo. Subukan muli para magamit ito sa chat na ito ngayon.",
       "unreachable": "Hindi maabot ang mga tool ng Kilo",
       "unreachableDescription": "Hindi tumugon ang server. Suriin ang koneksyon mo, pagkatapos ay subukan muli.",
       "unauthorized": "Tinanggihan ng mga tool ng Kilo ang session na ito",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Hindi ma-unbind ang repo",
       "repoValue": "Repositoryo: {{name}}",
       "profileValue": "Profile: {{name}}",
+      "profileUnavailable": "Hindi na available ang profile na ito. Pumili ng iba.",
       "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Ang may-ari ng organisasyon o admin ang makakagawa ng profile ng organisasyon."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Mag-e-expire sa loob ng {{duration}}",
     "neverExpires": "Hindi mag-e-expire",
     "includesNewMessages": "Kasama ang mga bagong mensahe.",
-    "excludesNewMessages": "Hindi kasama ang mga bagong mensahe."
+    "excludesNewMessages": "Hindi kasama ang mga bagong mensahe.",
+    "superseded": "Pinalitan ang link na ito sa ibang device, kaya hindi na ito gumagana."
   },
   "sharedSession": {
     "title": "Ibinahaging session",

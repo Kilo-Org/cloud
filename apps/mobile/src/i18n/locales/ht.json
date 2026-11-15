@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Resi rapò",
-      "description": "Resi pou rapò ou te soumèt la. Kenbe ID sa a pou w ka itilize l pita.",
+      "description": "Kenbe ID sa a pou w ka itilize l pita.",
       "receiptLabel": "Resi",
       "copyReceiptId": "Kopye ID resi a",
       "appealLabel": "Apèl",
@@ -3640,6 +3640,8 @@
       "available": "Zouti ki disponib: {{count}}",
       "none": "Pa gen zouti disponib",
       "noneDescription": "Sèvè Kilo a pa tounen okenn zouti.",
+      "notApplied": "Yo pa t ajoute zouti Kilo yo nan chat sa a",
+      "notAppliedDescription": "Chwa ou a anrejistre. Eseye ankò pou itilize li nan chat sa a kounye a.",
       "unreachable": "Nou pa t kapab rive jwenn zouti Kilo",
       "unreachableDescription": "Sèvè a pa reponn. Verifye koneksyon w, epi eseye ankò.",
       "unauthorized": "Zouti Kilo yo refize sesyon sa a",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Pa t 'kapab dezole repo",
       "repoValue": "Depo: {{name}}",
       "profileValue": "Pwofil: {{name}}",
+      "profileUnavailable": "Pwofil sa a pa disponib ankò. Chwazi yon lòt.",
       "pickerEmptyDescriptionOrganization": "Kreye yon pwofil òganizasyon pou reitilize varyab anviwònman yo, kòmandman konfigirasyon, ak ladrès atravè sesyon yo.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Yon pwopriyetè oswa administratè òganizasyon ka kreye yon pwofil òganizasyon."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Ap ekspire nan {{duration}}",
     "neverExpires": "Pa janm ekspire",
     "includesNewMessages": "Nouvo mesaj yo enkli.",
-    "excludesNewMessages": "Nouvo mesaj yo pa enkli."
+    "excludesNewMessages": "Nouvo mesaj yo pa enkli.",
+    "superseded": "Yo te ranplase lyen sa a yon lòt kote, kidonk li pa mache ankò."
   },
   "sharedSession": {
     "title": "Sesyon pataje",

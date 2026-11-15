@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "වාර්තා රිසිට්පත",
-      "description": "ඔබ ඉදිරිපත් කළ වාර්තාව සඳහා වන රිසිට්පත. පසුව එය සඳහන් කිරීමට මෙම ID අංකය තබා ගන්න.",
+      "description": "පසුව එය සඳහන් කිරීමට මෙම ID අංකය තබා ගන්න.",
       "receiptLabel": "රිසිට්පත",
       "copyReceiptId": "රිසිට්පතේ ID පිටපත් කරන්න",
       "appealLabel": "අභියාචනය",
@@ -3640,6 +3640,8 @@
       "available": "ලබා ගත හැකි මෙවලම්: {{count}}",
       "none": "මෙවලම් නොමැත",
       "noneDescription": "Kilo සේවාදායකය කිසිදු මෙවලමක් ආපසු ලබා දුන්නේ නැත.",
+      "notApplied": "මෙම කතාබහට Kilo මෙවලම් එක් කර නැත",
+      "notAppliedDescription": "ඔබගේ තේරීම සුරැකී ඇත. එය දැන් මෙම කතාබහේ භාවිතා කිරීමට නැවත උත්සාහ කරන්න.",
       "unreachable": "Kilo මෙවලම් වෙත ළඟා විය නොහැකි විය",
       "unreachableDescription": "සේවාදායකය පිළිතුරු දුන්නේ නැත. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "unauthorized": "Kilo මෙවලම් මෙම සැසිය ප්‍රතික්ෂේප කළේය",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "repo බැඳීම ඉවත් කළ නොහැකි විය",
       "repoValue": "ගබඩාව: {{name}}",
       "profileValue": "පැතිකඩ: {{name}}",
+      "profileUnavailable": "මෙම පැතිකඩ තවදුරටත් ලබා ගත නොහැක. වෙනත් පැතිකඩක් තෝරන්න.",
       "pickerEmptyDescriptionOrganization": "සැසි හරහා පරිසර විචල්‍ය, සැකසුම් විධාන සහ කුසලතා නැවත භාවිතා කිරීමට සංවිධාන පැතිකඩක් සාදන්න.",
       "pickerEmptyDescriptionOrganizationReadOnly": "සංවිධාන හිමිකරුවෙකුට හෝ පරිපාලකයෙකුට සංවිධාන පැතිකඩක් සෑදිය හැක."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "{{duration}}කින් කල් ඉකුත් වේ",
     "neverExpires": "කිසිදා කල් ඉකුත් නොවේ",
     "includesNewMessages": "නව පණිවිඩ ඇතුළත් වේ.",
-    "excludesNewMessages": "නව පණිවිඩ ඇතුළත් නොවේ."
+    "excludesNewMessages": "නව පණිවිඩ ඇතුළත් නොවේ.",
+    "superseded": "මෙම සබැඳිය වෙනත් තැනකින් ප්‍රතිස්ථාපනය කර ඇති නිසා එය තවදුරටත් ක්‍රියා නොකරයි."
   },
   "sharedSession": {
     "title": "බෙදාගත් සැසිය",

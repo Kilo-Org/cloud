@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Potvrzení o nahlášení",
-      "description": "Potvrzení k nahlášení, které jste odeslali. Uschovejte si toto ID, abyste se na něj mohli později odkázat.",
+      "description": "Uschovejte si toto ID, abyste se na něj mohli později odkázat.",
       "receiptLabel": "Potvrzení",
       "copyReceiptId": "Kopírovat ID potvrzení",
       "appealLabel": "Odvolání",
@@ -3748,6 +3748,8 @@
       "available": "Dostupné nástroje: {{count}}",
       "none": "Nejsou dostupné žádné nástroje",
       "noneDescription": "Server Kilo nevrátil žádné nástroje.",
+      "notApplied": "Nástroje Kilo nebyly přidány do této konverzace",
+      "notAppliedDescription": "Vaše volba je uložena. Chcete-li ji nyní použít v této konverzaci, klepněte na Zkusit znovu.",
       "unreachable": "Nepodařilo se připojit k nástrojům Kilo",
       "unreachableDescription": "Server neodpověděl. Zkontrolujte připojení a zkuste to znovu.",
       "unauthorized": "Nástroje Kilo odmítly tuto relaci",
@@ -4281,6 +4283,7 @@
       "unbindFailed": "Repo se nepodařilo zrušit",
       "repoValue": "Úložiště: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Tento profil už není dostupný. Vyberte jiný.",
       "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizace může vytvořit vlastník organizace nebo správce."
     },
@@ -4609,7 +4612,8 @@
     "expiresIn": "Vyprší za {{duration}}",
     "neverExpires": "Nikdy nevyprší",
     "includesNewMessages": "Nové zprávy jsou zahrnuty.",
-    "excludesNewMessages": "Nové zprávy nejsou zahrnuty."
+    "excludesNewMessages": "Nové zprávy nejsou zahrnuty.",
+    "superseded": "Tento odkaz byl nahrazen na jiném zařízení, a proto už nefunguje."
   },
   "sharedSession": {
     "title": "Sdílená relace",

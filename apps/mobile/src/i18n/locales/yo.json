@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Ìwé ẹ̀rí ìjábọ̀",
-      "description": "Ìwé ẹ̀rí fún ìjábọ̀ tí o fi ránṣẹ́. Tọ́jú id yìí láti tọ́ka sí i lẹ́yìn náà.",
+      "description": "Tọ́jú id yìí láti tọ́ka sí i lẹ́yìn náà.",
       "receiptLabel": "Ìwé ẹ̀rí",
       "copyReceiptId": "Dákọ ID ìwé ẹ̀rí",
       "appealLabel": "Ẹ̀bẹ̀",
@@ -3640,6 +3640,8 @@
       "available": "Àwọn irinṣẹ́ tó wà: {{count}}",
       "none": "Kò sí irinṣẹ́ kankan",
       "noneDescription": "Sáfà Kilo kò dá irinṣẹ́ kankan padà.",
+      "notApplied": "A kò fi àwọn irinṣẹ́ Kilo kún ìjíròrò yìí",
+      "notAppliedDescription": "A ti fi àṣàyàn rẹ pamọ́. Tún gbìyànjú láti lò ó nínú ìjíròrò yìí ní báyìí.",
       "unreachable": "A kò lè dé àwọn irinṣẹ́ Kilo",
       "unreachableDescription": "Sáfà kò dáhùn. Ṣàyẹ̀wò ìsopọ̀ rẹ, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
       "unauthorized": "Àwọn irinṣẹ́ Kilo kọ̀ ìpàdé yìí",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Ko le yọkuro repo",
       "repoValue": "Ibi ipamọ: {{name}}",
       "profileValue": "Profaili: {{name}}",
+      "profileUnavailable": "Profaili yìí kò sí mọ́. Yan òmíràn.",
       "pickerEmptyDescriptionOrganization": "Ṣẹda profaili ajọ kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Olukilani ajọ tabi olùṣàkoso ajọ le ṣẹda profaili ajọ kan."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Yóò dópin lẹ́yìn {{duration}}",
     "neverExpires": "Kò ní dópin láé",
     "includesNewMessages": "A fi àwọn ìfiránṣẹ́ tuntun kún un.",
-    "excludesNewMessages": "A kò fi àwọn ìfiránṣẹ́ tuntun kún un."
+    "excludesNewMessages": "A kò fi àwọn ìfiránṣẹ́ tuntun kún un.",
+    "superseded": "A ti rọ́pò ìjápọ̀ yìí ní ibòmíràn, nítorí náà kò ṣiṣẹ́ mọ́."
   },
   "sharedSession": {
     "title": "Ìgbà iṣẹ́ tí a pín",

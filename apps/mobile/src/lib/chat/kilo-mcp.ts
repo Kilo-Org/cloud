@@ -10,7 +10,7 @@ import {
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { KILO_MCP_URL } from '@/lib/config';
-import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { getItem, removeItem, setItem, setItemWithSignal } from '@/lib/persist/encrypted-kv';
 import { KILO_MCP_SERVER_ID } from './mcp-server-namespace';
 import { type ChatPlace } from './scope';
 
@@ -353,15 +353,32 @@ export function forgetKiloMcp(): void {
  * value is written under the session id, exactly as the unanswered question is.
  */
 export async function mcpEnabledFor(sessionId: string): Promise<boolean> {
-  return (await getItem(PREFERENCE_SCOPE, sessionId)) !== OFF;
+  return (await mcpChoiceFor(sessionId)) !== false;
 }
 
-export async function setMcpEnabled(sessionId: string, enabled: boolean): Promise<void> {
+/**
+ * The choice on disk, or null when the person never made one.
+ *
+ * Null is not "off": the switch draws its own default for a chat nobody chose
+ * for, and the default is on, so a chat with no stored value must not read as
+ * an off choice.
+ */
+export async function mcpChoiceFor(sessionId: string): Promise<boolean | null> {
+  return (await getItem(PREFERENCE_SCOPE, sessionId)) === OFF ? false : null;
+}
+
+export async function setMcpEnabled(
+  sessionId: string,
+  enabled: boolean,
+  signal?: AbortSignal
+): Promise<void> {
   if (enabled) {
-    await removeItem(PREFERENCE_SCOPE, sessionId);
+    await removeItem(PREFERENCE_SCOPE, sessionId, signal);
     return;
   }
-  await setItem(PREFERENCE_SCOPE, sessionId, OFF);
+  await (signal === undefined
+    ? setItem(PREFERENCE_SCOPE, sessionId, OFF)
+    : setItemWithSignal(PREFERENCE_SCOPE, sessionId, { value: OFF, signal }));
 }
 
 /** Carries the setting across a model switch, which opens a new session. */

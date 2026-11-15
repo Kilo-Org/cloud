@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "રિપોર્ટની રસીદ",
-      "description": "તમે સબમિટ કરેલા રિપોર્ટની રસીદ. પછીથી તેનો સંદર્ભ આપવા માટે આ ID સાચવી રાખો.",
+      "description": "પછીથી તેનો સંદર્ભ આપવા માટે આ ID સાચવી રાખો.",
       "receiptLabel": "રસીદ",
       "copyReceiptId": "રસીદ ID કૉપી કરો",
       "appealLabel": "અપીલ",
@@ -3640,6 +3640,8 @@
       "available": "ઉપલબ્ધ સાધનો: {{count}}",
       "none": "કોઈ સાધન ઉપલબ્ધ નથી",
       "noneDescription": "Kilo સર્વરે કોઈ સાધન પરત આપ્યું નથી.",
+      "notApplied": "આ ચેટમાં Kilo સાધનો ઉમેરાયા નથી",
+      "notAppliedDescription": "તમારી પસંદગી સાચવવામાં આવી છે. હવે આ ચેટમાં તેનો ઉપયોગ કરવા માટે ફરી પ્રયાસ કરો.",
       "unreachable": "Kilo સાધનો સુધી પહોંચી શકાયું નથી",
       "unreachableDescription": "સર્વરે જવાબ આપ્યો નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
       "unauthorized": "Kilo સાધનોએ આ સત્ર નકાર્યું",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "રિપોઝિટરીનું જોડાણ દૂર કરી શકાયું નથી",
       "repoValue": "રિપોઝિટરી: {{name}}",
       "profileValue": "પ્રોફાઇલ: {{name}}",
+      "profileUnavailable": "આ પ્રોફાઇલ હવે ઉપલબ્ધ નથી. બીજી પસંદ કરો.",
       "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો.",
       "pickerEmptyDescriptionOrganizationReadOnly": "સંસ્થા માલિક અથવા એડમિન સંસ્થા પ્રોફાઇલ બનાવી શકે છે."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "{{duration}} માં સમાપ્ત થશે",
     "neverExpires": "ક્યારેય સમાપ્ત થતી નથી",
     "includesNewMessages": "નવા સંદેશા શામેલ છે.",
-    "excludesNewMessages": "નવા સંદેશા શામેલ નથી."
+    "excludesNewMessages": "નવા સંદેશા શામેલ નથી.",
+    "superseded": "આ લિંક અન્યત્ર બદલવામાં આવી છે, તેથી તે હવે કામ કરતી નથી."
   },
   "sharedSession": {
     "title": "શેર કરેલું સત્ર",

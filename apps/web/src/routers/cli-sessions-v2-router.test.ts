@@ -4426,9 +4426,46 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('share result', () => {
+    const sessionId = 'ses_share_public_id_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Shared session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns the public_id the worker wrote beside the token', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            share_token: 'test.share.token',
+            public_id: '22222222-2222-4222-8222-222222222222',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).resolves.toEqual({
+          share_token: 'test.share.token',
+          public_id: '22222222-2222-4222-8222-222222222222',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
   describe('share size result', () => {
     const sessionId = 'ses_share_oversized_info_0001';
-
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values({
         session_id: sessionId,

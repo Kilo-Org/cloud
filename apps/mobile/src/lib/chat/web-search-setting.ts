@@ -1,4 +1,4 @@
-import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { getItem, removeItem, setItem, setItemWithSignal } from '@/lib/persist/encrypted-kv';
 
 import { decodeBackendTarget, decodeLocalTarget } from './backend-target';
 
@@ -16,14 +16,32 @@ export function webSearchDefault(model: string): boolean {
   return decodeLocalTarget(model) === null && decodeBackendTarget(model) === null;
 }
 
-/** Whether web search is offered in one chat, on the model its next question goes to. */
-export async function webSearchEnabledFor(sessionId: string, model: string): Promise<boolean> {
+/**
+ * The choice on disk, or null when the person never made one for this chat.
+ *
+ * Null is not "off": a chat nobody chose for takes the model's default, which a
+ * separate function decides because it depends on where the question goes.
+ */
+export async function webSearchChoiceFor(sessionId: string): Promise<boolean | null> {
   const stored = await getItem(PREFERENCE_SCOPE, sessionId);
-  return stored === null ? webSearchDefault(model) : stored === ON;
+  return stored === null ? null : stored === ON;
 }
 
-export async function setWebSearchEnabled(sessionId: string, enabled: boolean): Promise<void> {
-  await setItem(PREFERENCE_SCOPE, sessionId, enabled ? ON : OFF);
+/** Whether web search is offered in one chat, on the model its next question goes to. */
+export async function webSearchEnabledFor(sessionId: string, model: string): Promise<boolean> {
+  const choice = await webSearchChoiceFor(sessionId);
+  return choice ?? webSearchDefault(model);
+}
+
+export async function setWebSearchEnabled(
+  sessionId: string,
+  enabled: boolean,
+  signal?: AbortSignal
+): Promise<void> {
+  const value = enabled ? ON : OFF;
+  await (signal === undefined
+    ? setItem(PREFERENCE_SCOPE, sessionId, value)
+    : setItemWithSignal(PREFERENCE_SCOPE, sessionId, { value, signal }));
 }
 
 /** Carries the person's choice across a move, which opens a new session. */

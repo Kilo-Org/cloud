@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "د راپور رسید",
-      "description": "د هغه راپور رسید چې تاسو سپارلی دی. دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
+      "description": "دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
       "receiptLabel": "رسید",
       "copyReceiptId": "د رسید ID کاپي کړئ",
       "appealLabel": "استیناف",
@@ -3640,6 +3640,8 @@
       "available": "د لاسرسي وړ وسیلې: {{count}}",
       "none": "هیڅ وسیله نشته",
       "noneDescription": "د Kilo سرور هیڅ وسیله بیرته ورنکړه.",
+      "notApplied": "د Kilo وسیلې دې خبرو اترو ته نه دي ورزیاتې شوې",
+      "notAppliedDescription": "ستاسو انتخاب خوندي شوی دی. په دې خبرو اترو کې یې اوس د کارولو لپاره بیا هڅه وکړئ.",
       "unreachable": "د Kilo وسیلو ته رسیدل ممکن نه شو",
       "unreachableDescription": "سرور ځواب ورنکړ. خپل اتصال وګورئ او بیا هڅه وکړئ.",
       "unauthorized": "د Kilo وسیلو دا ناسته رد کړه",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "د زېرمتون تړاو لیرې نشو کړای",
       "repoValue": "زېرمتون: {{name}}",
       "profileValue": "پروفایل: {{name}}",
+      "profileUnavailable": "دا پروفایل نور شتون نه لري. بل پروفایل غوره کړئ.",
       "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ.",
       "pickerEmptyDescriptionOrganizationReadOnly": "د سازمان خاوند یا مدیر کولی شي د سازمان پروفایل رامینځته کړي."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "په {{duration}} کې پای ته رسېږي",
     "neverExpires": "هېڅکله نه ختمېږي",
     "includesNewMessages": "نوي پیغامونه شامل دي.",
-    "excludesNewMessages": "نوي پیغامونه شامل نه دي."
+    "excludesNewMessages": "نوي پیغامونه شامل نه دي.",
+    "superseded": "دا لینک په بل ځای کې بدل شوی دی، نو نور کار نه کوي."
   },
   "sharedSession": {
     "title": "شریکه شوې ناسته",

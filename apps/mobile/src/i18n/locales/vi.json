@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Biên nhận báo cáo",
-      "description": "Biên nhận cho báo cáo bạn đã gửi. Hãy lưu lại mã này để tra cứu sau.",
+      "description": "Hãy lưu lại mã này để tra cứu sau.",
       "receiptLabel": "Biên nhận",
       "copyReceiptId": "Sao chép mã biên nhận",
       "appealLabel": "Kháng nghị",
@@ -3640,6 +3640,8 @@
       "available": "Công cụ khả dụng: {{count}}",
       "none": "Không có công cụ nào khả dụng",
       "noneDescription": "Máy chủ Kilo không trả về công cụ nào.",
+      "notApplied": "Công cụ Kilo chưa được thêm vào cuộc trò chuyện này",
+      "notAppliedDescription": "Lựa chọn của bạn đã được lưu. Thử lại để áp dụng ngay trong cuộc trò chuyện này.",
       "unreachable": "Không thể kết nối với công cụ Kilo",
       "unreachableDescription": "Máy chủ không phản hồi. Kiểm tra kết nối của bạn, rồi thử lại.",
       "unauthorized": "Công cụ Kilo đã từ chối phiên này",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Không thể hủy liên kết repo",
       "repoValue": "Kho lưu trữ: {{name}}",
       "profileValue": "Hồ sơ: {{name}}",
+      "profileUnavailable": "Hồ sơ này không còn khả dụng. Hãy chọn hồ sơ khác.",
       "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Chủ sở hữu hoặc quản trị viên của tổ chức có thể tạo hồ sơ tổ chức."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Hết hạn sau {{duration}}",
     "neverExpires": "Không bao giờ hết hạn",
     "includesNewMessages": "Bao gồm cả tin nhắn mới.",
-    "excludesNewMessages": "Không bao gồm tin nhắn mới."
+    "excludesNewMessages": "Không bao gồm tin nhắn mới.",
+    "superseded": "Liên kết này đã được thay thế trên thiết bị khác nên không còn hoạt động."
   },
   "sharedSession": {
     "title": "Phiên được chia sẻ",

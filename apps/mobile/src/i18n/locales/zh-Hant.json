@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "檢舉回執",
-      "description": "這是你所提交檢舉的回執。請保留此 ID，以便日後查詢。",
+      "description": "請保留此 ID，以便日後查詢。",
       "receiptLabel": "回執",
       "copyReceiptId": "複製回執 ID",
       "appealLabel": "申訴",
@@ -3640,6 +3640,8 @@
       "available": "可用工具：{{count}}",
       "none": "沒有可用工具",
       "noneDescription": "Kilo 伺服器未傳回任何工具。",
+      "notApplied": "Kilo 工具尚未加入此對話",
+      "notAppliedDescription": "您的選擇已儲存。再試一次，即可立即在此對話中使用。",
       "unreachable": "無法連接 Kilo 工具",
       "unreachableDescription": "伺服器沒有回應。請檢查網路連線，然後重試。",
       "unauthorized": "Kilo 工具拒絕了此工作階段",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "無法解除倉庫綁定",
       "repoValue": "存儲庫: {{name}}",
       "profileValue": "個人資料: {{name}}",
+      "profileUnavailable": "此個人資料已無法使用。請選擇其他個人資料。",
       "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。",
       "pickerEmptyDescriptionOrganizationReadOnly": "組織擁有者或管理員可以建立組織設定檔。"
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "{{duration}}後到期",
     "neverExpires": "永不過期",
     "includesNewMessages": "包含新訊息。",
-    "excludesNewMessages": "不包含新訊息。"
+    "excludesNewMessages": "不包含新訊息。",
+    "superseded": "此連結已在其他裝置上被取代，因此已失效。"
   },
   "sharedSession": {
     "title": "已分享的工作階段",

@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Teate kinnitus",
-      "description": "Sinu esitatud teate kinnitus. Hoia see ID alles, et saaksid sellele hiljem viidata.",
+      "description": "Hoia see ID alles, et saaksid sellele hiljem viidata.",
       "receiptLabel": "Kinnitus",
       "copyReceiptId": "Kopeeri kinnituse ID",
       "appealLabel": "Vaidlustus",
@@ -3640,6 +3640,8 @@
       "available": "Saadaolevad tööriistad: {{count}}",
       "none": "Tööriistu pole saadaval",
       "noneDescription": "Kilo server ei tagastanud ühtegi tööriista.",
+      "notApplied": "Kilo tööriistu ei lisatud sellesse vestlusse",
+      "notAppliedDescription": "Sinu valik on salvestatud. Proovi uuesti, et seda kohe selles vestluses kasutada.",
       "unreachable": "Kilo tööriistadeni ei õnnestunud jõuda",
       "unreachableDescription": "Server ei vastanud. Kontrolli ühendust ja proovi uuesti.",
       "unauthorized": "Kilo tööriistad keeldusid sellest seansist",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Repot ei saanud lahti siduda",
       "repoValue": "Hoidla: {{name}}",
       "profileValue": "Profiil: {{name}}",
+      "profileUnavailable": "See profiil pole enam saadaval. Vali mõni teine.",
       "pickerEmptyDescriptionOrganization": "Loo organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organisatsiooni omanik või administraator saab organisatsiooniprofiili luua."
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "Kehtib veel {{duration}}",
     "neverExpires": "Ei aegu",
     "includesNewMessages": "Uued sõnumid on kaasatud.",
-    "excludesNewMessages": "Uued sõnumid ei ole kaasatud."
+    "excludesNewMessages": "Uued sõnumid ei ole kaasatud.",
+    "superseded": "See link asendati mujal, mistõttu see enam ei tööta."
   },
   "sharedSession": {
     "title": "Jagatud seanss",

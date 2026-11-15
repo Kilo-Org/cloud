@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "رپورٹ کی رسید",
-      "description": "آپ کی جمع کرائی گئی رپورٹ کی رسید۔ بعد میں حوالے کے لیے یہ آئی ڈی محفوظ رکھیں۔",
+      "description": "بعد میں حوالے کے لیے یہ آئی ڈی محفوظ رکھیں۔",
       "receiptLabel": "رسید",
       "copyReceiptId": "رسید کی آئی ڈی کاپی کریں",
       "appealLabel": "اپیل",
@@ -3640,6 +3640,8 @@
       "available": "دستیاب ٹولز: {{count}}",
       "none": "کوئی ٹول دستیاب نہیں",
       "noneDescription": "Kilo سرور نے کوئی ٹول واپس نہیں کیا۔",
+      "notApplied": "اس چیٹ میں Kilo ٹولز شامل نہیں کیے گئے",
+      "notAppliedDescription": "آپ کا انتخاب محفوظ ہے۔ اسے ابھی اس چیٹ میں استعمال کرنے کے لیے دوبارہ کوشش کریں۔",
       "unreachable": "Kilo ٹولز تک نہیں پہنچ سکا",
       "unreachableDescription": "سرور نے جواب نہیں دیا۔ اپنا کنکشن چیک کریں، پھر دوبارہ کوشش کریں۔",
       "unauthorized": "Kilo ٹولز نے یہ سیشن مسترد کر دیا",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "ریپو کو بند نہیں کیا جا سکا",
       "repoValue": "ذخیرہ: {{name}}",
       "profileValue": "پروفائل: {{name}}",
+      "profileUnavailable": "یہ پروفائل اب دستیاب نہیں ہے۔ کوئی دوسرا پروفائل منتخب کریں۔",
       "pickerEmptyDescriptionOrganization": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک تنظیمی پروفائل بنائیں۔",
       "pickerEmptyDescriptionOrganizationReadOnly": "تنظیم کا مالک یا ایڈمن تنظیمی پروفائل بنا سکتا ہے۔"
     },
@@ -4479,7 +4482,8 @@
     "expiresIn": "میعاد {{duration}} میں ختم ہوگی",
     "neverExpires": "میعاد کبھی ختم نہیں ہوگی",
     "includesNewMessages": "نئے پیغامات شامل ہیں۔",
-    "excludesNewMessages": "نئے پیغامات شامل نہیں ہیں۔"
+    "excludesNewMessages": "نئے پیغامات شامل نہیں ہیں۔",
+    "superseded": "یہ لنک کہیں اور سے بدل دیا گیا ہے، اس لیے اب یہ کام نہیں کرتا۔"
   },
   "sharedSession": {
     "title": "شیئر کردہ سیشن",

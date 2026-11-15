@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Potrdilo o prijavi",
-      "description": "Potrdilo za oddano prijavo. Shrani ta ID za poznejše sklicevanje.",
+      "description": "Shrani ta ID za poznejše sklicevanje.",
       "receiptLabel": "Potrdilo",
       "copyReceiptId": "Kopiraj ID potrdila",
       "appealLabel": "Pritožba",
@@ -3748,6 +3748,8 @@
       "available": "Razpoložljiva orodja: {{count}}",
       "none": "Ni razpoložljivih orodij",
       "noneDescription": "Strežnik Kilo ni vrnil nobenega orodja.",
+      "notApplied": "Orodja Kilo niso bila dodana v ta klepet",
+      "notAppliedDescription": "Izbira je shranjena. Poskusi znova, da jo zdaj uporabiš v tem klepetu.",
       "unreachable": "Ni bilo mogoče doseči orodij Kilo",
       "unreachableDescription": "Strežnik ni odgovoril. Preveri povezavo in poskusi znova.",
       "unauthorized": "Orodja Kilo so zavrnila to sejo",
@@ -4281,6 +4283,7 @@
       "unbindFailed": "Ni bilo mogoče razvezati repoja",
       "repoValue": "Repozitorij: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Ta profil ni več na voljo. Izberi drugega.",
       "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijski profil lahko ustvari lastnik organizacije ali skrbnik."
     },
@@ -4609,7 +4612,8 @@
     "expiresIn": "Poteče čez {{duration}}",
     "neverExpires": "Nikoli ne poteče",
     "includesNewMessages": "Nova sporočila so vključena.",
-    "excludesNewMessages": "Nova sporočila niso vključena."
+    "excludesNewMessages": "Nova sporočila niso vključena.",
+    "superseded": "Ta povezava je bila zamenjana drugje, zato ne deluje več."
   },
   "sharedSession": {
     "title": "Deljena seja",

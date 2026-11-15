@@ -301,6 +301,80 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
     unmount();
   });
 
+  it('does not open the reopened command on the refusal of the form it replaced', async () => {
+    h.query.data = [testCommand()];
+    h.query.isPending = false;
+    const held = Promise.withResolvers<unknown>();
+    h.mutations.updateKiloCommand.mutateAsync.mockReturnValue(held.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit slash command release-notes');
+    changeText(renderer.root, 'Command name', 'renamed');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    // A save in flight closes without asking, and the reader reopens the same
+    // command once the row guard's window has passed.
+    act(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command release-notes');
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 1);
+
+    await act(async () => {
+      held.reject(
+        Object.assign(new Error('A command with this name already exists in this profile'), {
+          data: { code: 'CONFLICT' },
+        })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The refusal belonged to the form that closed: the reopened one is clean.
+    expect(findField(renderer.root, 'Command name').props.error).toBeUndefined();
+
+    unmount();
+  });
+
+  it('clears the refusal of the command it reopens, not the closed add form’s', async () => {
+    h.query.data = [testCommand()];
+    h.query.isPending = false;
+    h.mutations.updateKiloCommand.mutateAsync.mockRejectedValue(new Error('Internal server error'));
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit slash command release-notes');
+    pressSheetDone(renderer.root);
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    act(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command release-notes');
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 1);
+
+    // Reopening the refused command retires that refusal: the fresh form starts
+    // clean instead of carrying the closed form's line.
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    ).toBe(false);
+
+    unmount();
+  });
+
   it('leaves a reopened add form alone when the previous add form’s save settles', async () => {
     h.query.data = [testCommand()];
     h.query.isPending = false;

@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Terminal } from '@/components/ui/icons';
 import { SlashCommandsSkeleton } from '@/components/profiles/slash-commands-skeleton';
-import { useCommandSavePhase } from '@/components/profiles/use-command-save-phase';
+import { ADD_FORM_KEY, useCommandSavePhase } from '@/components/profiles/use-command-save-phase';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -64,8 +64,11 @@ export function ProfileKiloCommandsScreen({
   // remount, and its generation is what proves a settling save still owns it.
   const draftScope = `profiles:slash-commands:${profileId}`;
   const form = useProfileFormDraft<KiloCommandSource, null>(draftScope, commands, null);
+  // The open form's key; the handlers below pass their own destination instead,
+  // because a handler closes over the render before the form it opens.
+  const formKey = form.editing?.id ?? ADD_FORM_KEY;
   const save = useCommandSavePhase(
-    { key: form.editing?.id ?? 'new', generation: form.generation, isCurrent: form.isCurrent },
+    { key: formKey, generation: form.generation, isCurrent: form.isCurrent },
     {
       create: async payload => {
         await createKiloCommand.mutateAsync({ profileId, ...payload });
@@ -81,14 +84,15 @@ export function ProfileKiloCommandsScreen({
 
   const startAdd = () => {
     form.startAdd();
-    // A settled refusal belongs to the previous form; a save still pending for
-    // this resource keeps its admission, so clearWhere cannot touch it.
-    save.retireFailure();
+    // The refusal is filed under the key of the form the reader opens, not the
+    // one the handler was created in. A save still pending for that key keeps
+    // its admission: clearWhere only touches a failed entry.
+    save.retireFailure(ADD_FORM_KEY);
   };
 
   const startEdit = (source: KiloCommandSource) => {
     form.startEdit(source);
-    save.retireFailure();
+    save.retireFailure(source.id);
   };
 
   const handleClose = () => {
@@ -267,7 +271,7 @@ export function ProfileKiloCommandsScreen({
           isSaving={save.isSaving}
           saveFailure={save.failure}
           onFieldEdited={() => {
-            save.retireFailure();
+            save.retireFailure(formKey);
           }}
           onClose={handleClose}
           onCreate={payload => {

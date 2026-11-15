@@ -285,9 +285,8 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
 
   const retireCompletedIntent = useCallback(
     async (intent: CreditPurchaseIntent, owner: PurchaseRequestRecord | null) => {
-      if (!canAttributeNativePurchaseOutcome(intent)) {
-        return;
-      }
+      // Every id this record holds was written by an attributable native
+      // identify, so completing one of them settles the request that recorded it.
       await retireCreditPurchaseIntent(intent);
       const currentOwner = pendingPurchaseRef.current;
       if (
@@ -480,9 +479,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
             ) {
               const completions = await Promise.all(
                 nativePurchases.map(async recovered =>
-                  recovered !== null &&
-                  recovered !== undefined &&
-                  isCurrentAuthEpoch(record.epoch)
+                  recovered !== null && recovered !== undefined && isCurrentAuthEpoch(record.epoch)
                     ? {
                         productId: recovered.productId,
                         completion: await completeDeliveredPurchaseRef.current?.(recovered),

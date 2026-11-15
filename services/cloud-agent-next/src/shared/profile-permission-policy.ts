@@ -25,6 +25,19 @@ function isPermissionAction(value: unknown): value is PermissionAction {
 }
 
 /**
+ * A tool value's rules, with a flat action normalised to the single wildcard
+ * that covers every command. An absent or non-map value states no rule, and the
+ * callers that spread the result treat it as such.
+ */
+export function permissionRulesOf(
+  value: PermissionValue | undefined
+): PermissionRuleMap | undefined {
+  if (typeof value === 'string') return { '*': value };
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) return { ...value };
+  return undefined;
+}
+
+/**
  * Match a command or pattern with the CLI's rule syntax. A permission rule is
  * anchored at both ends of the whole value, `*` matches any run of characters,
  * and `?` matches one.
@@ -312,12 +325,7 @@ export function narrowProfilePermission(
     if (Object.keys(agentRules).length === 0) continue;
     // A flat session action covers every pattern, so it composes as the single
     // wildcard rule and both policies apply to each call.
-    const sessionRules =
-      typeof sessionValue === 'string'
-        ? { '*': sessionValue }
-        : typeof sessionValue === 'object'
-          ? sessionValue
-          : undefined;
+    const sessionRules = permissionRulesOf(sessionValue);
     const rules = composeRuleMap(sessionRules, agentRules);
     if (rules !== undefined) narrowed[tool] = rules;
   }

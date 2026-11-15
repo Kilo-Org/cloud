@@ -522,7 +522,7 @@ describe('migrated origin permissions', () => {
     // The session states its policy as one flat action, so it covers every
     // pattern and the agent entry carries no allowance.
     expect(permission).toBeUndefined();
-    expect(resolveBashPermission({ '*': 'deny' }, {}, '*')).toBe('deny');
+    expect(resolveBashPermission({ '*': 'deny' }, {}, 'npm test')).toBe('deny');
   });
 
   it('bounds an agent entry by the permission map the session runs with', () => {

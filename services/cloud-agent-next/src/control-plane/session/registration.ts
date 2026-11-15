@@ -42,7 +42,11 @@ import {
   CONTROL_PLANE_SANDBOX_PERMISSION,
   isInteractiveSessionOrigin,
 } from '../../shared/control-plane-permission.js';
-import { narrowProfileAgents, type PermissionMap } from '../../shared/profile-permission-policy.js';
+import {
+  narrowProfileAgents,
+  permissionRulesOf,
+  type PermissionMap,
+} from '../../shared/profile-permission-policy.js';
 import { buildGitHubReviewBashRules } from '../../shared/github-review-bash-rules.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
@@ -163,18 +167,6 @@ function materializeAttachPayload(
     }
     throw error;
   }
-}
-
-/**
- * A flat `bash` action covers every command, so it normalises to the single
- * wildcard rule; an object keeps its own rules. Mirrors `composedPermissionMap`
- * in the wrapper, which composes the agent entries against the same shape.
- */
-function bashRulesOf(permission: PermissionMap): Record<string, 'allow' | 'ask' | 'deny'> {
-  const bash = permission['bash'];
-  if (typeof bash === 'string') return { '*': bash };
-  if (typeof bash === 'object' && bash !== null && !Array.isArray(bash)) return { ...bash };
-  return {};
 }
 
 /**
@@ -322,7 +314,7 @@ export function buildControlPlaneSessionRegistration(
   const compositionPermission: PermissionMap = reviewPublisherRules
     ? {
         ...enforcedPermission,
-        bash: { ...bashRulesOf(enforcedPermission), ...buildGitHubReviewBashRules() },
+        bash: { ...permissionRulesOf(enforcedPermission['bash']), ...buildGitHubReviewBashRules() },
       }
     : enforcedPermission;
   const effectiveProfile =

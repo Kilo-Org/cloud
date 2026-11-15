@@ -9,6 +9,7 @@ import {
 import {
   isCommandGuardPermissionMap,
   narrowProfileAgents,
+  permissionRulesOf,
   type PermissionMap,
 } from '../../../src/shared/profile-permission-policy.js';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
@@ -100,13 +101,10 @@ function composedPermissionMap(profile: RuntimeProfile): PermissionMap | undefin
   if (permission === undefined || !isCommandGuardPermissionMap(permission)) return undefined;
   const enforced: PermissionMap = { ...CONTROL_PLANE_SANDBOX_PERMISSION, ...permission };
   if (profile.githubReviewTarget === undefined) return enforced;
-  const bash = enforced['bash'];
-  const bashRules: Record<string, 'allow' | 'ask' | 'deny'> = {
-    ...(typeof bash === 'object' && bash !== null && !Array.isArray(bash) ? bash : {}),
-    ...(typeof bash === 'string' ? { '*': bash } : {}),
-    ...buildGitHubReviewBashRules(),
+  return {
+    ...enforced,
+    bash: { ...permissionRulesOf(enforced['bash']), ...buildGitHubReviewBashRules() },
   };
-  return { ...enforced, bash: bashRules };
 }
 
 /**

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Ku maamul shabakadda",
     "creditHistory": "Taariikhda kiredit-ka",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Jooji",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Iibsiyada, rasiidhada, iyo dhaqdhaqaaqa kiredit-ka",
     "invoicesSubtitle": "Soo dejiso qaansheegyada iibsiyadaada",
-    "manageBilling": "Ku maamul lacag-bixinta kilo.ai",
-    "manageBillingIosNote": "Hababka lacag-bixinta, ku-shubista tooska ah, iyo faahfaahinta biilasha waxaa lagu maamulaa kilo.ai.",
     "codeReviewerSubtitle": "Dib-u-eegisyada tooska ah ee PR",
     "securityAgentSubtitle": "Raadi oo sax nuglaanta amniga",
     "reviews": "Dib-u-eegisyo",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Wuu joogsanayaa {{date}}",
       "cancelScheduledChange": "Jooji isbeddelka la qorsheeyay",
       "cancelled": "Rukummada waa la joojiyay",
-      "changePlan": "Ka beddel qorshaha kilo.ai",
-      "changePlanIosNote": "Beddelka qorshayaasha lacagta ah waxaa laga heli karaa kilo.ai.",
       "creditHistoryEmpty": "Weli ma jiraan kiredit Kilo Pass ah.",
-      "manageInStore": "Ku maamul {{store}}",
       "resume": "Sii wad rukummada",
       "resumeCancelledDescription": "Kilo Pass-kaagu mar kale si toos ah ayuu u cusboonaysiinayaa.",
       "resumePausedDescription": "Kilo Pass-kaagu hadda ayuu dib u bilaabanayaa, ka hor taariikhdii loo qorsheeyay.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Guno bilaash ah",
     "bonusReferral": "Guno tixraac",
     "bonusAvailable": "Guno bilaash ah oo la heli karo",
-    "kiloPassManagement": "Maamulka Kilo Pass",
-    "kiloPassSetup": "Dejinta Kilo Pass",
-    "opensManagementOnWeb": "Wuxuu bogga internetka ka furaa maareynta Kilo Pass.",
     "loadFailedRetry": "Hubi xiriirkaaga, ka dibna mar kale isku day.",
     "legalTermsOfUse": "Shuruudaha isticmaalka (EULA)",
     "purchaseDifferentAccount": "Iibsashadan App Store kuma xidhna akoonkaaga Kilo. Soo gal Apple Account-kii loo adeegsaday iibsashada, ka dibna mar kale isku day.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Iibso boosas",
       "setupAutoTopUp": "Deji ku-shubid toos ah",
       "manageAutoTopUp": "Maaree ku-shubid toos ah",
-      "webAddress": "Cinwaanka webka {{url}}",
       "opensOnWeb": "Waxay ku furmaysaa webka"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "Kooxaha",
       "guardrails": "Xayndaabyada",
       "byok": "Keen furahaaga",
-      "ssoAndDomain": "SSO iyo domain",
-      "emailPreferences": "Doorbidyada iimaylka",
-      "dataCollection": "Ururinta xogta",
       "auditLogs": "Diiwaannada hubinta",
       "requestLogs": "Diiwaannada codsiyada",
       "subOrganizations": "Ururrada hoose",
@@ -3495,8 +3481,7 @@
       "paymentPending": "Lacag bixinta waa la sugayaa",
       "processingBlocked": "Habayntu waa la xannibay",
       "processingNeedsReview": "Habayntu waxay u baahan tahay dib-u-eegis",
-      "retryHint": "Wuxuu mar kale isku dayaa inuu soo shubo xaaladda Kilo Pass.",
-      "setupHint": "Wuxuu dejinta Kilo Pass ku furaa biraawsarka."
+      "retryHint": "Wuxuu mar kale isku dayaa inuu soo shubo xaaladda Kilo Pass."
     }
   },
   "authErrors": {

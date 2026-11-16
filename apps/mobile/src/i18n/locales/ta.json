@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "இணையத்தில் நிர்வகிக்கவும்",
     "creditHistory": "கிரெடிட் வரலாறு",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ரத்து செய்யவும்",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "வாங்குதல்கள், ரசீதுகள் மற்றும் கிரெடிட் செயல்பாடு",
     "invoicesSubtitle": "உங்கள் வாங்குதல்களுக்கான இன்வாய்ஸ்களைப் பதிவிறக்கவும்",
-    "manageBilling": "kilo.ai-இல் பில்லிங்கை நிர்வகிக்கவும்",
-    "manageBillingIosNote": "பணம் செலுத்தும் முறைகள், தானியங்கு டாப்-அப் மற்றும் பில்லிங் விவரங்கள் kilo.ai-இல் நிர்வகிக்கப்படுகின்றன.",
     "codeReviewerSubtitle": "தானியங்கி PR மதிப்பாய்வுகள்",
     "securityAgentSubtitle": "பாதுகாப்புக் குறைபாடுகளைக் கண்டறிந்து சரிசெய்யவும்",
     "reviews": "மதிப்பாய்வுகள்",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "{{date}} அன்று ரத்தாகும்",
       "cancelScheduledChange": "திட்டமிட்ட மாற்றத்தை ரத்துசெய்",
       "cancelled": "சந்தா ரத்துசெய்யப்பட்டது",
-      "changePlan": "kilo.ai-இல் திட்டத்தை மாற்றவும்",
-      "changePlanIosNote": "கட்டணத் திட்ட மாற்றங்கள் kilo.ai-இல் கிடைக்கின்றன.",
       "creditHistoryEmpty": "இதுவரை Kilo Pass கிரெடிட்கள் இல்லை.",
-      "manageInStore": "{{store}}-இல் நிர்வகிக்கவும்",
       "resume": "சந்தாவை மீண்டும் தொடங்கு",
       "resumeCancelledDescription": "உங்கள் Kilo Pass மீண்டும் தானாகப் புதுப்பிக்கத் தொடங்கும்.",
       "resumePausedDescription": "உங்கள் Kilo Pass திட்டமிட்ட மீண்டும் தொடங்கும் தேதிக்கு முன்பே இப்போது மீண்டும் தொடங்கும்.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "இலவச போனஸ்",
     "bonusReferral": "பரிந்துரை போனஸ்",
     "bonusAvailable": "கிடைக்கும் இலவச போனஸ்",
-    "kiloPassManagement": "Kilo Pass நிர்வாகம்",
-    "kiloPassSetup": "Kilo Pass அமைப்பு",
-    "opensManagementOnWeb": "Kilo Pass நிர்வாகப் பக்கத்தை வலைத்தளத்தில் திறக்கும்.",
     "loadFailedRetry": "உங்கள் இணைப்பைச் சரிபார்த்து, மீண்டும் முயற்சிக்கவும்.",
     "legalTermsOfUse": "பயன்பாட்டு விதிமுறைகள் (EULA)",
     "purchaseDifferentAccount": "App Store-இல் வாங்கிய இந்தச் சந்தா உங்கள் Kilo கணக்குடன் இணைக்கப்படவில்லை. வாங்குவதற்குப் பயன்படுத்திய Apple Account-இல் உள்நுழைந்த பிறகு மீண்டும் முயற்சிக்கவும்.",
@@ -3311,7 +3301,6 @@
       "buySeats": "பயனர் இடங்களை வாங்கவும்",
       "setupAutoTopUp": "தானியங்கு டாப்-அப்பை அமைக்கவும்",
       "manageAutoTopUp": "தானியங்கு டாப்-அப்பை நிர்வகி",
-      "webAddress": "இணைய முகவரி {{url}}",
       "opensOnWeb": "இணையத்தில் திறக்கும்"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "குழுக்கள்",
       "guardrails": "பாதுகாப்பு வரம்புகள்",
       "byok": "உங்கள் சொந்த கீயைப் பயன்படுத்தவும்",
-      "ssoAndDomain": "SSO மற்றும் டொமைன்",
-      "emailPreferences": "மின்னஞ்சல் விருப்பங்கள்",
-      "dataCollection": "தரவு சேகரிப்பு",
       "auditLogs": "தணிக்கைப் பதிவுகள்",
       "requestLogs": "கோரிக்கைப் பதிவுகள்",
       "subOrganizations": "துணை நிறுவனங்கள்",
@@ -3495,8 +3481,7 @@
       "paymentPending": "கட்டணம் நிலுவையில் உள்ளது",
       "processingBlocked": "செயலாக்கம் தடுக்கப்பட்டது",
       "processingNeedsReview": "செயலாக்கத்தை மதிப்பாய்வு செய்ய வேண்டும்",
-      "retryHint": "Kilo Pass நிலையை மீண்டும் ஏற்ற முயற்சிக்கும்.",
-      "setupHint": "Kilo Pass அமைவுப் பக்கத்தை இணையத்தில் திறக்கும்."
+      "retryHint": "Kilo Pass நிலையை மீண்டும் ஏற்ற முயற்சிக்கும்."
     }
   },
   "authErrors": {

@@ -51,7 +51,7 @@ type PushHistoryDecisions = Record<PushData['type'], PushHistoryDecision>;
  * carries the `NOT_RECORDED` decision.
  *
  * The table is total over `PushData['type']`, so a new variant fails typecheck
- * here until it has a history decision, as `GENERIC_BODY_BY_TYPE` in
+ * here until it has a history decision, as `GENERIC_BODY_LEAF_BY_TYPE` in
  * `push-copy.ts` does for the generic preview body.
  *
  * This map is the only place a decision is declared: the exported list and the

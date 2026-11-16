@@ -47,7 +47,12 @@ export function responseUsageContext(
  */
 export function rewriteUsageEndpointBody(body: UsageEndpointBody, context: ResponseUsageContext) {
   const usage = body.usage;
-  if (usage) {
+  // OpenRouter transcriptions report no `is_byok`, and the ledger prices them from the generation
+  // lookup, because a BYOK-served one reports only the fee. A paid cost the response cannot verify
+  // stays as the upstream reported it instead of claiming a billed amount that may be too low.
+  const costIsUnverified =
+    context.api_kind === 'audio_transcriptions' && usage?.is_byok == null && !context.is_free;
+  if (typeof usage === 'object' && usage !== null && !Array.isArray(usage) && !costIsUnverified) {
     // Vercel reports its cost in the body's provider metadata when `usage.cost` is absent.
     const gateway = (body.provider_metadata ?? body.providerMetadata)?.gateway;
     const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
@@ -68,8 +73,8 @@ export function rewriteUsageEndpointBody(body: UsageEndpointBody, context: Respo
 
 /**
  * Rewrites a successful JSON response of an endpoint that is not streamed, so its cost and model
- * match what the chat endpoints report. An error response, or a body that is not a JSON object,
- * passes through.
+ * match what the chat endpoints report. An error response, a body that is not
+ * JSON, and a JSON body that is not an object pass through.
  */
 export async function rewriteModelResponse_UsageEndpoint({
   response,
@@ -81,6 +86,10 @@ export async function rewriteModelResponse_UsageEndpoint({
   vercelRequestId: string | null;
 }): Promise<NextResponse> {
   if (!response.ok) return wrapInSafeNextResponse(response);
+  // `response_format` can ask for a plain-text body, which is never rewritten.
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    return wrapInSafeNextResponse(response);
+  }
   const headers = getOutputHeaders(response);
   const textResult = await readResponseText(response, headers, vercelRequestId, null, null);
   if ('errorResponse' in textResult) return textResult.errorResponse;

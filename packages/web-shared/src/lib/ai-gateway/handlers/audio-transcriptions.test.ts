@@ -281,10 +281,11 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       }) as never
     );
 
+    // The upstream reports no `is_byok`, so the paid cost is left as reported.
     await expect(response.json()).resolves.toEqual({
       text: 'hello world',
       model: 'openai/gpt-4o-mini-transcribe',
-      usage: { cost: 0.00002, is_byok: false, input_tokens: 10, output_tokens: 4, seconds: 3 },
+      usage: { cost: 0.00002, input_tokens: 10, output_tokens: 4, seconds: 3 },
     });
   });
 
@@ -333,7 +334,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     await expect(response.json()).resolves.toMatchObject({
       model: 'openai/gpt-4o-mini-transcribe',
-      usage: { cost: 0.00001, is_byok: false },
+      usage: { cost: 0.00001 },
     });
   });
 

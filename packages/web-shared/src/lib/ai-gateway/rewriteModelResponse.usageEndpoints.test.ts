@@ -111,6 +111,26 @@ describe('rewriteUsageEndpointBody', () => {
     });
   });
 
+  test.each([['n/a'], [5], [true], [[1]], [null]])('leaves the primitive usage %j alone', usage => {
+    const body = { model: 'upstream/model', usage } as Parameters<
+      typeof rewriteUsageEndpointBody
+    >[0];
+    rewriteUsageEndpointBody(body, context);
+    expect(body).toEqual({ model: 'openai/text-embedding-3-small', usage });
+  });
+
+  test('leaves a paid transcription cost without a BYOK flag as the upstream reported it', () => {
+    const body = { usage: { input_tokens: 10, cost: 0.00002 } };
+    rewriteUsageEndpointBody(body, { ...context, api_kind: 'audio_transcriptions' });
+    expect(body.usage).toEqual({ input_tokens: 10, cost: 0.00002 });
+  });
+
+  test('zeroes a free transcription even without a BYOK flag', () => {
+    const body = { usage: { input_tokens: 10, cost: 0.00002 } };
+    rewriteUsageEndpointBody(body, { ...context, api_kind: 'audio_transcriptions', is_free: true });
+    expect(body.usage).toEqual({ input_tokens: 10, cost: 0, is_byok: false });
+  });
+
   test('drops the internal cost fields', () => {
     const body = {
       usage: { cost: 0.001, market_cost: 0.001, gateway_cost: 0.001 },
@@ -185,10 +205,23 @@ describe('rewriteModelResponse_UsageEndpoint', () => {
   test.each(['not json', '[1,2]', 'null'])('passes the body %j through', async text => {
     const rewritten = await rewriteModelResponse_UsageEndpoint({
       ...params,
-      response: new Response(text, { status: 200 }),
+      response: new Response(text, {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
     });
 
     expect(rewritten.status).toBe(200);
+    await expect(rewritten.text()).resolves.toBe(text);
+  });
+
+  test('passes a plain-text body through even when it looks like a JSON object', async () => {
+    const text = '{"model":"spoken","usage":{"cost":1}}';
+    const rewritten = await rewriteModelResponse_UsageEndpoint({
+      ...params,
+      response: new Response(text, { status: 200, headers: { 'content-type': 'text/plain' } }),
+    });
+
     await expect(rewritten.text()).resolves.toBe(text);
   });
 

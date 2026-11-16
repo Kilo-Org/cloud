@@ -756,13 +756,17 @@ function isCapabilityCurrent(
   );
 }
 
+/** Discard cached authority while preserving the alias and pinned SCM identity. */
+function withoutCachedScmCapability(scm: ScmGrant | undefined): ScmGrant | undefined {
+  return scm ? { ...scm, capability: undefined } : undefined;
+}
+
 export async function refreshScmCapability(
   env: Partial<Pick<Env, 'GIT_TOKEN_SERVICE'>>,
   grant: { userId: string; orgId?: string; sandboxId: string },
   repository: CredentialRepository,
   outboundContainerId: string,
   now: number,
-  refresh = false,
   existingScm: ScmGrant | undefined = undefined,
   diagnostic?: GrantDiagnostic
 ): Promise<ScmGrant> {
@@ -784,7 +788,6 @@ export async function refreshScmCapability(
     }
   }
   if (
-    !refresh &&
     isCapabilityCurrent(existingScm?.capability, outboundContainerId, now) &&
     (repository.type !== 'github' || existingScm?.githubAppType !== undefined)
   )
@@ -1301,8 +1304,7 @@ export async function prepareCredentialGrant(
         repository,
         outboundContainerId,
         now,
-        input.refreshBacking,
-        existing?.scm,
+        input.refreshBacking ? withoutCachedScmCapability(existing?.scm) : existing?.scm,
         diagnostic
       );
       grant = { ...grant, scm: launchScm };
@@ -1319,8 +1321,7 @@ export async function prepareCredentialGrant(
               member,
               outboundContainerId,
               now,
-              input.refreshBacking,
-              existingScm,
+              input.refreshBacking ? withoutCachedScmCapability(existingScm) : existingScm,
               diagnostic
             ),
         });
@@ -1640,7 +1641,6 @@ export async function resolveSessionCredential(input: {
       entry.repository,
       input.outboundContainerId,
       now,
-      false,
       entry.scm
     );
     grant = withEntryScm(grant, entry.additionalIndex, scm);

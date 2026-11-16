@@ -128,6 +128,7 @@ function runtimeProxyInjectionRules(
         methods: ['GET', 'PUT', 'POST'],
         expectedAuthorization: authorization,
         injectedAuthorization: authorization,
+        originProof,
       })
     );
     const roots = adoptedHandles.has(handle)

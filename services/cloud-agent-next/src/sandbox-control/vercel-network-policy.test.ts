@@ -266,7 +266,7 @@ describe('contained Vercel modern policy composition', () => {
 });
 
 describe('Vercel runtime proxy origin proof', () => {
-  it('injects the sandbox proof only with runtime proxy facade credentials', () => {
+  it('injects the sandbox proof with facade and Session Sync credentials', () => {
     const policy = buildControlNetworkPolicy([grant('kilo')], undefined, {}, 'proof-1');
     const transforms = (policy.allow['worker.example.com'] ?? []).filter(
       rule => 'transform' in rule
@@ -280,8 +280,11 @@ describe('Vercel runtime proxy origin proof', () => {
       'GET',
       'Bearer kilo'
     );
+    sessionSync.headers.set(RUNTIME_PROXY_ORIGIN_HEADER, 'forged');
     expect(matchingTransform(policy, sessionSync)).toBeDefined();
-    expect(applyPolicy(policy, sessionSync).headers.has(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(false);
+    expect(applyPolicy(policy, sessionSync).headers.get(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(
+      'proof-1'
+    );
   });
 
   it('does not add the header without a proof', () => {

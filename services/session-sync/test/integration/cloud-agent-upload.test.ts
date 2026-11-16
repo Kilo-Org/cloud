@@ -15,17 +15,29 @@ async function fixture() {
     .setExpirationTime('1h')
     .sign(new TextEncoder().encode('synthetic-hosted-upload-handle-secret'));
   let active = true;
-  const authorizeUpload = vi.fn(async (input: { handle: string; sessionID?: string }) => {
-    if (!active || input.handle !== handle) return null;
-    if (input.sessionID && input.sessionID !== id) throw new Error('Ownership is not available');
-    return { userID, expiresAt: Date.now() + 3_600_000 };
-  });
+  const authorizeUpload = vi.fn(
+    async (input: { handle: string; sessionID?: string; originProof?: string }) => {
+      if (!active || input.handle !== handle || input.originProof !== 'synthetic-origin-proof')
+        return null;
+      if (input.sessionID && input.sessionID !== id) throw new Error('Ownership is not available');
+      return { userID, expiresAt: Date.now() + 3_600_000 };
+    }
+  );
   const env: Env = { ...testEnv, CLOUD_AGENT_SYNC_AUTH: { authorizeUpload } };
-  const request = (method: string, path: string, body?: unknown) =>
+  const request = (
+    method: string,
+    path: string,
+    body?: unknown,
+    originProof: string | null = 'synthetic-origin-proof'
+  ) =>
     app.fetch(
       new Request(`https://session-sync.test${path}`, {
         method,
-        headers: { authorization: `Bearer ${handle}`, 'content-type': 'application/json' },
+        headers: {
+          authorization: `Bearer ${handle}`,
+          'content-type': 'application/json',
+          ...(originProof === null ? {} : { 'x-kilo-runtime-proxy-origin': originProof }),
+        },
         ...(body === undefined || method === 'GET' ? {} : { body: JSON.stringify(body) }),
       }),
       env
@@ -44,6 +56,27 @@ async function fixture() {
 }
 
 describe('Cloud Agent upload-only access', () => {
+  it.each([null, 'synthetic-other-origin'])(
+    'denies exchanges and uploads without this sandbox proof: %s',
+    async originProof => {
+      const f = await fixture();
+      expect(
+        (await f.request('POST', '/v1/auth/exchange', { version: 1 }, originProof)).status
+      ).toBe(401);
+      expect(
+        (
+          await f.request(
+            'PUT',
+            `/v1/sessions/${f.id}`,
+            { version: 1, sourceID: f.sourceID },
+            originProof
+          )
+        ).status
+      ).toBe(401);
+      expect((await client(personal(f.userID)).state(f.id)).status).toBe(404);
+    }
+  );
+
   it('exchanges a handle, stores a batch, and checks its live authority on every upload', async () => {
     const f = await fixture();
     const exchange = await f.request('POST', '/v1/auth/exchange', { version: 1 });

@@ -1,4 +1,8 @@
 import { Buffer } from 'node:buffer';
+import {
+  CLOUD_AGENT_SESSION_SYNC_ORIGIN,
+  RUNTIME_PROXY_ORIGIN_HEADER,
+} from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { resolveSecret, type SecretBinding } from './auth.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
 
@@ -9,7 +13,7 @@ import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.
  * policy injects it. Sandbox processes never see the value, so a handle copied
  * out of a sandbox cannot be used from elsewhere.
  */
-export const RUNTIME_PROXY_ORIGIN_HEADER = 'x-kilo-runtime-proxy-origin';
+export { RUNTIME_PROXY_ORIGIN_HEADER };
 
 const PROOF_CONTEXT = 'kilo-runtime-proxy-origin:v1:';
 const encoder = new TextEncoder();
@@ -50,7 +54,7 @@ function isFacadeRequest(url: URL, facade: string | null): boolean {
 
 /**
  * Replaces any sandbox-supplied origin header, and adds this sandbox's proof
- * only to runtime credential proxy facade requests, which strip it upstream.
+ * only to runtime credential proxy facade and Session Sync requests.
  */
 export async function withRuntimeProxyOrigin(
   request: Request,
@@ -58,11 +62,14 @@ export async function withRuntimeProxyOrigin(
   outboundId: string
 ): Promise<Request> {
   const facade = env.WORKER_URL ? runtimeCredentialProxyFacadeBaseUrl(env.WORKER_URL) : null;
-  const toFacade = isFacadeRequest(new URL(request.url), facade);
-  if (!toFacade && !request.headers.has(RUNTIME_PROXY_ORIGIN_HEADER)) return request;
+  const url = new URL(request.url);
+  const needsProof =
+    isFacadeRequest(url, facade) ||
+    (url.origin === CLOUD_AGENT_SESSION_SYNC_ORIGIN && url.pathname.startsWith('/v1/'));
+  if (!needsProof && !request.headers.has(RUNTIME_PROXY_ORIGIN_HEADER)) return request;
   const headers = new Headers(request.headers);
   headers.delete(RUNTIME_PROXY_ORIGIN_HEADER);
-  const proof = toFacade ? await runtimeProxyOriginProof(env, outboundId) : null;
+  const proof = needsProof ? await runtimeProxyOriginProof(env, outboundId) : null;
   if (proof !== null) headers.set(RUNTIME_PROXY_ORIGIN_HEADER, proof);
   return new Request(request, { headers });
 }

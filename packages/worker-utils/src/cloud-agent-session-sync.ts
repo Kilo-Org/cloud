@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from './internal-service-token-audiences';
 
 export const CLOUD_AGENT_SESSION_SYNC_ORIGIN = 'https://session-sync.kiloapps.io';
+export const RUNTIME_PROXY_ORIGIN_HEADER = 'x-kilo-runtime-proxy-origin';
 
 export const cloudAgentSyncAuthorizationSchema = z.strictObject({
   userID: z.string().min(1).max(256),
@@ -15,6 +16,7 @@ export type CloudAgentSyncAuthorizationBinding = {
   authorizeUpload(input: {
     handle: string;
     sessionID?: string;
+    originProof?: string;
   }): Promise<CloudAgentSyncAuthorization | null>;
 };
 

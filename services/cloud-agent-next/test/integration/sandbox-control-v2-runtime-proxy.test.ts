@@ -13,8 +13,6 @@ import type {
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
-  createRuntimeProxyGrant,
-  issueRuntimeCredentialProxyHandle,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyHandleGrantId,
   RUNTIME_PROXY_GRANT_KEY,
@@ -25,6 +23,7 @@ import {
   renewStoredRuntimeAuthorization,
 } from '../../src/session/runtime-authorization-persistence.js';
 import worker from '../../src/server.js';
+import { SessionSyncAuthorization } from '../../src/session-sync-authorization.js';
 import { RUNTIME_PROXY_ORIGIN_HEADER } from '../../src/runtime-credential-proxy-origin.js';
 import { RUNTIME_PROXY_ORIGIN_ALLOCATION_KEY } from '../../src/control-plane/sandbox/runtime-proxy-origin-gate.js';
 import { logger } from '../../src/logger.js';
@@ -703,11 +702,22 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle, otherOrigin)).toBeNull();
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle, origin)).not.toBeNull();
 
+      const sync = new SessionSyncAuthorization(createExecutionContext(), env as Env);
+      const upload = { handle, sessionID: frame.spec.kiloSessionId };
+      expect(await sync.authorizeUpload(upload)).toBeNull();
+      expect(await sync.authorizeUpload({ ...upload, originProof: otherOrigin })).toBeNull();
+      expect(await sync.authorizeUpload({ ...upload, originProof: origin })).toEqual({
+        userID: USER_ID,
+        organizationID: ORG_ID,
+        expiresAt: expect.any(Number),
+      });
+
       // An allocation that started before origin proofs stays exempt until it stops.
       await runInDurableObject(sandboxStub, instance => {
         instance.ctx.storage.kv.delete(RUNTIME_PROXY_ORIGIN_ALLOCATION_KEY);
       });
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).not.toBeNull();
+      expect(await sync.authorizeUpload(upload)).toMatchObject({ userID: USER_ID });
     }
   );
 

@@ -62,6 +62,10 @@ describe('runtimeProxyOriginAdmitted', () => {
       });
     expect(await check('http://host.docker.internal:8794')).toBe(true);
     expect(await check('http://localhost:8794')).toBe(true);
+    expect(await check('http://127.0.0.1:8794')).toBe(true);
+    expect(await check('https://host.docker.internal')).toBe(false);
+    expect(await check('https://localhost:8794')).toBe(false);
+    expect(await check('https://127.0.0.1:8794')).toBe(false);
     expect(await check('https://cloud-agent.example.com')).toBe(false);
   });
 });

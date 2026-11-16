@@ -2,6 +2,7 @@ import {
   cloudAgentSyncAuthorizationSchema,
   cloudAgentSyncUploadSession,
   isCloudAgentSyncHandle,
+  RUNTIME_PROXY_ORIGIN_HEADER,
   type CloudAgentSyncAuthorizationBinding,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
@@ -26,12 +27,15 @@ function failure(status: number, code: string, message: string): Response {
   );
 }
 
-async function resolve(env: CloudAgentUploadEnv, handle: string, sessionID?: string) {
+async function resolve(
+  env: CloudAgentUploadEnv,
+  input: { handle: string; sessionID?: string; originProof?: string }
+) {
   if (!env.CLOUD_AGENT_SYNC_AUTH)
     return failure(503, 'auth_unavailable', 'Cloud Agent upload authorization is unavailable');
   try {
     const result = await withTimeout(
-      env.CLOUD_AGENT_SYNC_AUTH.authorizeUpload({ handle, sessionID }),
+      env.CLOUD_AGENT_SYNC_AUTH.authorizeUpload(input),
       5_000,
       'Cloud Agent upload authorization timed out'
     );
@@ -62,10 +66,11 @@ function principal(authorization: { userID: string; organizationID?: string }): 
 export async function exchangeCloudAgentUpload(
   token: string,
   organizationID: string | undefined,
-  env: CloudAgentUploadEnv
+  env: CloudAgentUploadEnv,
+  originProof?: string
 ): Promise<Response | undefined> {
   if (!isCloudAgentSyncHandle(token)) return undefined;
-  const authorization = await resolve(env, token);
+  const authorization = await resolve(env, { handle: token, originProof });
   if (authorization instanceof Response) return authorization;
   if (authorization.organizationID !== organizationID)
     return failure(
@@ -95,6 +100,10 @@ export async function authorizeCloudAgentUpload(
   const sessionID = url.search ? null : cloudAgentSyncUploadSession(request.method, url.pathname);
   if (sessionID === null)
     return failure(403, 'upload_only', 'Cloud Agent credentials permit session uploads only');
-  const authorization = await resolve(env, token, sessionID);
+  const authorization = await resolve(env, {
+    handle: token,
+    sessionID,
+    originProof: request.headers.get(RUNTIME_PROXY_ORIGIN_HEADER) ?? undefined,
+  });
   return authorization instanceof Response ? authorization : principal(authorization);
 }

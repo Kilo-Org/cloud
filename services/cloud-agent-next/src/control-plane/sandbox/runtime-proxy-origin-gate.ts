@@ -35,7 +35,9 @@ export function markRuntimeProxyOriginAllocation(
  */
 function isLocalFacade(workerUrl: string | undefined): boolean {
   const facade = workerUrl ? runtimeCredentialProxyFacadeBaseUrl(workerUrl) : null;
-  return facade !== null && isLocalFacadeUrl(new URL(facade));
+  if (facade === null) return false;
+  const url = new URL(facade);
+  return url.protocol === 'http:' && isLocalFacadeUrl(url);
 }
 
 /**

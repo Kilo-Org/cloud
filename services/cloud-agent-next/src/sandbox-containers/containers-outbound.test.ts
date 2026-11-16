@@ -420,6 +420,24 @@ describe('ContainersOutbound runtime proxy origin', () => {
     expect(await runtimeProxyOriginProof(env, 'container-2')).not.toBe(expected);
   });
 
+  it('replaces the proof before sending Session Sync uploads through the binding', async () => {
+    const sessionSync = vi.fn(async (_request: Request) => new Response('synced'));
+    const worker = outbound({ containerId: 'container-1' }, {
+      ...env,
+      SESSION_SYNC: { fetch: sessionSync },
+    } as unknown as Cloudflare.Env);
+    await worker.fetch(
+      new Request('https://session-sync.kiloapps.io/v1/sessions/ses_synthetic/batches', {
+        method: 'POST',
+        headers: { [RUNTIME_PROXY_ORIGIN_HEADER]: 'forged' },
+      })
+    );
+    expect(sessionSync).toHaveBeenCalledTimes(1);
+    expect(sessionSync.mock.calls[0]?.[0].headers.get(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(
+      await runtimeProxyOriginProof(env, 'container-1')
+    );
+  });
+
   it.each(['https://example.com/api/profile', 'https://control.example.com/kilo/session'])(
     'strips the proof header from requests outside the facade: %s',
     async url => {

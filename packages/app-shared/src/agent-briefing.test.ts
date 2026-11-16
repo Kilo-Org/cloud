@@ -74,6 +74,10 @@ describe('scheduled briefing contracts', () => {
       'ae\u0301b',
       'a😀b',
       '界😀'.repeat(8),
+      '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}',
+      '\u{1F44D}\u{1F3FD}',
+      '1\uFE0F\u20E3',
+      'e\u0301',
     ];
     // 1 + 4 + 3 bytes fit, but the family continues past them: the cut backs up to
     // the boundary after `a`, and no result carries an unpaired joiner.
@@ -90,6 +94,42 @@ describe('scheduled briefing contracts', () => {
         expect(cut === value).toBe(cap >= total);
       }
     }
+  });
+  it('keeps a cluster wider than the cap out of the cut', () => {
+    // A bare family starting at byte 0: the first code point fits a 4-byte cap but the
+    // cluster continues, so the cut backs up to offset 0 and returns no text at all.
+    expect(truncateBriefingUtf8('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 4)).toBe('');
+    // Two of the three people (4 + 3 + 4 = 11 bytes) still end inside the cluster,
+    // because the joiner after the second person expects another emoji.
+    expect(truncateBriefingUtf8('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 11)).toBe('');
+    // At the exact byte length the whole cluster fits and is returned unchanged.
+    expect(
+      truncateBriefingUtf8(
+        '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}',
+        utf8ByteLength('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}')
+      )
+    ).toBe('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}');
+    // A skin tone is part of the drawn character: the base glyph alone at 4 bytes is
+    // not a boundary, so the cut is empty rather than a base without its modifier.
+    expect(truncateBriefingUtf8('\u{1F44D}\u{1F3FD}', 4)).toBe('');
+    // The base plus its modifier is 8 bytes, so the whole pair comes back.
+    expect(truncateBriefingUtf8('\u{1F44D}\u{1F3FD}', 8)).toBe('\u{1F44D}\u{1F3FD}');
+    // A keycap is `1` + variation selector + enclosing key: one drawn character, so a
+    // 1-byte cap cannot keep the bare digit.
+    expect(truncateBriefingUtf8('1\uFE0F\u20E3', 1)).toBe('');
+    // Its exact byte length keeps the whole keycap.
+    expect(truncateBriefingUtf8('1\uFE0F\u20E3', utf8ByteLength('1\uFE0F\u20E3'))).toBe(
+      '1\uFE0F\u20E3'
+    );
+    // A combining acute accent belongs to its base letter, so a 1-byte cap drops the
+    // `e` instead of leaving it without the accent.
+    expect(truncateBriefingUtf8('e\u0301', 1)).toBe('');
+    // At its exact byte length the base and the mark both fit.
+    expect(truncateBriefingUtf8('e\u0301', utf8ByteLength('e\u0301'))).toBe('e\u0301');
+    // Plain ASCII sanity: a mid-string cap keeps the leading bytes.
+    expect(truncateBriefingUtf8('abcdefgh', 5)).toBe('abcde');
+    // A full-span cap keeps the whole string.
+    expect(truncateBriefingUtf8('ab', 2)).toBe('ab');
   });
   it('redacts sensitive completed-response text before truncation', () => {
     const excerpt = redactBriefingExcerpt(

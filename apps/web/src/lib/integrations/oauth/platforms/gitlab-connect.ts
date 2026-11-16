@@ -25,6 +25,7 @@ import {
   createAppShellFlowToken,
 } from '@/lib/integrations/oauth/app-shell-flow';
 import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
+import { appShellRedirect } from '@/lib/app-shell/redirect';
 import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -143,13 +144,10 @@ function gitLabConnectFailure(request: NextRequest, error: unknown): Response {
 
   const errorCode = denialCode ?? 'oauth_init_failed';
   if (request.nextUrl.pathname.startsWith(APP_SHELL_PREFIX)) {
-    return NextResponse.redirect(
-      new URL(
-        appendIntegrationOAuthRedirectQuery(
-          buildAppShellIntegrationPath(PLATFORM.GITLAB, organizationId ?? undefined),
-          `error=${encodeURIComponent(errorCode)}`
-        ),
-        request.url
+    return appShellRedirect(
+      appendIntegrationOAuthRedirectQuery(
+        buildAppShellIntegrationPath(PLATFORM.GITLAB, organizationId ?? undefined),
+        `error=${encodeURIComponent(errorCode)}`
       )
     );
   }

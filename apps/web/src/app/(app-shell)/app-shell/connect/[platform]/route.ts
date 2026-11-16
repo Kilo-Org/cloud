@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { appShellRedirect } from '@/lib/app-shell/redirect';
 import { requireAppShellUser } from '@/lib/app-shell/session';
 import { APP_SHELL_EXPIRED_PATH, APP_SHELL_PLATFORMS } from '@/lib/app-shell/shell-paths';
 import {
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const user = await requireAppShellUser();
   if (!user) {
-    return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, request.url));
+    return appShellRedirect(APP_SHELL_EXPIRED_PATH);
   }
 
   return handlePlatformOAuthConnectForAppShell(request, platform, user);

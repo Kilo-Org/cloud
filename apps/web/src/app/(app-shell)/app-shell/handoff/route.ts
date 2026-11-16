@@ -1,6 +1,6 @@
-import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import type { NextRequest, NextResponse } from 'next/server';
 import { consumeAppShellHandoff } from '@/lib/app-shell/handoff-token';
+import { appShellRedirect } from '@/lib/app-shell/redirect';
 import { APP_SHELL_EXPIRED_PATH } from '@/lib/app-shell/shell-paths';
 import {
   APP_SHELL_SESSION_COOKIE,
@@ -20,10 +20,10 @@ export async function GET(request: NextRequest) {
   const handoff = await consumeAppShellHandoff(token);
 
   if (!handoff) {
-    return noStore(NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, request.url)));
+    return noStore(appShellRedirect(APP_SHELL_EXPIRED_PATH));
   }
 
-  const response = NextResponse.redirect(new URL(handoff.targetPath, request.url));
+  const response = appShellRedirect(handoff.targetPath);
   response.cookies.set(
     APP_SHELL_SESSION_COOKIE,
     createAppShellSessionToken(handoff.userId),

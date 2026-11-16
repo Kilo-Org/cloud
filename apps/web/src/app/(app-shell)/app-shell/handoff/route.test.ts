@@ -22,8 +22,8 @@ const { GET } = jest.requireActual<typeof HandoffRouteModule>('./route');
 
 const mockConsume = jest.mocked(consumeAppShellHandoff);
 
-function handoffRequest(token?: string): NextRequest {
-  const url = new URL('https://kilo.example/app-shell/handoff');
+function handoffRequest(token?: string, origin = 'https://kilo.example'): NextRequest {
+  const url = new URL(`${origin}/app-shell/handoff`);
   if (token !== undefined) url.searchParams.set('token', token);
   return new NextRequest(url);
 }
@@ -38,9 +38,7 @@ describe('GET /app-shell/handoff', () => {
     const response = await GET(handoffRequest('one-time-token'));
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'https://kilo.example/app-shell/github-app?organizationId=org-1'
-    );
+    expect(response.headers.get('location')).toBe('/app-shell/github-app?organizationId=org-1');
     expect(response.headers.get('cache-control')).toContain('no-store');
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
 
@@ -51,12 +49,28 @@ describe('GET /app-shell/handoff', () => {
     expect(verifyAppShellSessionToken(cookie?.value)).toEqual({ userId: 'user-1' });
   });
 
+  test('redirects on the origin the browser requested, not the bind host', async () => {
+    mockConsume.mockResolvedValue({
+      userId: 'user-1',
+      targetPath: '/app-shell/connected-accounts',
+    });
+
+    // The dev server binds 0.0.0.0, so a Location built from `request.url` would
+    // send the browser to a different host than the one that holds the cookie.
+    const response = await GET(handoffRequest('one-time-token', 'http://0.0.0.0:3000'));
+
+    const location = response.headers.get('location');
+    expect(location).toBe('/app-shell/connected-accounts');
+    expect(location).not.toContain('0.0.0.0');
+    expect(location).not.toContain('://');
+  });
+
   test('sends a replayed or expired token to the terminal page instead of a page', async () => {
     mockConsume.mockResolvedValue(null);
 
     const response = await GET(handoffRequest('spent-token'));
 
-    expect(response.headers.get('location')).toBe('https://kilo.example/app-shell/expired');
+    expect(response.headers.get('location')).toBe('/app-shell/expired');
     expect(response.cookies.get(APP_SHELL_SESSION_COOKIE)).toBeUndefined();
   });
 
@@ -66,6 +80,6 @@ describe('GET /app-shell/handoff', () => {
     const response = await GET(handoffRequest());
 
     expect(mockConsume).toHaveBeenCalledWith('');
-    expect(response.headers.get('location')).toBe('https://kilo.example/app-shell/expired');
+    expect(response.headers.get('location')).toBe('/app-shell/expired');
   });
 });

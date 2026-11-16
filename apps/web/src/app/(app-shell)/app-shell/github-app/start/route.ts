@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { TRPCError } from '@trpc/server';
-import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { requireAppShellUser } from '@/lib/app-shell/session';
+import { appShellRedirect } from '@/lib/app-shell/redirect';
 import { APP_SHELL_EXPIRED_PATH, APP_SHELL_PREFIX } from '@/lib/app-shell/shell-paths';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
@@ -30,7 +30,7 @@ const SHELL_RETURN_PATH = `${APP_SHELL_PREFIX}/github-app`;
 export async function GET(request: NextRequest) {
   const user = await requireAppShellUser();
   if (!user) {
-    return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, request.url));
+    return appShellRedirect(APP_SHELL_EXPIRED_PATH);
   }
 
   const organizationId = request.nextUrl.searchParams.get('organizationId') ?? undefined;
@@ -47,14 +47,11 @@ export async function GET(request: NextRequest) {
       error instanceof TRPCError &&
       (error.code === 'FORBIDDEN' || error.code === 'UNAUTHORIZED')
     ) {
-      return NextResponse.redirect(
-        new URL(
-          `${SHELL_RETURN_PATH}?${new URLSearchParams({
-            error: 'installation_start_refused',
-            ...(organizationId ? { organizationId } : {}),
-          }).toString()}`,
-          APP_URL
-        )
+      return appShellRedirect(
+        `${SHELL_RETURN_PATH}?${new URLSearchParams({
+          error: 'installation_start_refused',
+          ...(organizationId ? { organizationId } : {}),
+        }).toString()}`
       );
     }
     throw error;

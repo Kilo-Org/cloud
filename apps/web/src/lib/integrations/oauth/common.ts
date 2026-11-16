@@ -10,6 +10,7 @@ import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organ
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
+import { appShellRedirect } from '@/lib/app-shell/redirect';
 import {
   APP_SHELL_FLOW_COOKIE,
   appShellFlowCookieOptions,
@@ -301,13 +302,10 @@ function oauthConnectFailure(
 
   if (request.nextUrl.pathname.startsWith(APP_SHELL_PREFIX)) {
     const errorCode = denialCode ?? 'oauth_init_failed';
-    return NextResponse.redirect(
-      new URL(
-        appendIntegrationOAuthRedirectQuery(
-          buildAppShellIntegrationPath(platform, organizationId ?? undefined),
-          `error=${encodeURIComponent(errorCode)}`
-        ),
-        request.url
+    return appShellRedirect(
+      appendIntegrationOAuthRedirectQuery(
+        buildAppShellIntegrationPath(platform, organizationId ?? undefined),
+        `error=${encodeURIComponent(errorCode)}`
       )
     );
   }

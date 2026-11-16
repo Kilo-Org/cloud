@@ -341,7 +341,6 @@ export function ProfileCommandsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.commandsTitle')}
-        backFallback={getProfilesPath()}
         onBack={leaveScreen}
       />
       <TabScreenScrollView

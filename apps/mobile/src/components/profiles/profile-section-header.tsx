@@ -3,6 +3,7 @@ import { type Href } from 'expo-router';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
+import { getProfilesPath } from '@/lib/profile-agent-navigation';
 
 /**
  * The header every profile-editor section screen shares.
@@ -24,15 +25,19 @@ export function ProfileSectionHeader({
   profileId,
   organizationId,
   title,
-  backFallback,
+  backFallback = getProfilesPath(),
   onBack,
 }: Readonly<{
   profileId: string;
   organizationId?: string;
   /** The section's own label: the screen's title and its accessible header name. */
   title: string;
-  /** Where the header's Back lands when the screen opens with no history to pop. */
-  backFallback: Href;
+  /**
+   * Where the header's Back lands when the screen opens with no history to pop.
+   * Every section hangs off the Profiles list, so that list is the default and
+   * a caller overrides it only to name a nearer destination.
+   */
+  backFallback?: Href;
   onBack?: () => void;
 }>) {
   const overview = useAgentProfileOverview(profileId, organizationId);

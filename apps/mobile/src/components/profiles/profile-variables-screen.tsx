@@ -31,7 +31,6 @@ import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
-import { getProfilesPath } from '@/lib/profile-agent-navigation';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_VARS: readonly ProfileVarSource[] = [];
@@ -273,7 +272,6 @@ export function ProfileVariablesScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.variablesTitle')}
-        backFallback={getProfilesPath()}
       />
       <TabScreenScrollView
         className="flex-1"

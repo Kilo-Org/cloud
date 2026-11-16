@@ -3044,6 +3044,9 @@ export const ByokEndpointDefinitionSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
     /** The API root without a trailing slash, optionally with `{model}`. */
+    // Plain HTTP is accepted so local development can reach local servers. Deployed gateways
+    // refuse non-HTTPS and non-public upstreams at request time (`isUpstreamUrlPolicyEnforced`),
+    // as they do for every configurable upstream.
     base_url: z
       .url({ protocol: /^https?$/ })
       .refine(url => !url.endsWith('/'), 'must not end with a slash')

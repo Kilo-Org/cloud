@@ -3841,7 +3841,7 @@
       "listImagePurpose": "टेक्स्ट के साथ-साथ इमेज भी पढ़ता है।",
       "smallestDownload": "सबसे छोटा डाउनलोड: {{size}} · लगभग {{memory}} मेमोरी",
       "fullFileName": "फ़ाइल: {{name}}",
-      "memoryEstimateNote": "मेमोरी के डेटा अनुमान हैं, माप नहीं।",
+      "memoryEstimateNote": "मेमोरी के आँकड़े अनुमान हैं, माप नहीं।",
       "parameters": "पैरामीटर: {{value}}",
       "downloads": "डाउनलोड: {{value}}",
       "likes": "लाइक: {{value}}",

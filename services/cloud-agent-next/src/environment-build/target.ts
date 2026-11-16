@@ -194,7 +194,6 @@ export async function resolveEnvironmentBuildTarget(args: {
     env,
     owner: selectionOwner(reference),
     repositoryType: repository.identity.platform,
-    environment: reference,
     ...(args.sandboxAllocation ? { environmentAllocation: args.sandboxAllocation } : {}),
     ...(target ? { target } : {}),
   });

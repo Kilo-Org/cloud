@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { providerSupports } from './sandbox-provider-capabilities';
+import type { SandboxProviderId } from './sandbox-provider-capabilities';
 
 export const sandboxAllocationSchema = z.enum([
   'isolated-standard',
@@ -203,20 +203,18 @@ export const vercelSandboxResourcesSchema = z.union([
 
 export type VercelSandboxResources = z.infer<typeof vercelSandboxResourcesSchema>;
 
-export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
+export function getSandboxAllocationProvider(allocation: SandboxAllocation): SandboxProviderId {
   return allocationRequests[allocation].provider.id;
 }
 
 /**
  * A multi-repository environment keeps every repository in one workspace, so it
  * needs a sandbox that one session owns. The retired shared Cloudflare sandbox
- * cannot give it one; the provider capability table decides the rest.
+ * cannot give it one. Every provider can: the shared SCM proxy selects each
+ * repository's capability from the request URL.
  */
 export function allocationSupportsMultiRepository(allocation: SandboxAllocation): boolean {
-  return (
-    allocation !== 'cloudflare-shared' &&
-    providerSupports(getSandboxAllocationProvider(allocation), 'multiRepository')
-  );
+  return allocation !== 'cloudflare-shared';
 }
 
 /**

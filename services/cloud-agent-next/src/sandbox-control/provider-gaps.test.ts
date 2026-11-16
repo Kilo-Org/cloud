@@ -43,12 +43,6 @@ const PROVIDER_GAPS: readonly ProviderGap[] = [
   },
   {
     provider: 'vercel',
-    feature: 'multiRepository',
-    class: 'gap',
-    reason: 'The network policy forwards only the launch repository capability.',
-  },
-  {
-    provider: 'vercel',
     feature: 'meteredBilling',
     class: 'intentional',
     reason: 'The customer pays Vercel; Kilo does not meter BYOC compute.',

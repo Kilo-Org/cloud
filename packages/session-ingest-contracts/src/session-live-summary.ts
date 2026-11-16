@@ -154,12 +154,16 @@ function characterSegmenter(): Intl.Segmenter | null {
 }
 
 /**
+ * The shared character reader for every cut in the workspace: display surfaces
+ * read it through `sessionLiveCut`, and byte-capped report fields read it
+ * directly after their own byte count.
+ *
  * The end of the character at or before `maxIndex`, as the index just past it:
  * the largest extended grapheme cluster boundary no greater than `maxIndex`.
  * A runtime without segmentation falls back to a code unit boundary that keeps
  * a surrogate pair whole.
  */
-function characterCut(line: string, maxIndex: number): number {
+export function characterCut(line: string, maxIndex: number): number {
   const segmenter = characterSegmenter();
   if (segmenter === null) {
     const last = line.charCodeAt(maxIndex - 1);

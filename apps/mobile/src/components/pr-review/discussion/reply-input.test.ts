@@ -214,12 +214,11 @@ describe('ensureTermsAcceptedOutcome', () => {
       pathname: '/(app)/legal/[document]',
       params: { document: 'terms' },
     });
-    // The dialog closes into the document rather than re-opening over it.
+    // The dialog closes into the document rather than re-opening over it, and
+    // the gate settles so the submit that awaited it stops loading.
     expect(alertCalls).toHaveLength(1);
-
-    pressButton('Cancel');
-    await flush();
     await expect(promise).resolves.toEqual({ kind: 'dismissed' });
+    expect(acceptTermsMock).not.toHaveBeenCalled();
   });
 
   it('reports a getTermsStatus failure as unknown, not as acceptance', async () => {

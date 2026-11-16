@@ -1,8 +1,8 @@
 import {
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
-  type PushData,
   pushBodyCatalogKey,
+  type PushData,
   pushDataSchema,
   translatePush,
 } from '@kilocode/notifications';

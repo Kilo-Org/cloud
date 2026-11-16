@@ -148,7 +148,11 @@ async function run(platformIntegration: PlatformIntegration, inputUser = user) {
       onSessionReady: mockOnSessionReady,
     });
   } finally {
-    Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+    if (previousNodeEnv === undefined) {
+      Reflect.deleteProperty(process.env, 'NODE_ENV');
+    } else {
+      Reflect.set(process.env, 'NODE_ENV', previousNodeEnv);
+    }
   }
 }
 

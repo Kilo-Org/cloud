@@ -186,7 +186,11 @@ it('returns a token the Worker runtime-admission consumer accepts', async () => 
       state: 'active',
     });
   } finally {
-    Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+    if (previousNodeEnv === undefined) {
+      Reflect.deleteProperty(process.env, 'NODE_ENV');
+    } else {
+      Reflect.set(process.env, 'NODE_ENV', previousNodeEnv);
+    }
   }
 });
 

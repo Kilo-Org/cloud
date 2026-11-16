@@ -5,7 +5,7 @@
  * alerts and organization screens read: absent means the caller's own triggers.
  */
 
-import type { Href } from 'expo-router';
+import { type Href } from 'expo-router';
 
 import { triggerScopeQuery } from './trigger-scope';
 

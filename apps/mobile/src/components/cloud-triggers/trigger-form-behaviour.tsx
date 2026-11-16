@@ -50,7 +50,7 @@ export function TriggerFormBehaviour({
           onDraftChange({ ...draft, prompt });
         }}
         error={problems.prompt === undefined ? undefined : triggerProblemMessage(problems.prompt)}
-        className="min-h-[120px] leading-5"
+        className="min-h-[120px] leading-[1.25rem]"
         textAlignVertical="top"
       />
 
@@ -72,7 +72,7 @@ export function TriggerFormBehaviour({
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            className="min-h-[120px] font-mono text-xs leading-5"
+            className="min-h-[120px] font-mono text-xs leading-[1.25rem]"
             textAlignVertical="top"
           />
           <Text variant="muted" className="text-xs">

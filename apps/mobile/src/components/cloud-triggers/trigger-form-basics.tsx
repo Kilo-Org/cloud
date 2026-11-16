@@ -179,26 +179,28 @@ export function TriggerFormBasics({
         )}
       </View>
 
-      <RepoPickerSheet
-        repositories={repositories.repositories}
-        isLoading={repositories.isLoading}
-        isError={repositories.isError}
-        onRetry={() => {
-          repositories.refetch();
-        }}
-        selectedKey={draft.repository.length === 0 ? null : `github:${draft.repository}`}
-        onSelect={repository => {
-          onRepositoryPickerOpenChange(false);
-          onDraftChange({
-            ...draft,
-            repository: repository.fullName,
-            environmentId: null,
-          });
-        }}
-        onClose={() => {
-          onRepositoryPickerOpenChange(false);
-        }}
-      />
+      {repositoryPickerOpen ? (
+        <RepoPickerSheet
+          repositories={repositories.repositories}
+          isLoading={repositories.isLoading}
+          isError={repositories.isError}
+          onRetry={() => {
+            repositories.refetch();
+          }}
+          selectedKey={draft.repository.length === 0 ? null : `github:${draft.repository}`}
+          onSelect={repository => {
+            onRepositoryPickerOpenChange(false);
+            onDraftChange({
+              ...draft,
+              repository: repository.fullName,
+              environmentId: null,
+            });
+          }}
+          onClose={() => {
+            onRepositoryPickerOpenChange(false);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { addToImportSelection } from '@/lib/byok/endpoint-form';
 
 function matchesSearch(model: ByokEndpointModel, search: string) {
   const query = search.trim().toLowerCase();
@@ -25,6 +26,7 @@ function matchesSearch(model: ByokEndpointModel, search: string) {
 export function ByokEndpointImportDialog({
   models,
   listedInternalIds,
+  capacity,
   onAdd,
   onClose,
 }: {
@@ -32,6 +34,8 @@ export function ByokEndpointImportDialog({
   models: ByokEndpointModel[];
   /** Upstream ids the endpoint already has; they cannot be added twice. */
   listedInternalIds: ReadonlySet<string>;
+  /** How many more models the endpoint can take. */
+  capacity: number;
   onAdd: (models: ByokEndpointModel[]) => void;
   onClose: () => void;
 }) {
@@ -42,23 +46,29 @@ export function ByokEndpointImportDialog({
   const selectable = visible.filter(model => !listedInternalIds.has(model.internal_id));
   const selectedVisible = selectable.filter(model => selected.has(model.internal_id)).length;
   const allVisibleSelected = selectable.length > 0 && selectedVisible === selectable.length;
+  const atCapacity = selected.size >= capacity;
+  const remaining = Math.max(0, capacity - selected.size);
 
   const toggle = (internalId: string, checked: boolean) => {
     setSelected(current => {
+      if (checked) return addToImportSelection(current, [internalId], capacity);
       const next = new Set(current);
-      if (checked) next.add(internalId);
-      else next.delete(internalId);
+      next.delete(internalId);
       return next;
     });
   };
 
   const toggleAllVisible = (checked: boolean) => {
     setSelected(current => {
-      const next = new Set(current);
-      for (const model of selectable) {
-        if (checked) next.add(model.internal_id);
-        else next.delete(model.internal_id);
+      if (checked) {
+        return addToImportSelection(
+          current,
+          selectable.map(model => model.internal_id),
+          capacity
+        );
       }
+      const next = new Set(current);
+      for (const model of selectable) next.delete(model.internal_id);
       return next;
     });
   };
@@ -70,7 +80,8 @@ export function ByokEndpointImportDialog({
           <DialogTitle>Import models</DialogTitle>
           <DialogDescription>
             The endpoint lists {models.length} model{models.length === 1 ? '' : 's'}. Select the
-            ones to add, then check their limits before saving.
+            ones to add, then check their limits before saving. {remaining} of {capacity} model slot
+            {capacity === 1 ? '' : 's'} left.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -84,8 +95,8 @@ export function ByokEndpointImportDialog({
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={allVisibleSelected ? true : selectedVisible > 0 ? 'indeterminate' : false}
-              onCheckedChange={toggleAllVisible}
-              disabled={selectable.length === 0}
+              onCheckedChange={checked => toggleAllVisible(checked === true && !atCapacity)}
+              disabled={selectable.length === 0 || (atCapacity && selectedVisible === 0)}
             />
             Select all{search.trim() ? ' matching' : ''}
           </label>
@@ -101,7 +112,7 @@ export function ByokEndpointImportDialog({
                   <label className="flex items-center gap-3 py-2 text-sm">
                     <Checkbox
                       checked={listed || selected.has(model.internal_id)}
-                      disabled={listed}
+                      disabled={listed || (atCapacity && !selected.has(model.internal_id))}
                       onCheckedChange={checked => toggle(model.internal_id, checked)}
                     />
                     <span className="min-w-0 flex-1">

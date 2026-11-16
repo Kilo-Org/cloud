@@ -1,8 +1,11 @@
 import { describe, expect, test } from '@jest/globals';
+import { BYOK_ENDPOINT_MAX_MODELS } from '@kilocode/db/schema-types';
 import {
   EMPTY_ENDPOINT_CREDENTIALS_FORM,
+  addToImportSelection,
   buildEndpointCredentials,
   buildEndpointDefinition,
+  getImportCapacity,
   mergeImportedModels,
   setEndpointModelFlag,
   toEndpointForm,
@@ -181,5 +184,32 @@ describe('mergeImportedModels', () => {
       `${'a'.repeat(198)}-3`,
     ]);
     expect(merged.every(row => row.id.length <= 200)).toBe(true);
+  });
+});
+
+describe('import capacity', () => {
+  test('counts only the rows with content against the model limit', () => {
+    expect(getImportCapacity([toEndpointModelRow()])).toBe(BYOK_ENDPOINT_MAX_MODELS);
+    expect(getImportCapacity([toEndpointModelRow(MODEL), toEndpointModelRow()])).toBe(
+      BYOK_ENDPOINT_MAX_MODELS - 1
+    );
+  });
+
+  test('is never negative', () => {
+    const rows = Array.from({ length: BYOK_ENDPOINT_MAX_MODELS + 1 }, (_, index) =>
+      toEndpointModelRow({ ...MODEL, id: `model-${index}`, internal_id: `model-${index}` })
+    );
+
+    expect(getImportCapacity(rows)).toBe(0);
+  });
+
+  test('stops adding to a selection at capacity', () => {
+    const next = addToImportSelection(new Set(['a']), ['a', 'b', 'c', 'd'], 3);
+
+    expect([...next]).toEqual(['a', 'b', 'c']);
+  });
+
+  test('leaves a selection at capacity unchanged', () => {
+    expect([...addToImportSelection(new Set(['a', 'b']), ['c'], 2)]).toEqual(['a', 'b']);
   });
 });

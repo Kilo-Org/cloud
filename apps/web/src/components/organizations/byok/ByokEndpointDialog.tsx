@@ -45,6 +45,7 @@ import {
   ENDPOINT_REASONING_FORMAT_LABELS,
   buildEndpointCredentials,
   buildEndpointDefinition,
+  getImportCapacity,
   mergeImportedModels,
   setEndpointModelFlag,
   toEndpointForm,
@@ -887,6 +888,7 @@ function ByokEndpointForm({
         <ByokEndpointImportDialog
           models={importedModels}
           listedInternalIds={new Set(form.models.map(row => row.internal_id.trim()))}
+          capacity={getImportCapacity(form.models)}
           onClose={() => setImportedModels(null)}
           onAdd={models => {
             setForm(current => ({

@@ -1,4 +1,5 @@
 import {
+  BYOK_ENDPOINT_MAX_MODELS,
   ByokEndpointCredentialsSchema,
   ByokEndpointDefinitionSchema,
   type ByokEndpointCredentials,
@@ -253,6 +254,29 @@ export function buildEndpointCredentials(
   };
 }
 
+function hasModelContent(row: EndpointModelRow) {
+  return row.id.trim() !== '' || row.internal_id.trim() !== '';
+}
+
+/** How many more models the endpoint can take, as `mergeImportedModels` counts the rows. */
+export function getImportCapacity(rows: EndpointModelRow[]): number {
+  return Math.max(0, BYOK_ENDPOINT_MAX_MODELS - rows.filter(hasModelContent).length);
+}
+
+/** Adds upstream ids to a selection, in order, without exceeding `capacity` selected. */
+export function addToImportSelection(
+  selected: ReadonlySet<string>,
+  internalIds: readonly string[],
+  capacity: number
+): Set<string> {
+  const next = new Set(selected);
+  for (const internalId of internalIds) {
+    if (next.size >= capacity) break;
+    next.add(internalId);
+  }
+  return next;
+}
+
 /**
  * Adds imported models after the existing rows, skipping models whose upstream id is already
  * listed and renaming a public id that is taken. A single empty row is replaced.
@@ -261,7 +285,7 @@ export function mergeImportedModels(
   rows: EndpointModelRow[],
   imported: ByokEndpointModel[]
 ): EndpointModelRow[] {
-  const kept = rows.filter(row => row.id.trim() !== '' || row.internal_id.trim() !== '');
+  const kept = rows.filter(hasModelContent);
   const internalIds = new Set(kept.map(row => row.internal_id.trim()));
   const ids = new Set(kept.map(row => row.id.trim()));
   const added: EndpointModelRow[] = [];

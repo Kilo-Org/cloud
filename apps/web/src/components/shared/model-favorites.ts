@@ -1,4 +1,4 @@
-import type { ModelOption } from './model-combobox-options';
+import type { ModelOption } from './model-option';
 
 export type FavoriteToggleAction =
   | { type: 'add'; model: string }

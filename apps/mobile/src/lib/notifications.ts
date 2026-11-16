@@ -61,8 +61,6 @@ import { readWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { getDndAccessGranted } from '@/glanceable-android/live-update';
 import { i18n } from '@/i18n';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openClawNotificationWebUrl } from './claw-notification';
 import { setPendingDeepLink } from './deep-link-launch';
 import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
 import {
@@ -72,7 +70,8 @@ import {
   pendingDeepLinkOptionsForData,
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
-import { notificationDestinationForData } from './notification-path';
+import { notificationPathForData } from './notification-path';
+import { isRetiredPushType } from './retired-push-types';
 import {
   isAppOwnedNeedsInputNotification,
   readNeedsInputPresentation,
@@ -142,9 +141,10 @@ const appBadgeSink: GlanceableSink = {
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so
 // always parse before reading fields from the OS-provided notification content.
-// Every push kind parses here, KiloClaw included: a KiloClaw tap now opens its
-// web page (see `notificationDestinationForData`), so it is no longer dropped
-// at the parse boundary.
+// A payload this build's schema does not declare — a kind the server removed,
+// or one a newer server added — parses to null and its tap does nothing. A kind
+// this build retired but the schema still declares is suppressed by the
+// foreground handler instead (`isRetiredPushType`).
 export function parseNotificationData(data: unknown): PushData | null {
   const parsed = pushDataSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
@@ -304,11 +304,11 @@ export function setupNotificationHandler() {
     handleNotification: async notification => {
       const parsed = pushDataSchema.safeParse(notification.request.content.data);
       const data = parsed.success ? parsed.data : null;
-      if (
-        data?.type === 'chat.message' ||
-        data?.type === 'instance-lifecycle' ||
-        data?.type === 'scheduled-action'
-      ) {
+
+      if (data && isRetiredPushType(data.type)) {
+        // A kind this app retired still parses and still has catalog copy, so
+        // this handler is the only thing between it and a foreground banner
+        // whose tap resolves no route. Suppress it until the senders stop.
         return suppressed;
       }
 
@@ -640,14 +640,12 @@ export function checkInitialNotification(): void {
   }
   const data = parseNotificationData(response.notification.request.content.data);
   if (data) {
-    const destination = notificationDestinationForData(data, WEB_BASE_URL);
-    if (destination?.kind === 'external') {
-      void openClawNotificationWebUrl(destination.url);
-    } else if (destination !== null) {
+    const href = notificationPathForData(data);
+    if (href !== null) {
       // Stash the session's destination the same way the warm tap paths do
       // (notification-actions.ts), so a session push that launches the app lands
       // in the session's organization instead of the previously selected one.
-      setPendingDeepLink(destination.href, 'notification', pendingDeepLinkOptionsForData(data));
+      setPendingDeepLink(href, 'notification', pendingDeepLinkOptionsForData(data));
     }
   }
   Notifications.clearLastNotificationResponse();
@@ -791,10 +789,6 @@ async function writeAndroidNotificationChannel(
   );
 }
 
-const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filter(
-  channel => channel.id !== 'kiloclaw'
-);
-
 const CHANNEL_NAME_KEYS = {
   'needs-input': 'glanceable.needsInput',
   'agent-progress': 'notifications.channel.agentProgress',
@@ -802,7 +796,29 @@ const CHANNEL_NAME_KEYS = {
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
   'followed-sessions-lock-screen': 'notifications.channel.followedSessions',
-} as const satisfies Record<Exclude<AndroidNotificationChannelId, 'kiloclaw'>, string>;
+} as const;
+
+/** The android channel ids this app posts to and has a translated name for. */
+type MobileAndroidNotificationChannelId = keyof typeof CHANNEL_NAME_KEYS;
+
+/** Whether this app creates and posts to the shared channel. */
+function isMobileAndroidChannel(
+  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number]
+): channel is (typeof ANDROID_NOTIFICATION_CHANNELS)[number] & {
+  id: MobileAndroidNotificationChannelId;
+} {
+  return channel.id in CHANNEL_NAME_KEYS;
+}
+
+/**
+ * The channels this app creates. `ANDROID_NOTIFICATION_CHANNELS` is shared with
+ * the push producers, so it can carry a channel for a product this app has no
+ * screen for; creating one of those would add a row to the system settings list
+ * for a notification the app can never post.
+ */
+const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filter(channel =>
+  isMobileAndroidChannel(channel)
+);
 
 /**
  * The user-visible name for one channel in the active catalog language. Creation

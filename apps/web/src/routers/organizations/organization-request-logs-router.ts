@@ -8,6 +8,7 @@ import {
   enkrypt_usage_guardrail,
   feature,
   finish_reason,
+  http_user_agent,
   inference_region,
   kilocode_users,
   microdollar_usage,
@@ -48,6 +49,7 @@ import {
   type RequestLogRoutingDetails,
 } from '@/lib/request-logs/routing-details';
 import { timedUsageQuery } from '@/lib/usage-query';
+import { getUserAgentName } from '@/lib/user-agent';
 
 const LOG_SOURCE = 'request-logs';
 
@@ -376,6 +378,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           streamed: microdollar_usage_metadata.streamed,
           auto_model: auto_model.auto_model,
           session_id: microdollar_usage_metadata.session_id,
+          user_agent: http_user_agent.http_user_agent,
           editor_name: editor_name.editor_name,
           mode: mode.mode,
           inference_region: inference_region.inference_region,
@@ -390,6 +393,10 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           eq(finish_reason.finish_reason_id, microdollar_usage_metadata.finish_reason_id)
         )
         .leftJoin(api_kind, eq(api_kind.api_kind_id, microdollar_usage_metadata.api_kind_id))
+        .leftJoin(
+          http_user_agent,
+          eq(http_user_agent.http_user_agent_id, microdollar_usage_metadata.http_user_agent_id)
+        )
         .leftJoin(
           editor_name,
           eq(editor_name.editor_name_id, microdollar_usage_metadata.editor_name_id)
@@ -415,7 +422,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
       }
 
       return {
-        request,
+        request: { ...request, user_agent: getUserAgentName(request.user_agent) },
         metadata: await readRequestLogMetadata(input.usageId),
       };
     }),

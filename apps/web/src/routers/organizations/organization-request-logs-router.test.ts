@@ -16,6 +16,7 @@ import {
   enkrypt_usage_guardrail,
   feature,
   finish_reason,
+  http_user_agent,
   microdollar_usage,
   microdollar_usage_metadata,
   organizations,
@@ -75,6 +76,18 @@ async function autoModelId(name: string): Promise<number> {
     .select({ id: auto_model.auto_model_id })
     .from(auto_model)
     .where(eq(auto_model.auto_model, name));
+  return row.id;
+}
+
+async function httpUserAgentId(userAgent: string): Promise<number> {
+  await db
+    .insert(http_user_agent)
+    .values({ http_user_agent: userAgent })
+    .onConflictDoNothing({ target: http_user_agent.http_user_agent });
+  const [row] = await db
+    .select({ id: http_user_agent.http_user_agent_id })
+    .from(http_user_agent)
+    .where(eq(http_user_agent.http_user_agent, userAgent));
   return row.id;
 }
 
@@ -1327,6 +1340,9 @@ describe('organizations.requestLogs trpc router', () => {
           cancelled: false,
           is_free: false,
           session_id: 'ses_request_logs_test',
+          http_user_agent_id: await httpUserAgentId(
+            'Kilo-Code/1.2.3 ai-sdk/provider-utils/1.0.0 runtime/bun/1.0.0'
+          ),
         })
       );
 
@@ -1349,6 +1365,7 @@ describe('organizations.requestLogs trpc router', () => {
           streamed: true,
           auto_model: null,
           session_id: 'ses_request_logs_test',
+          user_agent: 'Kilo Code',
           editor_name: null,
           mode: null,
           inference_region: null,
@@ -1356,6 +1373,25 @@ describe('organizations.requestLogs trpc router', () => {
         metadata: { status: 'not-configured' },
       });
     });
+
+    it.each([false, true])(
+      'returns Unknown when user agent is absent with metadata present=%s',
+      async hasMetadata => {
+        const usage = usageRow({ organization_id: organization.id });
+        await db.insert(microdollar_usage).values(usage);
+        if (hasMetadata) {
+          await db.insert(microdollar_usage_metadata).values(metadataRow(usage.id));
+        }
+
+        const caller = await createCallerForUser(owner.id);
+        const result = await caller.organizations.requestLogs.getDetails({
+          organizationId: organization.id,
+          usageId: usage.id,
+        });
+
+        expect(result.request.user_agent).toBe('Unknown');
+      }
+    );
 
     it('returns the auto model of an auto request', async () => {
       const usage = usageRow({

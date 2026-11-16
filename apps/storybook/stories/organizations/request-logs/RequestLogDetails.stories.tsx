@@ -37,6 +37,7 @@ const request: RequestLogDetails['request'] = {
   auto_model: null,
   session_id: 'ses_e3ed1c3b0ffe6jOGmgh5Xk2TqLw9',
   editor_name: 'Visual Studio Code 1.145.2',
+  user_agent: 'Kilo Code',
   mode: 'code',
   inference_region: null,
 };

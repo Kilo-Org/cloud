@@ -188,8 +188,8 @@ tagged envelope: `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
 `{"kind":"exa_usage","v":1,"record":<ExaUsageRecord>}` (`ExaUsageQueueMessageSchema`).
 LLM usage stays untagged and unchanged; its ingress schema strips unknown keys, so a body
 with its own `kind` key is always a tagged message. The gateway produces Enkrypt messages
-only through `/enkrypt-usage`, behind a default-off flag; see
-[Enkrypt usage rollout](#enkrypt-usage-rollout). Exa messages come only through
+only through `/enkrypt-usage`, in every region; see
+[Enkrypt usage queue](#enkrypt-usage-queue). Exa messages come only through
 `/exa-usage`, and only as a fallback after a failed direct write; see
 [Exa usage rollout](#exa-usage-rollout).
 
@@ -229,8 +229,8 @@ flag off. Never roll the consumer back to a version that does not route a kind
 while messages of that kind may be in flight or retrying: such a consumer retries
 them as invalid or unsupported events and they reach the DLQ after 20 retries. In
 particular, never roll back to a consumer from before Exa routing while Exa
-messages may be queued. To stop tagged traffic, turn the producer flag off and let
-the consumer drain.
+messages may be queued. To stop tagged traffic, roll the producer back — revert the
+Enkrypt source, or turn off the Exa fallback flag — and let the consumer drain.
 
 ## Observability
 
@@ -671,34 +671,29 @@ routes or preview URLs are configured. The consumer is attached to each environm
 The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
 
-## Enkrypt usage rollout
+## Enkrypt usage queue
 
-The gateway sends Enkrypt guardrail usage through this queue only when the
-`kilocode-ai-gateway` variable `ENKRYPT_USAGE_QUEUE_ENABLED` is exactly `true`; see
-`ENVIRONMENT.md`. It posts the bare Enkrypt usage record to `/enkrypt-usage` on the
-same Worker as `/usage`, and the ingress wraps it in the tagged queue envelope.
+The gateway sends Enkrypt guardrail usage through this queue in every region; there is no
+rollout selector. It posts the bare Enkrypt usage record to `/enkrypt-usage` on the same
+Worker as `/usage`, and the ingress wraps it in the tagged queue envelope. See `ENVIRONMENT.md`.
 
-Deploy in this order. Each step must be deployed and verified before the next:
+The producer depends on the gateway accepting an optional `usageId` in Enkrypt handoff
+replies, the web app's Enkrypt usage route echoing `usageId` under queue writer admission,
+and the writer's small non-LLM admission class plus the consumer that routes tagged Enkrypt
+messages and the `/enkrypt-usage` ingress. These shipped ahead of the producer; nothing posts
+to the ingress before the producer is deployed.
 
-1. The gateway accepts an optional `usageId` in Enkrypt handoff replies.
-2. The web app's Enkrypt usage route echoes `usageId` and takes queue writer admission.
-3. The writer's small non-LLM admission class, the consumer that routes tagged Enkrypt
-   messages, and the `/enkrypt-usage` ingress. Nothing posts to the ingress before step 4.
-4. The gateway producer, with the flag off.
-5. The flag on. Frankfurt and SFO pick it up with the same gateway deployment; that is not
-   an atomic cutover, because a rolling deployment can briefly overlap old and new settings.
+Rollback: revert the gateway source that makes the queue path permanent and redeploy. New
+Enkrypt usage then takes the direct path again, and the consumer drains what the queue already
+accepted. Delete the now-unused `ENKRYPT_USAGE_QUEUE_ENABLED` selector from the gateway project
+only after the new source is deployed and the old instances have turned over; deleting it while
+old code still reads it would flip that code back to the direct path. If rolling back to source
+that still reads the selector, reinstate the flag first. Never roll the consumer back to an
+LLM-only version while tagged Enkrypt messages may still be in the source queue or in flight:
+they would fail every retry and reach the DLQ.
 
-Rollback: set the flag to anything other than `true` and redeploy the gateway. New Enkrypt
-usage then takes the direct path again, and the consumer drains what the queue already
-accepted. Never roll the consumer back to an LLM-only version while tagged Enkrypt messages
-may still be in the source queue or in flight: they would fail every retry and reach the DLQ.
-
-Human-only steps, before the flag is turned on:
-
-- name a replay owner for the now-mixed DLQ, with a replay that handles both LLM and Enkrypt
-  messages;
-- confirm the existing DLQ alerting covers it;
-- set the flag on `kilocode-ai-gateway` and redeploy.
+The now-mixed DLQ needs a replay owner whose replay handles both LLM and Enkrypt messages, and
+the existing DLQ alerting must cover it.
 
 ## Exa usage rollout
 

@@ -7,9 +7,12 @@ const mocks = vi.hoisted(() => ({
   deleteSession: vi.fn(
     async (_config: unknown, _sessionId: string, _signal?: AbortSignal): Promise<void> => {}
   ),
-  findHostedSessionWorkspaceId: vi.fn(
-    async (_config: unknown, _sessionId: string, _signal?: AbortSignal): Promise<string | null> =>
-      null
+  getSessionSnapshot: vi.fn(
+    async (
+      _config: unknown,
+      _sessionId: string,
+      _signal?: AbortSignal
+    ): Promise<{ worktreeId?: string | null }> => ({})
   ),
   deleteWorktree: vi.fn(
     async (
@@ -32,7 +35,7 @@ vi.mock('../../e2e/client.js', async importOriginal => {
     ...actual,
     interruptSession: mocks.interruptSession,
     deleteSession: mocks.deleteSession,
-    findHostedSessionWorkspaceId: mocks.findHostedSessionWorkspaceId,
+    getSessionSnapshot: mocks.getSessionSnapshot,
     deleteWorktree: mocks.deleteWorktree,
   };
 });
@@ -274,11 +277,11 @@ describe('cleanupRemoteSession last workspace root', () => {
         'tRPC deleteSession failed: 409 Conflict — CONFLICT: workspace_requires_root_session'
       )
     );
-    mocks.findHostedSessionWorkspaceId.mockResolvedValueOnce('worktree_owned');
+    mocks.getSessionSnapshot.mockResolvedValueOnce({ worktreeId: 'worktree_owned' });
 
     await cleanupRemoteSession(config, 'workspace_last_root', 'label');
 
-    expect(mocks.findHostedSessionWorkspaceId.mock.calls[0]?.[1]).toBe('workspace_last_root');
+    expect(mocks.getSessionSnapshot.mock.calls[0]?.[1]).toBe('workspace_last_root');
     expect(mocks.deleteWorktree.mock.calls[0]?.[1]).toEqual({ worktreeId: 'worktree_owned' });
     expect(errorSpy).not.toHaveBeenCalled();
   });
@@ -301,7 +304,7 @@ describe('cleanupRemoteSession last workspace root', () => {
 
     await cleanupRemoteSession(config, 'workspace_other', 'label');
 
-    expect(mocks.findHostedSessionWorkspaceId).not.toHaveBeenCalled();
+    expect(mocks.getSessionSnapshot).not.toHaveBeenCalled();
     expect(String(errorSpy.mock.calls[0]?.[0])).toContain('deleteSession: tRPC deleteSession');
   });
 });

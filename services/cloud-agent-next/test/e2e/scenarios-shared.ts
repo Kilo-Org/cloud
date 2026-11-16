@@ -21,7 +21,7 @@ import {
   collectUntilTerminal,
   deleteSession,
   deleteWorktree,
-  findHostedSessionWorkspaceId,
+  getSessionSnapshot,
   fakeDirective,
   fetchFakeRequests,
   hasPreparationForMessage,
@@ -451,10 +451,8 @@ async function deleteOwningWorkspace(
 ): Promise<string | null> {
   try {
     const signal = AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS);
-    const worktreeId = await findHostedSessionWorkspaceId(config, sessionId, signal);
-    if (worktreeId === null) {
-      return 'deleteWorktree: the last root session has no workspace in the newest sessions';
-    }
+    const { worktreeId } = await getSessionSnapshot(config, sessionId, signal);
+    if (!worktreeId) return 'deleteWorktree: the last root session reports no workspace';
     await deleteWorktree(config, { worktreeId }, signal);
     return null;
   } catch (error) {

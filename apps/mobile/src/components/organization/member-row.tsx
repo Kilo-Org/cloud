@@ -13,9 +13,11 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatMoney } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
 import { assignableMemberRoles } from './organization-role-options';
+import { OrganizationPlanRefusal } from './plan-refusal';
 
 type MemberRowProps = {
   member: ActiveOrgMember;
@@ -44,6 +46,25 @@ export function roleLabel(role: OrgRole): string {
   return i18n.t(ROLE_LABEL_KEYS[role]);
 }
 
+/**
+ * The row's mutation that failed, if either did. The role change and the
+ * removal share this one failure slot: the two never settle at once (one
+ * mutation scope per organization serializes them), so the row can render one
+ * refusal at a time without a second flag beside it.
+ */
+function failedMemberRefusal<
+  T extends { isError: boolean; error: unknown },
+  U extends { isError: boolean; error: unknown },
+>({ updateMember, removeMember }: { updateMember: T; removeMember: U }) {
+  if (updateMember.isError) {
+    return updateMember;
+  }
+  if (removeMember.isError) {
+    return removeMember;
+  }
+  return null;
+}
+
 export function MemberRow({
   member,
   canManage,
@@ -57,8 +78,21 @@ export function MemberRow({
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const mutations = useOrganizationMutations(organizationId);
+  // This row renders a refused role change or removal inline (Pattern P2), so
+  // the hook's toast stays silent: the same announcement must not leave the
+  // row in two places, and the toast cannot win the stacking race against the
+  // menu sheet's own window it shares that moment with.
+  const mutations = useOrganizationMutations(organizationId, { silenceUpdateMemberToast: true });
   const displayName = firstNonEmpty(member.name, member.email);
+  // A refused role change or removal is explained on the row it was refused
+  // for, not in a toast the menu's own window can cover. The removal confirm
+  // keeps its own dialog, so only this row's refusal needs the line; the
+  // copy comes from the same server mapping the hook's toast used.
+  const failedMemberMutation = failedMemberRefusal(mutations);
+  const refusalMessage =
+    failedMemberMutation?.error != null
+      ? organizationErrorMessage(failedMemberMutation.error)
+      : null;
   const [menu, setMenu] = useState<'actions' | 'role' | null>(null);
   // The action a chosen row will run once its menu is gone. The menu's window
   // owns the back key until it finishes dismissing, so running the choice only
@@ -208,12 +242,17 @@ export function MemberRow({
     </View>
   );
 
+  const refusal = refusalMessage ? (
+    <OrganizationPlanRefusal message={refusalMessage} className="mt-2" />
+  ) : null;
+
   // No action at all, so the row is not pressable: a limit-only row still
   // opens the menu.
   if (actionOptions.length === 0) {
     return (
       <View className="px-3">
         {inner}
+        {refusal}
         {dialog}
       </View>
     );
@@ -230,6 +269,7 @@ export function MemberRow({
         className="px-3 active:opacity-70"
       >
         {inner}
+        {refusal}
         {dialog}
       </Pressable>
       <MenuSheet

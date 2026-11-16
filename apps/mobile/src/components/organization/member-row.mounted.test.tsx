@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- the spend display and the action/role menus share the row's mounted harness. */
-import { act } from '@/test/renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   updateMember: { mutate: vi.fn() },
   removeMember: { mutate: vi.fn() },
+  hookFactory: vi.fn(),
   menuProps: [] as Record<string, unknown>[],
 }));
 
@@ -36,6 +38,19 @@ vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: mocks.confirm, dialog: null }),
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The refusal block imports the icon barrel; the real lucide deep imports
+// cannot load in this project (see `vitest.setup.ts` for the same stubbing).
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ destructive: '#de0000' }),
+}));
+// The refusal block's message renders through AccessibleStatus; the studio
+// mock above drops the announcement channel but keeps the message visible so
+// the row's refusal copy stays assertable.
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: (props: Record<string, unknown>) =>
+    props.message == null ? null : createElement('Text', props, props.message as string),
+}));
 vi.mock('@/components/ui/menu-sheet', () => ({
   MenuSheet: (props: Record<string, unknown>) => {
     mocks.menuProps.push(props);
@@ -43,10 +58,7 @@ vi.mock('@/components/ui/menu-sheet', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
-  useOrganizationMutations: () => ({
-    updateMember: mocks.updateMember,
-    removeMember: mocks.removeMember,
-  }),
+  useOrganizationMutations: () => mocks.hookFactory(),
 }));
 
 const member = {
@@ -120,7 +132,19 @@ beforeEach(() => {
   mocks.confirm.mockReset();
   mocks.updateMember.mutate.mockReset();
   mocks.removeMember.mutate.mockReset();
+  mocks.hookFactory.mockReset();
+  // Healthy mutations by default: updateMember and removeMember ride their
+  // shared mutate mocks; every state read is false.
+  mocks.hookFactory.mockImplementation(() => ({
+    updateMember: { mutate: mocks.updateMember.mutate, isError: false, error: null },
+    removeMember: { mutate: mocks.removeMember.mutate, isError: false, error: null },
+  }));
 });
+
+// The row's rendered strings, whatever the block layout holds.
+function textsOf(renderer: ReactTestRenderer): unknown[] {
+  return renderer.root.findAllByType('Text').map(node => node.props.children as unknown);
+}
 
 afterEach(() => {
   for (const view of mounted.splice(0)) {
@@ -341,6 +365,56 @@ describe('MemberRow menu', () => {
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.updateMember.mutate).not.toHaveBeenCalled();
     expect(mocks.removeMember.mutate).not.toHaveBeenCalled();
+  });
+
+  // The hook is mocked per test, so a refusal is driven by returning a failed
+  // mutation object for the hook call this render makes.
+  function hookMutations(overrides: {
+    updateMember?: Partial<{
+      isError: boolean;
+      error: unknown;
+    }>;
+    removeMember?: Partial<{ isError: boolean; error: unknown }>;
+  }) {
+    return {
+      updateMember: { mutate: mocks.updateMember.mutate, ...overrides.updateMember },
+      removeMember: { mutate: mocks.removeMember.mutate, ...overrides.removeMember },
+    };
+  }
+
+  it('renders the mapped refusal on the row when the server refuses the role change', async () => {
+    mocks.hookFactory.mockImplementationOnce(() =>
+      hookMutations({
+        updateMember: {
+          isError: true,
+          error: { data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' } },
+        },
+      })
+    );
+    const view = await renderRow();
+
+    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('renders the mapped refusal on the row when the server refuses the removal', async () => {
+    mocks.hookFactory.mockImplementationOnce(() =>
+      hookMutations({
+        removeMember: {
+          isError: true,
+          error: { data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' } },
+        },
+      })
+    );
+    const view = await renderRow();
+
+    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('renders no refusal block while the mutations are healthy', async () => {
+    mocks.hookFactory.mockImplementationOnce(() => hookMutations({}));
+    const view = await renderRow();
+
+    expect(textsOf(view)).not.toContain(i18n.t('common.organizationTrialEnded'));
   });
 });
 

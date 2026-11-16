@@ -18,6 +18,16 @@ on:
         required: true
         type: string
         default: 'https://api.kilo.ai'
+      only:
+        description: 'Comma-separated scenario names to run; empty runs every scenario'
+        required: false
+        type: string
+        default: ''
+      parallel:
+        description: 'Scenario concurrency'
+        required: false
+        type: string
+        default: '4'
 
 permissions:
   contents: read
@@ -48,7 +58,8 @@ jobs:
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
       E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
       # The harness's existing DEFAULT_PARALLEL; the runner owns concurrency.
-      E2E_PARALLEL: 4
+      E2E_PARALLEL: ${{ inputs.parallel || '4' }}
+      E2E_ONLY: ${{ inputs.only }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -69,7 +80,9 @@ jobs:
       - name: Run deployed e2e
         run: |
           set -o pipefail
-          pnpm --filter cloud-agent-next run e2e:parallel 2>&1 | tee e2e.log
+          only_args=()
+          if [ -n "$E2E_ONLY" ]; then only_args=(--only "$E2E_ONLY"); fi
+          pnpm --filter cloud-agent-next run e2e:parallel "${only_args[@]}" 2>&1 | tee e2e.log
 
       - name: Summarize results
         id: summarize

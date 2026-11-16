@@ -3,6 +3,46 @@ import { GIT_CREDENTIAL_HELPER } from './runtime-distribution.js';
 export const PNPM_STORE_DIR = '/var/cache/kilo/pnpm-store';
 export const PNPM_STORE_ENV_VAR = 'pnpm_config_store_dir';
 
+export const AGENT_UID = 10001;
+export const AGENT_GID = 10001;
+export const AGENT_USER = 'kilo';
+
+const INHERITED_AGENT_ENVIRONMENT = [
+  'PATH',
+  'LANG',
+  'LC_ALL',
+  'TZ',
+  'TERM',
+  'COLORTERM',
+  'TMPDIR',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'CURL_CA_BUNDLE',
+  'REQUESTS_CA_BUNDLE',
+  'GIT_SSL_CAINFO',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'ALL_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'all_proxy',
+  'no_proxy',
+  PNPM_STORE_ENV_VAR,
+] as const;
+
+export function inheritedAgentEnvironment(
+  inherited: Record<string, string | undefined>
+): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const name of INHERITED_AGENT_ENVIRONMENT) {
+    const value = inherited[name];
+    if (value !== undefined) env[name] = value;
+  }
+  return env;
+}
+
 /**
  * Git configuration the platform pins for every sandbox: a read-only credential
  * helper that redeems Kilo capabilities at the outbound interceptor.
@@ -84,6 +124,14 @@ export const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
  * `/tmp` is not used: setup scripts clear it and `TMPDIR` would move it.
  */
 export const CONTROL_HOME_ROOT = '/home';
+
+/** Trees that startup and the environment builder give to the agent account. */
+export const AGENT_OWNED_ROOTS = [
+  '/workspace',
+  CONTROL_HOME_ROOT,
+  '/artifacts',
+  '/var/cache/kilo',
+] as const;
 
 /**
  * Directory name, under the OS temporary directory, of the per-scope homes of

@@ -14,7 +14,12 @@ import { writeWorkspaceStamp } from '../control-plane/workspace-stamp.js';
 import { git, type ProcessSpawn } from '../utils.js';
 import { runSetupScript } from '../setup-script.js';
 import { BuilderRefusedError, createBuilderClient } from './client.js';
-import { removeBuildCredentials, stopOtherProcesses, stopOwnedProcesses } from './cleanup.js';
+import {
+  removeBuildCredentials,
+  stopOtherProcesses,
+  stopOwnedProcesses,
+  transferAgentOwnership,
+} from './cleanup.js';
 import { createBuildReporter } from './reporter.js';
 import { runEnvironmentBuild } from './run.js';
 import { takeRunner } from './runner-file.js';
@@ -153,6 +158,7 @@ async function main(): Promise<void> {
       },
       cleanup: removeBuildCredentials,
       writeStamp: (directory, stamp) => writeWorkspaceStamp(directory, true, stamp),
+      transferOwnership: () => transferAgentOwnership(controller.signal),
       signal: controller.signal,
       inherited,
       logPath,

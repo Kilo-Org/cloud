@@ -68,6 +68,7 @@ import {
   parseAgentSandboxProvider,
 } from '../../../src/shared/sandbox-provider.js';
 import { reservedPreviewPorts } from '../../../src/shared/reserved-ports.js';
+import { initializeAgentExecution } from '../control/agent-execution.js';
 
 const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
 const FILE_LOG_FINALIZE_TIMEOUT_MS = 5_000;
@@ -519,6 +520,8 @@ async function main(
     await settle(() => fileLogs.finalize(FILE_LOG_FINALIZE_TIMEOUT_MS));
     return undefined;
   }
+
+  await initializeAgentExecution();
 
   // Spec §7 "Crash resistance": clear stale Kilo process groups before any Kilo spawn.
   await cleanupStaleKiloPidfiles({

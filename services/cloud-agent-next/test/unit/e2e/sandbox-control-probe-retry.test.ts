@@ -43,7 +43,7 @@ function scriptedExecutor(options: {
   return vi.fn(async (args: string[]) => {
     if (args[0] === 'ps') return { stdout: dockerPsOutput(options.containers ?? []) };
     if (args[0] === 'exec') {
-      options.onExec?.(JSON.parse(args[5] ?? '{}') as Record<string, unknown>);
+      options.onExec?.(JSON.parse(args.at(-1) ?? '{}') as Record<string, unknown>);
       const result = options.execResults[Math.min(execCalls, options.execResults.length - 1)];
       execCalls += 1;
       return { stdout: JSON.stringify(result) };

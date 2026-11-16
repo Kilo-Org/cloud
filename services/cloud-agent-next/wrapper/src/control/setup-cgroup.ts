@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import {
   closeSync,
   constants,
@@ -12,6 +12,7 @@ import path from 'node:path';
 import { Writable } from 'node:stream';
 import type { ProcessSpawn } from '../utils.js';
 import { releaseGate, spawnGated } from './gated-spawn.js';
+import { spawnAgent } from './agent-execution.js';
 import {
   admitControlWorkload,
   type ControlWorkload,
@@ -32,11 +33,11 @@ export function createSetupSpawn(workload: ControlWorkload): ProcessSpawn {
   return (command, args, options) => {
     if (!leaf) {
       const placement = admitControlWorkload(workload);
-      if (!placement) return spawn(command, args, options);
+      if (!placement) return spawnAgent(command, args, options);
       leaf = openSetupCgroup(placement);
       if (!leaf) {
         console.warn('Setup command cgroup unavailable; running unmanaged');
-        return spawn(command, args, options);
+        return spawnAgent(command, args, options);
       }
     }
     return spawnInCgroup(leaf, command, args, options);
@@ -117,7 +118,7 @@ export function spawnInCgroup(
     child.stderr?.destroy();
     child.kill('SIGKILL');
     console.warn('Setup command cgroup placement failed; running unmanaged');
-    return spawn(command, args, options);
+    return spawnAgent(command, args, options);
   }
 }
 

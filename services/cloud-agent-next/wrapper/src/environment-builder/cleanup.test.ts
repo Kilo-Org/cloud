@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { AGENT_GID, AGENT_UID } from '../../../src/shared/runtime-environment.js';
 import { createOwnedProcessScope } from '../control/owned-processes';
-import { stopOwnedProcesses } from './cleanup';
+import { stopOwnedProcesses, transferAgentOwnership } from './cleanup';
 
 function processAlive(pid: number | undefined): boolean {
   if (pid === undefined) return false;
@@ -119,4 +123,46 @@ describe('stopOwnedProcesses', () => {
       child.kill('SIGKILL');
     }
   });
+});
+
+describe('transferAgentOwnership', () => {
+  it.skipIf(process.platform !== 'linux' || process.getuid?.() !== 0)(
+    'gives every entry of the existing roots to the agent account',
+    async () => {
+      const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'builder-ownership-'));
+      try {
+        const root = path.join(directory, 'workspace');
+        await fs.mkdir(path.join(root, 'node_modules', 'pkg'), { recursive: true });
+        await fs.writeFile(path.join(directory, 'store-file'), 'cached');
+        await fs.link(
+          path.join(directory, 'store-file'),
+          path.join(root, 'node_modules', 'pkg', 'index.js')
+        );
+        await fs.symlink('pkg/index.js', path.join(root, 'node_modules', 'link'));
+
+        await transferAgentOwnership(new AbortController().signal, [
+          root,
+          path.join(directory, 'missing'),
+        ]);
+
+        for (const entry of [
+          '',
+          'node_modules',
+          'node_modules/pkg',
+          'node_modules/pkg/index.js',
+          'node_modules/link',
+        ]) {
+          const stat = await fs.lstat(path.join(root, entry));
+          expect({ entry, uid: stat.uid, gid: stat.gid }).toEqual({
+            entry,
+            uid: AGENT_UID,
+            gid: AGENT_GID,
+          });
+        }
+        expect((await fs.stat(directory)).uid).toBe(0);
+      } finally {
+        await fs.rm(directory, { recursive: true, force: true });
+      }
+    }
+  );
 });

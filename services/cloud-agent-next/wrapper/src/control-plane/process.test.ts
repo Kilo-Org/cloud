@@ -165,9 +165,12 @@ function nativeLogsEnv(url: string, uploadPort: number): Record<string, string> 
   });
 }
 
-describe('control-plane wrapper process', () => {
+const describeLinuxRoot = describe.skipIf(process.platform !== 'linux' || process.getuid?.() !== 0);
+
+describeLinuxRoot('control-plane wrapper process', () => {
   it('reports the installed CLI and bundled wrapper versions from the real entrypoint', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'wrapper-versions-'));
+    await chmod(directory, 0o755);
     const cli = join(directory, 'kilo');
     await writeFile(
       cli,

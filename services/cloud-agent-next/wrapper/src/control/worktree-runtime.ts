@@ -23,6 +23,8 @@ import {
   RESERVED_ENV_VAR_PREFIXES,
   SYSTEM_GIT_CONFIG_ENV,
   isStrippedGitConfigEnvVar,
+  inheritedAgentEnvironment,
+  AGENT_USER,
 } from '../../../src/shared/runtime-environment.js';
 import { kiloServerEnvForOrigin } from '../../../src/shared/kilo-server-env.js';
 import { type WrapperKiloClient } from '../kilo-api.js';
@@ -54,14 +56,6 @@ const BITBUCKET_METADATA_ENV_VARS = new Set([
   'KILO_BITBUCKET_WORKSPACE_UUID',
   'KILO_BITBUCKET_REPOSITORY_UUID',
 ]);
-const INHERITED_GIT_CREDENTIALS = new Set([
-  'GH_TOKEN',
-  'GITHUB_TOKEN',
-  'GITLAB_TOKEN',
-  'GITLAB_OAUTH_TOKEN',
-  'BITBUCKET_TOKEN',
-  'BITBUCKET_APP_PASSWORD',
-]);
 
 export class WorktreeKiloRuntimeError extends Error {
   constructor(
@@ -88,23 +82,13 @@ export function buildWorktreeKiloEnvironment(
     cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   }
 ): Record<string, string> {
-  const env: Record<string, string> = {};
+  const env = inheritedAgentEnvironment(inherited);
   const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
   const isRuntimeOwned = (name: string): boolean =>
     reserved.has(name) ||
     name === 'HOME' ||
     RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
 
-  for (const [name, value] of Object.entries(inherited)) {
-    if (
-      value !== undefined &&
-      !isRuntimeOwned(name) &&
-      !INHERITED_GIT_CREDENTIALS.has(name) &&
-      !isStrippedGitConfigEnvVar(name)
-    ) {
-      env[name] = value;
-    }
-  }
   for (const [name, value] of Object.entries(environment)) {
     if (
       (!isRuntimeOwned(name) || BITBUCKET_METADATA_ENV_VARS.has(name)) &&
@@ -172,6 +156,8 @@ export function buildWorktreeKiloEnvironment(
     ...env,
     PWD: directory,
     HOME: home,
+    USER: AGENT_USER,
+    LOGNAME: AGENT_USER,
     XDG_DATA_HOME: path.join(home, '.local', 'share'),
     XDG_CONFIG_HOME: path.join(home, '.config'),
     XDG_CACHE_HOME: path.join(home, '.cache'),

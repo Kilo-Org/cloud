@@ -853,6 +853,81 @@ Delivery is best effort; clients also refetch on view open, focus and reconnect.
 
 ## 7. Wrapper
 
+### Agent credential boundary
+
+The supervisor and wrapper run as root. Kilo and agent-controlled commands run as
+`kilo`, UID/GID `10001`. This includes setup, profile installers, Git hooks,
+finalization, recovery commands, terminals, and their descendants.
+
+The threat is arbitrary agent execution inside its own workspace. The agent may
+inspect processes, edit files, install tools, and create Git hooks. It must not
+read wrapper credentials through process memory, environments, descriptors, or
+private files. The kernel, provider, downloaded runtime, and prepared root
+filesystem remain trusted. Sibling chats in one workspace still share an identity.
+
+Credential ownership:
+
+| Material | Location | Agent access |
+|---|---|---|
+| Wrapper launch credential | Initial supervisor/wrapper environment; connection memory | Denied |
+| Log-upload grant | Initial supervisor/wrapper environment; uploader memory | Denied |
+| Runtime download grant | Bootstrap environment/command until supervisor exec | Not passed to agent execution |
+| Other inherited control credentials, including transfer grants | Wrapper/provider environment or root-private files | Not inherited; protected by UID/file permissions |
+| Git aliases | Runtime HOME `.local/share/kilo/cloud-agent/git-credentials` | Required |
+| Scoped model handle and workspace MCP credential | Prepared runtime environment/configuration | Required |
+| User profile/environment secrets | Prepared runtime environment | Required |
+
+Deleting `process.env` entries does not erase the initial Linux `/proc` environment.
+The different UID enforces access checks for wrapper `environ`, `mem`, and `fd`.
+No shared `/proc` remount or provider-specific `hidepid` setting is required.
+
+Downloaded startup provisions the account, including on compatible older base
+images. It transfers workspace, runtime-home, artifact, and package-cache ownership
+before agent execution. The transfer changes only entries that the agent does not
+own yet. It skips multiply linked files, because such a file can be a root file
+outside the tree. The environment builder transfers the same trees before capture,
+so a session that starts from a built snapshot has nothing to change.
+`/home` and the legacy HOME parent remain root-owned.
+The wrapper can still read agent-written files, including mode-600 files.
+Downloaded executable directories remain root-owned and traversable by the agent.
+
+The wrapper initializes one process-wide execution policy before starting Kilo.
+Every agent subprocess uses trusted `setpriv`, with supplementary groups and all
+capability sets cleared. `no_new_privs` prevents setuid/file-capability elevation.
+Cgroup gates run before the privilege drop and receive only a fixed launcher
+environment. The requested environment reaches the command only after the drop;
+loader and shell startup variables therefore cannot execute as root.
+
+Inherited agent settings use an explicit allowlist for tool discovery, locale,
+temporary storage, proxy configuration, certificate trust, and the package cache.
+Explicit workspace/profile values remain supported. Wrapper credentials never
+enter that environment. Root-only helpers use fixed executable paths and bounded,
+trusted operations: runtime installation, ownership changes, snapshot JSON
+filtering, and private log archiving. Archive names cannot become tar options.
+Wrapper writes into agent-owned paths pin directory descriptors and reject
+symlink parents, symlink files, and multiply linked files where content is written.
+Wrapper ownership changes of agent-writable trees use the same descriptors, do not
+follow symlinks, and skip multiply linked files. Files that Kilo or agent tools
+read, such as attachments, restored files, and the session-ingest registration,
+are agent-owned. Profile staging stays outside the agent-writable HOME.
+
+Compatibility and rollout:
+
+- Missing privilege-reduction tools or a conflicting account fail startup closed.
+  The Vercel base installs `util-linux`, `shadow-utils`, and `findutils` for them.
+- Session setup no longer has root access. Root-dependent installation belongs
+  in trusted environment preparation, not an agent session.
+- A running old wrapper remains unchanged and vulnerable until sandbox replacement.
+  Publishing a new runtime does not secure an existing process.
+- Ownership transfer preserves trusted environment caches and workspace snapshots.
+  It cannot repair a previously compromised root filesystem. Replace or rebuild
+  snapshots created from an untrusted root-running session before relying on this boundary.
+  Files that a root-running session hard-linked into these trees stay root-owned
+  until the environment is rebuilt.
+- Customer images must not expose unauthenticated root daemons or writable control
+  binaries to the agent. Hosted-provider qualification remains separate from local proof.
+- This change does not deploy, replace the fleet, or isolate sibling chats.
+
 ### Connection
 
 - A new wrapper advertises optional `heartbeatAck: true` in `hello`; the Sandbox DO echoes it

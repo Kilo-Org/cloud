@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
+import { renameAgentPath, writeAgentFile } from '../control/agent-execution.js';
 
 const STAMP_FILE = 'kilo-workspace.json';
 
@@ -64,8 +65,8 @@ export async function writeWorkspaceStamp(
 ): Promise<void> {
   const target = workspaceStampPath(directory, hasGit);
   const temporary = `${target}.tmp`;
-  await fs.writeFile(temporary, `${JSON.stringify(stamp)}\n`);
-  await fs.rename(temporary, target);
+  await writeAgentFile(temporary, `${JSON.stringify(stamp)}\n`);
+  await renameAgentPath(temporary, target);
 }
 
 export function classifyWorkspace(input: {

@@ -8,6 +8,7 @@ import {
 } from './runtime-profile.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { agentOwns, agentOwnsTree } from '../control/agent-execution.js';
 import {
   CONTROL_PLANE_COMMAND_FAILURES_MAX,
   CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
@@ -337,7 +338,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     deps.writeStamp ??
     (async (directory: string, stamp: WorkspaceStamp) =>
       writeWorkspaceStamp(directory, await hasGit(directory), stamp));
-  const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
+  const mkdir =
+    deps.mkdir ??
+    (async dir => {
+      await fs.mkdir(dir, { recursive: true });
+      await agentOwns(dir);
+    });
   const repository = createRepositoryPreparation({ runGit, runSetup, sleep, mkdir, hasGit, log });
   const { runNetworkGit, headCommit } = repository;
 
@@ -1226,6 +1232,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(`control-plane prepare received session=${sessionId} directory=${directory}`);
 
     try {
+      await fs.mkdir(home, { recursive: true });
+      await agentOwns(home);
       // Built inside the failure scope: an over-limit CLI config must surface as
       // `session.failed`, not reject the prepare promise (which the caller
       // swallows while the route waits out its timeout).
@@ -1304,6 +1312,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             if (!owner.released) emitProgress(sessionId, 'setup', detail);
           },
         });
+        await agentOwnsTree(path.join(home, '.kilocode'));
         if (owner.released) return;
         currentStep = 'kilo_runtime';
         emitProgress(sessionId, 'kilo_runtime');

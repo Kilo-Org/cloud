@@ -1,5 +1,6 @@
 import { constants } from 'fs';
-import { lstat, mkdir, mkdtemp, open, readlink, realpath, rm, writeFile } from 'fs/promises';
+import { lstat, mkdir, mkdtemp, open, readlink, realpath, rm } from 'fs/promises';
+import { agentOwns, writeAgentFile } from './agent-execution.js';
 import { tmpdir } from 'os';
 import { basename, dirname, join } from 'path';
 import {
@@ -477,7 +478,10 @@ async function collectWorktree(
     for (const file of tracked) {
       if (!append(file)) break;
     }
-    if (includeFiles) temporaryDirectory = await mkdtemp(join(tmpdir(), 'worktree-patch-'));
+    if (includeFiles) {
+      temporaryDirectory = await mkdtemp(join(tmpdir(), 'worktree-patch-'));
+      await agentOwns(temporaryDirectory);
+    }
     const budget = { remaining: MAX_UNTRACKED_READ_BYTES };
     const capturedUntracked = new Map<string, CapturedUntrackedFile>();
     const failedFiles = new Map<string, FileOmissionReason>();
@@ -761,14 +765,15 @@ async function collectSnapshotFiles({
     original?: { bytes: Buffer; mode: number }
   ): Promise<Buffer> {
     const directory = await mkdtemp(join(temporaryDirectory, 'file-'));
+    await agentOwns(directory);
     try {
       const temporaryPath = original ? join(directory, 'b', path) : join(directory, path);
       await mkdir(dirname(temporaryPath), { recursive: true });
-      await writeFile(temporaryPath, bytes, { mode });
+      await writeAgentFile(temporaryPath, bytes, mode);
       if (original) {
         const originalPath = join(directory, 'a', path);
         await mkdir(dirname(originalPath), { recursive: true });
-        await writeFile(originalPath, original.bytes, { mode: original.mode });
+        await writeAgentFile(originalPath, original.bytes, original.mode);
       }
       const operand = path === '-' ? './-' : path;
       return await runGit(

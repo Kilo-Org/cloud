@@ -212,7 +212,9 @@ describe('workspace session attachment', () => {
   });
 });
 
-describe('control-plane wrapper startup process', () => {
+const describeLinuxRoot = describe.skipIf(process.platform !== 'linux' || process.getuid?.() !== 0);
+
+describeLinuxRoot('control-plane wrapper startup process', () => {
   async function startWrapper(env: Record<string, string>) {
     const directory = await mkdtemp(join(tmpdir(), 'control-plane-startup-'));
     const child = Bun.spawn([process.execPath, 'run', join(import.meta.dir, 'main.ts')], {

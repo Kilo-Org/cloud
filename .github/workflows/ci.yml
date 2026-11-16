@@ -1525,10 +1525,18 @@ jobs:
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next check:duplication
 
+      # The wrapper refuses to start without root, and these suites check that
+      # agent processes drop to the agent account, so they run as root.
       - name: Run the wrapper process tests
         if: matrix.part == 'wrapper-process'
         working-directory: services/cloud-agent-next/wrapper
-        run: bun test ./src/control-plane/process.test.ts
+        run: >-
+          sudo --preserve-env env "PATH=$PATH" bun test
+          ./src/control-plane/process.test.ts
+          ./src/control-plane/main.test.ts
+          ./src/control-plane-smoke.test.ts
+          ./src/control/agent-execution.test.ts
+          ./src/environment-builder/cleanup.test.ts
 
       # Every other wrapper test file, in bun's own discovery order: some
       # files mock modules for the whole process, so the order matters.

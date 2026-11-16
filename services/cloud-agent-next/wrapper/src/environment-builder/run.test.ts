@@ -128,6 +128,7 @@ function v2Input(
 function harness(
   options: {
     cleanup?: typeof removeBuildCredentials;
+    transferOwnership?: () => Promise<void>;
     onClone?: (home: string) => Promise<void>;
     /** Real HTTPS remote URL to the local repository that stands in for it. */
     remotes?: Record<string, string>;
@@ -189,6 +190,7 @@ function harness(
       },
       cleanup: options.cleanup ?? removeBuildCredentials,
       writeStamp: (dir, stamp) => writeWorkspaceStamp(dir, true, stamp),
+      transferOwnership: options.transferOwnership ?? (async () => undefined),
       signal,
       inherited: { PATH: process.env.PATH, ENVIRONMENT_BUILD_CREDENTIAL: 'jwt', HOME: '/root' },
       logPath: undefined,
@@ -421,6 +423,23 @@ describe('environment build run', () => {
     });
     expect(await readWorkspaceStamp(directory)).toBeNull();
   });
+
+  it('fails cleanup instead of reporting ready when ownership transfer fails', async () => {
+    const h = harness({
+      transferOwnership: async () => {
+        throw new Error('Agent ownership transfer failed');
+      },
+    });
+
+    expect(await h.run(buildInput())).toEqual({
+      outcome: 'failed',
+      step: 'cleanup',
+      reason: 'cleanup_failed',
+      detail: 'cleanup did not complete',
+    });
+    expect(h.lines).not.toContain('Workspace prepared; waiting for the snapshot');
+  });
+
   it('reports an unavailable cleanup', async () => {
     const home = directoryHome(directory, homeRoot);
     const recordPath = gitCredentialRecordPath(home);

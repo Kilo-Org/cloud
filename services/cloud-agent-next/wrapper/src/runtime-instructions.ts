@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import type { RuntimeInstructionInput } from '../../src/shared/runtime-profile.js';
 import { logToFile } from './utils.js';
+import { writeAgentFile } from './control/agent-execution.js';
 
 const profileRuleFileSchema = z
   .string()
@@ -47,7 +48,7 @@ export async function writeRuntimeInstructions(
       continue;
     }
     const filename = `${instruction.name}.md`;
-    await fs.writeFile(path.join(rulesDir, filename), instruction.content);
+    await writeAgentFile(path.join(rulesDir, filename), instruction.content);
     retained.add(filename);
   }
   if (options.replaceExisting) {
@@ -67,7 +68,7 @@ export async function writeRuntimeInstructions(
       }
     }
   }
-  await fs.writeFile(
+  await writeAgentFile(
     manifest,
     JSON.stringify(
       options.replaceExisting ? [...retained] : [...new Set([...previous, ...retained])]

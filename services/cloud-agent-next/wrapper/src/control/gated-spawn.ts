@@ -6,6 +6,7 @@ import {
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
 import type { Writable } from 'node:stream';
+import { agentCommand } from './agent-execution.js';
 
 const GATE_SCRIPT = 'IFS= read -r start && [ "$start" = start ] && exec "$@"';
 
@@ -23,7 +24,11 @@ export function spawnGated(
 ): ChildProcessWithoutNullStreams;
 export function spawnGated(command: string, args: string[], options: SpawnOptions): ChildProcess;
 export function spawnGated(command: string, args: string[], options: SpawnOptions): ChildProcess {
-  return spawn('/bin/sh', ['-c', GATE_SCRIPT, 'kilo-owned', command, ...args], options);
+  const child = agentCommand(command, args, options.env);
+  return spawn('/bin/sh', ['-c', GATE_SCRIPT, 'kilo-owned', child.command, ...child.args], {
+    ...options,
+    env: child.env,
+  });
 }
 
 /** Opens the gate. The pipe stays open as the command's stdin. */

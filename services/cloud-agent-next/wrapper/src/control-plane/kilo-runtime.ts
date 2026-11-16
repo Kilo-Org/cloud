@@ -1,4 +1,5 @@
 import { runtimeHarness, kilo2RuntimeEnvironment, probeKilo2Health } from './runtime-harness.js';
+import { agentOwns, agentOwnsTree, writeAgentFile } from '../control/agent-execution.js';
 import {
   GH_STACK_EXTENSION_NAME,
   GH_STACK_EXTENSIONS_ROOT,
@@ -546,20 +547,21 @@ export async function prepareKiloFilesystem(
       ...(sandboxProvider ? { sandboxProvider } : {}),
       ...(artifacts ? { artifacts } : {}),
     });
+    await agentOwns(home);
   }
   const dataHome = env.XDG_DATA_HOME;
   if (dataHome !== undefined && dataHome.length > 0) {
     const authDirectory = path.join(dataHome, runtimeHarness().dataDirectory);
-    await fsp.mkdir(authDirectory, { recursive: true, mode: 0o700 });
-    await fsp.writeFile(path.join(authDirectory, 'auth.json'), env.KILO_AUTH_CONTENT ?? '', {
-      mode: 0o600,
-    });
+    const created = await fsp.mkdir(authDirectory, { recursive: true, mode: 0o700 });
+    if (created) await agentOwnsTree(created);
+    await writeAgentFile(path.join(authDirectory, 'auth.json'), env.KILO_AUTH_CONTENT ?? '', 0o600);
     // `gh` looks for extensions under `$XDG_DATA_HOME/gh/extensions`, while the
     // runtime HOME is per worktree and starts empty. Expose the image-baked
     // gh-stack extension through that path. An existing link (or an upgrade the
     // agent installed) is left untouched.
     const extensionsDirectory = path.join(dataHome, 'gh', 'extensions');
-    await fsp.mkdir(extensionsDirectory, { recursive: true });
+    const extensionsCreated = await fsp.mkdir(extensionsDirectory, { recursive: true });
+    if (extensionsCreated) await agentOwnsTree(extensionsCreated);
     const ghStackLink = path.join(extensionsDirectory, GH_STACK_EXTENSION_NAME);
     try {
       await fsp.lstat(ghStackLink);
@@ -571,8 +573,10 @@ export async function prepareKiloFilesystem(
   const runtimeDir = env.XDG_RUNTIME_DIR;
   if (runtimeDir !== undefined && runtimeDir.length > 0) {
     await fsp.mkdir(runtimeDir, { recursive: true, mode: 0o700 });
+    await agentOwns(runtimeDir);
   }
   await fsp.mkdir(directory, { recursive: true });
+  await agentOwns(directory);
 }
 
 export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {

@@ -8,6 +8,7 @@ import {
 } from '../../src/shared/runtime-profile.js';
 import { createSafeProcessDiagnostic, runProcess } from './utils.js';
 import { workspaceBootstrapError } from './bootstrap-error.js';
+import { agentOwns } from './control/agent-execution.js';
 
 export type RuntimeSkillInstallOptions = {
   run?: typeof runProcess;
@@ -158,6 +159,7 @@ export async function writeRuntimeSkills(
       if (skill.source !== undefined) {
         if (installerHome === undefined) {
           installerHome = await fs.mkdtemp(path.join(os.tmpdir(), 'profile-skills-'));
+          await agentOwns(installerHome);
         }
         await installSkillsShSkill(
           installerHome,

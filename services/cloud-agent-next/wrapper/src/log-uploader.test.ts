@@ -4,7 +4,12 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { createLogArchiveId, createLogUploader, type LogUploader } from './log-uploader';
+import {
+  createLogArchiveId,
+  createLogUploader,
+  createTarStream,
+  type LogUploader,
+} from './log-uploader';
 
 const originalFetch = globalThis.fetch;
 const originalLogPath = process.env.WRAPPER_LOG_PATH;
@@ -68,6 +73,18 @@ afterEach(async () => {
 });
 
 describe('createLogUploader', () => {
+  it('archives option-shaped filenames without interpreting them as tar options', async () => {
+    const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'log-option-names-'));
+    temporaryDirectories.push(directory);
+    const names = ['--checkpoint=1', '--checkpoint-action=exec=true'];
+    for (const name of names) await fsp.writeFile(path.join(directory, name), `literal ${name}`);
+    const archive = createTarStream(names.map(name => ({ directory, name })));
+    if (!archive) throw new Error('Expected a log archive');
+    const bytes = await new Response(archive.stream).arrayBuffer();
+    const contents = gunzipSync(bytes).toString();
+    for (const name of names) expect(contents).toContain(`literal ${name}`);
+  });
+
   it('settles an active upload when stopped even if fetch ignores abort', async () => {
     const files = await createFixture();
     const requestStarted = Promise.withResolvers<AbortSignal>();

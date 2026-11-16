@@ -42,7 +42,9 @@ describe('skills.sh container installation', () => {
   it.each([false, true])(
     'preserves previous skills when replacement fails and rollback failure is %s',
     async rollbackFails => {
-      const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-skills-rollback-'));
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-skills-rollback-'));
+      const home = path.join(root, 'home');
+      await fs.mkdir(home);
       try {
         await materializeRuntimeProfile(home, {
           runtimeSkills: [{ name: 'previous', rawMarkdown: 'Keep me' }],
@@ -76,16 +78,16 @@ describe('skills.sh container installation', () => {
         } finally {
           renameSpy.mockRestore();
         }
-        const staging = (await fs.readdir(home)).filter(name => name.startsWith('.profile-'));
+        const staging = (await fs.readdir(root)).filter(name => name.startsWith('.profile-'));
         expect(staging).toHaveLength(rollbackFails ? 1 : 0);
         const previousSkills = rollbackFails
-          ? path.join(home, staging[0], 'previous-skills')
+          ? path.join(root, staging[0], 'previous-skills')
           : skills;
         expect(await fs.readFile(path.join(previousSkills, 'previous', 'SKILL.md'), 'utf8')).toBe(
           'Keep me'
         );
       } finally {
-        await fs.rm(home, { recursive: true, force: true });
+        await fs.rm(root, { recursive: true, force: true });
       }
     }
   );

@@ -1,5 +1,5 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
+import { writeAgentFile } from './control/agent-execution.js';
 import {
   buildCloudAgentRules,
   type CloudAgentRulesInput,
@@ -15,6 +15,5 @@ export async function writeCloudAgentRulesFile(
   input: CloudAgentRulesInput
 ): Promise<void> {
   const file = cloudAgentRulesFilePath(home);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, buildCloudAgentRules(input));
+  await writeAgentFile(file, buildCloudAgentRules(input));
 }

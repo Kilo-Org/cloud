@@ -12,6 +12,7 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { AGENT_GID, AGENT_UID } from '../../src/shared/runtime-environment.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -641,6 +642,18 @@ async function runControlPlaneKiloOperationOnce(
     ({ stdout } = await executeDocker([
       'exec',
       containerId,
+      '/usr/bin/env',
+      '-i',
+      'PATH=/usr/local/bin:/usr/bin:/bin',
+      '/usr/bin/setpriv',
+      `--reuid=${AGENT_UID}`,
+      `--regid=${AGENT_GID}`,
+      '--clear-groups',
+      '--bounding-set=-all',
+      '--inh-caps=-all',
+      '--ambient-caps=-all',
+      '--no-new-privs',
+      '--',
       'bun',
       '-e',
       CONTROL_PLANE_KILO_SCRIPT,

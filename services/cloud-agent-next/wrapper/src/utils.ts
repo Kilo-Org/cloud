@@ -1,7 +1,9 @@
-import { spawn, type ChildProcess, type SpawnOptions } from 'child_process';
+import type { ChildProcess, SpawnOptions } from 'child_process';
 import { appendFileSync } from 'fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { currentOwnedProcessScope, type OwnedProcessScope } from './control/owned-processes.js';
+import { spawnAgent } from './control/agent-execution.js';
+import { inheritedAgentEnvironment } from '../../src/shared/runtime-environment.js';
 
 export type ExecResult = {
   stdout: string;
@@ -147,13 +149,13 @@ export function runProcess(
       ...(opts?.inheritEnv === false
         ? { env: opts.env ?? {} }
         : opts?.env
-          ? { env: { ...process.env, ...opts.env } }
-          : {}),
+          ? { env: { ...inheritedAgentEnvironment(process.env), ...opts.env } }
+          : { env: inheritedAgentEnvironment(process.env) }),
     };
     const owned = opts?.spawn ? undefined : currentOwnedProcessScope();
     const proc =
       owned?.spawn(command, args, options) ??
-      (opts?.spawn ?? spawn)(command, args, {
+      (opts?.spawn ?? spawnAgent)(command, args, {
         ...options,
         detached: true,
         stdio: [opts?.stdinFd ?? 'ignore', 'pipe', 'pipe'],
@@ -458,7 +460,7 @@ export async function hasGitUpstream(
 export function logToFile(message: string): void {
   const logPath = process.env.WRAPPER_LOG_PATH || '/tmp/kilocode-wrapper.log';
   try {
-    appendFileSync(logPath, `${new Date().toISOString()} ${message}\n`);
+    appendFileSync(logPath, `${new Date().toISOString()} ${message}\n`, { mode: 0o600 });
   } catch {
     // Ignore logging failures to avoid breaking the wrapper
   }

@@ -8,6 +8,7 @@ import {
 } from '../../../src/shared/runtime-profile-config.js';
 import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
 import { writeRuntimeInstructions } from '../runtime-instructions.js';
+import { agentOwns, agentOwnsTree, renameAgentPath } from '../control/agent-execution.js';
 
 type RuntimeProfile = Pick<
   ControlPlaneRouteSpec,
@@ -207,7 +208,7 @@ async function stageRuntimeProfile(
 ): Promise<void> {
   options?.signal?.throwIfAborted();
   await fs.mkdir(home, { recursive: true });
-  const staging = await fs.mkdtemp(path.join(home, '.profile-'));
+  const staging = await fs.mkdtemp(path.join(path.dirname(home), '.profile-'));
   let preserveBackup = false;
   try {
     await writeRuntimeSkills(staging, profile.runtimeSkills, options);
@@ -221,19 +222,19 @@ async function stageRuntimeProfile(
     options?.signal?.throwIfAborted();
     let hadSkills = false;
     try {
-      await fs.rename(skills, backup);
+      await renameAgentPath(skills, backup);
       hadSkills = true;
     } catch (error) {
       if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
     }
     try {
-      await fs.rename(stagedSkills, skills);
+      await renameAgentPath(stagedSkills, skills);
       options?.signal?.throwIfAborted();
       await commitRuntimeProfileConfig(stagedConfig, hasConfig, home);
     } catch (error) {
       try {
         await fs.rm(skills, { recursive: true, force: true });
-        if (hadSkills) await fs.rename(backup, skills);
+        if (hadSkills) await renameAgentPath(backup, skills);
       } catch (rollbackError) {
         preserveBackup = true;
         throw new AggregateError(
@@ -260,8 +261,10 @@ async function commitRuntimeProfileConfig(
     await fs.rm(file, { force: true });
     return;
   }
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.rename(stagedConfig, file);
+  const created = await fs.mkdir(path.dirname(file), { recursive: true });
+  if (created) await agentOwnsTree(created);
+  await renameAgentPath(stagedConfig, file);
+  await agentOwns(file);
 }
 
 async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile): Promise<boolean> {
@@ -284,7 +287,8 @@ async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile):
     await fs.rm(file, { force: true });
     return false;
   }
-  await fs.mkdir(path.dirname(file), { recursive: true });
+  const created = await fs.mkdir(path.dirname(file), { recursive: true });
+  if (created) await agentOwnsTree(created);
   await fs.writeFile(file, JSON.stringify(config), { mode: 0o600 });
   return true;
 }

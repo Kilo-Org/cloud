@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import {
-  spawn,
   spawnSync,
   type ChildProcessWithoutNullStreams,
   type SpawnOptionsWithoutStdio,
@@ -25,6 +24,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { pidStillMatches, readProcessTable } from '../tool-cgroup.js';
 import { nativeControlPlaneLogsEnabled } from '../../../src/shared/control-diagnostics.js';
 import { releaseGate, spawnGated } from './gated-spawn.js';
+import { spawnAgent } from './agent-execution.js';
 
 /**
  * Native stderr is captured as operational logs, so the raw containment error
@@ -1108,7 +1108,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       const spawnChild = (gatedChild: boolean): OwnedChild => {
         const child = gatedChild
           ? spawnGated(command, args, { ...options, detached: true, stdio: 'pipe' })
-          : spawn(command, args, { ...options, detached: true, stdio: 'pipe' });
+          : spawnAgent(command, args, { ...options, detached: true, stdio: 'pipe' });
         const record: OwnedChild = { process: child, exited: false };
         children.add(record);
         child.once('exit', () => {

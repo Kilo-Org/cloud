@@ -23,6 +23,12 @@ import {
   runtimeReleaseHarness,
 } from './runtime-release.js';
 import { STARTUP_FAILURES } from './startup-failure.js';
+import {
+  AGENT_GID,
+  AGENT_OWNED_ROOTS,
+  AGENT_UID,
+  AGENT_USER,
+} from '../shared/runtime-environment.js';
 
 const exitCodes = Object.fromEntries(
   Object.entries(STARTUP_FAILURES).map(([code, value]) => [code, value.exitCode])
@@ -118,6 +124,44 @@ function compatible() {
   if (d.abi !== C.baseAbi || process.platform !== d.platform.os || process.arch !== d.platform.arch || libc !== d.platform.libc || process.versions.node.split('.')[0] !== C.nodeMajor || bun.status !== 0 || bun.stdout.trim() !== C.bun) fail('base_incompatible');
   if (d.platform.cpu === 'modern' && !/(^|\s)avx2(\s|$)/.test(fs.readFileSync('/proc/cpuinfo', 'utf8').replace(/:/g, ' '))) fail('base_incompatible');
 }
+function prepareAgent() {
+  if (process.getuid() !== 0) fail('base_incompatible');
+  for (const file of ['/usr/bin/setpriv', '/usr/bin/env', '/usr/bin/chown', '/usr/bin/find']) {
+    try { fs.accessSync(file, fs.constants.X_OK); } catch { fail('base_incompatible'); }
+  }
+  function run(command, args) {
+    const result = spawnSync(command, args, { timeout: Math.max(1, C.deadlineAt - Date.now()), stdio: 'ignore' });
+    deadline();
+    if (result.status !== 0) fail('base_incompatible');
+  }
+  // A multiply linked file can be a root file outside the tree; it keeps its owner.
+  function own(directory) {
+    run('/usr/bin/find', [directory, '(', '-type', 'd', '-o', '-links', '1', ')', '(', '!', '-uid', String(C.agent.uid), '-o', '!', '-gid', String(C.agent.gid), ')', '-exec', '/usr/bin/chown', '-h', C.agent.uid + ':' + C.agent.gid, '--', '{}', '+']);
+  }
+  const users = fs.readFileSync('/etc/passwd', 'utf8').trim().split('\n').map(line => line.split(':'));
+  const groups = fs.readFileSync('/etc/group', 'utf8').trim().split('\n').map(line => line.split(':'));
+  const user = users.find(entry => entry[0] === C.agent.user || entry[2] === String(C.agent.uid));
+  const group = groups.find(entry => entry[0] === C.agent.user || entry[2] === String(C.agent.gid));
+  if (user && (user[0] !== C.agent.user || user[2] !== String(C.agent.uid) || user[3] !== String(C.agent.gid))) fail('base_incompatible');
+  if (group && (group[0] !== C.agent.user || group[2] !== String(C.agent.gid))) fail('base_incompatible');
+  if (!group) run('/usr/sbin/groupadd', ['--gid', String(C.agent.gid), C.agent.user]);
+  if (!user) run('/usr/sbin/useradd', ['--uid', String(C.agent.uid), '--gid', String(C.agent.gid), '--no-create-home', '--home-dir', '/home/kilo', '--shell', '/bin/bash', C.agent.user]);
+  for (const directory of C.agent.roots) {
+    realDirectory(directory);
+    own(directory);
+  }
+  const legacy = '/tmp/kilo-worktrees';
+  const entry = stat(legacy);
+  if (entry) {
+    if (!entry.isDirectory() || entry.isSymbolicLink()) fail('base_incompatible');
+    own(legacy);
+    fs.chownSync(legacy, 0, 0);
+    fs.chmodSync(legacy, 0o755);
+  }
+  fs.chmodSync('/root', 0o700);
+  fs.chownSync('/home', 0, 0);
+  fs.chmodSync('/home', 0o755);
+}
 async function pause(ms) {
   await new Promise(resolve => setTimeout(resolve, Math.max(0, Math.min(ms, C.deadlineAt - Date.now()))));
   deadline();
@@ -212,6 +256,7 @@ async function extract(artifact) {
   }
   const target = path.join(namespace, randomUUID());
   fs.renameSync(staging, target);
+  fs.chmodSync(target, 0o755);
   return target;
 }
 function previousRelease() {
@@ -270,6 +315,7 @@ function collect(keep) {
 }
 async function install() {
   prepare(); compatible();
+  if (!C.mainProcess) prepareAgent();
   const previous = previousRelease();
   collect(previous ? [previous] : []);
   const cliArtifact = C.descriptor.artifacts.find(artifact => artifact.role === 'cli');
@@ -286,6 +332,7 @@ async function install() {
   fs.symlinkSync(control, path.join(staging, 'control'));
   const release = path.join(namespace, randomUUID());
   fs.renameSync(staging, release);
+  fs.chmodSync(release, 0o755);
   // Every alias resolves through active, including during the first install.
   atomicLink(release, path.join(C.root, 'active'));
   for (const alias of C.aliases) {
@@ -380,6 +427,7 @@ export function renderRuntimeBootstrap(input: {
     maxExpandedBytes: RUNTIME_HARD_MAX_EXPANDED_BYTES,
     credentialHelper: GIT_CREDENTIAL_HELPER.realPath,
     credentialHelperLink: GIT_CREDENTIAL_HELPER.linkPath,
+    agent: { uid: AGENT_UID, gid: AGENT_GID, user: AGENT_USER, roots: AGENT_OWNED_ROOTS },
   });
   const environment = [
     '/usr/bin/env',

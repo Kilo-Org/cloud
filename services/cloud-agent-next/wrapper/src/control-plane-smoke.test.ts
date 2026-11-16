@@ -101,7 +101,9 @@ describe('control-plane smoke harness', () => {
   });
 });
 
-describe('control-plane smoke against the built distribution', () => {
+const describeLinuxRoot = describe.skipIf(process.platform !== 'linux' || process.getuid?.() !== 0);
+
+describeLinuxRoot('control-plane smoke against the built distribution', () => {
   let root = '';
   let installDir = '';
   let controlWrapperPath = '';

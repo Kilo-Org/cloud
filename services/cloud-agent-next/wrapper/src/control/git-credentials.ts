@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ExecResult } from '../utils.js';
+import { agentOwnsTree, renameAgentPath, writeAgentFile } from './agent-execution.js';
 
 /** Managed Git providers the platform can address a repository URL for. */
 export type GitCredentialPlatform = 'github' | 'gitlab' | 'bitbucket';
@@ -127,17 +128,12 @@ function credentialSetRecord(entry: GitCredentialSetEntry): string {
 async function replaceCredentialRecord(home: string, record: string): Promise<void> {
   const recordPath = gitCredentialRecordPath(home);
   const directory = path.dirname(recordPath);
-  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-  await fs.chmod(directory, 0o700);
+  const created = await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+  if (created) await agentOwnsTree(created);
   const temporaryPath = path.join(directory, `git-credentials.${randomUUID()}.tmp`);
   try {
-    const handle = await fs.open(temporaryPath, 'wx', 0o600);
-    try {
-      await handle.writeFile(record, 'utf8');
-    } finally {
-      await handle.close();
-    }
-    await fs.rename(temporaryPath, recordPath);
+    await writeAgentFile(temporaryPath, record, 0o600);
+    await renameAgentPath(temporaryPath, recordPath);
   } catch (error) {
     await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
     throw error;

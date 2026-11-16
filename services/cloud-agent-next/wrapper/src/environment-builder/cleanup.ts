@@ -1,5 +1,11 @@
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {
+  AGENT_GID,
+  AGENT_OWNED_ROOTS,
+  AGENT_UID,
+} from '../../../src/shared/runtime-environment.js';
 import { clearGitCredentialRecord } from '../control/git-credentials.js';
 import type { OwnedProcessScope } from '../control/owned-processes.js';
 import {
@@ -77,6 +83,38 @@ export async function stopOwnedProcesses(
     throw new Error('Setup processes could not be stopped');
   }
   scope.dispose();
+}
+
+/**
+ * Give the agent account the trees that sessions use, so that a session start
+ * from this snapshot has nothing to transfer. Builder setup is trusted root work,
+ * so every entry, including a multiply linked file, changes owner.
+ */
+export async function transferAgentOwnership(
+  signal: AbortSignal,
+  roots: readonly string[] = AGENT_OWNED_ROOTS
+): Promise<void> {
+  const existing: string[] = [];
+  for (const root of roots) {
+    try {
+      if ((await fs.lstat(root)).isDirectory()) existing.push(root);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+  if (existing.length === 0) return;
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('/usr/bin/chown', ['-hR', `${AGENT_UID}:${AGENT_GID}`, '--', ...existing], {
+      env: { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' },
+      stdio: 'ignore',
+      signal,
+      killSignal: 'SIGKILL',
+    });
+    child.once('error', reject);
+    child.once('exit', code =>
+      code === 0 ? resolve() : reject(new Error('Agent ownership transfer failed'))
+    );
+  });
 }
 
 export type CleanupInput = {

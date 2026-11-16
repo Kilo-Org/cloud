@@ -33,6 +33,7 @@ import { reportRestoreIncomplete } from './restore-incomplete.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-ref.js';
 import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
 import { credentialFreeGitUrl, requireGitCredentialRecord } from './control/git-credentials.js';
+import { openAgentFile } from './control/agent-execution.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
 // Kept below WORKSPACE_PREPARATION_TIMEOUT_MS so a stuck long command (notably
@@ -854,11 +855,7 @@ async function downloadBounded(
     throw new Error('Attachment download failed: empty body');
   }
 
-  const handle = await fs.open(
-    filePath,
-    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
-    0o600
-  );
+  const handle = await openAgentFile(filePath, 0o600);
   const reader = body.getReader();
   const onAbort = (): void => {
     void reader.cancel().catch(() => {});
@@ -955,11 +952,7 @@ async function downloadBuffered(
     );
   }
 
-  const handle = await fs.open(
-    filePath,
-    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
-    0o600
-  );
+  const handle = await openAgentFile(filePath, 0o600);
   try {
     await handle.write(bytes);
   } finally {
@@ -981,8 +974,6 @@ async function downloadAndMaterializeAttachment(
   signal: AbortSignal,
   strategy: AttachmentReadStrategy = 'stream'
 ): Promise<DownloadResult> {
-  signal.throwIfAborted();
-  await fs.mkdir(path.dirname(attachment.localPath), { recursive: true });
   signal.throwIfAborted();
 
   let response: Response;

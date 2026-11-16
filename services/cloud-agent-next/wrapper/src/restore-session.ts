@@ -3,6 +3,15 @@ import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
+import {
+  agentCommand,
+  agentOwns,
+  agentOwnsTree,
+  openAgentFile,
+  renameAgentPath,
+  writeAgentFile,
+} from './control/agent-execution.js';
+import { inheritedAgentEnvironment } from '../../src/shared/runtime-environment.js';
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
 import { selectedRuntimeCli } from '../../src/shared/runtime-distribution.js';
 import { routeRestoreDiffs, type RestoreRoots } from './restore-roots.js';
@@ -69,6 +78,7 @@ const KILO_IMPORT_TIMEOUT_MS = 120_000;
 const KILO_DOWNLOAD_TIMEOUT_MS = 120_000;
 const KILO_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000;
 const MAX_SESSION_EXPORT_BYTES = 1024 * 1024 * 1024;
+const JQ_BINARY = process.platform === 'linux' ? '/usr/bin/jq' : 'jq';
 // Bound the recorded skip list: a pathological snapshot with thousands of
 // skipped diffs must not blow the session-ready ingest frame budget. `skipped`
 // stays the true count; only the named record is capped.
@@ -181,11 +191,12 @@ export async function seedSessionIngestRegistration(
   }
 
   const directory = path.join(dataHome, 'kilo', 'storage', 'session_share');
-  await fs.promises.mkdir(directory, { recursive: true, mode: 0o700 });
+  const created = await fs.promises.mkdir(directory, { recursive: true, mode: 0o700 });
+  if (created) await agentOwnsTree(created);
   signal?.throwIfAborted();
   const temporaryPath = path.join(directory, `.${kiloSessionId}.${crypto.randomUUID()}.tmp`);
-  const file = await fs.promises.open(temporaryPath, 'wx', 0o600);
   try {
+    const file = await openAgentFile(temporaryPath, 0o600);
     try {
       signal?.throwIfAborted();
       await fs.promises.writeFile(
@@ -197,7 +208,7 @@ export async function seedSessionIngestRegistration(
       await file.close();
     }
     signal?.throwIfAborted();
-    await fs.promises.rename(temporaryPath, path.join(directory, `${kiloSessionId}.json`));
+    await renameAgentPath(temporaryPath, path.join(directory, `${kiloSessionId}.json`));
   } finally {
     await fs.promises.rm(temporaryPath, { force: true });
   }
@@ -555,11 +566,11 @@ async function sanitizeSnapshotWithJq(
   const tempPath = tokenSanitizationTempPath(snapshotPath);
   try {
     signal?.throwIfAborted();
-    const proc = Bun.spawn(['jq', '-c', filter, snapshotPath], {
+    const proc = Bun.spawn([JQ_BINARY, '-c', filter, snapshotPath], {
       stdout: 'pipe',
       stderr: 'ignore',
       signal,
-      env,
+      env: inheritedAgentEnvironment(env ?? process.env),
     });
     const writeOutput = proc.stdout.pipeTo(Writable.toWeb(fs.createWriteStream(tempPath)));
     const exitCode = await proc.exited;
@@ -622,11 +633,11 @@ export async function extractDiffs(
 ): Promise<SnapshotDiff[] | null> {
   signal?.throwIfAborted();
   try {
-    const proc = Bun.spawn(['jq', '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
+    const proc = Bun.spawn([JQ_BINARY, '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
       stdout: 'pipe',
       stderr: 'ignore',
       signal,
-      env,
+      env: inheritedAgentEnvironment(env ?? process.env),
     });
     const exitCode = await proc.exited;
     signal?.throwIfAborted();
@@ -699,12 +710,13 @@ async function runGitApply(
   signal?: AbortSignal,
   env?: NodeJS.ProcessEnv
 ): Promise<{ exitCode: number; stderr: string }> {
-  const proc = Bun.spawn(['git', 'apply', ...extraArgs, '--whitespace=nowarn', patchFile], {
+  const child = agentCommand('git', ['apply', ...extraArgs, '--whitespace=nowarn', patchFile], env);
+  const proc = Bun.spawn([child.command, ...child.args], {
     cwd: workspacePath,
     stdout: 'pipe',
     stderr: 'pipe',
     signal,
-    env,
+    env: child.env,
   });
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
@@ -818,7 +830,8 @@ async function applyPatch(
   const file = path.join(dir, 'change.patch');
   try {
     signal?.throwIfAborted();
-    fs.writeFileSync(file, normalized.patch);
+    await agentOwns(dir);
+    await writeAgentFile(file, normalized.patch);
     const threeWay = await runGitApply(workspacePath, file, ['--3way'], signal, env);
     signal?.throwIfAborted();
     if (threeWay.exitCode === 0) return { applied: true };
@@ -828,12 +841,13 @@ async function applyPatch(
 
     // A failed three-way apply can leave unmerged index entries. Reset the
     // index before trying fallbacks, while preserving restored working-tree files.
-    const reset = Bun.spawn(['git', 'reset', '--quiet'], {
+    const child = agentCommand('git', ['reset', '--quiet'], env);
+    const reset = Bun.spawn([child.command, ...child.args], {
       cwd: workspacePath,
       stdout: 'pipe',
       stderr: 'pipe',
       signal,
-      env,
+      env: child.env,
     });
     const resetStderr = await new Response(reset.stderr).text();
     const resetExitCode = await reset.exited;
@@ -884,8 +898,7 @@ async function applyPatch(
         return { applied: false, reason: 'outside_workspace' };
       }
       try {
-        fs.mkdirSync(path.dirname(fp), { recursive: true });
-        fs.writeFileSync(fp, diff.after);
+        await writeAgentFile(fp, diff.after);
       } catch {
         log(`failed to write snapshot after-content file=${diff.file}`);
         return { applied: false, reason: 'write_failed' };
@@ -1219,6 +1232,8 @@ export async function restoreSession(
     }
 
     await sanitizeSnapshot(tmpPath, options.signal, env);
+    if (tempDir) await agentOwns(tempDir);
+    await agentOwns(tmpPath);
 
     const importStartedAt = Date.now();
     log(
@@ -1379,8 +1394,7 @@ export async function restoreSession(
         }
       } else if (diff.after !== undefined) {
         try {
-          fs.mkdirSync(path.dirname(fp), { recursive: true });
-          fs.writeFileSync(fp, diff.after);
+          await writeAgentFile(fp, diff.after);
           applied++;
         } catch {
           log(`failed to apply diff file=${fp}`);

@@ -113,6 +113,7 @@ export type BuildRunDeps = {
   stopProcesses: () => Promise<void>;
   cleanup: (input: CleanupInput) => Promise<string | null>;
   writeStamp: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
+  transferOwnership: () => Promise<void>;
   /** Aborted on a cancel reply or at the build deadline. */
   signal: AbortSignal;
   inherited: NodeJS.ProcessEnv;
@@ -299,6 +300,7 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
         commit: entry.commit,
       });
     }
+    await deps.transferOwnership();
     reporter.line('Workspace prepared; waiting for the snapshot');
     if (isV2) {
       return { outcome: 'ready', members: { members: multiPins }, setupDurationMs };

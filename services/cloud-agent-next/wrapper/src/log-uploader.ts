@@ -53,9 +53,12 @@ export function createTarStream(paths: Array<string | TarArchiveEntry>): TarStre
 
   const tarArgs = ['czf', '-'];
   for (const entry of existing) {
-    tarArgs.push('-C', entry.directory, entry.name);
+    tarArgs.push('-C', entry.directory, `./${entry.name}`);
   }
-  const proc = spawn('tar', tarArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+  const proc = spawn('/usr/bin/tar', tarArgs, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' },
+  });
   const { stdout, stderr: stderrStream } = proc;
   if (!stdout || !stderrStream) return undefined;
 

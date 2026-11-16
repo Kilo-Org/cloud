@@ -2,6 +2,9 @@
 // Fill `dist/` with the output shell from the Pages release that
 // `../pages/source.json` pins.
 //
+// `output/worker.js` is built by nteract's release workflow; this script only
+// verifies and copies it. It compiles, bundles and runs nothing from nteract.
+//
 // There is one pin for both Workers. This script reads it, downloads and
 // checks the archive with the same code as the Pages build
 // (`../pages/scripts/pinned.mjs`), compares the package's `output/wrangler.json`

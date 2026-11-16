@@ -12,8 +12,9 @@
   // The name and domain of the Worker first deployed by hand from nteract, so
   // the first deploy from here replaces it in place.
   "name": "nteract-pages-outputs",
-  // Built by `pnpm run build` from the pinned package: one ES module with no
-  // imports.
+  // Built by nteract's release workflow: one ES module with no imports.
+  // `pnpm run build` only verifies it against the pinned package and copies it
+  // here.
   "main": "dist/worker.js",
   "no_bundle": true,
   "compatibility_date": "2026-11-15",

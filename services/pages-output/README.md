@@ -1,5 +1,12 @@
 # Pages output shell
 
+nteract builds the output shell in its own release workflow and publishes it,
+attested, inside the Pages release archive. This folder pins that release
+(through `../pages/source.json`, by tag and sha256), downloads the archive,
+verifies it and deploys the already-built `output/worker.js` with
+`no_bundle: true`. Nothing from nteract's source is compiled, bundled or run
+here.
+
 The output shell is the Worker that serves the sandboxed iframe in which a
 Page's interactive views (anywidget) run. It lives on its own origin,
 `https://pages.kilousercontent.com`, apart from Pages, so widget code never
@@ -19,7 +26,7 @@ shell and the Pages viewer cannot drift to different releases.
 
 ```
 ../pages/source.json → nteract release pages-<build_id> + sha256 of its archive
-  → pnpm run build (../pages/scripts/pinned.mjs: download, check sha256, read archive)
+  → pnpm run build (../pages/scripts/pinned.mjs: download, check sha256, read archive; compiles nothing)
   → compare output/wrangler.json with wrangler.jsonc, check output/worker.js
     against the receipt's output_files
   → dist/worker.js
@@ -29,8 +36,15 @@ wrangler.jsonc → wrangler deploy
 | File | Holds |
 |---|---|
 | `wrangler.jsonc` | What deploys: the Worker's name, account and custom domain |
-| `scripts/build.mjs` | Builds `dist/` from the Pages pin |
+| `scripts/build.mjs` | Downloads the pinned archive, verifies it and copies the shell into `dist/` |
 | `scripts/shell.mjs` | The checks on the shell: its structural fields and the receipt's digest |
+
+`pnpm run build` compiles nothing. It fetches the pinned archive, checks it
+and copies one file, `output/worker.js`, to `dist/worker.js`. It runs no
+nteract code. One exception sits in Wrangler: when Cloudflare refuses an
+upload with a startup error, `wrangler deploy` loads the module in a local
+workerd to explain it. There it has network access but no environment or
+files.
 
 The archive is read by the same code as the Pages build, with the same rules:
 regular files only, no links, no `.` or `..` components, no names that differ

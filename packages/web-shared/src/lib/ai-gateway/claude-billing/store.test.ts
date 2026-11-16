@@ -112,6 +112,82 @@ describe('Claude billing refusal transitions', () => {
     expect(row.updated_at).toBe(inserted.updated_at);
   });
 
+  it('keeps a specific refusal when a status-only refusal of the same class follows', async () => {
+    const user = await insertTestUser();
+    const profileId = `uprof_${user.id}`;
+    const connectedAt = '2026-04-01T00:00:00Z';
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: user.id,
+      user_profile_id: profileId,
+      created_by: user.id,
+      status: 'connected',
+      connected_at: connectedAt,
+    });
+
+    await recordClaudeBillingRefusal(
+      profileId,
+      'linked_organization_spend_limit_reached',
+      connectedAt
+    );
+    await recordClaudeBillingRefusal(profileId, 'billing_error', connectedAt);
+
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({
+      status: 'connected',
+      last_refusal_code: 'linked_organization_spend_limit_reached',
+    });
+  });
+
+  it('records a status-only refusal that has no specific code behind it', async () => {
+    const user = await insertTestUser();
+    const profileId = `uprof_${user.id}`;
+    const connectedAt = '2026-04-02T00:00:00Z';
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: user.id,
+      user_profile_id: profileId,
+      created_by: user.id,
+      status: 'connected',
+      connected_at: connectedAt,
+    });
+
+    await recordClaudeBillingRefusal(profileId, 'permission_error', connectedAt);
+
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ status: 'connected', last_refusal_code: 'permission_error' });
+  });
+
+  it('replaces a status-only refusal with a specific one and with a refusal of another class', async () => {
+    const user = await insertTestUser();
+    const profileId = `uprof_${user.id}`;
+    const connectedAt = '2026-04-03T00:00:00Z';
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: user.id,
+      user_profile_id: profileId,
+      created_by: user.id,
+      status: 'connected',
+      connected_at: connectedAt,
+    });
+    const lastRefusalCode = async () =>
+      (await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id }))
+        ?.last_refusal_code;
+
+    await recordClaudeBillingRefusal(profileId, 'billing_error', connectedAt);
+    await recordClaudeBillingRefusal(
+      profileId,
+      'linked_organization_billing_unavailable',
+      connectedAt
+    );
+    expect(await lastRefusalCode()).toBe('linked_organization_billing_unavailable');
+
+    await recordClaudeBillingRefusal(profileId, 'permission_error', connectedAt);
+    expect(await lastRefusalCode()).toBe('permission_error');
+
+    await clearClaudeBillingRefusal(profileId, connectedAt);
+    expect(await lastRefusalCode()).toBeNull();
+  });
+
   it.each([
     [403, { error: { message: 'model access denied' } }, 'permission_error', false],
     [

@@ -1,6 +1,7 @@
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
   getClaudeOperatorToken: jest.fn(async () => 'local-test-token'),
   isClaudeOperatorConfigured: jest.fn(() => true),
+  unlinkClaudeUserProfile: jest.fn(async () => ({ kind: 'unlinked', revokedConnectionIds: [] })),
 }));
 
 import { afterEach, describe, expect, it } from '@jest/globals';

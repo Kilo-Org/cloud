@@ -7,9 +7,13 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getClaudeOperatorToken,
   isClaudeOperatorConfigured,
+  unlinkClaudeUserProfile,
+  type ClaudeUserProfileUnlinkResult,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import {
+  findRetiringClaudeBillingPayer,
   liveClaudeBillingGrantWhere,
+  type ClaudeBillingOwner,
   type UnreferencedClaudeBillingPayer,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { CLAUDE_API_BASE_URL } from '@kilocode/web-shared/lib/auth/claude/config';
@@ -76,6 +80,21 @@ export async function retireUnreferencedClaudeBillingPayer(
       )
     )
   );
+}
+
+/**
+ * Ends Kilo's link at Anthropic for the payer this scope would retire, before
+ * any local row is retired. A scope whose payer another live grant keeps has
+ * nothing to end: that link still bills the other scope.
+ */
+export async function unlinkRetiringClaudeBillingPayer(
+  owner: ClaudeBillingOwner,
+  timeoutMs = 15_000
+): Promise<ClaudeUserProfileUnlinkResult> {
+  if (!operatorConfigured()) return { kind: 'unlinked', revokedConnectionIds: [] };
+  const retiring = await findRetiringClaudeBillingPayer(owner);
+  if (!retiring) return { kind: 'unlinked', revokedConnectionIds: [] };
+  return await unlinkClaudeUserProfile(retiring.userProfileId, timeoutMs);
 }
 
 export async function cleanupRemovedClaudeProfilesForUser(

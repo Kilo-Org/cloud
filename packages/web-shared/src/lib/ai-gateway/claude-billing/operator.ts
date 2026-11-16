@@ -3,8 +3,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { oidcFederationProvider } from '@anthropic-ai/sdk/lib/credentials/oidc-federation';
 import { TokenCache } from '@anthropic-ai/sdk/lib/credentials/token-cache';
 import type { AccessTokenProvider } from '@anthropic-ai/sdk/lib/credentials/types';
+import { z } from 'zod';
 import {
   CLAUDE_API_BASE_URL,
+  CLAUDE_BILLING_CLIENT_ID,
   CLAUDE_OPERATOR_FEDERATION_RULE_ID,
   CLAUDE_OPERATOR_ORGANIZATION_ID,
   CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID,
@@ -75,4 +77,58 @@ export function getClaudeOperatorClient(): Anthropic {
 export async function createClaudeUserProfile(): Promise<string> {
   const profile = await getClaudeOperatorClient().beta.userProfiles.create({});
   return profile.id;
+}
+
+/** Anthropic requires this beta to unlink, whatever its name suggests. */
+const UNLINK_BETA = 'user-profiles-search-2026-08-30';
+
+const unlinkResponseSchema = z.object({ revoked_connection_ids: z.array(z.string()) });
+
+export type ClaudeUserProfileUnlinkResult =
+  | { kind: 'unlinked'; revokedConnectionIds: string[] }
+  /** Anthropic did not answer usefully; the same call can succeed later. */
+  | { kind: 'retry' }
+  /** Anthropic refused the call; Kilo cannot end the link itself, the customer can. */
+  | { kind: 'needs_console' };
+
+function unlinkStatusResult(status: number): ClaudeUserProfileUnlinkResult {
+  if (status === 408 || status === 425 || status === 429 || status >= 500) return { kind: 'retry' };
+  return { kind: 'needs_console' };
+}
+
+/**
+ * Ends the profile's link to Kilo's app, so the customer's Linked platforms page
+ * stops showing Kilo and a later link of the same Claude organization is
+ * accepted. The profile itself stays. An empty `revokedConnectionIds` means the
+ * profile had no link to end, which is success.
+ */
+export async function unlinkClaudeUserProfile(
+  userProfileId: string,
+  timeoutMs = 15_000
+): Promise<ClaudeUserProfileUnlinkResult> {
+  if (!CLAUDE_BILLING_CLIENT_ID) return { kind: 'needs_console' };
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLAUDE_API_BASE_URL}/v1/user_profiles/${encodeURIComponent(userProfileId)}/unlink`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${await getClaudeOperatorToken()}`,
+          'anthropic-version': '2023-06-01',
+          'anthropic-beta': UNLINK_BETA,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ oauth_app_id: CLAUDE_BILLING_CLIENT_ID }),
+        redirect: 'manual',
+        signal: AbortSignal.timeout(timeoutMs),
+      }
+    );
+  } catch {
+    return { kind: 'retry' };
+  }
+  if (!response.ok) return unlinkStatusResult(response.status);
+  const parsed = unlinkResponseSchema.safeParse(await response.json().catch(() => null));
+  if (!parsed.success) return { kind: 'retry' };
+  return { kind: 'unlinked', revokedConnectionIds: parsed.data.revoked_connection_ids };
 }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the billing state-row, seats and manage-on-web contracts share one mock harness */
 // Billing screen failure contract: a rejected read renders that block's error
 // card with a Retry, and the Retry refetches only the query that failed — not
 // its siblings. The query layer is mocked so each block's state is driven
@@ -281,12 +282,9 @@ describe('OrganizationBillingScreen failure states', () => {
 });
 
 describe('OrganizationBillingScreen state row', () => {
-  it('states the running trial when Stripe has no seat subscription', async () => {
-    // An organization inside its Enterprise trial has bought no seats, so the
-    // subscription read answers null and the row used to claim there was none.
-    boundary.trialStatus = 'trial_active';
-    boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
-    queries.subscription.data = {
+  /** The subscription read of an organization that has bought no seats. */
+  function seatlessReadout() {
+    return {
       subscription: null,
       seatsUsed: 3,
       totalSeats: 3,
@@ -295,27 +293,25 @@ describe('OrganizationBillingScreen state row', () => {
       paidSeatItemId: null,
       latestSeatPurchaseStatus: null,
     };
+  }
+
+  it('states the running trial when Stripe has no seat subscription', async () => {
+    // An organization inside its Enterprise trial has bought no seats, so the
+    // subscription read answers null and the row used to claim there was none.
+    boundary.trialStatus = 'trial_active';
+    boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
+    queries.subscription.data = seatlessReadout();
 
     const { renderer, unmount } = await mount();
 
-    const value = stateReadout(renderer);
-    expect(typeof value).toBe('string');
-    expect(String(value).startsWith('Trial ends on ')).toBe(true);
+    expect(String(stateReadout(renderer)).startsWith('Trial ends on ')).toBe(true);
     const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'State');
     expect(row?.props.valueTone).toBe('good');
     unmount();
   });
 
   it('keeps "No subscription" for an organization with no trial and no subscription', async () => {
-    queries.subscription.data = {
-      subscription: null,
-      seatsUsed: 3,
-      totalSeats: 3,
-      nextSeatCount: null,
-      nextSeatCountEffectiveAt: null,
-      paidSeatItemId: null,
-      latestSeatPurchaseStatus: null,
-    };
+    queries.subscription.data = seatlessReadout();
 
     const { renderer, unmount } = await mount();
 
@@ -370,29 +366,32 @@ describe('OrganizationBillingScreen manage-on-web links', () => {
     unmount();
   });
 
-  it('keeps the set-up wording when the read answers disabled', async () => {
-    queries.autoTopUp.data = { enabled: false, amountCents: 5000, thresholdCents: 1000 };
-    const { renderer, unmount } = await mount();
-
-    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
-    unmount();
-  });
-
-  it('keeps the set-up wording while the read is pending', async () => {
+  it.each([
     // A pending read has no state to manage, so the block cannot claim one.
-    queries.autoTopUp.isPending = true;
-    queries.autoTopUp.data = undefined;
-    const { renderer, unmount } = await mount();
-
-    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
-    unmount();
-  });
-
-  it('keeps the set-up wording when the read failed', async () => {
+    [
+      'while the read is pending',
+      () => {
+        queries.autoTopUp.isPending = true;
+        queries.autoTopUp.data = undefined;
+      },
+    ],
     // A first read that rejected carries no data, and the error card above
     // already asks for the retry.
-    queries.autoTopUp.isError = true;
-    queries.autoTopUp.data = undefined;
+    [
+      'when the read failed',
+      () => {
+        queries.autoTopUp.isError = true;
+        queries.autoTopUp.data = undefined;
+      },
+    ],
+    [
+      'when the read answers disabled',
+      () => {
+        queries.autoTopUp.data = { enabled: false, amountCents: 5000, thresholdCents: 1000 };
+      },
+    ],
+  ])('keeps the set-up wording %s', async (_name, arm) => {
+    arm();
     const { renderer, unmount } = await mount();
 
     expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');

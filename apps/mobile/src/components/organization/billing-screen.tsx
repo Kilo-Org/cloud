@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the billing readout's blocks share one screen body: skeleton, error and card helpers stay beside the state they render */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -140,12 +141,9 @@ export function OrganizationBillingScreen() {
   // no action.
   const changePlanOnBanner = planEnded && planChange.kind === 'link';
 
-  // A running Enterprise trial has no seat subscription, so the row states the
-  // trial from the boundary row's own readout instead of reading as an
-  // organization that never subscribed.
-  const trial = { trialStatus: org.trialStatus, trialEndsAt: org.trialEndsAt };
+  // The boundary row's trial readout states the trial the seats never bought.
   const subscriptionState = subscription.data
-    ? getOrgSubscriptionState(subscription.data, trial)
+    ? getOrgSubscriptionState(subscription.data, org)
     : null;
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
   // The list entry already carries the same seat numbers, so the row paints
@@ -165,13 +163,13 @@ export function OrganizationBillingScreen() {
 
   // A child organization has no Kilo Pass of its own; an unknown parent link
   // keeps the row, which renders its loading state.
-  const isChildOrganization = parentLink != null;
-  const kiloPassRowState = isChildOrganization
-    ? null
-    : getOrgKiloPassRowState({
-        data: kiloPassSummary.data,
-        isError: kiloPassSummary.isError,
-      });
+  const kiloPassRowState =
+    parentLink != null
+      ? null
+      : getOrgKiloPassRowState({
+          data: kiloPassSummary.data,
+          isError: kiloPassSummary.isError,
+        });
 
   const renderSubscriptionState = (): ReactNode => {
     if (subscription.isPending) {

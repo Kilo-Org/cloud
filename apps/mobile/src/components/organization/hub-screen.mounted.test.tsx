@@ -433,8 +433,10 @@ describe('Organization hub plan', () => {
     // in the same words the billing screen's state row uses.
     expect(row?.props.value).toBe(i18n.t('organization.hub.planEnterprise'));
     expect(row?.props.valueTone).toBeUndefined();
-    expect(row?.props.valueStatus?.label).toBe('Trial ends on 2026-11-24');
-    expect(row?.props.valueStatus?.tone).toBe('good');
+    expect(row?.props.valueStatus).toMatchObject({
+      label: 'Trial ends on 2026-11-24',
+      tone: 'good',
+    });
     // A running trial is not the lapsed state, so nothing above the card
     // explains an ending that has not happened.
     expect(refusals(renderer)).toHaveLength(0);

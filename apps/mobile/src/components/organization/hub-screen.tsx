@@ -184,16 +184,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // exactly as it does for the new-session composer. Only the server's boolean
   // is read; nothing re-derives the plan state from seats or balance.
   const planEnded = org.isTrialExpiredForEnforcement;
-  // The tier alone does not say the organization is on a running trial, and the
-  // row beside a block that names the trial would otherwise read as any other
-  // plan. The pill speaks the trial's own words — the same readout the billing
+  // The pill speaks the trial's own words — the same readout the billing
   // screen's state row uses, from the boundary row the server already
   // classified — and is absent whenever the trial is not what governs the
   // organization.
-  const trialPill = getOrgTrialStatusPill({
-    trialStatus: org.trialStatus,
-    trialEndsAt: org.trialEndsAt,
-  });
+  const trialPill = getOrgTrialStatusPill(org);
   const planName =
     org.plan === 'enterprise'
       ? t('organization.hub.planEnterprise')

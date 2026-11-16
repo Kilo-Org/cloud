@@ -67,15 +67,15 @@ is rejected, not a path back to preinstalled startup. The renderer emits only th
 ### Kilo v2 harness
 
 A downloaded target can also name `kilo2: { orgIds }`. Without it, new sandboxes select v1.
+The checked-in default uses `kilo2: { orgIds: "*" }` for all organizations and personal accounts.
 A sandbox's first allocation selects v2 only when every preparing route has the
 worker-owned `billingOrigin: cloud-agent-web`. Its downloaded start must also pass the organization
-rule for the `kilo2.orgIds` list: all preparing routes belong to one listed organization, and native
-allocations are isolated. Code reviews, desktop, Agent Manager and other origins stay on v1, including
+rule for `kilo2.orgIds`: `"*"` admits every account; a UUID list requires one listed organization
+across all preparing routes. Native allocations must be isolated. Code reviews, desktop,
+Agent Manager and other origins stay on v1, including
 routes with a missing origin and sandboxes with mixed origins. This origin restriction applies only
 to v2 selection; downloaded v1 startup is available to every account. A client-supplied
 `createdOnPlatform` cannot select v2. Existing routes without a stored `billingOrigin` select v1.
-The checked-in catalog enables this rule only for organization
-`9d278969-5453-4ae3-a51f-a8d2274a7b56` after deployment.
 The Sandbox DO stores that harness, and every later allocation of the
 sandbox uses it, because native history does not move between v1 and v2. A sandbox that allocated
 before this record existed stays on v1. The harness is stored after startup preflight and capacity

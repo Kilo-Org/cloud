@@ -2,6 +2,10 @@ import { z } from 'zod';
 
 import { KILO_SESSION_ID_LENGTH, KILO_SESSION_ID_PREFIX } from './kilo-session-id';
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export const cloudAgentSessionScopeProtocolVersion = '1' as const;
 
 export const cloudAgentSessionScopeHeaders = {
@@ -22,7 +26,9 @@ const CONTAINED_KILO_SESSION_ID_TAIL_LENGTH =
 export const containedKiloSessionIdSchema = z
   .string()
   .regex(
-    new RegExp(`^${KILO_SESSION_ID_PREFIX}[A-Za-z0-9]{${CONTAINED_KILO_SESSION_ID_TAIL_LENGTH}}$`)
+    new RegExp(
+      `^${escapeRegExp(KILO_SESSION_ID_PREFIX)}[A-Za-z0-9]{${CONTAINED_KILO_SESSION_ID_TAIL_LENGTH}}$`
+    )
   );
 
 export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);

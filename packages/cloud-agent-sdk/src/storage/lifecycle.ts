@@ -44,12 +44,12 @@ type StorageContainers = {
 
 /** Drop one part and republish its parts channel. */
 function deletePartFromStorage(
-  storage: SessionStorage,
+  sessionStorage: SessionStorage,
   containers: StorageContainers,
   messageId: string,
   partId: string
 ): void {
-  forgetPartVersion(storage, messageId, partId);
+  forgetPartVersion(sessionStorage, messageId, partId);
   containers.beforeStructuralChange();
   const arr = containers.parts.get(messageId);
   if (!arr) return;
@@ -64,11 +64,11 @@ function deletePartFromStorage(
 
 /** Remove one message row, its parts, and notify every affected channel. */
 function deleteMessageFromStorage(
-  storage: SessionStorage,
+  sessionStorage: SessionStorage,
   containers: StorageContainers,
   messageId: string
 ): void {
-  forgetMessageVersions(storage, messageId);
+  forgetMessageVersions(sessionStorage, messageId);
   containers.beforeStructuralChange();
   // A part delta can create parts before the message row (see `applyPartDelta`),
   // so part state is dropped regardless of the row.
@@ -95,8 +95,8 @@ function deleteMessageFromStorage(
 }
 
 /** Drop the whole session and notify every affected channel. */
-function clearStorage(storage: SessionStorage, containers: StorageContainers): void {
-  storageVersions.delete(storage);
+function clearStorage(sessionStorage: SessionStorage, containers: StorageContainers): void {
+  storageVersions.delete(sessionStorage);
   containers.beforeStructuralChange();
   const existingMessageIds = [...containers.messages.ids()];
   const existingPartMessageIds = containers.parts.messageIds();

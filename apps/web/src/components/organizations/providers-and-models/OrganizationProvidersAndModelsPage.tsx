@@ -295,6 +295,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
         byokOnly: provider.byokOnly,
+        vercelInferenceRegions: model.endpoint.vercel_inference_regions ?? [],
         ...getOfferingPricing(
           customPricingConfig,
           getSnapshotModelVariantId(model),

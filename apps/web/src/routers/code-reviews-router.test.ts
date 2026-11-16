@@ -526,6 +526,29 @@ describe('codeReviewRouter.listForOrganization role-gated ids', () => {
   });
 });
 
+describe('codeReviewRouter.listForUser budget', () => {
+  it('answers a spent mobile budget retryably instead of an empty list', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'list-for-user-budget@example.com',
+      google_user_name: 'List For User Budget',
+      is_admin: false,
+    });
+
+    try {
+      const caller = await createCallerForUser(user.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(caller.codeReviews.listForUser({})).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Your code reviews took too long to load. Try again.',
+      });
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+    }
+  });
+});
+
 describe('codeReviewRouter.get role-gated ids', () => {
   let ownerUser: User;
   let memberUser: User;

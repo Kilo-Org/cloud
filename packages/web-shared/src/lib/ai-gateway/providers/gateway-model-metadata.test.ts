@@ -322,6 +322,41 @@ describe('readStoredGatewayModels', () => {
     );
   });
 
+  it('keeps only the geo region of each endpoint inference region', async () => {
+    await storeList([{ id: 'vendor/regional', name: 'Regional' }]);
+    await storeRows([
+      endpointsRow(
+        'vendor/regional',
+        endpointsBody([
+          {
+            provider_name: 'bedrock',
+            inference_regions: [
+              { scope: 'zone', geo_region: 'us', pricing: { prompt: '1', completion: '2' } },
+              { scope: 'global' },
+              { scope: 'specific', geo_region: 'eu', provider_region: 'eu-central-1' },
+            ],
+          },
+          { provider_name: 'vertex', inference_regions: null },
+        ])
+      ),
+    ]);
+
+    expect(storedEndpointsOf(await read())).toEqual(
+      new Map([
+        [
+          'vendor/regional',
+          [
+            {
+              provider_name: 'bedrock',
+              inference_regions: [{ geo_region: 'us' }, {}, { geo_region: 'eu' }],
+            },
+            { provider_name: 'vertex' },
+          ],
+        ],
+      ])
+    );
+  });
+
   it('keeps the model description fields only for a source whose schema has them', async () => {
     const described = {
       id: 'vendor/described',
@@ -335,7 +370,6 @@ describe('readStoredGatewayModels', () => {
       max_tokens: 32_000,
       modalities: { input: ['text'], output: ['text'] },
       supported_parameters: ['tools'],
-      regions: ['eu', 'us'],
       pricing: { input: '0.000001', output: '0.000002', input_cache_read: null },
       deprecated_at: Date.UTC(2027, 0, 15),
       reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
@@ -357,7 +391,6 @@ describe('readStoredGatewayModels', () => {
       max_tokens: 32_000,
       modalities: { input: ['text'], output: ['text'] },
       supported_parameters: ['tools'],
-      regions: ['eu', 'us'],
       pricing: { input: '0.000001', output: '0.000002' },
       deprecated_at: Date.UTC(2027, 0, 15),
       reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],

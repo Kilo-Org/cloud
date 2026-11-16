@@ -458,7 +458,7 @@ describe('Organization hub plan', () => {
 });
 
 describe('Organization hub balance masking', () => {
-  // The mocked org carries balance 5_000_000 → the mocked formatMoney paints $5.
+  // The mocked org carries balance 5_000_000 → the mocked formatPrefixedMoney paints $5.
   const balanceRow = (renderer: TestRenderer.ReactTestRenderer) =>
     renderer.root
       .findAllByType('KvRow')

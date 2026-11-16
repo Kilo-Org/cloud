@@ -1514,10 +1514,7 @@ describe('organizations settings trpc router', () => {
           organizationId: testOrganization.id,
           modelId: 'acme/unknown-model',
         })
-      ).resolves.toEqual({
-        vercel: { available: false, regions: [] },
-        openrouter: { available: false },
-      });
+      ).resolves.toEqual({ gateways: [] });
     });
 
     it('rejects model gateway availability while the feature is not enabled', async () => {

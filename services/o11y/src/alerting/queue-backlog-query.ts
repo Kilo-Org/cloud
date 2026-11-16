@@ -27,7 +27,8 @@ const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
 
 export async function queryQueueBacklog(
   env: QueryEnv,
-  fetchFn: FetchFn = fetch
+  fetchFn: FetchFn = fetch,
+  queueId: string = MONITORED_QUEUE_ID
 ): Promise<QueueBacklogMetrics> {
   const token = await env.O11Y_CF_CONTAINERS_API_TOKEN.get();
   if (!token) {
@@ -35,7 +36,7 @@ export async function queryQueueBacklog(
   }
 
   const response = await fetchFn(
-    `${CF_API_BASE}/accounts/${env.O11Y_CF_ACCOUNT_ID}/queues/${MONITORED_QUEUE_ID}/metrics`,
+    `${CF_API_BASE}/accounts/${env.O11Y_CF_ACCOUNT_ID}/queues/${queueId}/metrics`,
     {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(5_000),
@@ -58,7 +59,7 @@ export async function queryQueueBacklog(
       : undefined;
 
   return {
-    queueId: MONITORED_QUEUE_ID,
+    queueId,
     backlogCount: parsed.result.backlog_count,
     backlogBytes: parsed.result.backlog_bytes,
     oldestMessageTimestamp,

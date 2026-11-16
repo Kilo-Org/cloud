@@ -188,8 +188,8 @@ tagged envelope: `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
 `{"kind":"exa_usage","v":1,"record":<ExaUsageRecord>}` (`ExaUsageQueueMessageSchema`).
 LLM usage stays untagged and unchanged; its ingress schema strips unknown keys, so a body
 with its own `kind` key is always a tagged message. The gateway produces Enkrypt messages
-only through `/enkrypt-usage`, behind a default-off flag; see
-[Enkrypt usage rollout](#enkrypt-usage-rollout). Exa messages come only through
+only through `/enkrypt-usage`, in every region; see
+[Enkrypt usage queue](#enkrypt-usage-queue). Exa messages come only through
 `/exa-usage`, and only as a fallback after a failed direct write; see
 [Exa usage rollout](#exa-usage-rollout).
 
@@ -229,8 +229,8 @@ flag off. Never roll the consumer back to a version that does not route a kind
 while messages of that kind may be in flight or retrying: such a consumer retries
 them as invalid or unsupported events and they reach the DLQ after 20 retries. In
 particular, never roll back to a consumer from before Exa routing while Exa
-messages may be queued. To stop tagged traffic, turn the producer flag off and let
-the consumer drain.
+messages may be queued. To stop tagged traffic, roll the producer back — revert the
+Enkrypt source, or turn off the Exa fallback flag — and let the consumer drain.
 
 ## Observability
 
@@ -475,7 +475,8 @@ database capacity for larger settings.
 Persistent failures still reach the configured DLQ after the finite retry budget;
 a DLQ is a recovery queue, not proof the payload is poison. DLQ retention is
 enforced at Cloudflare's maximum of 14 days (1209600 seconds); see
-[Retention](#retention). Before guard rollout, verify alerting, replay ownership,
+[Retention](#retention). Before guard rollout, confirm the
+[dead-letter alert](#dead-letter-alert) is deployed, and confirm replay ownership
 and a controlled stable-ID reconciliation/replay procedure. A safe rollback must
 **not lower retries back to 3 while higher-attempt messages remain outstanding**,
 because their next failure could immediately dead-letter them. Preserve stable IDs
@@ -611,6 +612,66 @@ For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
 timeout 0 and the pre-trial cap 200 for the same single queue. Preserve the current writer
 route, retry delay/budget and per-message dispositions.
 
+## Dead-letter alert
+
+The alert covers every usage kind on the queue: LLM, Enkrypt and Exa.
+
+### What it watches
+
+The o11y Worker's every-minute cron (`services/o11y/src/alerting/`) reads the
+realtime backlog of the production DLQ, `usage-ingest-processing-dlq-eu`. The DLQ
+has no consumer, so its backlog is exactly the dead-lettered messages still
+retained, and it only grows when a message dead-letters. That backlog is the
+authoritative signal.
+
+o11y finds the queue by exact name on each run (`DEAD_LETTER_QUEUE_NAME` in
+`services/o11y/src/alerting/dead-letter-queue.ts`), then calls the Queues metrics
+API, using its existing `O11Y_CF_CONTAINERS_API_TOKEN` with Queues Read. A test in
+this service fails if that name drifts from `dead_letter_queue` in
+`wrangler.jsonc`. On an EU/global routing rollback, change both. The hedge
+queue's global DLQ, `usage-ingest-processing-dlq`, and staging's DLQs are not
+watched while the hedge is an experiment.
+
+It alerts when the backlog rises above the lowest backlog seen since the last
+alert: the first dead letter, more dead letters, or new ones after a replay or
+expiry. An alert repeats at most once per 4-hour ticket cooldown, and an unchanged
+or shrinking backlog never alerts. A lookup or API failure fails that run, which is
+reported like other o11y evaluation errors, without blocking the other alerts.
+
+The consumer also logs one `usage_ingest_final_attempt_failed` line at
+`console.error` when delivery 21 (above `max_retries` 20) is not acknowledged and
+is retried, which dead-letters it. Earlier failed deliveries and acknowledged
+deliveries log nothing. It is a triage aid in Workers Logs, not the alert: it
+gives the usage IDs to reconcile, but logs can be dropped and a killed invocation
+dead-letters without it.
+
+| Field | Value |
+|---|---|
+| `queue` | Source queue name |
+| `usage_kind` | `llm`, `enkrypt_usage`, `exa_usage`, or `unknown` for another `kind` tag |
+| `usage_id` | Usage ID, only when the message body validates |
+| `queue_message_id`, `delivery_attempts` | Queue message identity |
+| `reason` | Categorical processing reason, or `unexpected_error` |
+
+### Where it goes
+
+The alert has severity `ticket` (`DEAD_LETTER_QUEUE_SEVERITY`), so o11y posts it
+to the `O11Y_SLACK_WEBHOOK_TICKET` webhook, which `services/o11y/wrangler.jsonc`
+requires to deliver to #o11y-alerts. It does not page. Changing the severity to
+`page` would route it to `O11Y_SLACK_WEBHOOK_PAGE`, with o11y's other page alerts,
+and shorten the cooldown to 15 minutes.
+
+It goes live with the next o11y deployment; no operator step or new credential is
+needed. If the DLQ already holds messages then, the first run alerts once.
+
+### Who receives it
+
+Whoever triages #o11y-alerts, who hands it to the DLQ replay owner:
+**`<replay owner, to be named>`**. On an alert, find the usage IDs from
+`usage_ingest_final_attempt_failed` in Workers Logs for `usage-ingest`, reconcile
+by stable usage ID, and replay only as described under [Queue policy](#queue-policy),
+within the DLQ's retention.
+
 ## Deploy
 
 The `detect-changes` job of `.github/workflows/deploy-workers.yml` discovers
@@ -671,34 +732,29 @@ routes or preview URLs are configured. The consumer is attached to each environm
 The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
 
-## Enkrypt usage rollout
+## Enkrypt usage queue
 
-The gateway sends Enkrypt guardrail usage through this queue only when the
-`kilocode-ai-gateway` variable `ENKRYPT_USAGE_QUEUE_ENABLED` is exactly `true`; see
-`ENVIRONMENT.md`. It posts the bare Enkrypt usage record to `/enkrypt-usage` on the
-same Worker as `/usage`, and the ingress wraps it in the tagged queue envelope.
+The gateway sends Enkrypt guardrail usage through this queue in every region; there is no
+rollout selector. It posts the bare Enkrypt usage record to `/enkrypt-usage` on the same
+Worker as `/usage`, and the ingress wraps it in the tagged queue envelope. See `ENVIRONMENT.md`.
 
-Deploy in this order. Each step must be deployed and verified before the next:
+The producer depends on the gateway accepting an optional `usageId` in Enkrypt handoff
+replies, the web app's Enkrypt usage route echoing `usageId` under queue writer admission,
+and the writer's small non-LLM admission class plus the consumer that routes tagged Enkrypt
+messages and the `/enkrypt-usage` ingress. These shipped ahead of the producer; nothing posts
+to the ingress before the producer is deployed.
 
-1. The gateway accepts an optional `usageId` in Enkrypt handoff replies.
-2. The web app's Enkrypt usage route echoes `usageId` and takes queue writer admission.
-3. The writer's small non-LLM admission class, the consumer that routes tagged Enkrypt
-   messages, and the `/enkrypt-usage` ingress. Nothing posts to the ingress before step 4.
-4. The gateway producer, with the flag off.
-5. The flag on. Frankfurt and SFO pick it up with the same gateway deployment; that is not
-   an atomic cutover, because a rolling deployment can briefly overlap old and new settings.
+Rollback: revert the gateway source that makes the queue path permanent and redeploy. New
+Enkrypt usage then takes the direct path again, and the consumer drains what the queue already
+accepted. Delete the now-unused `ENKRYPT_USAGE_QUEUE_ENABLED` selector from the gateway project
+only after the new source is deployed and the old instances have turned over; deleting it while
+old code still reads it would flip that code back to the direct path. If rolling back to source
+that still reads the selector, reinstate the flag first. Never roll the consumer back to an
+LLM-only version while tagged Enkrypt messages may still be in the source queue or in flight:
+they would fail every retry and reach the DLQ.
 
-Rollback: set the flag to anything other than `true` and redeploy the gateway. New Enkrypt
-usage then takes the direct path again, and the consumer drains what the queue already
-accepted. Never roll the consumer back to an LLM-only version while tagged Enkrypt messages
-may still be in the source queue or in flight: they would fail every retry and reach the DLQ.
-
-Human-only steps, before the flag is turned on:
-
-- name a replay owner for the now-mixed DLQ, with a replay that handles both LLM and Enkrypt
-  messages;
-- confirm the existing DLQ alerting covers it;
-- set the flag on `kilocode-ai-gateway` and redeploy.
+The now-mixed DLQ needs a replay owner whose replay handles both LLM and Enkrypt messages, and
+the existing DLQ alerting must cover it.
 
 ## Exa usage rollout
 

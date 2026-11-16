@@ -19,6 +19,7 @@ import {
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
 import type { createGitHubPrReviewOctokit } from '@/lib/github-pr-review/client';
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
 import {
   buildChecksResult,
   buildFilesPage,
@@ -844,6 +845,9 @@ const PR_LEDGER_PERSISTENCE_FAILED_MESSAGE =
 // confirmed, so the row is surfaced as an unreadable result instead.
 const PR_LEDGER_RESULT_UNREADABLE_MESSAGE =
   'We could not read the recorded result of this action. Please try again.';
+// Retryable copy for an inbox page GitHub did not answer inside the mobile
+// procedure budget. Fixed text: never GitHub's own message.
+const INBOX_UNAVAILABLE_MESSAGE = 'Your review inbox took too long to load. Try again.';
 
 function ambiguousPrError(): TRPCError {
   return new TRPCError({ code: 'CONFLICT', message: PR_AMBIGUOUS_MESSAGE });
@@ -1979,37 +1983,49 @@ export const githubPrReviewRouter = createTRPCRouter({
   // paginated through GitHub GraphQL `search`. The query string is
   // server-fixed (INBOX_SEARCH_QUERY) so the caller can only ever see PRs
   // their own token can already see. Read-only — no ledger, no Terms check.
-  listInbox: baseProcedure.input(ListInboxInput).query(async ({ ctx, input }) => {
-    return withGitHubUserTokenRetry({
-      kiloUserId: ctx.user.id,
-      call: async octokit => {
-        const resp = (await octokit.request('POST /graphql', {
-          query: INBOX_QUERY,
-          variables: {
-            q: INBOX_SEARCH_QUERY,
-            first: INBOX_PAGE_SIZE,
-            after: input.cursor ?? null,
+  //
+  // GitHub can leave the GraphQL read open for minutes; the mobile app budgets
+  // the whole procedure, so the request carries the read's deadline signal and
+  // a stall answers retryably instead of failing opaquely.
+  listInbox: baseProcedure.input(ListInboxInput).query(async ({ ctx, input }) =>
+    withControlPlaneReadBudget({
+      clock: ctx,
+      message: INBOX_UNAVAILABLE_MESSAGE,
+      read: signal =>
+        withGitHubUserTokenRetry({
+          kiloUserId: ctx.user.id,
+          call: async octokit => {
+            const resp = (await octokit.request('POST /graphql', {
+              query: INBOX_QUERY,
+              variables: {
+                q: INBOX_SEARCH_QUERY,
+                first: INBOX_PAGE_SIZE,
+                after: input.cursor ?? null,
+              },
+              // Octokit reads request options (and so the deadline signal) from
+              // `request`, never from the top level, which is sent to GitHub.
+              request: { signal },
+            })) as {
+              data: {
+                data: {
+                  search: {
+                    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                    nodes: GraphQlInboxNode[];
+                  } | null;
+                } | null;
+                errors?: unknown;
+              };
+            };
+            throwTrpcFromGraphQlErrors(resp.data.errors as never);
+            const connection = resp.data.data?.search ?? null;
+            return buildInboxResult({
+              nodes: connection?.nodes ?? [],
+              pageInfo: connection?.pageInfo ?? null,
+            });
           },
-        })) as {
-          data: {
-            data: {
-              search: {
-                pageInfo: { hasNextPage: boolean; endCursor: string | null };
-                nodes: GraphQlInboxNode[];
-              } | null;
-            } | null;
-            errors?: unknown;
-          };
-        };
-        throwTrpcFromGraphQlErrors(resp.data.errors as never);
-        const connection = resp.data.data?.search ?? null;
-        return buildInboxResult({
-          nodes: connection?.nodes ?? [],
-          pageInfo: connection?.pageInfo ?? null,
-        });
-      },
-    });
-  }),
+        }),
+    })
+  ),
 
   // Post a single immediate review comment (no pending review required).
   createReviewComment: baseProcedure

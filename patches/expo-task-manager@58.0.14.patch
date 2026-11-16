@@ -1,8 +1,7 @@
 diff --git a/android/src/main/java/expo/modules/taskmanager/TaskService.java b/android/src/main/java/expo/modules/taskmanager/TaskService.java
-index 94e95b2..2d51340 100644
 --- a/android/src/main/java/expo/modules/taskmanager/TaskService.java
 +++ b/android/src/main/java/expo/modules/taskmanager/TaskService.java
-@@ -424,7 +424,15 @@ public class TaskService implements SingletonModule, TaskServiceInterface {
+@@ -427,7 +427,15 @@
      }
      mTasksAndEventsRepository.putEventForAppScopeKey(appScopeKey, body);
  
@@ -19,7 +18,7 @@ index 94e95b2..2d51340 100644
        new HeadlessAppLoader.Params(appScopeKey, task.getAppUrl()),
        () -> {
        },
-@@ -444,8 +452,10 @@ public class TaskService implements SingletonModule, TaskServiceInterface {
+@@ -448,8 +456,10 @@
    //region helpers
  
    private HeadlessAppLoader getAppLoader() {

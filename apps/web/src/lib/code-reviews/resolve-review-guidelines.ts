@@ -1,10 +1,8 @@
 import { JSON_SCHEMA, load } from 'js-yaml';
 import pLimit from 'p-limit';
 import type { ReviewGuidelineImport } from '@kilocode/db/schema-types';
-import {
-  fetchGitHubRepositoryDefaultBranchSha,
-  fetchGitHubRootTextFileAtRef,
-} from '@/lib/integrations/platforms/github/adapter';
+import { fetchGitHubRepositoryDefaultBranchSha } from '@/lib/integrations/platforms/github/adapter';
+import { fetchGitHubRegularFileAtCommit } from '@/lib/integrations/platforms/github/regular-file-at-commit';
 import {
   cleanReviewInstructions,
   MAX_REVIEW_INSTRUCTIONS_CHARS,
@@ -133,9 +131,9 @@ export async function resolveReviewGuidelines(params: {
           sourceShas.set(repository, sha);
         }
         metadata.sha = await sha;
-        const ref = metadata.sha;
+        const commitSha = metadata.sha;
         const raw = await limit(() =>
-          fetchGitHubRootTextFileAtRef({ token, owner, repo, path: parsed.path, ref })
+          fetchGitHubRegularFileAtCommit({ token, owner, repo, path: parsed.path, commitSha })
         );
         metadata.status = raw === null ? 'not_found' : 'imported';
         result.content = raw === null ? '' : parseFrontMatter(raw).body;

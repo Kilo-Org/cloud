@@ -16,6 +16,11 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () =>
 
 const SOURCE_SHA = 'a'.repeat(40);
 const HEAD_SHA = 'b'.repeat(40);
+const FRONTEND_BLOB = '1'.repeat(40);
+const BACKEND_TREE = '2'.repeat(40);
+const API_BLOB = '3'.repeat(40);
+const SYMLINK_BLOB = '4'.repeat(40);
+const ENV_BLOB = '5'.repeat(40);
 
 it('prepares the real prompt and persists import metadata with only GitHub HTTP faked', async () => {
   const originalAppId = process.env.GITHUB_APP_ID;
@@ -61,7 +66,7 @@ it('prepares the real prompt and persists import metadata with only GitHub HTTP 
       case '/repos/acme/app/contents/REVIEW.md':
         expect(url.searchParams.get('ref')).toBe('release');
         body = file(
-          '---\nextends:\n  - acme/guidelines:frontend.md\n  - acme/guidelines:backend/api.md\n  - acme/guidelines:missing.md\n  - acme/blocked:policy.md\n  - acme/inaccessible:policy.md\n  - "acme/guidelines:bad\\u0000.md"\n---\nRepository-specific rules.'
+          '---\nextends:\n  - acme/guidelines:frontend.md\n  - acme/guidelines:backend/api.md\n  - acme/guidelines:missing.md\n  - acme/guidelines:secrets.md\n  - acme/blocked:policy.md\n  - acme/inaccessible:policy.md\n  - "acme/guidelines:bad\\u0000.md"\n---\nRepository-specific rules.'
         );
         break;
       case '/repos/acme/guidelines':
@@ -72,16 +77,29 @@ it('prepares the real prompt and persists import metadata with only GitHub HTTP 
       case '/repos/acme/guidelines/git/ref/heads%2Fpolicy%2Fmain':
         body = { object: { sha: SOURCE_SHA, type: 'commit' } };
         break;
-      case '/repos/acme/guidelines/contents/frontend.md':
-        expect(url.searchParams.get('ref')).toBe(SOURCE_SHA);
+      case `/repos/acme/guidelines/git/trees/${SOURCE_SHA}`:
+        body = {
+          tree: [
+            { path: 'frontend.md', mode: '100644', type: 'blob', sha: FRONTEND_BLOB, size: 80 },
+            { path: 'backend', mode: '040000', type: 'tree', sha: BACKEND_TREE },
+            { path: 'secrets.md', mode: '120000', type: 'blob', sha: SYMLINK_BLOB, size: 4 },
+            { path: '.env', mode: '100644', type: 'blob', sha: ENV_BLOB, size: 30 },
+          ],
+          truncated: false,
+        };
+        break;
+      case `/repos/acme/guidelines/git/trees/${BACKEND_TREE}`:
+        body = {
+          tree: [{ path: 'api.md', mode: '100644', type: 'blob', sha: API_BLOB, size: 17 }],
+          truncated: false,
+        };
+        break;
+      case `/repos/acme/guidelines/git/blobs/${FRONTEND_BLOB}`:
         body = file('---\nextends: [acme/guidelines:nested.md]\n---\nShared frontend rules.');
         break;
-      case '/repos/acme/guidelines/contents/backend/api.md':
-      case '/repos/acme/guidelines/contents/backend%2Fapi.md':
-        expect(url.searchParams.get('ref')).toBe(SOURCE_SHA);
+      case `/repos/acme/guidelines/git/blobs/${API_BLOB}`:
         body = file('Shared API rules.');
         break;
-      case '/repos/acme/guidelines/contents/missing.md':
       case '/repos/acme/inaccessible':
         body = { message: 'Not Found' };
         status = 404;
@@ -175,6 +193,7 @@ it('prepares the real prompt and persists import metadata with only GitHub HTTP 
         { source: 'acme/guidelines:frontend.md', sha: SOURCE_SHA, status: 'imported' },
         { source: 'acme/guidelines:backend/api.md', sha: SOURCE_SHA, status: 'imported' },
         { source: 'acme/guidelines:missing.md', sha: SOURCE_SHA, status: 'not_found' },
+        { source: 'acme/guidelines:secrets.md', sha: SOURCE_SHA, status: 'not_found' },
         { source: 'acme/blocked:policy.md', sha: null, status: 'not_allowed' },
         { source: 'acme/inaccessible:policy.md', sha: null, status: 'not_accessible' },
         { source: 'acme/guidelines:bad\ufffd.md', sha: null, status: 'invalid' },
@@ -184,6 +203,10 @@ it('prepares the real prompt and persists import metadata with only GitHub HTTP 
     expect(requests.filter(url => url.pathname.includes('/git/ref/'))).toHaveLength(1);
     expect(requests.some(url => url.pathname.includes('/acme/blocked'))).toBe(false);
     expect(requests.some(url => url.pathname.includes('nested.md'))).toBe(false);
+    expect(requests.some(url => url.pathname.includes('/acme/guidelines/contents/'))).toBe(false);
+    expect(
+      requests.filter(url => url.pathname.startsWith('/repos/acme/guidelines/git/blobs/'))
+    ).toHaveLength(2);
 
     await db.insert(agent_configs).values({
       owned_by_user_id: user.id,
@@ -224,6 +247,7 @@ it('prepares the real prompt and persists import metadata with only GitHub HTTP 
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, manual.id));
     expect(savedManual.repository_review_instructions_imports?.map(entry => entry.status)).toEqual([
+      'not_allowed',
       'not_allowed',
       'not_allowed',
       'not_allowed',

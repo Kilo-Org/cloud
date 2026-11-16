@@ -17,7 +17,9 @@ import { resolveReviewGuidelines } from '../resolve-review-guidelines';
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchGitHubRepositoryDefaultBranchSha: jest.fn(async () => 'a'.repeat(40)),
-  fetchGitHubRootTextFileAtRef: jest.fn(
+}));
+jest.mock('@/lib/integrations/platforms/github/regular-file-at-commit', () => ({
+  fetchGitHubRegularFileAtCommit: jest.fn(
     async ({ path }: { path: string }) => `Rules from ${path}.`
   ),
 }));

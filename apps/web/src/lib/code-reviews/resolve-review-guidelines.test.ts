@@ -1,16 +1,16 @@
-import {
-  fetchGitHubRepositoryDefaultBranchSha,
-  fetchGitHubRootTextFileAtRef,
-} from '@/lib/integrations/platforms/github/adapter';
+import { fetchGitHubRepositoryDefaultBranchSha } from '@/lib/integrations/platforms/github/adapter';
+import { fetchGitHubRegularFileAtCommit } from '@/lib/integrations/platforms/github/regular-file-at-commit';
 import { resolveReviewGuidelines } from './resolve-review-guidelines';
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchGitHubRepositoryDefaultBranchSha: jest.fn(),
-  fetchGitHubRootTextFileAtRef: jest.fn(),
+}));
+jest.mock('@/lib/integrations/platforms/github/regular-file-at-commit', () => ({
+  fetchGitHubRegularFileAtCommit: jest.fn(),
 }));
 
 const fetchSha = jest.mocked(fetchGitHubRepositoryDefaultBranchSha);
-const fetchFile = jest.mocked(fetchGitHubRootTextFileAtRef);
+const fetchFile = jest.mocked(fetchGitHubRegularFileAtCommit);
 const SHA = 'a'.repeat(40);
 const defaults = {
   platform: 'github',
@@ -179,7 +179,7 @@ it('pins every file from one source repository to one SHA lookup', async () => {
   });
   expect(fetchSha).toHaveBeenCalledTimes(1);
   expect(fetchFile).toHaveBeenCalledTimes(2);
-  expect(fetchFile.mock.calls.every(([params]) => params.ref === SHA)).toBe(true);
+  expect(fetchFile.mock.calls.every(([params]) => params.commitSha === SHA)).toBe(true);
   expect(result.imports.map(entry => entry.sha)).toEqual([SHA, SHA]);
 });
 

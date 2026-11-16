@@ -1352,7 +1352,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         })
         .strict()
     )
-    .output(backgroundActivityInventorySchema)
+    .output(backgroundActivityInventorySchema.nullable())
     .query(async ({ ctx, input }) => {
       await assertOrganizationOwnsSession({
         organizationId: input.organizationId,

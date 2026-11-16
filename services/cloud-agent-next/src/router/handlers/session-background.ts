@@ -11,7 +11,7 @@ import type { ControlPlaneControlResult } from '../../shared/control-plane-proto
 
 export const getBackgroundActivity = protectedProcedure
   .input(z.object({ cloudAgentSessionId: sessionIdSchema }).strict())
-  .output(backgroundActivityInventorySchema)
+  .output(backgroundActivityInventorySchema.nullable())
   .query(async ({ input, ctx }) => {
     await requireCurrentSessionAccess({
       env: ctx.env,
@@ -31,6 +31,9 @@ export const getBackgroundActivity = protectedProcedure
         message: 'Background activity status is temporarily unavailable',
       });
     }
+    // An offline sandbox runs no background work. A null answer hides the
+    // activity strip instead of reporting an unreadable status.
+    if (!result.ok && result.error.code === 'not_ready') return null;
     const inventory = result.ok
       ? backgroundActivityInventorySchema.safeParse(result.result)
       : undefined;

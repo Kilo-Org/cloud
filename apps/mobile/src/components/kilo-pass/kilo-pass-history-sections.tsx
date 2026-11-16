@@ -13,7 +13,7 @@ import {
   type KiloPassCreditHistory,
 } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
-import { trpcErrorVariant } from '@/lib/trpc-error';
+import { isRetryableTrpcError } from '@/lib/trpc-error';
 import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function HistorySection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
@@ -64,8 +64,9 @@ function SectionPending({ children }: Readonly<{ children: ReactNode }>) {
  * not be loaded; a failed first page has nothing on screen and says so, rather
  * than claiming more could not be loaded when nothing loaded at all.
  *
- * A server that refused permanently gets the reason alone: offering Retry
- * there would promise an action that cannot succeed.
+ * A failure whose tRPC code is terminal gets the reason alone, because the
+ * caller passes no retry: offering Retry there would promise an action that
+ * cannot succeed.
  */
 function SectionError({
   message,
@@ -90,12 +91,6 @@ function SectionError({
       <Text className="text-sm text-primary">{t('common.retry')}</Text>
     </Pressable>
   );
-}
-
-/** Whether asking the server again cannot change this failure. */
-function isPermanentFailure(error: unknown): boolean {
-  const variant = trpcErrorVariant(error);
-  return variant === 'permission' || variant === 'not-found';
 }
 
 function CreditHistoryLine({ entry }: Readonly<{ entry: KiloPassCreditEntry }>) {
@@ -129,7 +124,7 @@ export function KiloPassCreditHistorySection({
   const { t } = useTranslation();
   const { query, entries, hasMore } = history;
   const firstPageFailed = query.isError && entries.length === 0;
-  const permanent = isPermanentFailure(query.error);
+  const retryable = isRetryableTrpcError(query.error);
 
   let body: ReactNode = null;
   if (query.isPending) {
@@ -144,11 +139,11 @@ export function KiloPassCreditHistorySection({
       <SectionError
         message={t('common.couldnTLoad')}
         onRetry={
-          permanent
-            ? undefined
-            : () => {
+          retryable
+            ? () => {
                 query.refetch();
               }
+            : undefined
         }
       />
     );
@@ -182,11 +177,11 @@ export function KiloPassCreditHistorySection({
         <SectionError
           message={t('common.couldnTLoadMore')}
           onRetry={
-            permanent
-              ? undefined
-              : () => {
+            retryable
+              ? () => {
                   query.fetchNextPage();
                 }
+              : undefined
           }
         />
       )}
@@ -201,7 +196,7 @@ export function KiloPassBillingHistorySection({
   const { t } = useTranslation();
   const { query, entries, hasMore } = history;
   const firstPageFailed = query.isError && entries.length === 0;
-  const permanent = isPermanentFailure(query.error);
+  const retryable = isRetryableTrpcError(query.error);
 
   let body: ReactNode = null;
   if (query.isPending) {
@@ -216,11 +211,11 @@ export function KiloPassBillingHistorySection({
       <SectionError
         message={t('common.couldnTLoad')}
         onRetry={
-          permanent
-            ? undefined
-            : () => {
+          retryable
+            ? () => {
                 query.refetch();
               }
+            : undefined
         }
       />
     );
@@ -254,11 +249,11 @@ export function KiloPassBillingHistorySection({
         <SectionError
           message={t('common.couldnTLoadMore')}
           onRetry={
-            permanent
-              ? undefined
-              : () => {
+            retryable
+              ? () => {
                   query.fetchNextPage();
                 }
+              : undefined
           }
         />
       )}

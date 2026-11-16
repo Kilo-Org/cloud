@@ -69,7 +69,11 @@ const BILLING_ENTRY: KiloPassBillingEntry = {
 
 /** The first-page failure codes the section classifies. */
 const RETRYABLE_ERROR = { data: { code: 'INTERNAL_SERVER_ERROR' } };
-const PERMANENT_ERROR = { data: { code: 'FORBIDDEN' } };
+// A refused read and an unprocessable one can never succeed on a second ask.
+const PERMANENT_ERRORS = [
+  { code: 'FORBIDDEN' },
+  { code: 'BAD_REQUEST' },
+] as const;
 
 async function renderElement(element: ReactElement): Promise<TestRenderer.ReactTestRenderer> {
   const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -176,16 +180,19 @@ describe.each(SECTIONS)('$name history section', section => {
     renderer.unmount();
   });
 
-  it('prints the refusal without Retry when the server refused permanently', async () => {
-    const renderer = await section.render(
-      ledgerQuery({ isError: true, error: PERMANENT_ERROR }),
-      'none'
-    );
-    expect(allText(renderer)).toContain("Couldn't load");
-    expect(retryControls(renderer)).toHaveLength(0);
-    expect(nodesOfType(renderer, 'Pressable')).toHaveLength(0);
-    renderer.unmount();
-  });
+  it.each(PERMANENT_ERRORS)(
+    'prints the refusal without Retry for a $code failure',
+    async permanent => {
+      const renderer = await section.render(
+        ledgerQuery({ isError: true, error: { data: { code: permanent.code } } }),
+        'none'
+      );
+      expect(allText(renderer)).toContain("Couldn't load");
+      expect(retryControls(renderer)).toHaveLength(0);
+      expect(nodesOfType(renderer, 'Pressable')).toHaveLength(0);
+      renderer.unmount();
+    }
+  );
 
   it('prints a loaded entry and no error copy', async () => {
     const renderer = await section.render(ledgerQuery(), 'one');

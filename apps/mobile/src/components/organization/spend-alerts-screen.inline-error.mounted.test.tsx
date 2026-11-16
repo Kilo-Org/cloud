@@ -91,6 +91,8 @@ vi.mock('@/lib/format', () => {
   };
   return {
     formatPrefixedMoney: (amount: number) => `$${amount}`,
+    formatPrefixedUsd: (amount: number, _locale: string, options: Intl.NumberFormatOptions = {}) =>
+      `$${amount.toLocaleString('en-US', options)}`,
     formatCurrency: (amount: number) => `$${amount}`,
     formatNumber: String,
     formatList: (values: readonly string[]) => values.join(' and '),

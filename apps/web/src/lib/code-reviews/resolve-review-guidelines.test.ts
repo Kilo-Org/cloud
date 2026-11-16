@@ -220,7 +220,7 @@ it('drops imports from the end before cutting repository text', async () => {
     'dropped_budget',
   ]);
   expect(result.content).toContain('r'.repeat(8_000));
-  expect(result.truncated).toBe(true);
+  expect(result.truncated).toBe(false);
 });
 
 it('cuts oversized repository text only after dropping all imports', async () => {
@@ -271,6 +271,16 @@ it('preserves plain markdown and removes unrelated front matter', async () => {
     expect(result.content).toBe('# Rules\n\nText.');
     expect(result.imports).toEqual([]);
   }
+});
+
+it.each([
+  '---\n# Review policy\nOnly flag regressions with evidence.\n---\n# Additional rules',
+  '---\n- Only flag regressions with evidence.\n---\n# Additional rules',
+])('keeps a leading block that is not a YAML mapping: %j', async rawContent => {
+  const result = await resolveReviewGuidelines({ ...defaults, rawContent });
+  expect(result.content).toContain('Only flag regressions with evidence.');
+  expect(result.content).toContain('# Additional rules');
+  expect(result.imports).toEqual([]);
 });
 
 it('falls back to default guidance when all imports fail and the repository body is empty', async () => {

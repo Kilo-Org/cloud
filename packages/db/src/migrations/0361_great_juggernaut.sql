@@ -1,1 +1,0 @@
-ALTER TABLE "cloud_agent_code_reviews" ADD COLUMN "repository_review_instruction_imports" jsonb;

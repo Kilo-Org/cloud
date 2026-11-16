@@ -39,9 +39,11 @@ function parseFrontMatter(raw: string): { body: string; entries: unknown[] } {
   const body = cleanReviewInstructions(text.slice(match[0].length));
   try {
     const metadata: unknown = load(match[1], { schema: JSON_SCHEMA });
-    if (typeof metadata !== 'object' || metadata === null || !('extends' in metadata)) {
-      return { body, entries: [] };
+    if (metadata === undefined || metadata === null) return { body, entries: [] };
+    if (typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return { body: cleanReviewInstructions(text), entries: [] };
     }
+    if (!('extends' in metadata)) return { body, entries: [] };
     return {
       body,
       entries: Array.isArray(metadata.extends) ? metadata.extends : ['[extends must be a list]'],
@@ -152,7 +154,7 @@ export async function resolveReviewGuidelines(params: {
       : body;
   const normalized = normalizeRepositoryReviewInstructions(repositoryText);
   let content = normalized?.content ?? '';
-  let truncated = normalized?.truncated ?? false;
+  const truncated = normalized?.truncated ?? false;
   const blocks = resolved.filter(result => result.metadata.status === 'imported' && result.content);
   const combined = () =>
     [
@@ -163,7 +165,6 @@ export async function resolveReviewGuidelines(params: {
   while (blocks.length > 0 && combined().length > MAX_REVIEW_INSTRUCTIONS_CHARS) {
     const dropped = blocks.pop();
     if (dropped) dropped.metadata.status = 'dropped_budget';
-    truncated = true;
   }
   if (blocks.length > 0) content = combined();
   return {

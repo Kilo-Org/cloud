@@ -42,6 +42,12 @@ export const RuntimeAuthorizationSchema = z
         authorizationPepperDigest: nullablePepperDigest,
         userMembershipId: z.string().min(1).optional(),
         authorizationUserMembershipId: z.string().min(1).optional(),
+        /**
+         * The device session that admitted a `device-access` credential, when
+         * one did. A record minted before this field existed has none and
+         * keeps its own lifetime; see `requireBindings`.
+         */
+        deviceSessionId: z.string().min(1).optional(),
       })
       .strict(),
     source: z

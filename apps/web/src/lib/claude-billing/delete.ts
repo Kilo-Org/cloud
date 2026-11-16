@@ -130,7 +130,10 @@ export async function unlinkAndRemoveClaudeBillingGrant(
     const unlink = retiring
       ? await unlinkClaudeUserProfile(retiring.userProfileId, timeoutMs)
       : NO_UNLINK;
-    if (unlink.kind !== 'unlinked') return { unlink, unreferencedPayer: null };
+    if (unlink.kind === 'retry' || unlink.kind === 'needs_console') {
+      return { unlink, unreferencedPayer: null };
+    }
+    // `unlinked` and `missing` both leave nothing to end at Anthropic.
     return { unlink, unreferencedPayer: await removeClaudeBillingGrant(owner, tx) };
   });
 }

@@ -297,6 +297,23 @@ describe('claudeBillingRouter.remove', () => {
     }
   );
 
+  it('removes the row when Anthropic has no profile left to unlink', async () => {
+    const { user, payer, caller } = await connectedPersonalCaller();
+    jest.mocked(unlinkClaudeUserProfile).mockResolvedValue({ kind: 'missing' });
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    const status = await caller.remove({});
+
+    expect(status).toMatchObject({ state: 'not_connected' });
+    expect(unlinkClaudeUserProfile).toHaveBeenCalledWith(payer.user_profile_id, 15_000);
+    expect(await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })).toBeNull();
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
   it('keeps the row and asks for a retry when Anthropic does not answer', async () => {
     const { user, payer, caller } = await connectedPersonalCaller();
     jest.mocked(unlinkClaudeUserProfile).mockResolvedValue({ kind: 'retry' });

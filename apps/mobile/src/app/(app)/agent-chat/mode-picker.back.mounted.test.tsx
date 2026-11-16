@@ -184,5 +184,10 @@ describe('ModePickerScreen hardware Back', () => {
     expect(router.back).toHaveBeenCalledTimes(1);
     expect(bridge.onSelect).not.toHaveBeenCalled();
     expect(modePickerSlotClear).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+    expect(backHandlers.listeners.size).toBe(0);
   });
 });

@@ -20,7 +20,8 @@ const bridge = vi.hoisted(() => ({
   onSelect: vi.fn(),
 }));
 // Reads through the live bridge object so a test can take it away (the slot
-// is gone) without touching the shared mock's other callers.
+// is gone) without touching the shared mock's other callers. A test that
+// flips the flag restores it, because nothing else resets it between tests.
 const bridgeGone = vi.hoisted(() => ({ gone: false }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const router = vi.hoisted(() => ({ back: vi.fn() }));
@@ -307,6 +308,7 @@ describe('FolderPickerScreen body', () => {
     act(() => {
       renderer.unmount();
     });
+    bridgeGone.gone = false;
   });
 });
 // Hardware Back behavior lives in folder-picker.back.mounted.test.tsx.

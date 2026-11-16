@@ -15,7 +15,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { KVRow } from '@/components/ui/kv-row';
+import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type CloudTriggerDetail } from '@/lib/cloud-triggers/trigger-draft';
@@ -47,8 +47,8 @@ function ReadOnlyTrigger({ detail }: Readonly<{ detail: CloudTriggerDetail }>) {
   const { t } = useTranslation();
   return (
     <View>
-      <KVRow label={t('common.repository')} value={detail.githubRepo ?? t('common.unknown')} />
-      <KVRow
+      <KvRow label={t('common.repository')} value={detail.githubRepo ?? t('common.unknown')} />
+      <KvRow
         label={t('cloudAgent.triggers.fieldActivation')}
         value={
           detail.activationMode === 'scheduled'
@@ -56,8 +56,8 @@ function ReadOnlyTrigger({ detail }: Readonly<{ detail: CloudTriggerDetail }>) {
             : t('cloudAgent.triggers.activationWebhook')
         }
       />
-      <KVRow label={t('cloudAgent.triggers.fieldAgent')} value={detail.mode ?? t('common.unknown')} />
-      <KVRow label={t('common.model')} value={detail.model ?? t('common.unknown')} last valueFace="text" />
+      <KvRow label={t('cloudAgent.triggers.fieldAgent')} value={detail.mode ?? t('common.unknown')} />
+      <KvRow label={t('common.model')} value={detail.model ?? t('common.unknown')} last valueFace="text" />
     </View>
   );
 }

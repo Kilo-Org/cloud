@@ -112,9 +112,7 @@ export function useTriggerMutations(
             queryKey: trpc.webhookTriggers.get.queryKey({ triggerId, ...scope }),
           });
         }
-        void queryClient.invalidateQueries({
-          queryKey: trpc.webhookTriggers.listRequests.pathFilter(),
-        });
+        void queryClient.invalidateQueries(trpc.webhookTriggers.listRequests.pathFilter());
         settleList();
       },
       onError: error => toast.error(error.message),
@@ -125,9 +123,7 @@ export function useTriggerMutations(
     trpc.webhookTriggers.invoke.mutationOptions({
       onSuccess: () => {
         announcingToast.success(i18n.t('cloudAgent.triggers.runStarted'));
-        void queryClient.invalidateQueries({
-          queryKey: trpc.webhookTriggers.listRequests.pathFilter(),
-        });
+        void queryClient.invalidateQueries(trpc.webhookTriggers.listRequests.pathFilter());
       },
       onError: error => toast.error(error.message),
     })

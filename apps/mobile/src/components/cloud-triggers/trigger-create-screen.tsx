@@ -40,7 +40,6 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const colors = useThemeColors();
   const [draft, setDraft] = useState<TriggerDraft>(() =>
     newTriggerDraft(Intl.DateTimeFormat().resolvedOptions().timeZone)
   );

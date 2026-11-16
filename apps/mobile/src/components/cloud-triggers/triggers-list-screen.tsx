@@ -162,7 +162,7 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
           <TriggerRow
             key={trigger.id}
             trigger={trigger}
-            busy={setActive.isPending && setActive.variables?.triggerId === trigger.triggerId}
+            busy={setActive.isPending && setActive.variables.triggerId === trigger.triggerId}
             onOpen={() => {
               router.push(triggerDetailHref(trigger.triggerId, organizationId) as Href);
             }}

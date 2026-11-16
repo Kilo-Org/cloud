@@ -26,7 +26,9 @@ export type CloudTriggerDetail = inferRouterOutputs<MobileRouter>['webhookTrigge
 export type CloudTriggerListRow = inferRouterOutputs<MobileRouter>['webhookTriggers']['list'][number];
 export type CloudTriggerDelivery =
   inferRouterOutputs<MobileRouter>['webhookTriggers']['listRequests'][number];
-export type CloudTriggerBodySchema = NonNullable<CloudTriggerCreateInput['bodySchema']>;
+
+/** The body schema a create or update carries: a JSON Schema object. */
+type CloudTriggerBodySchema = Record<string, unknown>;
 
 /** The web form's default prompts, so both surfaces start a trigger the same way. */
 const WEBHOOK_PROMPT_TEMPLATE = 'Describe this webhook request payload:\n\n{{body}}';

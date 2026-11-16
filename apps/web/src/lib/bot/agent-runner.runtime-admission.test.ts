@@ -133,7 +133,13 @@ async function run(platformIntegration: PlatformIntegration, inputUser = user) {
       message: {
         id: 'message-1',
         text: 'Audit dependencies',
-        author: { userId: user.id, userName: 'Owner', fullName: 'Owner', isBot: false, isMe: false },
+        author: {
+          userId: user.id,
+          userName: 'Owner',
+          fullName: 'Owner',
+          isBot: false,
+          isMe: false,
+        },
       },
       platformIntegration,
       user: inputUser,

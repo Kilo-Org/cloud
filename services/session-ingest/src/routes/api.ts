@@ -15,6 +15,7 @@ import {
   sessionIdSchema,
   sessionShareOptionsSchema,
   storedSessionIdSchema,
+  type KiloSdkMessageHistory,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
@@ -29,6 +30,8 @@ import {
   personalOrInheritedOrganizationCondition,
   zodJsonValidator,
   DEFAULT_DO_RETRY_CONFIG,
+  isDurableObjectRetryDeadline,
+  isTransientDurableObjectFailure,
   withDORetry,
 } from '@kilocode/worker-utils';
 import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
@@ -690,6 +693,67 @@ api.get('/session/:sessionId/diff', async c => {
 const SESSION_METADATA_READ_DEADLINE_MS = 2_000;
 
 /**
+ * Budget for one paged history read against the session's Durable Object.
+ * Strictly below the control plane's 8s upstream budget: a read that has not
+ * answered by then is already lost to the caller, so it answers as a
+ * retryable read failure here instead of holding the request open.
+ */
+const SESSION_HISTORY_READ_BUDGET_MS = 5_000;
+
+type SessionHistoryReadOutcome = 'ok' | 'none' | 'too_large' | 'retryable_failure' | 'invalid_data';
+
+type SessionHistoryRead = {
+  history: KiloSdkMessageHistory | null;
+  outcome: SessionHistoryReadOutcome;
+};
+
+/**
+ * The read did not answer, so nothing is known about the stored page: a retry
+ * can still succeed and the caller must not be told its history is gone.
+ */
+const TRANSIENT_HISTORY_READ: SessionHistoryRead = {
+  history: { kind: 'retryable_failure', phase: 'message_scan' },
+  outcome: 'retryable_failure',
+};
+
+/** A page the contract can validate has no `kind`; every failure variant has one. */
+function isPageShapedHistory(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'messages' in value &&
+    Array.isArray(value.messages)
+  );
+}
+
+function historyReadOutcome(history: KiloSdkMessageHistory | null): SessionHistoryReadOutcome {
+  if (history === null) return 'none';
+  return 'kind' in history ? history.kind : 'ok';
+}
+
+/**
+ * Classify what the Durable Object answered.
+ *
+ * Three outcomes are told apart, because the caller's recovery differs:
+ * - a validated typed answer (a page, `too_large`, `retryable_failure`,
+ *   `invalid_data`, or none) is returned verbatim;
+ * - an answer shaped like a page that the contract rejects is the stored page
+ *   itself, so it stays the terminal `invalid_data`;
+ * - anything else — an unknown failure kind, a body this worker cannot read —
+ *   is not evidence that the stored page is unreadable. Retrying a read that
+ *   never answered is always safe, so it is reported as retryable.
+ */
+function classifyHistoryRead(rawHistory: unknown): SessionHistoryRead {
+  const parsed = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+  if (parsed.success) {
+    return { history: parsed.data, outcome: historyReadOutcome(parsed.data) };
+  }
+  return isPageShapedHistory(rawHistory)
+    ? { history: { kind: 'invalid_data' }, outcome: 'invalid_data' }
+    : TRANSIENT_HISTORY_READ;
+}
+
+/**
  * Paginated session-message history for any Kilo session the user owns.
  * Reuses the same `(owner, current organization membership)` check shape as
  * `SessionIngestRPC.findOwnedAccessibleSession` and delegates the bounded
@@ -813,45 +877,65 @@ api.get('/session/:sessionId/messages', async c => {
       : undefined;
 
   const readStartedAt = Date.now();
-  let rawHistory: unknown;
-  try {
-    rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-      () =>
-        getSessionIngestDO(c.env, {
-          kiloUserId,
-          sessionId: inputParse.data.kiloSessionId,
-        }),
-      stub =>
-        stub.readKiloSdkMessages({
-          limit: inputParse.data.limit,
-          before: inputParse.data.before,
-        }),
-      'SessionIngestDO.readKiloSdkMessages'
-    );
-  } catch (error) {
-    // A DO isolate reset is `retryable:false` upstream and would otherwise
-    // leave the read unattributable in production. Log it once, then rethrow
-    // so the response is unchanged.
-    console.warn({
-      event: 'kilo_sdk_history_read_failed',
-      sessionId: inputParse.data.kiloSessionId,
-      limit: inputParse.data.limit,
-      hasCursor: inputParse.data.before !== undefined,
-      error: error instanceof Error ? error.message : String(error),
-      durationMs: Date.now() - readStartedAt,
-    });
-    throw error;
+  // One budget for the read and its confirming retry, so neither can push the
+  // answer past what the caller can still use.
+  const readDeadlineAt = readStartedAt + SESSION_HISTORY_READ_BUDGET_MS;
+
+  const readOnce = async (): Promise<SessionHistoryRead | 'transient'> => {
+    try {
+      const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+        () =>
+          getSessionIngestDO(c.env, {
+            kiloUserId,
+            sessionId: inputParse.data.kiloSessionId,
+          }),
+        stub =>
+          stub.readKiloSdkMessages({
+            limit: inputParse.data.limit,
+            before: inputParse.data.before,
+          }),
+        'SessionIngestDO.readKiloSdkMessages',
+        {
+          ...DEFAULT_DO_RETRY_CONFIG,
+          scope: { deadlineAt: readDeadlineAt },
+        }
+      );
+      return classifyHistoryRead(rawHistory);
+    } catch (error) {
+      // A DO isolate reset is `retryable:false` upstream and would otherwise
+      // leave the read unattributable in production. Log it once.
+      console.warn({
+        event: 'kilo_sdk_history_read_failed',
+        sessionId: inputParse.data.kiloSessionId,
+        limit: inputParse.data.limit,
+        hasCursor: inputParse.data.before !== undefined,
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: Date.now() - readStartedAt,
+      });
+      // The platform dropped the hop or the read outlived its budget: the read
+      // never answered, which says nothing about the stored page. Answer the
+      // retryable read failure instead of a 500 the caller cannot classify.
+      if (!isTransientDurableObjectFailure(error) && !isDurableObjectRetryDeadline(error)) {
+        throw error;
+      }
+      return 'transient';
+    }
+  };
+
+  let read = await readOnce();
+  if (read !== 'transient' && read.outcome === 'invalid_data') {
+    // Ingest rewrites a session's rows while the client reads them, so one read
+    // can see a page whose stored identities do not line up yet — the same page
+    // then answers a page a moment later. Only an answer that repeats is
+    // evidence the stored page itself is unreadable, and only then may the
+    // caller be told its history is gone.
+    read = await readOnce();
   }
-  const history = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
-  const page =
-    history.success && history.data !== null && !('kind' in history.data) ? history.data : null;
-  const outcome = !history.success
-    ? 'invalid_data'
-    : history.data === null
-      ? 'none'
-      : 'kind' in history.data
-        ? history.data.kind
-        : 'ok';
+  // A read that never answered on the confirming attempt says nothing about the
+  // stored page either, so it is never reported as the terminal kind.
+  const history = read === 'transient' ? TRANSIENT_HISTORY_READ.history : read.history;
+  const outcome = read === 'transient' ? TRANSIENT_HISTORY_READ.outcome : read.outcome;
+  const page = history !== null && !('kind' in history) ? history : null;
   // Exactly one structured read-outcome line per request, in the same plain
   // object shape as `direct_ingest_ok`, so `cloudflare-logpush` names the read
   // (and its typed outcome) that a stale-transcript report blames.
@@ -893,7 +977,7 @@ api.get('/session/:sessionId/messages', async c => {
     {
       success: true,
       kiloSessionId: inputParse.data.kiloSessionId,
-      history: history.success ? history.data : { kind: 'invalid_data' },
+      history,
       sessionMetadata,
     },
     200
@@ -1320,16 +1404,40 @@ api.get('/user/web', async c => {
 // Web UI mints a one-use ticket before opening /api/user/web. The ticket is
 // opaque; its object stores { userId, expiresAt, secret } and the websocket
 // upgrade consumes it exactly once.
+//
+// The mint is the caller's only answer, and it targets a fresh — therefore
+// cold — Durable Object, so it is bounded below the control plane's 8s
+// upstream budget: a mint that has not answered by then is answered here as
+// retryable, instead of letting the caller's fetch budget expire with no
+// attributable response.
+const WEB_TICKET_MINT_BUDGET_MS = 3_000;
+
 api.post('/user/web-ticket', async c => {
   const kiloUserId = c.get('user_id');
   const { ticket, secret, getStub } = createConnectionTicket(c.env.CONNECTION_TICKET_DO);
   const doExpiresAt = Date.now() + 60_000;
 
-  await withDORetry(
-    getStub,
-    stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
-    'ConnectionTicketDO.mint'
-  );
+  try {
+    await withDORetry(
+      getStub,
+      stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
+      'ConnectionTicketDO.mint',
+      {
+        ...DEFAULT_DO_RETRY_CONFIG,
+        scope: { deadlineAt: Date.now() + WEB_TICKET_MINT_BUDGET_MS },
+      }
+    );
+  } catch (error) {
+    if (!isTransientDurableObjectFailure(error) && !isDurableObjectRetryDeadline(error)) {
+      throw error;
+    }
+    // Nothing was minted, so a retry can still succeed.
+    console.warn({
+      event: 'web_ticket_mint_unavailable',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ success: false, error: 'ticket_mint_unavailable' }, 503);
+  }
 
   return c.json({ ticket, expiresAt: Math.floor(doExpiresAt / 1000) }, 200);
 });

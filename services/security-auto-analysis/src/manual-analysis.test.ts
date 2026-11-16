@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
+import { z } from 'zod';
 import {
   markSecurityAgentCommandRetriesExhausted,
   transitionSecurityAgentCommandWithCurrentState,
@@ -15,6 +18,7 @@ import {
 import type * as QueriesModule from './db/queries.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
 import {
+  MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS,
   RetryableManualAnalysisStartError,
   consumeManualAnalysisBatch,
   processManualAnalysisStart,
@@ -1043,61 +1047,68 @@ describe('consumeManualAnalysisBatch', () => {
     expect(message.retry).toHaveBeenCalledTimes(1);
   });
 
-  it('retries the command message when the admission read could not decide', async () => {
-    const message = queueMessage(1);
-    const db = fakeAdmissionDb({
-      admissionAnalysisStatus: null,
-      queueRowId: 'queue-row',
-      actorRow: { id: 'user-123', api_token_pepper: null },
-      configRow: { config: { analysis_mode: 'auto' } },
-    });
-    vi.mocked(getWorkerDb).mockReturnValue(db as never);
-    vi.mocked(startSecurityAnalysis).mockResolvedValue({
-      started: false,
-      error: 'admission unavailable',
-      failureNeedsLifecycleTransition: true,
-      failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
-    });
+  it.each([
+    [1, 30],
+    [2, 60],
+    [3, 120],
+  ])(
+    'replays the start on attempt %i after a %is delay when the admission read could not decide',
+    async (attempts, delaySeconds) => {
+      const message = queueMessage(attempts);
+      const db = fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: { config: { analysis_mode: 'auto' } },
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      vi.mocked(startSecurityAnalysis).mockResolvedValue({
+        started: false,
+        error: 'admission unavailable',
+        failureNeedsLifecycleTransition: true,
+        failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+      });
 
-    const infoCalls: unknown[][] = [];
-    const errorCalls: unknown[][] = [];
-    const info = vi.spyOn(console, 'info').mockImplementation((...args: unknown[]) => {
-      infoCalls.push(args);
-    });
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
-      errorCalls.push(args);
-    });
-    try {
-      await consumeManualAnalysisBatch(
-        { messages: [message] } as never,
-        {
-          ...manualStartEnv(),
-          HYPERDRIVE: { connectionString: 'postgres://worker' },
-        } as CloudflareEnv
+      const infoCalls: unknown[][] = [];
+      const errorCalls: unknown[][] = [];
+      const info = vi.spyOn(console, 'info').mockImplementation((...args: unknown[]) => {
+        infoCalls.push(args);
+      });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+        errorCalls.push(args);
+      });
+      try {
+        await consumeManualAnalysisBatch(
+          { messages: [message] } as never,
+          {
+            ...manualStartEnv(),
+            HYPERDRIVE: { connectionString: 'postgres://worker' },
+          } as CloudflareEnv
+        );
+      } finally {
+        info.mockRestore();
+        errorSpy.mockRestore();
+      }
+
+      expect(errorCalls).toEqual([]);
+      expect(infoCalls).toEqual([
+        [
+          'Manual security analysis command will replay the start',
+          expect.objectContaining({ attempts, max_attempts: 4 }),
+        ],
+      ]);
+      expect(message.retry).toHaveBeenCalledWith({ delaySeconds });
+      expect(message.ack).not.toHaveBeenCalled();
+      // The command stays running so the next delivery replays the same payload.
+      expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledTimes(1);
+      expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledWith(
+        db,
+        expect.objectContaining({ status: 'running' })
       );
-    } finally {
-      info.mockRestore();
-      errorSpy.mockRestore();
+      expect(transitionAnalysisStartLifecycle).not.toHaveBeenCalled();
+      expect(markSecurityAgentCommandRetriesExhausted).not.toHaveBeenCalled();
     }
-
-    expect(errorCalls).toEqual([]);
-    expect(infoCalls).toEqual([
-      [
-        'Manual security analysis command will replay the start',
-        expect.objectContaining({ attempts: 1, max_attempts: 4 }),
-      ],
-    ]);
-    expect(message.retry).toHaveBeenCalledTimes(1);
-    expect(message.ack).not.toHaveBeenCalled();
-    // The command stays running so the next delivery replays the same payload.
-    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledTimes(1);
-    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledWith(
-      db,
-      expect.objectContaining({ status: 'running' })
-    );
-    expect(transitionAnalysisStartLifecycle).not.toHaveBeenCalled();
-    expect(markSecurityAgentCommandRetriesExhausted).not.toHaveBeenCalled();
-  });
+  );
 
   it('settles the command when the retryable start exhausts its delivery budget', async () => {
     const message = queueMessage(4);
@@ -1210,5 +1221,41 @@ describe('ensureManualAnalysisQueueRow', () => {
         jobId: 'manual-job',
       })
     ).resolves.toBe(false);
+  });
+});
+
+describe('manual analysis command retry budget', () => {
+  it('keeps the deployed consumer retry budget equal to the handler attempt bound', () => {
+    const parseErrors: ParseError[] = [];
+    const config: unknown = parseJsonc(
+      readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'),
+      parseErrors,
+      { allowTrailingComma: true }
+    );
+    expect(parseErrors).toEqual([]);
+    const consumers = z
+      .object({
+        queues: z.object({
+          consumers: z.array(
+            z.object({
+              queue: z.string(),
+              max_retries: z.number(),
+              dead_letter_queue: z.string().optional(),
+            })
+          ),
+        }),
+      })
+      .parse(config).queues.consumers;
+    const consumer = consumers.find(
+      candidate => candidate.queue === 'security-manual-analysis-command-queue'
+    );
+
+    expect(consumer).toBeDefined();
+    expect(consumer?.dead_letter_queue).toBe('security-manual-analysis-command-dlq');
+    // The handler settles the command on the last delivery Cloudflare gives it,
+    // so the queue must deliver exactly MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS
+    // deliveries; a queue change that drops max_retries would otherwise retry the
+    // final delivery into the dead letter queue and strand the command as running.
+    expect((consumer?.max_retries ?? -1) + 1).toBe(MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS);
   });
 });

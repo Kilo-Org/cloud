@@ -316,7 +316,7 @@ describe('manual analysis command replay', () => {
 
     const firstDelivery = await deliver(command, 1);
 
-    expect(firstDelivery.retry).toHaveBeenCalledTimes(1);
+    expect(firstDelivery.retry).toHaveBeenCalledWith({ delaySeconds: 30 });
     expect(firstDelivery.ack).not.toHaveBeenCalled();
     expect(triageRequests).toHaveLength(0);
     expect(cloudAgentRequests.map(request => request.path)).toEqual([
@@ -413,7 +413,7 @@ describe('manual analysis command replay', () => {
 
     const firstDelivery = await deliver(command, 1);
 
-    expect(firstDelivery.retry).toHaveBeenCalledTimes(1);
+    expect(firstDelivery.retry).toHaveBeenCalledWith({ delaySeconds: 30 });
     expect(firstDelivery.ack).not.toHaveBeenCalled();
     expect(triageRequests).toHaveLength(0);
     // The interrupted run is replaced once, on the delivery that prepares it.

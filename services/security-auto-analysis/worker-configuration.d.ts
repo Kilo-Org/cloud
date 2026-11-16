@@ -2,11 +2,15 @@ declare type Hyperdrive = {
   connectionString: string;
 };
 
+declare type QueueRetryOptions = {
+  delaySeconds?: number;
+};
+
 declare type Message<T> = {
   body: T;
   attempts: number;
   ack(): void;
-  retry(): void;
+  retry(options?: QueueRetryOptions): void;
 };
 
 declare type MessageBatch<T> = {

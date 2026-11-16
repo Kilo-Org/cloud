@@ -70,7 +70,25 @@ export const ManualAnalysisStartRequestSchema = ManualAnalysisStartCommandSchema
 
 export type ManualAnalysisStartCommand = z.infer<typeof ManualAnalysisStartCommandSchema>;
 
-const MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS = 4;
+/**
+ * Deliveries a manual start command may take. The `security-manual-analysis-command-queue`
+ * consumer in wrangler.jsonc allows `max_retries: 3`, so the last delivery the handler sees
+ * is attempt `max_retries + 1`; the exhaustion path below relies on that equality to settle
+ * the command instead of retrying it into the dead letter queue. manual-analysis.test.ts
+ * reads wrangler.jsonc and fails when the two drift apart.
+ */
+export const MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS = 4;
+
+/**
+ * Backoff for a replayed start: 30s, 60s, then 120s, capped there. Without it the deliveries
+ * are consumed back to back and the whole budget settles within seconds although the reason
+ * for the replay (an admission read that could not decide) is transient.
+ */
+function manualAnalysisRetryDelaySeconds(attempts: number): number {
+  const baseDelaySeconds = 30;
+  const maxDelaySeconds = 120;
+  return Math.min(maxDelaySeconds, baseDelaySeconds * 2 ** Math.max(0, attempts - 1));
+}
 
 /**
  * A manual start whose credit admission read could not decide. Nothing is
@@ -555,7 +573,7 @@ export async function consumeManualAnalysisBatch(
           attempts: message.attempts,
           max_attempts: MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS,
         });
-        message.retry();
+        message.retry({ delaySeconds: manualAnalysisRetryDelaySeconds(message.attempts) });
         continue;
       }
 

@@ -97,12 +97,13 @@ const mockedResolveOrganizationMemberModelDecision = jest.mocked(
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
-function makeRequest(body: unknown) {
+function makeRequest(body: unknown, extraHeaders: Record<string, string> = {}) {
   return new Request('http://localhost:3000/api/edit/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-forwarded-for': '127.0.0.1',
+      ...extraHeaders,
     },
     body: JSON.stringify(body),
   });
@@ -451,7 +452,9 @@ describe('POST /api/edit/completions', () => {
 
     const { handleEditCompletionsRequest } = await import('./edit-completions');
     const requestBody = makeValidRequestBody();
-    const response = await handleEditCompletionsRequest(makeRequest(requestBody) as never);
+    const response = await handleEditCompletionsRequest(
+      makeRequest(requestBody, { 'x-kilocode-mode': 'code' }) as never
+    );
 
     expect(response.status).toBe(200);
     const [url, init] = mockedFetch.mock.calls[0];
@@ -475,6 +478,7 @@ describe('POST /api/edit/completions', () => {
         toolsUsed: [],
         ttfbMs: expect.any(Number),
         statusCode: 200,
+        mode: 'code',
       },
       expect.any(Promise),
       expect.any(Number)
@@ -490,14 +494,18 @@ describe('POST /api/edit/completions', () => {
 
     const { handleEditCompletionsRequest } = await import('./edit-completions');
     const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
+      makeRequest(makeValidRequestBody(), { 'x-kilocode-mode': 'code' }) as never
     );
 
     expect(response.status).toBe(500);
     expect(cloneSpy).not.toHaveBeenCalled();
     expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
     expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 200, completeRequestMs: expect.any(Number) })
+      expect.objectContaining({
+        statusCode: 200,
+        mode: 'code',
+        completeRequestMs: expect.any(Number),
+      })
     );
   });
 

@@ -284,6 +284,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     toolsUsed: [],
     ttfbMs,
     statusCode: proxyRes.status,
+    mode: usageContext.mode || undefined,
   };
 
   if (!proxyRes.body) {

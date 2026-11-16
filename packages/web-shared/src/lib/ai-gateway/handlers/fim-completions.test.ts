@@ -106,12 +106,17 @@ const mockedReleaseDecideLease = jest.mocked(releaseDecideLease);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
-function makeRequest(model = 'inception/mercury-edit-2', stream = false) {
+function makeRequest(
+  model = 'inception/mercury-edit-2',
+  stream = false,
+  extraHeaders: Record<string, string> = {}
+) {
   return new Request('http://localhost:3000/api/fim/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-forwarded-for': '127.0.0.1',
+      ...extraHeaders,
     },
     body: JSON.stringify({
       model,
@@ -197,7 +202,9 @@ describe('POST /api/fim/completions', () => {
     mockedFetch.mockResolvedValue(upstreamResponse);
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(makeRequest() as never);
+    const response = await handleFimCompletionsRequest(
+      makeRequest('inception/mercury-edit-2', false, { 'x-kilocode-mode': 'code' }) as never
+    );
 
     expect(response.status).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
@@ -227,6 +234,7 @@ describe('POST /api/fim/completions', () => {
         toolsUsed: [],
         ttfbMs: expect.any(Number),
         statusCode: 200,
+        mode: 'code',
       },
       expect.any(Promise),
       expect.any(Number)
@@ -241,13 +249,19 @@ describe('POST /api/fim/completions', () => {
     mockedFetch.mockResolvedValue(upstreamResponse);
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(makeRequest() as never);
+    const response = await handleFimCompletionsRequest(
+      makeRequest('inception/mercury-edit-2', false, { 'x-kilocode-mode': 'code' }) as never
+    );
 
     expect(response.status).toBe(500);
     expect(cloneSpy).not.toHaveBeenCalled();
     expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
     expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 200, completeRequestMs: expect.any(Number) })
+      expect.objectContaining({
+        statusCode: 200,
+        mode: 'code',
+        completeRequestMs: expect.any(Number),
+      })
     );
   });
 

@@ -122,70 +122,15 @@ import {
   watchPrMutationSchema,
   watchPrQuerySchema,
 } from '@/lib/cloud-agent/watch-pr';
-
-type SessionTrpcErrorData = {
-  code?: string;
-  httpStatus?: number;
-  clientError?: { retryable?: unknown };
-};
-
-function sessionTrpcErrorData(err: unknown): SessionTrpcErrorData | undefined {
-  if (!(err instanceof TRPCClientError)) return undefined;
-  const data = err.data as SessionTrpcErrorData | undefined;
-  const shapeData = (err.shape as { data?: SessionTrpcErrorData } | undefined)?.data;
-  if (data === undefined && shapeData === undefined) return undefined;
-  return {
-    code: data?.code ?? shapeData?.code,
-    httpStatus: data?.httpStatus ?? shapeData?.httpStatus,
-    clientError: data?.clientError ?? shapeData?.clientError,
-  };
-}
-
-function sessionTrpcErrorCode(err: unknown): string | undefined {
-  return sessionTrpcErrorData(err)?.code;
-}
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
+import {
+  isSessionNotFoundError,
+  isTransientRuntimeError,
+  sessionTrpcErrorCode,
+} from '@/lib/session-trpc-errors';
 
 function isSessionConflictError(err: unknown): boolean {
   return sessionTrpcErrorCode(err) === 'CONFLICT';
-}
-
-/**
- * Check if an error indicates the session was not found in the cloud-agent DO.
- * This is expected for legacy sessions created before the new DO-based system.
- */
-function isSessionNotFoundError(err: unknown): boolean {
-  const errorData = sessionTrpcErrorData(err);
-  return errorData?.code === 'NOT_FOUND' || errorData?.httpStatus === 404;
-}
-
-const TRANSIENT_TRPC_CODES = new Set(['SERVICE_UNAVAILABLE', 'TIMEOUT']);
-const TRANSIENT_HTTP_STATUSES = new Set([503, 504]);
-const TRANSPORT_ERROR_NAMES = new Set([
-  'HeadersTimeoutError',
-  'BodyTimeoutError',
-  'ConnectTimeoutError',
-  'AbortError',
-  'TimeoutError',
-]);
-
-function isTransportFailure(cause: unknown, depth = 0): boolean {
-  if (typeof cause !== 'object' || cause === null || depth > 3) return false;
-  const { name, message } = cause as { name?: unknown; message?: unknown };
-  if (typeof name === 'string' && TRANSPORT_ERROR_NAMES.has(name)) return true;
-  if (cause instanceof TypeError && message === 'fetch failed') return true;
-  return isTransportFailure((cause as { cause?: unknown }).cause, depth + 1);
-}
-
-/** Worker outages, timeouts, and network failures that a later retry may resolve. */
-function isTransientRuntimeError(err: unknown): boolean {
-  if (!(err instanceof TRPCClientError)) return false;
-  const errorData = sessionTrpcErrorData(err);
-  if (errorData === undefined) return isTransportFailure(err.cause);
-  if (errorData.code && TRANSIENT_TRPC_CODES.has(errorData.code)) return true;
-  if (errorData.httpStatus && TRANSIENT_HTTP_STATUSES.has(errorData.httpStatus)) return true;
-  const retryable = errorData.clientError?.retryable === true;
-  // Internal errors stay defects even when a Worker envelope marks them retryable.
-  return retryable && errorData.code !== undefined && errorData.code !== 'INTERNAL_SERVER_ERROR';
 }
 
 function isParentLookupUnavailableError(err: unknown): boolean {
@@ -2009,10 +1954,21 @@ export const cliSessionsV2Router = createTRPCRouter({
     // `(session_id, kilo_user_id)` — so the lookup cannot take the first row:
     // that could pick another account's row for the same id and deny the owner
     // their own session. Read the rows for the id and prefer the caller's.
-    const sessions = await db
-      .select({ ...getTableColumns(cli_sessions_v2), ...latestRunFields })
-      .from(cli_sessions_v2)
-      .where(eq(cli_sessions_v2.session_id, session_id));
+    //
+    // The read is one primary-key lookup plus the three latest-run subqueries,
+    // each of which walks its own `(cloud_agent_session_id, queued_at)` index,
+    // so a slow answer is the database, not the plan. It is bounded for the
+    // mobile client, whose procedure has a 10s budget the read must not
+    // consume.
+    const sessions = await withControlPlaneReadBudget({
+      clock: ctx,
+      message: 'Session details took too long to load. Try again.',
+      read: () =>
+        db
+          .select({ ...getTableColumns(cli_sessions_v2), ...latestRunFields })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, session_id)),
+    });
 
     const session = sessions.find(row => row.kilo_user_id === ctx.user.id);
 

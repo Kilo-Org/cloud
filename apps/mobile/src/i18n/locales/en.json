@@ -2083,6 +2083,9 @@
       "completedWillAppear": "Completed sessions will appear here.",
       "noPastSessions": "No past sessions",
       "pastSessions": "Past sessions",
+      "sectionAccessibility_one": "{{title}}, {{displayCount}} session",
+      "sectionAccessibility": "{{title}}, {{displayCount}} sessions",
+      "sectionAccessibility_other": "{{title}}, {{displayCount}} sessions",
       "live": "LIVE"
     },
     "sessionRow": {
@@ -3132,6 +3135,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Search recent sessions",
     "connectedCli": "On a connected CLI",
+    "connectedCliAccessibility_one": "{{title}}, {{displayCount}} instance",
+    "connectedCliAccessibility": "{{title}}, {{displayCount}} instances",
+    "connectedCliAccessibility_other": "{{title}}, {{displayCount}} instances",
     "newSessionOn": "New session on {{name}}",
     "noMatchingSessions": "No matching sessions.",
     "onlyFirstFilesAttached_one": "Only the first {{displayCount}} file will be attached.",

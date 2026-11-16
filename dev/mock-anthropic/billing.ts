@@ -13,12 +13,13 @@ export function createBillingStub(
     expiresAt: number;
   };
   type Approval = Par & { organization: string };
+  type Link = { profileId: string; organization: string; connectionId: string };
   const requests = new Map<string, Par>();
   const codes = new Map<string, Approval>();
-  const profiles = new Map<
-    string,
-    { id: string; organization: string | null; connection: string | null }
-  >();
+  const profiles = new Map<string, { id: string }>();
+  // A link outlives its profile, as it does at Anthropic: deleting the profile
+  // leaves the organization linked to the app until someone unlinks it.
+  const links = new Map<string, Link>();
   const tokens = new Set<string>();
   let refusal = '';
   let tokenError = '';
@@ -54,7 +55,19 @@ export function createBillingStub(
       return true;
     }
     if (method === 'GET' && url.pathname === '/test/profiles') {
-      send(response, 200, [...profiles.values()]);
+      send(
+        response,
+        200,
+        [...profiles.keys()].map(id => ({
+          id,
+          organization: links.get(id)?.organization ?? null,
+          connection: links.get(id)?.connectionId ?? null,
+        }))
+      );
+      return true;
+    }
+    if (method === 'GET' && url.pathname === '/test/links') {
+      send(response, 200, [...links.values()]);
       return true;
     }
     if (
@@ -120,7 +133,7 @@ export function createBillingStub(
       } else {
         response.writeHead(200, { 'content-type': 'text/html' });
         const organization = (
-          profiles.get(par.profileId)?.organization ?? `org-${uri.slice(-12)}`
+          links.get(par.profileId)?.organization ?? `org-${uri.slice(-12)}`
         ).replace(/[&<>"']/g, character => `&#${character.charCodeAt(0)};`);
         response.end(
           `<!doctype html><h1>Link your Claude organization</h1><p>Approve billing Claude requests from Kilo to your API organization.</p><form method="post" action="/oauth/billing/decision"><input name="request_uri" type="hidden" value="${uri}"><label>Claude organization <input name="organization" value="${organization}"></label><button name="decision" value="approve">Approve</button><button name="decision" value="decline">Decline</button></form>`
@@ -140,10 +153,10 @@ export function createBillingStub(
       const target = new URL(par.redirectUri);
       target.searchParams.set('state', par.state);
       const organization = form.get('organization') ?? '';
-      const conflict = [...profiles.values()].some(
-        profile => profile.id !== par.profileId && profile.organization === organization
+      const conflict = [...links.values()].some(
+        link => link.profileId !== par.profileId && link.organization === organization
       );
-      const existingOrganization = profiles.get(par.profileId)?.organization;
+      const existingOrganization = links.get(par.profileId)?.organization;
       if (
         form.get('decision') !== 'approve' ||
         (existingOrganization && existingOrganization !== organization)
@@ -183,17 +196,22 @@ export function createBillingStub(
           send(response, 400, { error: 'invalid_request' });
           return true;
         }
-        const conflict = [...profiles.values()].some(
-          other => other.id !== profile.id && other.organization === approval.organization
+        const conflict = [...links.values()].some(
+          link => link.profileId !== profile.id && link.organization === approval.organization
         );
-        if (conflict || (profile.organization && profile.organization !== approval.organization)) {
+        const existing = links.get(profile.id);
+        if (conflict || (existing && existing.organization !== approval.organization)) {
           send(response, 400, { error: 'user_profile_already_linked' });
           return true;
         }
-        profile.organization = approval.organization;
-        profile.connection ??= `ocon_${randomUUID()}`;
+        const connectionId = existing?.connectionId ?? `ocon_${randomUUID()}`;
+        links.set(profile.id, {
+          profileId: profile.id,
+          organization: approval.organization,
+          connectionId,
+        });
         send(response, 200, {
-          connection_id: profile.connection,
+          connection_id: connectionId,
           access_token: 'mock-metadata-only',
           token_type: 'Bearer',
           expires_in: 3600,
@@ -219,7 +237,7 @@ export function createBillingStub(
     }
     if (method === 'POST' && url.pathname === '/v1/user_profiles') {
       const id = `uprof_${randomUUID()}`;
-      profiles.set(id, { id, organization: null, connection: null });
+      profiles.set(id, { id });
       send(response, 200, {
         id,
         type: 'user_profile',
@@ -231,6 +249,32 @@ export function createBillingStub(
         updated_at: new Date().toISOString(),
         programs: {},
       });
+      return true;
+    }
+    const unlinkId = /^\/v1\/user_profiles\/([^/]+)\/unlink$/.exec(url.pathname)?.at(1);
+    if (method === 'POST' && unlinkId) {
+      const profileId = decodeURIComponent(unlinkId);
+      if (!beta?.includes('user-profiles-search-2026-08-30')) {
+        send(response, 404, { error: 'not_found' });
+        return true;
+      }
+      const keys = Object.keys(body);
+      if (url.search || keys.length !== 1 || typeof body.oauth_app_id !== 'string') {
+        send(response, 400, { error: 'invalid_request' });
+        return true;
+      }
+      if (body.oauth_app_id !== process.env.CLAUDE_BILLING_CLIENT_ID) {
+        send(response, 403, { error: 'forbidden' });
+        return true;
+      }
+      // The link outlives its profile, so recovery works after a profile delete.
+      if (!profiles.has(profileId) && !links.has(profileId)) {
+        send(response, 404, { error: 'not_found' });
+        return true;
+      }
+      const link = links.get(profileId);
+      links.delete(profileId);
+      send(response, 200, { revoked_connection_ids: link ? [link.connectionId] : [] });
       return true;
     }
     if (method === 'DELETE' && url.pathname.startsWith('/v1/user_profiles/')) {
@@ -254,10 +298,10 @@ export function createBillingStub(
       });
       return true;
     }
-    const profile = profiles.get(profileHeader ?? '');
+    const link = links.get(profileHeader ?? '');
     const policy = body.billing_policy;
     if (
-      !profile?.connection ||
+      !link ||
       !beta?.includes('user-profiles-billing-2026-10-01') ||
       typeof policy !== 'object' ||
       policy === null ||

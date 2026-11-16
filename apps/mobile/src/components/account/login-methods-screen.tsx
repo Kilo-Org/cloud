@@ -1,6 +1,7 @@
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { signInMethodRefusalForCode } from '@kilocode/app-shared/auth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type TFunction } from 'i18next';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -29,40 +30,84 @@ type AuthProviderId = inferRouterInputs<MobileRouter>['user']['unlinkAuthProvide
 
 const SKELETON_ROWS = [0, 1, 2];
 
+/**
+ * Every answer the screen can hold beside the list. One tag per answer keeps the
+ * sentence's source and its payload apart: a server sentence is never stored in
+ * the reader's language, and an unknown failure keeps the server's words.
+ */
+type UnlinkRefusal =
+  | { kind: 'lastMethod' }
+  | { kind: 'notLinked'; provider: AuthProviderId }
+  | { kind: 'unrecognised'; message: string };
+
+/**
+ * The sentence shown beneath the list, or null when nothing should be announced.
+ *
+ * The last-method rule is stated under the row itself while the list holds one
+ * method, so a one-method list leaves the status silent and only a list that
+ * gained a second method speaks its server answer.
+ */
+function refusalStatus(
+  refusal: UnlinkRefusal | null,
+  methodCount: number,
+  t: TFunction
+): string | null {
+  if (refusal === null) {
+    return null;
+  }
+  if (refusal.kind === 'lastMethod') {
+    return methodCount < 2 ? null : t('profile.signInMethods.lastMethod');
+  }
+  if (refusal.kind === 'notLinked') {
+    return t('profile.signInMethods.notLinked', { provider: providerLabel(refusal.provider) });
+  }
+  return refusal.message;
+}
+
 function ProviderRow({
   provider,
   email,
   onUnlink,
   disabled,
+  canUnlink,
 }: Readonly<{
   provider: string;
   email: string;
   onUnlink: () => void;
   disabled: boolean;
+  canUnlink: boolean;
 }>) {
   const { t } = useTranslation();
   const label = providerLabel(provider);
 
   return (
-    <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <View className="min-w-0 flex-1 gap-1">
-        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-          {label}
-        </Text>
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {email}
-        </Text>
+    <View className="gap-3 rounded-lg bg-secondary p-3">
+      <View className="flex-row items-center gap-3">
+        <View className="min-w-0 flex-1 gap-1">
+          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+            {label}
+          </Text>
+          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+            {email}
+          </Text>
+        </View>
+        <Button
+          variant="outline"
+          size="sm"
+          className={STATE_ACTION_CLASS}
+          disabled={disabled || !canUnlink}
+          accessibilityLabel={t('profile.signInMethods.unlinkProvider', { provider: label })}
+          accessibilityHint={canUnlink ? undefined : t('profile.signInMethods.lastMethod')}
+          onPress={onUnlink}
+        >
+          <Text>{t('profile.signInMethods.unlink')}</Text>
+        </Button>
       </View>
-      <Button
-        variant="outline"
-        size="sm"
-        className={STATE_ACTION_CLASS}
-        disabled={disabled}
-        accessibilityLabel={t('profile.signInMethods.unlinkProvider', { provider: label })}
-        onPress={onUnlink}
-      >
-        <Text>{t('profile.signInMethods.unlink')}</Text>
-      </Button>
+      {canUnlink ? null : (
+        <Text className="text-xs text-muted-foreground">
+          {t('profile.signInMethods.lastMethod')}
+        </Text>
+      )}
     </View>
   );
 }
@@ -78,11 +123,12 @@ function ProviderRow({
  * server's sentence as written. That inline status is the screen's single
  * announcement owner, so no toast repeats it.
  *
- * The screen refuses a last-method tap itself, without asking the server, and
- * that sentence retires as soon as the loaded list shows a second method; a
- * server refusal stands until the screen refuses a later tap itself or the
- * server answers again, because the server's answer is about the account, not
- * about the list this render drew.
+ * A one-method list states the last-method rule before any tap: the unlink
+ * control is disabled and carries that sentence as its hint, and the same
+ * sentence sits under the row, so the reader learns why without asking the
+ * server. Because the row already says it, the status stays silent for a
+ * last-method answer while the list still shows one method, and the answer's
+ * refresh hands this screen the one-method list that makes the rows agree.
  *
  * Adding a method is the web's round trip (the OAuth callback needs the browser
  * session that starts it), so the row opens the connected-accounts page in the
@@ -93,23 +139,16 @@ export function LoginMethodsScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { confirm, dialog } = useConfirmDialog();
-  const [unlinkError, setUnlinkError] = useState<string | null>(null);
-  // The screen's own refusal, kept apart from a server refusal: it describes the
-  // one-method list the reader tapped on, so a list that later shows two methods
-  // retires it instead of leaving a sentence the reader can check.
-  const [lastMethodRefusal, setLastMethodRefusal] = useState(false);
+  const [refusal, setRefusal] = useState<UnlinkRefusal | null>(null);
   useRouteForegroundRefresh([[['user']]]);
 
   const providers = useQuery(trpc.user.getAuthProviders.queryOptions());
   const methodCount = providers.data?.providers.length ?? 0;
-  // The screen's refusal only holds for the one-method list that produced it.
-  const statusMessage =
-    lastMethodRefusal && methodCount < 2 ? t('profile.signInMethods.lastMethod') : unlinkError;
+  const statusMessage = refusalStatus(refusal, methodCount, t);
   const unlink = useMutation(
     trpc.user.unlinkAuthProvider.mutationOptions({
       onSuccess: (_result, input) => {
-        setUnlinkError(null);
-        setLastMethodRefusal(false);
+        setRefusal(null);
         void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
         announcingToast.success(
           t('profile.signInMethods.unlinked', { provider: providerLabel(input.provider) })
@@ -118,36 +157,30 @@ export function LoginMethodsScreen() {
       // A known refusal code becomes catalog copy. Only a failure the screen
       // does not recognise shows the server's sentence as written.
       onError: (error, input) => {
-        const refusal = signInMethodRefusalForCode(readTrpcErrorField(error, 'upstreamCode'));
-        if (refusal === 'lastMethod') {
-          setUnlinkError(t('profile.signInMethods.lastMethod'));
+        const knownRefusal = signInMethodRefusalForCode(readTrpcErrorField(error, 'upstreamCode'));
+        if (knownRefusal === 'lastMethod') {
+          setRefusal({ kind: 'lastMethod' });
+          // The server only declines a one-method account, so a list that
+          // still draws two rows is stale: refresh it, and the row note owns
+          // the sentence instead of a status that the rows contradict.
+          void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
           return;
         }
-        if (refusal === 'notLinked') {
-          setUnlinkError(
-            t('profile.signInMethods.notLinked', { provider: providerLabel(input.provider) })
-          );
+        if (knownRefusal === 'notLinked') {
+          setRefusal({ kind: 'notLinked', provider: input.provider });
           // The list still draws the row the server reports as gone.
           void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
           return;
         }
-        setUnlinkError(error.message);
+        setRefusal({ kind: 'unrecognised', message: error.message });
       },
     })
   );
 
   const confirmUnlink = (provider: AuthProviderId) => {
-    // The server refuses the last method, so a confirmation would promise an
-    // outcome this tap cannot deliver.
-    if (methodCount < 2) {
-      setLastMethodRefusal(true);
-      // This tap answers for the list it drew, so an answer to an earlier tap
-      // must not wait behind it: once the refusal retires, that sentence would
-      // sit beside rows it never described.
-      setUnlinkError(null);
-      return;
-    }
-    setLastMethodRefusal(false);
+    // The reader is confirming against a list that holds two methods, so any
+    // sentence still standing answered a tap on a list this one replaced.
+    setRefusal(null);
     const label = providerLabel(provider);
     confirm({
       title: t('profile.signInMethods.unlinkTitle', { provider: label }),
@@ -189,6 +222,7 @@ export function LoginMethodsScreen() {
             provider={provider.provider}
             email={provider.email}
             disabled={unlink.isPending}
+            canUnlink={methodCount >= 2}
             onUnlink={() => {
               confirmUnlink(provider.provider);
             }}

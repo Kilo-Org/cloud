@@ -35,8 +35,9 @@ catalog:
   '@vitest/ui': 4.1.12
   '@workos-inc/node': 11.0.0
   aws4fetch: 1.0.20
+  dotenv: 18.0.10
   drizzle-kit: 0.31.11
-  drizzle-orm: 0.45.2
+  drizzle-orm: 0.45.4
   hono: 4.13.13
   jose: 6.2.12
   jsonwebtoken: 9.0.3

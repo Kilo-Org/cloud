@@ -92,10 +92,11 @@ describe('saveErrorCopy', () => {
 
 describe('thresholdError', () => {
   it('names the maximum once the value can no longer be a saved balance', () => {
-    // A pasted literal longer than a JS number still reads as Infinity, a
-    // number, and one far above the cap; it must not be reported as "enter an
-    // amount greater than 0". One over the cap earns the same sentence.
-    for (const value of ['1'.repeat(300), '1000000001']) {
+    // Three literals earn the cap sentence: one far past the cap that still
+    // reads as a finite double, one so long that only the digits carry its
+    // magnitude (`Number` overflows it to Infinity), and one just over the cap.
+    // None may be reported as "enter an amount greater than 0".
+    for (const value of ['1'.repeat(300), '1'.repeat(400), '1000000001']) {
       expect(thresholdError(value)).toBe(CAP_SENTENCE);
       expect(thresholdError(value)).not.toBe(GREATER_THAN_ZERO_SENTENCE);
     }
@@ -109,7 +110,7 @@ describe('thresholdError', () => {
   });
 
   it('parses nothing outside the bounds, never a clamped amount', () => {
-    for (const value of ['1'.repeat(300), '1000000001']) {
+    for (const value of ['1'.repeat(300), '1'.repeat(400), '1000000001']) {
       expect(parseThreshold(value)).toBeNull();
     }
   });

@@ -1573,6 +1573,10 @@ export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
 const OrganizationSettingsSchema = z.object({
+  // The default model and provider access for organization members. Group
+  // policies set the access of their own members. Organization admins manage
+  // both. See `evaluateEffectiveModelAccessPolicy` in
+  // `packages/web-shared/src/lib/organizations/group-policies/model-access/model-access.server.ts`.
   provider_allow_list: z.array(z.string()).optional(),
 
   model_deny_list: z.array(z.string()).optional(),

@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import type { DirectByokModelFlag } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import type {
+  DirectByokModel,
+  DirectByokModelFlag,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   ReasoningOptionSchema,
   type DirectByokModelEndpoint,
@@ -78,6 +81,33 @@ export type RawModel = {
   reasoning_options?: ReasoningOption[];
   endpoint?: DirectByokModelEndpoint;
 };
+
+const DEFAULT_CONTEXT_LENGTH = 200_000;
+const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
+
+/**
+ * A fetched model as BYOK model lists store it: a missing name or limit gets a default, image
+ * input sets the `vision` flag, and the max output never exceeds the context window.
+ */
+export function normalizeRawModel(raw: RawModel): Omit<DirectByokModel, 'catalog_model_id'> {
+  const name = raw.name ?? shortenDisplayName(raw.id);
+  const context_length = raw.context_length ?? DEFAULT_CONTEXT_LENGTH;
+  const flags = new Set(raw.flags);
+  if (raw.input_modalities?.includes('image')) flags.add('vision');
+  const max_completion_tokens = Math.min(
+    raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+    context_length
+  );
+  return {
+    id: raw.id,
+    name,
+    flags: flags.size > 0 ? [...flags] : undefined,
+    context_length,
+    max_completion_tokens,
+    reasoning_options: raw.reasoning_options,
+    ...(raw.endpoint && { endpoint: raw.endpoint }),
+  };
+}
 
 export function shortenDisplayName(id: string): string;
 export function shortenDisplayName(id: string | undefined): string | undefined;

@@ -139,7 +139,7 @@ describe('parseByokEndpointModelsResponse', () => {
         name: 'Qwen: Qwen4 Max',
         context_length: 1000000,
         max_completion_tokens: 131072,
-        supports_image_input: true,
+        flags: ['reasoning', 'vision'],
       },
       {
         id: 'deepseek/deepseek-v4',
@@ -147,7 +147,7 @@ describe('parseByokEndpointModelsResponse', () => {
         name: 'DeepSeek: DeepSeek V4',
         context_length: 163840,
         max_completion_tokens: 32000,
-        supports_image_input: false,
+        flags: ['reasoning'],
       },
     ]);
   });
@@ -160,7 +160,7 @@ describe('parseByokEndpointModelsResponse', () => {
         name: 'Qwen3-14B',
         context_length: 40960,
         max_completion_tokens: 16384,
-        supports_image_input: false,
+        flags: ['reasoning'],
       },
       {
         id: 'google/gemini-3-flash',
@@ -168,26 +168,28 @@ describe('parseByokEndpointModelsResponse', () => {
         name: 'Gemini 3 Flash',
         context_length: 1048576,
         max_completion_tokens: 65536,
-        supports_image_input: true,
+        flags: ['reasoning', 'vision'],
       },
     ]);
   });
 
-  test('reads Mistral capabilities and omits a name that repeats the id', () => {
+  test('reads Mistral capabilities', () => {
     expect(parseByokEndpointModelsResponse(MISTRAL)).toEqual([
       {
         id: 'codestral-2508',
         internal_id: 'codestral-2508',
+        name: 'codestral-2508',
         context_length: 256000,
         max_completion_tokens: 32000,
-        supports_image_input: false,
+        flags: ['reasoning'],
       },
       {
         id: 'mistral-medium-2508',
         internal_id: 'mistral-medium-2508',
+        name: 'mistral-medium-2508',
         context_length: 131072,
         max_completion_tokens: 32000,
-        supports_image_input: true,
+        flags: ['reasoning', 'vision'],
       },
     ]);
   });
@@ -200,7 +202,7 @@ describe('parseByokEndpointModelsResponse', () => {
         name: 'Hy4 Flash',
         context_length: 1000000,
         max_completion_tokens: 64000,
-        supports_image_input: true,
+        flags: ['reasoning', 'vision'],
       },
     ]);
   });
@@ -213,40 +215,45 @@ describe('parseByokEndpointModelsResponse', () => {
         name: 'Claude Fable 5.2',
         context_length: 1000000,
         max_completion_tokens: 128000,
-        supports_image_input: true,
+        flags: ['reasoning', 'vision'],
       },
     ]);
   });
 
-  test('gives OpenAI models without metadata the default limits', () => {
+  test('gives OpenAI models without metadata the default name and limits', () => {
     expect(parseByokEndpointModelsResponse(OPENAI)).toEqual([
       {
         id: 'gpt-5.5',
         internal_id: 'gpt-5.5',
-        context_length: 128000,
+        name: 'gpt-5.5',
+        context_length: 200000,
         max_completion_tokens: 32000,
-        supports_image_input: false,
+        flags: ['reasoning'],
       },
       {
         id: 'tts-1',
         internal_id: 'tts-1',
-        context_length: 128000,
+        name: 'tts-1',
+        context_length: 200000,
         max_completion_tokens: 32000,
-        supports_image_input: false,
+        flags: ['reasoning'],
       },
     ]);
   });
 
   test('accepts a bare array and keeps max output within a small context', () => {
     expect(
-      parseByokEndpointModelsResponse([{ id: 'Local/Model:Q4', max_model_len: 8192 }])
+      parseByokEndpointModelsResponse([
+        { id: 'Local/Model:Q4', max_model_len: 8192, max_tokens: 16384 },
+      ])
     ).toEqual([
       {
         id: 'local/model-q4',
         internal_id: 'Local/Model:Q4',
+        name: 'Model:Q4',
         context_length: 8192,
         max_completion_tokens: 8192,
-        supports_image_input: false,
+        flags: ['reasoning'],
       },
     ]);
   });

@@ -423,7 +423,7 @@ describe('BYOK endpoints', () => {
           name: 'My Model',
           context_length: 64000,
           max_completion_tokens: 32000,
-          supports_image_input: false,
+          flags: ['reasoning'],
         },
       ]);
       expect(upstream.calls).toHaveLength(1);

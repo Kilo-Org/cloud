@@ -1,7 +1,6 @@
 import { ByokEndpointModelIdSchema, type ByokEndpointModel } from '@kilocode/db/schema-types';
+import { normalizeRawModel, type RawModel } from '@/lib/providers/direct-byok/models-dev';
 
-const DEFAULT_CONTEXT_LENGTH = 128_000;
-const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 const MAX_MODEL_ID_LENGTH = 200;
 const MAX_INTERNAL_ID_LENGTH = 500;
 const MAX_NAME_LENGTH = 200;
@@ -109,10 +108,40 @@ function modelEntries(response: unknown): unknown[] {
   return [];
 }
 
+/** The model a `GET /models` entry describes, in the shape direct BYOK model lists start from. */
+function toRawModel(entry: JsonObject, internalId: string): RawModel {
+  return {
+    id: internalId,
+    name: [entry.display_name, entry.name]
+      .find((value): value is string => typeof value === 'string' && value.trim() !== '')
+      ?.trim(),
+    context_length: firstPositiveInteger(entry, [
+      ['context_length'],
+      ['context_window'],
+      ['max_context_length'],
+      ['max_input_tokens'],
+      ['context_size'],
+      ['top_provider', 'context_length'],
+      ['max_model_len'],
+    ]),
+    max_completion_tokens: firstPositiveInteger(entry, [
+      ['max_completion_tokens'],
+      ['max_output_tokens'],
+      ['max_tokens'],
+      ['top_provider', 'max_completion_tokens'],
+      ['output_token_limit'],
+    ]),
+    input_modalities: supportsImageInput(entry) ? ['text', 'image'] : ['text'],
+    // As for OpenAI-compatible direct BYOK providers: `/models` rarely says, and the flag only
+    // offers reasoning efforts that the model's family supports.
+    flags: ['reasoning'],
+  };
+}
+
 /**
  * Reads the models of an OpenAI-compatible `GET /models` response (`{ data: [...] }` or a bare
  * array) into endpoint models. Entries without an id and models that cannot chat are skipped;
- * missing limits get conservative defaults the user can correct before saving.
+ * missing names and limits get the direct BYOK defaults, which the user can correct before saving.
  */
 export function parseByokEndpointModelsResponse(response: unknown): ByokEndpointModel[] {
   const models: ByokEndpointModel[] = [];
@@ -128,39 +157,18 @@ export function parseByokEndpointModelsResponse(response: unknown): ByokEndpoint
     const baseId = toByokEndpointModelId(internalId);
     if (!baseId) continue;
     const id = uniqueModelId(baseId, ids);
-
-    const contextLength =
-      firstPositiveInteger(entry, [
-        ['context_length'],
-        ['context_window'],
-        ['max_context_length'],
-        ['max_input_tokens'],
-        ['context_size'],
-        ['top_provider', 'context_length'],
-        ['max_model_len'],
-      ]) ?? DEFAULT_CONTEXT_LENGTH;
-    const maxCompletionTokens =
-      firstPositiveInteger(entry, [
-        ['max_completion_tokens'],
-        ['max_output_tokens'],
-        ['max_tokens'],
-        ['top_provider', 'max_completion_tokens'],
-        ['output_token_limit'],
-      ]) ?? Math.min(DEFAULT_MAX_COMPLETION_TOKENS, contextLength);
-    const rawName = [entry.display_name, entry.name].find(
-      (value): value is string => typeof value === 'string' && value.trim() !== ''
-    );
-    const name = rawName?.trim().slice(0, MAX_NAME_LENGTH);
+    const model = normalizeRawModel(toRawModel(entry, internalId));
+    const name = model.name.trim().slice(0, MAX_NAME_LENGTH);
 
     ids.add(id);
     internalIds.add(internalId);
     models.push({
       id,
       internal_id: internalId,
-      ...(name && name !== internalId && { name }),
-      context_length: contextLength,
-      max_completion_tokens: maxCompletionTokens,
-      supports_image_input: supportsImageInput(entry),
+      ...(name && { name }),
+      ...(model.flags && { flags: model.flags }),
+      context_length: model.context_length,
+      max_completion_tokens: model.max_completion_tokens,
     });
   }
   return models;

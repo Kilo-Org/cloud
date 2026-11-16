@@ -18,6 +18,7 @@ import {
   loadModelsDevCatalog,
   modelsDevCatalogSource,
   isUsableModelsDevModel,
+  normalizeRawModel,
   shortenDisplayName,
   toRawModel,
   type ModelsDevCatalog,
@@ -27,9 +28,6 @@ import {
 import { parseAwsBedrockModelsDevModels } from './bedrock-models';
 import { parseGcpVertexModelsDevModels } from './vertex-models';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
-
-const DEFAULT_CONTENT_LENGTH = 200_000;
-const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 
 const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
@@ -285,23 +283,9 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
-    const name = raw.name ?? shortenDisplayName(raw.id);
-    const context_length = raw.context_length ?? DEFAULT_CONTENT_LENGTH;
-    const flags = new Set(raw.flags);
-    if (raw.input_modalities?.includes('image')) flags.add('vision');
-    const max_completion_tokens = Math.min(
-      raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
-      context_length
-    );
     models.push({
-      id: raw.id,
-      name,
-      flags: flags.size > 0 ? [...flags] : undefined,
-      context_length,
-      max_completion_tokens,
-      reasoning_options: raw.reasoning_options,
+      ...normalizeRawModel(raw),
       catalog_model_id: catalogModelIds.get(raw.id),
-      ...(raw.endpoint && { endpoint: raw.endpoint }),
     });
   }
 

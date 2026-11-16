@@ -29,6 +29,7 @@ import type {
 
 export function ModelDetailsDialog({
   organizationId,
+  showGatewayAvailability,
   open,
   canEdit,
   infoModel,
@@ -42,6 +43,7 @@ export function ModelDetailsDialog({
   onClose,
 }: {
   organizationId: string;
+  showGatewayAvailability: boolean;
   open: boolean;
   canEdit: boolean;
   infoModel: ModelRow | null;
@@ -192,7 +194,7 @@ export function ModelDetailsDialog({
             </TableBody>
           </Table>
 
-          {infoModel ? (
+          {infoModel && showGatewayAvailability ? (
             <GatewayAvailabilityTable organizationId={organizationId} modelId={infoModel.modelId} />
           ) : null}
         </div>

@@ -393,7 +393,15 @@ export const organizationsSettingsRouter = createTRPCRouter({
   getModelGatewayAvailability: organizationMemberProcedure
     .input(OrganizationIdInputSchema.extend({ modelId: z.string().min(1) }))
     .output(ModelGatewayAvailabilityResponseSchema)
-    .query(({ input }) => getModelGatewayAvailability(input.modelId)),
+    .query(async ({ input }) => {
+      if (!(await isGatewaySettingsAvailable(input.organizationId))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Gateway settings are not available for this organization.',
+        });
+      }
+      return getModelGatewayAvailability(input.modelId);
+    }),
 
   updateGatewaySettings: organizationAdminMutationProcedure
     .input(UpdateGatewaySettingsInputSchema)

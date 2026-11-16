@@ -128,8 +128,8 @@ export function ModelDetailsDialog({
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>
                 <TableHead>Trains</TableHead>
-                <TableHead>Retains prompts</TableHead>
-                {showGatewayAvailability ? <TableHead>Vercel regions</TableHead> : null}
+                <TableHead>Retains</TableHead>
+                {showGatewayAvailability ? <TableHead>Regions</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>

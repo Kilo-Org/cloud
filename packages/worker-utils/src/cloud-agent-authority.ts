@@ -124,11 +124,7 @@ const scopedPrepareSessionSchema = z
     model: z.string().min(1).max(200),
     mode: z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask', 'build', 'architect']),
     prompt: z.string().min(1).max(100_000),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: z.string().min(1).max(50).optional(),
     upstreamBranch: z.string().min(1).max(500).optional(),
     stackOnWorktreeId: cloudAgentWorktreeIdSchema
       .describe(

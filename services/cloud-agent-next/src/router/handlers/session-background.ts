@@ -32,8 +32,9 @@ export const getBackgroundActivity = protectedProcedure
       });
     }
     // An offline sandbox runs no background work. A null answer hides the
-    // activity strip instead of reporting an unreadable status.
-    if (!result.ok && result.error.code === 'not_ready') return null;
+    // activity strip instead of reporting an unreadable status. Wrapper
+    // timeouts and socket failures stay `not_ready` and remain retryable.
+    if (!result.ok && result.error.code === 'runtime_offline') return null;
     const inventory = result.ok
       ? backgroundActivityInventorySchema.safeParse(result.result)
       : undefined;

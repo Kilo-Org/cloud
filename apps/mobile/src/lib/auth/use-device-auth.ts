@@ -168,30 +168,23 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         if (!response.ok) {
-          if (response.status === 429) {
-            const body = await response.json().catch(() => undefined);
-            setState(
-              errorDeviceAuthState(
-                undefined,
-                getDeviceAuthStartRefusalError(body, response.status),
-                undefined
-              )
-            );
-            return;
-          }
+          // One body read serves both refusals below: the pending-link match and
+          // the stable code that picks the banner copy.
+          const body = await response.json().catch(() => undefined);
           // A link that lapsed or was used elsewhere cannot start a browser sign-in. The
           // pending-link screen shows its own expired state, so this is no error banner.
-          if (response.status === 400 && pendingLinkToken) {
-            const refusal = parseAuthError(await response.json().catch(() => undefined));
-            if (refusal?.code === 'PENDING_LINK_EXPIRED') {
-              setState({ ...idleDeviceAuthState(), expiredPendingLinkToken: pendingLinkToken });
-              return;
-            }
+          if (
+            response.status === 400 &&
+            pendingLinkToken &&
+            parseAuthError(body)?.code === 'PENDING_LINK_EXPIRED'
+          ) {
+            setState({ ...idleDeviceAuthState(), expiredPendingLinkToken: pendingLinkToken });
+            return;
           }
           setState(
             errorDeviceAuthState(
               undefined,
-              deviceAuthErrorKey('authErrors.startSignInFailed'),
+              getDeviceAuthStartRefusalError(body, response.status),
               undefined
             )
           );

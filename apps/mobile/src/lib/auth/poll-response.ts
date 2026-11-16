@@ -43,8 +43,9 @@ export function classifyPollResponse(
 }
 
 /**
- * The device-auth start refusal, read from its HTTP status and stable code. A
- * 429 is a rate-limit refusal whether or not its body names the code: an edge
+ * The device-auth start refusal, read from its HTTP status and stable code.
+ * Every non-OK start response uses it, so both the code and the status decide.
+ * A 429 is a rate-limit refusal whether or not its body names the code: an edge
  * or proxy that answers before the route still means too many attempts. The
  * server's own sentence is never shown; the catalog owns the copy in the active
  * language.

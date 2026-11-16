@@ -538,6 +538,30 @@ describe('useDeviceAuth hook', () => {
     expect(resultRef.current?.expiredPendingLinkToken).toBeUndefined();
   });
 
+  it('shows the rate-limit copy for a refused start and opens no browser', async () => {
+    vi.mocked(openAuthSessionAsync).mockClear();
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json(
+        { error: 'RATE_LIMITED', message: 'Too many sign-in attempts.', retryAfterSeconds: 600 },
+        { status: 429 }
+      )
+    );
+
+    const resultRef = await mountSettled();
+    await act(async () => {
+      await requireResult(resultRef).start('signin');
+    });
+
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.error).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
+    expect(startDeviceAuthPoll).not.toHaveBeenCalled();
+    expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
+  });
+
   it('opens a plain browser for a non-product auth host (no consent alert)', async () => {
     const url = 'http://127.0.0.1:3000/device-auth?code=UC-1';
     await startSignin(url);

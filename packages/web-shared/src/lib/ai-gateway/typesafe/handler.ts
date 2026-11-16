@@ -53,7 +53,6 @@ import {
   systemOneResponseSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
 import { FEATURE_HEADER, validateFeatureHeader } from '@kilocode/web-shared/lib/feature-detection';
-import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';

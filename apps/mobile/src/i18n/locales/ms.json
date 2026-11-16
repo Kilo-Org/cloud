@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Tidak dapat memuatkan tetapan repositori.",
-      "githubAppSettings": "Tetapan apl GitHub",
       "manageAccess": "Urus akses apl GitHub",
       "noRepositories": "Tiada repositori",
       "noRepositoriesDescription": "Benarkan apl GitHub Kilo mengakses repositori.",

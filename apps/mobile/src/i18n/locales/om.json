@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Qindaa'ina kuusaa koodii fe'uun hin danda'amne.",
-      "githubAppSettings": "Qindaa'ina aplikeeshinii GitHub",
       "manageAccess": "Hayyama aplikeeshinii GitHub bulchi",
       "noRepositories": "Kuusaan koodii hin jiru",
       "noRepositoriesDescription": "Aplikeeshinii GitHub kan Kilo kuusaawwan koodii akka argatu hayyama kenniif.",

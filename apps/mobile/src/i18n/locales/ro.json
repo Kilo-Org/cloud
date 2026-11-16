@@ -1885,7 +1885,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nu s-au putut încărca setările depozitelor.",
-      "githubAppSettings": "Setările aplicației GitHub",
       "manageAccess": "Gestionează accesul aplicației GitHub",
       "noRepositories": "Niciun depozit",
       "noRepositoriesDescription": "Acordă aplicației Kilo pentru GitHub acces la depozite.",

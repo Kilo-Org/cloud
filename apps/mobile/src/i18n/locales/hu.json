@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nem sikerült betölteni az adattárak beállításait.",
-      "githubAppSettings": "GitHub-alkalmazás beállításai",
       "manageAccess": "GitHub-alkalmazás hozzáférésének kezelése",
       "noRepositories": "Nincsenek adattárak",
       "noRepositoriesDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az adattárakhoz.",

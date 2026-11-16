@@ -1261,7 +1261,6 @@
     },
     "repositories": {
       "couldNotLoad": "Depo ayarları yüklenemedi.",
-      "githubAppSettings": "GitHub uygulaması ayarları",
       "manageAccess": "GitHub uygulamasının erişimini yönet",
       "noRepositories": "Depo yok",
       "noRepositoriesDescription": "Kilo GitHub uygulamasına depolara erişim izni ver.",

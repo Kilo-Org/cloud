@@ -1923,7 +1923,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nastavení repozitářů se nepodařilo načíst.",
-      "githubAppSettings": "Nastavení aplikace GitHub",
       "manageAccess": "Spravovat přístup aplikace GitHub",
       "noRepositories": "Žádné repozitáře",
       "noRepositoriesDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům.",

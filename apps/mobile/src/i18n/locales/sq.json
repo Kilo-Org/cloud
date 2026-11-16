@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nuk u ngarkuan cilësimet e depove.",
-      "githubAppSettings": "Cilësimet e aplikacionit GitHub",
       "manageAccess": "Menaxho qasjen e aplikacionit GitHub",
       "noRepositories": "Asnjë depo",
       "noRepositoriesDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot.",

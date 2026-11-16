@@ -1261,7 +1261,6 @@
     },
     "repositories": {
       "couldNotLoad": "Tidak dapat memuat pengaturan repositori.",
-      "githubAppSettings": "Pengaturan aplikasi GitHub",
       "manageAccess": "Kelola akses aplikasi GitHub",
       "noRepositories": "Tidak ada repositori",
       "noRepositoriesDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori.",

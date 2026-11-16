@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Hoidlate seadeid ei õnnestunud laadida.",
-      "githubAppSettings": "GitHubi rakenduse seaded",
       "manageAccess": "Halda GitHubi rakenduse juurdepääsu",
       "noRepositories": "Hoidlaid pole",
       "noRepositoriesDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele.",

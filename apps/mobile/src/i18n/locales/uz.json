@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Repozitoriya sozlamalarini yuklab bo'lmadi.",
-      "githubAppSettings": "GitHub ilovasi sozlamalari",
       "manageAccess": "GitHub ilovasining kirish huquqlarini boshqarish",
       "noRepositories": "Repozitoriyalar yo'q",
       "noRepositoriesDescription": "Kilo GitHub ilovasiga repozitoriyalarga kirish huquqini bering.",

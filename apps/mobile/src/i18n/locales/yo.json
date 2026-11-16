@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "A kò lè gbé àwọn ètò ibi ìpamọ́ wọlé.",
-      "githubAppSettings": "Àwọn ètò ohun èlò GitHub",
       "manageAccess": "Ṣàkóso àṣẹ ohun èlò GitHub",
       "noRepositories": "Kò sí ibi ìpamọ́",
       "noRepositoriesDescription": "Fún ohun èlò Kilo fún GitHub ní àṣẹ láti wọlé sí àwọn ibi ìpamọ́.",

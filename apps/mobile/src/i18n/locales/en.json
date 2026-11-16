@@ -1914,7 +1914,6 @@
     },
     "repositories": {
       "couldNotLoad": "Could not load repository settings",
-      "githubAppSettings": "GitHub App settings",
       "manageAccess": "Manage GitHub App access",
       "noRepositories": "No repositories",
       "noRepositoriesDescription": "Grant the Kilo GitHub App access to repositories",

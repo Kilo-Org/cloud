@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nou pa t ka chaje paramèt depo yo.",
-      "githubAppSettings": "Paramèt aplikasyon GitHub la",
       "manageAccess": "Jere aksè aplikasyon GitHub la",
       "noRepositories": "Pa gen depo",
       "noRepositoriesDescription": "Bay aplikasyon GitHub Kilo a aksè nan depo yo.",

@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Non se puido cargar a configuración dos repositorios.",
-      "githubAppSettings": "Configuración da aplicación de GitHub",
       "manageAccess": "Xestionar o acceso da aplicación de GitHub",
       "noRepositories": "Sen repositorios",
       "noRepositoriesDescription": "Concédelle á aplicación de Kilo en GitHub acceso aos repositorios.",

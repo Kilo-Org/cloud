@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Imeshindikana kupakia mipangilio ya hazina.",
-      "githubAppSettings": "Mipangilio ya programu ya GitHub",
       "manageAccess": "Simamia ruhusa za ufikiaji za programu ya GitHub",
       "noRepositories": "Hakuna hazina",
       "noRepositoriesDescription": "Ipe programu ya Kilo ya GitHub ruhusa ya kufikia hazina.",

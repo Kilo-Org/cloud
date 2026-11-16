@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "রিপোজিটরির সেটিংস লোড করা যায়নি।",
-      "githubAppSettings": "GitHub অ্যাপের সেটিংস",
       "manageAccess": "GitHub অ্যাপের অ্যাক্সেস পরিচালনা করুন",
       "noRepositories": "কোনো রিপোজিটরি নেই",
       "noRepositoriesDescription": "Kilo GitHub অ্যাপকে রিপোজিটরিগুলোতে অ্যাক্সেস দিন।",

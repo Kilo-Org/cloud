@@ -1261,7 +1261,6 @@
     },
     "repositories": {
       "couldNotLoad": "Không thể tải cài đặt kho lưu trữ.",
-      "githubAppSettings": "Cài đặt ứng dụng GitHub",
       "manageAccess": "Quản lý quyền truy cập của ứng dụng GitHub",
       "noRepositories": "Không có kho lưu trữ",
       "noRepositoriesDescription": "Cấp quyền truy cập các kho lưu trữ cho ứng dụng Kilo trên GitHub.",

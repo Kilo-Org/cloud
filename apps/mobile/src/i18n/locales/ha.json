@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "An kasa loda saitunan ma'ajiya.",
-      "githubAppSettings": "Saitunan manhajar GitHub",
       "manageAccess": "Sarrafa damar manhajar GitHub",
       "noRepositories": "Babu ma'ajiyoyi",
       "noRepositoriesDescription": "Ba manhajar Kilo ta GitHub damar shiga ma'ajiyoyi.",

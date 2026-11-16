@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Asikwazanga ukulayisha izilungiselelo zezinqolobane zekhodi.",
-      "githubAppSettings": "Izilungiselelo zohlelo lokusebenza lwe-GitHub",
       "manageAccess": "Phatha izimvume zohlelo lokusebenza lwe-GitHub",
       "noRepositories": "Azikho izinqolobane zekhodi",
       "noRepositoriesDescription": "Nika uhlelo lokusebenza lwe-Kilo ku-GitHub imvume yokufinyelela ezinqolobaneni zekhodi.",

@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Kunne ikke laste inn innstillingene for kodelagre.",
-      "githubAppSettings": "Innstillinger for GitHub-appen",
       "manageAccess": "Administrer tilgangen til GitHub-appen",
       "noRepositories": "Ingen kodelagre",
       "noRepositoriesDescription": "Gi Kilos GitHub-app tilgang til kodelagre.",

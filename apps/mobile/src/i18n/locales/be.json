@@ -1923,7 +1923,6 @@
     },
     "repositories": {
       "couldNotLoad": "Не атрымалася загрузіць налады рэпазіторыяў.",
-      "githubAppSettings": "Налады праграмы GitHub",
       "manageAccess": "Кіраваць доступам праграмы GitHub",
       "noRepositories": "Няма рэпазіторыяў",
       "noRepositoriesDescription": "Дайце праграме Kilo для GitHub доступ да рэпазіторыяў.",

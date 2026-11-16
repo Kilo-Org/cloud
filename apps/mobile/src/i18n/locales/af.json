@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Die bewaarplekinstellings kon nie gelaai word nie.",
-      "githubAppSettings": "GitHub-appinstellings",
       "manageAccess": "Bestuur die GitHub-app se toegang",
       "noRepositories": "Geen bewaarplekke nie",
       "noRepositoriesDescription": "Gee die Kilo GitHub-app toegang tot bewaarplekke.",

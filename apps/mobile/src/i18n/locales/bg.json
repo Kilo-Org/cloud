@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Не успяхме да заредим настройките за хранилищата.",
-      "githubAppSettings": "Настройките на приложението за GitHub",
       "manageAccess": "Управлявай достъпа на приложението за GitHub",
       "noRepositories": "Няма хранилища",
       "noRepositoriesDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата.",

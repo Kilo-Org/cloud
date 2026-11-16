@@ -1261,7 +1261,6 @@
     },
     "repositories": {
       "couldNotLoad": "无法加载仓库设置",
-      "githubAppSettings": "GitHub 应用设置",
       "manageAccess": "管理 GitHub 应用访问权限",
       "noRepositories": "暂无仓库",
       "noRepositoriesDescription": "请授予 Kilo GitHub 应用访问仓库的权限。",

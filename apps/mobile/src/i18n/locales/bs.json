@@ -1885,7 +1885,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nije moguće učitati postavke repozitorija.",
-      "githubAppSettings": "Postavke GitHub aplikacije",
       "manageAccess": "Upravljaj pristupom GitHub aplikacije",
       "noRepositories": "Nema repozitorija",
       "noRepositoriesDescription": "Dodijeli Kilo GitHub aplikaciji pristup repozitorijima.",

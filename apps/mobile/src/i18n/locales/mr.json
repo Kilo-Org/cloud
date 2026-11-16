@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "रिपॉझिटरीच्या सेटिंग्ज लोड करता आल्या नाहीत.",
-      "githubAppSettings": "GitHub ॲपच्या सेटिंग्ज",
       "manageAccess": "GitHub ॲपचा प्रवेश व्यवस्थापित करा",
       "noRepositories": "रिपॉझिटरी नाहीत",
       "noRepositoriesDescription": "Kilo GitHub ॲपला रिपॉझिटरींमध्ये प्रवेश द्या.",

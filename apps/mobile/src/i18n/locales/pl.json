@@ -1289,7 +1289,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nie udało się wczytać ustawień repozytoriów.",
-      "githubAppSettings": "Ustawienia aplikacji GitHub",
       "manageAccess": "Zarządzaj dostępem aplikacji GitHub",
       "noRepositories": "Brak repozytoriów",
       "noRepositoriesDescription": "Przyznaj aplikacji Kilo w serwisie GitHub dostęp do repozytoriów.",

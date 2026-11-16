@@ -1261,7 +1261,6 @@
     },
     "repositories": {
       "couldNotLoad": "De repository-instellingen konden niet worden geladen.",
-      "githubAppSettings": "Instellingen van de GitHub-app",
       "manageAccess": "Toegang tot de GitHub-app beheren",
       "noRepositories": "Geen repositories",
       "noRepositoriesDescription": "Geef de Kilo GitHub-app toegang tot repositories.",

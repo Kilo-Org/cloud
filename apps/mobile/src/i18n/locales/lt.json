@@ -1923,7 +1923,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nepavyko įkelti saugyklų nustatymų",
-      "githubAppSettings": "GitHub programėlės nustatymai",
       "manageAccess": "Tvarkyti GitHub programėlės prieigą",
       "noRepositories": "Nėra saugyklų",
       "noRepositoriesDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų",

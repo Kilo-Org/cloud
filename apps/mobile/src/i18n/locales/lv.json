@@ -1885,7 +1885,6 @@
     },
     "repositories": {
       "couldNotLoad": "Neizdevās ielādēt repozitoriju iestatījumus.",
-      "githubAppSettings": "GitHub lietotnes iestatījumi",
       "manageAccess": "Pārvaldīt GitHub lietotnes piekļuvi",
       "noRepositories": "Nav repozitoriju",
       "noRepositoriesDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem.",

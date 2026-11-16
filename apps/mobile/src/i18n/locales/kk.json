@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Репозиторий баптауларын жүктеу мүмкін болмады.",
-      "githubAppSettings": "GitHub қолданбасының баптаулары",
       "manageAccess": "GitHub қолданбасының рұқсаттарын басқару",
       "noRepositories": "Репозиторийлер жоқ",
       "noRepositoriesDescription": "GitHub-тағы Kilo қолданбасына репозиторийлерге кіруге рұқсат беріңіз.",

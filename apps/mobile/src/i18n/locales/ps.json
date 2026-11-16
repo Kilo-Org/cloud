@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "د زېرمتون ترتیبات بار نه شول.",
-      "githubAppSettings": "د GitHub اپ ترتیبات",
       "manageAccess": "د GitHub اپ لاسرسی مدیریت کړئ",
       "noRepositories": "هېڅ زېرمتون نشته",
       "noRepositoriesDescription": "د Kilo د GitHub اپ ته زېرمتونونه د لاسرسي وړ کړئ.",

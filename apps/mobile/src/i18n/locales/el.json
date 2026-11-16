@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων αποθετηρίων.",
-      "githubAppSettings": "Ρυθμίσεις της εφαρμογής GitHub",
       "manageAccess": "Διαχείριση πρόσβασης της εφαρμογής GitHub",
       "noRepositories": "Κανένα αποθετήριο",
       "noRepositoriesDescription": "Δώσε στην εφαρμογή Kilo για το GitHub πρόσβαση σε αποθετήρια.",

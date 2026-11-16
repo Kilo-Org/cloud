@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "ไม่สามารถโหลดการตั้งค่าคลังโค้ดได้",
-      "githubAppSettings": "การตั้งค่า GitHub App",
       "manageAccess": "จัดการสิทธิ์การเข้าถึง GitHub App",
       "noRepositories": "ไม่มีคลังโค้ด",
       "noRepositoriesDescription": "ให้สิทธิ์ Kilo GitHub App เข้าถึงคลังโค้ด",

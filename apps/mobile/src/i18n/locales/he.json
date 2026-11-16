@@ -1275,7 +1275,6 @@
     },
     "repositories": {
       "couldNotLoad": "לא ניתן לטעון את הגדרות המאגרים.",
-      "githubAppSettings": "הגדרות אפליקציית GitHub",
       "manageAccess": "ניהול הרשאות הגישה של אפליקציית GitHub",
       "noRepositories": "אין מאגרים",
       "noRepositoriesDescription": "יש לתת לאפליקציית Kilo ב-GitHub גישה למאגרים.",

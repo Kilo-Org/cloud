@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "የማከማቻ ቅንብሮችን መጫን አልተቻለም።",
-      "githubAppSettings": "የGitHub መተግበሪያ ቅንብሮች",
       "manageAccess": "የGitHub መተግበሪያ መዳረሻን ያስተዳድሩ",
       "noRepositories": "ምንም ማከማቻዎች የሉም",
       "noRepositoriesDescription": "ለKilo የGitHub መተግበሪያ ወደ ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",

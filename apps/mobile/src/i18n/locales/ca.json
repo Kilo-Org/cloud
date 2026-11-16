@@ -1885,7 +1885,6 @@
     },
     "repositories": {
       "couldNotLoad": "No s'ha pogut carregar la configuració dels repositoris.",
-      "githubAppSettings": "Configuració de l'aplicació de GitHub",
       "manageAccess": "Gestiona l'accés de l'aplicació de GitHub",
       "noRepositories": "Cap repositori",
       "noRepositoriesDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris.",

@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Ekki tókst að sækja geymslustillingar.",
-      "githubAppSettings": "Stillingar GitHub-forritsins",
       "manageAccess": "Stjórna aðgangi GitHub-forritsins",
       "noRepositories": "Engar geymslur",
       "noRepositoriesDescription": "Veittu GitHub-forriti Kilo aðgang að geymslum.",

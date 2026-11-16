@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Репозиторийн тохиргоог ачаалж чадсангүй.",
-      "githubAppSettings": "GitHub аппын тохиргоо",
       "manageAccess": "GitHub аппын хандах эрхийг удирдах",
       "noRepositories": "Репозитори байхгүй",
       "noRepositoriesDescription": "Kilo GitHub аппад репозиториудад хандах эрх олгоно уу.",

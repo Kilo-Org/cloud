@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Hindi ma-load ang mga setting ng repository.",
-      "githubAppSettings": "Mga setting ng GitHub App",
       "manageAccess": "Pamahalaan ang access sa GitHub App",
       "noRepositories": "Walang repository",
       "noRepositoriesDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository.",

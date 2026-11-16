@@ -1317,7 +1317,6 @@
     },
     "repositories": {
       "couldNotLoad": "تعذّر تحميل إعدادات المستودعات.",
-      "githubAppSettings": "إعدادات تطبيق GitHub",
       "manageAccess": "إدارة صلاحيات وصول تطبيق GitHub",
       "noRepositories": "لا توجد مستودعات",
       "noRepositoriesDescription": "امنح تطبيق Kilo على GitHub صلاحية الوصول إلى المستودعات.",

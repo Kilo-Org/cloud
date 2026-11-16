@@ -1261,7 +1261,6 @@
     },
     "repositories": {
       "couldNotLoad": "無法載入存放庫設定。",
-      "githubAppSettings": "GitHub App 設定",
       "manageAccess": "管理 GitHub App 存取權限",
       "noRepositories": "沒有存放庫",
       "noRepositoriesDescription": "請授權 Kilo GitHub App 存取存放庫。",

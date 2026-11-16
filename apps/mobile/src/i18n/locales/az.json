@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Repozitoriya parametrlərini yükləmək mümkün olmadı.",
-      "githubAppSettings": "GitHub tətbiqinin parametrləri",
       "manageAccess": "GitHub tətbiqinin giriş icazələrini idarə et",
       "noRepositories": "Repozitoriya yoxdur",
       "noRepositoriesDescription": "Kilo GitHub tətbiqinə repozitoriyalara giriş icazəsi ver.",

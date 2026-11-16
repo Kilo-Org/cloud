@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "ରିପୋଜିଟୋରୀ ସେଟିଂସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "githubAppSettings": "GitHub ଆପ୍ ସେଟିଂସ୍",
       "manageAccess": "GitHub ଆପ୍‌ର ଅନୁମତି ପରିଚାଳନା କରନ୍ତୁ",
       "noRepositories": "କୌଣସି ରିପୋଜିଟୋରୀ ନାହିଁ",
       "noRepositoriesDescription": "Kilo GitHub ଆପ୍‌କୁ ରିପୋଜିଟୋରୀ ବ୍ୟବହାର କରିବାର ଅନୁମତି ଦିଅନ୍ତୁ।",

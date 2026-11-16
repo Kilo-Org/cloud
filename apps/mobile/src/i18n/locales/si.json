@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "ගබඩා සැකසුම් පූරණය කළ නොහැකි විය.",
-      "githubAppSettings": "GitHub යෙදුම් සැකසුම්",
       "manageAccess": "GitHub යෙදුමේ ප්‍රවේශය කළමනාකරණය කරන්න",
       "noRepositories": "ගබඩා නැත",
       "noRepositoriesDescription": "ගබඩාවලට ප්‍රවේශ වීමට Kilo GitHub යෙදුමට අවසර දෙන්න.",

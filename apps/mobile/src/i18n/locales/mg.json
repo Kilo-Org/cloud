@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Tsy nety nampidirina ny fikiran'ny tahirin-kaody.",
-      "githubAppSettings": "Fikiran'ny rindranasa GitHub",
       "manageAccess": "Tantano ny alalana hidiran'ny rindranasa GitHub",
       "noRepositories": "Tsy misy tahirin-kaody",
       "noRepositoriesDescription": "Omeo alalana hiditra amin'ny tahirin-kaody ny rindranasa Kilo ao amin'ny GitHub.",

@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Koodivarastojen asetuksia ei voitu ladata",
-      "githubAppSettings": "GitHub-sovelluksen asetukset",
       "manageAccess": "Hallinnoi GitHub-sovelluksen käyttöoikeuksia",
       "noRepositories": "Ei koodivarastoja",
       "noRepositoriesDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin",

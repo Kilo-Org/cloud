@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "មិនអាចផ្ទុកការកំណត់ឃ្លាំងកូដបានទេ។",
-      "githubAppSettings": "ការកំណត់កម្មវិធី GitHub",
       "manageAccess": "គ្រប់គ្រងសិទ្ធិចូលប្រើរបស់កម្មវិធី GitHub",
       "noRepositories": "គ្មានឃ្លាំងកូដ",
       "noRepositoriesDescription": "ផ្តល់សិទ្ធិឱ្យកម្មវិធី GitHub របស់ Kilo ចូលប្រើឃ្លាំងកូដ។",

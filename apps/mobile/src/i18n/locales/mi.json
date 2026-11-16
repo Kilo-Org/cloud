@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Kāore i taea te uta i ngā tautuhinga pūranga.",
-      "githubAppSettings": "Ngā tautuhinga taupānga GitHub",
       "manageAccess": "Whakahaeretia te uru o te taupānga GitHub",
       "noRepositories": "Kāore he pūranga",
       "noRepositoriesDescription": "Tukua te taupānga GitHub a Kilo kia uru ki ngā pūranga.",

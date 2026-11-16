@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Enweghị ike ibudata ntọala ebe nchekwa.",
-      "githubAppSettings": "Ntọala ngwa GitHub",
       "manageAccess": "Jikwaa ikike ịnweta nke ngwa GitHub",
       "noRepositories": "Enweghị ebe nchekwa",
       "noRepositoriesDescription": "Nye ngwa Kilo maka GitHub ikike ịnweta ebe nchekwa.",

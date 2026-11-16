@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Kunde inte läsa in inställningarna för kodarkiv",
-      "githubAppSettings": "Inställningarna för GitHub-appen",
       "manageAccess": "Hantera GitHub-appens åtkomst",
       "noRepositories": "Inga kodarkiv",
       "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv",

@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "రిపోజిటరీ సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము.",
-      "githubAppSettings": "GitHub యాప్ సెట్టింగ్‌లు",
       "manageAccess": "GitHub యాప్ అనుమతులను నిర్వహించండి",
       "noRepositories": "రిపోజిటరీలు లేవు",
       "noRepositoriesDescription": "రిపోజిటరీలను యాక్సెస్ చేయడానికి Kilo GitHub యాప్‌కు అనుమతి ఇవ్వండి.",

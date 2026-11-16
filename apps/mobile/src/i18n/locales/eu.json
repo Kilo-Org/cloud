@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Ezin izan dira biltegien ezarpenak kargatu.",
-      "githubAppSettings": "GitHub aplikazioaren ezarpenak",
       "manageAccess": "Kudeatu GitHub aplikazioaren sarbidea",
       "noRepositories": "Ez dago biltegirik",
       "noRepositoriesDescription": "Eman Kiloren GitHub aplikazioari biltegietarako sarbidea.",

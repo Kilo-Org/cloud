@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "ರೆಪೊಸಿಟರಿಗಳ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "githubAppSettings": "GitHub ಅಪ್ಲಿಕೇಶನ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
       "manageAccess": "GitHub ಅಪ್ಲಿಕೇಶನ್‌ನ ಪ್ರವೇಶವನ್ನು ನಿರ್ವಹಿಸಿ",
       "noRepositories": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳಿಲ್ಲ",
       "noRepositoriesDescription": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು Kilo GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಅನುಮತಿ ನೀಡಿ.",

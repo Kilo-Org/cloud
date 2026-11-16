@@ -1261,7 +1261,6 @@
     },
     "repositories": {
       "couldNotLoad": "リポジトリ設定を読み込めませんでした。",
-      "githubAppSettings": "GitHub Appの設定",
       "manageAccess": "GitHub Appのアクセス権を管理",
       "noRepositories": "リポジトリがありません",
       "noRepositoriesDescription": "Kilo GitHub Appにリポジトリへのアクセスを許可してください。",

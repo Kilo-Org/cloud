@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "ကုဒ်သိုလှောင်ရာဆက်တင်များကို ရယူ၍ မရပါ။",
-      "githubAppSettings": "GitHub အက်ပ်ဆက်တင်များ",
       "manageAccess": "GitHub အက်ပ်၏ ဝင်ရောက်ခွင့်ကို စီမံရန်",
       "noRepositories": "ကုဒ်သိုလှောင်ရာ မရှိပါ",
       "noRepositoriesDescription": "Kilo GitHub အက်ပ်ကို ကုဒ်သိုလှောင်ရာများသို့ ဝင်ရောက်ခွင့်ပေးပါ။",

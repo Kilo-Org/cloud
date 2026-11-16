@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Չհաջողվեց բեռնել պահոցների կարգավորումները։",
-      "githubAppSettings": "GitHub հավելվածի կարգավորումներ",
       "manageAccess": "Կառավարել GitHub հավելվածի հասանելիությունը",
       "noRepositories": "Պահոցներ չկան",
       "noRepositoriesDescription": "Kilo-ի GitHub հավելվածին տրամադրիր պահոցների հասանելիություն։",

@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "ریپوزٹری کی ترتیبات لوڈ نہیں ہو سکیں۔",
-      "githubAppSettings": "GitHub ایپ کی ترتیبات",
       "manageAccess": "GitHub ایپ کی رسائی کا انتظام کریں",
       "noRepositories": "کوئی ریپوزٹری نہیں",
       "noRepositoriesDescription": "Kilo کی GitHub ایپ کو ریپوزٹریز تک رسائی دیں۔",

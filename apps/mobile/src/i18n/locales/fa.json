@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "بارگذاری تنظیمات مخازن ممکن نشد.",
-      "githubAppSettings": "تنظیمات برنامه GitHub",
       "manageAccess": "مدیریت دسترسی برنامه GitHub",
       "noRepositories": "هیچ مخزنی وجود ندارد",
       "noRepositoriesDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازن را بدهید.",

@@ -1923,7 +1923,6 @@
     },
     "repositories": {
       "couldNotLoad": "Nastavitev skladišč ni bilo mogoče naložiti.",
-      "githubAppSettings": "Nastavitve aplikacije GitHub",
       "manageAccess": "Upravljaj dostop aplikacije GitHub",
       "noRepositories": "Ni skladišč",
       "noRepositoriesDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč.",

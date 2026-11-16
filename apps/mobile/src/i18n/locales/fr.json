@@ -1242,7 +1242,6 @@
     },
     "repositories": {
       "couldNotLoad": "Impossible de charger les paramètres des dépôts",
-      "githubAppSettings": "Paramètres de l'application GitHub",
       "manageAccess": "Gérer l'accès de l'application GitHub",
       "noRepositories": "Aucun dépôt",
       "noRepositoriesDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts",

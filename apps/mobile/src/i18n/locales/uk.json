@@ -1289,7 +1289,6 @@
     },
     "repositories": {
       "couldNotLoad": "Не вдалося завантажити налаштування репозиторіїв.",
-      "githubAppSettings": "Налаштування застосунку GitHub",
       "manageAccess": "Керувати доступом застосунку GitHub",
       "noRepositories": "Немає репозиторіїв",
       "noRepositoriesDescription": "Надайте застосунку Kilo для GitHub доступ до репозиторіїв.",

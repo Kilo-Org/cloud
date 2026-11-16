@@ -1961,7 +1961,6 @@
     },
     "repositories": {
       "couldNotLoad": "Níorbh fhéidir socruithe na stórtha a lódáil.",
-      "githubAppSettings": "Socruithe na haipe GitHub",
       "manageAccess": "Bainistigh rochtain na haipe GitHub",
       "noRepositories": "Níl aon stór ann",
       "noRepositoriesDescription": "Tabhair rochtain ar na stórtha d'aip GitHub Kilo.",

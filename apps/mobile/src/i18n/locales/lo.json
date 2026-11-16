@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າຄັງໂຄ້ດໄດ້.",
-      "githubAppSettings": "ການຕັ້ງຄ່າແອັບ GitHub",
       "manageAccess": "ຈັດການສິດເຂົ້າເຖິງຂອງແອັບ GitHub",
       "noRepositories": "ບໍ່ມີຄັງໂຄ້ດ",
       "noRepositoriesDescription": "ໃຫ້ສິດແອັບ GitHub ຂອງ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດ.",

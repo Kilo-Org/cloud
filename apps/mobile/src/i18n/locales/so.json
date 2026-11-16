@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "Dejinta kaydadka lama soo dejin karin.",
-      "githubAppSettings": "Dejinta abka GitHub",
       "manageAccess": "Maamul oggolaanshaha abka GitHub",
       "noRepositories": "Ma jiraan kaydad",
       "noRepositoriesDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka.",

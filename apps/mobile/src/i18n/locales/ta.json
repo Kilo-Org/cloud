@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "களஞ்சிய அமைப்புகளை ஏற்ற முடியவில்லை.",
-      "githubAppSettings": "GitHub செயலி அமைப்புகள்",
       "manageAccess": "GitHub செயலியின் அணுகலை நிர்வகிக்கவும்",
       "noRepositories": "களஞ்சியங்கள் இல்லை",
       "noRepositoriesDescription": "களஞ்சியங்களை அணுக Kilo GitHub செயலிக்கு அனுமதி வழங்கவும்.",

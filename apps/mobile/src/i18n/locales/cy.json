@@ -1999,7 +1999,6 @@
     },
     "repositories": {
       "couldNotLoad": "Ni ellid llwytho gosodiadau'r ystorfeydd.",
-      "githubAppSettings": "Gosodiadau ap GitHub",
       "manageAccess": "Rheoli mynediad ap GitHub",
       "noRepositories": "Dim ystorfeydd",
       "noRepositoriesDescription": "Rhowch fynediad at ystorfeydd i ap GitHub Kilo.",

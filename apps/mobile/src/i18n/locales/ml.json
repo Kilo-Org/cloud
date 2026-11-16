@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "റിപ്പോസിറ്ററി ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "githubAppSettings": "GitHub ആപ്പ് ക്രമീകരണങ്ങൾ",
       "manageAccess": "GitHub ആപ്പിന്റെ അനുമതികൾ നിയന്ത്രിക്കുക",
       "noRepositories": "റിപ്പോസിറ്ററികളൊന്നുമില്ല",
       "noRepositoriesDescription": "റിപ്പോസിറ്ററികൾ ഉപയോഗിക്കാൻ Kilo GitHub ആപ്പിന് അനുമതി നൽകുക.",

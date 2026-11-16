@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "რეპოზიტორების პარამეტრების ჩატვირთვა ვერ მოხერხდა.",
-      "githubAppSettings": "GitHub აპის პარამეტრები",
       "manageAccess": "GitHub აპის წვდომის მართვა",
       "noRepositories": "რეპოზიტორები არ არის",
       "noRepositoriesDescription": "მიანიჭე Kilo-ს GitHub აპს რეპოზიტორებზე წვდომა.",

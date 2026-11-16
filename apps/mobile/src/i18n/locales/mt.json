@@ -1961,7 +1961,6 @@
     },
     "repositories": {
       "couldNotLoad": "Ma setax jitgħabba l-issettjar tar-repożitorji.",
-      "githubAppSettings": "Issettjar tal-app ta' GitHub",
       "manageAccess": "Immaniġġja l-aċċess tal-app ta' GitHub",
       "noRepositories": "L-ebda repożitorju",
       "noRepositoriesDescription": "Agħti lill-app ta' Kilo fuq GitHub aċċess għar-repożitorji.",

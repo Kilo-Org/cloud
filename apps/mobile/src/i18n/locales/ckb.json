@@ -1847,7 +1847,6 @@
     },
     "repositories": {
       "couldNotLoad": "نەتوانرا ڕێکخستنەکانی کۆگا بار بکرێن.",
-      "githubAppSettings": "ڕێکخستنەکانی ئەپی GitHub",
       "manageAccess": "دەستگەیشتنی ئەپی GitHub بەڕێوە ببە",
       "noRepositories": "هیچ کۆگایەک نییە",
       "noRepositoriesDescription": "مۆڵەتی دەستگەیشتن بە کۆگاکان بدە بە ئەپی Kilo لە GitHub.",

@@ -704,7 +704,8 @@ function ByokEndpointForm({
             The API root, without a trailing slash; requests go to /chat/completions, /messages, or
             /responses under it. Include <code>{BYOK_ENDPOINT_MODEL_PLACEHOLDER}</code> to send the
             upstream model ID in the URL instead of the request body, for example{' '}
-            <code>https://example.com/models/{BYOK_ENDPOINT_MODEL_PLACEHOLDER}/v1</code>.
+            <code>https://example.com/models/{BYOK_ENDPOINT_MODEL_PLACEHOLDER}/v1</code>. The
+            placeholder is only supported for Chat Completions.
           </p>
         </div>
 

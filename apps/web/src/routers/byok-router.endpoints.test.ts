@@ -649,11 +649,10 @@ describe('BYOK endpoints', () => {
       expect(bodyOf(upstream.calls[1])).not.toHaveProperty('max_tokens');
     });
 
-    test('sends a Messages request with the model in the URL to a chosen model', async () => {
+    test('sends a Chat Completions request with the model in the URL to a chosen model', async () => {
       const created = await createEndpoint({
         ...DEFINITION,
         base_url: 'https://llm.example.com/models/{model}',
-        api_kinds: ['chat_completions', 'messages'],
         models: [
           ...DEFINITION.models,
           {
@@ -661,11 +660,10 @@ describe('BYOK endpoints', () => {
             internal_id: 'claude/sonnet',
             context_length: 200000,
             max_completion_tokens: 64000,
-            client_provider: 'anthropic',
           },
         ],
       });
-      const upstream = mockUpstream(() => Response.json({ content: [] }));
+      const upstream = mockUpstream(() => Response.json({ choices: [] }));
       restoreFetch = upstream.restore;
       const caller = await createCallerForUser(owner.id);
 
@@ -676,11 +674,26 @@ describe('BYOK endpoints', () => {
           modelId: 'claude',
         })
       ).resolves.toMatchObject({ success: true });
-      expect(upstream.calls[0].url).toBe('https://llm.example.com/models/claude%2Fsonnet/messages');
-      expect(headersOf(upstream.calls[0]).get('anthropic-version')).toBe('2023-06-01');
-      const body = bodyOf(upstream.calls[0]);
-      expect(body).not.toHaveProperty('model');
-      expect(body).toMatchObject({ max_tokens: 256 });
+      expect(upstream.calls[0].url).toBe(
+        'https://llm.example.com/models/claude%2Fsonnet/chat/completions'
+      );
+      expect(bodyOf(upstream.calls[0])).not.toHaveProperty('model');
+    });
+
+    test('rejects the {model} placeholder for an endpoint serving Messages', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.byok.createEndpoint({
+          organizationId: organization.id,
+          definition: {
+            ...DEFINITION,
+            base_url: 'https://llm.example.com/models/{model}',
+            api_kinds: ['chat_completions', 'messages'],
+          },
+          credentials: API_KEY_CREDENTIALS,
+        })
+      ).rejects.toThrow('only supported for Chat Completions');
     });
 
     test('reports the upstream error', async () => {

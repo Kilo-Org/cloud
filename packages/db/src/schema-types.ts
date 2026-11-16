@@ -3071,6 +3071,16 @@ export const ByokEndpointDefinitionSchema = z
       const clientApiKind = getCustomLlmClientApiKind(
         model.client_provider ?? definition.client_provider
       );
+      if (
+        definition.base_url.includes(BYOK_ENDPOINT_MODEL_PLACEHOLDER) &&
+        (apiKinds.includes('messages') || apiKinds.includes('responses'))
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: model.api_kinds ? ['models', index, 'api_kinds'] : ['api_kinds'],
+          message: `The ${BYOK_ENDPOINT_MODEL_PLACEHOLDER} placeholder is only supported for Chat Completions`,
+        });
+      }
       if (!apiKinds.includes(clientApiKind)) {
         ctx.addIssue({
           code: 'custom',

@@ -324,4 +324,35 @@ describe('ByokEndpointDefinitionSchema', () => {
       message: 'must not contain a username or password',
     });
   });
+
+  describe('{model} placeholder', () => {
+    const base_url = 'https://llm.acme.example/{model}/v1';
+
+    it('accepts it when only Chat Completions is served', () => {
+      expect(ByokEndpointDefinitionSchema.safeParse(definition({ base_url })).success).toBe(true);
+    });
+
+    it.each(['messages', 'responses'])('rejects it when the endpoint serves %s', apiKind => {
+      const result = ByokEndpointDefinitionSchema.safeParse(
+        definition({ base_url, api_kinds: ['chat_completions', apiKind] })
+      );
+
+      expect(result.error?.issues[0]).toMatchObject({
+        path: ['api_kinds'],
+        message: 'The {model} placeholder is only supported for Chat Completions',
+      });
+    });
+
+    it('rejects it when a model overrides the supported APIs with Messages', () => {
+      const [model] = definition().models;
+      const result = ByokEndpointDefinitionSchema.safeParse(
+        definition({
+          base_url,
+          models: [{ ...model, api_kinds: ['chat_completions', 'messages'] }],
+        })
+      );
+
+      expect(result.error?.issues[0]).toMatchObject({ path: ['models', 0, 'api_kinds'] });
+    });
+  });
 });

@@ -91,6 +91,7 @@ describe('ContainersOutbound egress enforcement', () => {
       expect(recordEgressRequest).toHaveBeenCalledWith({
         requestId: expect.stringMatching(/^[a-f0-9-]{36}$/),
         allocationRef: 'allocation-1',
+        scope: 'request',
         timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
         method: 'POST',
         hostname: new URL(url).hostname,

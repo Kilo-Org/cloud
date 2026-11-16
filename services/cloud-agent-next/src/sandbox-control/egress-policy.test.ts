@@ -4,6 +4,31 @@ import { buildNativeEgressAllowlist, matchesActiveEgressPolicy } from './egress-
 const env = { WORKER_URL: 'https://agent.example.com' };
 
 describe('buildNativeEgressAllowlist', () => {
+  it('includes validated provider routing targets through the canonical builder', () => {
+    const host = 'customer-artifacts.s3.us-east-1.amazonaws.com';
+    const allowlist = Object.freeze([host, 'packages.example.com']);
+    const policy = buildNativeEgressAllowlist({
+      allowlist,
+      env,
+      providerRoutingTargets: [`https://${host}`],
+    });
+    expect(policy.filter(value => value === host)).toEqual([host]);
+    expect(policy).toContain('packages.example.com');
+    expect(policy).toEqual([...policy].sort());
+    expect(allowlist).toEqual([host, 'packages.example.com']);
+  });
+  it.each(['http://bucket.example.com', 'https://127.0.0.1', 'https://bucket.example.com:8443'])(
+    'rejects an invalid provider routing destination: %s',
+    target => {
+      expect(() =>
+        buildNativeEgressAllowlist({
+          allowlist: [],
+          env,
+          providerRoutingTargets: [target],
+        })
+      ).toThrow('Sandbox configuration is invalid or unsupported');
+    }
+  );
   it('keeps loopback Worker upstreams behind the public runtime facade', () => {
     const policy = buildNativeEgressAllowlist({
       allowlist: [],

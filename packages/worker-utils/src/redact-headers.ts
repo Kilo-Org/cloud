@@ -1,6 +1,8 @@
 const SENSITIVE_HEADERS = new Set([
   'authorization',
   'proxy-authorization',
+  'x-kilo-egress-identity',
+  'x-kilo-egress-credential',
   'cookie',
   'set-cookie',
   'x-api-key',

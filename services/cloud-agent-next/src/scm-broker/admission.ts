@@ -63,7 +63,7 @@ function live(context: ScmAdmissionContext): boolean {
   );
 }
 
-function activeGrants(context: ScmAdmissionContext, now: number) {
+export function activeScmGrants(context: ScmAdmissionContext, now: number) {
   return context.grants.filter(
     grant =>
       hasRuntimeCredentialProxy(grant) &&
@@ -150,7 +150,7 @@ export async function admitScmRequest<C extends ScmAdmissionContext>(
     async function currentGrants() {
       const current = await deps.readContext();
       if (!sameAllocation(current, context) || !isIdentityCurrent()) return null;
-      const grants = activeGrants(current, now());
+      const grants = activeScmGrants(current, now());
       return admittedTarget(url, grants, now()) ? grants : null;
     }
     const grants = await currentGrants();

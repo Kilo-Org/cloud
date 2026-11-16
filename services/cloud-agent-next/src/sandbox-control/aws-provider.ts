@@ -16,6 +16,7 @@ import {
   ProviderStoppedError,
   type ProviderAdapter,
   type ProviderLaunchResult,
+  type ProviderStartup,
 } from './provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { logger } from '../logger.js';
@@ -26,6 +27,7 @@ import {
   reserveAwsOperation,
   type AwsOperation,
   type AwsOperationStorage,
+  type AwsProviderRef,
 } from './aws-operation.js';
 
 /** Replay is deliberately bounded; AWS does not document permanent token retention. */
@@ -142,6 +144,11 @@ export function createAwsProviderAdapter(deps: {
   sandboxId: string;
   resolveRuntime: (configuration?: AwsByocConfiguration) => Promise<AwsRuntimeAccess>;
   storage: AwsOperationStorage;
+  prepareStartup: (input: {
+    startup: ProviderStartup;
+    ref: AwsProviderRef;
+    configuration: AwsByocConfiguration;
+  }) => Promise<ProviderStartup>;
   now?: () => number;
 }): AwsProviderAdapter {
   const now = deps.now ?? Date.now;
@@ -304,6 +311,11 @@ export function createAwsProviderAdapter(deps: {
       if (value.phase === 'terminated' || value.phase === 'stopping')
         throw new Error('AWS allocation is stopping');
       if (!value.request) {
+        startup = await deps.prepareStartup({
+          startup,
+          ref: value.ref,
+          configuration: value.config,
+        });
         const { objects } = await deps.resolveRuntime(value.config);
         if (startup.command.argv.length === 0 || startup.command.argv.length > 64)
           throw new ProviderCreationError('invalid_configuration');
@@ -311,7 +323,7 @@ export function createAwsProviderAdapter(deps: {
           options?.deadlineAt ?? now() + AWS_LAUNCH_RECOVERY_MS,
           now() + AWS_LAUNCH_RECOVERY_MS
         );
-        const env = {
+        const env: Record<string, string> = {
           ...startup.env,
           PROVIDER_INSTANCE_ID: ref,
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
@@ -325,7 +337,12 @@ export function createAwsProviderAdapter(deps: {
         ).join('');
         const launchKey = `kilo/launch/${value.ref.intentId}.json`;
         const url = await objects.downloadUrl(launchKey, 600);
-        const payload = JSON.stringify({ url, sha256, deadlineAt });
+        const payload = JSON.stringify({
+          url,
+          sha256,
+          deadlineAt,
+          ...(env.HTTPS_PROXY ? { proxy: env.HTTPS_PROXY } : {}),
+        });
         if (new TextEncoder().encode(payload).byteLength > 16_384)
           throw new ProviderCreationError('invalid_configuration');
         try {

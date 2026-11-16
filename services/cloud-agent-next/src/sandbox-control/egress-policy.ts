@@ -10,19 +10,7 @@ export const nativeEgressAllowlistSchema = z
   .array(egressDomainSchema)
   .transform(domains => [...new Set(domains)].sort());
 
-/** The shared egress check: http or https, the default port, no userinfo, an exact listed host. */
-export function isAllowedEgressUrl(url: URL, allowlist: readonly string[]): boolean {
-  if (
-    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
-    url.port !== '' ||
-    url.username !== '' ||
-    url.password !== ''
-  ) {
-    return false;
-  }
-  const hostname = egressDomainSchema.safeParse(url.hostname);
-  return hostname.success && allowlist.includes(hostname.data);
-}
+export { isAllowedEgressUrl } from '@kilocode/worker-utils/egress-allowlist';
 
 const GIT_DOMAINS = [
   'github.com',
@@ -42,7 +30,7 @@ type AllowlistContext = {
   repositoryUrl?: string;
 };
 
-function compileAllowlist(allowlist: string[], targets: string[]): string[] {
+function compileAllowlist(allowlist: readonly string[], targets: string[]): string[] {
   try {
     const urls = targets.map(value => new URL(value));
     if (urls.some(url => url.protocol !== 'https:' || url.port || url.username || url.password))
@@ -59,13 +47,17 @@ function compileAllowlist(allowlist: string[], targets: string[]): string[] {
 
 /** The runtime uses only the facade. Upstream model and ingest requests run inside the Worker. */
 export function buildNativeEgressAllowlist(
-  input: AllowlistContext & { allowlist: string[]; kiloToken?: string }
+  input: AllowlistContext & {
+    allowlist: readonly string[];
+    providerRoutingTargets?: readonly string[];
+  }
 ): string[] {
   const facade = input.env.WORKER_URL && runtimeCredentialProxyFacadeBaseUrl(input.env.WORKER_URL);
   if (!facade) throw new ProviderCreationError('invalid_configuration');
   return compileAllowlist(input.allowlist, [
     facade,
     CLOUD_AGENT_SESSION_SYNC_ORIGIN,
+    ...(input.providerRoutingTargets ?? []),
     ...(input.repositoryUrl === undefined ? [] : [input.repositoryUrl]),
   ]);
 }

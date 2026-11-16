@@ -38,3 +38,13 @@ export const GITHUB_CAPABILITY_HOSTS = [
 
 export const BITBUCKET_GIT_ORIGIN = 'https://bitbucket.org';
 export const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
+
+/** Standard hosted SCM destinations. AWS's immutable MVP certificate covers this exact catalog. */
+export const STANDARD_SCM_HOSTS: readonly string[] = Object.freeze(
+  [
+    ...GITHUB_CAPABILITY_HOSTS,
+    'gitlab.com',
+    new URL(BITBUCKET_GIT_ORIGIN).hostname,
+    new URL(BITBUCKET_API_ORIGIN).hostname,
+  ].sort()
+);

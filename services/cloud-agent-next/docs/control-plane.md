@@ -804,7 +804,6 @@ keep environment snapshots and existing history/worktree recovery.
   always restore on demand, so history-only warmup cannot suppress their saved file patches.
   Cancelling a caller stops its wait immediately, but its import lock remains until the underlying
   harness open settles. A queued requested open keeps its own inputs and cancellation deadline.
-
 - **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
   allocation, capture time, selected source and skip/fallback reason. They never log handles,
   credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;
@@ -1612,6 +1611,34 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | Optional egress restriction | Native Containers checks its trusted allowlist before credential handling. Unrestricted native requests without managed carriers retain their original headers and redirect policy. Containment does not require restricted general egress. |
 | Retry and bounds | Only eligible GitHub upload-pack reads retry 429 responses: three retries, 30 seconds per scheduled wait, and 60 seconds of total scheduled waits. An excessive next wait returns the current response. POST replay includes exactly 1 MiB; over-cap or unavailable bodies forward once. This is not a total request deadline. Diagnostics read at most 2 KiB within 100 milliseconds. |
 
+### AWS egress admission modules
+
+`aws-admission.ts` connects one `aws-egress-identity.ts` owner to policy, audit and SCM admission modules.
+The identity owner checks the signed proof, current owner connection and pinned deployment, then rechecks durable allocation state.
+Deployment metadata uses one cache entry for at most 15 seconds. Source/configuration changes replace it; failed reads are not cached.
+Each request rechecks current owner authorization, allocation state and credential hash. SCM admission rereads current grants.
+Policy and SCM replies use current allocation checks. Audit persistence runs outside the serial queue and requires a final allocation check before acknowledgement.
+The Worker route owns SCM redemption and request/response bodies.
+
+### AWS egress behavior
+
+AWS enforces egress in the customer VPC. The customer proxy forwards general traffic directly to public destinations. Managed SCM traffic uses the Worker credential broker.
+Only port 443 is permitted. Plain `http://` fails in allowlist and unrestricted modes.
+A tool that ignores the proxy cannot connect directly.
+
+For ordinary TLS tunnels, the allowlist checks the hostname declared in CONNECT and the resolved public address.
+The proxy does not inspect the inner TLS SNI or HTTP Host. Those names can differ on shared CDN infrastructure.
+An allowed CONNECT hostname therefore does not prove that each inner request uses that hostname.
+Managed SCM interception separately validates its supported TLS name and request destination.
+
+Both providers use `worker-utils/egress-audit` and the same bounded audit store.
+New records carry `scope: connection` for AWS CONNECT decisions or `scope: request` for inspected HTTP requests.
+A connection record describes one tunnel decision. Its `CONNECT` method is the outer proxy method, not an inner HTTP method.
+It does not count inner requests or record their methods. Intercepted SCM requests have separate request records.
+Historical records without scope remain readable; their scope is unspecified.
+Paths, query values, headers and bodies are not audit fields.
+See [AWS network access](aws-network-access.md) for user guidance.
+
 **Intentionally denied**
 
 | Case | Existing decision |
@@ -2159,7 +2186,6 @@ Request and response bodies stream; there is no body-size cap.
   change: it shows the preview button once the Worker reports preview as enabled. The `kilo serve`
   password is in the wrapper, so ship a sandbox image with it before you enable preview; an older
   image leaves `kilo serve` open to a preview of its port.
-
 #### Preview tunnel (`wrapper-tunnel`)
 
 A provider without a private network path to its sandbox (today Vercel) reaches the dev server
@@ -2537,7 +2563,6 @@ A new preparation after stop creates a contained allocation. Sessions retain the
 Earlier branch work recorded live Vercel identity and GitHub checks.
 The shared admission refactor has local tests only; those earlier checks do not verify this change.
 Maximum payload and duration compatibility still require verification before production rollout.
-
 ## Customer billing schema maintenance
 
 The customer billing schema owner is `packages/session-ingest-contracts/src/cloud-agent-billing.ts`.
@@ -2549,16 +2574,3 @@ cp packages/session-ingest-contracts/src/cloud-agent-billing.ts services/cloud-a
 ```
 
 The mirror test requires exact source equality. Verify the standalone Docker wrapper build after schema changes.
-
-
-### Containers allowlist and runtime facade
-
-New Containers allowlist allocations include the Worker runtime facade, Session Sync, and required repository hosts.
-Model, backend, and ingest upstreams remain behind the Worker facade. The wrapper receives a bound proxy handle before preparation.
-A legacy grant fails with `credential_upgrade_required`. A failed handle mint sends no prepare frame and fails workspace preparation.
-
-An active allocation keeps its exact persisted allowlist. `matchesActiveEgressPolicy` recognizes the previous direct-upstream baseline
-only when the requested destinations and audit setting are unchanged. It never broadens or rewrites the active pin.
-The next allocation uses the facade baseline after the previous allocation stops.
-Remove this compatibility comparison only after every pre-facade allocation is confirmed stopped, including hibernated Durable Objects.
-A release age or a successful new allocation does not prove that condition.

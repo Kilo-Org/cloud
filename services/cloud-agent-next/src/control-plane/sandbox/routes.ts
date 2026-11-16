@@ -1,3 +1,4 @@
+import { AwsScmContainmentError } from '../../scm-broker/aws-policy.js';
 import {
   environmentReferenceSchema,
   type SessionEnvironmentReference,
@@ -408,7 +409,7 @@ export function grantIssueFailure(
   if (error instanceof EnvironmentMemberCredentialError) {
     return { reason: 'repository_access_failed', stage: memberCredentialFailureStage(error) };
   }
-  if (error instanceof VercelScmContainmentError) {
+  if (error instanceof VercelScmContainmentError || error instanceof AwsScmContainmentError) {
     return { reason: error.reason, stage: admissionFailureStage(error, fallbackStage) };
   }
   return { reason: 'workspace_setup_failed', stage: admissionFailureStage(error, fallbackStage) };

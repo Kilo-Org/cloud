@@ -1,3 +1,5 @@
+import { type AwsScmAdmission, type AwsEgressProof } from '../../egress/aws-admission.js';
+import { createAwsSandboxEgress } from '../../egress/aws-sandbox-context.js';
 import { assertContainerAccountAvailable } from '../../container-account-admission.js';
 import { billingFailureFromAdmission } from '../../billing-failure.js';
 import { isContainersLaunchInterrupted } from '../../sandbox-containers/launch-interrupted.js';
@@ -2540,6 +2542,36 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  private readonly awsEgressAdmission = createAwsSandboxEgress({
+    env: this.env,
+    admission: this.scmAdmissionDependencies(),
+    readContext: () => this.readScmAdmissionContext(),
+    operationStorage: this.ctx.storage,
+    readCredentialHash: () => this.ctx.storage.get<string>(CREDENTIAL_HASH_KEY),
+    readPolicy: () => ({
+      allowlist: this.providerPin?.egressAllowlist,
+      audit: this.providerPin?.egressAudit === true,
+    }),
+  });
+
+  async getAwsEgressPolicy(proof: AwsEgressProof): Promise<Response> {
+    await this.initialized;
+    return this.awsEgressAdmission.policy(proof);
+  }
+
+  async recordAwsEgressAudit(proof: AwsEgressProof, value: unknown): Promise<Response> {
+    await this.initialized;
+    return this.awsEgressAdmission.audit(proof, value);
+  }
+
+  async admitAwsScm(
+    proof: AwsEgressProof,
+    request: AwsScmAdmission
+  ): Promise<ControlPlaneScmForwardAdmissionResult> {
+    await this.initialized;
+    return this.awsEgressAdmission.admitScm(proof, request);
+  }
+
   private scmAdmissionDependencies() {
     return {
       serial: <T>(operation: () => Promise<T>) => this.enqueue(operation),
@@ -3255,11 +3287,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
-  private pinFromInput(
-    input: EnsureAllocationInput,
-    repositoryUrl?: string,
-    kiloToken?: string
-  ): StoredProviderPin {
+  private pinFromInput(input: EnsureAllocationInput, repositoryUrl?: string): StoredProviderPin {
     const policy = egressPolicySchema.safeParse(input);
     if (!policy.success) throw new ProviderCreationError('invalid_configuration');
     if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
@@ -3295,7 +3323,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
               allowlist: policy.data.egressAllowlist ?? [],
               env: this.env,
               repositoryUrl,
-              kiloToken,
             }),
           }),
       ...(input.byoc ? { byoc: input.byoc } : {}),
@@ -3609,8 +3636,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const repository = source.repository;
         selectedPin = this.pinFromInput(
           sandboxSelection,
-          repository && repository.type !== 'github' ? repository.url : undefined,
-          source.kiloToken
+          repository && repository.type !== 'github' ? repository.url : undefined
         );
       }
       if (

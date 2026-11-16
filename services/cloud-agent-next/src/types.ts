@@ -498,6 +498,10 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Private R2 bucket for workspace artifacts synchronized from `/artifacts`. */
+  WORKSPACE_ARTIFACTS_BUCKET: R2Bucket;
+  /** Bucket name used as the S3 bucket in presigned artifact download URLs. */
+  WORKSPACE_ARTIFACTS_BUCKET_NAME?: string;
   /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;

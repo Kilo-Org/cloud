@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../../../src/shared/control-plane-protocol.js';
@@ -10,6 +10,7 @@ import {
   controlPlaneExitPolicy,
   createControlPlaneFrameDispatcher,
   createControlPlaneLifecycle,
+  ensureWorkspaceArtifactRoot,
   type ControlPlaneLifecycle,
   type ControlPlaneProcess,
 } from './main.js';
@@ -58,6 +59,7 @@ function createFakeConnection(): {
     connection: {
       wrapperId: 'wrapper_test',
       snapshot: () => ({ phase: 'idle', attempt: 0, outboxBytes: 0 }),
+      supportsTransferGrants: () => false,
       start: () => {
         started += 1;
       },
@@ -250,6 +252,28 @@ describe('control-plane wrapper startup process', () => {
       await rm(directory, { recursive: true, force: true });
     }
   }, 10_000);
+});
+
+describe('ensureWorkspaceArtifactRoot', () => {
+  it('creates a writable artifact root', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'workspace-artifact-root-'));
+    try {
+      expect(await ensureWorkspaceArtifactRoot(join(directory, 'artifacts'))).toBe(true);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('reports failure when the root cannot be created', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'workspace-artifact-root-'));
+    try {
+      const file = join(directory, 'not-a-directory');
+      await writeFile(file, 'x');
+      expect(await ensureWorkspaceArtifactRoot(join(file, 'artifacts'))).toBe(false);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('createControlPlaneLifecycle', () => {

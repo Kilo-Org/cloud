@@ -1,3 +1,5 @@
+import { constants } from 'node:fs';
+import fsp from 'node:fs/promises';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   type ControlPlaneWrapperFrame,
@@ -48,6 +50,19 @@ import { createHistoryRequests } from './history-requests.js';
 import { runtimeHarness } from './runtime-harness.js';
 import { readKiloCliVersion } from './runtime-versions.js';
 import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
+import { createTransferGrantRequests } from './transfer-grant-requests.js';
+import { createSandboxTransferClient } from '../control/sandbox-transfer-client.js';
+import {
+  WORKSPACE_ARTIFACT_FLUSH_BUDGET_MS,
+  WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS,
+} from '../../../src/shared/workspace-artifacts.js';
+import {
+  createWorkspaceArtifactSync,
+  WORKSPACE_ARTIFACT_ROOT,
+  WORKSPACE_ARTIFACT_STATE_PATH,
+  type WorkspaceArtifactSync,
+} from './workspace-artifacts.js';
+import { transferUrlForWrapperInstance } from './wrapper-identity.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   parseAgentSandboxProvider,
@@ -56,6 +71,36 @@ import { reservedPreviewPorts } from '../../../src/shared/reserved-ports.js';
 
 const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
 const FILE_LOG_FINALIZE_TIMEOUT_MS = 5_000;
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function transferGrantHasArtifactsScope(grant: string): boolean {
+  const encoded = grant.split('.')[1];
+  if (encoded === undefined) return false;
+  try {
+    const payload: unknown = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (typeof payload !== 'object' || payload === null) return false;
+    const scopes = (payload as { scopes?: unknown }).scopes;
+    return Array.isArray(scopes) && scopes.includes('workspace_artifacts');
+  } catch {
+    return false;
+  }
+}
+
+export async function ensureWorkspaceArtifactRoot(
+  root: string = WORKSPACE_ARTIFACT_ROOT
+): Promise<boolean> {
+  try {
+    await fsp.mkdir(root, { recursive: true });
+    await fsp.access(root, constants.W_OK);
+    return true;
+  } catch (error) {
+    logToFile(`workspace artifact root is unavailable: ${messageOf(error)}`);
+    return false;
+  }
+}
 
 export type ControlPlaneExitEvent =
   | 'shutdown'
@@ -230,6 +275,8 @@ export function createControlPlaneSessionHost(options: {
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
   isWorkspaceBusy?(): boolean;
+  /** True while the turn-end artifact flush is running. */
+  isFlushingArtifacts?(): boolean;
 }) {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
@@ -249,7 +296,11 @@ export function createControlPlaneSessionHost(options: {
     runtimes,
     turns: manager,
     getHeartbeat: () => ({
-      active: options.isPreparing() || runtimes.needsCompute() || manager.hasPendingWork(),
+      active:
+        options.isPreparing() ||
+        runtimes.needsCompute() ||
+        manager.hasPendingWork() ||
+        (options.isFlushingArtifacts?.() ?? false),
       workspaceBusy: options.isWorkspaceBusy?.() ?? false,
       degraded: runtimes.suspected(),
     }),
@@ -272,6 +323,7 @@ export type ControlPlaneFrameDispatcherDeps = {
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
   previewServices?: { current?: ReturnType<typeof createControlPlanePreviewServices> };
   historyRequests?: { current?: ReturnType<typeof createHistoryRequests> };
+  transferGrants?: { current?: ReturnType<typeof createTransferGrantRequests> };
   send: (frame: ControlPlaneWrapperFrame) => void;
   log: (message: string) => void;
 };
@@ -362,6 +414,9 @@ export function createControlPlaneFrameDispatcher(
       case 'history.result':
         deps.historyRequests?.current?.handle(frame);
         return;
+      case 'transfer.grant.result':
+        deps.transferGrants?.current?.handle(frame);
+        return;
       case 'terminal.create':
       case 'terminal.resize':
       case 'terminal.close':
@@ -384,24 +439,70 @@ async function main(
 ): Promise<ControlPlaneLifecycle | undefined> {
   const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
   const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
+  const url = env.SANDBOX_CONTROL_URL;
+  const credential = env.SANDBOX_CONTROL_CREDENTIAL;
+  const allocationId = env[CONTROL_PLANE_ALLOCATION_ID_ENV];
+  const transferUrl = env.SANDBOX_TRANSFER_URL;
+  const transferGrant = env.SANDBOX_TRANSFER_GRANT;
+  // The launch identity is reused by the supervisor for every restart, so the
+  // process identity must be generated here and used for both `hello` and the
+  // transfer path and grant. The launch-time identity stays only in the path
+  // string we rewrite below.
+  const wrapperInstanceId = crypto.randomUUID();
+  const currentTransferUrl =
+    transferUrl === undefined
+      ? undefined
+      : transferUrlForWrapperInstance(transferUrl, wrapperInstanceId);
+  const artifactsEnabled =
+    transferUrl !== undefined &&
+    transferGrant !== undefined &&
+    transferGrantHasArtifactsScope(transferGrant);
+  // The grant requester answers over the connection created below, so every
+  // transfer client reaches it through a holder.
+  const transferGrantsRef: {
+    current?: ReturnType<typeof createTransferGrantRequests>;
+  } = {};
+  const transferRenewal = (): Promise<{ grant: string; expiresAt: number }> => {
+    const requests = transferGrantsRef.current;
+    return requests === undefined
+      ? Promise.reject(new Error('transfer grants are unavailable'))
+      : requests.requestGrant();
+  };
+  const logClient =
+    currentTransferUrl !== undefined && transferUrl !== undefined && transferGrant !== undefined
+      ? createSandboxTransferClient({
+          baseUrl: currentTransferUrl,
+          renewGrant: transferRenewal,
+          // Older Workers cannot renew, and uploads before the first welcome
+          // still use the launch-time route and grant.
+          fallback: { baseUrl: transferUrl, grant: transferGrant },
+          attempts: 1,
+          log: logToFile,
+        })
+      : undefined;
   const projector = createControlDiagnosticProjector({
     enabled: nativeControlPlaneLogsEnabled(env),
   });
-  const diagnostics = createControlDiagnostics({ uploadUrl, uploadGrant, projector });
+  const diagnostics = createControlDiagnostics({
+    uploadUrl,
+    uploadGrant,
+    ...(logClient === undefined ? {} : { client: logClient, logPathPrefix: 'logs' }),
+    projector,
+  });
   const fileLogs = createControlFileLogUploader({
     uploadUrl,
     uploadGrant,
+    ...(logClient === undefined ? {} : { client: logClient, logPathPrefix: 'logs' }),
     wrapperLogPath: env.WRAPPER_LOG_PATH,
     environment: env,
     onDiagnostic: diagnostics.onDiagnostic,
     projector,
   });
-  const url = env.SANDBOX_CONTROL_URL;
-  const credential = env.SANDBOX_CONTROL_CREDENTIAL;
-  const allocationId = env[CONTROL_PLANE_ALLOCATION_ID_ENV];
   delete env.SANDBOX_CONTROL_CREDENTIAL;
   delete env.CONTROL_LOG_UPLOAD_URL;
   delete env.CONTROL_LOG_UPLOAD_GRANT;
+  delete env.SANDBOX_TRANSFER_URL;
+  delete env.SANDBOX_TRANSFER_GRANT;
   delete env.CONTROL_WRAPPER_INSTANCE_ID;
 
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
@@ -426,6 +527,7 @@ async function main(
   const timers = resolveControlPlaneTimers(env);
   // Keep the tool/workload cgroup placement for the Kilo server chain.
   const workload = initializeControlWorkload({ env, report: diagnostics.onDiagnostic });
+  const artifactsReady = artifactsEnabled && (await ensureWorkspaceArtifactRoot());
   // The connection's shutdown callback needs the lifecycle that owns the same
   // connection, so route it through a holder assigned after construction.
   const shutdownRef: { current?: (reason: string | undefined) => void } = {};
@@ -460,11 +562,21 @@ async function main(
   } = {};
   // Wrapper-initiated Cloud history reads answer over the same connection.
   const historyRequestsRef: { current?: ReturnType<typeof createHistoryRequests> } = {};
+  const transferClientRef: { current?: ReturnType<typeof createSandboxTransferClient> } = {};
+  const artifactSyncRef: { current?: WorkspaceArtifactSync } = {};
+  const artifactDiagnostic = (message: string): void => {
+    logToFile(message);
+    diagnostics.onDiagnostic('control.event', {
+      category: 'other',
+      detail: message.slice(0, 128),
+    });
+  };
   const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
   const host = createControlPlaneSessionHost({
     runtime: {
       timers,
       ...(sandboxProvider ? { sandboxProvider } : {}),
+      artifacts: artifactsReady,
       log: logToFile,
       workload,
       onNativeDiagnostic: projector,
@@ -474,9 +586,17 @@ async function main(
       log: logToFile,
       onDiagnostic: diagnostics.onDiagnostic,
       onNativeDiagnostic: projector,
+      flushArtifacts: () => {
+        const sync = artifactSyncRef.current;
+        if (sync === undefined) return;
+        void sync.flush(WORKSPACE_ARTIFACT_FLUSH_BUDGET_MS).catch(error => {
+          logToFile(`workspace artifact flush failed: ${messageOf(error)}`);
+        });
+      },
     },
     isPreparing: () => preparationRef.current?.isPreparing() ?? false,
     isWorkspaceBusy: () => terminalsRef.current?.hasActivePty() ?? false,
+    isFlushingArtifacts: () => artifactSyncRef.current?.isFlushing() ?? false,
   });
   const { runtimes } = host;
   turnsRef.current = host.turns;
@@ -488,6 +608,7 @@ async function main(
     allocationId,
     runtimeHarness: harness.kind,
     runtimeVersions: { kiloCliVersion, wrapperVersion: WRAPPER_VERSION },
+    wrapperId: wrapperInstanceId,
     timers,
     log: logToFile,
     onNativeDiagnostic: projector,
@@ -502,19 +623,54 @@ async function main(
       kiloRequests: kiloRequestsRef,
       previewServices: previewServicesRef,
       historyRequests: historyRequestsRef,
+      transferGrants: transferGrantsRef,
       send: frame => connection.send(frame),
       log: logToFile,
     }),
     onShutdown: reason => shutdownRef.current?.(reason),
-    onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
+    onConnected: () => {
+      const canRenew = connection.supportsTransferGrants();
+      transferClientRef.current?.setConnected(canRenew);
+      logClient?.setConnected(canRenew);
+      diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true });
+    },
     onDisconnected: reason => {
       historyRequestsRef.current?.disconnected();
+      transferGrantsRef.current?.disconnected();
+      transferClientRef.current?.setConnected(false);
+      logClient?.setConnected(false);
       logToFile(`control-plane disconnected: ${reason}`);
     },
   });
   const historyRequests = createHistoryRequests({ send: frame => connection.send(frame) });
   historyRequestsRef.current = historyRequests;
   sentryContext.wrapperInstanceId = connection.wrapperId;
+  const transferGrants = createTransferGrantRequests({
+    send: frame => connection.send(frame),
+  });
+  transferGrantsRef.current = transferGrants;
+  if (artifactsReady && currentTransferUrl !== undefined) {
+    const client = createSandboxTransferClient({
+      baseUrl: `${currentTransferUrl.replace(/\/$/, '')}/artifacts`,
+      renewGrant: () => transferGrants.requestGrant(),
+      timeoutMs: WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS,
+      log: logToFile,
+    });
+    transferClientRef.current = client;
+    artifactSyncRef.current = createWorkspaceArtifactSync({
+      root: WORKSPACE_ARTIFACT_ROOT,
+      statePath: WORKSPACE_ARTIFACT_STATE_PATH,
+      allocationId,
+      client,
+      timers: {
+        setTimeout: (handler, ms) => setTimeout(handler, ms),
+        clearTimeout: handle => clearTimeout(handle),
+      },
+      log: logToFile,
+      onDiagnostic: artifactDiagnostic,
+    });
+  }
+  artifactSyncRef.current?.start();
   terminalsRef.current = createControlPlaneTerminals({
     controlUrl: url,
     wrapperId: connection.wrapperId,
@@ -651,6 +807,9 @@ async function main(
     exit: code => process.exit(code),
     log: logToFile,
     stop: async () => {
+      await artifactSyncRef.current?.stop();
+      transferGrantsRef.current?.disconnected();
+      transferClientRef.current?.stop();
       nativeStatus.stop();
       turnsRef.current?.shutdown();
       terminalsRef.current?.shutdown();

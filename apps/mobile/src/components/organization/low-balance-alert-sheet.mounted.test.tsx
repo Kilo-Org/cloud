@@ -96,6 +96,15 @@ const thresholdFieldOf = (renderer: ReactTestRenderer): ReactTestInstance =>
 const saveButtonOf = (renderer: ReactTestRenderer): ReactTestInstance =>
   renderer.root.find(node => String(node.type) === 'Button');
 
+/** The sentence the threshold field shows for an amount above the stored ceiling. */
+const capSentence = () =>
+  i18n.t('spendAlerts.thresholdMaxError', {
+    max: formatPrefixedUsd(1_000_000_000, i18n.language, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }),
+  });
+
 const EMOJI_REJECTION =
   '[{"validation":"email","code":"invalid_format","path":["minimum_balance_alert_email"]}]';
 
@@ -237,12 +246,6 @@ describe('low balance alert sheet', () => {
   });
 
   it('disables Save for a threshold too large to store, then re-enables it once corrected', async () => {
-    const capSentence = i18n.t('spendAlerts.thresholdMaxError', {
-      max: formatPrefixedUsd(1_000_000_000, i18n.language, {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }),
-    });
     const { renderer, unmount } = await mountSheet();
     const toggle = renderer.root.find(node => String(node.type) === 'Switch');
     await act(() => {
@@ -258,7 +261,7 @@ describe('low balance alert sheet', () => {
     expect(saveButtonOf(renderer).props.disabled).toBe(true);
     expect(
       (thresholdFieldOf(renderer).props.validate as (value: string) => string | null)(paste)
-    ).toBe(capSentence);
+    ).toBe(capSentence());
 
     await act(() => {
       (threshold.props.onChangeText as (value: string) => void)('250');
@@ -277,7 +280,7 @@ describe('low balance alert sheet', () => {
     await act(() => {
       (toggle.props.onValueChange as (value: boolean) => void)(true);
     });
-    expect(thresholdFieldOf(renderer).props.error).toBe(capSentence);
+    expect(thresholdFieldOf(renderer).props.error).toBe(capSentence());
     expect(saveButtonOf(renderer).props.disabled).toBe(true);
     unmount();
 
@@ -290,7 +293,7 @@ describe('low balance alert sheet', () => {
       },
     };
     const seeded = await mountSheet();
-    expect(thresholdFieldOf(seeded.renderer).props.error).toBe(capSentence);
+    expect(thresholdFieldOf(seeded.renderer).props.error).toBe(capSentence());
     expect(saveButtonOf(seeded.renderer).props.disabled).toBe(true);
 
     const seededThreshold = thresholdFieldOf(seeded.renderer);
@@ -300,6 +303,26 @@ describe('low balance alert sheet', () => {
     expect(thresholdFieldOf(seeded.renderer).props.error).toBeUndefined();
     expect(saveButtonOf(seeded.renderer).props.disabled).toBe(false);
     seeded.unmount();
+  });
+
+  it('names the ceiling on the keystroke that pastes an amount above it, before any blur', async () => {
+    const { renderer, unmount } = await mountSheet();
+    expect(thresholdFieldOf(renderer).props.error).toBeUndefined();
+
+    await act(() => {
+      (thresholdFieldOf(renderer).props.onChangeText as (value: string) => void)('1000000001');
+    });
+
+    expect(thresholdFieldOf(renderer).props.error).toBe(capSentence());
+    expect(saveButtonOf(renderer).props.disabled).toBe(true);
+
+    await act(() => {
+      (thresholdFieldOf(renderer).props.onChangeText as (value: string) => void)('250');
+    });
+
+    expect(thresholdFieldOf(renderer).props.error).toBeUndefined();
+    expect(saveButtonOf(renderer).props.disabled).toBe(false);
+    unmount();
   });
 
   it('keeps a transport failure to the localized form line, never its raw text', async () => {

@@ -35,6 +35,22 @@ describe('parseInternalServiceEndpoint', () => {
     ).toBe('https://worker.example.com/admin/x');
   });
 
+  test('resolves a single leading slash on the accepted host', () => {
+    expect(parseInternalServiceEndpoint('https://worker.example.com', '/admin/x')?.toString()).toBe(
+      'https://worker.example.com/admin/x'
+    );
+  });
+
+  test.each([
+    '//evil.example.org/admin',
+    '/\\evil.example.org/admin',
+    '/\t/evil.example.org/admin',
+    'evil.example.org/admin',
+    'https://evil.example.org/admin',
+  ])('treats a path that names another host as unconfigured: %s', path => {
+    expect(parseInternalServiceEndpoint('https://worker.example.com', path)).toBeNull();
+  });
+
   test.each(['http://worker.example.com', 'ftp://worker.example.com', '', undefined])(
     'treats the path of a rejected value as unconfigured: %s',
     value => {

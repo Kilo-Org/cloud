@@ -26,9 +26,16 @@ export function parseInternalServiceUrl(value: string | undefined): URL | null {
  *
  * The base is the parsed value, so the request URL is built from the same value
  * the rule accepted instead of from string concatenation.
+ *
+ * The path must be absolute on that endpoint. A path outside that form counts as
+ * unconfigured, and the resolved URL must keep the endpoint's origin, so the request URL
+ * always derives from the value the rule accepted.
  */
 export function parseInternalServiceEndpoint(value: string | undefined, path: string): URL | null {
   const base = parseInternalServiceUrl(value);
   if (!base) return null;
-  return new URL(path, base);
+  if (!path.startsWith('/') || path.startsWith('//') || path.startsWith('/\\')) return null;
+  const endpoint = new URL(path, base);
+  // The URL parser normalises a path before it resolves it, so the origin is checked too.
+  return endpoint.origin === base.origin ? endpoint : null;
 }

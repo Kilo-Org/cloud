@@ -11,11 +11,11 @@
  */
 import { createElement, createRef, type ReactElement, type RefObject } from 'react';
 import {
-  type RVLayout,
   ViewHolderCollection,
   type ViewHolderCollectionProps,
   type ViewHolderCollectionRef,
 } from '@shopify/flash-list/dist/recyclerview/ViewHolderCollection';
+import { type RVLayout } from '@shopify/flash-list/dist/recyclerview/layout-managers/LayoutManager';
 import { describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
@@ -76,7 +76,7 @@ function collectionOf(
     isInLastRow: () => false,
     inverted: false,
   };
-  return createElement(ViewHolderCollection, props);
+  return createElement(ViewHolderCollection<Row>, props);
 }
 
 /** One rendered cell: the index it was drawn for and the box it was given. */

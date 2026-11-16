@@ -160,8 +160,12 @@ export const BenchmarkConfigSchema = z
     // Optional override for the organization context. Null means the worker
     // uses DEFAULT_BENCHMARK_ORG_ID.
     benchmarkOrgId: z.string().trim().min(1).nullable().default(null),
-    productionTokenProfile: productionTokenProfile.nullable().default(null),
-    switchHorizonTurns: switchHorizonTurns.nullable().default(null),
+    productionTokenProfile: productionTokenProfile
+      .nullable()
+      .default(POLICY_SETTING_VALUE_DEFAULTS.productionTokenProfile),
+    switchHorizonTurns: switchHorizonTurns
+      .nullable()
+      .default(POLICY_SETTING_VALUE_DEFAULTS.switchHorizonTurns),
     // Admin overrides for system-optimal policy settings. Null/absent entries
     // mean "use the computed value". Server-owned: the computed map is never
     // written through this schema.

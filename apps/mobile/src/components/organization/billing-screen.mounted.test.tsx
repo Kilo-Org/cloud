@@ -360,6 +360,7 @@ describe('OrganizationBillingScreen change plan placement', () => {
     const plan = renderer.root
       .findAllByType('KvRow' as never)
       .find(node => node.props.label === 'Organization plan');
+    expect(plan).toBeDefined();
     expect(plan?.props.valueTone).toBeUndefined();
     unmount();
   });

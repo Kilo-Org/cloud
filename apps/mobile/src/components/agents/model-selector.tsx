@@ -163,14 +163,16 @@ export function ModelSelector({
         accessibilityLabel={t('common.model')}
         className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"
       >
-        {/* The catalogue's name slot is a bar of the loaded label's height, so
-            the chip keeps its width class and does not resize when the default
-            model arrives. `bg-muted-soft` for the reason recorded on the
-            repository loading row: the default `bg-skeleton-fill` equals this
-            pill's `bg-secondary` in the light palette and would paint nothing.
-            The wrapper keeps the busy label for assistive tech without a text
-            node that reads as a resolved value. */}
-        <Skeleton className="h-4 w-24 bg-muted-soft" />
+        {/* The bar stands in for the label line, so it takes that line's own box
+            (`text-sm` sets 17.5 dp): a shorter bar would leave the pill 3.4 dp
+            short and the resolved model would grow the row. The width is a
+            typical label's, so a short name barely moves and a long one grows
+            the pill once, as it does between two model names. `bg-muted-soft`
+            for the reason recorded on the repository loading row: the default
+            `bg-skeleton-fill` equals this pill's `bg-secondary` in the light
+            palette and would paint nothing. The wrapper keeps the busy label for
+            assistive tech without a text node that reads as a resolved value. */}
+        <Skeleton className="h-[17.5px] w-[105px] bg-muted-soft" />
         <View className="opacity-50">
           <ChevronDown size={14} color={colors.mutedForeground} />
         </View>

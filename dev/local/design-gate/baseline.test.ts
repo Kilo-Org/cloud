@@ -125,6 +125,10 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
   for (const component of [
     '../card.tsx',
     'apps/mobile/src/app/_layout.tsx',
+    'apps/mobile/src/app/(app)/_layout.tsx',
+    'apps/mobile/src/app/(app)/agent-chat/+not-found.tsx',
+    'apps/mobile/src/app/../components/card.tsx',
+    'apps/mobile/src/app/(app)/agent-chat/repo-picker.ts',
     'apps/mobile/src/components/../auth.tsx',
   ]) {
     assert.equal(
@@ -133,6 +137,21 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
         targets: [{ ...TARGET, diagnostic: { component } }],
       }).success,
       false
+    );
+  }
+  // A screen file is a valid diagnostic source: a change that only alters the
+  // props a route passes to a shared component is invisible to a component
+  // target, because that component renders the same on both revisions.
+  for (const component of [
+    'apps/mobile/src/app/(app)/agent-chat/repo-picker.tsx',
+    'apps/mobile/src/app/(app)/(tabs)/(3_profile)/profiles/[profileId]/index.tsx',
+  ]) {
+    assert.equal(
+      ProofManifestSchema.safeParse({
+        version: 1,
+        targets: [{ ...TARGET, diagnostic: { component } }],
+      }).success,
+      true
     );
   }
   assert.equal(

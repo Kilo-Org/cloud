@@ -49,6 +49,10 @@ export function TriggerFormBehaviour({
   return (
     <View className="gap-4">
       <FormField
+        // The prompt is uncontrolled, so switching activation in the create
+        // form would leave the old default on screen while the draft carried
+        // the new one. The key remounts it on the value the draft now holds.
+        key={`prompt-${draft.activation}`}
         label={t('agentChat.partDetail.field.prompt')}
         required
         multiline

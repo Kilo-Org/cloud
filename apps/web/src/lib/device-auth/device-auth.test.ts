@@ -24,6 +24,7 @@ import {
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_PENDING_LOCK_WAIT_MS,
+  DEVICE_AUTH_CODE_LIFETIME_SECONDS,
   DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
   DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
   getDeviceAuthPendingLink,
@@ -258,21 +259,48 @@ describe('Device Auth', () => {
       expect(result.code).toBeDefined();
       expect(result.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     });
-    test('rejects the sixth live pending request from the same IP', async () => {
+    test('rejects the sixth live pending request from the same IP with the oldest row as the retry advisory', async () => {
       const ipAddress = `192.168.1.${(Date.now() * 11) % 254}`;
 
       // Clean up any leftover rows.
       await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
 
-      // Create 5 live pending requests.
-      for (let i = 0; i < 5; i++) {
-        await createDeviceAuthRequest({ ipAddress });
+      // Create 5 live pending requests, staggered so the OLDEST row is
+      // distinguishable: the first request expires first, the rest later.
+      const firstUserCode = await (async () => {
+        const { userCode } = await createDeviceAuthRequest({ ipAddress });
+        return userCode;
+      })();
+      for (let i = 0; i < 4; i++) {
+        const { userCode } = await createDeviceAuthRequest({ ipAddress });
+        // Push each later row past the first one's expiry in the same live state.
+        await db
+          .update(device_auth_requests)
+          .set({ expires_at: new Date(Date.now() + (600_000 + (i + 1) * 60_000)).toISOString() })
+          .where(eq(device_auth_requests.user_code, userCode));
       }
+      // The first row keeps the shortest remaining life of the five live rows.
+      const [oldest] = await db
+        .select({ expires_at: device_auth_requests.expires_at })
+        .from(device_auth_requests)
+        .where(eq(device_auth_requests.user_code, firstUserCode));
+      expect(oldest).toBeDefined();
+      const oldestRemainingMs = new Date(oldest!.expires_at).getTime() - Date.now();
 
-      // The 6th request must be rejected.
-      await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
-        DeviceAuthPendingLimitError
-      );
+      // The 6th request must be rejected with an advisory derived from that row.
+      let refusal: DeviceAuthPendingLimitError | undefined;
+      try {
+        await createDeviceAuthRequest({ ipAddress });
+      } catch (error) {
+        if (error instanceof DeviceAuthPendingLimitError) refusal = error;
+      }
+      expect(refusal).toBeInstanceOf(DeviceAuthPendingLimitError);
+      const retryAfterSeconds = refusal!.retryAfterSeconds;
+      // The advisory tracks the oldest row's remaining life (within a small
+      // tolerance for elapsed time between the read and the throw) and never
+      // promises a longer or shorter wait than the block allows.
+      expect(retryAfterSeconds).toBeGreaterThanOrEqual(Math.floor(oldestRemainingMs / 1000) - 5);
+      expect(retryAfterSeconds).toBeLessThanOrEqual(Math.ceil(oldestRemainingMs / 1000) + 5);
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
         DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );
@@ -348,8 +376,11 @@ describe('Device Auth', () => {
         expect(other.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
         expect(Date.now() - otherStartedAt).toBeLessThan(1_000);
 
-        // The wait ends at the bound with the pending-limit refusal.
-        expect(await waitingOutcome).toBeInstanceOf(DeviceAuthPendingLimitError);
+        // The wait ends at the bound with the pending-limit refusal, carrying
+        // the default full code lifetime as its retry advisory.
+        const waitingError = (await waitingOutcome) as DeviceAuthPendingLimitError;
+        expect(waitingError).toBeInstanceOf(DeviceAuthPendingLimitError);
+        expect(waitingError.retryAfterSeconds).toBe(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
         const waitedMs = Date.now() - waitingStartedAt;
         expect(waitedMs).toBeGreaterThanOrEqual(DEVICE_AUTH_PENDING_LOCK_WAIT_MS - 250);
         expect(waitedMs).toBeLessThan(DEVICE_AUTH_PENDING_LOCK_WAIT_MS + 10_000);

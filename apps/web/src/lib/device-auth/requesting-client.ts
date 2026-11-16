@@ -1,3 +1,4 @@
+import { sessionDisplayLine } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 
 /**
@@ -16,15 +17,20 @@ export type RequestingClient = {
 export const REQUESTING_CLIENT_FIELD_MAX = 200;
 
 /**
- * A value rendered as text on the approval page: bounded, and free of control
- * characters so it cannot break a line or a shell-style record.
+ * A value rendered as text on the approval page: bounded, free of control
+ * characters so it cannot break a line or a shell-style record, and normalized
+ * through the repository's display-text rule so a layout format control cannot
+ * reorder what the approver confirms. The value is normalized after the raw
+ * checks, so what is stored and echoed is the display text the approver reads.
  */
 const displayField = z
   .string()
   .trim()
   .min(1)
   .max(REQUESTING_CLIENT_FIELD_MAX)
-  .refine(value => !/\p{Cc}/u.test(value), 'must not contain control characters');
+  .refine(value => !/\p{Cc}/u.test(value), 'must not contain control characters')
+  .transform(value => sessionDisplayLine(value).trim())
+  .refine(value => value.length >= 1, 'must not contain only invisible characters');
 
 /**
  * Schemes a browser handles itself. A bare scheme is only accepted for a native

@@ -28,6 +28,26 @@ on:
         required: false
         type: string
         default: '4'
+  # The nightly workflow calls this after it deploys the e2e stack.
+  workflow_call:
+    inputs:
+      only:
+        description: 'Comma-separated scenario names to run; empty runs every scenario'
+        required: false
+        type: string
+        default: ''
+      parallel:
+        description: 'Scenario concurrency'
+        required: false
+        type: string
+        default: '4'
+    outputs:
+      failed:
+        description: 'Number of failed scenarios, or unknown'
+        value: ${{ jobs.e2e.outputs.failed }}
+      summary:
+        description: 'The harness summary line without its prefix'
+        value: ${{ jobs.e2e.outputs.summary }}
 
 permissions:
   contents: read
@@ -105,60 +125,3 @@ jobs:
           name: e2e-log
           path: e2e.log
           retention-days: 7
-
-  notify-failure:
-    needs: e2e
-    # Guard: this workflow_dispatch is reachable from a fork, and the job posts
-    # to Slack using a repo secret. Only the canonical repo may run it.
-    if: always() && github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Notify Slack
-        continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
-        with:
-          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": ":red_circle: Cloud Agent E2E failed on main"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Author:*\n${{ github.actor }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Failed tests:*\n${{ needs.e2e.outputs.failed || 'n/a' }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Summary:*\n${{ needs.e2e.outputs.summary || 'summary unavailable' }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
-                    }
-                  ]
-                }
-              ]
-            }

@@ -9,6 +9,12 @@ on:
         type: string
         default: ''
   workflow_call:
+    inputs:
+      runtime_source_sha:
+        description: 'Main SHA whose published runtime to use; empty uses the run SHA'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read

@@ -1,3 +1,22 @@
+/**
+ * To refresh these heuristics, query recently recorded raw user agents in PostgreSQL
+ * (prefer a read replica; this scans the last 24 hours of request metadata):
+ *
+ * SELECT ua.http_user_agent, COUNT(*) AS request_count
+ * FROM microdollar_usage_metadata AS m
+ * JOIN http_user_agent AS ua
+ *   ON ua.http_user_agent_id = m.http_user_agent_id
+ * WHERE m.created_at >= NOW() - INTERVAL '24 hours'
+ *   AND m.created_at < NOW()
+ * GROUP BY ua.http_user_agent
+ * ORDER BY request_count DESC;
+ *
+ * Review the frequent signatures, verify public product names, and update the
+ * aliases or parsing rules below. Add synthetic, version-varied regression cases
+ * to user-agent.test.ts. Keep exports private: raw agents can contain identifying
+ * details, so do not commit the export or copy private client names into fixtures.
+ */
+
 // Product names are matched exactly, not as prefixes: e.g. kilo-proxy is not Kilo.
 const appNames = new Map<string, string>([
   ['kilo-code', 'Kilo Code'],

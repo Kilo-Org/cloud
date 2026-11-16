@@ -132,7 +132,7 @@ const CLASS_RULES: ClassRule[] = [
   { className: 'kc-faint', declarations: /(?:^|;)\s*color:\s*#ccc\b/i },
   {
     className: 'kc-box',
-    declarations: /(?:background-color:\s*#f6f6f4\b|border:\s*1px solid #ebebea\b)/i,
+    declarations: /(?:background(?:-color)?:\s*#f6f6f4\b|border:\s*1px solid #ebebea\b)/i,
   },
   { className: 'kc-divider', declarations: /border-top:\s*1px solid #(?:ebebea|eee)\b/i },
   { className: 'kc-btn', declarations: /background(?:-color)?:\s*#1a1a1a\b/i },

@@ -54,7 +54,10 @@ export function TriggerFormAgent({
   const { t } = useTranslation();
   const models = useAvailableModels(organizationId, 'shared_services');
   const environments = useTriggerEnvironments(organizationId, draft.repository);
-  const profiles = useTriggerProfiles(organizationId, openSheet === 'profile');
+  // The server checks a profile against the run's owner: a trigger that runs as
+  // its creator takes the caller's own profiles, never the organization's.
+  // Loaded up front so a saved profile's name shows before the sheet is opened.
+  const profiles = useTriggerProfiles(draft.runAsCreator ? undefined : organizationId, true);
   const isCustomAgent = !BUILTIN_AGENT_MODES.some(mode => mode === draft.agent);
 
   const agentOptions: TriggerChoice[] = [

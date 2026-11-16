@@ -577,7 +577,10 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // The samples report the cadence they were produced at, which the app's own
   // tick cost extends beyond the interval it was asked for. Say so when that
   // spacing is far enough from the constant that the shift timings would move.
-  const reportSpacing = (sampled: readonly ProbeSample[]): number => {
+  // A pass with fewer than two retained samples carries no delta to read, so the
+  // caller keeps the spacing it already had.
+  const reportSpacing = (sampled: readonly ProbeSample[]): number | undefined => {
+    if (sampled.length < 2) return undefined;
     const spacing = sampleInterval(sampled);
     if (Math.abs(spacing - IN_APP_SAMPLE_INTERVAL_MS) > IN_APP_SAMPLE_INTERVAL_MS * 0.25) {
       ctx.log(
@@ -587,7 +590,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     return spacing;
   };
   reportTruncation();
-  let spacingMs = reportSpacing(samples);
+  let spacingMs = reportSpacing(samples) ?? IN_APP_SAMPLE_INTERVAL_MS;
   const files = captureFiles(ctx.out, cell, target.id);
   // Sampling stops before the screenshot, and the screen does not: a navigation
   // push or a late render arrives after the last sample. The bracket compares two
@@ -622,15 +625,23 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     // A layout the sampled window never saw is real work, and the bracket must not
     // absorb it: silent acceptance would hide a late layout shift exactly on the
     // slow screens this wait exists for. One more pass samples the screen as it now
-    // is, so the change joins the timeline the shift rule reads. A bound of one
+    // is, and both passes join one timeline, so the shift rule reports the late
+    // change instead of reading the late layout as the rest state. A bound of one
     // retry keeps a screen that keeps moving from extending the run.
+    const firstPass = samples;
+    const firstPassTruncated = truncated;
     ctx.log(`design-gate: ${target.id} late change after sampling stopped; bracket waited for it`);
-    ctx.log(`design-gate: ${target.id} sampling once more so the late change joins the timeline`);
+    ctx.log(`design-gate: ${target.id} sampling once more; the late change stays in the timeline`);
     await startSampling(ctx, samplingMs);
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
-    ({ samples, truncated } = await ctx.probe.stopSampling());
+    const retry = await ctx.probe.stopSampling();
+    // The stretch between the two passes is not a cadence, so the spacing comes
+    // from one pass only: the first pass sizes the gap, and the retry pass, when it
+    // reports one, becomes the spacing the shift rule reads.
+    samples = joinPasses(firstPass, retry.samples, spacingMs);
+    truncated = firstPassTruncated || retry.truncated;
     reportTruncation();
-    spacingMs = reportSpacing(samples);
+    spacingMs = reportSpacing(retry.samples) ?? spacingMs;
     quiet = await waitForQuiet();
     started = ctx.clock.now();
     before = await readTree();
@@ -689,28 +700,60 @@ export function expandSamples(samples: readonly ProbeSample[]): ProbeDump[] {
  *
  * The app samples itself on its own JS thread, so the distance between two
  * samples is the interval it was asked for plus the cost of the dump between
- * ticks, and both vary with the screen. A shift converts sample distance into
- * milliseconds with the spacing that produced those samples, never with a
- * constant: a change that arrives two samples after the rest says how long the
- * screen took, and the constant is only the answer when no sample carries a
- * spacing of its own.
+ * ticks, and both vary with the screen. Identical consecutive states collapse
+ * into one sample, which keeps the stamp of its first tick, so two retained
+ * stamps are a whole number of spacings apart, never one spacing. The spacing is
+ * therefore the span the samples cover divided by the ticks that span it: every
+ * sample but the last one adds its repeats, because the last sample's repeats
+ * happen after its own stamp. A shift converts sample distance into milliseconds
+ * with the spacing that produced those samples, never with a constant: a change
+ * that arrives two samples after the rest says how long the screen took, and the
+ * constant is only the answer when no sample carries a spacing of its own.
  */
 export function sampleInterval(samples: readonly ProbeSample[]): number {
-  const times = samples.map(sample => sample.t).sort((a, b) => a - b);
-  const spacings: number[] = [];
-  for (let index = 1; index < times.length; index += 1) {
-    const earlier = times[index - 1];
-    const later = times[index];
-    if (earlier !== undefined && later !== undefined && later > earlier) {
-      spacings.push(later - earlier);
-    }
-  }
-  if (spacings.length === 0) return IN_APP_SAMPLE_INTERVAL_MS;
-  spacings.sort((a, b) => a - b);
-  const middle = Math.floor(spacings.length / 2);
-  const upper = spacings[middle] ?? IN_APP_SAMPLE_INTERVAL_MS;
-  if (spacings.length % 2 === 1) return upper;
-  return ((spacings[middle - 1] ?? upper) + upper) / 2;
+  if (samples.length < 2) return IN_APP_SAMPLE_INTERVAL_MS;
+  const ordered = [...samples].sort((left, right) => left.t - right.t);
+  const first = ordered[0];
+  const last = ordered[ordered.length - 1];
+  if (first === undefined || last === undefined) return IN_APP_SAMPLE_INTERVAL_MS;
+  const span = last.t - first.t;
+  let ticks = 0;
+  for (const sample of ordered.slice(0, -1)) ticks += sample.repeat;
+  if (span <= 0 || ticks === 0) return IN_APP_SAMPLE_INTERVAL_MS;
+  return span / ticks;
+}
+
+// A second sampling pass starts after a stretch no pass sampled. The bracket saw
+// no layout change across that stretch, so the stretch counts as repeats of the
+// last state of the first pass, and both passes stay one timeline. The cap bounds
+// a long quiet wait, and a repeat stores only the reference to the same dump.
+const MAX_GAP_REPEATS = 64;
+
+/**
+ * Join two sampling passes into one timeline.
+ *
+ * The unsampled stretch between the passes is counted as repeats of the last
+ * state of the first pass, at the spacing that pass reported. The join keeps the
+ * late layout change in the timeline the shift rule reads, instead of letting a
+ * fresh pass become the baseline. A pass that retained nothing falls back to the
+ * concatenation.
+ */
+export function joinPasses(
+  first: readonly ProbeSample[],
+  second: readonly ProbeSample[],
+  spacingMs: number
+): ProbeSample[] {
+  const last = first[first.length - 1];
+  const start = second[0];
+  if (last === undefined || start === undefined) return [...first, ...second];
+  const gap = start.t - last.t;
+  const ticks = spacingMs > 0 ? Math.round(gap / spacingMs) - 1 : 0;
+  const repeats = Math.min(MAX_GAP_REPEATS, Math.max(0, ticks));
+  return [
+    ...first.slice(0, -1),
+    { t: last.t, repeat: last.repeat + repeats, dump: last.dump },
+    ...second,
+  ];
 }
 
 type LanguageTarget = { preference: string; resolved: string; rtl?: boolean };

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Gerenciar na web",
     "creditHistory": "Histórico de créditos",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Compras, recibos e movimentação de créditos",
     "invoicesSubtitle": "Baixe as faturas das suas compras",
-    "manageBilling": "Gerenciar cobrança em kilo.ai",
-    "manageBillingIosNote": "Formas de pagamento, recarga automática e dados de cobrança são gerenciados em kilo.ai.",
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Encontrar e corrigir vulnerabilidades",
     "reviews": "Revisões",
@@ -2580,10 +2576,7 @@
       "cancelScheduled": "Será cancelada em {{date}}",
       "cancelScheduledChange": "Cancelar alteração agendada",
       "cancelled": "Assinatura cancelada",
-      "changePlan": "Alterar plano em kilo.ai",
-      "changePlanIosNote": "Alterações de planos pagos estão disponíveis em kilo.ai.",
       "creditHistoryEmpty": "Nenhum crédito do Kilo Pass ainda.",
-      "manageInStore": "Gerenciar na {{store}}",
       "resume": "Retomar assinatura",
       "resumeCancelledDescription": "Seu Kilo Pass voltará a ser renovado automaticamente.",
       "resumePausedDescription": "Seu Kilo Pass será retomado agora, antes da data de retomada agendada.",
@@ -2620,9 +2613,6 @@
     "bonusFree": "Bônus grátis",
     "bonusReferral": "Bônus de indicação",
     "bonusAvailable": "Bônus grátis disponível",
-    "kiloPassManagement": "Gerenciamento do Kilo Pass",
-    "kiloPassSetup": "Configuração do Kilo Pass",
-    "opensManagementOnWeb": "Abre o gerenciamento do Kilo Pass no site.",
     "loadFailedRetry": "Verifique sua conexão e tente novamente.",
     "legalTermsOfUse": "Termos de uso (EULA)",
     "purchaseDifferentAccount": "Esta compra da App Store não está vinculada à sua conta Kilo. Entre na Conta Apple usada na compra e tente novamente.",
@@ -3366,7 +3356,6 @@
       "buySeats": "Comprar licenças",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Gerenciar recarga automática",
-      "webAddress": "Endereço web {{url}}",
       "opensOnWeb": "Abre na web"
     },
     "boundary": {
@@ -3521,9 +3510,6 @@
       "groups": "Grupos",
       "guardrails": "Proteções",
       "byok": "Use sua própria chave",
-      "ssoAndDomain": "SSO e domínio",
-      "emailPreferences": "Preferências de e-mail",
-      "dataCollection": "Coleta de dados",
       "auditLogs": "Registros de auditoria",
       "requestLogs": "Registros de solicitações",
       "subOrganizations": "Suborganizações",
@@ -3551,7 +3537,6 @@
       "processingBlocked": "Processamento bloqueado",
       "processingNeedsReview": "O processamento precisa de revisão",
       "retryHint": "Tenta novamente carregar o status do Kilo Pass.",
-      "setupHint": "Abre a configuração do Kilo Pass na web.",
       "paidSeat_many": "{{displayCount}} licenças pagas"
     }
   },

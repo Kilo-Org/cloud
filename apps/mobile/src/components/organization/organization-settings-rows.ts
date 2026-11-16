@@ -11,12 +11,9 @@ import {
   FileText,
   KeyRound,
   LineChart,
-  Lock,
   type LucideIcon,
-  Mail,
   Plug,
   ScrollText,
-  Server,
   Shield,
   SlidersHorizontal,
   Users,
@@ -42,10 +39,9 @@ import { WEB_BASE_URL } from '@/lib/config';
  * - `sub-organizations` and `distribute-funds` additionally redirect for a
  *   child organization (`parent_organization_id !== null`);
  * - `custom-modes`, `byok` and `integrations` render for every member;
- * - `data-collection` is the dashboard card a teams plan shows;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
- *   the organization dashboard rather than pages of their own, so they open
- *   `/organizations/<id>`.
+ *   the organization dashboard rather than pages of their own, and the
+ *   dashboard links to the seats purchase, so the hub lists none of them.
  *
  * Four areas are in-app destinations instead, and each carries the gate its
  * own procedure applies: usage (every member), the audit log (billing role,
@@ -56,9 +52,6 @@ type OrgSettingsArea =
   | 'customModes'
   | 'groups'
   | 'byok'
-  | 'ssoAndDomain'
-  | 'emailPreferences'
-  | 'dataCollection'
   | 'requestLogs'
   | 'integrations'
   | 'subOrganizations'
@@ -109,7 +102,7 @@ export type OrgInAppSettingsGate = Readonly<{
 type OrgSettingsRowSpec = Readonly<{
   area: OrgSettingsArea;
   icon: LucideIcon;
-  /** The page's path after `/organizations/<id>`. Empty for a dashboard card. */
+  /** The page's path after `/organizations/<id>`. */
   suffix: string;
   visible: (gate: OrgSettingsGate) => boolean;
 }>;
@@ -127,23 +120,10 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/byok',
     visible: gate => canManageOrganizationBilling(gate.role),
   },
-  // The SSO card renders only on an enterprise dashboard.
-  {
-    area: 'ssoAndDomain',
-    icon: Lock,
-    suffix: '',
-    visible: gate => gate.plan === 'enterprise',
-  },
-  // Email preferences card: owner/admin.
-  {
-    area: 'emailPreferences',
-    icon: Mail,
-    suffix: '',
-    visible: gate => canManageOrganization(gate.role),
-  },
-  // Data collection card: the teams dashboard shows it in place of providers
-  // and models.
-  { area: 'dataCollection', icon: Server, suffix: '', visible: gate => gate.plan === 'teams' },
+  // The SSO card, the email preferences card and the data collection card live
+  // on the organization dashboard itself, and that page links to the seats
+  // purchase. The hub does not list a row that lands there: no suffix means a
+  // dashboard card, and the dashboard is never a settings destination here.
   // "Request Logs": billing role.
   {
     area: 'requestLogs',
@@ -174,9 +154,6 @@ const TITLE_KEYS = {
   customModes: 'agentChat.modePicker.customModes',
   groups: 'organization.settingsOnWeb.groups',
   byok: 'organization.settingsOnWeb.byok',
-  ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
-  emailPreferences: 'organization.settingsOnWeb.emailPreferences',
-  dataCollection: 'organization.settingsOnWeb.dataCollection',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
   // The in-app organization Integrations row opens the app's own screen; this
   // one opens the web page, so it names the web instead of repeating that title.

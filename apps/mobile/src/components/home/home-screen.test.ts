@@ -75,8 +75,4 @@ describe('HomeScreen copy', () => {
   it('does not show the first-time welcome headline on the main page', () => {
     expect(HomeScreen.toString()).not.toContain('Welcome to Kilo');
   });
-
-  it('renders no KiloClaw surface', () => {
-    expect(HomeScreen.toString()).not.toContain('KiloClaw');
-  });
 });

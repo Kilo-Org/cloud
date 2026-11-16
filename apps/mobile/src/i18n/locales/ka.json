@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "ვებში მართვა",
     "creditHistory": "კრედიტების ისტორია",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "გაუქმება",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "შენაძენები, ქვითრები და კრედიტების აქტივობა",
     "invoicesSubtitle": "ჩამოტვირთეთ თქვენი შენაძენების ინვოისები",
-    "manageBilling": "გადახდების მართვა kilo.ai-ზე",
-    "manageBillingIosNote": "გადახდის მეთოდები, ავტომატური შევსება და ანგარიშსწორების დეტალები იმართება kilo.ai-ზე.",
     "codeReviewerSubtitle": "PR-ების ავტომატური შემოწმება",
     "securityAgentSubtitle": "მოწყვლადობების პოვნა და აღმოფხვრა",
     "reviews": "კოდის შემოწმება",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "გაუქმდება {{date}}",
       "cancelScheduledChange": "დაგეგმილი ცვლილების გაუქმება",
       "cancelled": "გამოწერა გაუქმდა",
-      "changePlan": "გეგმის შეცვლა kilo.ai-ზე",
-      "changePlanIosNote": "ფასიანი გეგმის შეცვლა ხელმისაწვდომია kilo.ai-ზე.",
       "creditHistoryEmpty": "Kilo Pass-ის კრედიტები ჯერ არ არის.",
-      "manageInStore": "მართვა {{store}}-ში",
       "resume": "გამოწერის აღდგენა",
       "resumeCancelledDescription": "თქვენი Kilo Pass კვლავ ავტომატურად განახლდება.",
       "resumePausedDescription": "თქვენი Kilo Pass ახლავე აღდგება, დაგეგმილ თარიღამდე.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "უფასო ბონუსი",
     "bonusReferral": "მოწვევის ბონუსი",
     "bonusAvailable": "ხელმისაწვდომი უფასო ბონუსი",
-    "kiloPassManagement": "Kilo Pass-ის მართვა",
-    "kiloPassSetup": "Kilo Pass-ის გამართვა",
-    "opensManagementOnWeb": "ვებსაიტზე Kilo Pass-ის მართვის გვერდს ხსნის.",
     "loadFailedRetry": "შეამოწმე კავშირი და შემდეგ სცადე ხელახლა.",
     "legalTermsOfUse": "გამოყენების პირობებს (EULA)",
     "purchaseDifferentAccount": "App Store-ის ეს შესყიდვა შენს Kilo ანგარიშთან დაკავშირებული არ არის. შედი იმ Apple Account-ში, რომლითაც შესყიდვა განახორციელე, შემდეგ სცადე ხელახლა.",
@@ -3311,7 +3301,6 @@
       "buySeats": "ადგილების ყიდვა",
       "setupAutoTopUp": "ავტომატური შევსების დაყენება",
       "manageAutoTopUp": "ავტომატური შევსების მართვა",
-      "webAddress": "ვებმისამართი {{url}}",
       "opensOnWeb": "იხსნება ვებ-ვერსიაში"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "ჯგუფები",
       "guardrails": "დამცავი წესები",
       "byok": "საკუთარი გასაღების გამოყენება",
-      "ssoAndDomain": "SSO და დომენი",
-      "emailPreferences": "ელფოსტის პარამეტრები",
-      "dataCollection": "მონაცემთა შეგროვება",
       "auditLogs": "აუდიტის ჟურნალები",
       "requestLogs": "მოთხოვნების ჟურნალები",
       "subOrganizations": "ქვეორგანიზაციები",
@@ -3495,8 +3481,7 @@
       "paymentPending": "გადახდის მოლოდინში",
       "processingBlocked": "დამუშავება დაბლოკილია",
       "processingNeedsReview": "დამუშავება შემოწმებას საჭიროებს",
-      "retryHint": "ხელახლა ცდილობს Kilo Pass-ის სტატუსის ჩატვირთვას.",
-      "setupHint": "ბრაუზერში ხსნის Kilo Pass-ის გამართვის გვერდს."
+      "retryHint": "ხელახლა ცდილობს Kilo Pass-ის სტატუსის ჩატვირთვას."
     }
   },
   "authErrors": {

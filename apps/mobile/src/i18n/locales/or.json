@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "ୱେବରେ ପରିଚାଳନା କରନ୍ତୁ",
     "creditHistory": "କ୍ରେଡିଟ୍ ଇତିହାସ",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "ବାତିଲ କରନ୍ତୁ",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "କ୍ରୟ, ରସିଦ ଏବଂ କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ",
     "invoicesSubtitle": "ଆପଣଙ୍କ କ୍ରୟର ଇନଭଏସ୍ ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
-    "manageBilling": "kilo.aiରେ ବିଲିଂ ପରିଚାଳନା କରନ୍ତୁ",
-    "manageBillingIosNote": "ପେମେଣ୍ଟ ପଦ୍ଧତି, ଅଟୋ ଟପ୍-ଅପ୍ ଏବଂ ବିଲିଂ ବିବରଣୀ kilo.aiରେ ପରିଚାଳିତ ହୁଏ।",
     "codeReviewerSubtitle": "ସ୍ୱୟଂଚାଳିତ PR ସମୀକ୍ଷା",
     "securityAgentSubtitle": "ସୁରକ୍ଷା ଦୁର୍ବଳତା ଖୋଜି ସୁଧାରନ୍ତୁ",
     "reviews": "ସମୀକ୍ଷା",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "{{date}}ରେ ବାତିଲ ହେବ",
       "cancelScheduledChange": "ନିର୍ଧାରିତ ପରିବର୍ତ୍ତନ ବାତିଲ କରନ୍ତୁ",
       "cancelled": "ସବସ୍କ୍ରିପସନ୍ ବାତିଲ ହୋଇଛି",
-      "changePlan": "kilo.aiରେ ପ୍ଲାନ୍ ବଦଳାନ୍ତୁ",
-      "changePlanIosNote": "ପେଡ୍ ପ୍ଲାନ୍ ପରିବର୍ତ୍ତନ kilo.aiରେ ଉପଲବ୍ଧ।",
       "creditHistoryEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି Kilo Pass କ୍ରେଡିଟ୍ ନାହିଁ।",
-      "manageInStore": "{{store}}ରେ ପରିଚାଳନା କରନ୍ତୁ",
       "resume": "ସବସ୍କ୍ରିପସନ୍ ପୁନଃଆରମ୍ଭ କରନ୍ତୁ",
       "resumeCancelledDescription": "ଆପଣଙ୍କ Kilo Pass ପୁଣି ସ୍ୱୟଂଚାଳିତ ଭାବେ ନବୀକରଣ ହେବା ଆରମ୍ଭ କରିବ।",
       "resumePausedDescription": "ଆପଣଙ୍କ Kilo Pass ଏହାର ନିର୍ଧାରିତ ପୁନଃଆରମ୍ଭ ତାରିଖ ପୂର୍ବରୁ ଏବେ ପୁନଃଆରମ୍ଭ ହେବ।",
@@ -3123,9 +3116,6 @@
     "bonusFree": "ମାଗଣା ବୋନସ",
     "bonusReferral": "ରେଫରାଲ୍ ବୋନସ",
     "bonusAvailable": "ଉପଲବ୍ଧ ମାଗଣା ବୋନସ",
-    "kiloPassManagement": "Kilo Pass ପରିଚାଳନା",
-    "kiloPassSetup": "Kilo Pass ସେଟଅପ୍",
-    "opensManagementOnWeb": "ୱେବ୍‌ରେ Kilo Pass ପରିଚାଳନା ପୃଷ୍ଠା ଖୋଲେ।",
     "loadFailedRetry": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "legalTermsOfUse": "ବ୍ୟବହାର ନିୟମାବଳୀ (EULA)",
     "purchaseDifferentAccount": "ଏହି App Store କ୍ରୟ ଆପଣଙ୍କ Kilo ଆକାଉଣ୍ଟ ସହ ଯୋଡ଼ାଯାଇନାହିଁ। କ୍ରୟ ପାଇଁ ବ୍ୟବହାର କରିଥିବା Apple Account ରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -3311,7 +3301,6 @@
       "buySeats": "ସିଟ୍ କିଣନ୍ତୁ",
       "setupAutoTopUp": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ସେଟ୍ ଅପ୍ କରନ୍ତୁ",
       "manageAutoTopUp": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ପରିଚାଳନା କରନ୍ତୁ",
-      "webAddress": "ୱେବ୍ ଠିକଣା {{url}}",
       "opensOnWeb": "ୱେବ୍‌ରେ ଖୋଲେ"
     },
     "boundary": {
@@ -3453,9 +3442,6 @@
       "groups": "ଗ୍ରୁପ୍",
       "guardrails": "ଗାର୍ଡରେଲ୍",
       "byok": "ନିଜର କି ଆଣନ୍ତୁ",
-      "ssoAndDomain": "SSO ଏବଂ ଡୋମେନ୍",
-      "emailPreferences": "ଇମେଲ୍ ପସନ୍ଦ",
-      "dataCollection": "ଡାଟା ସଂଗ୍ରହ",
       "auditLogs": "ଅଡିଟ୍ ଲଗ୍",
       "requestLogs": "ଅନୁରୋଧ ଲଗ୍",
       "subOrganizations": "ଉପ-ସଂଗଠନ",
@@ -3495,8 +3481,7 @@
       "paymentPending": "ପେମେଣ୍ଟ ଅପେକ୍ଷାରେ",
       "processingBlocked": "ପ୍ରକ୍ରିୟାକରଣ ଅଟକିଛି",
       "processingNeedsReview": "ପ୍ରକ୍ରିୟାକରଣର ସମୀକ୍ଷା ଆବଶ୍ୟକ",
-      "retryHint": "Kilo Pass ସ୍ଥିତି ପୁଣି ଲୋଡ୍ କରିବାକୁ ଚେଷ୍ଟା କରେ।",
-      "setupHint": "ୱେବ୍‌ରେ Kilo Pass ସେଟଅପ୍ ଖୋଲେ।"
+      "retryHint": "Kilo Pass ସ୍ଥିତି ପୁଣି ଲୋଡ୍ କରିବାକୁ ଚେଷ୍ଟା କରେ।"
     }
   },
   "authErrors": {

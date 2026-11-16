@@ -38,6 +38,12 @@ const METRIC_OPTIONS = [
   { value: 'tokens', labelKey: 'codeReviewer.reviewDetail.tokens' },
 ] as const;
 
+/**
+ * One tile of the totals grid. The caption sits directly under the value, and
+ * the detail line follows it: a wrapped detail then grows the tile downwards
+ * without pushing this tile's caption off the line its row partner uses, and it
+ * keeps the full input and output figures readable instead of ellipsized.
+ */
 function StatTile({
   label,
   value,
@@ -50,12 +56,8 @@ function StatTile({
   return (
     <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
       <Text className="text-lg font-bold text-foreground">{value}</Text>
-      {subtext !== undefined && (
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {subtext}
-        </Text>
-      )}
       <Text className="text-xs text-muted-foreground">{label}</Text>
+      {subtext !== undefined && <Text className="text-xs text-muted-foreground">{subtext}</Text>}
     </View>
   );
 }

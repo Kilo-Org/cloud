@@ -595,4 +595,103 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       });
     });
   });
+
+  describe('upstream fetch failures', () => {
+    function requestWithSignal(signal: AbortSignal) {
+      return new NextRequest('http://localhost:3000/api/gateway/embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+        body: JSON.stringify({ model, input: 'hello world' }),
+        signal,
+      });
+    }
+
+    function expectFailureMetrics(statusCode: number) {
+      expect(countAndStoreEmbeddingUsage).not.toHaveBeenCalled();
+      expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
+      expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode, completeRequestMs: expect.any(Number) })
+      );
+    }
+
+    it('answers a network failure with a classified 503', async () => {
+      mockedFetch.mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+        })
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.upstream_disconnect,
+        message: 'The upstream provider closed the connection before sending a response.',
+      });
+      expect(captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            source: 'ai-gateway-upstream-fetch',
+            failure_family: 'conn_reset',
+          }),
+        })
+      );
+      expectFailureMetrics(503);
+    });
+
+    it('stops the upstream call within the route duration and answers a classified 503', async () => {
+      const { EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS, handleEmbeddingsRequest } =
+        await import('./embeddings');
+      const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+      const budgetTimer = new AbortController();
+      const timeoutSpy = jest
+        .spyOn(AbortSignal, 'timeout')
+        .mockImplementation(ms =>
+          ms === EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS ? budgetTimer.signal : originalTimeout(ms)
+        );
+      mockedFetch.mockImplementation(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            signal?.addEventListener('abort', () => reject(signal.reason));
+            budgetTimer.abort();
+          })
+      );
+
+      try {
+        const response = await handleEmbeddingsRequest(makeRequest());
+
+        expect(timeoutSpy).toHaveBeenCalledWith(EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS);
+        expect(response.status).toBe(503);
+        await expect(response.json()).resolves.toMatchObject({
+          error_type: ProxyErrorType.upstream_disconnect,
+          message:
+            'The upstream provider did not send response headers before the gateway timeout.',
+        });
+        expectFailureMetrics(503);
+      } finally {
+        timeoutSpy.mockRestore();
+      }
+    });
+
+    it('answers 499 without reporting an upstream failure when the client leaves', async () => {
+      const controller = new AbortController();
+      mockedFetch.mockImplementation(async () => {
+        controller.abort();
+        throw new DOMException('This operation was aborted', 'AbortError');
+      });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(requestWithSignal(controller.signal));
+
+      expect(response.status).toBe(499);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.client_disconnect,
+      });
+      expect(captureException).not.toHaveBeenCalled();
+      expectFailureMetrics(499);
+    });
+  });
 });

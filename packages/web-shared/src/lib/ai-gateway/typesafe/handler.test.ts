@@ -27,6 +27,12 @@ import {
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type * as LlmProxyHelpers from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import type * as UpstreamRequest from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import type * as UpstreamUrlPolicy from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import {
+  isUpstreamUrlPolicyEnforced,
+  rejectDisallowedUpstreamUrls,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
@@ -122,19 +128,30 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
   mapToUsageStats: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request', () => ({
+  ...jest.requireActual<typeof UpstreamRequest>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request'
+  ),
   fetchGeneration: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy', () => ({
+  ...jest.requireActual<typeof UpstreamUrlPolicy>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy'
+  ),
+  isUpstreamUrlPolicyEnforced: jest.fn(),
+  rejectDisallowedUpstreamUrls: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitGatewayApiMetrics: jest.fn(),
 }));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
-// The handler reads `performance.now()` once per measured point: request start, first byte, then
-// the metrics read. Advancing by one step per read makes each measured interval exact.
+// The handler reads `performance.now()` once per measured point: request start, the upstream
+// fetch start and its headers (read by `fetchUpstream`), first byte, then the metrics read.
+// Advancing by one step per read makes each measured interval exact.
 const CLOCK_START_MS = 1_000;
 const CLOCK_STEP_MS = 500;
-const METERED_LATENCY_MS = CLOCK_STEP_MS;
-const METERED_COMPLETE_REQUEST_MS = 2 * CLOCK_STEP_MS;
+const METERED_LATENCY_MS = 3 * CLOCK_STEP_MS;
+const METERED_COMPLETE_REQUEST_MS = 4 * CLOCK_STEP_MS;
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
 const pricedSystemOneModels: Record<string, GatewayModelWithEndpoints> = {
@@ -256,9 +273,13 @@ function upstreamRequest() {
 }
 
 function deferredUsageCallbacks(): Array<() => Promise<unknown>> {
-  return jest
-    .mocked(after)
-    .mock.calls.map(([arg]) => arg)
+  // `fetchUpstream` registers its budget-timer cleanup before it calls fetch; the usage writes
+  // come after the fetch.
+  const fetchedAt = mockedFetch.mock.invocationCallOrder[0] ?? 0;
+  const { calls, invocationCallOrder } = jest.mocked(after).mock;
+  return calls
+    .filter((_call, index) => invocationCallOrder[index] > fetchedAt)
+    .map(([arg]) => arg)
     .filter((arg): arg is () => Promise<unknown> => typeof arg === 'function');
 }
 
@@ -918,12 +939,11 @@ describe('handleSystemOneRequest', () => {
     {
       case: 'a transport failure',
       arrange: () => mockedFetch.mockRejectedValue(new Error('connection failed')),
-      message: 'OpenRouter System One request failed',
       latency: null,
     },
   ])(
     'records a zero-cost attempt row when the upstream call ends with $case',
-    async ({ arrange, message, latency }) => {
+    async ({ arrange, latency }) => {
       mockMeteredClock();
       arrange();
 
@@ -935,8 +955,8 @@ describe('handleSystemOneRequest', () => {
         error_type: 'upstream_error',
       });
       expect(errorExceptInTest).toHaveBeenCalledWith(
-        message,
-        expect.objectContaining({ message: expect.any(String) })
+        'AI gateway upstream fetch failed',
+        expect.objectContaining({ path: '/systemone', failureFamily: 'unknown' })
       );
       await runAfter();
       expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
@@ -1109,19 +1129,36 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it('records a duration-bound attempt row when the upstream call times out', async () => {
-    mockedFetch.mockRejectedValue(
-      new DOMException('The operation was aborted due to timeout', 'TimeoutError')
-    );
+  it.each([
+    ['the gateway duration budget', new DOMException('The operation was aborted', 'TimeoutError')],
+    [
+      "undici's header timeout",
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('Headers Timeout Error'), {
+          code: 'UND_ERR_HEADERS_TIMEOUT',
+        }),
+      }),
+    ],
+  ])(
+    'records a duration-bound attempt row when %s ends the upstream call',
+    async (_case, error) => {
+      mockedFetch.mockRejectedValue(error);
 
-    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+      const response = await handleSystemOneRequest(makeRequest());
 
-    await runAfter();
-    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
-      expect.objectContaining({ hasError: true, status_code: 504, cost_mUsd: 0 }),
-      expect.objectContaining({ status_code: 504 })
-    );
-  });
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({
+        message: 'Upstream request failed',
+        error_type: 'upstream_error',
+      });
+
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ hasError: true, status_code: 504, cost_mUsd: 0 }),
+        expect.objectContaining({ status_code: 504 })
+      );
+    }
+  );
 
   it.each([
     ['missing usage', undefined],
@@ -1287,6 +1324,23 @@ describe('handleSystemOneRequest', () => {
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
     expect(captureException).not.toHaveBeenCalled();
     expect(fetchGeneration).not.toHaveBeenCalled();
+  });
+
+  it('returns a URL policy refusal without sending or recording', async () => {
+    const refusal = NextResponse.json({ error_type: 'upstream_url_rejected' }, { status: 503 });
+    jest.mocked(isUpstreamUrlPolicyEnforced).mockReturnValue(true);
+    jest.mocked(rejectDisallowedUpstreamUrls).mockResolvedValue(refusal);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response).toBe(refusal);
+    expect(mockedFetch).not.toHaveBeenCalled();
+    // The only deferred work is `fetchUpstream`'s budget-timer cleanup.
+    for (const [callback] of jest.mocked(after).mock.calls) {
+      if (typeof callback === 'function') await callback();
+    }
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    expect(emitGatewayApiMetrics).not.toHaveBeenCalled();
   });
 
   it('answers 499 without sending or recording when the client left before the upstream call', async () => {

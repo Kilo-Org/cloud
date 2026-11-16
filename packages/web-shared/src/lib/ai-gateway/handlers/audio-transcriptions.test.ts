@@ -20,6 +20,7 @@ import {
   countAndStoreTranscriptionUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
@@ -851,5 +852,119 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'model not found' });
+  });
+
+  describe('upstream fetch failures', () => {
+    const transcriptionBody = {
+      model: 'openai/gpt-4o-mini-transcribe',
+      input_audio: { data: 'UklGRiQA', format: 'wav' },
+    };
+
+    function expectFailureMetrics(statusCode: number) {
+      expect(countAndStoreTranscriptionUsage).not.toHaveBeenCalled();
+      expect(mockedEmitApiMetricsForResponse).not.toHaveBeenCalled();
+      expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode, completeRequestMs: expect.any(Number) })
+      );
+    }
+
+    it.each([
+      ['JSON', () => makeRequest(transcriptionBody)],
+      [
+        'multipart',
+        () =>
+          makeMultipartRequest(
+            { model: 'openai/gpt-4o-mini-transcribe' },
+            { blob: new Blob(['UklGRiQA']), filename: 'speech.wav' }
+          ),
+      ],
+    ])('answers a network failure of a %s request with a classified 503', async (_kind, build) => {
+      setUserAuth();
+      mockedFetch.mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+        })
+      );
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(build() as never);
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        error_type: 'upstream_disconnect',
+        message: 'The upstream provider closed the connection before sending a response.',
+      });
+      expect(mockedCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            source: 'ai-gateway-upstream-fetch',
+            failure_family: 'conn_reset',
+          }),
+        })
+      );
+      expectFailureMetrics(503);
+    });
+
+    it('stops the upstream call within the route duration and answers a classified 503', async () => {
+      setUserAuth();
+      const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+      const budgetTimer = new AbortController();
+      const timeoutSpy = jest
+        .spyOn(AbortSignal, 'timeout')
+        .mockImplementation(ms =>
+          ms === UPSTREAM_DURATION_BUDGET_MS ? budgetTimer.signal : originalTimeout(ms)
+        );
+      mockedFetch.mockImplementation(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            signal?.addEventListener('abort', () => reject(signal.reason));
+            budgetTimer.abort();
+          })
+      );
+
+      try {
+        const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+        const response = await handleAudioTranscriptionsRequest(
+          makeRequest(transcriptionBody) as never
+        );
+
+        expect(timeoutSpy).toHaveBeenCalledWith(UPSTREAM_DURATION_BUDGET_MS);
+        expect(response.status).toBe(503);
+        expect(await response.json()).toMatchObject({
+          error_type: 'upstream_disconnect',
+          message:
+            'The upstream provider did not send response headers before the gateway timeout.',
+        });
+        expectFailureMetrics(503);
+      } finally {
+        timeoutSpy.mockRestore();
+      }
+    });
+
+    it('answers 499 without reporting an upstream failure when the client leaves', async () => {
+      setUserAuth();
+      const controller = new AbortController();
+      mockedFetch.mockImplementation(async () => {
+        controller.abort();
+        throw new DOMException('This operation was aborted', 'AbortError');
+      });
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(
+        new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+          body: JSON.stringify(transcriptionBody),
+          signal: controller.signal,
+        }) as never
+      );
+
+      expect(response.status).toBe(499);
+      expect(await response.json()).toMatchObject({ error_type: 'client_disconnect' });
+      expect(mockedCaptureException).not.toHaveBeenCalled();
+      expectFailureMetrics(499);
+    });
   });
 });

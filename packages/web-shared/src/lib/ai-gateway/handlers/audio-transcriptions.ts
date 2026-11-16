@@ -17,7 +17,6 @@ import {
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { providerPreferencesSchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -40,7 +39,10 @@ import {
   type TranscriptionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/transcriptions/transcription-request';
 import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  fetchUpstream,
+  UPSTREAM_DURATION_BUDGET_MS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   gatewayUsageContextBase,
@@ -55,37 +57,6 @@ import {
   rawClientIp,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
-
-async function transcriptionProxyRequest(params: {
-  body: Record<string, unknown> | FormData;
-  provider: Provider;
-  signal?: AbortSignal;
-}) {
-  const { body, provider, signal } = params;
-  // No explicit Content-Type for a multipart body: fetch sets the boundary.
-  const isMultipartBody = body instanceof FormData;
-  const headers = new Headers();
-  if (!isMultipartBody) {
-    headers.set('Content-Type', 'application/json');
-  }
-  headers.set('Authorization', `Bearer ${provider.apiKey}`);
-
-  for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
-    headers.set(key, value);
-  }
-
-  const timeout = AbortSignal.timeout(10 * 60 * 1000);
-  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-
-  return await fetch(`${provider.apiUrl}/audio/transcriptions`, {
-    method: 'POST',
-    headers,
-    body: isMultipartBody ? body : JSON.stringify(body),
-    // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
-    duplex: 'half',
-    signal: combined,
-  });
-}
 
 /** Prompt info attributed from a multipart upload: file name and size. */
 function extractMultipartPromptInfo(file: File, language: string | null): PromptInfo {
@@ -334,14 +305,19 @@ export async function handleAudioTranscriptionsRequest(
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
 
-  const response = await transcriptionProxyRequest({
-    body: upstreamBody,
+  const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
+  // The route's maxDuration matches chat's, and so does the usage work after the response.
+  const upstream = await fetchUpstream({
     provider,
+    path: '/audio/transcriptions',
+    method: 'POST',
+    body: upstreamBody,
     signal: request.signal,
+    vercelRequestId,
+    durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.status_code = response.status;
 
   const metricsParams = {
     kiloUserId: user.id,
@@ -355,8 +331,15 @@ export async function handleAudioTranscriptionsRequest(
     toolsAvailable: [],
     toolsUsed: [],
     ttfbMs,
-    statusCode: response.status,
+    statusCode: upstream.response.status,
   };
+
+  if (upstream.type === 'error') {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
+    return upstream.response;
+  }
+  const { response } = upstream;
+  usageContext.status_code = response.status;
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
@@ -382,6 +365,6 @@ export async function handleAudioTranscriptionsRequest(
   return await rewriteModelResponse_UsageEndpoint({
     response,
     usageContext: responseUsageContext(usageContext, await getCustomPricingConfig()),
-    vercelRequestId: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+    vercelRequestId,
   });
 }

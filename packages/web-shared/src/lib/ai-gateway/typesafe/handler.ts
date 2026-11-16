@@ -10,7 +10,10 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
-import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  extractHeaderAndLimitLength,
+  wrapInSafeNextResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   gatewayUsageContextBase,
   organizationProviderPreferences,
@@ -18,7 +21,6 @@ import {
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   logMicrodollarUsageAndReportToBouncer,
@@ -29,7 +31,11 @@ import type {
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { parseUsageWithRecovery } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
-import { fetchGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import {
+  fetchGeneration,
+  fetchUpstream,
+  UPSTREAM_DURATION_BUDGET_MS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
@@ -66,12 +72,6 @@ import {
   startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 
-/**
- * One upstream System One call, from the fetch through the last body byte. The
- * route's maxDuration leaves room for the deferred usage work after it.
- */
-const SYSTEM_ONE_UPSTREAM_TIMEOUT_MS = 10 * 60 * 1000;
-
 const generationIdSchema = z.object({ id: z.string().min(1) });
 
 /** A body the gateway could not use may still name the model the provider billed. */
@@ -79,18 +79,6 @@ const providerModelSchema = z.object({ model: z.string().trim().min(1) });
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
-}
-
-/**
- * `AbortSignal.timeout` rejects the fetch with its own `TimeoutError` reason, so
- * this tells a duration bound from a provider or transport failure without
- * trusting the error message.
- */
-function isUpstreamTimeoutError(error: unknown): boolean {
-  if (error instanceof DOMException) return error.name === 'TimeoutError';
-  if (!(error instanceof Error)) return false;
-  if (error.name === 'TimeoutError') return true;
-  return error.cause instanceof DOMException && error.cause.name === 'TimeoutError';
 }
 
 async function isSystemOneModel(modelId: string) {
@@ -370,12 +358,12 @@ export async function handleSystemOneRequest(request: NextRequest) {
    * gateway measured, which is absent only when no response ever arrived.
    */
   const upstreamFailureResponse = (
-    error: unknown,
+    timedOut: boolean,
     measuredTtfbMs: number | null,
     recordUsage = true
   ) => {
     if (recordUsage) {
-      deferZeroCostUsage(null, isUpstreamTimeoutError(error) ? 504 : 502, measuredTtfbMs);
+      deferZeroCostUsage(null, timedOut ? 504 : 502, measuredTtfbMs);
     }
     if (request.signal.aborted) {
       return errorResponse(
@@ -396,33 +384,31 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
-  let response: Response;
-  let ttfbMs: number;
-  try {
-    response = await fetch(`${OPENROUTER.apiUrl}/systemone`, {
-      method: 'POST',
-      headers: {
-        ...ATTRIBUTION_HEADERS,
-        Authorization: `Bearer ${OPENROUTER.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...parsed.data,
-        provider: providerPolicy,
-        user: generateProviderSpecificHash(user.id, OPENROUTER),
-      }),
-      // The provider's outcome decides what this request costs, and a client that
-      // leaves does not undo a generation the provider already started. Only the
-      // duration bound stops the call, so a disconnect still reaches the usage
-      // record below instead of discarding it.
-      signal: AbortSignal.timeout(SYSTEM_ONE_UPSTREAM_TIMEOUT_MS),
-    });
-    ttfbMs = Math.max(0, Math.round(performance.now() - startedAt));
-  } catch (error) {
+  const upstream = await fetchUpstream({
+    provider: OPENROUTER,
+    path: '/systemone',
+    method: 'POST',
+    body: {
+      ...parsed.data,
+      provider: providerPolicy,
+      user: generateProviderSpecificHash(user.id, OPENROUTER),
+    },
+    // No `signal`: the provider's outcome decides what this request costs, and a
+    // client that leaves does not undo a generation the provider already started.
+    // Only the duration bound stops the call, so a disconnect still reaches the
+    // usage record below instead of discarding it.
+    vercelRequestId: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+    // The route's maxDuration matches chat's, and so does the usage work after the response.
+    durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+  });
+  if (upstream.type === 'error') {
+    // The URL policy refused the call before the provider generated anything.
+    if (!upstream.fetchFailure) return upstream.response;
     // No response arrived, so this request has no first byte to report.
-    errorExceptInTest('OpenRouter System One request failed', error);
-    return upstreamFailureResponse(error, null);
+    return upstreamFailureResponse(upstream.fetchFailure.timedOut, null);
   }
+  const { response } = upstream;
+  const ttfbMs = Math.max(0, Math.round(performance.now() - startedAt));
 
   if (!response.ok) {
     if (response.status === 402) {
@@ -478,7 +464,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
       },
       context
     );
-    if (!bodyRead) return upstreamFailureResponse(undefined, ttfbMs, false);
+    if (!bodyRead) return upstreamFailureResponse(false, ttfbMs, false);
     return errorResponse('Invalid upstream response', 'upstream_error', 502);
   }
 

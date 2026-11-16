@@ -13,6 +13,8 @@ import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-l
 import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { TRPCError } from '@trpc/server';
 
 type ValidationResult = { valid: true } | { valid: false; reason: 'unavailable' };
 
@@ -34,6 +36,28 @@ function validationResult(available: boolean) {
   );
 }
 
+async function organizationCatalog(
+  organizationId: string,
+  kiloUserId: string,
+  countryCode: string | null
+): Promise<OpenRouterModelsResponse | null> {
+  try {
+    return await getAvailableModelsForOrganization(
+      organizationId,
+      { type: 'member', kiloUserId },
+      'member',
+      { fromDb: readDb, countryCode }
+    );
+  } catch (error) {
+    // An organization that no longer exists is not a server fault and offers nothing
+    // to retry, so it reads as no models rather than a failed check.
+    if (error instanceof TRPCError && error.code === 'NOT_FOUND') {
+      return null;
+    }
+    throw error;
+  }
+}
+
 /**
  * Answers from the member-effective organization catalog, the same catalog the
  * organization model routes list and the gateway enforces at inference time. The
@@ -46,11 +70,10 @@ async function validateForOrganizationMember(params: {
   modelId: string;
   countryCode: string | null;
 }) {
-  const result = await getAvailableModelsForOrganization(
+  const result = await organizationCatalog(
     params.organizationId,
-    { type: 'member', kiloUserId: params.kiloUserId },
-    'member',
-    { fromDb: readDb, countryCode: params.countryCode }
+    params.kiloUserId,
+    params.countryCode
   );
   if (!result) {
     return validationResult(false);

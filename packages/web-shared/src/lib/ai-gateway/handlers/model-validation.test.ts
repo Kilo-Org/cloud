@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { TRPCError } from '@trpc/server';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
@@ -258,6 +259,18 @@ describe('POST /api/openrouter/models/validate', () => {
         userId: 'member-1',
         organizationId: 'org-1',
       });
+    });
+
+    test('reports unavailable when the organization no longer exists', async () => {
+      signInAsOrganizationMember();
+      mockedGetAvailableModelsForOrganization.mockRejectedValue(
+        new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' })
+      );
+
+      const response = await handleModelValidationRequest(request('org/available'));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
     });
 
     test('keeps the personal catalog for a personal credential', async () => {

@@ -241,17 +241,13 @@ async function openWithKey(key: string): Promise<KVDatabase> {
   }
 }
 
-/**
- * Thrown when the migrations fail on a file that opened and keyed correctly.
- * Distinct from a corrupt file, because delete-and-recreate would discard a
- * readable file that the migration itself did not damage.
- */
-class SchemaMigrationError extends Error {
-  constructor(cause: unknown) {
-    super('encrypted-kv: schema migration failed on a keyed database', { cause });
-    this.name = 'SchemaMigrationError';
-  }
-}
+// A failed migration is tagged with this message before it leaves
+// `migrateSchema`. The open catch reads the tag: a migration failed on a file
+// that opened and keyed correctly, which delete-and-recreate must not touch —
+// it would discard a readable file the migration itself did not damage. A
+// class would trip the file's one-class lint rule, so the tag travels on a
+// plain Error.
+const MIGRATION_FAILURE_MESSAGE = 'encrypted-kv: schema migration failed on a keyed database';
 
 function probeSchema(db: KVDatabase): void {
   // A wrong key or a corrupt file makes this throw (DEC-01 step 3).
@@ -267,7 +263,11 @@ async function migrateSchema(db: KVDatabase): Promise<void> {
     await migrate(db, migrations);
   } catch (error) {
     // Tag the failure so the open can tell it apart from a corrupt file.
-    throw new SchemaMigrationError(error);
+    if (error instanceof Error && error.message !== MIGRATION_FAILURE_MESSAGE) {
+      const tagged = new Error(MIGRATION_FAILURE_MESSAGE, { cause: error });
+      throw tagged;
+    }
+    throw error;
   }
 }
 
@@ -314,7 +314,7 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     // The file opened and keyed correctly, so the migration failed on readable
     // data. Report it and rethrow: deleting the file would lose the chats and
     // conversation tables the failure never touched.
-    if (openError instanceof SchemaMigrationError) {
+    if (openError instanceof Error && openError.message === MIGRATION_FAILURE_MESSAGE) {
       if (db) {
         await closeQuietly(db.$client);
       }

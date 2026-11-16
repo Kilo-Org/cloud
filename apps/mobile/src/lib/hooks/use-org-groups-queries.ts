@@ -13,10 +13,31 @@ type OrgGroupList = RouterOutputs['organizations']['groups']['list'];
 export type OrgGroup = Extract<OrgGroupList, { access: 'manager' }>['groups'][number];
 
 /**
+ * One group, as the update and delete procedures take it. `get` answers the same
+ * manager record the list's manager branch carries, so the edit screen resolves a
+ * group from it without depending on that branch.
+ */
+export function useOrgGroup(
+  organizationId: string | null,
+  groupId: string | null,
+  enabled: boolean
+) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.groups.get.queryOptions(
+      { organizationId: organizationId ?? '', groupId: groupId ?? '' },
+      { enabled: enabled && organizationId != null && groupId != null }
+    )
+  );
+}
+
+/**
  * The organization's groups. The procedure answers a manager shape (every
- * group, with its members and policies) to an owner, admin or billing manager,
- * and a member shape (the caller's own groups) to everyone else, so the screen
- * renders whichever arrived.
+ * group, with its members and policies) to the owner or billing manager, the
+ * two access levels it treats as billing, and a member shape (the caller's own
+ * groups) to everyone else, so the screen renders whichever arrived. An admin
+ * gets the member shape here; the form resolves its own record through
+ * {@link useOrgGroup} for that reason.
  */
 export function useOrgGroups(organizationId: string | null, enabled: boolean) {
   const trpc = useTRPC();

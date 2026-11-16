@@ -14,7 +14,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useOrgGroups } from '@/lib/hooks/use-org-groups-queries';
+import { useOrgGroup } from '@/lib/hooks/use-org-groups-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups';
@@ -27,22 +27,46 @@ const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups';
  * saves the metadata together with the member selection, which is the one
  * `updateDetails` call the web panel makes.
  *
- * Only an owner or admin may change a group — the mutations are
+ * Groups are an Enterprise feature (the web page redirects every lower plan),
+ * so both paths refuse a lower plan here instead of mounting a form the server
+ * would reject. Only an owner or admin may change a group — the mutations are
  * `organizationAdminMutationProcedure` — so a member who reaches the route by a
- * deep link sees the refusal rather than a form the server would reject.
+ * deep link sees the refusal rather than a form the server would reject. The
+ * edited group is resolved through `groups.get`, because `groups.list` answers
+ * the manager shape to an owner or billing manager only and an admin may still
+ * edit the group.
  */
 export function OrganizationGroupFormScreen() {
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const { t } = useTranslation();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const enterprise = org?.plan === 'enterprise';
-  const groupsQuery = useOrgGroups(organizationId, enterprise);
+  const canManage = canManageOrganization(role);
+  const groupQuery = useOrgGroup(organizationId, groupId ?? null, enterprise && canManage);
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t('organization.settingsOnWeb.groups')} />;
   }
 
-  if (groupId !== undefined && groupsQuery.isPending) {
+  if (!enterprise) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
+        <EmptyState icon={Users} placement="top" title={t('organization.groups.enterpriseOnly')} />
+      </View>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
+        <PermissionDenied description={t('organization.groups.permissionDenied')} />
+      </View>
+    );
+  }
+
+  if (groupId !== undefined && groupQuery.isPending) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
@@ -54,34 +78,21 @@ export function OrganizationGroupFormScreen() {
     );
   }
 
-  if (groupsQuery.isError) {
-    const errorView = selectOrgListErrorView(groupsQuery.error);
+  if (groupQuery.isError) {
+    const errorView = selectOrgListErrorView(groupQuery.error);
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
         <QueryError
           variant={errorView.variant}
-          onRetry={errorView.showRetry ? () => void groupsQuery.refetch() : undefined}
-          isRetrying={groupsQuery.isFetching}
+          onRetry={errorView.showRetry ? () => void groupQuery.refetch() : undefined}
+          isRetrying={groupQuery.isFetching}
         />
       </View>
     );
   }
 
-  if (!canManageOrganization(role)) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-        <PermissionDenied description={t('organization.groups.permissionDenied')} />
-      </View>
-    );
-  }
-
-  const data = groupsQuery.data;
-  const group =
-    groupId === undefined || data?.access !== 'manager'
-      ? undefined
-      : data.groups.find(candidate => candidate.id === groupId);
+  const group = groupId === undefined ? undefined : groupQuery.data?.group;
 
   if (groupId !== undefined && group === undefined) {
     return <GroupNotFound />;

@@ -1,12 +1,7 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import {
-  exa_monthly_usage,
-  exa_usage_log,
-  kilocode_users,
-  organization_memberships,
-  type User,
-} from '@kilocode/db/schema';
+import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
@@ -79,7 +74,8 @@ const WRITE_IDLE_TIMEOUT_MS = 60_000;
 
 /**
  * Records the source row, monthly counter, and charged owner mutation atomically.
- * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge.
+ * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge; a
+ * committed record keeps answering `duplicate` even when its payer no longer resolves.
  * A record whose named payer cannot be resolved resolves to `rejected` and writes
  * nothing; low-balance notification scheduling happens only after a commit.
  */
@@ -119,6 +115,14 @@ export async function recordExaUsage(
       organizationId: organizationId ?? null,
     });
     if (rejectionReason) {
+      const [committed] = await tx
+        .select({ id: exa_usage_log.id })
+        .from(exa_usage_log)
+        .where(and(eq(exa_usage_log.id, id), eq(exa_usage_log.created_at, occurredAt)))
+        .limit(1);
+      if (committed) {
+        return { status: 'duplicate' as const, organizationUsage: null };
+      }
       return { status: 'rejected' as const, organizationUsage: null, rejectionReason };
     }
 
@@ -185,8 +189,8 @@ export async function recordExaUsage(
 
 /**
  * Resolves the payer a record names inside the writing transaction. A record is
- * written only when its user exists and a non-null organization is one the user
- * belongs to; otherwise the payer cannot be charged and nothing may be recorded.
+ * written only when its user exists and a non-null organization is a live one the
+ * user belongs to; otherwise the payer cannot be charged and nothing may be recorded.
  */
 async function unresolvablePayer(
   tx: DrizzleTransaction,
@@ -201,17 +205,9 @@ async function unresolvablePayer(
 
   if (params.organizationId === null) return null;
 
-  const [membership] = await tx
-    .select({ kilo_user_id: organization_memberships.kilo_user_id })
-    .from(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.organization_id, params.organizationId),
-        eq(organization_memberships.kilo_user_id, params.userId)
-      )
-    )
-    .limit(1);
-  if (!membership) return 'organization_membership_missing';
+  if (!(await isOrganizationMember(tx, params.organizationId, params.userId))) {
+    return 'organization_membership_missing';
+  }
 
   return null;
 }

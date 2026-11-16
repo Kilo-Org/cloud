@@ -10,10 +10,11 @@ import {
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_qualifying_spend_events,
   kilocode_users,
+  organization_memberships,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
@@ -454,6 +455,129 @@ describe('Exa Usage Tracking', () => {
         '[exa-usage] usage record rejected: payer could not be resolved',
         { usage_id: identity.id, reason: 'organization_membership_missing' }
       );
+    });
+
+    test('rejects an organization record once the organization is marked deleted', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const user = await insertTestUser({
+        microdollars_used: 0,
+        total_microdollars_acquired: 100_000_000,
+      });
+      const organization = await createTestOrganization(
+        `exa-deleted-org-${crypto.randomUUID()}`,
+        user.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(organization.id);
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      const identity = usageIdentity();
+
+      await expect(
+        recordExaUsage({
+          ...identity,
+          userId: user.id,
+          organizationId: organization.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).resolves.toBe('rejected');
+
+      const membershipRows = await db
+        .select()
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, user.id)
+          )
+        );
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.organization_id, organization.id));
+      const monthlyRows = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+      const memberUsageRows = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+
+      expect(membershipRows).toHaveLength(1);
+      expect(sourceRows).toHaveLength(0);
+      expect(monthlyRows).toHaveLength(0);
+      expect(memberUsageRows).toHaveLength(0);
+      expect(chargedOrganization.microdollars_used).toBe(0);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        '[exa-usage] usage record rejected: payer could not be resolved',
+        { usage_id: identity.id, reason: 'organization_membership_missing' }
+      );
+    });
+
+    test('answers duplicate when a committed record is replayed after its membership is removed', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const user = await insertTestUser({
+        microdollars_used: 0,
+        total_microdollars_acquired: 100_000_000,
+      });
+      const organization = await createTestOrganization(
+        `exa-replay-${crypto.randomUUID()}`,
+        user.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(organization.id);
+      const record: ExaUsageRecord = {
+        ...usageIdentity(),
+        userId: user.id,
+        organizationId: organization.id,
+        path: '/contents',
+        costMicrodollars: 9000,
+        chargedToBalance: true,
+        freeAllowanceMicrodollars: 10_000_000,
+      };
+
+      await expect(recordExaUsage(record)).resolves.toBe('recorded');
+
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, user.id)
+          )
+        );
+
+      await expect(recordExaUsage(record)).resolves.toBe('duplicate');
+
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.organization_id, organization.id));
+      const memberUsageRows = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+
+      expect(sourceRows).toHaveLength(1);
+      expect(memberUsageRows).toHaveLength(1);
+      expect(memberUsageRows[0].microdollar_usage).toBe(9000);
+      expect(chargedOrganization.microdollars_used).toBe(9000);
+      expect(consoleError).not.toHaveBeenCalled();
     });
 
     test('does not deduct from balance when chargedToBalance is false', async () => {

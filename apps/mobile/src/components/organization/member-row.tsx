@@ -10,7 +10,7 @@ import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
-import { formatMoney } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
 import { cn, firstNonEmpty } from '@/lib/utils';
@@ -145,10 +145,10 @@ export function MemberRow({
   // run keeps its own left-to-right order inside the pair.
   const dailyLimit = member.dailyUsageLimitUsd;
   const limitText =
-    dailyLimit == null ? null : isolateLtrBidiText(formatMoney(dailyLimit, i18n.language));
+    dailyLimit == null ? null : isolateLtrBidiText(formatPrefixedMoney(dailyLimit, i18n.language));
   const spendText =
     isSalesDemo && currentDailyUsageUsd != null
-      ? isolateLtrBidiText(formatMoney(currentDailyUsageUsd, i18n.language))
+      ? isolateLtrBidiText(formatPrefixedMoney(currentDailyUsageUsd, i18n.language))
       : null;
   // Web pairs the two amounts only when both exist and the organization is a
   // sales demo; every other case keeps the limit line alone.

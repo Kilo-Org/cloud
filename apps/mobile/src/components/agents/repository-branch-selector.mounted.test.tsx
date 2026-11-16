@@ -26,6 +26,11 @@ vi.mock('expo-router', () => ({
   useRouter: () => router,
   // The selector only builds an href literal; Href stays a type.
 }));
+// The picker opener goes through the guarded push, which forwards to the same
+// router spy asserted below.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => router.push,
+}));
 vi.mock('react-native', async () => {
   const React = await import('react');
   return {

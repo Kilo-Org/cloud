@@ -1,5 +1,5 @@
 import type { Part } from '@kilocode/app-shared/opencode';
-import type { MessageInfo } from '../types';
+import type { MessageInfo, ReadonlyPart } from '../types';
 import {
   EMPTY_PARTS,
   appendPartTextChunks,
@@ -11,8 +11,11 @@ import {
   forgetPartUpdateTime,
   insertSortedBy,
   isSupportedDeltaField,
+  messageIdsKey,
+  messageKey,
   messageIdKey,
   orderMessageIds,
+  partsKey,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
@@ -697,6 +700,17 @@ describe('createReadonlyPartView', () => {
     delete (view as Record<string, unknown>)['text'];
     expect((view as Part & { text: string }).text).toBe('hello');
   });
+
+  test('mutations through the view do not reach the stored part', () => {
+    const stored = makePart('p1', 'hello');
+    const view = createReadonlyPartView(stored);
+    (view as { text: string }).text = 'changed';
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete (view as Record<string, unknown>)['id'];
+    expect((stored as Part & { text: string }).text).toBe('hello');
+    expect(stored.id).toBe('p1');
+    expect((view as { text: string }).text).toBe('hello');
+  });
 });
 
 describe('applyTextDeltas', () => {
@@ -761,7 +775,7 @@ describe('appendPartTextChunks', () => {
 
 describe('publishPartsChanged', () => {
   test('invalidates the message snapshot and notifies only its channel', () => {
-    const snapshot = new Map<string, Part[] | null>([['msg-1', [makePart('a')]]]);
+    const snapshot = new Map<string, readonly ReadonlyPart[] | null>([['msg-1', [makePart('a')]]]);
     const partsCallback = jest.fn();
     const messageCallback = jest.fn();
     const subscribers = createSubscriberRegistry();
@@ -794,9 +808,9 @@ describe('createSubscriberRegistry', () => {
     const cb1 = jest.fn();
     const cb2 = jest.fn();
     const registry = createSubscriberRegistry();
-    registry.subscribe('k', cb1);
-    registry.subscribe('k', cb2);
-    registry.notify('k');
+    registry.subscribe(messageKey('msg-1'), cb1);
+    registry.subscribe(messageKey('msg-1'), cb2);
+    registry.notify(messageKey('msg-1'));
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
   });
@@ -804,13 +818,33 @@ describe('createSubscriberRegistry', () => {
   test('no-op for missing key', () => {
     const cb = jest.fn();
     const registry = createSubscriberRegistry();
-    registry.subscribe('k', cb);
-    registry.notify('other');
+    registry.subscribe(partsKey('msg-1'), cb);
+    registry.notify(messageKey('msg-2'));
     expect(cb).not.toHaveBeenCalled();
   });
 
   test('no-op for empty registry', () => {
-    expect(() => createSubscriberRegistry().notify('k')).not.toThrow();
+    expect(() => createSubscriberRegistry().notify(messageIdsKey)).not.toThrow();
+  });
+
+  test('built keys address the channels the registry notifies', () => {
+    const registry = createSubscriberRegistry();
+    const idsCb = jest.fn();
+    const messageCb = jest.fn();
+    const partsCb = jest.fn();
+    registry.subscribe(messageIdsKey, idsCb);
+    registry.subscribe(messageKey('msg-1'), messageCb);
+    registry.subscribe(partsKey('msg-1'), partsCb);
+
+    registry.notifyMessageIds();
+    registry.notifyMessage('msg-1');
+    registry.notifyParts('msg-1');
+
+    expect(idsCb).toHaveBeenCalledTimes(1);
+    expect(messageCb).toHaveBeenCalledTimes(1);
+    expect(partsCb).toHaveBeenCalledTimes(1);
+    registry.notifyMessage('msg-2');
+    expect(messageCb).toHaveBeenCalledTimes(1);
   });
 });
 

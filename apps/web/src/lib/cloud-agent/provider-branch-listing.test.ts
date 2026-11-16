@@ -177,8 +177,32 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('leaves a server-side GitHub failure (5xx) untouched', async () => {
-    const failure = githubRefusal(500, 'Server Error');
+  it('answers a server-side GitHub failure (5xx) retryably instead of a 500', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(500, 'Server Error'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
+  it('answers a 502 retryably', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(502, 'Bad Gateway'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
+  it('rethrows a transport failure with no status unchanged', async () => {
+    const failure = new TypeError('fetch failed');
     mockListGitHubBranches.mockRejectedValue(failure);
 
     await expect(
@@ -188,6 +212,42 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
         repositoryFullName: 'octocat/hello',
       })
     ).rejects.toBe(failure);
+  });
+
+  it('rethrows a branch-mapping defect unchanged instead of blaming the provider', async () => {
+    mockListGitHubBranches.mockResolvedValue({ branches: null });
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toBeInstanceOf(TypeError);
+  });
+
+  it('maps a refused installation credential (401) to the reconnect state', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(401, 'Bad credentials'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  it('maps a legally blocked repository (451) to FORBIDDEN', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(451, 'Repository access blocked'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'blocked/repo',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('returns the listing when GitHub accepts the request', async () => {
@@ -387,6 +447,56 @@ describe('listProviderRepositoryBranches (organization github installations)', (
   it('prefers the retryable state over the install message when one installation is limited', async () => {
     mockListGitHubBranches
       .mockRejectedValueOnce(githubRefusal(404, 'Not Found'))
+      .mockRejectedValueOnce(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
+  });
+
+  it('walks past a refused installation credential to the one that can list', async () => {
+    mockListGitHubBranches
+      .mockRejectedValueOnce(githubRefusal(401, 'Bad credentials'))
+      .mockResolvedValueOnce(listing);
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).resolves.toEqual({
+      defaultBranch: 'main',
+      branches: ['main', 'release'],
+      truncated: false,
+    });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers the reconnect state when every installation credential is refused', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(401, 'Bad credentials'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
+  });
+
+  it('prefers the retryable state over the reconnect state when one installation is limited', async () => {
+    mockListGitHubBranches
+      .mockRejectedValueOnce(githubRefusal(401, 'Bad credentials'))
       .mockRejectedValueOnce(githubRefusal(429, 'Too Many Requests'));
 
     await expect(

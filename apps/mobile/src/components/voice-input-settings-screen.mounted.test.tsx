@@ -52,9 +52,9 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
 }));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push }),
-}));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
+// `openModelPicker` takes the screen's guarded push (this file's spy).
+vi.mock('@/lib/hooks/use-single-push-route', () => ({ useSinglePushRoute: () => push }));
 vi.mock('@/components/ui/icons', () => ({
   Cpu: 'Cpu',
   Globe: 'Globe',

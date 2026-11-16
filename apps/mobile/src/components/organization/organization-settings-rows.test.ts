@@ -52,7 +52,6 @@ function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
 describe('visibleOrgSettingsRows', () => {
   it('lists every area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
-      'usageDetails',
       'customModes',
       'groups',
       'byok',
@@ -67,7 +66,6 @@ describe('visibleOrgSettingsRows', () => {
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
     expect(areas({ role: 'member' })).toEqual([
-      'usageDetails',
       'customModes',
       'groups',
       'ssoAndDomain',
@@ -77,7 +75,6 @@ describe('visibleOrgSettingsRows', () => {
 
   it('drops the enterprise-only rows for a member on teams', () => {
     expect(areas({ role: 'member', plan: 'teams' })).toEqual([
-      'usageDetails',
       'customModes',
       'dataCollection',
       'integrations',
@@ -86,7 +83,6 @@ describe('visibleOrgSettingsRows', () => {
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
-      'usageDetails',
       'customModes',
       'byok',
       'emailPreferences',
@@ -115,9 +111,6 @@ describe('visibleOrgSettingsRows', () => {
     const rows = visibleOrgSettingsRows(gate(), 'org_1');
     const byArea = new Map(rows.map(row => [row.area, row]));
     expect(
-      byArea.get('usageDetails')?.url.endsWith('/organizations/org_1/usage-details?view=ai-usage')
-    ).toBe(true);
-    expect(
       byArea.get('subOrganizations')?.url.endsWith('/organizations/org_1/sub-organizations')
     ).toBe(true);
     expect(
@@ -139,6 +132,7 @@ describe('visibleOrgSettingsRows', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member', undefined] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
         const rows = areas({ role, plan });
+        expect(rows).not.toContain('usageDetails');
         expect(rows).not.toContain('auditLogs');
         expect(rows).not.toContain('providersAndModels');
         expect(rows).not.toContain('guardrails');
@@ -148,9 +142,10 @@ describe('visibleOrgSettingsRows', () => {
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns the audit log and Model Access to every billing role on the enterprise plan', () => {
+  it('returns usage to every role and plan, plus the billing-role areas on enterprise', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
       expect(inAppAreas({ role, guardrailsEnabled: false })).toEqual([
+        'usageDetails',
         'auditLogs',
         'providersAndModels',
       ]);
@@ -159,7 +154,12 @@ describe('visibleInAppSettingsRows', () => {
 
   it('adds guardrails for the roles that manage the organization', () => {
     for (const role of ['owner', 'admin'] as const) {
-      expect(inAppAreas({ role })).toEqual(['auditLogs', 'providersAndModels', 'guardrails']);
+      expect(inAppAreas({ role })).toEqual([
+        'usageDetails',
+        'auditLogs',
+        'providersAndModels',
+        'guardrails',
+      ]);
     }
   });
 
@@ -168,20 +168,20 @@ describe('visibleInAppSettingsRows', () => {
     expect(inAppAreas({ guardrailsEnabled: undefined })).not.toContain('guardrails');
   });
 
-  it('returns the member-readable area less to a member, an unknown role or a teams plan', () => {
-    expect(inAppAreas({ role: 'member' })).toEqual([]);
-    expect(inAppAreas({ role: undefined })).toEqual([]);
-    expect(inAppAreas({ plan: 'teams' })).toEqual(['guardrails']);
+  it('keeps usage for a member, an unknown role and a teams plan', () => {
+    expect(inAppAreas({ role: 'member' })).toEqual(['usageDetails']);
+    expect(inAppAreas({ role: undefined })).toEqual(['usageDetails']);
+    expect(inAppAreas({ plan: 'teams', guardrailsEnabled: false })).toEqual(['usageDetails']);
   });
 
-  it('opens each in-app screen at its own route', () => {
-    const byArea = new Map(
-      visibleInAppSettingsRows({
-        role: 'owner',
-        plan: 'enterprise',
-        guardrailsEnabled: true,
-      }).map(row => [row.area, row])
-    );
+  it('opens the app screens, not pages', () => {
+    const rows = visibleInAppSettingsRows({
+      role: 'owner',
+      plan: 'enterprise',
+      guardrailsEnabled: true,
+    });
+    const byArea = new Map(rows.map(row => [row.area, row]));
+    expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
     expect(byArea.get('providersAndModels')?.href).toBe(
       '/(app)/(tabs)/(3_profile)/organization/providers-and-models'

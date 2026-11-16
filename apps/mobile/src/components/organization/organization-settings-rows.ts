@@ -41,20 +41,18 @@ import { WEB_BASE_URL } from '@/lib/config';
  * - the sidebar hides Groups below the enterprise plan;
  * - `sub-organizations` and `distribute-funds` additionally redirect for a
  *   child organization (`parent_organization_id !== null`);
- * - `custom-modes`, `byok`, `integrations` and `usage-details` render for every
- *   member;
+ * - `custom-modes`, `byok` and `integrations` render for every member;
  * - `data-collection` is the dashboard card a teams plan shows;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
  *   the organization dashboard rather than pages of their own, so they open
  *   `/organizations/<id>`.
  *
- * Three areas are in-app destinations instead, and each carries the gate its
- * own procedure applies: the audit log (billing role, enterprise plan), Model
- * Access (billing role, enterprise plan) and guardrails (`owner`/`admin` and
- * the organization's Kilo Encrypt setting).
+ * Four areas are in-app destinations instead, and each carries the gate its
+ * own procedure applies: usage (every member), the audit log (billing role,
+ * enterprise plan), Model Access (billing role, enterprise plan) and
+ * guardrails (`owner`/`admin` and the organization's Kilo Encrypt setting).
  */
 type OrgSettingsArea =
-  | 'usageDetails'
   | 'customModes'
   | 'groups'
   | 'byok'
@@ -82,11 +80,11 @@ export type OrgSettingsRow = Readonly<{
 }>;
 
 /**
- * The areas the app reads itself instead of opening their web pages. The
- * providers-and-models page and the guardrails page are the two settings the
- * organization hub opens natively; the audit log was the first.
+ * The areas the app reads itself instead of opening their web pages: usage and
+ * the audit log, plus the Model Access and guardrails settings the organization
+ * hub opens natively.
  */
-type OrgInAppSettingsArea = 'auditLogs' | 'providersAndModels' | 'guardrails';
+type OrgInAppSettingsArea = 'usageDetails' | 'auditLogs' | 'providersAndModels' | 'guardrails';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
@@ -117,13 +115,6 @@ type OrgSettingsRowSpec = Readonly<{
 }>;
 
 const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
-  // The sidebar lists Usage under Dashboard for every member.
-  {
-    area: 'usageDetails',
-    icon: LineChart,
-    suffix: '/usage-details?view=ai-usage',
-    visible: () => true,
-  },
   // "Custom Modes": no gate in the sidebar or on the page.
   { area: 'customModes', icon: SlidersHorizontal, suffix: '/custom-modes', visible: () => true },
   // "Groups": enterprise only; the page redirects every other plan.
@@ -180,7 +171,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
 ];
 
 const TITLE_KEYS = {
-  usageDetails: 'organization.settingsOnWeb.usageDetails',
   customModes: 'agentChat.modePicker.customModes',
   groups: 'organization.settingsOnWeb.groups',
   byok: 'organization.settingsOnWeb.byok',
@@ -215,6 +205,15 @@ type OrgInAppSettingsRowSpec = Readonly<{
 }>;
 
 const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
+  // "Usage": the app's own usage screen reads the same summary, series and
+  // breakdown the web page charts, so the row opens the screen. Every member
+  // sees it, as on the web sidebar, and nothing in its gate needs a payload.
+  {
+    area: 'usageDetails',
+    icon: LineChart,
+    href: '/(app)/(tabs)/(3_profile)/organization/usage',
+    visible: () => true,
+  },
   // "Audit logs": the gate its procedure applies, which the screen repeats to
   // itself. The row opens the screen rather than the web page.
   {
@@ -242,6 +241,9 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
 ];
 
 const IN_APP_TITLE_KEYS = {
+  // The copy's own name keeps its group prefix: the web sidebar lists the same
+  // area under Dashboard, and check:i18n refuses a second key with this copy.
+  usageDetails: 'organization.settingsOnWeb.usageDetails',
   auditLogs: 'organization.settingsOnWeb.auditLogs',
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
   guardrails: 'organization.settingsOnWeb.guardrails',
@@ -268,11 +270,11 @@ export function visibleOrgSettingsRows(
  * The in-app rows this role and plan may open, in the order the card shows
  * them.
  *
- * The gate reads only the role and the plan, both of which arrive on the
- * organization row that decides whether the hub renders at all. So the hub
- * paints these rows on its first frame while the web rows below wait for the
- * membership payload: a row inserted above them later would move the group
- * under it, which the design gate's layout-shift rule refuses.
+ * The role and the plan arrive on the organization row that decides whether the
+ * hub renders at all, so usage, the audit log and Model Access paint on the
+ * hub's first frame. Guardrails also reads the organization's Kilo Encrypt
+ * setting, so it lands with the membership payload — the same commit that
+ * paints the web rows below it, so nothing already on screen moves.
  */
 export function visibleInAppSettingsRows(
   gate: OrgInAppSettingsGate

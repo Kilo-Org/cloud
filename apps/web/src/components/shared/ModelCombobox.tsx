@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { BookOpenCheck, Brain, ChevronsUpDown, Check, Image } from 'lucide-react';
+import { BookOpenCheck, Brain, ChevronsUpDown, Check, Image, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   buildModelOptionGroups,
@@ -21,6 +21,8 @@ import {
   type ModelOption,
   type ModelOptionGroup,
 } from './model-combobox-options';
+import { favoriteToggleAction, isFavoriteOption } from './model-favorites';
+import { useModelFavorites } from '@/lib/hooks/use-model-preferences';
 import { usePreferredModels } from './usePreferredModels';
 
 export type { ModelOption };
@@ -71,6 +73,11 @@ export type ModelComboboxProps = {
   triggerAriaLabel?: string;
   /** Optional id for the trigger button/label pair. Set this when rendering more than one full-variant combobox on a page to avoid duplicate DOM ids. */
   id?: string;
+  /**
+   * Show favorite stars and a Favorites group, persisted to the user's cloud
+   * model preferences. The organization scopes which favorites are shown.
+   */
+  favorites?: { organizationId?: string };
 };
 
 export function ModelCombobox({
@@ -95,6 +102,7 @@ export function ModelCombobox({
   modal = false,
   triggerAriaLabel,
   id = 'model-combobox',
+  favorites,
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
   const handleOpenChange = (value: boolean) => {
@@ -109,10 +117,29 @@ export function ModelCombobox({
   }, []);
 
   const preferredModels = usePreferredModels();
+  const {
+    favorites: favoriteModels,
+    addFavorite,
+    removeFavorite,
+  } = useModelFavorites(favorites?.organizationId, { enabled: favorites !== undefined });
+  const favoriteIds = useMemo(() => new Set(favoriteModels), [favoriteModels]);
   const modelGroups = useMemo(
-    () => buildModelOptionGroups(models, preferredModels),
-    [models, preferredModels]
+    () => buildModelOptionGroups(models, preferredModels, favoriteIds),
+    [models, preferredModels, favoriteIds]
   );
+
+  const handleToggleFavorite = useCallback(
+    (model: ModelOption) => {
+      const action = favoriteToggleAction(model, favoriteModels);
+      if (action.type === 'remove') {
+        for (const id of action.models) removeFavorite({ model: id });
+      } else {
+        addFavorite({ model: action.model });
+      }
+    },
+    [favoriteModels, addFavorite, removeFavorite]
+  );
+  const onToggleFavorite = favorites ? handleToggleFavorite : undefined;
 
   const selectedModel = [pinnedModel, ...models].find(model => model?.id === value);
   const isCompact = variant === 'compact';
@@ -253,6 +280,8 @@ export function ModelCombobox({
                   onValueChange(modelId);
                   setOpen(false);
                 }}
+                favoriteIds={favoriteIds}
+                onToggleFavorite={onToggleFavorite}
               />
             </CommandList>
           </Command>
@@ -322,6 +351,8 @@ export function ModelCombobox({
                   onValueChange(modelId);
                   setOpen(false);
                 }}
+                favoriteIds={favoriteIds}
+                onToggleFavorite={onToggleFavorite}
               />
             </CommandList>
           </Command>
@@ -371,10 +402,14 @@ function ModelOptionGroups({
   groups,
   value,
   onSelect,
+  favoriteIds,
+  onToggleFavorite,
 }: {
   groups: ModelOptionGroup[];
   value?: string;
   onSelect: (value: string) => void;
+  favoriteIds: ReadonlySet<string>;
+  onToggleFavorite?: (model: ModelOption) => void;
 }) {
   return groups.map(group => (
     <CommandGroup key={group.id} heading={group.heading}>
@@ -415,11 +450,57 @@ function ModelOptionGroups({
                 model.id === value ? 'opacity-100' : 'opacity-0'
               )}
             />
+            {onToggleFavorite && !model.unavailable && (
+              <FavoriteStar
+                model={model}
+                isFavorite={isFavoriteOption(model, favoriteIds)}
+                onToggle={onToggleFavorite}
+              />
+            )}
           </CommandItem>
         );
       })}
     </CommandGroup>
   ));
+}
+
+function FavoriteStar({
+  model,
+  isFavorite,
+  onToggle,
+}: {
+  model: ModelOption;
+  isFavorite: boolean;
+  onToggle: (model: ModelOption) => void;
+}) {
+  const label = isFavorite
+    ? `Remove ${model.name} from favorites`
+    : `Add ${model.name} to favorites`;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={isFavorite}
+      title={label}
+      onClick={event => {
+        event.stopPropagation();
+        event.preventDefault();
+        onToggle(model);
+      }}
+      onPointerDown={event => event.stopPropagation()}
+      onKeyDown={event => {
+        // cmdk's root handler turns a bubbled Enter into a row selection;
+        // the button's own default action must fire the toggle instead.
+        if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+      }}
+      className={cn(
+        'focus-visible:ring-ring inline-flex shrink-0 items-center rounded-sm p-0.5 outline-none focus-visible:ring-2',
+        isFavorite ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+      )}
+    >
+      <Star className={cn('h-4 w-4', isFavorite && 'fill-current')} />
+    </button>
+  );
 }
 
 /**

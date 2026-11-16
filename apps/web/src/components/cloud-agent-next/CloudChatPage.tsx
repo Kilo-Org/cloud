@@ -2047,6 +2047,9 @@ export default function CloudChatPage({
                                       organization: orgUploadUrl,
                                     },
                                   }}
+                                  favorites={{
+                                    organizationId: sessionModels.gatewayOrganizationId,
+                                  }}
                                 />
                                 <ComposerContextLine
                                   userId={currentUserId}

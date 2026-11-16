@@ -1,3 +1,5 @@
+import { isFavoriteOption } from './model-favorites';
+
 export type ModelOption = {
   id: string; // e.g., "anthropic/claude-sonnet-4.5"
   name: string; // e.g., "Claude Sonnet 4.5"
@@ -18,6 +20,10 @@ export type ModelOption = {
   variants?: string[];
   /** Reasoning-control variants only; [] is known default-only, absent is unknown. */
   reasoningVariants?: string[];
+  /** CLI catalog identity on remote-session options; Gateway options have none. */
+  modelRef?: { providerID: string; modelID: string };
+  /** 'legacy-gateway' options keep Gateway favorite identity despite a modelRef. */
+  overrideSource?: 'cli-catalog' | 'legacy-gateway';
 };
 
 export type ModelOptionGroup = {
@@ -26,15 +32,28 @@ export type ModelOptionGroup = {
   models: ModelOption[];
 };
 
+const NO_FAVORITES: ReadonlySet<string> = new Set();
+
 export function buildModelOptionGroups(
   models: ModelOption[],
-  preferredModels: ReadonlyArray<string>
+  preferredModels: ReadonlyArray<string>,
+  favoriteIds: ReadonlySet<string> = NO_FAVORITES
 ): ModelOptionGroup[] {
   const groups: ModelOptionGroup[] = [];
+  const favorites: ModelOption[] = [];
+  const rest: ModelOption[] = [];
+  for (const model of models) {
+    if (isFavoriteOption(model, favoriteIds)) favorites.push(model);
+    else rest.push(model);
+  }
+  if (favorites.length > 0) {
+    groups.push({ id: 'favorites', heading: 'Favorites', models: favorites });
+  }
+
   const groupIndexes = new Map<string, number>();
   const ungrouped: ModelOption[] = [];
 
-  for (const model of models) {
+  for (const model of rest) {
     if (!model.providerGroup) {
       ungrouped.push(model);
       continue;

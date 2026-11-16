@@ -1594,6 +1594,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               }
               className="md:hidden"
               customModeOptions={customModeOptions}
+              favorites={{ organizationId }}
             />
             {/* Desktop: individual pickers */}
             <div className="hidden md:contents">
@@ -1626,6 +1627,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                   isLoading={!modelsData}
                   variant="compact"
                   className="min-w-0"
+                  favorites={{ organizationId }}
                 />
               )}
               {hasAgentModelOverride

@@ -71,7 +71,9 @@ async function flushMicrotasks(): Promise<void> {
   });
 }
 
-type MergeDraft = { title: string; message: string };
+// Mirrors the persisted shape: every field is optional, because the sheet stores
+// only the fields the person authored.
+type MergeDraft = { title?: string; message?: string; method?: string };
 
 function MergeDraftHarness({
   userId,

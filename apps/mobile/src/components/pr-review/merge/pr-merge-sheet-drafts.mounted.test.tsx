@@ -1,11 +1,17 @@
 import './pr-merge-sheet.test-mocks';
 import { describe, expect, it, vi } from 'vitest';
-import { act, type ReactTestRenderer } from '@/test/renderer';
-import { DRAFT_DEBOUNCE_MS } from '@/lib/persist/drafts';
+import { act } from '@/test/renderer';
+import { DRAFT_DEBOUNCE_MS, DRAFT_MAX_BYTES } from '@/lib/persist/drafts';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import {
+  defaultCommitMessage,
+  defaultCommitTitle,
+} from '@/lib/pr-review/merge/merge-commit-defaults';
 import { MergeNotCompletedError } from '@/lib/pr-review/merge/merge-result-error';
 import {
   baseProps,
+  chipChecked,
+  chooseChip,
   deferred,
   draftKey,
   edit,
@@ -23,34 +29,6 @@ import {
   update,
 } from './pr-merge-sheet.test-support';
 
-// The method chips are Pressables, so `press` (built for Button) does not reach
-// them; these read and press the chip by its spoken method label.
-function chipChecked(renderer: ReactTestRenderer, label: string): boolean {
-  const chip = findChip(renderer, label);
-  const accessibilityState: unknown = chip.props.accessibilityState;
-  return (
-    typeof accessibilityState === 'object' &&
-    accessibilityState !== null &&
-    'checked' in accessibilityState &&
-    accessibilityState.checked === true
-  );
-}
-
-function findChip(renderer: ReactTestRenderer, label: string) {
-  const chip = hosts(renderer, 'Pressable').find(node => node.props.accessibilityLabel === label);
-  if (!chip) {
-    throw new Error(`Method chip ${label} missing`);
-  }
-  return chip;
-}
-
-async function chooseChip(renderer: ReactTestRenderer, label: string) {
-  const chip = findChip(renderer, label);
-  await act(() => {
-    (chip.props.onPress as () => void)();
-  });
-}
-
 describe('PrMergeSheet durable drafts', () => {
   it('debounces title and message edits into a real durable save', async () => {
     vi.useFakeTimers();
@@ -64,8 +42,55 @@ describe('PrMergeSheet durable drafts', () => {
     expect(storedDraft()).toEqual({
       title: 'Draft title',
       message: 'Draft message',
-      method: 'squash',
     });
+  });
+
+  it('stores only the method when a chip tap is the only edit', async () => {
+    const renderer = await mount({ initialMethod: 'merge' });
+    await chooseChip(renderer, 'Squash and merge');
+    await unmount(renderer);
+    // The default title and message were never the person's text, so the record
+    // holds no text at all.
+    expect(storedDraft()).toEqual({ method: 'squash' });
+
+    const restored = await mount({
+      initialMethod: 'merge',
+      title: 'Renamed feature',
+      bodyMarkdown: 'New body',
+    });
+    expect(chipChecked(restored, 'Squash and merge')).toBe(true);
+    expect(input(restored, 'Commit title').props.defaultValue).toBe(
+      defaultCommitTitle('Renamed feature', 1)
+    );
+    expect(input(restored, 'Commit message').props.defaultValue).toBe(
+      defaultCommitMessage('New body')
+    );
+  });
+
+  it('keeps a method-only tap when the derived message is over the draft cap', async () => {
+    const body = 'x'.repeat(DRAFT_MAX_BYTES + 1);
+    const renderer = await mount({ initialMethod: 'merge', bodyMarkdown: body });
+    await chooseChip(renderer, 'Squash and merge');
+    await unmount(renderer);
+    // The message is no longer written, so the byte cap cannot drop the method.
+    expect(storedDraft()).toEqual({ method: 'squash' });
+
+    const restored = await mount({ initialMethod: 'merge', bodyMarkdown: body });
+    expect(chipChecked(restored, 'Squash and merge')).toBe(true);
+  });
+
+  it('keeps the authored title of a record whose method this build cannot restore', async () => {
+    seedDraft('u1', draftKey, { title: 'Stored title', method: 'octopus' });
+    const renderer = await mount({ initialMethod: 'merge' });
+    // The record loads instead of being read as a shape mismatch, so its text
+    // survives; the unknown method falls back to the default chip.
+    expect(input(renderer, 'Commit title').props.defaultValue).toBe('Stored title');
+    expect(chipChecked(renderer, 'Create a merge commit')).toBe(true);
+    expect(chipChecked(renderer, 'Squash and merge')).toBe(false);
+
+    await edit(renderer, 'Commit message', 'Fresh message');
+    await unmount(renderer);
+    expect(storedDraft()).toEqual({ title: 'Stored title', message: 'Fresh message' });
   });
 
   it('flushes a pending edit on passive back and restores it after remount', async () => {
@@ -84,7 +109,6 @@ describe('PrMergeSheet durable drafts', () => {
     expect(storedDraft()).toEqual({
       title: 'Keep my title',
       message: 'Keep my message',
-      method: 'squash',
     });
 
     const restored = await mount();
@@ -190,7 +214,6 @@ describe('PrMergeSheet durable drafts', () => {
       expect(storedDraft()).toEqual({
         title: 'Retained title',
         message: 'Retained message',
-        method: 'squash',
       });
       const restored = await mount({ mode });
       expect(input(restored, 'Commit title').props.defaultValue).toBe('Retained title');
@@ -243,7 +266,6 @@ describe('PrMergeSheet durable drafts', () => {
     expect(storedDraft('u2')).toEqual({
       title: 'Current account',
       message: 'Current edit',
-      method: 'squash',
     });
   });
 

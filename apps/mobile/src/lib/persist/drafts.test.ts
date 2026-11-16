@@ -152,17 +152,19 @@ describe('draft scope and entity keys', () => {
     );
   });
 
-  it('isMergeDraft accepts a title+message object and rejects other shapes', () => {
+  it('isMergeDraft accepts any subset of the authored fields and rejects other shapes', () => {
     expect(isMergeDraft({ title: 'T', message: 'M' })).toBe(true);
     expect(isMergeDraft({ title: '', message: '' })).toBe(true);
-    // The persisted method is optional: a legacy record and a chosen method both load.
-    expect(isMergeDraft({ title: 'T', message: 'M', method: 'squash' })).toBe(true);
-    expect(isMergeDraft({ title: 'T', message: 'M', method: 'merge' })).toBe(true);
-    expect(isMergeDraft({ title: 'T', message: 'M', method: 'rebase' })).toBe(true);
-    expect(isMergeDraft({ title: 'T', message: 'M', method: 'octopus' })).toBe(false);
+    // Every field is optional: the sheet persists only what the person authored,
+    // so a method-only tap stores `{ method }` and a text-only edit stores none.
+    expect(isMergeDraft({})).toBe(true);
+    expect(isMergeDraft({ title: 'T' })).toBe(true);
+    expect(isMergeDraft({ message: 'M' })).toBe(true);
+    expect(isMergeDraft({ method: 'squash' })).toBe(true);
+    // The method is an open string, narrowed against the pull request's allowed
+    // methods at restore, so another build's record still loads its text.
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 'octopus' })).toBe(true);
     expect(isMergeDraft({ title: 'T', message: 'M', method: 1 })).toBe(false);
-    expect(isMergeDraft({ title: 'T' })).toBe(false);
-    expect(isMergeDraft({ message: 'M' })).toBe(false);
     expect(isMergeDraft({ title: 1, message: 'M' })).toBe(false);
     expect(isMergeDraft({ title: 'T', message: 2 })).toBe(false);
     expect(isMergeDraft('not an object')).toBe(false);
@@ -252,6 +254,23 @@ describe('merge, reply, and comment keys restore per account and destination', (
       title: 'T',
       message: 'M',
       method: 'squash',
+    });
+  });
+
+  it('keeps the user text of a record whose method this build cannot restore', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    // Another build persisted a method this one does not know. The text is
+    // still the person's, so the record must load rather than be classified as
+    // a shape mismatch (which `drafts.ts` leaves stored for the other build).
+    seedStoredValue(
+      draftScope('u1'),
+      key,
+      JSON.stringify({ title: 'T', message: 'M', method: 'octopus' })
+    );
+    await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({
+      title: 'T',
+      message: 'M',
+      method: 'octopus',
     });
   });
 

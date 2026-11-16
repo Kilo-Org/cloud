@@ -129,6 +129,26 @@ export async function press(renderer: ReactTestRenderer, label: string) {
     (target.props.onPress as () => void)();
   });
 }
+// The method chips are Pressables, so `press` (built for Button) does not reach
+// them; these read and press the chip by its spoken method label.
+export function chipChecked(renderer: ReactTestRenderer, label: string): boolean {
+  const chip = findChip(renderer, label);
+  const props: { accessibilityState?: { checked?: boolean | 'mixed' } } = chip.props;
+  return props.accessibilityState?.checked === true;
+}
+function findChip(renderer: ReactTestRenderer, label: string) {
+  const chip = hosts(renderer, 'Pressable').find(node => node.props.accessibilityLabel === label);
+  if (!chip) {
+    throw new Error(`Method chip ${label} missing`);
+  }
+  return chip;
+}
+export async function chooseChip(renderer: ReactTestRenderer, label: string) {
+  const chip = findChip(renderer, label);
+  await act(() => {
+    (chip.props.onPress as () => void)();
+  });
+}
 export async function edit(renderer: ReactTestRenderer, label: string, text: string) {
   await act(() => {
     (input(renderer, label).props.onChangeText as (value: string) => void)(text);
@@ -139,9 +159,9 @@ export async function submit(renderer: ReactTestRenderer, label = 'Merge') {
   await press(renderer, `Confirm ${label}`);
 }
 type StoredMergeDraft = {
-  title: string;
-  message: string;
-  method?: 'merge' | 'squash' | 'rebase';
+  title?: string;
+  message?: string;
+  method?: string;
 };
 export function seedDraft(userId: string, entityKey: string, value: StoredMergeDraft) {
   state.rows.set(`draft:${userId}\u0000${entityKey}`, JSON.stringify(value));

@@ -17,7 +17,6 @@ type ScreenState = {
   role: string;
   mutateAsync: Mock;
   dismissTo: Mock;
-  toastError: Mock;
 };
 
 const ORG_ID = '6f1c2f9a-0d3b-4a55-9c1e-2b8f7c4d5e60';
@@ -30,7 +29,6 @@ const state = vi.hoisted((): ScreenState => ({
   role: 'owner',
   mutateAsync: vi.fn(),
   dismissTo: vi.fn(),
-  toastError: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -58,9 +56,6 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   };
 });
-vi.mock('sonner-native', () => ({
-  toast: { error: state.toastError, success: vi.fn() },
-}));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
@@ -164,7 +159,6 @@ beforeEach(() => {
   state.mutateAsync.mockReset();
   state.mutateAsync.mockResolvedValue(undefined);
   state.dismissTo.mockClear();
-  state.toastError.mockClear();
 });
 
 afterEach(() => {

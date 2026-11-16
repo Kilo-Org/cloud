@@ -1,5 +1,4 @@
 import { type RepositoryModelOverrideInput } from '@kilocode/app-shared/code-review';
-import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -12,6 +11,7 @@ import {
 } from '@/lib/a11y/tap-target';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { cn } from '@/lib/utils';
 
 /** One repository the section can override: its platform id and its display name. */
@@ -51,7 +51,7 @@ export function RepositoryModelOverrides({
   onRemove: (repositoryId: number | string) => void;
 }>) {
   const { t } = useTranslation();
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
 
   if (repositories.length === 0) {
     return null;
@@ -71,7 +71,7 @@ export function RepositoryModelOverrides({
     repo: OverridableRepository,
     override: RepositoryModelOverrideInput | undefined
   ) => {
-    openModelPicker(router, {
+    openModelPicker(pushOnce, {
       options: models,
       value: override?.modelSlug ?? defaultModelSlug,
       variant: override?.thinkingEffort ?? '',

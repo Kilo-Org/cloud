@@ -28,7 +28,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 
 /**
  * The organization destinations the hub lists, in the two shapes it opens
- * them: the web pages this app does not reimplement, and the one area the app
+ * them: the web pages this app does not reimplement, and the areas the app
  * reads itself.
  *
  * Every web row opens the page that already owns the setting. The list, its
@@ -45,24 +45,22 @@ import { WEB_BASE_URL } from '@/lib/config';
  *   child organization (`parent_organization_id !== null`);
  * - `guardrails` requires `owner`/`admin` and the organization's Kilo Encrypt
  *   setting;
- * - `providers-and-models`, `custom-modes`, `byok`, `integrations` and
- *   `usage-details` render for every member;
+ * - `providers-and-models`, `custom-modes`, `byok` and `integrations` render
+ *   for every member;
  * - `data-collection` is the dashboard card a teams plan shows where an
  *   enterprise plan shows providers and models;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
  *   the organization dashboard rather than pages of their own, so they open
  *   `/organizations/<id>`.
  *
- * The audit log is the exception neither table shares with the other: the app
- * reads it natively, so it is an in-app destination, and its gate is the one
- * its procedure applies (billing role and the enterprise plan).
- *
- * BYOK is the second in-app destination: the app's own provider-keys screen
- * reads and writes an organization's keys, so its row opens that screen with
- * the organization's scope instead of the web page.
+ * Usage, the audit log and BYOK are the areas the app reads itself, so their
+ * rows open the app's own screens instead of a page. Usage is visible to every
+ * member, as on the web sidebar; the audit log's gate is the one its procedure
+ * applies (billing role and the enterprise plan); BYOK opens the app's own
+ * provider-keys screen with the organization's scope, behind the web sidebar's
+ * billing-role gate.
  */
 type OrgSettingsArea =
-  | 'usageDetails'
   | 'providersAndModels'
   | 'customModes'
   | 'groups'
@@ -96,7 +94,7 @@ export type OrgSettingsRow = Readonly<{
  * The areas the app reads and writes itself, each opening its own screen
  * instead of a web page.
  */
-type OrgInAppSettingsArea = 'auditLogs' | 'byok';
+type OrgInAppSettingsArea = 'usageDetails' | 'auditLogs' | 'byok';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
@@ -120,13 +118,6 @@ type OrgSettingsRowSpec = Readonly<{
 }>;
 
 const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
-  // The sidebar lists Usage under Dashboard for every member.
-  {
-    area: 'usageDetails',
-    icon: LineChart,
-    suffix: '/usage-details?view=ai-usage',
-    visible: () => true,
-  },
   // "Model Access": billing role and the enterprise plan.
   {
     area: 'providersAndModels',
@@ -189,7 +180,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
 ];
 
 const TITLE_KEYS = {
-  usageDetails: 'organization.settingsOnWeb.usageDetails',
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
   customModes: 'agentChat.modePicker.customModes',
   groups: 'organization.settingsOnWeb.groups',
@@ -226,6 +216,15 @@ type OrgInAppSettingsRowSpec = Readonly<{
 }>;
 
 const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
+  // "Usage": the app's own usage screen reads the same summary, series and
+  // breakdown the web page charts, so the row opens the screen. Every member
+  // sees it, as on the web sidebar, and nothing in its gate needs a payload.
+  {
+    area: 'usageDetails',
+    icon: LineChart,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/usage',
+    visible: () => true,
+  },
   // "Audit logs": the gate its procedure applies, which the screen repeats to
   // itself. The row opens the screen rather than the web page.
   {
@@ -245,6 +244,9 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
 ];
 
 const IN_APP_TITLE_KEYS = {
+  // The copy's own name keeps its group prefix: the web sidebar lists the same
+  // area under Dashboard, and check:i18n refuses a second key with this copy.
+  usageDetails: 'organization.settingsOnWeb.usageDetails',
   auditLogs: 'organization.settingsOnWeb.auditLogs',
   byok: 'organization.settingsOnWeb.byok',
 } satisfies Record<OrgInAppSettingsArea, string>;

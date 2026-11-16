@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatMoney, formatNumber, formatUsd } from '@/lib/format';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 
 export type ModelPricing = { prompt?: string; completion?: string };
 
@@ -15,14 +15,14 @@ function formatSide(pricePerTokenStr: string | undefined): string | null {
 
   if (pricePer1M < 0.01) {
     return i18n.t('agentChat.modelCost.lessThan', {
-      amount: formatUsd(0.01, i18n.language),
+      amount: formatPrefixedMoney(0.01, i18n.language),
     });
   }
 
   // Two fixed decimals so every row in the picker lines up, matching the web
   // model list (`formatPrice` pins `$X.XX`). Trimming produced "$0.6" beside
   // "$0.54" in the same list.
-  return formatMoney(pricePer1M, i18n.language);
+  return formatPrefixedMoney(pricePer1M, i18n.language);
 }
 
 /** Visible per-1M-token cost for picker rows. null = hide the cost line. */

@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatCurrency, formatNumber, normalizeLocalizedNumber } from '@/lib/format';
+import { formatNumber, formatPrefixedUsd, normalizeLocalizedNumber } from '@/lib/format';
 
 /**
  * Bounds the save payload's schema enforces, mirrored here so the form shows an
@@ -104,7 +104,10 @@ export function thresholdError(value: string): string | null {
   }
   if (problem === 'aboveMaximum') {
     return i18n.t('spendAlerts.thresholdMaxError', {
-      max: formatCurrency(MAX_THRESHOLD_USD, i18n.language, 0),
+      max: formatPrefixedUsd(MAX_THRESHOLD_USD, i18n.language, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }),
     });
   }
   // Empty, unparsable, and below the smallest storable amount share the billing

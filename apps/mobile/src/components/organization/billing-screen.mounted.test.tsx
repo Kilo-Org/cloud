@@ -185,9 +185,7 @@ function subscriptionReadout() {
 
 /** The seats row's rendered value, as the screen hands it to `KvRow`. */
 function seatsReadout(renderer: ReactTestRenderer): unknown {
-  const row = renderer.root
-    .findAllByType('KvRow')
-    .find(node => node.props.label === 'Organization seats');
+  const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'In use');
   return row?.props.value;
 }
 

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -16,6 +16,7 @@ import {
   ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -37,13 +38,16 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
  * that differs from the active one (for example an explicit route scope). It
  * drives the check mark and the no-op comparison; a pick still changes the
  * active account, which is what every other surface reads.
+ *
+ * The opener admits a single push of the shared sheet per press burst, so a
+ * double tap does not stack two identical sheets.
  */
 export function useContextPicker(
   orgs: OrgListEntry[] | undefined,
   onSelectionChange?: (organizationId: string | null) => void,
   shownOrganizationId?: string | null
 ) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const { setOrganizationId, organizationId } = useOrganization();
   const shownId = shownOrganizationId !== undefined ? shownOrganizationId : organizationId;
@@ -87,7 +91,7 @@ export function useContextPicker(
         currentIndex,
         onSelect: select,
       });
-      router.push('/(app)/context-picker' as Href);
+      pushOnce('/(app)/context-picker' as Href);
     },
   };
 }

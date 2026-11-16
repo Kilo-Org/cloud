@@ -50,7 +50,6 @@ function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
 describe('visibleOrgSettingsRows', () => {
   it('lists every web area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
-      'usageDetails',
       'providersAndModels',
       'customModes',
       'groups',
@@ -66,7 +65,6 @@ describe('visibleOrgSettingsRows', () => {
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
     expect(areas({ role: 'member' })).toEqual([
-      'usageDetails',
       'customModes',
       'groups',
       'ssoAndDomain',
@@ -76,7 +74,6 @@ describe('visibleOrgSettingsRows', () => {
 
   it('drops the enterprise-only rows for a member on teams', () => {
     expect(areas({ role: 'member', plan: 'teams' })).toEqual([
-      'usageDetails',
       'customModes',
       'dataCollection',
       'integrations',
@@ -85,7 +82,6 @@ describe('visibleOrgSettingsRows', () => {
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
-      'usageDetails',
       'customModes',
       'guardrails',
       'emailPreferences',
@@ -119,9 +115,6 @@ describe('visibleOrgSettingsRows', () => {
     const rows = visibleOrgSettingsRows(gate(), 'org_1');
     const byArea = new Map(rows.map(row => [row.area, row]));
     expect(
-      byArea.get('usageDetails')?.url.endsWith('/organizations/org_1/usage-details?view=ai-usage')
-    ).toBe(true);
-    expect(
       byArea.get('subOrganizations')?.url.endsWith('/organizations/org_1/sub-organizations')
     ).toBe(true);
     expect(
@@ -143,6 +136,7 @@ describe('visibleOrgSettingsRows', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member', undefined] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
         expect(areas({ role, plan })).not.toContain('auditLogs');
+        expect(areas({ role, plan })).not.toContain('usageDetails');
         expect(areas({ role, plan })).not.toContain('byok');
       }
     }
@@ -150,26 +144,28 @@ describe('visibleOrgSettingsRows', () => {
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns the audit log and the keys to every billing role on the enterprise plan', () => {
+  it('returns usage to every role and plan, and the audit log and keys to billing roles', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
-      expect(inAppAreas({ role })).toEqual(['auditLogs', 'byok']);
+      expect(inAppAreas({ role })).toEqual(['usageDetails', 'auditLogs', 'byok']);
     }
   });
 
+  it('keeps usage for a member, an unknown role and a teams plan', () => {
+    expect(inAppAreas({ role: 'member' })).toEqual(['usageDetails']);
+    expect(inAppAreas({ role: undefined })).toEqual(['usageDetails']);
+    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['usageDetails']);
+  });
+
   it('keeps the keys for a billing role on the teams plan, where the audit log is refused', () => {
-    expect(inAppAreas({ plan: 'teams' })).toEqual(['byok']);
+    expect(inAppAreas({ plan: 'teams' })).toEqual(['usageDetails', 'byok']);
   });
 
-  it('returns nothing to a member or an unknown role', () => {
-    expect(inAppAreas({ role: 'member' })).toEqual([]);
-    expect(inAppAreas({ role: undefined })).toEqual([]);
-  });
-
-  it('opens the organization’s own keys screen with its scope', () => {
-    const byok = visibleInAppSettingsRows({ role: 'owner', plan: 'teams' }, 'org_1').find(
-      row => row.area === 'byok'
-    );
-    expect(byok?.href).toEqual({
+  it('opens the app screens, not pages', () => {
+    const rows = visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise' }, 'org_1');
+    const byArea = new Map(rows.map(row => [row.area, row]));
+    expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
+    expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
+    expect(byArea.get('byok')?.href).toEqual({
       pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
       params: { org: 'org_1' },
     });

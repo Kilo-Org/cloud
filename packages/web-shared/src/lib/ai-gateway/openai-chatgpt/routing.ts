@@ -336,6 +336,14 @@ export function buildOpenAiChatGptProvider(
       // with `unsupported_parameter`.
       delete body.temperature;
       delete body.top_p;
+      // Avoid Responses auto-strict reinterpretation of caller-supplied function schemas.
+      if (Array.isArray(body.tools)) {
+        for (const tool of body.tools) {
+          if (tool?.type === 'function' && tool.strict === undefined) {
+            tool.strict = false;
+          }
+        }
+      }
       if (
         typeof body.max_output_tokens === 'number' &&
         body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS

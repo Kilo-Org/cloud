@@ -17,6 +17,7 @@ import type { ServiceEvent } from './normalizer';
 import {
   replaySnapshotPage,
   replayStoredMessages,
+  SESSION_HISTORY_UNAVAILABLE_MESSAGE,
   sessionSnapshotFailureMessage,
   snapshotPageFromSnapshot,
 } from './snapshot-page';
@@ -139,7 +140,7 @@ async function readCloudSnapshotPage(
 
 function snapshotReadFailureMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
-  return 'Session history temporarily unavailable';
+  return SESSION_HISTORY_UNAVAILABLE_MESSAGE;
 }
 const MAX_EVENT_VERSIONS = 2048;
 const MAX_SESSION_INFO_VERSIONS = 1024;

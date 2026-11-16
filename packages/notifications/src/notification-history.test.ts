@@ -77,5 +77,9 @@ describe('notificationHistoryEntryForPushData', () => {
     // cast builds that unreachable-in-types payload on purpose.
     const payload = { type: 'future_kind' } as unknown as PushData;
     expect(notificationHistoryEntryForPushData(payload)).toBeNull();
+    // A name the table only inherits from `Object.prototype` is not a kind.
+    expect(
+      notificationHistoryEntryForPushData({ type: 'toString' } as unknown as PushData)
+    ).toBeNull();
   });
 });

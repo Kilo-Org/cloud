@@ -12,6 +12,10 @@ import { View, type ViewStyle } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
 import { MemberRow } from '@/components/organization/member-row';
+import {
+  type MemberRemovalStore,
+  useMemberRemovalFeedback,
+} from '@/components/organization/member-removal-feedback';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -76,6 +80,17 @@ function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies ViewStyle;
 
+/** The refused removal this row must state, read from the screen-level store. */
+function readRemovalFailure(snapshot: MemberRemovalStore['snapshot'], memberId: string) {
+  const phase = snapshot.states.get(memberId);
+  return phase?.status === 'failed' ? phase.failure : null;
+}
+
+/** One admission per member; the store refuses a second concurrent attempt. */
+function admitRemoval(removals: MemberRemovalStore, memberId: string) {
+  return removals.begin(memberId);
+}
+
 export function OrganizationMembersScreen() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -84,6 +99,7 @@ export function OrganizationMembersScreen() {
   const orgWithMembers = useOrgWithMembers(organizationId);
   const { userId: currentUserId } = useCurrentUserId();
   const paddingBottom = useTabBarBottomPadding();
+  const removals = useMemberRemovalFeedback();
 
   const members = orgWithMembers.data?.members ?? [];
   const activeMembers = sortActiveMembers(members.filter(m => isActiveOrgMember(m)));
@@ -93,6 +109,15 @@ export function OrganizationMembersScreen() {
     () => buildMembersListItems({ activeMembers, invitedMembers }),
     [activeMembers, invitedMembers]
   );
+
+  const handleRemovalStarted = (memberId: string) => admitRemoval(removals, memberId);
+  // A refused removal renders until the row's next action for that member
+  // supersedes it. The store retires only a failed entry with this match; a
+  // pending attempt is left alone. The failure family has one kind, so any
+  // failure is this row's refusal.
+  const handleRemovalCleared = (memberId: string) => {
+    removals.clear(memberId, () => true);
+  };
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t('organization.members.title')} />;
@@ -171,6 +196,9 @@ export function OrganizationMembersScreen() {
               enableUsageLimits={enableUsageLimits}
               isSalesDemo={isSalesDemo}
               organizationId={organizationId}
+              removalFailure={readRemovalFailure(removals.snapshot, item.member.id)}
+              onRemovalStarted={handleRemovalStarted}
+              onRemovalCleared={handleRemovalCleared}
               last={item.last}
             />
           </View>

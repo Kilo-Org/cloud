@@ -277,9 +277,16 @@ function hitSlopPerSide(hitSlop: unknown): number {
 }
 
 function findRenameControl(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
-  return root.findAll(
-    node => typeof node.type === 'string' && node.props.accessibilityLabel === 'Rename organization'
-  );
+  // A lapsed plan appends its reason to the control's name, so the search takes
+  // the name the control always starts with rather than the whole string.
+  const title = i18n.t('organization.hub.renameTitle');
+  return root.findAll(node => {
+    if (typeof node.type !== 'string') {
+      return false;
+    }
+    const label: unknown = node.props.accessibilityLabel;
+    return typeof label === 'string' && (label === title || label.startsWith(`${title}. `));
+  });
 }
 
 async function renderHub() {
@@ -458,7 +465,7 @@ describe('Organization hub plan', () => {
 });
 
 describe('Organization hub balance masking', () => {
-  // The mocked org carries balance 5_000_000 → the mocked formatMoney paints $5.
+  // The mocked org carries balance 5_000_000 → the mocked formatPrefixedMoney paints $5.
   const balanceRow = (renderer: TestRenderer.ReactTestRenderer) =>
     renderer.root
       .findAllByType('KvRow')
@@ -564,6 +571,63 @@ describe('OrganizationHubScreen rename control', () => {
     if (!control) {
       throw new Error('rename control not found');
     }
+    act(() => {
+      (control.props.onPress as () => void)();
+    });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(1);
+    unmount();
+  });
+
+  it('states why a lapsed plan cannot rename, keeping the box and the control disabled', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const controls = findRenameControl(renderer.root);
+    expect(controls).toHaveLength(1);
+    const control = controls[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+
+    // The server refuses every rename while the trial is expired, so the control
+    // says why instead of opening a field whose save cannot succeed. The reason
+    // joins the control's name: React Native maps a hint to Android's tooltip
+    // text, which a screen reader does not announce with the node.
+    expect(control.props.disabled).toBe(true);
+    expect(control.props.accessibilityState).toEqual({ disabled: true });
+    expect(control.props.accessibilityLabel).toBe(
+      `${i18n.t('organization.hub.renameTitle')}. ${i18n.t('organization.hub.planEnded')}`
+    );
+    expect(control.props.accessibilityHint).toBeUndefined();
+    expect(control.props.onPress).toBeUndefined();
+
+    // The control keeps the header's box, so the title above it does not move.
+    expect(sideFromClass(control.props.className, 'h')).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(sideFromClass(control.props.className, 'w')).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(String(control.props.className)).toContain('opacity-50');
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(0);
+    unmount();
+  });
+
+  it('leaves the control enabled and unannotated on an active plan', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const controls = findRenameControl(renderer.root);
+    expect(controls).toHaveLength(1);
+    const control = controls[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+
+    expect(control.props.disabled).not.toBe(true);
+    expect(control.props.accessibilityLabel).toBe(i18n.t('organization.hub.renameTitle'));
+    expect(control.props.accessibilityHint).toBeUndefined();
+    expect(control.props.accessibilityState).toBeUndefined();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(0);
     act(() => {
       (control.props.onPress as () => void)();
     });

@@ -23,7 +23,8 @@ vi.mock('@sentry/react-native', () => ({
 }));
 
 /* eslint-disable import/first */
-import { isMergeDraft, prMergeDraftKey } from './drafts';
+import { prMergeDraftKey } from './drafts';
+import { isMergeDraft } from './merge-draft';
 import { useFencedDraftLoad } from './use-draft-load';
 /* eslint-enable import/first */
 
@@ -70,7 +71,9 @@ async function flushMicrotasks(): Promise<void> {
   });
 }
 
-type MergeDraft = { title: string; message: string };
+// Mirrors the persisted shape: every field is optional, because the sheet stores
+// only the fields the person authored.
+type MergeDraft = { title?: string; message?: string; method?: string };
 
 function MergeDraftHarness({
   userId,

@@ -1,6 +1,5 @@
 import { type PushData } from '@kilocode/notifications/schemas';
 
-import { clawNotificationWebUrl } from './claw-notification';
 import { providerPrRoutePath } from './pr-review/provider-pr-ref';
 import { parseProviderPrUrl } from './pr-review/provider-pr-url';
 import { getSecurityAgentPath } from './security-agent';
@@ -71,32 +70,4 @@ export function notificationPathForData(data: PushData): string | null {
       return _exhaustive;
     }
   }
-}
-
-/**
- * Where a push's tap lands: an app route, or a web page this app opens in the
- * in-app browser because it has no native screen for it.
- */
-export type NotificationDestination =
-  | Readonly<{ kind: 'app'; href: string }>
-  | Readonly<{ kind: 'external'; url: string }>;
-
-/**
- * The one destination a push has, in-app or on the web, or null when it has
- * none.
- *
- * `webBaseUrl` is the Kilo web origin an external destination opens on — the
- * app's own `WEB_BASE_URL`, passed in so this module stays free of the runtime
- * config.
- */
-export function notificationDestinationForData(
-  data: PushData,
-  webBaseUrl: string
-): NotificationDestination | null {
-  const href = notificationPathForData(data);
-  if (href !== null) {
-    return { kind: 'app', href };
-  }
-  const url = clawNotificationWebUrl(data, webBaseUrl);
-  return url === null ? null : { kind: 'external', url };
 }

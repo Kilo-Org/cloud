@@ -41,6 +41,11 @@ vi.mock('expo-haptics', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
 }));
+// The chip's opener is the guarded push; the ordering assertion below reads the
+// same router spy.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
   Brain: 'Brain',

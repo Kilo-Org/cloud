@@ -95,7 +95,7 @@ export function ByokEndpointImportDialog({
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={allVisibleSelected ? true : selectedVisible > 0 ? 'indeterminate' : false}
-              onCheckedChange={checked => toggleAllVisible(checked === true && !atCapacity)}
+              onCheckedChange={checked => toggleAllVisible(checked === true)}
               disabled={selectable.length === 0 || (atCapacity && selectedVisible === 0)}
             />
             Select all{search.trim() ? ' matching' : ''}

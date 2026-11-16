@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardLoadFailure } from '@/components/CardLoadFailure';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SSOSignupCard } from '@/components/organizations/SSOSignupCard';
 import { OrganizationDataCollectionCard } from '@/components/organizations/OrganizationDataCollectionCard';
@@ -14,6 +13,10 @@ type CardProps = {
   role: OrganizationRole;
 };
 
+/** What a reader stranded on a shell page can do about a card that did not load. */
+const SHELL_FAILURE_DESCRIPTION =
+  'The request did not complete. Try again, or close this window and reopen it from the Kilo App.';
+
 /**
  * The SSO card needs the organization row the dashboard already loaded, so the
  * shell loads the same read the dashboard uses. Empty, loading, and both
@@ -23,9 +26,15 @@ type CardProps = {
 export function AppShellSsoCard({ organizationId, role }: CardProps) {
   const { data, isLoading, error, refetch } = useOrganizationWithMembers(organizationId);
 
-  if (isLoading) return <Skeleton className="h-40 w-full" />;
   if (error)
-    return <CardLoadFailure title="Could not load SSO settings" onRetry={() => refetch()} />;
+    return (
+      <CardLoadFailure
+        title="Could not load SSO settings"
+        description={SHELL_FAILURE_DESCRIPTION}
+        onRetry={() => void refetch()}
+      />
+    );
+  if (isLoading) return <Skeleton className="h-40 w-full" />;
   if (!data) return <Skeleton className="h-40 w-full" />;
 
   return (
@@ -41,24 +50,5 @@ export function AppShellDataCollectionCard({ organizationId, role }: CardProps) 
     <OrganizationContextProvider value={{ userRole: role, isKiloAdmin: false }}>
       <OrganizationDataCollectionCard organizationId={organizationId} />
     </OrganizationContextProvider>
-  );
-}
-
-function CardLoadFailure({ title, onRetry }: { title: string; onRetry: () => void }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-muted-foreground text-sm">
-          The request did not complete. Try again, or close this window and reopen it from the Kilo
-          App.
-        </p>
-        <Button variant="outline" onClick={onRetry}>
-          Try again
-        </Button>
-      </CardContent>
-    </Card>
   );
 }

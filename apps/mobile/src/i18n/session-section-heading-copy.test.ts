@@ -69,7 +69,13 @@ describe('session-list section heading copy', () => {
     };
     const rendered = heading('agents.sessionList.sectionAccessibility', 'ar', count);
     expect(rendered).toBe(
-      (expected[count] ?? '').replace('{{title}}', TITLE).replace('{{displayCount}}', String(count))
+      (expected[count] ?? '')
+        .replace('{{title}}', TITLE)
+        // The label carries the count the row shows: the `Intl.NumberFormat('ar')`
+        // digits of this runtime, which render Latin digits here and on the
+        // device (the emulator's header reads «اليوم: 2 جلستان»), not
+        // Arabic-Indic digits.
+        .replace('{{displayCount}}', new Intl.NumberFormat('ar').format(count))
     );
   });
 

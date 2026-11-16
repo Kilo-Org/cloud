@@ -48,7 +48,7 @@ describe('SessionListSectionHeader mounted', () => {
 
     // The visible row still shows the title and the count as separate parts,
     // nested inside the heading that now carries the spoken label.
-    const parts = heading?.children.filter((child): child is string => typeof child !== 'string');
+    const parts = heading?.children.filter(child => typeof child !== 'string');
     expect(parts).toHaveLength(2);
   });
 

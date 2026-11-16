@@ -269,7 +269,7 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     const [calledPush, params] = lastPickerCall();
     // The picker now receives the screen's guarded push function, not the
     // router object.
-    expect(calledPush).toEqual(expect.any(Function));
+    expect(calledPush).toBe(router.push);
     // The translation model carries no reasoning effort: the picker gets the
     // live catalogue but is told the picked effort has nowhere to be stored, so
     // its rows leave the effort chips out and a model tap is the whole pick.

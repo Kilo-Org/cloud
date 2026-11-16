@@ -430,9 +430,12 @@ describe('MemberRow menu', () => {
       () =>
         hookMutations({
           removeMember: {
-            mutateAsync: vi
-              .fn()
-              .mockRejectedValueOnce({ data: { code: 'FORBIDDEN', message: 'No seats' } }),
+            // A recognized server sentence must arrive mapped, not as the
+            // generic fallback: the fallback copy would also satisfy a bare
+            // restore, so this rejection tells the two paths apart.
+            mutateAsync: vi.fn().mockRejectedValueOnce({
+              data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' },
+            }),
           },
         }) as never
     );
@@ -456,7 +459,12 @@ describe('MemberRow menu', () => {
     });
 
     expect(onRemovalStarted).toHaveBeenCalledWith('membership-1');
-    expect(settled).toEqual({ kind: 'removal-refused', message: 'Something went wrong' });
+    // The mapped sentence for the recognized server message, not the generic
+    // fallback: this is what tells the mapping from a bare restore.
+    expect(settled).toEqual({
+      kind: 'removal-refused',
+      message: i18n.t('common.organizationTrialEnded'),
+    });
     expect(abandoned).toBe(false);
   });
 
@@ -468,17 +476,18 @@ describe('MemberRow menu', () => {
   });
 
   it('gives a newer removal the row the refused role change no longer describes', async () => {
-    let resetCalled = false;
+    let resetCalls = 0;
     mocks.hookFactory.mockImplementation(() =>
       hookMutations({
         updateMember: {
           isError: true,
           error: { data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' } },
           // The row resets the sticky role-change error to retire the refusal
-          // its newer removal supersedes.
-          get reset() {
-            resetCalled = true;
-            return () => undefined;
+          // its newer removal supersedes. The count reads the call, not the
+          // property: the reset must run when the removal supersedes the
+          // refusal, not when this mock is wired.
+          reset: () => {
+            resetCalls += 1;
           },
         },
         removeMember: {
@@ -497,8 +506,6 @@ describe('MemberRow menu', () => {
         abandon: () => true,
       }),
     });
-
-    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
     await act(() => {
       (view.root.findByType('Pressable').props.onPress as () => void)();
     });
@@ -509,7 +516,8 @@ describe('MemberRow menu', () => {
       actionsMenu().onDismiss();
     });
 
-    expect(resetCalled).toBe(true);
+    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(resetCalls).toBe(1);
   });
 });
 

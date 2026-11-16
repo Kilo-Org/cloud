@@ -112,9 +112,11 @@ export function OrganizationMembersScreen() {
 
   const handleRemovalStarted = (memberId: string) => admitRemoval(removals, memberId);
   // A refused removal renders until the row's next action for that member
-  // supersedes it; the failure kind check keeps a pending attempt alone.
+  // supersedes it. The store retires only a failed entry with this match; a
+  // pending attempt is left alone. The failure family has one kind, so any
+  // failure is this row's refusal.
   const handleRemovalCleared = (memberId: string) => {
-    removals.clear(memberId, failure => failure.kind === 'removal-refused');
+    removals.clear(memberId, () => true);
   };
 
   if (isResolving || organizationId == null || org == null) {

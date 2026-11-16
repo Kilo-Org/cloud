@@ -141,12 +141,10 @@ export function useUsageAnalytics(scope: UsageScope, range: UsageRange, metric: 
     points: timeseries.data && fillDailySeries(window, timeseries.data.timeseries),
     models: models.data?.breakdown,
     features: features.data?.breakdown,
-    isSummaryError: summary.isError,
-    isSeriesError: timeseries.isError,
-    isBreakdownError: models.isError || features.isError,
-    isLoading: queries.some(query => query.isLoading),
+    summaryError: summary.error,
+    seriesError: timeseries.error,
+    breakdownError: models.error ?? features.error,
     isFetching: queries.some(query => query.isFetching),
-    isError: queries.some(query => query.isError),
     isPaused: queries.some(query => query.isPaused),
     refetch: () => {
       for (const query of queries) {

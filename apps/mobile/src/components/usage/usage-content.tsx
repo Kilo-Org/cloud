@@ -19,6 +19,7 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 
 import { UsageBarChart } from './usage-bar-chart';
 import { UsageBreakdownList } from './usage-breakdown-list';
+import { selectUsageErrorView } from './usage-error-view';
 import { formatUsageCost, formatUsageCostPrecise } from './usage-format';
 
 const RANGE_OPTIONS = [
@@ -83,11 +84,19 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
   const summary = usage.summary;
   const empty = summary?.requestCount === 0;
   // No totals at all: the screen has nothing to show but the failure.
-  const failed = usage.isSummaryError && summary === undefined;
+  const failed = usage.summaryError !== null && summary === undefined;
   const loading = summary === undefined && !failed;
   // Totals loaded, but a refresh of them failed: keep the numbers and flag them
   // instead of presenting stale data as current.
-  const staleTotals = usage.isSummaryError && summary !== undefined;
+  const staleTotals = usage.summaryError !== null && summary !== undefined;
+  const summaryErrorView =
+    failed || staleTotals ? selectUsageErrorView(usage.summaryError, usage.isPaused) : null;
+  const seriesErrorView =
+    usage.seriesError === null ? null : selectUsageErrorView(usage.seriesError, usage.isPaused);
+  const breakdownErrorView =
+    usage.breakdownError === null
+      ? null
+      : selectUsageErrorView(usage.breakdownError, usage.isPaused);
   const retryAll = () => {
     usage.refetch();
   };
@@ -106,19 +115,10 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
         )}
       </View>
 
-      {failed && (
+      {summaryErrorView !== null && (
         <QueryError
-          variant={usage.isPaused ? 'offline' : 'neutral'}
-          onRetry={retryAll}
-          isRetrying={usage.isFetching}
-          placement="top"
-        />
-      )}
-
-      {staleTotals && (
-        <QueryError
-          variant={usage.isPaused ? 'offline' : 'neutral'}
-          onRetry={retryAll}
+          variant={summaryErrorView.variant}
+          onRetry={summaryErrorView.showRetry ? retryAll : undefined}
           isRetrying={usage.isFetching}
           placement="top"
         />
@@ -191,10 +191,10 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
               onChange={setMetric}
               accessibilityLabel={t('usage.metricPicker')}
             />
-            {usage.isSeriesError ? (
+            {seriesErrorView !== null ? (
               <QueryError
-                variant={usage.isPaused ? 'offline' : 'neutral'}
-                onRetry={retryAll}
+                variant={seriesErrorView.variant}
+                onRetry={seriesErrorView.showRetry ? retryAll : undefined}
                 isRetrying={usage.isFetching}
               />
             ) : (
@@ -205,10 +205,10 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
             )}
           </View>
 
-          {usage.isBreakdownError ? (
+          {breakdownErrorView !== null ? (
             <QueryError
-              variant={usage.isPaused ? 'offline' : 'neutral'}
-              onRetry={retryAll}
+              variant={breakdownErrorView.variant}
+              onRetry={breakdownErrorView.showRetry ? retryAll : undefined}
               isRetrying={usage.isFetching}
             />
           ) : (

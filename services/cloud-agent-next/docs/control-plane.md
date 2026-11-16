@@ -314,7 +314,7 @@ so a later report changes nothing.
 | `connected` | `stopping` | Inactive heartbeat after 1 min for unattended routes, no activity for 10 min otherwise, or explicit stop or delete | Unattended idle 1 min; existing idle backstop 10 min |
 | `disconnected` | `connected` | Wrapper `hello`, same or new `wrapperId` | — |
 | `disconnected` | `stopping` | No activity for 10 min, or 90 s after the last frame received, or explicit stop or delete | Idle 10 min, or reconnect 90 s, whichever is earlier |
-| `stopping` | `stopped` | Provider confirms stop, or the existing stop ladder ends | Existing ladder |
+| `stopping` | `stopped` | Provider confirms stop, or the existing stop ladder ends on its attempt count or its wall-clock budget | Existing ladder |
 | any | `stopped` | Provider reports the sandbox gone | — |
 
 - A `hello` from a stale `allocationId`, an older protocol version or a bad credential gets
@@ -360,7 +360,12 @@ so a later report changes nothing.
   attempt when the condition clears; failed routes never automatically retry permanent errors.
 - `stopped` is a routing state. When the stop ladder ends without provider confirmation, the stop is
   logged as unconfirmed and a later `prepare` may create again. Billing and worktree deletion do not
-  read `stopped` as proof of physical stop (see below).
+  read `stopped` as proof of physical stop (see below). The ladder also ends on a wall-clock budget: each
+  attempt is bounded, so an unanswered provider destroy would otherwise hold a message that is waiting
+  for the replacement sandbox for the whole attempt count. The budget is checked when the in-flight
+  attempt's own bound elapses, so the last attempt is never cut short; a destroy that has not resolved
+  by then is wedged, and further retries only extend that wait. The replacement allocation then starts
+  and retains the unconfirmed provider ref through the existing `stopped` path.
 
 ### Route state (per session)
 
@@ -1262,7 +1267,7 @@ them through one development-only override.
 | Sandbox DO | Credential grant | 4 h; re-issued below 1 h by `deliver` or the Sandbox alarm, which retries a failed renewal every 5 min, once per grant scope | Route `failed` (`workspace_setup_failed`) when the grant expired and re-issue failed |
 | Sandbox DO | Artifact grant | `createDeadlineAt` plus first connect | Downloads are rejected |
 | Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
-| Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
+| Sandbox DO | Provider stop | Existing ladder, also ending on a wall-clock budget | Log unconfirmed stop; routing state `stopped` |
 | Sandbox DO | Environment snapshot lookup | 15 s, capped by the launch deadline | Start from the image |
 | Sandbox DO | Snapshot launch attempt (workspace or environment) | 5 min per attempt, 2 attempts with a confirmed stop (up to 30 s) between; the retry moves the create deadline | Route `failed` (`workspace_snapshot_start_failed` or `environment_snapshot_required`) |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |

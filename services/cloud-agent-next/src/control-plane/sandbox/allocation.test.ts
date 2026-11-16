@@ -95,6 +95,87 @@ describe('allocation stop-ladder exhaustion', () => {
   });
 });
 
+describe('allocation stop budget', () => {
+  it('ends the ladder at the wall-clock bound and keeps the ref as evidence', () => {
+    const stopping = reduceAllocation(
+      {
+        ...initialAllocationState(),
+        kind: 'connected',
+        allocationId: 'alloc-1',
+        connectionId: 'conn-1',
+        providerRef: 'ref-1',
+        lastFrameAt: 0,
+        lastActivityAt: 0,
+      },
+      { type: 'stop-requested', at: 1_000, reason: 'preparation_cancelled' },
+      TIMERS
+    ).state;
+    expect(stopping.stopDeadlineAt).toBe(1_000 + TIMERS.providerStopBudgetMs);
+    expect(nextAllocationAlarmAt(stopping, TIMERS)).toBe(1_000 + TIMERS.providerStopAttemptMs);
+
+    // The first attempt does not confirm, so a retry is scheduled.
+    const retry = reduceAllocation(
+      stopping,
+      { type: 'stop-result', at: 2_000, allocationId: 'alloc-1', stopAttempt: 1, confirmed: false },
+      TIMERS
+    ).state;
+    expect(retry.kind).toBe('stopping');
+    expect(retry.stopPending).toBe(true);
+    // The retry pause is earlier than the budget, so it still wins the alarm.
+    expect(nextAllocationAlarmAt(retry, TIMERS)).toBe(retry.stopAt);
+    // An attempt issued near the bound cannot push the alarm past it.
+    const lateAttempt: AllocationState = { ...retry, stopPending: false, stopAt: 90_000 };
+    expect(nextAllocationAlarmAt(lateAttempt, TIMERS)).toBe(1_000 + TIMERS.providerStopBudgetMs);
+
+    const due = reduceAllocation(
+      retry,
+      {
+        type: 'tick',
+        at: 1_000 + TIMERS.providerStopBudgetMs,
+        nextAllocationId: 'alloc-2',
+        retryAllowed: true,
+      },
+      TIMERS
+    );
+    expect(due.state.kind).toBe('stopped');
+    expect(due.state.providerRef).toBeNull();
+    expect(due.state.unconfirmedProviderRef).toBe('ref-1');
+    expect(due.effects).toEqual([]);
+  });
+
+  it('does not schedule another attempt once the budget is spent', () => {
+    const stopping: AllocationState = {
+      ...initialAllocationState(),
+      kind: 'stopping',
+      allocationId: 'alloc-1',
+      providerRef: 'ref-1',
+      stopAttempt: 1,
+      stopPending: false,
+      stopAt: 0,
+      stopDeadlineAt: 1_000,
+    };
+    const { state, effects } = reduceAllocation(
+      stopping,
+      { type: 'stop-result', at: 1_000, allocationId: 'alloc-1', stopAttempt: 1, confirmed: false },
+      TIMERS
+    );
+    expect(state.kind).toBe('stopped');
+    expect(state.unconfirmedProviderRef).toBe('ref-1');
+    expect(effects).toEqual([]);
+  });
+
+  it('still ends the ladder on the attempt count before the budget', () => {
+    const state = stoppingState();
+    const { state: next } = reduceAllocation(
+      state,
+      { type: 'tick', at: 1, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(next.kind).toBe('stopped');
+    expect(next.unconfirmedProviderRef).toBe('ref-1');
+  });
+});
+
 describe('allocation snapshot launch retry', () => {
   const creating: AllocationState = {
     ...initialAllocationState(),

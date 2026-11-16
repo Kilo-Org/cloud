@@ -1,0 +1,1 @@
+ALTER TABLE `allocation` ADD `stop_deadline_at` integer;

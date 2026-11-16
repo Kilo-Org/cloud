@@ -47,6 +47,13 @@ export type ControlPlaneTimers = {
     organizationMembershipReadRetryMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
+    /**
+     * Wall-clock end of the stop ladder. Two bounded attempts cover one
+     * transient provider failure; a later retry only holds a message waiting for
+     * the replacement sandbox, so the ladder ends and retains the unconfirmed
+     * provider ref as evidence.
+     */
+    providerStopBudgetMs: number;
   };
   wrapper: {
     heartbeatIntervalMs: number;
@@ -87,6 +94,12 @@ export type ControlPlaneTimers = {
 const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
 const PROVIDER_CREATE_RETRY_MS = 10_000;
 const PROVIDER_STOP_ATTEMPT_MS = 30_000;
+// A wedged provider destroy costs a full attempt bound each time. The ladder
+// therefore also ends on wall clock: one bounded attempt, its retry pause and a
+// second attempt is the longest a message waiting for the replacement sandbox
+// should see. The bound is read when the in-flight attempt's own bound elapses,
+// so an attempt is never cut short.
+const PROVIDER_STOP_BUDGET_MS = 60_000;
 // Snapshot starts use `DEADLINE_MS.repositoryStartup` for each launch attempt;
 // this module also ships in the wrapper without the worker sources.
 const PREPARATION_CREATE_MS = 5 * MINUTE_MS;
@@ -157,6 +170,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     organizationMembershipReadRetryMs: 1_000,
     providerStopAttemptMs: PROVIDER_STOP_ATTEMPT_MS,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
+    providerStopBudgetMs: PROVIDER_STOP_BUDGET_MS,
   };
   const wrapper = {
     heartbeatIntervalMs: ms(5_000),

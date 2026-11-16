@@ -54,6 +54,15 @@ export type AllocationState = {
   stopPending: boolean;
   stopAt: number | null;
   /**
+   * Wall-clock end of the stop ladder (spec §9). A provider destroy that has not
+   * resolved by then is wedged: a later retry cannot shorten the wait, and the
+   * existing unconfirmed-stop evidence path already covers it. The ladder ends
+   * after the attempt in flight at that point reports its own bound, so a message
+   * waiting for the replacement sandbox is not held through the full attempt
+   * count.
+   */
+  stopDeadlineAt: number | null;
+  /**
    * Evidence kept only on `stopped` when the stop ladder was exhausted without a
    * provider confirmation (spec §9): the container may still run. `providerRef`
    * stays null so a `stopped` state with a live-looking ref is never re-encoded
@@ -83,6 +92,7 @@ export function initialAllocationState(): AllocationState {
     stopAttempt: 0,
     stopPending: false,
     stopAt: null,
+    stopDeadlineAt: null,
     unconfirmedProviderRef: null,
   };
 }
@@ -192,6 +202,11 @@ function maxStopAttempts(timers: SandboxTimers): number {
   return timers.providerStopLadderMs.length + 1;
 }
 
+/** Whether the stop ladder's wall-clock bound is spent at `at`. */
+function stopBudgetSpent(state: AllocationState, at: number): boolean {
+  return state.stopDeadlineAt !== null && at >= state.stopDeadlineAt;
+}
+
 function enterStopping(
   state: AllocationState,
   at: number,
@@ -210,6 +225,7 @@ function enterStopping(
       stopAttempt: 1,
       stopPending: false,
       stopAt: at + timers.providerStopAttemptMs,
+      stopDeadlineAt: at + timers.providerStopBudgetMs,
     },
     effects: [{ type: 'stop', stopAttempt: 1 }],
     stopReason: reason,
@@ -428,6 +444,9 @@ export function reduceAllocation(
         return { state, effects: NO_EFFECTS };
       }
       if (event.confirmed) return { state: initialAllocationState(), effects: NO_EFFECTS };
+      if (stopBudgetSpent(state, event.at)) {
+        return { state: stoppedAfterUnconfirmedStop(state), effects: NO_EFFECTS };
+      }
       return scheduleStopAttempt(state, event.at, timers);
     }
 
@@ -503,6 +522,11 @@ function reduceTick(
       if (state.stopAt === null || event.at < state.stopAt) {
         return { state, effects: NO_EFFECTS };
       }
+      // The bound is spent: the provider destroy is wedged, so end the ladder
+      // instead of holding a waiting message through more attempts.
+      if (stopBudgetSpent(state, event.at)) {
+        return { state: stoppedAfterUnconfirmedStop(state), effects: NO_EFFECTS };
+      }
       if (state.stopPending) {
         // The scheduled attempt is due: issue exactly one stop for it.
         return {
@@ -560,7 +584,11 @@ export function nextAllocationAlarmAt(
       return candidates.length === 0 ? null : Math.min(...candidates);
     }
     case 'stopping':
-      return state.stopAt;
+      return state.stopDeadlineAt === null
+        ? state.stopAt
+        : state.stopAt === null
+          ? state.stopDeadlineAt
+          : Math.min(state.stopAt, state.stopDeadlineAt);
     default:
       return null;
   }

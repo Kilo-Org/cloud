@@ -785,6 +785,7 @@ function stateToRow(state: AllocationState): typeof allocationTable.$inferInsert
     stop_attempt: state.stopAttempt,
     stop_pending: state.stopPending,
     stop_at: state.stopAt,
+    stop_deadline_at: state.stopDeadlineAt,
     unconfirmed_provider_ref: state.unconfirmedProviderRef,
   };
 }
@@ -804,6 +805,7 @@ function rowToState(row: AllocationRow): AllocationState {
     stopAttempt: row.stop_attempt,
     stopPending: row.stop_pending,
     stopAt: row.stop_at,
+    stopDeadlineAt: row.stop_deadline_at,
     unconfirmedProviderRef: row.unconfirmed_provider_ref,
   };
 }
@@ -2912,6 +2914,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               // The backstop is the first ladder attempt: init must not run the
               // stop inline, so the alarm resumes it (H2).
               stopAt: Date.now() + this.sandboxTimers().providerStopAttemptMs,
+              stopDeadlineAt: Date.now() + this.sandboxTimers().providerStopBudgetMs,
             }),
       };
       await this.writeAllocation(state);

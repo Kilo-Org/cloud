@@ -24,6 +24,7 @@ export const allocation = sqliteTable('allocation', {
   stop_attempt: integer('stop_attempt').notNull(),
   stop_pending: integer('stop_pending', { mode: 'boolean' }).notNull(),
   stop_at: integer('stop_at'),
+  stop_deadline_at: integer('stop_deadline_at'),
   unconfirmed_provider_ref: text('unconfirmed_provider_ref'),
   provider_pin: text('provider_pin'),
 });

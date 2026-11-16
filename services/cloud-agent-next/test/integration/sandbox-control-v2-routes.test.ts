@@ -2815,6 +2815,52 @@ describe('SandboxControlV2 routes and forwarding', () => {
     });
   });
 
+  it('replaces the sandbox at the stop budget instead of the full ladder', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    await stub.release({ sessionId: SESSION });
+    await wrapper.next();
+
+    await setAllocationField(stub, {
+      last_activity_at: Date.now() - (TIMERS.idleMs + 1_000),
+    });
+    await runAlarm(stub);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopping'));
+    const stopping = await readState(stub);
+
+    // A message sent during the stop waits for the replacement allocation.
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(() => expect(provider.stopGates).toHaveLength(1));
+
+    // The provider destroy never answers. The ladder's own bound, not its
+    // attempt count, ends it so the waiting message is not held for minutes.
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({ stop_at: Date.now() - 1, stop_deadline_at: Date.now() - 1 })
+        .where(eq(allocationTable.id, 'current'));
+    });
+    await runAlarm(stub);
+
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(state.kind).not.toBe('stopping');
+      expect(state.allocationId).not.toBe(stopping.allocationId);
+    });
+    const replaced = await readState(stub);
+    expect(replaced.kind).not.toBe('stopping');
+    // The ladder ended on its bound: no further provider stop was issued.
+    expect(provider.stopCalls).toHaveLength(1);
+    // The new allocation creates and the waiting route stays preparing.
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('preparing');
+    expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
+  });
+
   it('ignores session frames from a socket superseded by stopping', async () => {
     const provider = createFakeProvider({ gateStop: true });
     const { stub, peer } = await setup(provider);

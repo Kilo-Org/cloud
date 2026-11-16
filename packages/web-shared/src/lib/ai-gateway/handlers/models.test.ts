@@ -173,6 +173,7 @@ describe('GET /api/openrouter/models', () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
     await expect(response.json()).resolves.toEqual({ data: [makeModel('public/model')] });
     expect(mockedGetUserByokProviderIds).not.toHaveBeenCalled();
     expect(mockedAddUserByokAvailability).not.toHaveBeenCalled();
@@ -207,6 +208,7 @@ describe('GET /api/openrouter/models', () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     await expect(response.json()).resolves.toEqual({
       data: [{ ...publicModel, hasUserByokAvailable: true, isFree: false }, directModel],
     });
@@ -323,6 +325,7 @@ describe('GET /api/openrouter/models', () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     await expect(response.json()).resolves.toEqual({
       data: [
         {

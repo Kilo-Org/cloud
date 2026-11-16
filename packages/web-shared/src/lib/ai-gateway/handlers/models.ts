@@ -27,13 +27,20 @@ import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
 } from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
 
-async function modelResponse(response: OpenRouterModelsResponse) {
+async function modelResponse(
+  response: OpenRouterModelsResponse,
+  cacheScope: keyof typeof CATALOG_CACHE_HEADERS
+) {
   const snapshot = await getEnkryptBenchmarks({ fromDb: readDb });
-  return NextResponse.json({
-    ...response,
-    data: publishEnkryptModels(response.data, snapshot),
-  });
+  return NextResponse.json(
+    {
+      ...response,
+      data: publishEnkryptModels(response.data, snapshot),
+    },
+    { headers: CATALOG_CACHE_HEADERS[cacheScope] }
+  );
 }
 
 async function usableCustomRouters(params: { userId: string; organizationId: string | null }) {
@@ -84,10 +91,13 @@ export async function handleModelsRequest(
         addAutoRoutingModels(result.data),
         usableCustomRouters({ userId: auth.user.id, organizationId: auth.organizationId }),
       ]);
-      return await modelResponse({
-        ...result,
-        data: addCustomRouterModels(models, customRouters),
-      });
+      return await modelResponse(
+        {
+          ...result,
+          data: addCustomRouterModels(models, customRouters),
+        },
+        'perCaller'
+      );
     }
 
     const data = await getEnhancedOpenRouterModels({ countryCode, fromDb: readDb });
@@ -96,9 +106,12 @@ export async function handleModelsRequest(
     }
     const models = await addAutoRoutingModels(data.data);
     if (!auth?.user) {
-      return await modelResponse({
-        data: appendLocalFakeDeterministicCatalogModels(models),
-      });
+      return await modelResponse(
+        {
+          data: appendLocalFakeDeterministicCatalogModels(models),
+        },
+        'shared'
+      );
     }
 
     const [byokModels, enabledByokProviderIds, directByokCatalogModelIds, customRouters] =
@@ -115,11 +128,14 @@ export async function handleModelsRequest(
         directByokCatalogModelIds
       )
     );
-    return await modelResponse({
-      data: appendLocalFakeDeterministicCatalogModels(
-        addCustomRouterModels(modelsWithByokAvailability.concat(byokModels), customRouters)
-      ),
-    });
+    return await modelResponse(
+      {
+        data: appendLocalFakeDeterministicCatalogModels(
+          addCustomRouterModels(modelsWithByokAvailability.concat(byokModels), customRouters)
+        ),
+      },
+      'perCaller'
+    );
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },

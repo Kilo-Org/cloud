@@ -107,7 +107,7 @@ describe('claudeBillingReconnectResponse', () => {
     expect(response.headers.get('retry-after')).toBeNull();
     const body = (await response.json()) as { error: string; error_type: string; message: string };
     expect(body.error_type).toBe(ProxyErrorType.byok_error);
-    expect(body.message).toContain('An organization owner must reconnect Claude billing');
+    expect(body.message).toContain('An organization owner must link Claude billing again');
     expect(body.message).toContain(`/organizations/${organizationId}/byok`);
     expect(body.error).toBe(body.message);
   });

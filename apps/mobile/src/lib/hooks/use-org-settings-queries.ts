@@ -61,6 +61,17 @@ export function useOrgAvailableModels(organizationId: string | null, enabled: bo
   );
 }
 
+/**
+ * The gateway's whole catalog, before the organization's policy filters it.
+ * `useOrgAvailableModels` omits every denied model, so the deny list needs this
+ * one to show the models it blocks and let an admin allow them again — the same
+ * unfiltered source the web editor's Models tab reads.
+ */
+export function useOrgModelCatalog(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(trpc.models.list.queryOptions(undefined, { enabled, ...SETTLE_WHILE_OFFLINE }));
+}
+
 /** The gateway's own two settings; `available` says whether the organization may change them. */
 export function useOrgGatewaySettings(organizationId: string | null, enabled: boolean) {
   const trpc = useTRPC();

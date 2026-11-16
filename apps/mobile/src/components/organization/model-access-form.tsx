@@ -16,6 +16,8 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import {
   type AvailableModel,
   catalogProviderSlugs,
+  type DenyListModel,
+  denyListModels,
   draftsEqual,
   initialDraft,
   type ModelAccessDraft,
@@ -33,6 +35,7 @@ export function ModelAccessForm({
   organizationId,
   canEdit,
   models,
+  catalog,
   providerAllowList,
   modelDenyList,
   gateway,
@@ -43,6 +46,7 @@ export function ModelAccessForm({
   organizationId: string;
   canEdit: boolean;
   models: readonly AvailableModel[];
+  catalog: readonly DenyListModel[];
   providerAllowList: readonly string[] | undefined;
   modelDenyList: readonly string[] | undefined;
   gateway: OrgGatewaySettings | undefined;
@@ -120,6 +124,15 @@ export function ModelAccessForm({
     blockingIssue: null,
   });
 
+  // The organization's own catalog omits the models it denies, so the rows come
+  // from the whole gateway catalog with its entries added: a denied model has
+  // to stay on screen, or the admin can never allow it again.
+  const denyRows = denyListModels({
+    catalog,
+    available: models,
+    denyList: draft.modelDenyList,
+  });
+
   return (
     <View className="flex-1">
       <View className="gap-3 px-4 pt-3">
@@ -172,7 +185,7 @@ export function ModelAccessForm({
 
       {tab === 'models' ? (
         <ModelDenyList
-          models={models}
+          models={denyRows}
           draft={draft}
           onChange={onDraftChange}
           disabled={!canEdit || saving}

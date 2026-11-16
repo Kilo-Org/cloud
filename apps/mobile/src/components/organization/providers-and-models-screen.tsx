@@ -9,7 +9,11 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Lock } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useOrgAvailableModels, useOrgGatewaySettings } from '@/lib/hooks/use-org-settings-queries';
+import {
+  useOrgAvailableModels,
+  useOrgGatewaySettings,
+  useOrgModelCatalog,
+} from '@/lib/hooks/use-org-settings-queries';
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
 
 const TITLE_KEY = 'organization.settingsOnWeb.providersAndModels';
@@ -26,6 +30,7 @@ export function OrganizationProvidersAndModelsScreen() {
   const enterprise = org?.plan === 'enterprise';
   const membership = useOrgWithMembers(organizationId);
   const models = useOrgAvailableModels(organizationId, enterprise);
+  const catalog = useOrgModelCatalog(enterprise);
   const gateway = useOrgGatewaySettings(organizationId, enterprise);
 
   if (isResolving || organizationId == null || org == null) {
@@ -46,7 +51,28 @@ export function OrganizationProvidersAndModelsScreen() {
     );
   }
 
-  if (membership.data == null || models.isPending) {
+  if (membership.data == null) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={t(TITLE_KEY)} />
+        {membership.isError ? (
+          <QueryError
+            className="bg-background"
+            message={t('organizationModelAccess.loadError')}
+            onRetry={() => void membership.refetch()}
+            isRetrying={membership.isFetching}
+          />
+        ) : (
+          <View className="gap-3 px-4 pt-4">
+            <Skeleton className="h-10 w-full rounded-lg bg-muted-soft" />
+            <Skeleton className="h-64 w-full rounded-lg bg-muted-soft" />
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  if (models.isPending || catalog.isPending) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} />
@@ -61,10 +87,11 @@ export function OrganizationProvidersAndModelsScreen() {
   const retry = () => {
     void membership.refetch();
     void models.refetch();
+    void catalog.refetch();
     void gateway.refetch();
   };
 
-  if (models.isError && models.data == null) {
+  if ((models.isError && models.data == null) || (catalog.isError && catalog.data == null)) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} />
@@ -72,7 +99,7 @@ export function OrganizationProvidersAndModelsScreen() {
           className="bg-background"
           message={t('organizationModelAccess.loadError')}
           onRetry={retry}
-          isRetrying={models.isFetching}
+          isRetrying={models.isFetching || catalog.isFetching}
         />
       </View>
     );
@@ -85,6 +112,7 @@ export function OrganizationProvidersAndModelsScreen() {
         organizationId={organizationId}
         canEdit={canManageOrganization(role)}
         models={models.data.data}
+        catalog={catalog.data}
         providerAllowList={membership.data.settings.provider_allow_list}
         modelDenyList={membership.data.settings.model_deny_list}
         gateway={gateway.data}

@@ -12,10 +12,9 @@ import { SearchX } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import {
-  type AvailableModel,
+  type DenyListModel,
   matchesSearch,
   type ModelAccessDraft,
-  normalizeModelId,
   setModelsAllowed,
   setProvidersAllowed,
   toggleModel,
@@ -148,9 +147,11 @@ export function ProviderAllowList({
 }
 
 /**
- * The organization's denied models: every model in the catalog with a switch,
- * on while the model is not in the deny list. The list can run to hundreds of
- * models, so a search field and the web page's denied-only filter narrow it.
+ * The organization's denied models: every model in the gateway's catalog with a
+ * switch, on while the model is not in the deny list. The list comes from the
+ * unfiltered catalog, so a model the policy already denies still renders and
+ * can be allowed again. It can run to hundreds of models, so a search field and
+ * the web page's denied-only filter narrow it.
  */
 export function ModelDenyList({
   models,
@@ -158,7 +159,7 @@ export function ModelDenyList({
   onChange,
   disabled,
 }: Readonly<{
-  models: readonly AvailableModel[];
+  models: readonly DenyListModel[];
   draft: ModelAccessDraft;
   onChange: (next: ModelAccessDraft) => void;
   disabled: boolean;
@@ -171,16 +172,16 @@ export function ModelDenyList({
   const shown = models.filter(
     model =>
       matchesSearch([model.name, model.id], search) &&
-      (!deniedOnly || draft.modelDenyList.includes(normalizeModelId(model.id)))
+      (!deniedOnly || draft.modelDenyList.includes(model.id))
   );
   const shownIds = shown.map(model => model.id);
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<AvailableModel>) => (
+    ({ item }: ListRenderItemInfo<DenyListModel>) => (
       <SettingsSwitchRow
         label={item.name}
         description={item.id}
-        value={!draft.modelDenyList.includes(normalizeModelId(item.id))}
+        value={!draft.modelDenyList.includes(item.id)}
         disabled={disabled}
         onValueChange={next => {
           onChange(toggleModel(draft, item.id, next));

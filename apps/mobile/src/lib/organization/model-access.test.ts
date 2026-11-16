@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type CatalogModel,
-  catalogModelIds,
   catalogProviderSlugs,
+  denyListModels,
   draftsEqual,
   initialDraft,
   matchesSearch,
@@ -42,9 +42,25 @@ describe('catalog derivation', () => {
       'openai',
     ]);
   });
+});
 
-  it('lists model ids without their variant suffixes', () => {
-    expect(catalogModelIds(MODELS)).toEqual(['anthropic/claude', 'meta/llama', 'openai/gpt']);
+describe('denyListModels', () => {
+  it('keeps a denied model on the list from the unfiltered catalog, one row per bare id', () => {
+    const rows = denyListModels({
+      catalog: [
+        { id: 'openai/gpt', name: 'GPT' },
+        { id: 'openai/gpt:free', name: 'GPT (free)' },
+        { id: 'meta/llama', name: 'Llama' },
+      ],
+      available: [{ id: 'anthropic/claude', name: 'Claude' }],
+      denyList: ['meta/llama', 'gone/model'],
+    });
+    expect(rows).toEqual([
+      { id: 'anthropic/claude', name: 'Claude' },
+      { id: 'gone/model', name: 'gone/model' },
+      { id: 'meta/llama', name: 'Llama' },
+      { id: 'openai/gpt', name: 'GPT' },
+    ]);
   });
 });
 

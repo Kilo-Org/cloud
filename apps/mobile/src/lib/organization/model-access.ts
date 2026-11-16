@@ -38,11 +38,6 @@ function sortedUnique(values: readonly string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
-/** The model ids the organization's catalog offers, deduped and sorted. */
-export function catalogModelIds(models: readonly CatalogModel[]): string[] {
-  return sortedUnique(models.map(model => normalizeModelId(model.id)));
-}
-
 /**
  * Every provider that can serve at least one model in this catalog. The model
  * catalog carries the inference providers per model in the same slug namespace
@@ -52,6 +47,37 @@ export function catalogModelIds(models: readonly CatalogModel[]): string[] {
 export function catalogProviderSlugs(models: readonly CatalogModel[]): string[] {
   const slugs = models.flatMap(model => model.inference_provider_ids ?? []);
   return sortedUnique(slugs);
+}
+
+/** One row of the deny list: a model an admin may allow or deny, by its bare id. */
+export type DenyListModel = Readonly<{ id: string; name: string }>;
+
+/**
+ * Every model the deny list can show, one row per bare id — the same list the
+ * web editor's Models tab shows. The organization's own catalog omits the
+ * models its policy denies, so the gateway's whole catalog supplies them; the
+ * organization's list adds the entries only it serves (custom LLMs, BYOK, the
+ * auto model); and an id the saved deny list names that neither carries still
+ * gets a row, so a stale entry can be allowed again.
+ */
+export function denyListModels(params: {
+  catalog: readonly DenyListModel[];
+  available: readonly DenyListModel[];
+  denyList: readonly string[];
+}): DenyListModel[] {
+  const nameById = new Map<string, string>();
+  for (const model of [...params.catalog, ...params.available]) {
+    const id = normalizeModelId(model.id);
+    if (!nameById.has(id)) {
+      nameById.set(id, model.name);
+    }
+  }
+  for (const id of params.denyList) {
+    if (!nameById.has(id)) {
+      nameById.set(id, id);
+    }
+  }
+  return [...nameById].map(([id, name]) => ({ id, name })).sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /**

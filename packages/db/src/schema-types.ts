@@ -2545,6 +2545,12 @@ export const OpenRouterEndpoint = z.object({
       retainsPrompts: z.boolean().optional(),
     })
     .nullish(),
+  /**
+   * The inference regions Vercel AI Gateway can pin the model to at this provider, in a fixed
+   * order. Absent when Vercel does not serve the model through the provider or has no regional
+   * inference for it there.
+   */
+  vercel_inference_regions: z.array(OrganizationDataRegionSchema).optional().catch(undefined),
 });
 
 export type OpenRouterModel = z.infer<typeof OpenRouterModel>;
@@ -3347,8 +3353,6 @@ export const VercelModelSchema = ModelSchema.extend({
     .optional()
     .catch(undefined),
   supported_parameters: z.array(z.string()).optional().catch(undefined),
-  /** The inference regions the model can be pinned to; absent when it has no regional inference. */
-  regions: z.array(z.string()).optional().catch(undefined),
   pricing: z
     .object({
       input: z.string(),
@@ -3404,6 +3408,11 @@ export const EndpointSchema = z.object({
   // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
   has_zdr: z.boolean().optional().catch(undefined),
   has_no_training: z.boolean().optional().catch(undefined),
+  /** Vercel AI Gateway: the regions the endpoint can be pinned to; OpenRouter does not set it. */
+  inference_regions: z
+    .array(z.object({ geo_region: z.string() }))
+    .optional()
+    .catch(undefined),
 });
 
 export type Endpoint = z.infer<typeof EndpointSchema>;

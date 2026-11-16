@@ -852,3 +852,75 @@ describe('injectVercelModels data policy of paid Vercel-only models under OpenRo
     expect(data[0]?.models[0]?.endpoint?.data_policy).toBeUndefined();
   });
 });
+
+describe('injectVercelModels inference regions', () => {
+  const policy = { training: false, retainsPrompts: false, canPublish: false };
+
+  function regions(...geoRegions: string[]): Endpoint['inference_regions'] {
+    return geoRegions.map(geo_region => ({ geo_region }));
+  }
+
+  test('records the known regions of each provider listing in a fixed order', () => {
+    const providerModelData = [
+      { provider: provider('nvidia', 'NVIDIA', policy), models: [nvidiaModel()] },
+      {
+        provider: provider('amazon-bedrock', 'Amazon Bedrock', policy),
+        models: [] as OpenRouterModel[],
+      },
+      { provider: provider('google-vertex', 'Google Vertex', policy), models: [] },
+    ];
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [
+          { provider_name: 'nvidia' },
+          { provider_name: 'bedrock', inference_regions: regions('jp', 'xx', 'us', 'us') },
+          { provider_name: 'vertex', inference_regions: regions('eu') },
+          { provider_name: 'vertexAnthropic', inference_regions: regions('us') },
+        ],
+      },
+    };
+
+    injectSnapshotModels(vercelModels, providerModelData);
+
+    expect(
+      providerModelData.map(({ provider, models }) => [
+        provider.slug,
+        models[0]?.endpoint?.vercel_inference_regions,
+      ])
+    ).toEqual([
+      ['nvidia', undefined],
+      ['amazon-bedrock', ['us', 'jp']],
+      ['google-vertex', ['us', 'eu']],
+    ]);
+  });
+
+  test('records regions on listings OpenRouter already has and on providers only Vercel lists', () => {
+    const providerModelData: ProviderModelData = [
+      { provider: provider('nvidia', 'NVIDIA', policy), models: [nvidiaModel()] },
+    ];
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [
+          { provider_name: 'nvidia', inference_regions: regions('eu') },
+          { provider_name: 'baseten', inference_regions: regions('au') },
+        ],
+      },
+    };
+
+    injectSnapshotModels(vercelModels, providerModelData);
+
+    expect(
+      providerModelData.map(({ provider, models }) => [
+        provider.slug,
+        models[0]?.endpoint?.vercel_inference_regions,
+      ])
+    ).toEqual([
+      ['nvidia', ['eu']],
+      ['baseten', ['au']],
+    ]);
+  });
+});

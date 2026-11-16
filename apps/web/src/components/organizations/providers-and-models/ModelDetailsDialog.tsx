@@ -21,7 +21,8 @@ import {
   PolicyPill,
 } from '@/components/organizations/providers-and-models/PolicyPills';
 import { DiscountedPrice } from '@/components/organizations/providers-and-models/DiscountedPrice';
-import { GatewayAvailabilityTable } from '@/components/organizations/providers-and-models/GatewayAvailabilityTable';
+import { GatewayAvailabilityList } from '@/components/organizations/providers-and-models/GatewayAvailabilityList';
+import { InferenceRegionFlags } from '@/components/organizations/providers-and-models/InferenceRegionFlags';
 import type {
   ModelRow,
   ProviderOffering,
@@ -128,6 +129,7 @@ export function ModelDetailsDialog({
                 <TableHead>Out</TableHead>
                 <TableHead>Trains</TableHead>
                 <TableHead>Retains prompts</TableHead>
+                {showGatewayAvailability ? <TableHead>Vercel regions</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -188,6 +190,11 @@ export function ModelDetailsDialog({
                     <TableCell>
                       <PolicyPill value={offering.retainsPrompts} variant="retainsPrompts" />
                     </TableCell>
+                    {showGatewayAvailability ? (
+                      <TableCell>
+                        <InferenceRegionFlags regions={offering.vercelInferenceRegions} />
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 );
               })}
@@ -195,7 +202,7 @@ export function ModelDetailsDialog({
           </Table>
 
           {infoModel && showGatewayAvailability ? (
-            <GatewayAvailabilityTable organizationId={organizationId} modelId={infoModel.modelId} />
+            <GatewayAvailabilityList organizationId={organizationId} modelId={infoModel.modelId} />
           ) : null}
         </div>
       </DialogContent>

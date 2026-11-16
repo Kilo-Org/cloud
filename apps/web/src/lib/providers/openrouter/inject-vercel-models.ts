@@ -11,7 +11,7 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { Endpoint } from '@kilocode/db/schema-types';
+import { OrganizationDataRegionSchema, type Endpoint } from '@kilocode/db/schema-types';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
@@ -148,6 +148,20 @@ function addVercelEndpointModel(
       dataPolicy,
       offering.isVercelOnly ? offering.isFree : undefined
     )
+  );
+}
+
+/**
+ * Records the regions Vercel can pin the provider's listing of `slug` to. Vercel may serve a model
+ * through several endpoints of one provider (e.g. Vertex), so their regions are combined.
+ */
+function addVercelInferenceRegions(providerData: ProviderData, slug: string, endpoint: Endpoint) {
+  const regions = new Set(endpoint.inference_regions?.map(region => region.geo_region));
+  const listed = providerData.models.find(m => m.slug === slug)?.endpoint;
+  if (!listed || regions.size === 0) return;
+  for (const region of listed.vercel_inference_regions ?? []) regions.add(region);
+  listed.vercel_inference_regions = OrganizationDataRegionSchema.options.filter(region =>
+    regions.has(region)
   );
 }
 
@@ -310,6 +324,7 @@ export function injectVercelModels({
       if (openRouterProviders) {
         for (const providerData of openRouterProviders) {
           addToOpenRouterProvider(providerData, offering, endpoint);
+          addVercelInferenceRegions(providerData, offering.model.slug, endpoint);
         }
         continue;
       }
@@ -327,6 +342,7 @@ export function injectVercelModels({
         vercelOnlyProviders.set(providerId, providerData);
       }
       addToVercelOnlyProvider(providerData, offering, endpoint);
+      addVercelInferenceRegions(providerData, offering.model.slug, endpoint);
     }
   }
 

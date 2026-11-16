@@ -215,6 +215,43 @@ describe('listActiveSessions budgets', () => {
     }
   });
 
+  it('gives the body only what the headers left of the read budget', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      // Headers land 3,000 ms in, the body never does. The read must still end
+      // the answer inside the read budget measured from the request, so the
+      // boundary below is 4,500 ms and not 7,500: a body that took a fresh
+      // READ_BUDGET_MS of its own would answer 3,000 ms after the headers.
+      const HEADER_DELAY_MS = 3_000;
+      mockFetchWithinBudget.mockImplementationOnce(async () => {
+        await new Promise(resolve => setTimeout(resolve, HEADER_DELAY_MS));
+        return { ok: true, json: () => new Promise<never>(() => {}) };
+      });
+      selectMock.mockImplementation(() => fakeQuery([]));
+
+      const pending = listActiveSessions({
+        userId: 'user-1',
+        organizationId: undefined,
+        includeCloudAgentSessions: true,
+      });
+      const assertion = expect(pending).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+      const { settled } = trackSettled(pending);
+
+      await jest.advanceTimersByTimeAsync(READ_BUDGET_MS - 1);
+      expect(settled()).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
+      await assertion;
+    } finally {
+      warn.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   it('reports a stalled merge as retryable for an organization-filtered caller', async () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);

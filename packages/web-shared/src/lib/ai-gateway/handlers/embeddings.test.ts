@@ -951,5 +951,33 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       expect(captureException).not.toHaveBeenCalled();
       expectFailureMetrics(499);
     });
+
+    describe('client disconnect reported by Next.js', () => {
+      class ResponseAborted extends Error {
+        override readonly name = 'ResponseAborted';
+      }
+
+      it('answers 499 when the request signal aborts with ResponseAborted', async () => {
+        const controller = new AbortController();
+        mockedFetch.mockImplementation(
+          (_input, init) =>
+            new Promise<Response>((_resolve, reject) => {
+              const signal = init?.signal;
+              signal?.addEventListener('abort', () => reject(signal.reason));
+              controller.abort(new ResponseAborted());
+            })
+        );
+
+        const { handleEmbeddingsRequest } = await import('./embeddings');
+        const response = await handleEmbeddingsRequest(requestWithSignal(controller.signal));
+
+        expect(response.status).toBe(499);
+        await expect(response.json()).resolves.toMatchObject({
+          error_type: ProxyErrorType.client_disconnect,
+        });
+        expect(captureException).not.toHaveBeenCalled();
+        expectFailureMetrics(499);
+      });
+    });
   });
 });

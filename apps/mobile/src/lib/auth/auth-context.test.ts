@@ -148,19 +148,20 @@ describe('performRefresh', () => {
     setSignOutTeardownActive(false);
   });
 
-  it('returns unreadable, not refused, when no refresh token is stored but a token is', async () => {
+  it('returns unrenewable, not refused, when no refresh token is stored but a token is', async () => {
     store.set(AUTH_TOKEN_KEY, 'stored-token');
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     const outcome = await performRefresh();
 
-    // A null refresh-token read is a failed read of one member, not an
-    // absent session: it must never refuse (which the handler signs out on).
+    // A set with no refresh token can never rotate. It is not a refusal — the
+    // caller ends the session once with the branch it records — and it is not a
+    // failed read either: the device was unlocked, so the null is an absence.
     expect(outcome).toEqual({
       ok: false,
       refused: false,
-      unreadable: true,
-      presentKeys: [AUTH_TOKEN_KEY],
+      unrenewable: true,
+      sessionVersion: currentAuthEpoch(),
     });
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
@@ -175,7 +176,6 @@ describe('performRefresh', () => {
       ok: false,
       refused: false,
       unreadable: true,
-      presentKeys: [],
     });
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();

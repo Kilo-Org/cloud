@@ -115,8 +115,8 @@ function isIdentifierRun(run: string): boolean {
 /**
  * The exact event paths whose own value is a contractually app-set identifier
  * rather than payload data: the `error.subsystem`, `error.operation`,
- * `trpc.procedure`, `trpc.code`, `auth.cause`, `auth.branch` and `auth.keys`
- * tags the app writes (code names such as `refresh_token_unreadable` or
+ * `trpc.procedure`, `trpc.code`, `auth.cause` and `auth.branch` tags the app
+ * writes (code names such as `refresh_token_absent` or
  * `cliSessionsV2.getSessionMessagesPage`), the two `credits.store-error-*` tags
  * that carry a store SDK failure's slugged name and code
  * (`purchase-verification-finish-failed`), the `turbo_module.method` tag the
@@ -138,7 +138,6 @@ const IDENTIFIER_PATHS = new Set([
   'tags.trpc.code',
   'tags.auth.cause',
   'tags.auth.branch',
-  'tags.auth.keys',
   'tags.credits.store-error-name',
   'tags.credits.store-error-code',
   'tags.turbo_module.method',

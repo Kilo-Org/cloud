@@ -9,7 +9,7 @@ import {
   readStoredValueWithRetry,
 } from '@/lib/auth/secure-store-read';
 import { deleteStoredValue, writeStoredValue } from '@/lib/auth/secure-store-value';
-import { getActiveToken, isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
+import { isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { isProtectedDataAvailable } from '@/lib/protected-data';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
@@ -64,25 +64,40 @@ type RefreshTransient = {
 };
 type RefreshSuperseded = { ok: false; refused: false; superseded: true; unreadable?: false };
 /**
- * The refresh-token read spent its whole budget on `null` while the rest of
- * the credential set may still hold a session: an unreadable credential read,
- * not an absent session. Never a refusal — a null member is not a signed-out
- * session, so the caller must not sign out. `presentKeys` carries storage-key
- * names only, never a value.
+ * The refresh-token read spent its whole budget on `null` and no member of the
+ * credential set is present: there is no session to renew. Never a refusal —
+ * a null member is not a signed-out session, so the caller must not sign out.
  */
 type RefreshUnreadable = {
   ok: false;
   refused: false;
   superseded?: false;
   unreadable: true;
-  presentKeys: readonly string[];
+};
+/**
+ * The credential set holds a member but no refresh token, and the read that
+ * found this was reliable (the device was unlocked, so the null is an absence,
+ * not a refused read): the set can never rotate. Once the server refuses the
+ * token nothing can renew it, so the caller ends the session — once — instead
+ * of retrying a rotation that has no credential to present.
+ */
+type RefreshUnrenewable = {
+  ok: false;
+  refused: false;
+  superseded?: false;
+  unreadable?: false;
+  unrenewable: true;
+  /** The session that owned the read. A handler drops this outcome once the
+   *  epoch has moved: the set it describes no longer belongs to the person. */
+  sessionVersion: number;
 };
 export type RefreshOutcome =
   | RefreshSuccess
   | RefreshRefused
   | RefreshTransient
   | RefreshSuperseded
-  | RefreshUnreadable;
+  | RefreshUnreadable
+  | RefreshUnrenewable;
 
 // The one refresh route. Named so the classification fingerprints and the
 // request path can never drift apart.
@@ -246,28 +261,25 @@ export async function performRefresh(): Promise<RefreshOutcome> {
 }
 
 /**
- * The credential key names present after the refresh-token read answered
- * `null`: a names-only diagnostic, never a value. The token and the expiry are
- * read as one unit so a session is never called absent because one member
- * could not be read. Both reads are best-effort: the null already settled the
- * outcome, so a rejection here cannot change it.
+ * Whether the stored credential set still holds a member after the refresh-token
+ * read answered `null`. The token and the expiry are read as one unit so a
+ * session is never called absent because one member could not be read. Both
+ * reads are best-effort: the null already settled the outcome, so a rejection
+ * here cannot change it.
+ *
+ * Only the store counts. The in-memory owner outlives a 401's credential clear
+ * on purpose — sign-out's remote cleanup still reads it — so counting it would
+ * make a set the clear already emptied look unrenewable.
  */
-async function readPresentCredentialKeys(): Promise<readonly string[]> {
+async function hasStoredCredentialMember(): Promise<boolean> {
   const [storedAuthToken, storedExpiresAt] = await Promise.allSettled([
     readStoredValueWithRetry(AUTH_TOKEN_KEY),
     readStoredValueWithRetry(TOKEN_EXPIRES_AT_KEY),
   ]);
-  const presentKeys: string[] = [];
-  const hasAuthToken =
+  return (
     (storedAuthToken.status === 'fulfilled' && storedAuthToken.value !== null) ||
-    getActiveToken() !== null;
-  if (hasAuthToken) {
-    presentKeys.push(AUTH_TOKEN_KEY);
-  }
-  if (storedExpiresAt.status === 'fulfilled' && storedExpiresAt.value !== null) {
-    presentKeys.push(TOKEN_EXPIRES_AT_KEY);
-  }
-  return presentKeys;
+    (storedExpiresAt.status === 'fulfilled' && storedExpiresAt.value !== null)
+  );
 }
 
 async function doRefresh(): Promise<RefreshOutcome> {
@@ -302,15 +314,18 @@ async function doRefresh(): Promise<RefreshOutcome> {
       return { ok: false, refused: false };
     }
     if (storedRefreshToken === null) {
-      // The credential set is one unit: a refresh-token null while another
-      // member is present is an unreadable credential read, never a
-      // signed-out session. Only the server 401 below refuses.
-      return {
-        ok: false,
-        refused: false,
-        unreadable: true,
-        presentKeys: await readPresentCredentialKeys(),
-      };
+      // The credential set is one unit: a refresh-token absence is never a
+      // signed-out session on its own. Which of the two it is depends on what
+      // the rest of the set holds, and only a present member owes the person
+      // an end to the session instead of a retry.
+      if (await hasStoredCredentialMember()) {
+        // A token-only set (the legacy long-lived sign-in, or an interrupted
+        // legacy exchange) can never rotate. The device was unlocked, so this
+        // null is a real absence: the rotation is unrenewable, and the caller
+        // ends the session once rather than retrying forever.
+        return { ok: false, refused: false, unrenewable: true, sessionVersion };
+      }
+      return { ok: false, refused: false, unreadable: true };
     }
 
     // Bound the refresh network I/O at the control-plane deadline so a hung
@@ -331,6 +346,12 @@ async function doRefresh(): Promise<RefreshOutcome> {
     }
 
     if (!response.ok) {
+      // A 403 needs its body read: the refresh route has no 403 branch, so the
+      // body is what tells its own refusal apart from an intermediary's (an
+      // edge firewall, a WAF, a proxy) refusal, which proves nothing about the
+      // stored pair. Every other status is classified on the status alone.
+      const refusalBody =
+        response.status === 403 ? await response.json().catch(() => undefined) : undefined;
       // Classify before deciding: a 401 is terminal (the stored pair is gone),
       // a 429/5xx is retryable and carries the server's own back-off, and any
       // other 4xx is terminal without a retry guidance to honour.
@@ -338,6 +359,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
         path: REFRESH_PATH,
         status: response.status,
         retryAfterHeader: response.headers.get('retry-after'),
+        body: refusalBody,
       });
       if (classified.kind === 'terminal') {
         if (classified.clearCredential) {

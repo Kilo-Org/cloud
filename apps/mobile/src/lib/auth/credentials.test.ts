@@ -411,8 +411,8 @@ describe('refresh rotation', () => {
 
   // The defect this slice removes: a null refresh-token read used to be read
   // as "no session" and refused, which signed a healthy person out. It is a
-  // failed read of one member, not an absent credential set.
-  it('returns unreadable, not refused, when the refresh token is absent but the token is present', async () => {
+  // reliable read of a set with no refresh token, which can never rotate.
+  it('returns unrenewable, not refused, when the refresh token is absent but the token is present', async () => {
     store.set(AUTH_TOKEN_KEY, 'stored-token');
     vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
       await Promise.resolve();
@@ -427,11 +427,12 @@ describe('refresh rotation', () => {
       expect(outcome).toEqual({
         ok: false,
         refused: false,
-        unreadable: true,
-        presentKeys: [AUTH_TOKEN_KEY],
+        unrenewable: true,
+        sessionVersion: currentAuthEpoch(),
       });
       expect(fetchMock).not.toHaveBeenCalled();
-      // The stored token is untouched: nothing was deleted or published.
+      // Nothing was deleted or published: the caller decides how the session
+      // ends, and a refused outcome here would sign out before it is asked.
       expect(store.get(AUTH_TOKEN_KEY)).toBe('stored-token');
       expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
     } finally {
@@ -476,7 +477,7 @@ describe('refresh rotation', () => {
     }
   });
 
-  it('returns unreadable with no present keys for an empty credential set', async () => {
+  it('returns unreadable for an empty credential set', async () => {
     vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
       await Promise.resolve();
       return store.get(key) ?? null;
@@ -493,7 +494,6 @@ describe('refresh rotation', () => {
         ok: false,
         refused: false,
         unreadable: true,
-        presentKeys: [],
       });
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {

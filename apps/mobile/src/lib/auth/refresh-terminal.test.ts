@@ -95,7 +95,6 @@ describe('refresh terminal classification', () => {
       ok: false,
       refused: false,
       unreadable: true,
-      presentKeys: [],
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
@@ -147,6 +146,48 @@ describe('refresh terminal classification', () => {
     expect(outcome).toEqual({ ok: false, refused: false, retryAfterMs: 9000 });
     expect(store.get(AUTH_TOKEN_KEY)).toBe('live-token');
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+  });
+
+  it('keeps the pair and files nothing when an intermediary answers 403', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<html>Request blocked</html>', {
+        status: 403,
+        headers: { 'content-type': 'text/html' },
+      })
+    );
+    const events = recordEvents();
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({ ok: false, refused: false, retryAfterMs: undefined });
+    // The 403 never reached the refresh route: it is no defect and no proof
+    // about the pair, so the session stays and the next rotation tries again.
+    expect(store.get(AUTH_TOKEN_KEY)).toBe('live-token');
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+    expect(events).toEqual([]);
+  });
+
+  it('stops when the refresh route itself refuses with its 403 body', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ error: 'SESSION_REVOKED' }, { status: 403 })
+    );
+    const events = recordEvents();
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      ok: false,
+      refused: true,
+      sessionVersion: currentAuthEpoch(),
+    });
+    // Not a 401, so the credential set stays until sign-out clears it.
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('error');
   });
 
   it('stops on a 4xx with no retry guidance instead of retrying it', async () => {

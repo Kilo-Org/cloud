@@ -102,6 +102,45 @@ describe('classifyAuthResponse', () => {
     });
   });
 
+  it('keeps an intermediary 403 on the refresh route retryable so the session survives', () => {
+    // The refresh route has no 403 branch, so a 403 is an edge firewall or WAF
+    // answering in front of it. Its body is not one the route writes, so it
+    // proves nothing about the stored pair: the rotation retries later instead
+    // of ending a session whose credentials may be perfectly healthy.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: { code: '403' } },
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: undefined });
+    expect(classifyAuthResponse({ path: '/api/auth/native/refresh', status: 403 })).toEqual({
+      kind: 'retry',
+      status: 403,
+      retryAfterMs: undefined,
+    });
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        retryAfterHeader: '15',
+        body: '<html>blocked</html>',
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: 15_000 });
+  });
+
+  it('keeps a refresh 403 carrying the route refusal body terminal', () => {
+    // A body the route itself writes is the route refusing, whatever the status
+    // an intermediary may have rewritten it to.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: 'SESSION_REVOKED' },
+      })
+    ).toEqual({ kind: 'terminal', status: 403, clearCredential: false });
+  });
+
   it.each([400, 403, 404, 409, 425])(
     'classifies a 4xx with no retry guidance (%i) as terminal and never retries it',
     status => {

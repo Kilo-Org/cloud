@@ -151,7 +151,7 @@ export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerifi
         owner: parsed.data.owner,
         userId: parsed.data.uid,
         issuedAt: parsed.data.iat,
-        appShell: parsed.data.appShell === true,
+        ...(parsed.data.appShell === true ? { appShell: true } : {}),
         ...(returnTo ? { returnTo } : {}),
         ...(parsed.data.purpose ? { purpose: parsed.data.purpose } : {}),
       };

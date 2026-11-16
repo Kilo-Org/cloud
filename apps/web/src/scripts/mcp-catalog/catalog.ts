@@ -81,6 +81,10 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   // Sharing a Claude payer binds a paid Claude organization to another Kilo scope.
   'claudeBilling.share': true,
   'claudeBilling.sharePersonal': true,
+  // Mints a one-time token for a page the native app opens in its in-app browser. The
+  // token is only useful with the browser that receives the shell cookie, so it is an
+  // app-internal hand-off, not an API for agents.
+  'appShell.mintHandoff': true,
 };
 
 /**

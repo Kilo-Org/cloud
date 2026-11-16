@@ -294,16 +294,17 @@ async function buildGitLabConnectOAuthUrl(
     throw new Error('GitLab OAuth credentials cache is unavailable');
   }
 
-  const state = createGitLabOAuthState(
-    {
-      owner,
-      ...(usesCustomInstance ? { instanceUrl: normalizedInstanceUrl } : {}),
-      ...(customCredentialsRef ? { customCredentialsRef } : {}),
-      ...(returnTo ? { returnTo } : {}),
-    },
-    user.id,
-    { appShell }
-  );
+  const statePayload = {
+    owner,
+    ...(usesCustomInstance ? { instanceUrl: normalizedInstanceUrl } : {}),
+    ...(customCredentialsRef ? { customCredentialsRef } : {}),
+    ...(returnTo ? { returnTo } : {}),
+  };
+  // The web entry point has no shell to pin; passing the option only for a shell
+  // start keeps the signed payload of a plain web connect identical.
+  const state = appShell
+    ? createGitLabOAuthState(statePayload, user.id, { appShell: true })
+    : createGitLabOAuthState(statePayload, user.id);
 
   return {
     url: buildGitLabOAuthUrl(state, normalizedInstanceUrl, customCredentials),

@@ -935,7 +935,7 @@ describe('Organization hub integrations rows', () => {
 });
 
 describe('Organization hub settings rows on the app shell', () => {
-  const rowTitled = (renderer: TestRenderer, title: string) => {
+  const rowTitled = (renderer: TestRenderer.ReactTestRenderer, title: string) => {
     const row = renderer.root
       .findAllByType('ConfigureRow')
       .find(node => node.props.title === title);

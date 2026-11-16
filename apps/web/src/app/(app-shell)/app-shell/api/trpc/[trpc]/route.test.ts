@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import type * as TrpcInitModule from '@kilocode/web-shared/lib/trpc/init';
 import type * as SessionModule from '@/lib/app-shell/session';
 import type * as TrpcRouteModule from './route';
 import { shellUser } from '@/tests/helpers/shell-user.helper';
@@ -12,9 +13,8 @@ jest.mock('@/lib/app-shell/session', () => ({
 // The root router builds service clients at import time; this suite only needs a
 // router that answers one query.
 jest.mock('@/routers/root-router', () => {
-  const { createTRPCRouter, baseProcedure } = jest.requireActual<
-    typeof import('@kilocode/web-shared/lib/trpc/init')
-  >('@kilocode/web-shared/lib/trpc/init');
+  const { createTRPCRouter, baseProcedure } =
+    jest.requireActual<typeof TrpcInitModule>('@kilocode/web-shared/lib/trpc/init');
   return {
     rootRouter: createTRPCRouter({
       user: createTRPCRouter({

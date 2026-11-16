@@ -6,13 +6,13 @@ import {
 import {
   getByokEndpointModelBaseUrl,
   hasByokEndpointModelPlaceholder,
-  isByokEndpointUrlPolicyEnforced,
   resolveByokEndpointAuth,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import { parseByokEndpointModelsResponse } from '@/lib/byok/endpoint-models';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 import {
   findUpstreamUrlViolation,
+  isUpstreamUrlPolicyEnforced,
   type UpstreamUrlViolation,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 
@@ -34,7 +34,7 @@ const URL_VIOLATION_MESSAGES = {
 } as const satisfies Record<UpstreamUrlViolation, string>;
 
 async function findUrlViolationMessage(url: string): Promise<string | null> {
-  if (!isByokEndpointUrlPolicyEnforced()) return null;
+  if (!isUpstreamUrlPolicyEnforced()) return null;
   const violation = await findUpstreamUrlViolation(url);
   return violation ? URL_VIOLATION_MESSAGES[violation] : null;
 }

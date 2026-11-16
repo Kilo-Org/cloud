@@ -15,7 +15,6 @@ import {
 } from '@kilocode/db/schema-types';
 import type { DirectUpstreamAuth } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
-import { isUpstreamUrlPolicyEnforced } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 
 export { isByokEndpointProviderId, type ByokEndpointProviderId };
 
@@ -95,15 +94,6 @@ export function getByokEndpointModelBaseUrl(
     BYOK_ENDPOINT_MODEL_PLACEHOLDER,
     encodeURIComponent(model.internal_id)
   );
-}
-
-/**
- * Endpoint URLs come from organization members rather than Kilo admins, so the HTTPS and
- * public-host policy applies on every deployed environment, including previews. Only local
- * development, which reaches local fakes over plain HTTP, is exempt.
- */
-export function isByokEndpointUrlPolicyEnforced(): boolean {
-  return isUpstreamUrlPolicyEnforced() || process.env.NODE_ENV === 'production';
 }
 
 export function parseByokEndpointCredentials(decrypted: string): ByokEndpointCredentials | null {

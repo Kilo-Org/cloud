@@ -7,10 +7,11 @@
  * way into the runs they started.
  */
 
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -38,11 +39,16 @@ const STATUS_TONE = {
 
 const SKELETON_ROWS = [0, 1, 2];
 
-function DeliveryRow({ delivery }: Readonly<{ delivery: CloudTriggerDelivery }>) {
+function DeliveryRow({
+  delivery,
+  organizationId,
+}: Readonly<{ delivery: CloudTriggerDelivery; organizationId?: string }>) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const at = parseTimestamp(delivery.timestamp);
   const hasTime = !Number.isNaN(at.getTime());
+  // A const keeps the null check's narrowing inside the press handler.
+  const sessionId = delivery.kiloSessionId;
   return (
     <View className="gap-1 border-b-[0.5px] border-hair-soft py-2">
       <View className="flex-row items-center gap-2">
@@ -63,13 +69,16 @@ function DeliveryRow({ delivery }: Readonly<{ delivery: CloudTriggerDelivery }>)
           {delivery.errorMessage}
         </Text>
       )}
-      {delivery.kiloSessionId === null ? null : (
+      {sessionId === null ? null : (
         <Button
           variant="ghost"
           size="sm"
           className="self-start px-0"
           onPress={() => {
-            router.push(`/(app)/agent-chat/${delivery.kiloSessionId}` as Href);
+            // An organization trigger's run belongs to that organization: the
+            // route carries the scope so the session opens in it instead of
+            // re-keying from the personal one.
+            router.push(getAgentSessionPath(sessionId, organizationId));
           }}
         >
           <Text>{t('cloudAgent.triggers.openSession')}</Text>
@@ -120,7 +129,7 @@ export function TriggerDeliveries({
   return (
     <View>
       {query.data.map(delivery => (
-        <DeliveryRow key={delivery.id} delivery={delivery} />
+        <DeliveryRow key={delivery.id} delivery={delivery} organizationId={organizationId} />
       ))}
     </View>
   );

@@ -177,9 +177,8 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('leaves a server-side GitHub failure (5xx) untouched', async () => {
-    const failure = githubRefusal(500, 'Server Error');
-    mockListGitHubBranches.mockRejectedValue(failure);
+  it('answers a server-side GitHub failure (5xx) retryably instead of a 500', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(500, 'Server Error'));
 
     await expect(
       listProviderRepositoryBranches({
@@ -187,7 +186,43 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
         userId: 'user_1',
         repositoryFullName: 'octocat/hello',
       })
-    ).rejects.toBe(failure);
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
+  it('answers a GitHub transport failure with no status retryably', async () => {
+    mockListGitHubBranches.mockRejectedValue(new TypeError('fetch failed'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
+  it('maps a refused installation credential (401) to the reconnect state', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(401, 'Bad credentials'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  it('maps a legally blocked repository (451) to FORBIDDEN', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(451, 'Repository access blocked'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'blocked/repo',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('returns the listing when GitHub accepts the request', async () => {

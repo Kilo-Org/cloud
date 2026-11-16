@@ -185,6 +185,48 @@ function githubRateLimitTrpcError(error: unknown): TRPCError {
   });
 }
 
+/** Fixed copy for a GitHub branch read that failed past the refusal classes. */
+const githubCredentialRefusedMessage =
+  'Your GitHub connection is no longer valid. Reconnect GitHub and try again.';
+const githubBranchesUnavailableMessage = 'GitHub did not answer the branch list. Try again.';
+
+/**
+ * Map a GitHub branch-listing failure that is neither a rate limit nor a
+ * repository refusal. The callers handle 403 and 404 themselves, because only
+ * they know whether another installation may still see the repository.
+ *
+ * A 5xx, a transport failure (no status), and any other answer Kilo cannot act
+ * on are provider-side: they stay retryable so the caller sees a state it can
+ * retry instead of an opaque internal error. A 401 is the installation
+ * credential itself being refused, which a reconnect fixes; a 451 is GitHub
+ * blocking the repository for legal reasons, which is a refusal like 403.
+ */
+function githubBranchesErrorToTrpcError(error: unknown): TRPCError {
+  // The list call's own refusals (a vanished integration, an incomplete
+  // installation) are already classified and keep their specific code.
+  if (error instanceof TRPCError) return error;
+  const status = refusalStatus(error);
+  if (status === 401) {
+    return new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: githubCredentialRefusedMessage,
+      cause: error,
+    });
+  }
+  if (status === 451) {
+    return new TRPCError({
+      code: 'FORBIDDEN',
+      message: githubRepositoryForbiddenMessage,
+      cause: error,
+    });
+  }
+  return new TRPCError({
+    code: 'SERVICE_UNAVAILABLE',
+    message: githubBranchesUnavailableMessage,
+    cause: error,
+  });
+}
+
 /** A refusal meaning "this installation cannot see that repository" — try the next one. */
 function isRepositoryUnreachable(error: unknown): boolean {
   if (error instanceof TRPCError) return error.code === 'NOT_FOUND' || error.code === 'FORBIDDEN';
@@ -246,7 +288,7 @@ async function listOrganizationGitHubBranches(
         rateLimitError ??= error;
         continue;
       }
-      if (!isRepositoryUnreachable(error)) throw error;
+      if (!isRepositoryUnreachable(error)) throw githubBranchesErrorToTrpcError(error);
       lastError = error;
     }
   }
@@ -298,7 +340,7 @@ async function listGitHubBranches(
         cause: error,
       });
     }
-    throw error;
+    throw githubBranchesErrorToTrpcError(error);
   }
 }
 

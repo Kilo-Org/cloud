@@ -360,7 +360,9 @@ function pullControl(root: ReactTestRenderer['root']) {
         refreshControl?: { props: { refreshing: boolean; onRefresh: () => void } };
       };
       if (typeof forwarded.onRefresh === 'function') {
-        return { props: { refreshing: forwarded.refreshing === true, onRefresh: forwarded.onRefresh } };
+        return {
+          props: { refreshing: forwarded.refreshing === true, onRefresh: forwarded.onRefresh },
+        };
       }
       return forwarded.refreshControl;
     })(),

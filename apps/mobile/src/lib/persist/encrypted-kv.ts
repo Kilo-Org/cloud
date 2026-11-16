@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one encrypted store: the key, the open recovery, and every kv query share one module-level open */
 import * as Sentry from '@sentry/react-native';
 import { and, asc, eq, like, sql } from 'drizzle-orm';
 // The `drizzle-orm/expo-sqlite` barrel also pulls in `useLiveQuery`, which
@@ -35,10 +36,14 @@ import { kv } from './schema';
  * thread; the exported API stays async because opening and keying do not.
  *
  * Opening is single-flight: one module-level open promise, awaited by every
- * caller. A wrong key or a corrupt file fails the `sqlite_master` probe and
- * is recovered by closing, deleting the database, generating a fresh key,
- * and reopening — the loss is accepted (cache and drafts are recoverable
- * losses), startup is never blocked, and the reset is reported to Sentry.
+ * caller. A wrong key or a corrupt file fails the `sqlite_master` probe. That
+ * failure is recovered by closing, deleting the database, generating a fresh
+ * key, and reopening. The reset is reported to Sentry and startup is never
+ * blocked. The unreadable file is the trigger. It also holds the durable
+ * chats table and the harness SDK's conversation tables, which are lost with
+ * it. A failed migration is different. The file opened and keyed correctly,
+ * so the failure is reported under the migration operation and rethrown
+ * without deleting anything.
  */
 
 const DATABASE_NAME = 'kilo-persist.db';
@@ -236,12 +241,34 @@ async function openWithKey(key: string): Promise<KVDatabase> {
   }
 }
 
-async function probeAndMigrate(db: KVDatabase): Promise<void> {
+/**
+ * Thrown when the migrations fail on a file that opened and keyed correctly.
+ * Distinct from a corrupt file, because delete-and-recreate would discard a
+ * readable file that the migration itself did not damage.
+ */
+class SchemaMigrationError extends Error {
+  constructor(cause: unknown) {
+    super('encrypted-kv: schema migration failed on a keyed database', { cause });
+    this.name = 'SchemaMigrationError';
+  }
+}
+
+function probeSchema(db: KVDatabase): void {
   // A wrong key or a corrupt file makes this throw (DEC-01 step 3).
   db.get(sql`SELECT count(*) FROM sqlite_master`);
+}
+
+async function migrateSchema(db: KVDatabase): Promise<void> {
   // Drizzle owns the schema; a recreated (deleted) file has no
-  // `__drizzle_migrations` table, so the migrations run again on it.
-  await migrate(db, migrations);
+  // `__drizzle_migrations` table, so the migrations run again on it. A failure
+  // here is a migration error on a file that opened and keyed correctly, not
+  // a corrupt file.
+  try {
+    await migrate(db, migrations);
+  } catch (error) {
+    // Tag the failure so the open can tell it apart from a corrupt file.
+    throw new SchemaMigrationError(error);
+  }
 }
 
 /**
@@ -261,7 +288,9 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
   let db: KVDatabase | undefined = undefined;
   try {
     db = await openWithKey(key);
-    await probeAndMigrate(db);
+    // The probe throws synchronously, before any await can interleave.
+    probeSchema(db);
+    await migrateSchema(db);
     return db;
   } catch (openError) {
     // The device locked during the open, so the failure says nothing about the
@@ -282,13 +311,28 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       });
       throw openError;
     }
+    // The file opened and keyed correctly, so the migration failed on readable
+    // data. Report it and rethrow: deleting the file would lose the chats and
+    // conversation tables the failure never touched.
+    if (openError instanceof SchemaMigrationError) {
+      if (db) {
+        await closeQuietly(db.$client);
+      }
+      Sentry.captureException(openError.cause, {
+        level: 'error',
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+      });
+      throw openError.cause;
+    }
     // Wrong key, corrupt file, or a tampered key: cache and drafts are
     // recoverable losses. Close, delete the file, regenerate the key, and
-    // reopen (DEC-01 step 4).
+    // reopen (DEC-01 step 4). This file also holds the durable chats table and
+    // the harness SDK's conversation tables. This recovery is the last resort
+    // for them, and it runs only when the file cannot be read.
     if (db) {
-      // The probe or migration failed after the handle opened. A handle that
-      // will not close must not be replaced by a second connection to the same
-      // file: abort the reset and report the original open error instead.
+      // The probe failed after the handle opened. A handle that will not close
+      // must not be replaced by a second connection to the same file: abort
+      // the reset and report the original open error instead.
       if (!(await closeQuietly(db.$client))) {
         reportAbortedReset(openError);
       }
@@ -301,7 +345,8 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       await SQLite.deleteDatabaseAsync(DATABASE_NAME);
       const freshKey = await generateAndStoreKey();
       reopened = await openWithKey(freshKey);
-      await probeAndMigrate(reopened);
+      probeSchema(reopened);
+      await migrateSchema(reopened);
       Sentry.captureException(openError, {
         level: 'warning',
         tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
@@ -373,7 +418,8 @@ export function resetEncryptedKvOpenForTests(): void {
  * The chat store is the one: it hands this handle to the harness SDK, which
  * keeps the conversations in tables of its own on the same file. One file
  * means one key, one SQLCipher probe, and one delete-and-recreate recovery
- * rather than a second copy of all three.
+ * rather than a second copy of all three. The delete runs on a failed probe
+ * only; a failed migration reports and rethrows, and the file stays.
  */
 export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
   const db = await openDatabase();

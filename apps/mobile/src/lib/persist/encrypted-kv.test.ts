@@ -25,6 +25,11 @@ const store = new Map<string, string>();
 const sqlLog: string[] = [];
 let randomCallCount = 0;
 let failNextProbe = false;
+// Fails the next schema migration the way a disk error does. `migrate` reads
+// the `__drizzle_migrations` ledger before it runs the schema. That read is the
+// one statement Drizzle does not wrap, so the fake rejects it once. The caller
+// then gets the original error, not a wrapper.
+let failNextMigration = false;
 let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
@@ -109,13 +114,21 @@ function nativeStatement(source: string): FakeStatement {
         getFirstSync: () => rows[0] ?? null,
       };
     },
-    executeForRawResultSync: (params = []) => ({
-      getAllSync: () =>
-        currentHandle()
-          .prepare(source)
-          .all(...params)
-          .map(row => Object.values(row)),
-    }),
+    executeForRawResultSync: (params = []) => {
+      // Migration failure seam. Drizzle reads the ledger with `session.values`,
+      // which wraps nothing, so this throw is the error the open reports.
+      if (failNextMigration && source.includes('__drizzle_migrations')) {
+        failNextMigration = false;
+        throw new Error('migration failed: disk I/O error');
+      }
+      return {
+        getAllSync: () =>
+          currentHandle()
+            .prepare(source)
+            .all(...params)
+            .map(row => Object.values(row)),
+      };
+    },
   };
 }
 
@@ -268,6 +281,7 @@ beforeEach(() => {
   sqlLog.length = 0;
   randomCallCount = 0;
   failNextProbe = false;
+  failNextMigration = false;
   failEveryProbe = false;
   failNextPragma = false;
   failEveryPragma = false;
@@ -696,6 +710,70 @@ describe('open failure recovery', () => {
       level: 'error',
       tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
     });
+  });
+});
+
+describe('migration failure keeps the database', () => {
+  it('a_migration_failure_does_not_delete_the_file_or_regenerate_the_key', async () => {
+    // A healthy open stores a value and the key it opened with.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+    expect(storedKey).toBeDefined();
+
+    // The next launch fails its migration.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+
+    // The second open ran and closed its handle.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(closeCallCount).toBe(1);
+    // The file and the key stay: this branch never deletes or rekeys.
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    // The failure is reported once, under the migration operation tag.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+    });
+  });
+
+  it('the_stored_value_survives_a_migration_failure_to_a_later_launch', async () => {
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+
+    // The next launch fails its migration and keeps the file and the key.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+
+    // A launch after the failure reopens the same file and reads the value.
+    failNextMigration = false;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(3);
+  });
+
+  it('a_probe_failure_still_deletes_the_file_and_regenerates_the_key', async () => {
+    failNextProbe = true;
+    await setItem('s', 'a', 'x');
+
+    // A probe failure keeps the delete-and-recreate recovery, key included.
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
   });
 });
 

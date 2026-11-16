@@ -171,6 +171,7 @@ import {
 import { setSentryContext } from '@/lib/sentry-context';
 import { initSentry } from '@/lib/sentry-init';
 import { installErrorReporting } from '@/lib/telemetry/install-error-reporting';
+import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { reapTempFiles } from '@/lib/temp-file-registry';
@@ -698,9 +699,13 @@ function RootLayoutNav({
       }
 
       if (result.status === 'error') {
-        Sentry.captureException(result.error, {
-          tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
-        });
+        // A locked device refusing the keychain read is that device state, not
+        // a defect; the gate reports its own retry state below either way.
+        if (!isKeychainInteractionRefused(result.error)) {
+          Sentry.captureException(result.error, {
+            tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
+          });
+        }
         setNeedsConsent(false);
         setOptionalConsentState(false);
         setConsentChecked(false);

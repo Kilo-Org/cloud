@@ -60,6 +60,7 @@ jest.mock('./processUsage.shared', () => {
   return {
     ...actual,
     computeOpenRouterCostFields: jest.fn(actual.computeOpenRouterCostFields),
+    selectUsageCostFields: jest.fn(actual.selectUsageCostFields),
   };
 });
 
@@ -107,7 +108,7 @@ describe('claudeBillingReconnectResponse', () => {
     expect(response.headers.get('retry-after')).toBeNull();
     const body = (await response.json()) as { error: string; error_type: string; message: string };
     expect(body.error_type).toBe(ProxyErrorType.byok_error);
-    expect(body.message).toContain('An organization owner must reconnect Claude billing');
+    expect(body.message).toContain('An organization owner must link Claude billing again');
     expect(body.message).toContain(`/organizations/${organizationId}/byok`);
     expect(body.error).toBe(body.message);
   });
@@ -480,7 +481,7 @@ describe('countAndStoreEmbeddingUsage', () => {
     mockedLogMicrodollarUsage.mockClear();
     mockedProcessTokenData.mockClear();
     jest.mocked(after).mockClear();
-    jest.mocked(sharedUsage.computeOpenRouterCostFields).mockClear();
+    jest.mocked(sharedUsage.selectUsageCostFields).mockClear();
     jest.mocked(captureException).mockClear();
     jest.mocked(captureMessage).mockClear();
   });
@@ -546,7 +547,7 @@ describe('countAndStoreEmbeddingUsage', () => {
         );
         expect(mockedProcessTokenData.mock.calls[0][2]).toBe(servingProvider);
         expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
-        expect(sharedUsage.computeOpenRouterCostFields).not.toHaveBeenCalled();
+        expect(sharedUsage.selectUsageCostFields).not.toHaveBeenCalled();
       }
     );
 
@@ -605,6 +606,53 @@ describe('countAndStoreEmbeddingUsage', () => {
       expect(mockedProcessTokenData).not.toHaveBeenCalled();
       expect(captureException).not.toHaveBeenCalled();
     });
+  });
+
+  it('hands the read body and the billed stats to the response', async () => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+    };
+    const text = JSON.stringify({
+      id: 'embedding-id',
+      model: 'test/embedding',
+      usage: { prompt_tokens: 10, cost: 0.001, is_byok: false },
+    });
+
+    const accounting = countAndStoreEmbeddingUsage(new Response(text), usageContext, undefined);
+    await accounting.usagePromise;
+
+    await expect(accounting.bodyPromise).resolves.toEqual({
+      text,
+      json: { value: JSON.parse(text) },
+    });
+    const billed = await accounting.pricedStatsPromise;
+    expect(billed).toMatchObject({ cost_mUsd: 1000, market_cost: 1000 });
+    expect(mockedLogMicrodollarUsage.mock.calls[0]?.[0]).toBe(billed);
+  });
+
+  it('rejects the read body and prices nothing when the body cannot be read', async () => {
+    const readError = new TypeError('terminated');
+    const accounting = countAndStoreEmbeddingUsage(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.error(readError);
+          },
+        })
+      ),
+      {
+        ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+        api_kind: 'embeddings',
+      },
+      undefined
+    );
+    await accounting.usagePromise;
+
+    await expect(accounting.bodyPromise).rejects.toBe(readError);
+    await expect(accounting.pricedStatsPromise).resolves.toBeNull();
+    expect(mockedProcessTokenData).toHaveBeenCalledTimes(1);
   });
 
   it.each([400, 429])(
@@ -704,6 +752,53 @@ describe('countAndStoreEmbeddingUsage', () => {
       expect.objectContaining({ cost_mUsd: testCase.expectedCost, market_cost: 1000 }),
       usageContext
     );
+  });
+});
+
+describe.each([
+  {
+    apiKind: 'embeddings' as const,
+    countUsage: countAndStoreEmbeddingUsage,
+    recordedStats: () => mockedLogMicrodollarUsage.mock.calls[0]?.[0],
+    chunks: [
+      [500, '{"id":"embedding-timed","model":"test/embedding",'],
+      [540, '"usage":{"prompt_tokens":10,"cost":0.001,"is_byok":false}}'],
+    ] satisfies [number, string][],
+  },
+  {
+    apiKind: 'audio_transcriptions' as const,
+    countUsage: countAndStoreTranscriptionUsage,
+    recordedStats: () => mockedProcessTokenData.mock.calls[0]?.[0],
+    chunks: [
+      [500, '{"id":"transcription-timed","model":"test/transcribe",'],
+      [540, '"text":"hello","usage":{"cost":0.001,"is_byok":false}}'],
+    ] satisfies [number, string][],
+  },
+])('$apiKind response timing', ({ apiKind, countUsage, recordedStats, chunks }) => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+  });
+
+  it('measures the response from the request start', async () => {
+    const clockSpy = clock.install();
+    try {
+      countUsage(
+        new Response(clock.bodyArrivingAt(chunks)),
+        {
+          ...createMockUsageContext('timing-user', 'unused@example.com', 0),
+          api_kind: apiKind,
+          requested_model: 'test/model',
+          requestStartedAt: 200,
+        },
+        undefined
+      );
+      await waitForUsageWrite();
+    } finally {
+      clockSpy.mockRestore();
+    }
+
+    expect(recordedStats()).toMatchObject({ latency: 300, generation_time: 40 });
   });
 });
 
@@ -1446,7 +1541,11 @@ describe.each<{
   if (apiKind === 'embeddings' || apiKind === 'audio_transcriptions') {
     it('does not recover from pricing failures', async () => {
       const accountingError = new Error('usage pricing failed');
-      jest.mocked(sharedUsage.computeOpenRouterCostFields).mockImplementationOnce(() => {
+      const pricing =
+        apiKind === 'embeddings'
+          ? sharedUsage.selectUsageCostFields
+          : sharedUsage.computeOpenRouterCostFields;
+      jest.mocked(pricing).mockImplementationOnce(() => {
         throw accountingError;
       });
       countUsage(new Response(JSON.stringify(validPayload)), makeContext(), undefined);
@@ -1749,6 +1848,19 @@ describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {
 
     expect(result.cost_mUsd).toBe(450);
     expect(result.is_byok).toBe(true);
+  });
+
+  it('reads Vercel AI Gateway cost from snake_case provider_metadata, as the response does', () => {
+    const response = JSON.stringify({
+      object: 'list',
+      model: 'mistral/codestral-embed',
+      usage: { prompt_tokens: 3000, total_tokens: 3000 },
+      provider_metadata: { gateway: { cost: '0.00045', marketCost: '0.00045' } },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(450);
   });
 });
 
@@ -2493,6 +2605,65 @@ describe('makeErrorReadable', () => {
     expect((await result.json()).error_type).toBe('provider_not_allowed');
   });
 
+  it('recognizes the current OpenRouter error with explanatory text appended to the message', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message:
+            "No allowed providers are available for the selected model. Providers serving openai/gpt-4o-mini: azure, openai, but your request's provider.only preference permits only: nonexistent-provider-slug.",
+          code: 404,
+          metadata: {
+            available_providers: ['azure', 'openai'],
+            requested_providers: ['nonexistent-provider-slug'],
+            routing_funnel: [
+              { step: 'Initial Endpoints', endpoint_count: 3 },
+              { step: 'Filter by Regional Surcharge', endpoint_count: 2 },
+            ],
+            failed_routing_step: 'Filter by Allowed Providers',
+          },
+        },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'openrouter',
+      requestedModel: 'openai/gpt-4o-mini',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect(result?.status).toBe(404);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: 'provider_not_allowed',
+      message:
+        'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
+    });
+  });
+
+  it('recognizes an unwrapped error with appended message text', async () => {
+    const response = Response.json(
+      {
+        message: 'No allowed providers are available for the selected model. Extra detail.',
+        code: 404,
+        metadata: { available_providers: ['alibaba'], requested_providers: ['openai'] },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'openrouter',
+      requestedModel: 'qwen/qwen3.7-plus',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect((await result?.json())?.error_type).toBe('provider_not_allowed');
+  });
+
   it('does not rewrite matching errors from other providers', async () => {
     const response = Response.json(
       {
@@ -2528,6 +2699,16 @@ describe('makeErrorReadable', () => {
         { status: 404 }
       ),
       Response.json({ message: 'Model not found', code: 404 }, { status: 404 }),
+      Response.json(
+        {
+          error: {
+            message: 'No endpoints found for this model.',
+            code: 404,
+            metadata: { available_providers: ['alibaba'], requested_providers: ['openai'] },
+          },
+        },
+        { status: 404 }
+      ),
       new Response('not json', { status: 404 }),
     ];
 

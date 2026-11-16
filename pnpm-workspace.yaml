@@ -280,6 +280,8 @@ packageExtensions:
     peerDependencies:
       '@types/react': '*'
 patchedDependencies:
+  # Reinitializing Sentry's async context at each cold DO loses in-flight scopes.
+  '@sentry/cloudflare@10.69.0': patches/@sentry+cloudflare@10.69.0.patch
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
   # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
   # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller
@@ -334,6 +336,10 @@ patchedDependencies:
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
+  # iOS: hold the execution request for the length of a launch. A task that
+  # finishes on another thread releases it mid-launch, and the launch then sends
+  # `maybeEvaluate` to a freed object, which is the background-task launch crash
+  # (expo/expo#51789, expo/expo#47316).
   expo-task-manager@58.0.12: patches/expo-task-manager@58.0.12.patch
   expo-widgets@58.0.17: patches/expo-widgets@58.0.17.patch
   # PurchaseConnector.create returns the native promise, so a create failure
@@ -387,7 +393,12 @@ patchedDependencies:
   # past the rows that arrived. The patch bounds the engaged-index passes and
   # answers an out-of-range key and type without calling the list's callbacks,
   # so those are never handed an undefined row that keyExtractor would
-  # dereference. Remove once an upstream release carries both guards.
+  # dereference. It also reads a row layout through the bounds-safe accessor, so
+  # a stale onLayout or render-stack entry past a shrink draws nothing instead of
+  # throwing, and it drops the forced child re-render whose rows the collection
+  # already drew, so the parent's layout effect and the collection's commit no
+  # longer re-enter each other until React's nested update limit. Remove once an
+  # upstream release carries every guard.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
 publicHoistPattern:
   - '@types/*'

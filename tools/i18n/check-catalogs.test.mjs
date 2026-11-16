@@ -1612,6 +1612,56 @@ test('accepts a push source that builds its key from the payload', () => {
   assert.deepEqual(found, []);
 });
 
+test('accepts a leaf table whose built key the source names at runtime', () => {
+  // The catalog leaf lives in a table and the key is built from it. The leaf
+  // literal beside the built head is the only place the key is named, so the
+  // dead-key rule must read both together.
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push key under a built head that no leaf names', () => {
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: [
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: en\.json defines "generic\.body\.scheduledAction", which no source file uses/
+  );
+});
+
 test('rejects a push value left in English in one locale', () => {
   // The mobile rule only fires when a value is English in every locale, which a
   // single untranslated locale never is.

@@ -177,16 +177,35 @@ const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 404, 409,
 const FORBIDDEN_STATUS = 403;
 
 /**
+ * The one procedure whose `FORBIDDEN` the screen already presents: the personal
+ * branch listing answers it only when the provider installation no longer
+ * grants the repository, which the screen renders as a permanent note with no
+ * retry, and the app can only learn about the lost grant by asking.
+ * Organization-scoped procedures are not exempt: their `FORBIDDEN` also comes
+ * from the organization access middleware, including a transient support-access
+ * lookup failure, so it still names a state worth reporting.
+ */
+const HANDLED_FORBIDDEN_PROCEDURE = 'cloudAgentNext.listRepositoryBranches';
+
+/**
  * True when a status is an expected answer: one of
- * {@link EXPECTED_HTTP_STATUSES}, or a 403 with no tRPC error code. Production
- * 403s come from the edge firewall (OFAC-sanctioned regions, IP blocks), whose
- * body is not a tRPC error. A 403 from a tRPC procedure carries its code
- * (`FORBIDDEN`) and names app code, so it is still reported.
+ * {@link EXPECTED_HTTP_STATUSES}, a 403 with no tRPC error code, or a
+ * `FORBIDDEN` from {@link HANDLED_FORBIDDEN_PROCEDURE}. Production 403s come
+ * from the edge firewall (OFAC-sanctioned regions, IP blocks), whose body is not
+ * a tRPC error. A 403 from a tRPC procedure carries its code (`FORBIDDEN`) and
+ * names app code, so it is still reported unless the caller renders the refusal.
  */
 function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
-  return (
-    EXPECTED_HTTP_STATUSES.has(status) || (status === FORBIDDEN_STATUS && trpc.code === undefined)
-  );
+  if (EXPECTED_HTTP_STATUSES.has(status)) {
+    return true;
+  }
+  if (status !== FORBIDDEN_STATUS) {
+    return false;
+  }
+  if (trpc.code === undefined) {
+    return true;
+  }
+  return trpc.code === 'FORBIDDEN' && trpc.path === HANDLED_FORBIDDEN_PROCEDURE;
 }
 
 /**
@@ -687,6 +706,45 @@ function recordNetworkErrorBreadcrumb(context: NetworkErrorContext): void {
 }
 
 /**
+ * Property this wrapper sets on the rejection it recorded as a transport
+ * failure. The rejection is produced by the platform's `fetch`, not by this
+ * module, so it cannot be a typed error of its own; the marker is the only way
+ * a read-modify-write catch-all can tell a request that got no HTTP response
+ * apart from an app defect. Non-enumerable, so attaching it changes nothing the
+ * rejection is serialized or reported as.
+ */
+const TRANSPORT_FAILURE_KEY = 'kiloTransportFailure';
+
+const TransportFailureSchema = z.looseObject({ [TRANSPORT_FAILURE_KEY]: z.literal(true) });
+const ObjectValueSchema = z.looseObject({});
+
+/**
+ * True when the fetch wrapper already recorded this rejection as a transport
+ * failure and left a breadcrumb for it ({@link recordTransportFailure}), so a
+ * query or mutation reporter must not file the same failure again as an app
+ * error. Total: an unrecognized value yields `false` and never throws.
+ */
+export function isTransportFailure(error: unknown): boolean {
+  try {
+    return TransportFailureSchema.safeParse(error).success;
+  } catch {
+    return false;
+  }
+}
+
+function markTransportFailure(error: unknown): void {
+  try {
+    if (!ObjectValueSchema.safeParse(error).success) {
+      return;
+    }
+    Object.defineProperty(error, TRANSPORT_FAILURE_KEY, { value: true, configurable: true });
+  } catch {
+    // A frozen or otherwise non-extensible rejection keeps its shape and is
+    // reported by the caller instead: the safe direction for an unknown value.
+  }
+}
+
+/**
  * Record a request that got no HTTP response (no network, DNS, TLS, reset, or
  * the request deadline) as a breadcrumb. Never an event: see Family 3 in the
  * header. Never throws; never includes the host, headers, bodies, or query
@@ -742,8 +800,11 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
  * caller's own `isExpectedAnswer` rule), the first repeat
  * of a fingerprint already reported in this process, are breadcrumbs instead of
  * reports, and later repeats record nothing. `readResponseError` may parse the
- * body via a clone to enrich the report. The original rejection is re-thrown and
- * the original Response is returned unchanged; the original body is never read.
+ * body via a clone to enrich the report. The original rejection is re-thrown —
+ * carrying {@link isTransportFailure}'s marker when it was recorded as a
+ * transport failure, so a query or mutation catch-all does not file it again —
+ * and the original Response is returned unchanged; the original body is never
+ * read.
  */
 export function createNetworkErrorFetch(
   baseFetch: typeof fetch,
@@ -796,6 +857,7 @@ export function createNetworkErrorFetch(
           durationMs: Date.now() - startedAt,
           error,
         });
+        markTransportFailure(error);
       }
       throw error;
     }

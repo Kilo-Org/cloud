@@ -1,10 +1,11 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { ChevronDown } from '@/components/ui/icons';
 import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type RepoOption as BridgeRepoOption,
@@ -109,7 +110,7 @@ export function RepoSelector({
   onChange,
   disabled = false,
 }: Readonly<RepoSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   // An empty picker explains missing repositories; it must remain reachable.
@@ -149,7 +150,7 @@ export function RepoSelector({
     // See ModelSelector: the sheet never re-anchors after the keyboard hides,
     // so the keyboard must be down before this push.
     Keyboard.dismiss();
-    router.push('/(app)/agent-chat/repo-picker' as Href);
+    pushOnce('/(app)/agent-chat/repo-picker' as Href);
   }
 
   // With nothing chosen the trigger shows its own placeholder, which already names

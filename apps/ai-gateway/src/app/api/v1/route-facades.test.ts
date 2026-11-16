@@ -12,6 +12,7 @@ import * as modelValidation from './models/validate/route';
 import * as organizationModels from './organizations/[id]/models/route';
 import * as organizationModelValidation from './organizations/[id]/models/validate/route';
 import * as providers from './providers/route';
+import * as systemOne from './systemone/route';
 import * as transcriptionModels from './transcription-models/route';
 import * as autoRoutingDeniedModels from './internal/auto-routing/denied-models/route';
 import { handleAutoRoutingDeniedModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/auto-routing-denied-models';
@@ -29,6 +30,10 @@ import { handleProvidersRequest } from '@kilocode/web-shared/lib/ai-gateway/hand
 import { handleTranscriptionModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/transcription-models';
 import { handleAudioTranscriptionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/audio-transcriptions';
 import { handleLlmProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  UPSTREAM_POST_RESPONSE_HEADROOM_MS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 
 describe('ai-gateway route facades', () => {
   test.each([
@@ -71,8 +76,27 @@ describe('ai-gateway route facades', () => {
   test.each([
     ['[...path]', llmProxy.maxDuration, 800],
     ['audio/transcriptions', audioTranscriptions.maxDuration, 800],
-    ['embeddings', embeddings.maxDuration, 300],
+    ['embeddings', embeddings.maxDuration, 800],
+    ['edit/completions', editCompletions.maxDuration, 800],
+    ['fim/completions', fimCompletions.maxDuration, 800],
+    ['systemone', systemOne.maxDuration, 800],
   ])('%s keeps its route duration limit', (_route, maxDuration, expected) => {
     expect(maxDuration).toBe(expected);
   });
+
+  test.each([
+    ['[...path]', llmProxy.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['audio/transcriptions', audioTranscriptions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['embeddings', embeddings.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['edit/completions', editCompletions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['fim/completions', fimCompletions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+    ['systemone', systemOne.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
+  ])(
+    '%s leaves the post-response headroom after its upstream budget',
+    (_route, maxDuration, upstreamBudgetMs) => {
+      expect(upstreamBudgetMs + UPSTREAM_POST_RESPONSE_HEADROOM_MS).toBeLessThanOrEqual(
+        maxDuration * 1000
+      );
+    }
+  );
 });

@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/react-native';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
@@ -204,16 +203,12 @@ export function createSecureStorePreference<T>(options: {
         requested = value;
         void drainWrites();
       }
-    } catch (error) {
+    } catch {
       // Keep the default on read failure — this runs on mount, before the
       // user has done anything, so there's nothing actionable to tell them.
-      // Just log so we can see failure rates.
-      Sentry.captureException(error, {
-        tags: {
-          'error.subsystem': 'preferences',
-          'error.operation': 'load_secure_store',
-        },
-      });
+      // The SecureStore read path already reports the rejection once (a
+      // warning event for a real failure, a breadcrumb for a locked device's
+      // refusal), so a second record here would only duplicate it.
     } finally {
       loadSettled = true;
       hasLoaded = true;

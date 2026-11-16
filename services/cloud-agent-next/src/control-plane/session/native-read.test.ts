@@ -87,12 +87,12 @@ describe('SandboxSessionV2.kiloRequest', () => {
     });
   });
 
-  it('returns not_ready for a stopped route without waking compute', async () => {
+  it('returns runtime_offline for a stopped route without waking compute', async () => {
     const kiloRequest = vi.fn();
     const session = unit({ routeState: 'unknown', peer: { kiloRequest } });
     await expect(session.kiloRequest({ name: 'session.status' })).resolves.toEqual({
       ok: false,
-      error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+      error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
     });
     expect(kiloRequest).not.toHaveBeenCalled();
   });

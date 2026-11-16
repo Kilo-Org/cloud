@@ -24,14 +24,21 @@ await i18n.init({
  * catalog has to say that in its own plural forms: a bare number after the title
  * is the defect these families replace.
  */
-const FAMILIES = ['agents.sessionList.sectionAccessibility', 'share.connectedCliAccessibility'] as const;
+const FAMILIES = [
+  'agents.sessionList.sectionAccessibility',
+  'share.connectedCliAccessibility',
+] as const;
 
 /** Counts that reach several plural categories, including the zero and teen ranges. */
 const COUNTS = [0, 1, 2, 3, 5, 11, 21, 101, 1000] as const;
 
 const TITLE = 'TT';
 
-function heading(family: (typeof FAMILIES)[number], language: SupportedLanguage, count: number): string {
+function heading(
+  family: (typeof FAMILIES)[number],
+  language: SupportedLanguage,
+  count: number
+): string {
   return i18n.t(family, {
     lng: language,
     title: TITLE,
@@ -51,23 +58,20 @@ describe('session-list section heading copy', () => {
     expect(heading('share.connectedCliAccessibility', 'en', 3)).toBe('TT, 3 instances');
   });
 
-  it.each([0, 1, 2, 3, 11, 100] as const)(
-    'uses its own Arabic plural form at %i',
-    count => {
-      const expected: Record<number, string> = {
-        0: '{{title}}: {{displayCount}} جلسة',
-        1: '{{title}}: {{displayCount}} جلسة واحدة',
-        2: '{{title}}: {{displayCount}} جلستان',
-        3: '{{title}}: {{displayCount}} جلسات',
-        11: '{{title}}: {{displayCount}} جلسة',
-        100: '{{title}}: {{displayCount}} جلسة',
-      };
-      const rendered = heading('agents.sessionList.sectionAccessibility', 'ar', count);
-      expect(rendered).toBe(
-        (expected[count] ?? '').replace('{{title}}', TITLE).replace('{{displayCount}}', String(count))
-      );
-    }
-  );
+  it.each([0, 1, 2, 3, 11, 100] as const)('uses its own Arabic plural form at %i', count => {
+    const expected: Record<number, string> = {
+      0: '{{title}}: {{displayCount}} جلسة',
+      1: '{{title}}: {{displayCount}} جلسة واحدة',
+      2: '{{title}}: {{displayCount}} جلستان',
+      3: '{{title}}: {{displayCount}} جلسات',
+      11: '{{title}}: {{displayCount}} جلسة',
+      100: '{{title}}: {{displayCount}} جلسة',
+    };
+    const rendered = heading('agents.sessionList.sectionAccessibility', 'ar', count);
+    expect(rendered).toBe(
+      (expected[count] ?? '').replace('{{title}}', TITLE).replace('{{displayCount}}', String(count))
+    );
+  });
 
   it.each(SUPPORTED_LANGUAGES)('%s states the title and the count in every family', language => {
     for (const family of FAMILIES) {

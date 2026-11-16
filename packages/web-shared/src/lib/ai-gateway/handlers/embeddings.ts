@@ -29,6 +29,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
@@ -84,6 +85,11 @@ export async function handleEmbeddingsRequest(
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
 
+  const ipAddress = rawClientIp(request);
+  // Like chat, cap the account before reading the body or authenticating.
+  const accountRateLimited = await gatewayAccountRateLimitRejection(request, ipAddress);
+  if (accountRateLimited) return accountRateLimited;
+
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
   debugSaveProxyRequest(requestBodyText);
@@ -108,7 +114,6 @@ export async function handleEmbeddingsRequest(
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
       {

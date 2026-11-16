@@ -671,7 +671,12 @@ describe('handleSystemOneRequest', () => {
     const response = await handleSystemOneRequest(request);
 
     expect(response.status).toBe(429);
-    expect(await response.json()).toMatchObject({ error_type: 'rate_limit_exceeded' });
+    // The same response chat and the other inference routes answer.
+    expect(await response.json()).toEqual({
+      error: 'Rate limit exceeded',
+      error_type: 'rate_limit_exceeded',
+      message: 'Too many requests. Please try again later.',
+    });
     expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '192.0.2.1');
     expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'test-rate-limit-key');
     expect(getUserFromAuth).not.toHaveBeenCalled();

@@ -6,14 +6,11 @@ import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
-  gatewayRateLimitKey,
-  isGatewayAccountRateLimited,
-} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
-import {
   extractHeaderAndLimitLength,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
@@ -90,9 +87,8 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const startedAt = performance.now();
   const startedAtMs = Date.now();
   const ipAddress = rawClientIp(request);
-  if (await isGatewayAccountRateLimited(request, gatewayRateLimitKey(request.headers, ipAddress))) {
-    return errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
-  }
+  const accountRateLimited = await gatewayAccountRateLimitRejection(request, ipAddress);
+  if (accountRateLimited) return accountRateLimited;
   const caller = resolveGatewayCaller(
     await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
     { allowAnonymous: false, passThroughAuthFailure: true }

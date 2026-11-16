@@ -45,6 +45,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
@@ -131,6 +132,11 @@ export async function handleAudioTranscriptionsRequest(
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
 
+  const ipAddress = rawClientIp(request);
+  // Like chat, cap the account before reading the body or authenticating.
+  const accountRateLimited = await gatewayAccountRateLimitRejection(request, ipAddress);
+  if (accountRateLimited) return accountRateLimited;
+
   const isMultipartRequest = (request.headers.get('content-type') ?? '')
     .toLowerCase()
     .startsWith('multipart/form-data');
@@ -150,7 +156,6 @@ export async function handleAudioTranscriptionsRequest(
     parsedRequest.kind === 'json' ? parsedRequest.body.model.trim() : parsedRequest.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
       {

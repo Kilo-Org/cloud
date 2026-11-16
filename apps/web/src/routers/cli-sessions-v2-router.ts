@@ -3039,6 +3039,11 @@ export const cliSessionsV2Router = createTRPCRouter({
     try {
       await deleteSessionIngest(session_id, ctx.user.id);
     } catch (err) {
+      // `deleteSession` raises its own `TRPCError` for the worker's workspace
+      // conflicts (409). The client reads that code and message to cascade into
+      // deleting the workspace, so forward it unchanged; only a transport
+      // failure is mapped.
+      if (err instanceof TRPCError) throw err;
       throw sessionIngestTrpcError('Failed to delete session', err);
     }
 

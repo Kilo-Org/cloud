@@ -116,6 +116,38 @@ describe('unlinkClaudeUserProfile', () => {
     await expect(unlinkClaudeUserProfile('uprof_5')).resolves.toEqual({ kind: 'retry' });
   });
 
+  it('mints a new operator token after a 401', async () => {
+    let tokenRequests = 0;
+    const unlinkAuthorization: string[] = [];
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = requestUrl(input);
+      if (!url.endsWith('/unlink')) {
+        tokenRequests += 1;
+        return new Response(
+          JSON.stringify({
+            access_token: `operator-token-${tokenRequests}`,
+            expires_in: 3600,
+            token_type: 'Bearer',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      unlinkAuthorization.push(new Headers(init?.headers).get('Authorization') ?? '');
+      return unlinkAuthorization.length === 1
+        ? new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })
+        : new Response(JSON.stringify({ revoked_connection_ids: [] }), { status: 200 });
+    });
+
+    await expect(unlinkClaudeUserProfile('uprof_8')).resolves.toEqual({ kind: 'retry' });
+    await expect(unlinkClaudeUserProfile('uprof_8')).resolves.toEqual({
+      kind: 'unlinked',
+      revokedConnectionIds: [],
+    });
+
+    expect(tokenRequests).toBe(2);
+    expect(unlinkAuthorization).toEqual(['Bearer operator-token-1', 'Bearer operator-token-2']);
+  });
+
   it.each([400, 403, 404])('sends the customer to Claude Console on %s', async status => {
     stubAnthropic(new Response(JSON.stringify({ error: 'refused' }), { status }));
 

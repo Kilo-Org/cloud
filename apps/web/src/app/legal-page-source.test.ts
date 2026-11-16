@@ -159,7 +159,11 @@ describe('extractLegalMainHtml', () => {
       '<span>pricing</span>',
     ],
     ['a relative marketing link', '<a href="pricing">pricing</a>', '<span>pricing</span>'],
-    ['a copied pricing URL', '<a href="https://kilo.ai/pricing?plan=pro">pricing</a>', '<span>pricing</span>'],
+    [
+      'a copied pricing URL',
+      '<a href="https://kilo.ai/pricing?plan=pro">pricing</a>',
+      '<span>pricing</span>',
+    ],
     [
       'a legal page from another host that is not kilo.ai',
       '<a href="https://www.anaconda.com/legal/terms/terms-of-service">terms</a>',

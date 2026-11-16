@@ -925,15 +925,11 @@ describe('createNetworkErrorFetch status policy', () => {
     expect(breadcrumbs).toHaveLength(0);
   });
 
-  it.each([
-    'cloudAgentNext.listRepositoryBranches',
-    'organizations.cloudAgentNext.getAttachmentUploadUrl',
-    'organizations.cloudAgentNext.listRepositoryBranches',
-  ])('records the member-removed FORBIDDEN on %s as a breadcrumb', async procedure => {
-    // The caller is no longer a member of the organization it has selected,
-    // or the provider installation no longer grants the repository. The
-    // screen names that answer and offers no retry, so it is the app's
-    // expected outcome, not a defect to file.
+  it('records the repository-refused FORBIDDEN on the personal branch listing as a breadcrumb', async () => {
+    // The provider installation no longer grants the repository. The screen
+    // names that answer and offers no retry, so it is the app's expected
+    // outcome, not a defect to file.
+    const procedure = 'cloudAgentNext.listRepositoryBranches';
     await respond(
       `https://example.com/api/trpc/${procedure}`,
       Response.json(
@@ -954,8 +950,12 @@ describe('createNetworkErrorFetch status policy', () => {
     ]);
   });
 
-  it('records the member-removed FORBIDDEN of a batch item as a breadcrumb', async () => {
-    const procedure = 'organizations.cloudAgentNext.getAttachmentUploadUrl';
+  it.each([
+    'organizations.cloudAgentNext.getAttachmentUploadUrl',
+    'organizations.cloudAgentNext.listRepositoryBranches',
+  ])('still reports an organization FORBIDDEN on %s in a batch', async procedure => {
+    // Organization access middleware also answers FORBIDDEN for a transient
+    // support-access lookup failure, so these refusals stay reportable.
     await respond(
       `https://example.com/api/trpc/${procedure},user.getMe?batch=1`,
       Response.json(
@@ -972,9 +972,8 @@ describe('createNetworkErrorFetch status policy', () => {
       )
     );
 
-    expect(events).toHaveLength(0);
-    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
-      `POST /api/trpc/${procedure} -> 403`,
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', procedure, 'http.403'],
     ]);
   });
 

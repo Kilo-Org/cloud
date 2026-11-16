@@ -177,31 +177,20 @@ const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 404, 409,
 const FORBIDDEN_STATUS = 403;
 
 /**
- * Whether a procedure's `FORBIDDEN` is the refusal the screen already presents:
- * the caller is no longer an active member of the organization it has selected,
- * or the provider installation no longer grants the repository. The attachment
- * presign and the branch listing both render that answer as a permanent state
- * with no retry, and the app can only learn about the lost access by asking, so
- * the request cannot be avoided. A `FORBIDDEN` on any other procedure still
- * names app code that asked for something the caller may hold.
+ * The one procedure whose `FORBIDDEN` the screen already presents: the personal
+ * branch listing answers it only when the provider installation no longer
+ * grants the repository, which the screen renders as a permanent note with no
+ * retry, and the app can only learn about the lost grant by asking.
+ * Organization-scoped procedures are not exempt: their `FORBIDDEN` also comes
+ * from the organization access middleware, including a transient support-access
+ * lookup failure, so it still names a state worth reporting.
  */
-function isHandledForbiddenProcedure(path: string): boolean {
-  switch (path) {
-    case 'cloudAgentNext.listRepositoryBranches':
-    case 'organizations.cloudAgentNext.getAttachmentUploadUrl':
-    case 'organizations.cloudAgentNext.listRepositoryBranches': {
-      return true;
-    }
-    default: {
-      return false;
-    }
-  }
-}
+const HANDLED_FORBIDDEN_PROCEDURE = 'cloudAgentNext.listRepositoryBranches';
 
 /**
  * True when a status is an expected answer: one of
- * {@link EXPECTED_HTTP_STATUSES}, a 403 with no tRPC error code, or a 403 whose
- * body names a procedure {@link isHandledForbiddenProcedure} accepts. Production 403s come
+ * {@link EXPECTED_HTTP_STATUSES}, a 403 with no tRPC error code, or a
+ * `FORBIDDEN` from {@link HANDLED_FORBIDDEN_PROCEDURE}. Production 403s come
  * from the edge firewall (OFAC-sanctioned regions, IP blocks), whose body is not
  * a tRPC error. A 403 from a tRPC procedure carries its code (`FORBIDDEN`) and
  * names app code, so it is still reported unless the caller renders the refusal.
@@ -216,9 +205,7 @@ function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   if (trpc.code === undefined) {
     return true;
   }
-  return (
-    trpc.code === 'FORBIDDEN' && trpc.path !== undefined && isHandledForbiddenProcedure(trpc.path)
-  );
+  return trpc.code === 'FORBIDDEN' && trpc.path === HANDLED_FORBIDDEN_PROCEDURE;
 }
 
 /**

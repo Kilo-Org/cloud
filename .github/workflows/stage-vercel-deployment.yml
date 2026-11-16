@@ -101,7 +101,7 @@ jobs:
         id: deploy
         # The deploy uploads the whole checkout, and the CLI counts every local
         # file before uploading. The repo is past the 15000-file limit, so the
-        # upload is sent as one tgz archive, which the CLI counts as one file.
+        # upload is sent as a tgz archive in a few parts instead of every file.
         run: |
           if [ "$TARGET_ENVIRONMENT" = "production" ]; then
             deployment_output=$(vercel deploy --prod --skip-domain --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})

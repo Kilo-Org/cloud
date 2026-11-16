@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
 import { ProviderCreationError } from './provider.js';
+import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
-import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
+import { egressDomainSchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { resolveCloudAgentMcpUrl } from '../cloud-agent-authority.js';
 
 /** The canonical effective allowlist of a sandbox, for every provider. */
@@ -37,58 +38,102 @@ const GIT_DOMAINS = [
   'api.bitbucket.org',
 ];
 
-export function buildNativeEgressAllowlist(input: {
-  allowlist: string[];
+type AllowlistContext = {
   env: KiloTargetEnv & {
     WORKER_URL?: string;
     CLOUD_AGENT_MCP_URL_OVERRIDE?: string;
     R2_ENDPOINT?: string;
   };
-  kiloToken?: string;
   repositoryUrl?: string;
   networkSecretHosts?: readonly string[];
   cloudAgentMcp?: boolean;
-}): string[] {
-  const targets = deriveKiloSandboxTargets(input.env, input.kiloToken ?? '', {
-    requireHttps: true,
-  });
-  if (!targets.success || !input.env.WORKER_URL) {
-    throw new ProviderCreationError('invalid_configuration');
-  }
+};
+
+/** Hosts the runtime adds for its own sources: network secrets, and the MCP and R2 endpoints when delegation is on. */
+function contextHosts(input: AllowlistContext): string[] {
+  return [
+    ...(input.networkSecretHosts ?? []),
+    ...(input.cloudAgentMcp
+      ? [
+          resolveCloudAgentMcpUrl(input.env.CLOUD_AGENT_MCP_URL_OVERRIDE),
+          input.env.R2_ENDPOINT,
+        ].flatMap(value => {
+          if (!value) return [];
+          const url = URL.parse(value);
+          if (!url) throw new ProviderCreationError('invalid_configuration');
+          return url.protocol === 'https:' && url.port === '' && !url.username && !url.password
+            ? [url.hostname]
+            : [];
+        })
+      : []),
+  ];
+}
+
+function compileAllowlist(allowlist: readonly string[], targets: string[]): string[] {
   try {
-    const urls = [
-      input.env.WORKER_URL,
-      CLOUD_AGENT_SESSION_SYNC_ORIGIN,
-      ...Object.values(targets.targets),
-      ...(input.repositoryUrl === undefined ? [] : [input.repositoryUrl]),
-    ].map(value => new URL(value));
-    if (
-      urls.some(
-        url =>
-          url.protocol !== 'https:' || url.port !== '' || url.username !== '' || url.password !== ''
-      )
-    ) {
+    const urls = targets.map(value => new URL(value));
+    if (urls.some(url => url.protocol !== 'https:' || url.port || url.username || url.password))
       throw new ProviderCreationError('invalid_configuration');
-    }
     return nativeEgressAllowlistSchema.parse([
-      ...input.allowlist,
-      ...(input.networkSecretHosts ?? []),
+      ...allowlist,
       ...GIT_DOMAINS,
       ...urls.map(url => url.hostname),
-      ...(input.cloudAgentMcp
-        ? [
-            resolveCloudAgentMcpUrl(input.env.CLOUD_AGENT_MCP_URL_OVERRIDE),
-            input.env.R2_ENDPOINT,
-          ].flatMap(value => {
-            if (!value) return [];
-            const url = new URL(value);
-            return url.protocol === 'https:' && url.port === '' && !url.username && !url.password
-              ? [url.hostname]
-              : [];
-          })
-        : []),
     ]);
   } catch {
     throw new ProviderCreationError('invalid_configuration');
+  }
+}
+
+/** The runtime uses only the facade. Upstream model and ingest requests run inside the Worker. */
+export function buildNativeEgressAllowlist(
+  input: AllowlistContext & { allowlist: string[]; kiloToken?: string }
+): string[] {
+  const facade = input.env.WORKER_URL && runtimeCredentialProxyFacadeBaseUrl(input.env.WORKER_URL);
+  if (!facade) throw new ProviderCreationError('invalid_configuration');
+  return compileAllowlist(
+    [...input.allowlist, ...contextHosts(input)],
+    [
+      facade,
+      CLOUD_AGENT_SESSION_SYNC_ORIGIN,
+      ...(input.repositoryUrl === undefined ? [] : [input.repositoryUrl]),
+    ]
+  );
+}
+
+type EgressPin = { egressAllowlist?: readonly string[]; egressAudit?: boolean };
+type EgressRequest = { egressMode?: EgressMode; egressAllowlist?: string[]; egressAudit?: boolean };
+
+/** Match the deployed baseline only for an immutable active pin. Never rewrite that pin or broaden its access. */
+export function matchesActiveEgressPolicy(
+  input: AllowlistContext & {
+    stored: EgressPin | null;
+    selected: EgressPin | undefined;
+    request: EgressRequest | undefined;
+    kiloToken?: string;
+  }
+): boolean {
+  if ((input.stored?.egressAudit === true) !== (input.selected?.egressAudit === true)) return false;
+  const stored = input.stored?.egressAllowlist;
+  if (JSON.stringify(stored) === JSON.stringify(input.selected?.egressAllowlist)) return true;
+  if (!stored || !input.selected?.egressAllowlist || input.request?.egressMode !== 'allowlist')
+    return false;
+  // Prior releases included Worker-side upstream targets. Reconstruct that exact request for comparison only.
+  const targets = deriveKiloSandboxTargets(input.env, input.kiloToken ?? '', {
+    requireHttps: true,
+  });
+  if (!targets.success || !input.env.WORKER_URL) return false;
+  try {
+    const previous = compileAllowlist(
+      [...(input.request.egressAllowlist ?? []), ...contextHosts(input)],
+      [
+        input.env.WORKER_URL,
+        CLOUD_AGENT_SESSION_SYNC_ORIGIN,
+        ...Object.values(targets.targets),
+        ...(input.repositoryUrl === undefined ? [] : [input.repositoryUrl]),
+      ]
+    );
+    return JSON.stringify(previous) === JSON.stringify(stored);
+  } catch {
+    return false;
   }
 }

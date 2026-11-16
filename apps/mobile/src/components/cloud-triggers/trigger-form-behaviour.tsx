@@ -26,6 +26,8 @@ type TriggerFormBehaviourProps = Readonly<{
   problems: TriggerDraftProblems;
   /** Whether the worker holds a secret for this trigger already. */
   authConfigured: boolean;
+  /** Changes after a save so the uncontrolled secret field remounts empty. */
+  secretResetKey: number;
   onDraftChange: (next: TriggerDraft) => void;
 }>;
 
@@ -35,6 +37,7 @@ export function TriggerFormBehaviour({
   draft,
   problems,
   authConfigured,
+  secretResetKey,
   onDraftChange,
 }: TriggerFormBehaviourProps) {
   const { t } = useTranslation();
@@ -114,6 +117,7 @@ export function TriggerFormBehaviour({
                   placeholder={TRIGGER_FIELD_EXAMPLES.authHeader}
                 />
                 <FormField
+                  key={`auth-secret-${secretResetKey}`}
                   label={t('cloudAgent.triggers.authSecretLabel')}
                   required={!authConfigured}
                   defaultValue={draft.authSecret}

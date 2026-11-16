@@ -37,6 +37,8 @@ type TriggerFormProps = Readonly<{
   onDraftChange: (next: TriggerDraft) => void;
   /** Whether the worker already holds a secret for this trigger. */
   authConfigured: boolean;
+  /** Bumped by a screen after a save, so the secret field remounts empty. */
+  secretResetKey?: number;
   submitting: boolean;
   submitLabel: string;
   canSubmit: boolean;
@@ -83,6 +85,7 @@ export function TriggerForm({
   problems,
   onDraftChange,
   authConfigured,
+  secretResetKey = 0,
   submitting,
   submitLabel,
   canSubmit,
@@ -121,6 +124,7 @@ export function TriggerForm({
         draft={draft}
         problems={problems}
         authConfigured={authConfigured}
+        secretResetKey={secretResetKey}
         onDraftChange={onDraftChange}
       />
       {failure === null ? null : (

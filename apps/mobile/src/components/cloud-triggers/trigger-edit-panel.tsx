@@ -49,6 +49,8 @@ export function TriggerEditPanel({
   const colors = useThemeColors();
   const { confirm, dialog } = useConfirmDialog();
   const [draft, setDraft] = useState<TriggerDraft>(() => triggerDraftFromDetail(detail));
+  // Bumped after a save so the uncontrolled secret field remounts empty.
+  const [secretResetKey, setSecretResetKey] = useState(0);
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<TriggerFormFailure>();
   const save = useMutation(
     trpc.webhookTriggers.update.mutationOptions({
@@ -87,6 +89,7 @@ export function TriggerEditPanel({
       void queryClient.invalidateQueries({ queryKey: detailKey });
       // The stored secret is the worker's now; the field stays empty.
       setDraft(current => ({ ...current, authSecret: '' }));
+      setSecretResetKey(key => key + 1);
       if (!attempt.succeed()) {
         return false;
       }
@@ -116,6 +119,7 @@ export function TriggerEditPanel({
           setDraft(next);
         }}
         authConfigured={authConfigured}
+        secretResetKey={secretResetKey}
         submitting={submitting}
         submitLabel={t('common.save')}
         canSubmit={!hasTriggerDraftProblems(problems) && !submitting}

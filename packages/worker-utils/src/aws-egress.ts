@@ -9,6 +9,7 @@ export const AWS_EGRESS_MAX_CLOCK_SKEW_MS = 5_000;
 export const AWS_EGRESS_CONTROL_TIMEOUT_MS = 15_000;
 export const AWS_EGRESS_PORT = 3128;
 export const AWS_EGRESS_AUDIENCE = 'kilo-aws-egress';
+export const AWS_BUILD_EGRESS_AUDIENCE = 'kilo-aws-build-egress';
 export const AWS_EGRESS_IDENTITY_HEADER = 'x-kilo-egress-identity';
 export const AWS_EGRESS_CREDENTIAL_HEADER = 'x-kilo-egress-credential';
 export const AWS_EGRESS_TARGET_HEADER = 'x-kilo-egress-target';
@@ -53,6 +54,25 @@ export const awsEgressClaimsSchema = z
   })
   .strict();
 export type AwsEgressClaims = z.infer<typeof awsEgressClaimsSchema>;
+
+/** Build credentials cannot authorize a Session DO or a runner callback. */
+export const awsBuildEgressClaimsSchema = z
+  .object({
+    ...awsEgressClaimsSchema.omit({ type: true, aud: true }).shape,
+    type: z.literal('aws_build_egress'),
+    aud: z.literal(AWS_BUILD_EGRESS_AUDIENCE),
+    provider: z.enum(['aws', 'aws-ecs']),
+    environmentId: z.uuid(),
+    buildId: z.uuid(),
+    actorUserId: z.string().min(1).max(256),
+    credentialId: z.uuid(),
+  })
+  .strict();
+export type AwsBuildEgressClaims = z.infer<typeof awsBuildEgressClaimsSchema>;
+export const awsProxyEgressClaimsSchema = z.union([
+  awsEgressClaimsSchema,
+  awsBuildEgressClaimsSchema,
+]);
 
 export const awsEgressPolicySchema = z
   .object({

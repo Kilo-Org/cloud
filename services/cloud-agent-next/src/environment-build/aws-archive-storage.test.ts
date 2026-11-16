@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
 import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import {
   awsArchiveBaseImage,
+  awsEcsArchiveBaseImage,
   decodeAwsArchiveBase,
   decodeAwsArchiveSnapshot,
   encodeAwsArchiveSnapshot,
@@ -16,12 +18,15 @@ import {
 
 const connectionId = '11111111-1111-4111-8111-111111111111';
 const captureId = '55555555-5555-4555-8555-555555555555';
-function fixture() {
+function fixtureFor(provider: 'aws' | 'aws-ecs') {
   let context: AwsBuildArchiveContext = {
     environmentId: '22222222-2222-4222-8222-222222222222',
     buildId: '33333333-3333-4333-8333-333333333333',
     allocationId: '44444444-4444-4444-8444-444444444444',
-    baseImage: awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION),
+    baseImage:
+      provider === 'aws'
+        ? awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION)
+        : awsEcsArchiveBaseImage(connectionId, ECS_TEST_CONFIG),
     deadlineAt: 100_000,
     state: 'preparing',
   };
@@ -34,6 +39,7 @@ function fixture() {
     fileCount: 2,
     deletedCount: 1,
   };
+  let now = 1000;
   let stored: { size: number; sha256: string } | null = null;
   let onUpload = async () => {};
   let onHead = async () => {};
@@ -44,7 +50,7 @@ function fixture() {
     persist: archive => {
       context.archive = structuredClone(archive);
     },
-    now: () => 1000,
+    now: () => now,
     objects: {
       async prepareArchiveUpload(key, sha256, ttl) {
         // Persisted state must exist before a write capability can escape.
@@ -65,6 +71,9 @@ function fixture() {
   });
   return {
     api,
+    setNow: (value: number) => {
+      now = value;
+    },
     descriptor,
     issued,
     context: () => context,
@@ -83,7 +92,8 @@ function fixture() {
   };
 }
 
-describe('AWS immutable prepared archive', () => {
+describe.each(['aws', 'aws-ecs'] as const)('%s immutable prepared archive', provider => {
+  const fixture = () => fixtureFor(provider);
   it('reconciles a lost upload reply and returns the same captured descriptor', async () => {
     const f = fixture();
     await f.api.prepareUpload(f.descriptor);
@@ -107,6 +117,20 @@ describe('AWS immutable prepared archive', () => {
       archive: f.descriptor,
     });
     expect(first.size).toBe(f.descriptor.size);
+  });
+  it('starts eligibility before a delayed verification and publication', async () => {
+    const f = fixture();
+    await f.api.prepareUpload(f.descriptor);
+    f.upload();
+    f.setNow(60_000);
+    await f.api.completeUpload();
+    f.replace({ state: 'capturing', captureId });
+    f.setNow(70_000);
+    expect(await f.api.capture(captureId)).toMatchObject({
+      status: 'stored',
+      capturedAt: 1000,
+      durationMs: 59_000,
+    });
   });
   it('never replaces a reserved object with another checksum or size', async () => {
     const f = fixture();
@@ -186,6 +210,7 @@ describe('AWS immutable prepared archive', () => {
 });
 
 describe('AWS archive public identity', () => {
+  const fixture = () => fixtureFor('aws');
   it('contains no role credentials, external ID or proxy identity', () => {
     const base = awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION);
     const decoded = decodeAwsArchiveBase(base);

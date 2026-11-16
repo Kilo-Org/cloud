@@ -4,6 +4,7 @@ import {
   createControlPlaneClient,
   egressCredentialKey,
   parseProxyAuthorization,
+  parseEgressCredential,
 } from './control-plane.js';
 
 const stackId = 'arn:aws:cloudformation:us-east-1:123456789012:stack/customer/12345678-abcd';
@@ -180,5 +181,43 @@ describe('proxy control-plane boundary', () => {
       return;
     }
     throw new Error('Expected rejection');
+  });
+});
+
+describe.each(['aws', 'aws-ecs'] as const)('%s build proxy route', provider => {
+  const environmentId = '33333333-3333-4333-8333-333333333333';
+  const buildId = '44444444-4444-4444-8444-444444444444';
+  const buildClaims = {
+    ...claims,
+    type: 'aws_build_egress',
+    aud: 'kilo-aws-build-egress',
+    provider,
+    environmentId,
+    buildId,
+    actorUserId: 'oauth/provider/actor',
+    credentialId: '55555555-5555-4555-8555-555555555555',
+  };
+  const encoded = (value: unknown) =>
+    ['header', Buffer.from(JSON.stringify(value)).toString('base64url'), 'signature'].join('.');
+  it('routes opaque build proof to its environment coordinator and binds the common policy', async () => {
+    const buildToken = encoded(buildClaims);
+    const transport = vi.fn(async (request: Request) => {
+      expect(request.url).toBe(
+        `https://worker.example/environment-build/${environmentId}/${buildId}/aws-egress/policy`
+      );
+      expect(request.headers.get('x-kilo-egress-credential')).toBe(buildToken);
+      return Response.json(policy);
+    });
+    expect(parseEgressCredential(buildToken)).toEqual(buildClaims);
+    await expect(client(transport).loadPolicy(buildToken, signal())).resolves.toEqual(policy);
+  });
+  it.each([
+    { provider: 'unknown' },
+    { type: 'aws_egress' },
+    { aud: 'kilo-aws-egress' },
+    { environmentId: '../other' },
+    { credentialId: undefined },
+  ])('rejects ambiguous or malformed build routing metadata: %j', override => {
+    expect(parseEgressCredential(encoded({ ...buildClaims, ...override }))).toBeNull();
   });
 });

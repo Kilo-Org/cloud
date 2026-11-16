@@ -29,16 +29,21 @@ const allocation: VercelBuilderAllocation = {
     instance: 'vercel-small',
   },
 };
-const state = {
+const state: BuilderLifecycleState = {
   get: async () => null,
   set: async () => undefined,
   clear: async () => undefined,
+  update: async transition => transition(undefined),
 };
 
 function memoryState(initial: Record<string, unknown> = {}): BuilderLifecycleState {
   let value: unknown = initial;
   return {
     get: async () => value,
+    update: async transition => {
+      value = transition(value);
+      return value;
+    },
     set: async next => {
       value = next;
     },

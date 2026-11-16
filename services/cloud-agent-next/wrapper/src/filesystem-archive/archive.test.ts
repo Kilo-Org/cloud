@@ -1,6 +1,6 @@
 import { rejects } from 'node:assert/strict';
 import { afterEach, describe, expect, it } from 'bun:test';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   cp,
@@ -24,7 +24,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { baselineRootFilesystem, captureRootFilesystem, restoreRootFilesystem } from './archive.js';
-import type { RootfsArchiveDescriptor } from '../../../src/shared/rootfs-archive.js';
+import {
+  rootfsArchiveConfiguration,
+  type RootfsArchiveDescriptor,
+} from '../../../src/shared/rootfs-archive.js';
+import { ROOTFS_ARCHIVE_PYTHON } from '../../../src/shared/rootfs-archive-python.js';
 
 const python = promisify(execFile);
 const temporary: string[] = [];
@@ -76,6 +80,85 @@ async function mutation(f: Awaited<ReturnType<typeof fixture>>) {
   await f.write('home/worktree/.cache/tool/data', 'prepared cache');
 }
 describe.skipIf(process.platform !== 'linux')('shared root filesystem archives', () => {
+  it('finds nested mounts when the archive root is the filesystem root', async () => {
+    const definitions = ROOTFS_ARCHIVE_PYTHON.slice(
+      0,
+      ROOTFS_ARCHIVE_PYTHON.lastIndexOf('\ntry:\n    data =')
+    );
+    const { stdout } = await python('/usr/bin/python3', [
+      '-c',
+      definitions + "\nROOT = '/'\nprint(json.dumps(sorted(nested_mounts())))",
+    ]);
+    const mounts: string[] = JSON.parse(stdout);
+    expect(mounts).toContain('proc');
+    expect(mounts).not.toContain('.');
+    expect(mounts.every(name => !name.startsWith('/'))).toBe(true);
+  });
+
+  it('captures and replaces regular files with a different overlay device', async () => {
+    const f = await fixture();
+    const overlay = String.raw`import os, stat
+original_lstat, original_stat = os.lstat, os.stat
+class OverlayStat:
+    def __init__(self, value):
+        self.value = value
+    def __getattr__(self, name):
+        return self.value.st_dev + 1 if name == 'st_dev' else getattr(self.value, name)
+def overlay_lstat(*args, **kwargs):
+    value = original_lstat(*args, **kwargs)
+    return OverlayStat(value) if stat.S_ISREG(value.st_mode) else value
+def overlay_stat(*args, **kwargs):
+    value = original_stat(*args, **kwargs)
+    return OverlayStat(value) if stat.S_ISREG(value.st_mode) else value
+os.lstat, os.stat = overlay_lstat, overlay_stat
+original_listxattr = os.listxattr
+def provider_labels(*args, **kwargs):
+    return list(set(original_listxattr(*args, **kwargs)) | {'security.selinux'})
+os.listxattr = provider_labels
+`;
+    async function execute(
+      action: 'baseline' | 'capture' | 'restore',
+      expected?: RootfsArchiveDescriptor
+    ) {
+      const input = JSON.stringify({
+        ...rootfsArchiveConfiguration(),
+        ...f,
+        root: action === 'restore' ? f.restored : f.root,
+        action,
+        expected,
+      });
+      const stdout = await new Promise<string>((resolve, reject) => {
+        const child = spawn('/usr/bin/python3', ['-c', overlay + ROOTFS_ARCHIVE_PYTHON], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        let output = '';
+        child.stdout.on('data', chunk => {
+          output += chunk.toString();
+        });
+        child.once('error', reject);
+        child.once('close', code => (code === 0 ? resolve(output) : reject(new Error(output))));
+        child.stdin.end(input);
+      });
+      return JSON.parse(stdout);
+    }
+    await execute('baseline');
+    await f.write('usr/lib/package/tool', 'changed overlay file');
+    await rm(path.join(f.root, 'type-file'));
+    await f.write('type-file/child', 'new overlay descendant');
+    const descriptor = (await execute('capture')).result as RootfsArchiveDescriptor;
+    expect(
+      (await readFile(f.archivePath)).includes(Buffer.from('KILO.xattr.c2VjdXJpdHkuc2VsaW51eA'))
+    ).toBe(false);
+    expect(descriptor.expandedBytes).toBeGreaterThan(0);
+    expect((await execute('restore', descriptor)).ok).toBe(true);
+    expect(await readFile(path.join(f.restored, 'usr/lib/package/tool'), 'utf8')).toBe(
+      'changed overlay file'
+    );
+    expect(await readFile(path.join(f.restored, 'type-file/child'), 'utf8')).toBe(
+      'new overlay descendant'
+    );
+  });
+
   it('restores installed files, old mtimes, hardlinks, symlinks, deletions and type replacements', async () => {
     const f = await fixture();
     await baselineRootFilesystem(f);
@@ -271,6 +354,24 @@ print(p.stdout.strip())`,
     expect(await readFile(path.join(f.restored, 'obsolete'), 'utf8')).toBe('remove me');
   });
   it.skipIf(!process.env.ROOTFS_MOUNT_TEST_ROOT)(
+    'excludes nested mounts and refuses replacing a mounted file',
+    async () => {
+      const f = await fixture();
+      const root = process.env.ROOTFS_MOUNT_TEST_ROOT;
+      if (!root) throw new Error('Missing test mount root');
+      const expected = await hostile(f, [{ name: 'mounted-file', data: 'replacement' }], []);
+      await rejects(restoreRootFilesystem({ ...f, root, expected }), { code: 'invalid_archive' });
+      expect(await readFile(path.join(root, 'mounted-file'), 'utf8')).toBe('mounted file');
+      await rm(f.archivePath);
+      const location = { ...f, root };
+      await baselineRootFilesystem(location);
+      await writeFile(path.join(root, 'ordinary-file'), 'included');
+      const descriptor = await captureRootFilesystem(location);
+      expect(descriptor.fileCount).toBe(1);
+      expect(descriptor.expandedBytes).toBe(8);
+    }
+  );
+  it.skipIf(!process.env.ROOTFS_MOUNT_TEST_ROOT)(
     'refuses deletion across a nested filesystem boundary',
     async () => {
       const f = await fixture();
@@ -325,6 +426,28 @@ with tarfile.open(sys.argv[1],'w',format=tarfile.PAX_FORMAT) as t:
 describe.skipIf(process.platform !== 'linux')(
   'archive validation before filesystem mutation',
   () => {
+    it('rejects imported SELinux labels before applying any deletion', async () => {
+      const f = await fixture();
+      const key = 'KILO.xattr.' + Buffer.from('security.selinux').toString('base64url');
+      const expected = await hostile(
+        f,
+        [
+          {
+            name: 'usr/lib/package/tool',
+            data: 'unsafe label',
+            pax: { [key]: Buffer.from('source-context').toString('base64') },
+          },
+        ],
+        ['obsolete']
+      );
+      await rejects(restoreRootFilesystem({ ...f, root: f.restored, expected }), {
+        code: 'unsupported_metadata',
+      });
+      expect(await readFile(path.join(f.restored, 'obsolete'), 'utf8')).toBe('remove me');
+      expect(await readFile(path.join(f.restored, 'usr/lib/package/tool'), 'utf8')).toBe(
+        'old package'
+      );
+    });
     it.each(
       [
         [{ name: '../outside', data: 'bad' }],

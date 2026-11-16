@@ -1,3 +1,4 @@
+import type { BuilderLifecycleState } from './builder-state.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
 import type {
@@ -18,10 +19,11 @@ const allocation = {
   allocationId: 'allocation',
   instance: 'standard-4' as const,
 };
-const lifecycle = {
+const lifecycle: BuilderLifecycleState = {
   get: async () => null,
   set: async () => undefined,
   clear: async () => undefined,
+  update: async transition => transition(undefined),
 };
 const runner = { url: 'https://worker.test/environment-build/test', credential: 'synthetic' };
 const command = { argv: ['/bin/sh', '-c', 'download-selected-builder'] };

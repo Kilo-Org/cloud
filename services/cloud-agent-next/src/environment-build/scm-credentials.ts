@@ -32,7 +32,7 @@ const buildScmShape = z
       .refine(id => !id.startsWith('dind-')),
     userId: z.string().min(1),
     orgId: z.string().min(1).optional(),
-    provider: z.literal('aws'),
+    provider: z.enum(['aws', 'aws-ecs']),
     containmentEnabled: z.literal(true),
     outboundContainerId: z.string().min(1),
     preparedAt: z.number().int().nonnegative(),
@@ -52,9 +52,23 @@ const buildScmShape = z
   })
   .strict();
 
+/** The engine and immutable build allocation jointly identify broker authority. */
+export function awsBuildOutboundContainerId(input: {
+  provider: 'aws' | 'aws-ecs';
+  environmentId: string;
+  buildId: string;
+  allocationId: string;
+}): string {
+  return `${input.provider}-environment-build:${input.environmentId}:${input.buildId}:${input.allocationId}`;
+}
+
 /** Builder authority has no model credential or Session DO member. */
 export const buildScmGrantSchema = buildScmShape.superRefine((grant, ctx) => {
-  if (grant.expiresAt <= grant.preparedAt || !hasManagedScmCapability(grant)) {
+  if (
+    grant.expiresAt <= grant.preparedAt ||
+    !hasManagedScmCapability(grant) ||
+    grant.outboundContainerId !== awsBuildOutboundContainerId(grant)
+  ) {
     ctx.addIssue({ code: 'custom', message: 'Invalid build SCM authority' });
   }
   for (const entry of grantScmEntries(grant)) {
@@ -112,6 +126,7 @@ type BuildOwner = Pick<
 /** The caller persists the complete grant before delivering any aliases to the builder. */
 export async function issueBuildScmGrant(input: {
   env: ScmEnv;
+  provider: 'aws' | 'aws-ecs';
   owner: BuildOwner;
   members: readonly EnvironmentReferenceRepository[];
   now: number;
@@ -121,7 +136,10 @@ export async function issueBuildScmGrant(input: {
     throw new Error('Invalid build repositories');
   const repositories = input.members.map(repositoryFor);
   assertAwsScmRepositories(repositories);
-  const outboundContainerId = `aws-environment-build:${input.owner.environmentId}:${input.owner.buildId}:${input.owner.allocationId}`;
+  const outboundContainerId = awsBuildOutboundContainerId({
+    ...input.owner,
+    provider: input.provider,
+  });
   const issue = (repository: BuildRepository) =>
     refreshScmCapability(input.env, input.owner, repository, outboundContainerId, input.now);
   const [repository, ...additional] = repositories;
@@ -138,7 +156,7 @@ export async function issueBuildScmGrant(input: {
   });
   const grant = buildScmGrantSchema.parse({
     ...input.owner,
-    provider: 'aws',
+    provider: input.provider,
     containmentEnabled: true,
     outboundContainerId,
     preparedAt: input.now,

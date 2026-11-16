@@ -1,3 +1,4 @@
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { and, asc, desc, eq, gt, inArray, lt, or } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { z } from 'zod';
@@ -63,6 +64,7 @@ export const buildInputRecordSchema = z.union([
       commands: z.array(z.string()),
       plainVars: z.record(z.string(), z.string()),
       target: environmentBuildTargetSchema.optional(),
+      egressPolicy: egressPolicySchema.optional(),
     })
     .strict(),
   z
@@ -72,6 +74,7 @@ export const buildInputRecordSchema = z.union([
       commands: z.array(z.string()),
       plainVars: z.record(z.string(), z.string()),
       target: environmentBuildTargetSchema.optional(),
+      egressPolicy: egressPolicySchema.optional(),
     })
     .strict(),
 ]);

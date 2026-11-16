@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test';
+import { createServer } from 'node:http';
+import { createConnection } from 'node:net';
+import type { Duplex } from 'node:stream';
 import type { WrapperPty, WrapperPtySize } from '../kilo-api.js';
 import type { Harness } from './harness.js';
 import { createKiloHarness } from './kilo-harness.js';
@@ -304,6 +307,91 @@ describe('control-plane terminal adapter (B10)', () => {
     });
 
     terminals.shutdown();
+  });
+
+  it('uses the configured proxy for the reverse Worker socket while the local PTY stays direct', async () => {
+    sockets.reverse = undefined;
+    ptyAuthorizations.length = 0;
+    const workerPort = server.port;
+    if (workerPort === undefined) throw new Error('Worker fixture did not bind a port');
+    const destinations: string[] = [];
+    const connections = new Set<Duplex>();
+    const proxy = createServer((_request, response) => response.writeHead(502).end());
+    const track = (socket: Duplex) => {
+      connections.add(socket);
+      socket.on('close', () => connections.delete(socket));
+      return socket;
+    };
+    proxy.on('connection', track);
+    proxy.on('connect', (request, downstream, head) => {
+      destinations.push(request.url ?? '');
+      const upstream = track(
+        createConnection(workerPort, '127.0.0.1', () => {
+          downstream.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+          if (head.length) upstream.write(head);
+          downstream.pipe(upstream).pipe(downstream);
+        })
+      );
+      upstream.on('error', () => downstream.destroy());
+      downstream.on('error', () => upstream.destroy());
+    });
+    proxy.on('upgrade', (request, downstream, head) => {
+      const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
+      destinations.push(url.host);
+      const upstream = track(
+        createConnection(workerPort, '127.0.0.1', () => {
+          const headers = Object.entries(request.headers)
+            .filter(([key]) => !key.startsWith('proxy-'))
+            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`);
+          upstream.write(
+            `GET ${url.pathname}${url.search} HTTP/1.1\r\n${headers.join('\r\n')}\r\n\r\n`
+          );
+          if (head.length) upstream.write(head);
+          downstream.pipe(upstream).pipe(downstream);
+        })
+      );
+      upstream.on('error', () => downstream.destroy());
+      downstream.on('error', () => upstream.destroy());
+    });
+    await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve));
+    const address = proxy.address();
+    if (!address || typeof address === 'string') throw new Error('Proxy did not bind a port');
+    const terminals = createControlPlaneTerminals({
+      controlUrl: `ws://worker.invalid:${workerPort}`,
+      proxyUrl: `http://127.0.0.1:${address.port}`,
+      wrapperId: 'wrapper_proxy_test',
+      runtimes: fakeRuntimes(fakeRuntime(fakeClient(serverUrl))),
+    });
+    try {
+      terminals.rememberAttachedSession(session, session.sessionId);
+      await terminals.handle({
+        type: 'terminal.create',
+        requestId: 'proxy_create',
+        session,
+        payload: { operationId: '00000000-0000-4000-8000-000000000099' },
+      });
+      const connected = await terminals.handle({
+        type: 'terminal.connect',
+        requestId: 'proxy_connect',
+        session,
+        payload: {
+          ownerId: 'user_1',
+          ptyId,
+          bridgeGeneration: crypto.randomUUID(),
+          capability: 'p'.repeat(64),
+        },
+      });
+      expect(connected).toMatchObject({ ok: true, result: { connected: true } });
+      expect(destinations).toHaveLength(1);
+      expect(destinations[0]).toBe(`worker.invalid:${workerPort}`);
+      expect(ptyAuthorizations).toEqual([KILO_AUTHORIZATION]);
+    } finally {
+      terminals.shutdown();
+      for (const socket of connections) socket.destroy();
+      await new Promise<void>((resolve, reject) =>
+        proxy.close(error => (error ? reject(error) : resolve()))
+      );
+    }
   });
 
   it('tracks recent browser-to-PTY input for diagnostics', async () => {

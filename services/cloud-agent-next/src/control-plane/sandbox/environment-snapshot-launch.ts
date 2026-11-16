@@ -144,7 +144,9 @@ export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotS
   return {
     snapshotId: resolution.snapshot.snapshotId,
     baseImage,
-    ...(resolution.snapshot.provider === 'vercel' ? { provider: 'vercel' as const } : {}),
+    ...(resolution.snapshot.provider === 'cloudflare-containers'
+      ? {}
+      : { provider: resolution.snapshot.provider }),
   };
 }
 

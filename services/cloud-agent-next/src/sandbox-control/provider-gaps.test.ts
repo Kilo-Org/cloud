@@ -31,12 +31,6 @@ const RETIRED = 'The retired runtime starts no new compute.';
 const PROVIDER_GAPS: readonly ProviderGap[] = [
   {
     provider: 'vercel',
-    feature: 'preview',
-    class: 'gap',
-    reason: 'Ports are fixed at create and the Worker does not proxy the Vercel route URL.',
-  },
-  {
-    provider: 'vercel',
     feature: 'workspaceSnapshots',
     class: 'gap',
     reason: 'The adapter has no per-workspace capture and restore.',

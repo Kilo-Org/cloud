@@ -223,6 +223,17 @@ export type KiloProcess = KiloServer & {
   stop(deadlineAt: number): Promise<boolean>;
 };
 
+/** The TCP port in a `kilo serve` URL, if it has one. */
+export function kiloServerPort(server: KiloServer | undefined): number | undefined {
+  if (server === undefined) return undefined;
+  try {
+    const port = Number(new URL(server.url).port);
+    return Number.isInteger(port) && port > 0 ? port : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type KiloProcessSpawnInput = {
   directory: string;
   env: Record<string, string>;
@@ -386,6 +397,8 @@ export type KiloRuntime = {
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
+  /** The port of the live `kilo serve`; preview refuses it. */
+  serverPort(): number | undefined;
   needsCompute(): boolean;
   liveTreeExecutions(root: string): number[] | undefined;
   sessionState(id: string): ReturnType<RuntimeActivity['state']>;
@@ -1359,6 +1372,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     isSuspected: isSuspectedPhase,
     isRestarting: () => phase === 'restarting',
     isUnavailable: () => phase === 'unavailable',
+    serverPort: () => kiloServerPort(kiloProcess),
     async shutdown(): Promise<void> {
       if (phase === 'stopped') return;
       phase = 'stopped';
@@ -1421,6 +1435,8 @@ export type KiloRuntimes = {
   };
   /** Live runtimes serving one directory; worktree deletion retires them (R2). */
   runtimesForDirectory(directory: string): KiloRuntime[];
+  /** The ports of every live `kilo serve`; preview refuses them. */
+  serverPorts(): number[];
   /** Stops and removes every runtime serving one directory (worktree deletion). */
   retireDirectory(directory: string): Promise<void>;
   shutdown(): Promise<void>;
@@ -1610,6 +1626,11 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
     },
     runtimesForDirectory: directory =>
       [...runtimes.values()].filter(runtime => runtime.directory === directory),
+    serverPorts: () =>
+      [...runtimes.values()].flatMap(runtime => {
+        const port = runtime.serverPort();
+        return port === undefined ? [] : [port];
+      }),
     async retireDirectory(directory) {
       const targets = [...runtimes.entries()].filter(
         ([, runtime]) => runtime.directory === directory

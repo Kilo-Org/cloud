@@ -39,6 +39,7 @@ function metadata(input: {
 const COORDINATES: PreviewTargetResult = {
   status: 'ok',
   coordinates: {
+    transport: 'durable-object',
     provider: 'cloudflare-containers',
     logicalSandboxId: SESSION_ID,
     allocationRef: SANDBOX_ID,

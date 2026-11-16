@@ -34,9 +34,15 @@ import {
   previewLabel,
   type PreviewHostMatch,
 } from './host.js';
-import { PREVIEW_NOT_RUNNING_TEXT, PREVIEW_SESSION_MISSING_TEXT } from './container-port-fetch.js';
+import {
+  PREVIEW_NOT_READY_TEXT,
+  PREVIEW_NOT_RUNNING_TEXT,
+  PREVIEW_SESSION_MISSING_TEXT,
+  PREVIEW_UNAVAILABLE_TEXT,
+} from './container-port-fetch.js';
 import { isPreviewReservedPath, previewReturnPath } from './return-path.js';
 import { previewUpstreamHost, previewUpstreamUrl } from './upstream.js';
+import { fetchPreviewUpstream } from './upstreams.js';
 import { resolveWorkspacePreviewTarget } from './workspace-target.js';
 
 export const PREVIEW_ENTER_PATH = '/.kilo-preview/enter';
@@ -82,15 +88,6 @@ export type PreviewRouteDeps = {
   ) => Promise<Response>;
 };
 
-export async function defaultFetchUpstream(
-  env: Env,
-  coordinates: PreviewProviderCoordinates,
-  request: Request
-): Promise<Response> {
-  const stub = env.SANDBOX_CONTAINERS.getByName(coordinates.logicalSandboxId);
-  return stub.fetch(request);
-}
-
 const defaultPreviewRouteDeps: PreviewRouteDeps = {
   validateAccess: async ({ env, userId, cloudAgentSessionId, expectedOrganizationId }) => {
     await requireCurrentSessionAccess({
@@ -109,7 +106,7 @@ const defaultPreviewRouteDeps: PreviewRouteDeps = {
       expectedOrganizationId,
     }),
   consumeTicketNonce: consumeStreamTicketNonce,
-  fetchUpstream: defaultFetchUpstream,
+  fetchUpstream: fetchPreviewUpstream,
 };
 
 function fixed(status: number, message: string, retryAfter = false): Response {
@@ -309,7 +306,7 @@ async function handleEntry(
       return entryResponse(projected.status, await projected.text());
     }
     logger.withFields({ error: errorMessage(error) }).warn('Preview target resolution failed');
-    return entryResponse(503, 'Preview is temporarily unavailable', true);
+    return entryResponse(503, PREVIEW_UNAVAILABLE_TEXT, true);
   }
   if (target.status !== 'ok') return entryUnavailableTargetResponse(target);
   const coordinates = target.coordinates;
@@ -320,7 +317,7 @@ async function handleEntry(
     firstUse = await deps.consumeTicketNonce(env, ticket.nonce, ticket.expiresAtMs);
   } catch (error) {
     logger.withFields({ error: errorMessage(error) }).warn('Preview ticket nonce consume failed');
-    return entryResponse(503, 'Preview is temporarily unavailable', true);
+    return entryResponse(503, PREVIEW_UNAVAILABLE_TEXT, true);
   }
   if (!firstUse) {
     return entryResponse(401, PREVIEW_TICKET_USED_TEXT);
@@ -366,10 +363,9 @@ function upstreamRequest(
   headers.delete('Origin');
   headers.set('Origin', `http://localhost:${port}`);
   headers.set('Host', previewUpstreamHost(port));
+  // Every upstream reads or strips the markers before the request leaves the Worker.
   headers.set(PREVIEW_MARKER_PORT_HEADER, String(port));
-  if (coordinates.provider === 'cloudflare-containers') {
-    headers.set(PREVIEW_MARKER_ALLOCATION_HEADER, coordinates.allocationRef);
-  }
+  headers.set(PREVIEW_MARKER_ALLOCATION_HEADER, coordinates.allocationRef);
   const method = request.method.toUpperCase();
   const init: RequestInit & { duplex?: 'half' } = {
     method: request.method,
@@ -424,7 +420,7 @@ function unavailableTargetResponse(
     case 'unsupported_provider':
       return fixed(409, 'Preview is not available for this sandbox provider');
     case 'not_ready':
-      return fixed(503, 'The sandbox is not ready', true);
+      return fixed(503, PREVIEW_NOT_READY_TEXT, true);
     case 'not_running':
       return fixed(503, PREVIEW_NOT_RUNNING_TEXT);
   }
@@ -492,10 +488,10 @@ async function handleProxy(
   } catch (error) {
     if (isForbiddenAccessError(error)) return accessErrorResponse(error);
     logger.withFields({ error: errorMessage(error) }).warn('Preview target resolution failed');
-    return fixed(503, 'Preview is temporarily unavailable', true);
+    return fixed(503, PREVIEW_UNAVAILABLE_TEXT, true);
   }
   if (target.status !== 'ok') return unavailableTargetResponse(target);
-  // The physical DO refuses reserved ports before it touches the container.
+  // The upstream refuses reserved ports before a request reaches the sandbox.
   const coordinates = target.coordinates;
 
   // A cookie minted for another allocation must not follow a replacement.
@@ -514,7 +510,7 @@ async function handleProxy(
     logger
       .withFields({ error: errorMessage(error), provider: coordinates.provider })
       .warn('Preview upstream fetch failed');
-    return fixed(503, 'Preview is temporarily unavailable', true);
+    return fixed(503, PREVIEW_UNAVAILABLE_TEXT, true);
   }
   return sanitizedResponse(response, claims.port, url.origin, secure);
 }

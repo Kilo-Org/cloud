@@ -42,7 +42,7 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
     meteredBilling: false,
   },
   vercel: {
-    preview: false,
+    preview: true,
     workspaceSnapshots: false,
     environmentSnapshots: true,
     egressPolicy: false,

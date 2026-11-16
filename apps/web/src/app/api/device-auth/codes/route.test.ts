@@ -313,6 +313,15 @@ describe('POST /api/device-auth/codes', () => {
       { client_id: 'client-abc', client_name: '\u3164', redirect_origin: 'https://a.test' },
       'INVALID_REQUESTING_CLIENT',
     ],
+    [
+      'a name of only variation selectors',
+      {
+        client_id: 'client-abc',
+        client_name: '\uFE00\uFE0F\u034F',
+        redirect_origin: 'https://a.test',
+      },
+      'INVALID_REQUESTING_CLIENT',
+    ],
   ])('refuses a client description with %s', async (_label, requesting_client, code) => {
     const response = await POST(
       new NextRequest('http://localhost:3000/api/device-auth/codes', {

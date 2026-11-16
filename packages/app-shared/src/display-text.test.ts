@@ -100,4 +100,13 @@ describe('hasVisibleGlyph', () => {
     expect(hasVisibleGlyph('\u200c\u200d')).toBe(false);
     expect(hasVisibleGlyph('\u2028\u2029')).toBe(false);
   });
+
+  it('rejects a mark that has nothing to attach to', () => {
+    expect(hasVisibleGlyph('\uFE00')).toBe(false);
+    expect(hasVisibleGlyph('\uFE0F\uFE0E')).toBe(false);
+    expect(hasVisibleGlyph('\u034F')).toBe(false);
+    expect(hasVisibleGlyph('\u180B\u180C')).toBe(false);
+    expect(hasVisibleGlyph('\u17B4')).toBe(false);
+    expect(hasVisibleGlyph('\u0301\u0308')).toBe(false);
+  });
 });

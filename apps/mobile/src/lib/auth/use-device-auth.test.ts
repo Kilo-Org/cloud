@@ -70,7 +70,8 @@ describe('use-device-auth start path — rate-limit refusal', () => {
       message: 'x',
       retryAfterSeconds: 30,
     };
-    expect(getDeviceAuthStartRefusalError(serverBody, 429)).toEqual({
+    // A status other than 429, so the code alone decides this case.
+    expect(getDeviceAuthStartRefusalError(serverBody, 400)).toEqual({
       kind: 'key',
       key: 'authErrors.tooManySignInAttempts',
     });

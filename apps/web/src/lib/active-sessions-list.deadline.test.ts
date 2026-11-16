@@ -71,13 +71,16 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
 }));
 
 const workerAnswer = () => ({ ok: true, json: async () => ({ sessions: liveSessions }) });
-const mockFetchWithinBudget = jest.fn(async () => workerAnswer());
+const mockFetchWithinBudget = jest.fn(async (_url: string, _init?: RequestInit, _deps?: object) =>
+  workerAnswer()
+);
 
 jest.mock('@/lib/bounded-service-fetch', () => ({
   // The real body reader stays in place: the answer must bound the body read
   // as well as the fetch, so the tests drive it through the real helper.
   ...jest.requireActual('@/lib/bounded-service-fetch'),
-  fetchWithinBudget: (...args: unknown[]) => mockFetchWithinBudget(...args),
+  fetchWithinBudget: (url: string, init?: RequestInit, deps?: object) =>
+    mockFetchWithinBudget(url, init, deps),
 }));
 
 jest.mock('@/lib/session-associated-pr', () => {

@@ -329,6 +329,23 @@ describe('getVercelOnlyCatalogModels', () => {
     expect(ids(models)).toEqual(['reflection/beam-free', 'openai/gpt-5-fast']);
   });
 
+  it('keeps a Vercel-only model whose name only an unlisted OpenRouter model has', async () => {
+    const models = await getVercelOnlyCatalogModels({
+      openRouterModels: [
+        ...openRouterModels,
+        openRouterModel('qwen/qwen3.5-flash-preview', 'Qwen: Qwen3.5 Flash'),
+      ],
+      listedOpenRouterModels: openRouterModels,
+      openRouterMetadata: {},
+    });
+
+    expect(ids(models)).toEqual([
+      'qwen/qwen3.5-flash',
+      'reflection/beam-free',
+      'openai/gpt-5-fast',
+    ]);
+  });
+
   it('treats models in the stored OpenRouter metadata as covered', async () => {
     const models = await getVercelOnlyCatalogModels({
       openRouterModels,

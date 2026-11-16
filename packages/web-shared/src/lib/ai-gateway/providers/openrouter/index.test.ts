@@ -458,6 +458,7 @@ describe('Vercel-only models', () => {
 
     expect(getVercelOnlyCatalogModels).toHaveBeenCalledWith({
       openRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      listedOpenRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
       openRouterMetadata: {},
     });
     const ids = models.data.map(model => model.id);
@@ -466,6 +467,29 @@ describe('Vercel-only models', () => {
       name: 'Vendor: Vercel Only',
       inference_provider_ids: ['amazon-bedrock', 'vendor'],
       isFree: false,
+    });
+  });
+
+  it('only compares Vercel-only names against the OpenRouter models the catalog lists', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [buildModel(), buildModel({ id: 'vendor/model:batch', name: 'Vendor: Batch' })],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(getVercelOnlyCatalogModels).toHaveBeenCalledWith({
+      openRouterModels: [
+        expect.objectContaining({ id: 'vendor/model' }),
+        expect.objectContaining({ id: 'vendor/model:batch' }),
+      ],
+      listedOpenRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      openRouterMetadata: {},
     });
   });
 

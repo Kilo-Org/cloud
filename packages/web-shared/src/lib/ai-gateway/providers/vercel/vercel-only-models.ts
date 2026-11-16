@@ -68,9 +68,12 @@ function hasRoutableProvider({ id, storedModel }: VercelOnlyModel) {
  */
 export async function getVercelOnlyCatalogModels({
   openRouterModels,
+  listedOpenRouterModels = openRouterModels,
   openRouterMetadata,
 }: {
   openRouterModels: readonly OpenRouterModel[];
+  /** The models of `openRouterModels` the catalog lists; a Vercel-only model may not reuse their names. */
+  listedOpenRouterModels?: readonly OpenRouterModel[];
   openRouterMetadata: GatewayModelMap;
 }): Promise<OpenRouterModel[]> {
   const [routingConfig, vercelMetadata, overrides] = await Promise.all([
@@ -87,6 +90,7 @@ export async function getVercelOnlyCatalogModels({
       ...Object.keys(openRouterMetadata),
     ],
     openRouterModels,
+    listedOpenRouterModels,
     vercelMetadata,
     overrides,
   })

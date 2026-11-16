@@ -60,25 +60,28 @@ export function getVercelOnlyModelName(
  *
  * Vercel sometimes serves a model under a different ID than OpenRouter, so no OpenRouter ID maps to
  * it. When `openRouterModels` is given, a model is also left out if the name it would be listed with
- * equals, exactly, the name of one of those models. Without it, only the IDs are compared.
+ * equals, exactly, the name of one of the models in `listedOpenRouterModels`, which defaults to
+ * `openRouterModels`. `openRouterModels` also supplies the vendor names. Without it, only the IDs
+ * are compared.
  */
 export function findVercelOnlyModels({
   openRouterModelIds,
   openRouterModels,
+  listedOpenRouterModels = openRouterModels,
   vercelMetadata,
   overrides,
 }: {
   openRouterModelIds: Iterable<string>;
   openRouterModels?: Iterable<{ id: string; name: string }>;
+  listedOpenRouterModels?: Iterable<{ name: string }>;
   vercelMetadata: GatewayModelMap;
   overrides: VercelModelIdOverrides;
 }): VercelOnlyModel[] {
   const coveredVercelModelIds = new Set(
     [...openRouterModelIds].map(id => mapResolvedModelIdToVercel(id, overrides))
   );
-  const openRouterNames = openRouterModels && [...openRouterModels];
-  const vendorNames = getVendorNamesByModelPrefix(openRouterNames ?? []);
-  const listedNames = new Set(openRouterNames?.map(model => model.name));
+  const vendorNames = getVendorNamesByModelPrefix(openRouterModels ?? []);
+  const listedNames = new Set([...(listedOpenRouterModels ?? [])].map(model => model.name));
   return Object.values(vercelMetadata).flatMap(storedModel => {
     const { context_window, modalities, pricing } = storedModel;
     if (

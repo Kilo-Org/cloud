@@ -282,7 +282,10 @@ describe('cleanupRemoteSession last workspace root', () => {
     await cleanupRemoteSession(config, 'workspace_last_root', 'label');
 
     expect(mocks.getSessionSnapshot.mock.calls[0]?.[1]).toBe('workspace_last_root');
-    expect(mocks.deleteWorktree.mock.calls[0]?.[1]).toEqual({ worktreeId: 'worktree_owned' });
+    expect(mocks.deleteWorktree.mock.calls[0]?.[1]).toEqual({
+      worktreeId: 'worktree_owned',
+      onlyIfSoleSessionId: 'workspace_last_root',
+    });
     expect(errorSpy).not.toHaveBeenCalled();
   });
 

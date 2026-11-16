@@ -450,10 +450,18 @@ async function deleteOwningWorkspace(
   sessionId: string
 ): Promise<string | null> {
   try {
-    const signal = AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS);
-    const { worktreeId } = await getSessionSnapshot(config, sessionId, signal);
+    const { worktreeId } = await getSessionSnapshot(
+      config,
+      sessionId,
+      AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS)
+    );
     if (!worktreeId) return 'deleteWorktree: the last root session reports no workspace';
-    await deleteWorktree(config, { worktreeId }, signal);
+    // The fence makes the delete fail if another session joined the workspace.
+    await deleteWorktree(
+      config,
+      { worktreeId, onlyIfSoleSessionId: sessionId },
+      AbortSignal.timeout(DELETE_SESSION_TIMEOUT_MS)
+    );
     return null;
   } catch (error) {
     return `deleteWorktree: ${errorMessage(error)}`;

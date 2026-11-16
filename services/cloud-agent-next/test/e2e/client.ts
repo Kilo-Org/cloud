@@ -316,7 +316,7 @@ export function getHostedWorkspaceStatus(
  */
 export function deleteWorktree(
   config: DriverConfig,
-  input: { worktreeId: string; kilocodeOrganizationId?: string },
+  input: { worktreeId: string; kilocodeOrganizationId?: string; onlyIfSoleSessionId?: string },
   signal?: AbortSignal
 ): Promise<{ success: true; deletedSessionIds: string[] }> {
   return trpcCall<{ success: true; deletedSessionIds: string[] }>(config, 'deleteWorktree', input, {

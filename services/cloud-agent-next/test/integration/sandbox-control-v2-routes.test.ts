@@ -2781,6 +2781,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
   });
 
   it('interrupts native preparation before its probe completes and waits only for destroy', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
     const native = await pendingNativeStart();
     const provider = createFakeProvider();
     provider.adapter.launch = async (ref, { env: launchEnv }) => {
@@ -2823,6 +2824,10 @@ describe('SandboxControlV2 routes and forwarding', () => {
       await new Promise(resolve => setTimeout(resolve, 25));
       expect((await readState(stub)).allocationId).toBe(replacement.allocationId);
       expect(native.container.starts).toBe(2);
+      const diagnostics = fields.mock.calls.map(([record]) => record.diagnosticEvent);
+      expect(diagnostics).toContain('launch_interrupted');
+      expect(diagnostics).not.toContain('create_failed');
+      expect(diagnostics).not.toContain('snapshot_launch_failed');
     } finally {
       native.releaseProbe();
       native.releaseDestroy();

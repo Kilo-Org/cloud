@@ -1,5 +1,6 @@
 import { assertContainerAccountAvailable } from '../../container-account-admission.js';
 import { billingFailureFromAdmission } from '../../billing-failure.js';
+import { isContainersLaunchInterrupted } from '../../sandbox-containers/launch-interrupted.js';
 import {
   parseRuntimeHarness,
   RUNTIME_HARNESS_HEADER,
@@ -5608,6 +5609,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ) {
           await clearNativeBillingAdmissionDeadline(this.ctx.storage);
         }
+        if (isContainersLaunchInterrupted(error)) {
+          logControlDiagnostic('launch_interrupted', { sandboxId: this.sandboxId, allocationId });
+          return;
+        }
         if (error instanceof ProviderSnapshotCreationError) {
           await this.failSnapshotStart(
             allocationId,
@@ -6163,6 +6168,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           }
         );
       } catch (error) {
+        if (isContainersLaunchInterrupted(error)) throw error;
         // A create-time snapshot cannot be retried by launch. Retry creation
         // through the allocation lifecycle instead.
         if (!requestedSnapshot || this.provider.environmentSnapshots === 'create') throw error;

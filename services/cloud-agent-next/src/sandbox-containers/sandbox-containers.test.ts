@@ -2822,7 +2822,7 @@ describe('SandboxContainers environment snapshot starts', () => {
         vi.mocked(container.exec).mockImplementation(exec);
         await expect(launch(instance, REF_B)).resolves.toMatchObject({ started: true });
         probe.resolve(makeExecProcess({ stdout: `/bin/sh\0${CONTROL_SUPERVISOR_PATH}` }));
-        await Promise.resolve();
+        await new Promise(resolve => setTimeout(resolve, 0));
         expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
         expect(container.startCalls).toHaveLength(2);
         expect(container.destroyCalls).toBe(1);
@@ -2873,6 +2873,43 @@ describe('SandboxContainers environment snapshot starts', () => {
     releaseHeldPut();
 
     expect(await starting).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+    await expect(stopping).resolves.toBe('terminal');
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+  });
+
+  it('cancels before starting when Stop arrives during the instance write', async () => {
+    const { instance, container, readRecord, setPutGate, releaseHeldPut } = setup();
+    const writing = Promise.withResolvers<void>();
+    setPutGate(() => {
+      writing.resolve();
+      return 'hold';
+    });
+    const starting = launchFromSnapshot(instance, REF_A).catch((error: unknown) => error);
+    await writing.promise;
+    const stopping = instance.stop(REF_A);
+    releaseHeldPut();
+
+    expect(await starting).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+    await expect(stopping).resolves.toBe('terminal');
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+  });
+
+  it('cancels queued launches while a superseded allocation is being destroyed', async () => {
+    const { instance, container, readRecord } = setup({
+      running: true,
+      record: { ...idleRecord, state: 'running', allocationRef: REF_B },
+    });
+    container.destroyBehavior = 'deferred';
+    const starting = launchFromSnapshot(instance, REF_A).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(container.destroyCalls).toBe(1));
+    const queued = launchFromSnapshot(instance, REF_A).catch((error: unknown) => error);
+    const stopping = instance.stop(REF_A);
+    container.deferredDestroy?.resolve();
+
+    expect(await starting).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
+    expect(await queued).toMatchObject({ name: 'ContainersLaunchInterruptedError' });
     await expect(stopping).resolves.toBe('terminal');
     expect(container.startCalls).toHaveLength(0);
     expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });

@@ -368,12 +368,12 @@ export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
 type SameUnion<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type AssertTrue<T extends true> = T;
-const _dispatchPushOutcomeVocabulary: AssertTrue<
+export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
   SameUnion<
     DispatchPushOutcome['kind'],
     'delivered' | DeliveryOutcomeReason | ChannelDeliveryOutcomeReason | 'suppressed_rate_limit'
   >
-> = true;
+>;
 
 // ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
 

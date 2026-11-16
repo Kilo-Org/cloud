@@ -30,6 +30,9 @@ let failNextProbe = false;
 // one statement Drizzle does not wrap, so the fake rejects it once. The caller
 // then gets the original error, not a wrapper.
 let failNextMigration = false;
+// The message the migration seam throws. A corruption message routes the open
+// into the reset recovery; anything else keeps the file.
+let nextMigrationMessage = 'migration failed: disk I/O error';
 let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
@@ -119,7 +122,7 @@ function nativeStatement(source: string): FakeStatement {
       // which wraps nothing, so this throw is the error the open reports.
       if (failNextMigration && source.includes('__drizzle_migrations')) {
         failNextMigration = false;
-        throw new Error('migration failed: disk I/O error');
+        throw new Error(nextMigrationMessage);
       }
       return {
         getAllSync: () =>
@@ -282,6 +285,7 @@ beforeEach(() => {
   randomCallCount = 0;
   failNextProbe = false;
   failNextMigration = false;
+  nextMigrationMessage = 'migration failed: disk I/O error';
   failEveryProbe = false;
   failNextPragma = false;
   failEveryPragma = false;
@@ -768,6 +772,28 @@ describe('migration failure keeps the database', () => {
     expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
     expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
     expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+  });
+
+  it('a_corrupt_page_that_fails_inside_the_migration_resets_like_a_probe_failure', async () => {
+    // Damage past the first page passes the `sqlite_master` count and fails
+    // inside `migrate()` instead. The engine message routes it into the same
+    // recovery: an unrecoverable file must not leave the store broken for
+    // every later launch.
+    failNextMigration = true;
+    nextMigrationMessage = 'database disk image is malformed';
+    await setItem('s', 'a', 'x');
+
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    // One report: the reset, not a second migration capture for the same file.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
       level: 'warning',
       tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },

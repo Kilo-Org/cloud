@@ -249,6 +249,23 @@ async function openWithKey(key: string): Promise<KVDatabase> {
 // plain Error.
 const MIGRATION_FAILURE_MESSAGE = 'encrypted-kv: schema migration failed on a keyed database';
 
+// Damage in a non-first page passes the `sqlite_master` count and surfaces
+// inside `migrate()` instead. These engine messages mean the file itself is
+// unreadable, so the open routes them into the same delete-and-recreate
+// recovery as a failed probe. Every other migrate rejection is a migration or
+// environment failure on a readable file and keeps the file.
+const CORRUPTION_SIGNALS = [
+  'SQLITE_CORRUPT',
+  'SQLITE_NOTADB',
+  'file is not a database',
+  'database disk image is malformed',
+];
+
+function isCorruptionSignal(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : '';
+  return CORRUPTION_SIGNALS.some(signal => message.includes(signal));
+}
+
 function probeSchema(db: KVDatabase): void {
   // A wrong key or a corrupt file makes this throw (DEC-01 step 3).
   db.get(sql`SELECT count(*) FROM sqlite_master`);
@@ -311,18 +328,27 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       });
       throw openError;
     }
-    // The file opened and keyed correctly, so the migration failed on readable
-    // data. Report it and rethrow: deleting the file would lose the chats and
+    // The file opened and keyed correctly, so the migration failed there. A
+    // corruption signal means the file is unreadable after all: route it into
+    // the delete-and-recreate recovery below, like a failed probe. Any other
+    // rejection is a migration or environment failure on a readable file —
+    // report it and rethrow: deleting the file would lose the chats and
     // conversation tables the failure never touched.
+    let resetCause = openError;
     if (openError instanceof Error && openError.message === MIGRATION_FAILURE_MESSAGE) {
       if (db) {
         await closeQuietly(db.$client);
       }
-      Sentry.captureException(openError.cause, {
-        level: 'error',
-        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
-      });
-      throw openError.cause;
+      if (!isCorruptionSignal(openError.cause)) {
+        Sentry.captureException(openError.cause, {
+          level: 'error',
+          tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+        });
+        throw openError.cause;
+      }
+      // The corruption report rides on the reset report below; a separate
+      // capture would file the same unreadable file twice.
+      resetCause = openError.cause;
     }
     // Wrong key, corrupt file, or a tampered key: cache and drafts are
     // recoverable losses. Close, delete the file, regenerate the key, and
@@ -334,11 +360,11 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       // must not be replaced by a second connection to the same file: abort
       // the reset and report the original open error instead.
       if (!(await closeQuietly(db.$client))) {
-        reportAbortedReset(openError);
+        reportAbortedReset(resetCause);
       }
-    } else if (openError instanceof Error && unclosedOpenErrors.has(openError)) {
+    } else if (resetCause instanceof Error && unclosedOpenErrors.has(resetCause)) {
       // The failed open never returned a handle, and its handle is still open.
-      reportAbortedReset(openError);
+      reportAbortedReset(resetCause);
     }
     let reopened: KVDatabase | undefined = undefined;
     try {
@@ -347,7 +373,7 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       reopened = await openWithKey(freshKey);
       probeSchema(reopened);
       await migrateSchema(reopened);
-      Sentry.captureException(openError, {
+      Sentry.captureException(resetCause, {
         level: 'warning',
         tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
       });

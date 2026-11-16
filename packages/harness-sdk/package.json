@@ -60,10 +60,10 @@
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/core": "2.4.0",
     "@modelcontextprotocol/ext-apps": "2.1.0",
-    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "drizzle-orm": "catalog:",
     "effect": "4.0.5",
-    "eventsource-parser": "4.1.2",
+    "eventsource-parser": "4.1.3",
     "typia": "15.1.0"
   },
   "devDependencies": {
@@ -71,7 +71,7 @@
     "@ttsc/unplugin": "0.33.0",
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
-    "openai": "7.36.0",
+    "openai": "7.55.0",
     "ttsc": "0.33.0",
     "typescript": "catalog:",
     "vitest": "catalog:vitest5"

@@ -52,6 +52,15 @@ const ORGANIZATION_INVITE_NOT_RESENDABLE_MESSAGE = 'This invitation can no longe
 const ORGANIZATION_INVITE_MISSING_MESSAGE = 'Invitation not found';
 
 /**
+ * `cloudAgentNext.prepareSession` clone rejections that mean the copy was
+ * interrupted rather than the form being wrong: the source transcript changed
+ * while it was read, or the copy's own staging failed. Both carry the stable
+ * code as the message, and both clear on another attempt.
+ */
+const CLONE_SOURCE_CHANGED_MESSAGE = 'source_digest_changed';
+const CLONE_STAGING_FAILED_MESSAGE = 'clone_setup_failed';
+
+/**
  * The i18n key for a server sentence the app explains, or `undefined` when it
  * has none. A `switch` keeps the mapping exhaustive and typo-free without an
  * open string dictionary.
@@ -93,6 +102,12 @@ function copyKeyFor(message: string): string | undefined {
     }
     case ORGANIZATION_INVITE_MISSING_MESSAGE: {
       return 'queryError.notFoundDescription';
+    }
+    case CLONE_SOURCE_CHANGED_MESSAGE:
+    case CLONE_STAGING_FAILED_MESSAGE: {
+      // The source session is still being written to, or the copy's staging
+      // failed: the same clone can be started again once it settles.
+      return 'agentChat.session.cloneFailedRetry';
     }
     case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found: {
       return 'queryError.notFoundDescription';

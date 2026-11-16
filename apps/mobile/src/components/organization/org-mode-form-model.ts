@@ -191,21 +191,28 @@ export function orgModeFormValues(mode: OrgMode): OrgModeFormValues {
 }
 
 /**
- * The `config` a create or update sends. Empty optional strings are omitted
- * rather than stored as empty text, the tool groups are rebuilt in the server's
- * order so two identical forms send identical payloads, and a file restriction
- * rides on the `edit` group only while that group is enabled.
+ * The `config` a create or update sends. A create omits empty optional strings
+ * rather than storing empty text. An update sends them as empty strings: the
+ * server applies `config` as a JSONB patch over the stored row
+ * (`updateOrganizationMode`), so an omitted key keeps its previous value and
+ * clearing a field would be a silent no-op. The tool groups are rebuilt in the
+ * server's order so two identical forms send identical payloads, and a file
+ * restriction rides on the `edit` group only while that group is enabled.
  */
-export function orgModeConfigInput(values: OrgModeFormValues): OrgModeConfigInput {
+export function orgModeConfigInput(
+  values: OrgModeFormValues,
+  mode: 'create' | 'update'
+): OrgModeConfigInput {
   const description = values.description.trim();
   const whenToUse = values.whenToUse.trim();
   const customInstructions = values.customInstructions.trim();
   const editFileRegex = values.editFileRegex.trim();
+  const clearing = mode === 'update';
   return {
     roleDefinition: values.roleDefinition.trim(),
-    ...(description.length === 0 ? {} : { description }),
-    ...(whenToUse.length === 0 ? {} : { whenToUse }),
-    ...(customInstructions.length === 0 ? {} : { customInstructions }),
+    ...(description.length === 0 && !clearing ? {} : { description }),
+    ...(whenToUse.length === 0 && !clearing ? {} : { whenToUse }),
+    ...(customInstructions.length === 0 && !clearing ? {} : { customInstructions }),
     groups: MODE_TOOL_GROUPS.filter(group => values.groups.includes(group)).map(group =>
       group === 'edit' && editFileRegex.length > 0
         ? [

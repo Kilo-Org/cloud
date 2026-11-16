@@ -95,16 +95,16 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   const guard = useMetadataLeaveGuard({ enabled: true });
   const { confirm, dialog } = useConfirmDialog();
 
-  const currentValues = (): OrgModeFormValues => ({
+  const currentValues = (nextGroups: readonly ModeToolGroup[] = groups): OrgModeFormValues => ({
     ...values,
     // An empty identifier follows the name, which is how the web form derives
     // one; the field itself stays empty until the person replaces it.
     slug: values.slug.length > 0 ? values.slug : modeSlugFromName(values.name),
-    groups,
+    groups: nextGroups,
   });
 
-  const syncDirty = () => {
-    const next = isOrgModeFormDirty(currentValues(), initial);
+  const syncDirty = (nextGroups: readonly ModeToolGroup[] = groups) => {
+    const next = isOrgModeFormDirty(currentValues(nextGroups), initial);
     if (next !== dirty) {
       setDirty(next);
       guard.handleDirtyChange(next);
@@ -134,7 +134,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
     if (failed) {
       return;
     }
-    const config = orgModeConfigInput(next);
+    const config = orgModeConfigInput(next, mode === undefined ? 'create' : 'update');
     const name = next.name.trim();
     const slug = next.slug.trim();
     if (mode === undefined) {
@@ -251,14 +251,13 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
           filePatternError={errorFor('editFileRegex')}
           disabled={busy}
           onToggleGroup={(group, checked) => {
-            setGroups(previous =>
-              checked
-                ? MODE_TOOL_GROUPS.filter(
-                    candidate => candidate === group || previous.includes(candidate)
-                  )
-                : previous.filter(candidate => candidate !== group)
-            );
-            syncDirty();
+            const next = checked
+              ? MODE_TOOL_GROUPS.filter(
+                  candidate => candidate === group || groups.includes(candidate)
+                )
+              : groups.filter(candidate => candidate !== group);
+            setGroups(next);
+            syncDirty(next);
           }}
           onChangeFilePattern={value => {
             values.editFileRegex = value;

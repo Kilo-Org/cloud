@@ -250,15 +250,13 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
                   multi
                   disabled={busy}
                   onPress={() => {
-                    setMemberIds(previous => {
-                      const toggled = toggleOrgGroupMembers(
-                        previous,
-                        visibleMemberIds,
-                        !allVisibleSelected
-                      );
-                      syncDirty(toggled);
-                      return toggled;
-                    });
+                    const toggled = toggleOrgGroupMembers(
+                      memberIds,
+                      visibleMemberIds,
+                      !allVisibleSelected
+                    );
+                    setMemberIds(toggled);
+                    syncDirty(toggled);
                   }}
                   className={cn('border-b-[0.5px] border-hair-soft')}
                 />
@@ -272,11 +270,9 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
                     disabled={busy}
                     onPress={() => {
                       const selected = !memberIds.includes(member.id);
-                      setMemberIds(previous => {
-                        const toggled = toggleOrgGroupMember(previous, member.id, selected);
-                        syncDirty(toggled);
-                        return toggled;
-                      });
+                      const toggled = toggleOrgGroupMember(memberIds, member.id, selected);
+                      setMemberIds(toggled);
+                      syncDirty(toggled);
                     }}
                     className={cn(
                       index < visibleMembers.length - 1 && 'border-b-[0.5px] border-hair-soft'

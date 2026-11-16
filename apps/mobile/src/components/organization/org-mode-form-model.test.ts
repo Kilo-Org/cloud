@@ -162,9 +162,24 @@ describe('orgModeFormValues', () => {
 });
 
 describe('orgModeConfigInput', () => {
-  it('omits optional text the person left empty', () => {
-    expect(orgModeConfigInput(values({ groups: [] }))).toEqual({
+  it('omits optional text the person left empty on create', () => {
+    expect(orgModeConfigInput(values({ groups: [] }), 'create')).toEqual({
       roleDefinition: 'You review changes.',
+      groups: [],
+    });
+  });
+
+  it('sends empty optional text on update so clearing a field reaches the server', () => {
+    expect(
+      orgModeConfigInput(
+        values({ groups: [], description: '', whenToUse: ' ', customInstructions: '' }),
+        'update'
+      )
+    ).toEqual({
+      roleDefinition: 'You review changes.',
+      description: '',
+      whenToUse: '',
+      customInstructions: '',
       groups: [],
     });
   });
@@ -172,7 +187,8 @@ describe('orgModeConfigInput', () => {
   it('trims the text it sends', () => {
     expect(
       orgModeConfigInput(
-        values({ name: ' x ', roleDefinition: '  Review.  ', description: ' Draft ' })
+        values({ name: ' x ', roleDefinition: '  Review.  ', description: ' Draft ' }),
+        'create'
       )
     ).toEqual({
       roleDefinition: 'Review.',
@@ -184,12 +200,15 @@ describe('orgModeConfigInput', () => {
   it('rebuilds the edit restriction as the group tuple the server stores', () => {
     expect(
       orgModeConfigInput(
-        values({ groups: ['edit', 'read'], editFileRegex: '\\.md$', editRestrictionLabel: 'Docs' })
+        values({ groups: ['edit', 'read'], editFileRegex: '\\.md$', editRestrictionLabel: 'Docs' }),
+        'create'
       ).groups
     ).toEqual(['read', ['edit', { fileRegex: '\\.md$', description: 'Docs' }]]);
   });
 
   it('drops the restriction with the group that disables it', () => {
-    expect(orgModeConfigInput(values({ groups: [], editFileRegex: '\\.md$' })).groups).toEqual([]);
+    expect(
+      orgModeConfigInput(values({ groups: [], editFileRegex: '\\.md$' }), 'create').groups
+    ).toEqual([]);
   });
 });

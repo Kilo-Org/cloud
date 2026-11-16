@@ -407,7 +407,7 @@
       "codeRequired": "Daħħal il-kodiċi mill-email.",
       "download": "Niżżel il-fajl",
       "downloadFailed": "Ma setgħetx titniżżel l-esportazzjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
-      "unavailableTitle": "Id-data tiegħek għadha mhix disponibbli",
+      "unavailableTitle": "L-esportazzjoni tad-data għadha mhix disponibbli",
       "unavailableDescription": "L-esportazzjoni tad-data qed titnieda gradwalment. Erġa' ċċekkja dalwaqt."
     },
     "blockedPeople": {
@@ -3108,7 +3108,7 @@
     "noSessions": "L-ebda sessjoni attiva",
     "noSessionsDescription": "Idħol bl-applikazzjoni ta' Kilo fuq apparat ieħor u s-sessjoni tidher hawn.",
     "signedIn": "Dħul: {{signedIn}} · L-aħħar attività: {{lastSeen}}",
-    "signInScopeNote": "Hawn jidhru s-sessjonijiet tal-applikazzjoni ta' Kilo u tal-Kilo CLI. Is-sessjonijiet tal-editur mhumiex elenkati.",
+    "signInScopeNote": "Hawn jidhru s-sessjonijiet tal-applikazzjoni ta' Kilo, tal-Kilo CLI u tal-brawżer tal-web. Is-sessjonijiet tal-editur mhumiex elenkati.",
     "thisDevice": "Dan l-apparat",
     "viewProfile": "Ara l-profil",
     "webBrowser": "Brawżer tal-web",

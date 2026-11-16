@@ -407,7 +407,7 @@
       "codeRequired": "Nhập mã trong email.",
       "download": "Tải tệp xuống",
       "downloadFailed": "Không thể tải xuống bản xuất. Hãy kiểm tra kết nối và thử lại.",
-      "unavailableTitle": "Dữ liệu của bạn chưa sẵn sàng",
+      "unavailableTitle": "Xuất dữ liệu chưa sẵn sàng",
       "unavailableDescription": "Tính năng xuất dữ liệu đang được triển khai dần. Vui lòng quay lại sau."
     },
     "blockedPeople": {
@@ -2403,7 +2403,7 @@
     "noSessions": "Không có phiên đang hoạt động",
     "noSessionsDescription": "Đăng nhập vào ứng dụng Kilo trên thiết bị khác để thiết bị đó xuất hiện tại đây.",
     "signedIn": "Đăng nhập lúc {{signedIn}} · Hoạt động gần nhất {{lastSeen}}",
-    "signInScopeNote": "Các phiên đăng nhập qua ứng dụng Kilo và Kilo CLI xuất hiện tại đây. Các phiên đăng nhập qua trình soạn thảo mã không được liệt kê.",
+    "signInScopeNote": "Các phiên đăng nhập qua ứng dụng Kilo, Kilo CLI và trình duyệt web xuất hiện tại đây. Các phiên đăng nhập qua trình soạn thảo mã không được liệt kê.",
     "thisDevice": "Thiết bị này",
     "webBrowser": "Trình duyệt web",
     "viewProfile": "Xem hồ sơ",

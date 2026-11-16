@@ -407,7 +407,7 @@
       "codeRequired": "Whakaurua te waehere i te īmēra.",
       "download": "Tikiake kōnae",
       "downloadFailed": "Kāore i taea te tikiake i te kaweake. Tirohia tō hononga, ka whakamātau anō.",
-      "unavailableTitle": "Kāore anō ō raraunga kia wātea",
+      "unavailableTitle": "Kāore anō te kaweake raraunga kia wātea",
       "unavailableDescription": "Kei te horahia haere te kaweake raraunga. Hoki mai ā tōna wā."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "noSessions": "Kāore he wātū hohe",
     "noSessionsDescription": "Takiuru mā te taupānga Kilo ki tētahi atu pūrere, ka puta taua pūrere ki konei.",
     "signedIn": "I takiuru i te {{signedIn}} · I kitea whakamutungatia i te {{lastSeen}}",
-    "signInScopeNote": "Ka puta ki konei ngā takiuru mā te taupānga Kilo me te Kilo CLI. Kāore ngā takiuru mā te ētita e rārangitia.",
+    "signInScopeNote": "Ka puta ki konei ngā takiuru mā te taupānga Kilo, mā te Kilo CLI me te pūtirotiro tukutuku. Kāore ngā takiuru mā te ētita e rārangitia.",
     "thisDevice": "Tēnei pūrere",
     "viewProfile": "Tirohia te kōtaha",
     "webBrowser": "Pūtirotiro tukutuku",

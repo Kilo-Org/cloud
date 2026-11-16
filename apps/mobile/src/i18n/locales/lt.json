@@ -407,7 +407,7 @@
       "codeRequired": "Įveskite kodą iš el. laiško.",
       "download": "Atsisiųsti failą",
       "downloadFailed": "Nepavyko atsisiųsti eksporto. Patikrinkite ryšį ir bandykite dar kartą.",
-      "unavailableTitle": "Jūsų duomenys dar nepasiekiami",
+      "unavailableTitle": "Duomenų eksportas dar nepasiekiamas",
       "unavailableDescription": "Duomenų eksportas diegiamas palaipsniui. Netrukus užsukite dar kartą."
     },
     "blockedPeople": {
@@ -3054,7 +3054,7 @@
     "noSessions": "Nėra aktyvių sesijų",
     "noSessionsDescription": "Prisijunkite prie Kilo programėlės kitame įrenginyje, ir jis bus rodomas čia.",
     "signedIn": "Prisijungta {{signedIn}} · Paskutinė veikla {{lastSeen}}",
-    "signInScopeNote": "Čia rodomi prisijungimai prie Kilo programėlės ir Kilo CLI. Prisijungimai per redaktorių nerodomi.",
+    "signInScopeNote": "Čia rodomi prisijungimai prie Kilo programėlės, Kilo CLI ir žiniatinklio naršyklės. Prisijungimai per redaktorių nerodomi.",
     "thisDevice": "Šis įrenginys",
     "viewProfile": "Peržiūrėti profilį",
     "signOutThisDevice": "Atsijungti šiame įrenginyje",

@@ -407,7 +407,7 @@
       "codeRequired": "이메일로 받은 코드를 입력하세요.",
       "download": "파일 다운로드",
       "downloadFailed": "내보낸 데이터를 다운로드하지 못했습니다. 연결 상태를 확인한 후 다시 시도하세요.",
-      "unavailableTitle": "아직 데이터를 이용할 수 없습니다",
+      "unavailableTitle": "아직 데이터 내보내기를 이용할 수 없습니다",
       "unavailableDescription": "데이터 내보내기 기능은 순차적으로 제공되고 있습니다. 잠시 후 다시 확인하세요."
     },
     "blockedPeople": {
@@ -2403,7 +2403,7 @@
     "noSessions": "로그인 중인 세션 없음",
     "noSessionsDescription": "다른 기기에서 Kilo 앱으로 로그인하면 여기에 표시됩니다.",
     "signedIn": "{{signedIn}}에 로그인함 · 마지막 활동 {{lastSeen}}",
-    "signInScopeNote": "Kilo 앱 및 Kilo CLI의 로그인 내역이 여기에 표시됩니다. 에디터의 로그인 내역은 표시되지 않습니다.",
+    "signInScopeNote": "Kilo 앱, Kilo CLI 및 웹 브라우저의 로그인 내역이 여기에 표시됩니다. 에디터의 로그인 내역은 표시되지 않습니다.",
     "thisDevice": "이 기기",
     "viewProfile": "프로필 보기",
     "signOutThisDevice": "이 기기 로그아웃",

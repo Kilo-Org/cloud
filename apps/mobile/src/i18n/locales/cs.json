@@ -407,7 +407,7 @@
       "codeRequired": "Zadejte kód z e-mailu.",
       "download": "Stáhnout soubor",
       "downloadFailed": "Export se nepodařilo stáhnout. Zkontrolujte připojení a zkuste to znovu.",
-      "unavailableTitle": "Vaše data zatím nejsou k dispozici",
+      "unavailableTitle": "Export dat zatím není k dispozici",
       "unavailableDescription": "Export dat zavádíme postupně. Zkuste to brzy znovu."
     },
     "blockedPeople": {
@@ -3054,7 +3054,7 @@
     "noSessions": "Žádné aktivní relace",
     "noSessionsDescription": "Přihlaste se do aplikace Kilo na jiném zařízení. Pak se zde zobrazí.",
     "signedIn": "Přihlášení: {{signedIn}} · Poslední aktivita: {{lastSeen}}",
-    "signInScopeNote": "Zde se zobrazují přihlášení do aplikace Kilo a do Kilo CLI. Přihlášení v editoru nejsou uvedena.",
+    "signInScopeNote": "Zde se zobrazují přihlášení do aplikace Kilo, do Kilo CLI a do webového prohlížeče. Přihlášení v editoru nejsou uvedena.",
     "thisDevice": "Toto zařízení",
     "webBrowser": "Webový prohlížeč",
     "viewProfile": "Zobrazit profil",

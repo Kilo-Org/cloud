@@ -407,7 +407,7 @@
       "codeRequired": "በኢሜይል የደረሰዎትን ኮድ ያስገቡ።",
       "download": "ፋይል አውርድ",
       "downloadFailed": "ወደ ውጭ የተላከውን ውሂብ ማውረድ አልተቻለም። ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
-      "unavailableTitle": "ውሂብዎ ገና አልተዘጋጀም",
+      "unavailableTitle": "ውሂብን ወደ ውጭ መላክ ገና አልተዘጋጀም",
       "unavailableDescription": "ውሂብን ወደ ውጭ የመላክ አገልግሎት ቀስ በቀስ እየተለቀቀ ነው። በቅርቡ ተመልሰው ይመልከቱ።"
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "noSessions": "ንቁ ክፍለ ጊዜዎች የሉም",
     "noSessionsDescription": "በሌላ መሣሪያ ላይ በKilo መተግበሪያ ይግቡ፤ እዚህ ይታያል።",
     "signedIn": "የገቡበት ጊዜ፦ {{signedIn}} · ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}",
-    "signInScopeNote": "የKilo መተግበሪያ እና የKilo CLI መግቢያዎች እዚህ ይታያሉ። የአርታዒ መግቢያዎች አይዘረዘሩም።",
+    "signInScopeNote": "የKilo መተግበሪያ፣ የKilo CLI እና የድር አሳሽ መግቢያዎች እዚህ ይታያሉ። የአርታዒ መግቢያዎች አይዘረዘሩም።",
     "thisDevice": "ይህ መሣሪያ",
     "webBrowser": "የድር አሳሽ",
     "viewProfile": "መገለጫ ይመልከቱ",

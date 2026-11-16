@@ -966,5 +966,39 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       expect(mockedCaptureException).not.toHaveBeenCalled();
       expectFailureMetrics(499);
     });
+
+    describe('client disconnect reported by Next.js', () => {
+      class ResponseAborted extends Error {
+        override readonly name = 'ResponseAborted';
+      }
+
+      it('answers 499 when the request signal aborts with ResponseAborted', async () => {
+        setUserAuth();
+        const controller = new AbortController();
+        mockedFetch.mockImplementation(
+          (_input, init) =>
+            new Promise<Response>((_resolve, reject) => {
+              const signal = init?.signal;
+              signal?.addEventListener('abort', () => reject(signal.reason));
+              controller.abort(new ResponseAborted());
+            })
+        );
+
+        const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+        const response = await handleAudioTranscriptionsRequest(
+          new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+            body: JSON.stringify(transcriptionBody),
+            signal: controller.signal,
+          }) as never
+        );
+
+        expect(response.status).toBe(499);
+        expect(await response.json()).toMatchObject({ error_type: 'client_disconnect' });
+        expect(mockedCaptureException).not.toHaveBeenCalled();
+        expectFailureMetrics(499);
+      });
+    });
   });
 });

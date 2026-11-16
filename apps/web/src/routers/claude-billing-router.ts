@@ -264,10 +264,11 @@ export const claudeBillingRouter = createTRPCRouter({
       if (unreferencedPayer) {
         await retireUnreferencedClaudeBillingPayer(unreferencedPayer, { unlink: false }).catch(
           error => {
-          console.error('[claude-billing] remote profile retirement deferred', {
-            error: error instanceof Error ? error.name : 'unknown',
-          });
-        });
+            console.error('[claude-billing] remote profile retirement deferred', {
+              error: error instanceof Error ? error.name : 'unknown',
+            });
+          }
+        );
       }
       return await buildScopeStatus(userId, owner, canManage);
     }),

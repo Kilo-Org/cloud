@@ -16,6 +16,10 @@ import {
   shareClaudeBillingConnection,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import {
+  isClaudeOperatorConfigured,
+  unlinkClaudeUserProfile,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
+import {
   ClaudeProfileDeletionError,
   cleanupRemovedClaudeProfilesForUser,
   deleteUserClaudeProfiles,

@@ -1,4 +1,4 @@
-import { usePreventRemove, useRouter } from 'expo-router';
+import { type Href, usePreventRemove, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -30,7 +30,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { getProfilesPath } from '@/lib/profile-agent-navigation';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -57,18 +56,28 @@ function CommandsSkeleton() {
 export function ProfileCommandsScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /**
+   * The Profiles list of the stack that mounted this screen: the screen's own
+   * "no history" destination, since both the Profile tab and the app-level
+   * Manage Profiles stack render it.
+   */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const router = useRouter();
   // A cold link can render this route with nothing beneath it: Back then lands
-  // on the Profiles list instead of unwinding the stack.
+  // on the mounting stack's Profiles list instead of unwinding the stack.
   const leaveScreen = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
       return;
     }
-    router.dismissTo(getProfilesPath());
-  }, [router]);
+    router.dismissTo(backFallback);
+  }, [router, backFallback]);
   const colors = useThemeColors();
   const commandsQuery = useAgentProfileCommands(profileId, organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
@@ -341,6 +350,7 @@ export function ProfileCommandsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.commandsTitle')}
+        backFallback={backFallback}
         onBack={leaveScreen}
       />
       <TabScreenScrollView

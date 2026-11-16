@@ -3,14 +3,17 @@ import type { OrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/g
 import { isOrganizationFeatureEnabled } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import { getDomain } from 'tldts';
 
 export type ManagedGatewayId = 'openrouter';
 
 /**
  * The organization's advanced gateway policies, as they apply to requests Kilo pays for. A user's
- * own BYOK key (a provider key, or an OpenRouter or Vercel AI Gateway key) is exempt from both,
- * and so are autocomplete (FIM) and edit completions, which never call these handlers' policy.
+ * own BYOK key (a provider key, or an OpenRouter or Vercel AI Gateway key) is exempt from both, as
+ * are a linked ChatGPT subscription or Claude billing connection, and autocomplete (FIM) and edit
+ * completions, which go straight to their providers without this policy.
  *
  * Neither policy changes the model lists the model endpoints return. That is a deliberate
  * limitation until end users ask for it; see `packages/web-shared/AGENTS.md`.
@@ -78,13 +81,23 @@ export type GatewayPolicyRoute = {
   userByok: readonly BYOKResult[] | null;
 };
 
-function isUserByokRoute(route: Pick<GatewayPolicyRoute, 'userByok'>): boolean {
-  return !!route.userByok && route.userByok.length > 0;
+/**
+ * Whether the user's own credential pays for the route: a BYOK key, or a linked ChatGPT
+ * subscription or Claude billing connection, which usage accounting treats the same way.
+ */
+function isUserPaidRoute(
+  route: Pick<GatewayPolicyRoute, 'userByok'> & { provider: Pick<Provider, 'type'> }
+): boolean {
+  return (
+    (!!route.userByok && route.userByok.length > 0) ||
+    route.provider.type === OPENAI_CHATGPT_PROVIDER_ID ||
+    route.provider.type === CLAUDE_BILLING_PROVIDER_ID
+  );
 }
 
 /**
- * Why the gateway settings refuse a route, or null when it may serve the request. A user's own
- * BYOK key is never refused. Otherwise an inference region admits only Kilo's Vercel AI Gateway,
+ * Why the gateway settings refuse a route, or null when it may serve the request. A route the
+ * user's own credential pays for is never refused. Otherwise an inference region admits only Kilo's Vercel AI Gateway,
  * and a disabled OpenRouter refuses OpenRouter and any upstream URL on its domain.
  */
 export function getGatewaySettingsRefusal(
@@ -94,7 +107,7 @@ export function getGatewaySettingsRefusal(
   | { kind: 'inference-region'; region: OrganizationDataRegion }
   | { kind: ManagedGatewayId }
   | null {
-  if (isUserByokRoute(route)) return null;
+  if (isUserPaidRoute(route)) return null;
   if (settings.dataRegion && route.provider.type !== 'vercel') {
     return { kind: 'inference-region', region: settings.dataRegion };
   }
@@ -113,6 +126,6 @@ export function getRouteInferenceRegion(
   settings: OrganizationGatewaySettings,
   route: Pick<GatewayPolicyRoute, 'userByok'> & { provider: Pick<Provider, 'type'> }
 ): OrganizationDataRegion | null {
-  if (isUserByokRoute(route) || route.provider.type !== 'vercel') return null;
+  if (isUserPaidRoute(route) || route.provider.type !== 'vercel') return null;
   return settings.dataRegion;
 }

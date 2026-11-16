@@ -32,8 +32,13 @@ import {
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
+  VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { parseUsageWithRecovery } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import {
+  computeVercelCostFields,
+  extractVercelIsByok,
+  parseUsageWithRecovery,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   fetchGeneration,
   fetchUpstream,
@@ -81,7 +86,8 @@ const vercelGenerationIdSchema = z.object({
 /**
  * The Vercel AI Gateway's System One response: TypeSafe's shape with the cost and generation id
  * under `provider_metadata.gateway`. Normalizes to the OpenRouter-compatible body the gateway
- * returns to its callers, and reports the market cost separately so it never reaches them.
+ * returns to its callers, with the cost chat and embeddings bill for Vercel (see
+ * `computeVercelCostFields`), and reports the cost fields separately for the ledger row.
  */
 const vercelSystemOneResponseSchema = z
   .looseObject({
@@ -96,15 +102,19 @@ const vercelSystemOneResponseSchema = z
       }),
     }),
   })
-  .transform(({ provider_metadata: { gateway }, ...body }) => ({
-    marketCost: gateway.marketCost === undefined ? undefined : Number(gateway.marketCost),
-    body: {
-      ...body,
-      id: gateway.generationId,
-      provider: gateway.routing?.finalProvider,
-      usage: { ...body.usage, cost: Number(gateway.cost) },
-    },
-  }));
+  .transform(({ provider_metadata: { gateway }, ...body }) => {
+    const vercelGateway = gateway as NonNullable<VercelProviderMetaData['gateway']>;
+    const costFields = computeVercelCostFields(vercelGateway, extractVercelIsByok(vercelGateway));
+    return {
+      costFields,
+      body: {
+        ...body,
+        id: gateway.generationId,
+        provider: gateway.routing?.finalProvider,
+        usage: { ...body.usage, cost: costFields.cost_mUsd / 1_000_000 },
+      },
+    };
+  });
 
 function generationIdOf(
   body: z.infer<typeof generationIdSchema> | z.infer<typeof vercelGenerationIdSchema>
@@ -201,7 +211,11 @@ export async function handleSystemOneRequest(request: NextRequest) {
     modelType: 'evaluation',
     user,
     organizationId,
-    allowedProviders: organizationDecision?.eligibleProviderRoutes,
+    // A denied model leaves no provider allowed, as on chat; the preferences check rejects it.
+    allowedProviders:
+      organizationDecision && !organizationDecision.allowed
+        ? new Set()
+        : organizationDecision?.eligibleProviderRoutes,
     openRouterDisabled: gatewaySettings.openRouterDisabled,
   });
   const gatewayRejection = gatewaySettingsRejection(gatewaySettings, route);
@@ -519,7 +533,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   let responseBody: unknown;
   let bodyRead = false;
   let answer: z.infer<typeof systemOneResponseSchema> | undefined;
-  let marketCost: number | undefined;
+  let vercelCostFields: z.infer<typeof vercelSystemOneResponseSchema>['costFields'] | undefined;
   const context = usageContextOf(response.status, ttfbMs);
   const stats = await parseUsageWithRecovery(response, context, async () => {
     responseBody = await response.json();
@@ -527,7 +541,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     if (isVercelRoute) {
       const normalized = vercelSystemOneResponseSchema.parse(responseBody);
       answer = systemOneResponseSchema.parse(normalized.body);
-      marketCost = normalized.marketCost;
+      vercelCostFields = normalized.costFields;
     } else {
       answer = systemOneResponseSchema.parse(responseBody);
     }
@@ -569,12 +583,13 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse('Invalid upstream response', 'upstream_error', 502);
   }
 
-  const cost = toMicrodollars(answer.usage.cost);
-  stats.cost_mUsd = cost;
-  stats.market_cost =
-    marketCost !== undefined && Number.isFinite(marketCost) && marketCost >= 0
-      ? toMicrodollars(marketCost)
-      : cost;
+  if (vercelCostFields) {
+    stats.cost_mUsd = vercelCostFields.cost_mUsd;
+    stats.nonInferenceCost_mUsd = vercelCostFields.nonInferenceCost_mUsd;
+  } else {
+    stats.cost_mUsd = toMicrodollars(answer.usage.cost);
+  }
+  stats.market_cost = stats.cost_mUsd;
   // Keeps the provider cost as `market_cost`, then applies custom pricing and zeroes a free model.
   applyUsagePricing(stats, context, customPricingConfig);
   after(async () => {

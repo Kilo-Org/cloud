@@ -10,8 +10,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   byokOwner,
-  getBYOKforOrganization,
-  getBYOKforUser,
   getByokCredentials,
   getByokKeyStates,
   getStoredByokKeys,
@@ -27,7 +25,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   classifyRequestedModel,
-  getAllowedGatewayRoutedByokProviders,
   isKeyPlanStep,
   planRoutes,
   type GatewayByokPlanStep,

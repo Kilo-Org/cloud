@@ -218,14 +218,17 @@ describe('resolveUsageEndpointRoute', () => {
       expect(decrypt.mock.calls).toEqual([['openrouter']]);
     });
 
-    it('falls through to a provider key ranked after it', async () => {
+    it('falls through to a key ranked after it when Vercel does not serve the model', async () => {
       mockedGetModelInferenceUserByokProviders.mockResolvedValue(['mistral']);
-      storeKeys(key('vercel-ai-gateway', { priority: 0 }), key('mistral', { priority: 1 }));
+      storeKeys(
+        key('vercel-ai-gateway', { priority: 0 }),
+        key('mistral', { priority: 1 }),
+        key('openrouter', { priority: 2 })
+      );
 
       const route = await resolveEmbedding();
 
-      expect(route.provider).toBe(VERCEL_AI_GATEWAY);
-      expect(route.userByok).toEqual([credential('mistral')]);
+      expect(route.provider).toMatchObject({ type: 'openrouter', apiKey: 'sk-openrouter' });
     });
 
     it('takes precedence over the OpenRouter key by default when Vercel serves the model', async () => {
@@ -251,6 +254,7 @@ describe('resolveUsageEndpointRoute', () => {
     it('route through Kilo’s Vercel AI Gateway with every provider key', async () => {
       mockedGetModelInferenceUserByokProviders.mockResolvedValue(['mistral', 'codestral']);
       const decrypt = storeKeys(key('mistral'), key('codestral'), key('openrouter'));
+      vercelServes('embedding', vercelModelId);
 
       const route = await resolveEmbedding();
 
@@ -277,11 +281,20 @@ describe('resolveUsageEndpointRoute', () => {
     it('are ignored when disabled', async () => {
       mockedGetModelInferenceUserByokProviders.mockResolvedValue(['mistral', 'codestral']);
       storeKeys(key('mistral', { isEnabled: false }), key('codestral'));
+      vercelServes('embedding', vercelModelId);
 
       const route = await resolveEmbedding();
 
       expect(route.provider).toBe(VERCEL_AI_GATEWAY);
       expect(route.userByok).toEqual([credential('codestral')]);
+    });
+
+    it('are skipped when Vercel does not list the mapped model with the endpoint type', async () => {
+      mockedGetModelInferenceUserByokProviders.mockResolvedValue(['mistral']);
+      storeKeys(key('mistral'));
+      vercelServes('language', vercelModelId);
+
+      expect(await resolveEmbedding()).toEqual({ provider: OPENROUTER, userByok: null });
     });
 
     it('are ignored when no inference provider of the model matches them', async () => {
@@ -304,6 +317,7 @@ describe('resolveUsageEndpointRoute', () => {
     it('are limited to the providers the organization allows', async () => {
       mockedGetModelInferenceUserByokProviders.mockResolvedValue(['openai']);
       storeKeys(key('openai'));
+      vercelServes('embedding', vercelModelId);
 
       const denied = await resolveEmbedding({ allowedProviders: new Set(['azure']) });
       expect(denied).toEqual({ provider: OPENROUTER, userByok: null });

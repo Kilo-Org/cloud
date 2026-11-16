@@ -88,7 +88,8 @@ An enterprise organization's Advanced policies (`disable_openrouter`, `data_regi
 see `providers/organization-gateway-settings.ts`) apply only to requests Kilo pays for.
 A set inference region admits only Kilo's Vercel AI Gateway route, pinned to the region,
 and also disables OpenRouter. User BYOK routes (provider keys through Vercel, OpenRouter
-and Vercel AI Gateway keys, direct BYOK) are exempt and never get a region. FIM and edit
+and Vercel AI Gateway keys, direct BYOK) and linked ChatGPT or Claude billing
+connections are exempt and never get a region. FIM and edit
 completions go straight to their providers and are exempt. A disabled OpenRouter also
 lifts Kilo's Vercel opt-out list for that request, as a user's own Vercel AI Gateway key
 always does.

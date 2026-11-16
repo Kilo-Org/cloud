@@ -68,12 +68,13 @@ async function loadEnabledKeysInRouteOrder(
  * Picks the route of an embeddings or System One request. In the owner's BYOK route order, the
  * first enabled key that serves the model takes it:
  *
- * - a provider key the Vercel AI Gateway serves the model with; every such key of the owner then
- *   travels with the request, as chat's Vercel BYOK route does,
+ * - a provider key the Vercel AI Gateway serves the mapped model with; every such key of the owner
+ *   then travels with the request, as chat's Vercel BYOK route does,
  * - the owner's OpenRouter key, which serves any model OpenRouter does,
  * - the owner's Vercel AI Gateway key, when Vercel serves the mapped model.
  *
- * Direct BYOK keys never serve these endpoints. Free models are Kilo-funded, so no key serves them.
+ * Direct BYOK keys never serve these endpoints. Free models are Kilo-funded, so gateway keys never
+ * serve them, as on chat.
  * Without a key Kilo pays: through OpenRouter, or through Kilo's Vercel AI Gateway when the
  * organization disabled OpenRouter and Vercel serves the mapped model. Kilo's Vercel opt-out list
  * does not apply to these endpoints; the gateway settings decide afterwards whether the route may
@@ -117,10 +118,14 @@ export async function resolveUsageEndpointRoute(input: {
             userByok: [credential],
           };
         }
+        if (!(await servesOnVercel())) continue;
         const providerKeys = candidates.filter(
           candidate => !isGatewayUserByokProviderId(candidate.providerId)
         );
-        return { provider: VERCEL_AI_GATEWAY, userByok: await Promise.all(providerKeys.map(decrypt)) };
+        return {
+          provider: VERCEL_AI_GATEWAY,
+          userByok: await Promise.all(providerKeys.map(decrypt)),
+        };
       }
     }
   }

@@ -176,12 +176,24 @@ describe('gateway settings routes', () => {
       ['openrouter', openRouter],
       ['custom', custom],
       ['custom at openrouter.ai', customAtOpenRouter],
-      ['claude-billing', claudeBilling],
     ] as const)('refuses a %s route under an inference region', (_name, route) => {
       expect(getGatewaySettingsRefusal(euRegion, route)).toEqual({
         kind: 'inference-region',
         region: 'eu',
       });
+    });
+
+    it.each([
+      ['claude-billing', claudeBilling],
+      [
+        'openai-chatgpt',
+        {
+          provider: { type: 'openai-chatgpt', apiUrl: 'https://chatgpt.com/backend-api' },
+          userByok: null,
+        },
+      ],
+    ] as const)('admits a %s route the user pays for under an inference region', (_name, route) => {
+      expect(getGatewaySettingsRefusal(euRegion, route)).toBeNull();
     });
 
     it('admits Kilo’s Vercel AI Gateway route under an inference region', () => {

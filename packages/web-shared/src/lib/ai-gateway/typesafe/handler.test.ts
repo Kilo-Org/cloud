@@ -1965,7 +1965,7 @@ describe('handleSystemOneRequest', () => {
       });
       await runAfter();
       expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
-        expect.objectContaining({ cost_mUsd: 124, is_byok: false }),
+        expect.objectContaining({ cost_mUsd: 200, is_byok: false }),
         expect.objectContaining({
           provider: 'vercel',
           user_byok: false,
@@ -2024,7 +2024,7 @@ describe('handleSystemOneRequest', () => {
         model: TYPESAFE_MODEL,
         provider: 'typesafe-ai',
         answers: upstreamBody.answers,
-        usage: { input_tokens: 23, output_tokens: 7, cost: 0.000124, is_byok: false },
+        usage: { input_tokens: 23, output_tokens: 7, cost: 0.0002, is_byok: false },
       });
       await runAfter();
       expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
@@ -2032,7 +2032,7 @@ describe('handleSystemOneRequest', () => {
           messageId: 'gen_vercel_systemone',
           model: VERCEL_SYSTEM_ONE_MODEL,
           inference_provider: 'typesafe-ai',
-          cost_mUsd: 124,
+          cost_mUsd: 200,
           market_cost: 200,
           inputTokens: 23,
           outputTokens: 7,

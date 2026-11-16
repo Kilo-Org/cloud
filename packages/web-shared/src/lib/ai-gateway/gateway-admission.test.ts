@@ -490,7 +490,6 @@ describe('gatewaySettingsRejection', () => {
   it.each([
     { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
     { type: 'custom', apiUrl: 'https://llm.example.com/v1' },
-    { type: 'claude-billing', apiUrl: 'https://api.anthropic.com/v1' },
   ] as const)('rejects a $type provider under an inference region', async provider => {
     const response = gatewaySettingsRejection(euRegion, { provider, userByok: null });
 

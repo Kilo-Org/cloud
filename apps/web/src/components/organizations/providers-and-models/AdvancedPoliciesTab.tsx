@@ -140,6 +140,15 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
           </ul>
         </div>
 
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Requests that need OpenRouter</h3>
+          <p className="text-muted-foreground text-sm">
+            Voice transcription and requests with a per-request spending limit run only through
+            OpenRouter. While OpenRouter is off or an inference region is selected, they return an
+            error unless they use your organization&apos;s own OpenRouter key.
+          </p>
+        </div>
+
         {!canEdit && (
           <p className="text-muted-foreground text-sm">
             Only organization owners and admins can change advanced policies.

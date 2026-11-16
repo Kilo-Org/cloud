@@ -90,7 +90,9 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
   }) {
     const decision = await organizationDecision();
     return await getEmbeddingProvider(requestedModelLowerCased, user, organizationId, {
-      allowedProviders: decision?.eligibleProviderRoutes,
+      // A denied model leaves no provider allowed, as on chat; the pipeline then rejects it.
+      allowedProviders:
+        decision && !decision.allowed ? new Set() : decision?.eligibleProviderRoutes,
       openRouterDisabled: gatewaySettings.openRouterDisabled,
     });
   },

@@ -280,7 +280,7 @@ const MANAGED_GATEWAY_NAMES = {
 } as const satisfies Record<ManagedGatewayId, string>;
 
 const ADVANCED_POLICIES_HINT =
-  'Add your own key (BYOK), or ask an organization admin to review the Advanced policies on the Providers & Models page.';
+  'Select a model the Vercel AI Gateway offers, add your own key (BYOK), or ask an organization admin to review the Advanced policies on the Providers & Models page.';
 
 export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
   const error = `This request would be routed through ${MANAGED_GATEWAY_NAMES[gateway]}, which your organization has disabled.`;
@@ -288,7 +288,7 @@ export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
     {
       error,
       error_type: ProxyErrorType.provider_not_allowed,
-      message: `${error} Select another model. ${ADVANCED_POLICIES_HINT}`,
+      message: `${error} ${ADVANCED_POLICIES_HINT}`,
     },
     { status: 403 }
   );
@@ -300,7 +300,7 @@ export function inferenceRegionRefusedResponse(region: OrganizationDataRegion) {
     {
       error,
       error_type: ProxyErrorType.provider_not_allowed,
-      message: `${error} Select a model available through the Vercel AI Gateway. ${ADVANCED_POLICIES_HINT}`,
+      message: `${error} In that region, requests paid with Kilo credits run only through the Vercel AI Gateway. ${ADVANCED_POLICIES_HINT}`,
     },
     { status: 403 }
   );

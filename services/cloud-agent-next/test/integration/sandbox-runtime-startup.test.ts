@@ -222,7 +222,7 @@ async function requestPrepare(h: Harness, options: PrepareOptions = {}) {
       userId: 'user_123',
       kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
       kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-      orgId: options.orgId ?? 'org_123',
+      orgId: options.orgId,
       ...(options.createdOnPlatform === undefined
         ? {}
         : { createdOnPlatform: options.createdOnPlatform }),
@@ -481,6 +481,9 @@ describe('downloaded startup in the allocation owner', () => {
         await prepare(h, { ...isolatedTarget, orgId });
         expect(harnessOf(h, 0)).toBe('kilo2');
         await runInDurableObject(h.stub, async (_instance, state) => {
+          const route = await readRoute(drizzle(state.storage), SESSION);
+          expect(route?.credentialSource).toMatchObject({ billingOrigin: 'cloud-agent-web' });
+          expect(route?.credentialSource?.orgId).toBe(orgId);
           expect(await state.storage.get('runtime_harness')).toBe('kilo2');
         });
       }

@@ -2,11 +2,8 @@
 // free of any react-native/expo imports so it can be unit tested directly.
 
 import { parseRetryAfterMs } from '@/lib/auth/auth-response-class';
-import {
-  type DeviceAuthError,
-  deviceAuthErrorKey,
-  deviceAuthErrorText,
-} from '@/lib/auth/device-auth-state';
+import { type DeviceAuthError, deviceAuthErrorKey } from '@/lib/auth/device-auth-state';
+import { parseAuthError } from '@/lib/auth/native-auth-contract';
 
 type PollOutcome =
   | { readonly status: 'approved' }
@@ -46,13 +43,13 @@ export function classifyPollResponse(
 }
 
 /**
- * The device-auth start 429 refusal. The server's own body text has no
- * catalog key, so it flows through as text; the fallback translates at
- * render from its key.
+ * The device-auth start refusal, read from its stable code. The server's own
+ * sentence is never shown: the catalog owns the copy in the active language.
  */
-export function getDeviceAuth429Error(body: { error?: string } | undefined): DeviceAuthError {
-  if (body?.error) {
-    return deviceAuthErrorText(body.error);
-  }
-  return deviceAuthErrorKey('authErrors.tooManySignInAttempts');
+export function getDeviceAuthStartRefusalError(body: unknown): DeviceAuthError {
+  return deviceAuthErrorKey(
+    parseAuthError(body)?.code === 'RATE_LIMITED'
+      ? 'authErrors.tooManySignInAttempts'
+      : 'authErrors.startSignInFailed'
+  );
 }

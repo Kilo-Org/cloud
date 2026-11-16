@@ -4,7 +4,7 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
+import { getDeviceAuthStartRefusalError } from '@/lib/auth/poll-response';
 import {
   buildDeviceAuthPollRequest,
   parseDeviceAuthTokenResponse,
@@ -61,29 +61,32 @@ describe('device-auth polling request', () => {
   });
 });
 
-// --- Existing 429 tests (unchanged) ---
+// --- Device-auth start refusals ---
 
-describe('use-device-auth start path — 429 rate-limit message', () => {
-  it('carries the server error field as untranslated text', () => {
+describe('use-device-auth start path — 429 rate-limit refusal', () => {
+  it('reads the stable RATE_LIMITED code and ignores the server sentence', () => {
     const serverBody = {
-      error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.',
+      error: 'RATE_LIMITED',
+      message: 'x',
+      retryAfterSeconds: 30,
     };
-    const error = getDeviceAuth429Error(serverBody);
-    expect(error).toEqual({ kind: 'text', text: serverBody.error });
-  });
-
-  it('falls back to the catalog key when the server body has no error field', () => {
-    const serverBody: { error?: string } = {};
-    expect(getDeviceAuth429Error(serverBody)).toEqual({
+    expect(getDeviceAuthStartRefusalError(serverBody)).toEqual({
       kind: 'key',
       key: 'authErrors.tooManySignInAttempts',
     });
   });
 
-  it('falls back to the catalog key when JSON parsing fails', () => {
-    expect(getDeviceAuth429Error(undefined)).toEqual({
+  it('falls back to the generic start failure when the body has no error field', () => {
+    expect(getDeviceAuthStartRefusalError({ message: 'x' })).toEqual({
       kind: 'key',
-      key: 'authErrors.tooManySignInAttempts',
+      key: 'authErrors.startSignInFailed',
+    });
+  });
+
+  it('falls back to the generic start failure when the body is unparseable', () => {
+    expect(getDeviceAuthStartRefusalError(undefined)).toEqual({
+      kind: 'key',
+      key: 'authErrors.startSignInFailed',
     });
   });
 });

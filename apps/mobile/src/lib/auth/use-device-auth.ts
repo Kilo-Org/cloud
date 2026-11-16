@@ -3,7 +3,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 import { openAuthBrowser, resolveAuthBrowserKind } from '@/lib/auth/auth-browser';
-import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
+import { getDeviceAuthStartRefusalError } from '@/lib/auth/poll-response';
 import { parseAuthError, parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
@@ -169,10 +169,10 @@ export function useDeviceAuth(): DeviceAuthResult {
 
         if (!response.ok) {
           if (response.status === 429) {
-            const body = (await response.json().catch(() => undefined)) as
-              | { error?: string }
-              | undefined;
-            setState(errorDeviceAuthState(undefined, getDeviceAuth429Error(body), undefined));
+            const body = await response.json().catch(() => undefined);
+            setState(
+              errorDeviceAuthState(undefined, getDeviceAuthStartRefusalError(body), undefined)
+            );
             return;
           }
           // A link that lapsed or was used elsewhere cannot start a browser sign-in. The

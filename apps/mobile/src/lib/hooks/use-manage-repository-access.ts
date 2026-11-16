@@ -15,6 +15,7 @@ import { trpcClient } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { isPersonal } from './use-code-reviewer';
+import { isInstallStateRefusal } from '@/components/security-agent/scope-entry-render';
 
 /**
  * The longest the control draws its own busy state. The install state is one
@@ -45,6 +46,13 @@ export type ManageRepositoryAccess = {
 type ManageRepositoryAccessHandlers = {
   /** A launch is starting, before the install state is minted. */
   onOpen?: () => void;
+  /**
+   * The server refused the organization's install-state mint for this reader's
+   * role. A caller that passes this handler presents the refusal itself, so
+   * nothing opens and no page is offered that the role cannot act on; a caller
+   * without it keeps the settings-page fallback below.
+   */
+  onRoleRefused?: () => void;
   /**
    * The browser wait settled. `opened` is false when the mint or the launch
    * failed, so a caller that explains a fix in place can keep that explanation
@@ -94,7 +102,7 @@ export function useManageRepositoryAccess(
   // The attempt ids grow monotonically, so a settled attempt is recognised by id.
   const attempts = useRef(0);
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { onOpen, onReturn } = handlers;
+  const { onOpen, onReturn, onRoleRefused } = handlers;
 
   const move = useCallback((next: HandoffPhase) => {
     phaseRef.current = next;
@@ -150,9 +158,15 @@ export function useManageRepositoryAccess(
         // already has an active GitHub App connection is refused with
         // `FORBIDDEN`. Neither can mint a token, and the settings page still
         // works without one: it mints its own state for the signed-in web user.
-        // Both therefore hand the reader to that page instead of an error
-        // toast, which would leave the control inert in exactly the state that
-        // needs a route to it.
+        // A caller that presents refusals itself takes the role's answer here
+        // instead, and nothing opens — a refused role should not be handed a
+        // page it cannot act on. Everything else keeps the page fallback in
+        // place of a toast that would leave the control inert in exactly the
+        // state that needs a route to it.
+        if (orgScope && onRoleRefused && isInstallStateRefusal(error)) {
+          onRoleRefused();
+          return false;
+        }
         const code = readTrpcErrorField(error, 'code');
         if (orgScope && (code === 'FORBIDDEN' || code === 'UNAUTHORIZED')) {
           const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope));
@@ -167,7 +181,7 @@ export function useManageRepositoryAccess(
       return opened;
     }
     return false;
-  }, [orgScope, platform, t]);
+  }, [orgScope, onRoleRefused, platform, t]);
 
   const handlePress = useCallback(() => {
     if (phaseRef.current.kind === 'busy') {

@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { RoleRefusalNotice } from '@/components/security-agent/role-refusal-notice';
-import { useRepositoryAccess } from '@/components/security-agent/use-repository-access';
+import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
@@ -78,12 +78,27 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const { accessRefused, manageAccess } = useRepositoryAccess({
-    scope,
-    refetch: async () => {
-      await repositories.refetch();
+  // The scope whose mint the server refused for this reader's role. Stored by
+  // scope rather than as a bare flag: a refusal recorded for one scope must not
+  // answer for another if the router reuses this component instance.
+  const [refusedScope, setRefusedScope] = useState<string | null>(null);
+  const manageAccess = useManageRepositoryAccess(scope, 'github', {
+    // A refused role is the answer this screen presents itself: the notice below
+    // stands in the control's place, no page opens, and the list is not read
+    // again — nothing the reader could have changed changed.
+    onRoleRefused: () => {
+      setRefusedScope(scope);
+    },
+    // The GitHub settings page is where installation access is widened, and
+    // reading the repository list again once the browser settles is what makes
+    // a widened grant appear here.
+    onReturn: opened => {
+      if (opened) {
+        void repositories.refetch();
+      }
     },
   });
+  const accessRefused = refusedScope === scope;
   // The saved baseline the draft is compared against. State rather than a ref:
   // a successful save must re-render, so `dirty` (and the back guard that
   // reads it) reflects the saved values by the time the header action leaves.
@@ -293,7 +308,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                     // page beside it.
                     variant="default"
                     onPress={() => {
-                      void manageAccess();
+                      manageAccess?.handlePress();
                     }}
                   >
                     <Text>{t('securityAgent.repositories.manageAccess')}</Text>

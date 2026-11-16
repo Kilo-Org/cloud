@@ -76,7 +76,11 @@ export function accessMocks() {
 
 export type HookResult = ManageRepositoryAccess | undefined;
 
-export type Handlers = { onOpen?: () => void; onReturn?: (opened: boolean) => void };
+export type Handlers = {
+  onOpen?: () => void;
+  onReturn?: (opened: boolean) => void;
+  onRoleRefused?: () => void;
+};
 
 function Harness({
   scope,

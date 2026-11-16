@@ -222,7 +222,7 @@ describe('useManageRepositoryAccess', () => {
     expect(requireHook(resultRef).pending).toBe(false);
   });
 
-  // The organization's mint is narrower than the screens that offer this
+  // An organization's mint is narrower than the screens that offer this
   // control: a member is refused with UNAUTHORIZED, and an installation that
   // cannot take another one with FORBIDDEN. Neither can mint a token, and the
   // page works without one — so the tap opens it rather than answering nothing
@@ -244,6 +244,84 @@ describe('useManageRepositoryAccess', () => {
       expect(mocks.toastError).not.toHaveBeenCalled();
     });
   }
+
+  // A caller that can present refusals itself takes the role's answer instead of
+  // the page: nothing opens, the list is not resynced, and no error is toasted —
+  // the caller renders the refusal in the control's place.
+  it('hands a role refusal to the caller and opens nothing', async () => {
+    mocks.mintInstallState.mockRejectedValue(
+      Object.assign(new Error('mint refused'), { data: { code: 'UNAUTHORIZED' } })
+    );
+    const onRoleRefused = vi.fn<() => void>();
+    const onReturn = vi.fn<(opened: boolean) => void>();
+    const resultRef = mountHook('org_123', 'github', { onReturn, onRoleRefused });
+
+    await act(() => {
+      requireHook(resultRef).handlePress();
+    });
+
+    await vi.waitFor(() => {
+      expect(onRoleRefused).toHaveBeenCalledTimes(1);
+    });
+    expect(onReturn).toHaveBeenCalledWith(false);
+    expect(mocks.launch).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(requireHook(resultRef).pending).toBe(false);
+  });
+
+  // The single-installation guard and a lost session are not the role answer:
+  // the plain settings page mints its own state for the signed-in user, so the
+  // caller that presents refusals still hands the reader to it for these.
+  for (const failure of [
+    {
+      name: 'an organization that already holds an installation',
+      error: { data: { code: 'FORBIDDEN' } },
+    },
+    {
+      name: 'a missing or invalid session',
+      error: Object.assign(new Error('session expired'), {
+        data: { code: 'UNAUTHORIZED', authRequired: true },
+      }),
+    },
+  ]) {
+    it(`keeps the settings-page fallback for ${failure.name}`, async () => {
+      mocks.mintInstallState.mockRejectedValue(failure.error);
+      const onRoleRefused = vi.fn<() => void>();
+      const onReturn = vi.fn<(opened: boolean) => void>();
+      const resultRef = mountHook('org_123', 'github', { onReturn, onRoleRefused });
+
+      await act(() => {
+        requireHook(resultRef).handlePress();
+      });
+
+      await vi.waitFor(() => {
+        expect(onReturn).toHaveBeenCalledWith(true);
+      });
+      expect(onRoleRefused).not.toHaveBeenCalled();
+      expect(mocks.launch).toHaveBeenCalledWith('https://app.example.com/org_123');
+      expect(mocks.toastError).not.toHaveBeenCalled();
+    });
+  }
+
+  // A caller without the handler keeps the page fallback for a role refusal:
+  // nothing there names the refusal, and the page is the route the control has.
+  it('keeps the settings-page fallback for a role refusal without the handler', async () => {
+    mocks.mintInstallState.mockRejectedValue(
+      Object.assign(new Error('mint refused'), { data: { code: 'UNAUTHORIZED' } })
+    );
+    const onReturn = vi.fn<(opened: boolean) => void>();
+    const resultRef = mountHook('org_123', 'github', { onReturn });
+
+    await act(() => {
+      requireHook(resultRef).handlePress();
+    });
+
+    await vi.waitFor(() => {
+      expect(onReturn).toHaveBeenCalledWith(true);
+    });
+    expect(mocks.launch).toHaveBeenCalledWith('https://app.example.com/org_123');
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
 
   // A personal scope has no page-level fallback to reach: the page mints its
   // own state for a signed-in user, and a personal mint failure still has to be

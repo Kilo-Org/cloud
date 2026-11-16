@@ -35,9 +35,16 @@ const capability = vi.hoisted(() => ({ canManage: true }));
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
-const manageAccess = vi.hoisted(() => ({
-  openExternalUrl: vi.fn<(url: string, options?: unknown) => Promise<void>>(),
-  mintInstallState: vi.fn<() => Promise<{ token: string }>>(),
+// The screen mounts the shared Manage-access hook (`useManageRepositoryAccess`);
+// its own classification suite covers the mint's answers, so this suite stubs
+// the hook and drives the handlers the screen wired.
+const access = vi.hoisted(() => ({
+  handlePress: vi.fn(),
+  pending: false,
+  handlers: null as null | {
+    onRoleRefused?: () => void;
+    onReturn?: (opened: boolean) => void;
+  },
 }));
 
 vi.mock('react-native', () => ({
@@ -105,11 +112,17 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
     dialog: null,
   }),
 }));
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: manageAccess.mintInstallState } } },
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
+  useManageRepositoryAccess: (
+    _scope: string,
+    _platform: 'github',
+    handlers: NonNullable<typeof access.handlers>
+  ) => {
+    access.handlers = handlers;
+    return { handlePress: access.handlePress, pending: access.pending };
+  },
 }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: manageAccess.openExternalUrl }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
 }));
@@ -154,12 +167,6 @@ const THREE_REPOS: readonly [RepoRow, RepoRow, RepoRow] = [
   { id: 2, fullName: 'acme/two', private: true },
   { id: 3, fullName: 'acme/three', private: false },
 ];
-
-// The shape a tRPC client rejection carries: the error code and its `data`
-// payload travel on the error object, not in the message.
-function mintFailure(code: string, data: Record<string, unknown> = {}): Error {
-  return Object.assign(new Error('mint refused'), { data: { code, ...data } });
-}
 
 function configData(mode: 'all' | 'selected', selectedRepositoryIds: number[] = []) {
   return { isEnabled: true, repositorySelectionMode: mode, selectedRepositoryIds };
@@ -230,13 +237,12 @@ function emptyStateActionVariant(renderer: TestRenderer.ReactTestRenderer): unkn
   return props.variant;
 }
 
-// Presses the action and lets the mint → launch → refetch chain settle.
-async function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
+// Presses the action; the wired handler is the stubbed `handlePress`, so no
+// async chain has to settle.
+function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   const onPress = emptyStateAction(renderer);
   act(onPress);
-  await vi.waitFor(() => {
-    expect(manageAccess.mintInstallState).toHaveBeenCalled();
-  });
+  expect(access.handlePress).toHaveBeenCalledTimes(1);
 }
 
 beforeEach(() => {
@@ -259,10 +265,9 @@ beforeEach(() => {
   saveButton.onSave = null;
   repositories.refetch.mockReset();
   repositories.refetch.mockResolvedValue(undefined);
-  manageAccess.mintInstallState.mockReset();
-  manageAccess.mintInstallState.mockResolvedValue({ token: 'install-state' });
-  manageAccess.openExternalUrl.mockReset();
-  manageAccess.openExternalUrl.mockResolvedValue(undefined);
+  access.handlePress.mockReset();
+  access.pending = false;
+  access.handlers = null;
 });
 
 afterEach(() => {
@@ -405,25 +410,25 @@ describe('RepositorySettingsScreen repository picker', () => {
     repositories.data = [];
     const { renderer } = await mount();
 
-    await pressEmptyStateAction(renderer);
+    pressEmptyStateAction(renderer);
 
-    expect(manageAccess.openExternalUrl).toHaveBeenCalledTimes(1);
-    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-      'https://settings.test/github-app?installState=install-state&fromApp=1'
-    );
-    await vi.waitFor(() => {
-      expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    act(() => {
+      access.handlers?.onReturn?.(true);
     });
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
   });
 
+  // The list is read again on the return edge only when a page the reader could
+  // have changed actually opened; a launch that failed offers no change to catch.
   it('does not read the repositories when no settings page was opened', async () => {
     repositories.data = [];
-    manageAccess.mintInstallState.mockRejectedValueOnce(new Error('mint refused'));
     const { renderer } = await mount();
 
-    await pressEmptyStateAction(renderer);
+    pressEmptyStateAction(renderer);
 
-    expect(manageAccess.openExternalUrl).not.toHaveBeenCalled();
+    act(() => {
+      access.handlers?.onReturn?.(false);
+    });
     expect(repositories.refetch).not.toHaveBeenCalled();
   });
 
@@ -432,77 +437,54 @@ describe('RepositorySettingsScreen repository picker', () => {
   // read again.
   it('shows the role notice in place of the action when the server answers for the role', async () => {
     repositories.data = [];
-    manageAccess.mintInstallState.mockRejectedValueOnce(mintFailure('UNAUTHORIZED'));
     const { renderer } = await mount('org_123');
 
-    await pressEmptyStateAction(renderer);
+    pressEmptyStateAction(renderer);
+    act(() => {
+      access.handlers?.onRoleRefused?.();
+    });
 
     const notice = i18n.t('securityAgent.scopeEntry.connectOwnerOnly', {
       platform: i18n.t('common.github'),
     });
-    await vi.waitFor(() => {
-      expect(textContents(renderer)).toContain(notice);
-    });
+    expect(textContents(renderer)).toContain(notice);
     const action = renderer.root.find(node => String(node.type) === 'EmptyState').props.action as {
       type: unknown;
       props: Record<string, unknown>;
     };
     expect(action.type).not.toBe('Button');
     expect(action.props).not.toHaveProperty('onPress');
-    expect(manageAccess.openExternalUrl).not.toHaveBeenCalled();
     expect(repositories.refetch).not.toHaveBeenCalled();
   });
 
-  // The single-installation guard is a different answer: the plain settings page
-  // mints its own state for the signed-in user, so the control still opens it.
-  it('opens the plain organization settings page on FORBIDDEN', async () => {
+  // The answer is tied to the scope it was given for: a refusal recorded for one
+  // scope must not answer for another if the router reuses this component
+  // instance.
+  it('restores the action when the scope changes after a refusal', async () => {
     repositories.data = [];
-    manageAccess.mintInstallState.mockRejectedValueOnce(mintFailure('FORBIDDEN'));
     const { renderer } = await mount('org_123');
 
-    await pressEmptyStateAction(renderer);
-
-    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-      'https://settings.test/github-app?organizationId=org_123'
-    );
-    await vi.waitFor(() => {
-      expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    pressEmptyStateAction(renderer);
+    act(() => {
+      access.handlers?.onRoleRefused?.();
     });
-  });
-
-  // A missing or invalid session is flagged `authRequired` and is not the role
-  // answer, so it keeps the plain-page fallback.
-  it('opens the plain organization settings page for a session auth failure', async () => {
-    repositories.data = [];
-    manageAccess.mintInstallState.mockRejectedValueOnce(
-      mintFailure('UNAUTHORIZED', { authRequired: true })
+    expect(textContents(renderer)).toContain(
+      i18n.t('securityAgent.scopeEntry.connectOwnerOnly', { platform: i18n.t('common.github') })
     );
-    const { renderer } = await mount('org_123');
 
-    await pressEmptyStateAction(renderer);
-
-    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-      'https://settings.test/github-app?organizationId=org_123'
-    );
-    await vi.waitFor(() => {
-      expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    act(() => {
+      renderer.update(createElement(RepositorySettingsScreen, { scope: 'org_456' }));
     });
-  });
 
-  // A failure that never reached the server keeps the plain-page fallback.
-  it('opens the plain organization settings page on a transport failure', async () => {
-    repositories.data = [];
-    manageAccess.mintInstallState.mockRejectedValueOnce(new TypeError('Network request failed'));
-    const { renderer } = await mount('org_123');
-
-    await pressEmptyStateAction(renderer);
-
-    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-      'https://settings.test/github-app?organizationId=org_123'
-    );
-    await vi.waitFor(() => {
-      expect(repositories.refetch).toHaveBeenCalledTimes(1);
-    });
+    const action = renderer.root.find(node => String(node.type) === 'EmptyState').props.action as {
+      type: unknown;
+      props: { onPress?: unknown };
+    };
+    expect(action.type).toBe('Button');
+    expect(typeof action.props.onPress).toBe('function');
+    // The new scope wired its own handlers, so a refusal there is recorded for
+    // that scope.
+    expect(access.handlers).not.toBeNull();
   });
 
   it('keeps the EmptyState out while the repository query has no data yet', async () => {

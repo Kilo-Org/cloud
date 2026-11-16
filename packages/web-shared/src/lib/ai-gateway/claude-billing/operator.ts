@@ -89,12 +89,15 @@ export type ClaudeUserProfileUnlinkResult =
   /** Anthropic did not answer usefully; the same call can succeed later. */
   | { kind: 'retry' }
   /** Anthropic refused the call; Kilo cannot end the link itself, the customer can. */
-  | { kind: 'needs_console' };
+  | { kind: 'needs_console' }
+  /** Anthropic has no such profile, so it holds no link to end. */
+  | { kind: 'missing' };
 
 function unlinkStatusResult(status: number): ClaudeUserProfileUnlinkResult {
   if (status === 401 || status === 408 || status === 425 || status === 429 || status >= 500) {
     return { kind: 'retry' };
   }
+  if (status === 404) return { kind: 'missing' };
   return { kind: 'needs_console' };
 }
 

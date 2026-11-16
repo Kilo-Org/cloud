@@ -148,10 +148,16 @@ describe('unlinkClaudeUserProfile', () => {
     expect(unlinkAuthorization).toEqual(['Bearer operator-token-1', 'Bearer operator-token-2']);
   });
 
-  it.each([400, 403, 404])('sends the customer to Claude Console on %s', async status => {
+  it.each([400, 403])('sends the customer to Claude Console on %s', async status => {
     stubAnthropic(new Response(JSON.stringify({ error: 'refused' }), { status }));
 
     await expect(unlinkClaudeUserProfile('uprof_6')).resolves.toEqual({ kind: 'needs_console' });
+  });
+
+  it('reports a missing profile as nothing to end', async () => {
+    stubAnthropic(new Response(JSON.stringify({ error: 'not_found' }), { status: 404 }));
+
+    await expect(unlinkClaudeUserProfile('uprof_9')).resolves.toEqual({ kind: 'missing' });
   });
 
   it('does not call Anthropic without the app id', async () => {

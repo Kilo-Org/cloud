@@ -59,11 +59,31 @@ async function deleteClaudeUserProfileRemote(
   deleteResponseSchema.parse(await response.json());
 }
 
+/**
+ * Ends Kilo's link at Anthropic before the profile behind it is deleted, because
+ * deleting the profile leaves the customer's Claude organization linked to Kilo.
+ * A retryable failure keeps the row and its profile identifier for a later run;
+ * a refusal that no retry can fix leaves the row in place for a later attempt
+ * instead of blocking the caller; a missing profile holds no link, so the delete
+ * goes ahead.
+ */
+async function unlinkBeforeProfileDelete(userProfileId: string, timeoutMs: number): Promise<void> {
+  const unlink = await unlinkClaudeUserProfile(userProfileId, timeoutMs);
+  if (unlink.kind === 'retry') throw new ClaudeProfileDeletionError(true);
+  if (unlink.kind === 'needs_console') throw new ClaudeProfileDeletionError(false);
+}
+
 export async function retireUnreferencedClaudeBillingPayer(
   payer: UnreferencedClaudeBillingPayer,
-  timeoutMs = 15_000
+  options: {
+    timeoutMs?: number;
+    /** Set false when the caller already ended this payer's link. */
+    unlink?: boolean;
+  } = {}
 ): Promise<void> {
   if (!operatorConfigured()) return;
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  if (options.unlink ?? true) await unlinkBeforeProfileDelete(payer.userProfileId, timeoutMs);
   await deleteClaudeUserProfileRemote(payer.userProfileId, timeoutMs);
   await db.delete(claude_billing_connections).where(
     and(
@@ -165,12 +185,20 @@ export async function cleanupRemovedClaudeProfilesForUser(
     )
     .limit(options.limit ?? 10);
   const timeoutMs = options.timeoutMs ?? 15_000;
-  await Promise.allSettled(rows.map(row => retireUnreferencedClaudeBillingPayer(row, timeoutMs)));
+  await Promise.allSettled(
+    rows.map(row => retireUnreferencedClaudeBillingPayer(row, { timeoutMs }))
+  );
 }
 /**
- * Deletes the Anthropic user profiles behind connections the person created
- * when no other Kilo scope still uses them. A payer shared with another person
- * or shared services keeps its profile.
+ * Ends Kilo's link at Anthropic for every profile this person's connections own,
+ * before the profile is deleted, so the customer's Claude organization does not
+ * stay linked to Kilo after the account is gone. A payer shared with another
+ * person or shared services keeps its profile.
+ *
+ * A retryable unlink failure keeps the rows and their profile identifiers and
+ * reports a retryable `ClaudeProfileDeletionError`, so the deletion queue tries
+ * again. A refused unlink reports a non-retryable one: the rows stay for a later
+ * attempt rather than blocking the deletion forever.
  */
 export async function deleteUserClaudeProfiles(userId: string): Promise<void> {
   const rows = await db
@@ -233,6 +261,7 @@ export async function deleteUserClaudeProfiles(userId: string): Promise<void> {
         userProfileId: row.user_profile_id,
       });
     } else {
+      await unlinkBeforeProfileDelete(row.user_profile_id, 15_000);
       await deleteClaudeUserProfileRemote(row.user_profile_id);
       await db
         .update(claude_billing_connections)

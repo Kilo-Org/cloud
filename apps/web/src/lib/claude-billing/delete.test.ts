@@ -15,7 +15,6 @@ import {
   removeClaudeBillingGrant,
   shareClaudeBillingConnection,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
-import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import {
   ClaudeProfileDeletionError,
   cleanupRemovedClaudeProfilesForUser,
@@ -26,6 +25,10 @@ import {
 afterEach(() => {
   jest.restoreAllMocks();
   jest.mocked(isClaudeOperatorConfigured).mockReturnValue(true);
+  jest
+    .mocked(unlinkClaudeUserProfile)
+    .mockReset()
+    .mockResolvedValue({ kind: 'unlinked', revokedConnectionIds: [] });
 });
 
 async function connectedUser() {
@@ -183,6 +186,85 @@ describe('Personal Claude profile erasure', () => {
       await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
     ).toMatchObject({ user_profile_id: `uprof_${user.id}` });
   });
+
+  it.each([
+    [{ kind: 'retry' as const }, true],
+    [{ kind: 'needs_console' as const }, false],
+  ])('keeps the removed payer when the unlink is %j', async (unlink, retryable) => {
+    const user = await connectedUser();
+    const unreferenced = await removeClaudeBillingGrant({ kind: 'personal', kiloUserId: user.id });
+    if (!unreferenced) throw new Error('Expected unreferenced payer');
+    jest.mocked(unlinkClaudeUserProfile).mockResolvedValue(unlink);
+    const fetchMock = jest.spyOn(globalThis, 'fetch');
+
+    await expect(retireUnreferencedClaudeBillingPayer(unreferenced)).rejects.toMatchObject({
+      retryable,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({
+      id: unreferenced.id,
+      status: 'removed',
+      user_profile_id: `uprof_${user.id}`,
+    });
+  });
+
+  it('deletes the profile when Anthropic has no link left to end', async () => {
+    const user = await connectedUser();
+    const unreferenced = await removeClaudeBillingGrant({ kind: 'personal', kiloUserId: user.id });
+    if (!unreferenced) throw new Error('Expected unreferenced payer');
+    jest.mocked(unlinkClaudeUserProfile).mockResolvedValue({ kind: 'missing' });
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await retireUnreferencedClaudeBillingPayer(unreferenced);
+
+    expect(unlinkClaudeUserProfile).toHaveBeenCalledWith(`uprof_${user.id}`, 15_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })).toBeNull();
+  });
+
+  it('ends the link of a connected profile before erasing the person', async () => {
+    const user = await connectedUser();
+    jest
+      .mocked(unlinkClaudeUserProfile)
+      .mockResolvedValue({ kind: 'unlinked', revokedConnectionIds: ['ocon_ended'] });
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await deleteUserClaudeProfiles(user.id);
+
+    expect(unlinkClaudeUserProfile).toHaveBeenCalledWith(`uprof_${user.id}`, 15_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ status: 'billing_unavailable', user_profile_id: `uprof_${user.id}` });
+  });
+
+  it.each([
+    [{ kind: 'retry' as const }, true],
+    [{ kind: 'needs_console' as const }, false],
+  ])(
+    'keeps a connected profile when the unlink before erasure is %j',
+    async (unlink, retryable) => {
+      const user = await connectedUser();
+      jest.mocked(unlinkClaudeUserProfile).mockResolvedValue(unlink);
+      const fetchMock = jest.spyOn(globalThis, 'fetch');
+
+      await expect(deleteUserClaudeProfiles(user.id)).rejects.toMatchObject({ retryable });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(
+        await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+      ).toMatchObject({ status: 'connected', user_profile_id: `uprof_${user.id}` });
+    }
+  );
 
   it('retires an unshared removed payer profile and cleans up deferred removed rows', async () => {
     const user = await connectedUser();

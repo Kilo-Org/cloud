@@ -258,9 +258,12 @@ export const claudeBillingRouter = createTRPCRouter({
           message: 'Unlink Kilo under Linked platforms in Claude Console, then remove it here.',
         });
       }
+      // `missing` continues here: Anthropic has no such profile, so there is no
+      // link left to end and the row has nothing to bill through.
       const unreferencedPayer = removal.unreferencedPayer;
       if (unreferencedPayer) {
-        await retireUnreferencedClaudeBillingPayer(unreferencedPayer).catch(error => {
+        await retireUnreferencedClaudeBillingPayer(unreferencedPayer, { unlink: false }).catch(
+          error => {
           console.error('[claude-billing] remote profile retirement deferred', {
             error: error instanceof Error ? error.name : 'unknown',
           });

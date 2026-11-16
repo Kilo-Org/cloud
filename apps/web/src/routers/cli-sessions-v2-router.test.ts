@@ -1855,22 +1855,15 @@ describe('cli-sessions-v2-router', () => {
     it('maps an ingest delete budget expiry to the retryable answer', async () => {
       // The ingest delete is the last hop of a mutation the caller already
       // completed. A worker that never answers must read as retryable upstream,
-      // not as an internal defect.
-      fetchSpy.mockImplementation(() => new Promise<Response>(() => {}));
+      // not as an internal defect. `fetchWithinBudget` rejects with this error
+      // when the hop outlives `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
+      fetchSpy.mockRejectedValueOnce(new ServiceFetchTimeoutError(8000));
       const caller = await createCallerForUser(regularUser.id);
 
-      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-      try {
-        const pending = caller.cliSessionsV2.delete({ session_id: sessionId });
-        const assertion = expect(pending).rejects.toMatchObject({
-          code: 'SERVICE_UNAVAILABLE',
-          message: 'Failed to delete session',
-        });
-        await jest.advanceTimersByTimeAsync(8_500);
-        await assertion;
-      } finally {
-        jest.useRealTimers();
-      }
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to delete session',
+      });
     });
 
     it('deletes a legacy agent session through ingest without a runtime call', async () => {

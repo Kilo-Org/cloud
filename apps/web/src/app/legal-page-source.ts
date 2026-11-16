@@ -67,14 +67,53 @@ const LEGAL_CONTENT_ALLOWED_ATTRIBUTES = {
 
 const LEGAL_CONTENT_ALLOWED_SCHEMES = ['http', 'https', 'mailto', 'tel'];
 
+// The store review surfaces render this content inside the app, so a link from a
+// legal document to any other kilo.ai page (pricing, plans, the marketing site)
+// is stripped down to its text: a legal document may not hand a reviewer a path
+// to a purchase page. Links to the legal pages themselves stay, which keeps the
+// terms -> privacy cross reference working.
+const KILO_LEGAL_PATH = /^\/(?:terms|privacy)(?:\/|$)/;
+
+// Every path the document links to resolves against the page it came from, so a
+// relative href names the same kilo.ai destination as the live page and the
+// marketing-link rule below sees it. An absolute URL, a scheme, a fragment, a
+// protocol-relative target and anything carrying an entity stay as written: the
+// sanitizer's own scheme allowlist decides what survives them.
+const NOT_A_PATH = /^(?:[a-z][a-z0-9+.-]*:|#|\/\/)|&/i;
+
 function absolutizeKiloLinks(html: string, sourceUrl: string): string {
-  return html.replaceAll(/(href|src)="\/(?!\/)/g, `$1="${new URL('/', sourceUrl)}`);
+  return html.replaceAll(/(href|src)="([^"]*)"/g, (match, attribute: string, target: string) =>
+    NOT_A_PATH.test(target) ? match : `${attribute}="${new URL(target, sourceUrl).toString()}"`
+  );
+}
+
+function isLegalDocumentLink(href: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    // A fragment-only or otherwise unparseable target names no destination to
+    // strip; the sanitizer's own scheme allowlist decides what survives.
+    return true;
+  }
+
+  if (url.hostname !== 'kilo.ai' && url.hostname !== 'www.kilo.ai') {
+    return true;
+  }
+
+  return KILO_LEGAL_PATH.test(url.pathname);
 }
 
 // The marketing site opens its external links in a new tab; keep that behavior
 // and follow the apps/web convention of pairing `target="_blank"` with
 // `rel="noopener noreferrer"` even when the source document leaves `rel` out.
-function enforceRelOnBlankTargets(_tagName: string, attribs: sanitizeHtml.Attributes) {
+function transformLegalAnchor(_tagName: string, attribs: sanitizeHtml.Attributes) {
+  if (attribs.href && !isLegalDocumentLink(attribs.href)) {
+    // Downgrading to a span keeps the linked words and drops the destination,
+    // so the copy still reads and nothing points at a marketing page.
+    return { tagName: 'span', attribs: {} };
+  }
+
   // HTML keyword attributes are ASCII case-insensitive.
   if (attribs.target?.trim().toLowerCase() !== '_blank') {
     return { tagName: 'a', attribs };
@@ -93,7 +132,7 @@ function sanitizeLegalContent(html: string): string {
     allowedSchemes: LEGAL_CONTENT_ALLOWED_SCHEMES,
     allowProtocolRelative: false,
     disallowedTagsMode: 'discard',
-    transformTags: { a: enforceRelOnBlankTargets },
+    transformTags: { a: transformLegalAnchor },
   });
 }
 
@@ -109,4 +148,28 @@ export function extractLegalMainHtml(options: ExtractLegalMainHtmlOptions): stri
   }
 
   return content;
+}
+
+/** Revalidate the fetched legal source once an hour, as the rendered pages do. */
+export const LEGAL_SOURCE_REVALIDATE_SECONDS = 3600;
+
+/**
+ * Load one legal document's sanitized body. Throws when the source is
+ * unreachable or the document has no main content, which lets the app route
+ * distinguish a retryable fetch failure from a successful response with a
+ * fallback notice; the pages wrap this in their own fallback.
+ */
+export async function loadLegalMainHtml(options: {
+  sourceUrl: string;
+  extract: (html: string) => string;
+}): Promise<string> {
+  const response = await fetch(options.sourceUrl, {
+    next: { revalidate: LEGAL_SOURCE_REVALIDATE_SECONDS },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${options.sourceUrl}: ${response.status}`);
+  }
+
+  return options.extract(await response.text());
 }

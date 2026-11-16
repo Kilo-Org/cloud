@@ -79,6 +79,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 
 const BUTTON = 'Button' as ElementType;
+const LAST_METHOD = "You can't unlink your only sign-in method. Link another method first.";
 
 let renderer: ReactTestRenderer | undefined = undefined;
 let queryClient: QueryClient | undefined = undefined;
@@ -111,6 +112,17 @@ function rerender() {
 
 function unlinkButtons(root: ReactTestRenderer['root']) {
   return root.findAll(node => Object.is(node.type, BUTTON) && node.props.accessibilityLabel);
+}
+
+/** The row note that states the last-method rule under a blocked row. */
+function noteTexts(root: ReactTestRenderer['root']) {
+  return root.findAll(node => Object.is(node.type, 'Text') && node.props.children === LAST_METHOD);
+}
+
+function statusMessages(root: ReactTestRenderer['root']) {
+  return root
+    .findAll(node => Object.is(node.type, 'AccessibleStatus'))
+    .map(node => node.props.message);
 }
 
 function lastConfirm(): ConfirmOptions {
@@ -157,6 +169,11 @@ describe('LoginMethodsScreen', () => {
       throw new Error('missing GitHub unlink button');
     }
 
+    // Two methods: the control is live and states no rule, and no note is drawn.
+    expect(github.props.disabled).toBe(false);
+    expect(github.props.accessibilityHint).toBeUndefined();
+    expect(noteTexts(root)).toHaveLength(0);
+
     act(() => {
       (github.props.onPress as () => void)();
     });
@@ -170,94 +187,27 @@ describe('LoginMethodsScreen', () => {
     expect(state.mutate).toHaveBeenCalledWith({ provider: 'github' });
   });
 
-  it('refuses to ask when a single linked method is the one being unlinked', async () => {
+  it('disables the unlink control and states the rule under the row for one method', async () => {
     state.providers = [{ provider: 'github', email: 'ada@example.test' }];
     const root = await mount();
-    const [github] = unlinkButtons(root);
+
+    const buttons = unlinkButtons(root);
+    expect(buttons).toHaveLength(1);
+    const [github] = buttons;
     if (!github) {
       throw new Error('missing GitHub unlink button');
     }
 
-    act(() => {
-      (github.props.onPress as () => void)();
-    });
-
+    expect(github.props.disabled).toBe(true);
+    expect(github.props.accessibilityLabel).toBe('Unlink GitHub');
+    expect(github.props.accessibilityHint).toBe(LAST_METHOD);
+    expect(noteTexts(root)).toHaveLength(1);
+    // The row's own note owns the sentence, so the status must not repeat it.
+    expect(statusMessages(root)).toEqual([null]);
     expect(state.confirm).not.toHaveBeenCalled();
-    const status = root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
-    expect(status.map(node => node.props.message)).toEqual([
-      "You can't unlink your only sign-in method. Link another method first.",
-    ]);
-    expect(state.mutate).not.toHaveBeenCalled();
-
-    // The reader links a second method and the foreground refresh hands this same
-    // mounted tree a two-method list.
-    state.providers = [
-      { provider: 'github', email: 'ada@example.test' },
-      { provider: 'google', email: 'ada@example.test' },
-    ];
-    rerender();
-
-    if (!renderer) {
-      throw new Error('missing mounted tree');
-    }
-    expect(unlinkButtons(renderer.root)).toHaveLength(2);
-    const retired = renderer.root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
-    expect(retired.map(node => node.props.message)).toEqual([null]);
   });
 
-  it('drops an earlier server answer when a later tap is refused locally', async () => {
-    const root = await mount();
-
-    act(() => {
-      state.mutations[0]?.onError?.(
-        Object.assign(new Error('User does not have a linked github account'), {
-          data: { upstreamCode: 'sign_in_method_not_linked' },
-        }),
-        { provider: 'github' }
-      );
-    });
-    expect(
-      root.findAll(node => Object.is(node.type, 'AccessibleStatus')).map(node => node.props.message)
-    ).toEqual(['GitHub is no longer linked to your account.']);
-
-    // The reload lands a one-method list, so the tap is refused before the server
-    // is asked and that sentence masks the server's earlier answer.
-    state.providers = [{ provider: 'github', email: 'ada@example.test' }];
-    rerender();
-    if (!renderer) {
-      throw new Error('missing mounted tree');
-    }
-    const [github] = unlinkButtons(renderer.root);
-    if (!github) {
-      throw new Error('missing GitHub unlink button');
-    }
-    act(() => {
-      (github.props.onPress as () => void)();
-    });
-    expect(state.confirm).not.toHaveBeenCalled();
-    expect(
-      renderer.root
-        .findAll(node => Object.is(node.type, 'AccessibleStatus'))
-        .map(node => node.props.message)
-    ).toEqual(["You can't unlink your only sign-in method. Link another method first."]);
-
-    // Linking a second method retires the local refusal, and the retired server
-    // answer must not come back in its place.
-    state.providers = [
-      { provider: 'github', email: 'ada@example.test' },
-      { provider: 'google', email: 'ada@example.test' },
-    ];
-    rerender();
-    expect(unlinkButtons(renderer.root)).toHaveLength(2);
-    expect(
-      renderer.root
-        .findAll(node => Object.is(node.type, 'AccessibleStatus'))
-        .map(node => node.props.message)
-    ).toEqual([null]);
-  });
-
-  it('reports the last-method rule beside the list in the screen language', async () => {
-    state.providers = [{ provider: 'github', email: 'ada@example.test' }];
+  it('reports the last-method rule beside the list once a second method exists', async () => {
     const root = await mount();
 
     act(() => {
@@ -269,11 +219,48 @@ describe('LoginMethodsScreen', () => {
       );
     });
 
-    const status = root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
-    expect(status.map(node => node.props.message)).toEqual([
-      "You can't unlink your only sign-in method. Link another method first.",
-    ]);
-    expect(state.invalidateQueries).not.toHaveBeenCalled();
+    expect(statusMessages(root)).toEqual([LAST_METHOD]);
+    // The answer contradicts the two-method list this render drew, so the
+    // refresh reconciles it before the reader taps again.
+    expect(state.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['user', 'getAuthProviders'],
+    });
+  });
+
+  it('refreshes a stale two-method list a server last-method answer contradicts', async () => {
+    const root = await mount();
+
+    act(() => {
+      state.mutations[0]?.onError?.(
+        Object.assign(new Error('Cannot unlink the last authentication method'), {
+          data: { upstreamCode: 'last_sign_in_method' },
+        }),
+        { provider: 'google' }
+      );
+    });
+
+    // The server only declines a one-method account, so the two-method list
+    // this render drew is stale: the refresh reconciles it.
+    expect(state.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['user', 'getAuthProviders'],
+    });
+    expect(statusMessages(root)).toEqual([LAST_METHOD]);
+
+    // The refreshed list holds one method: the row draws disabled with its
+    // note, and the status stays silent instead of speaking above enabled rows.
+    state.providers = [{ provider: 'github', email: 'ada@example.test' }];
+    rerender();
+    if (!renderer) {
+      throw new Error('missing mounted tree');
+    }
+    const [github] = unlinkButtons(renderer.root);
+    if (!github) {
+      throw new Error('missing GitHub unlink button');
+    }
+    expect(github.props.disabled).toBe(true);
+    expect(github.props.accessibilityHint).toBe(LAST_METHOD);
+    expect(noteTexts(renderer.root)).toHaveLength(1);
+    expect(statusMessages(renderer.root)).toEqual([null]);
   });
 
   it('names the provider a stale row still shows and reloads the list', async () => {

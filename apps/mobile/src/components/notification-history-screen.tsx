@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
@@ -19,8 +19,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { useAuth } from '@/lib/auth/auth-context';
-import { openClawNotificationWebUrl } from '@/lib/claw-notification';
-import { WEB_BASE_URL } from '@/lib/config';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 import { pendingDeepLinkOptionsForData } from '@/lib/notification-actions';
 import {
@@ -30,6 +28,7 @@ import {
   notificationHistoryTarget,
 } from '@/lib/notification-history';
 import { useNotificationMasterGate } from '@/lib/hooks/use-notification-master-gate';
+import { isRetiredPushType } from '@/lib/retired-push-types';
 import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
@@ -109,8 +108,41 @@ export function NotificationHistoryScreen() {
   // `reconcileFirstPage` keeps the retained pages until page one arrives, so
   // the rows a refresh started from stay on screen (and scroll survives) even
   // when the refetch is paused by lost connectivity or fails.
-  const items = flatItems;
-  const hasListContent = items.length > 0 || query.isFetchNextPageError;
+  // A stored page can still hold a row of a kind this build retired; the list
+  // never draws one.
+  const items = useMemo(
+    () => flatItems.filter(row => !isRetiredPushType(row.pushType)),
+    [flatItems]
+  );
+  // A page can be nothing but retired rows. Rather than report an account with
+  // no notifications, the list reads on until it has a row to show or the
+  // retention window ends.
+  const { fetchNextPage, hasNextPage, isFetchNextPageError, isFetchingNextPage } = query;
+  const readingOn = items.length === 0 && (hasNextPage || isFetchingNextPage);
+  const hasListContent = items.length > 0 || readingOn || isFetchNextPageError;
+  useEffect(() => {
+    // A failed next page keeps the cursor and clears the fetching flag, so an
+    // unguarded read-on would re-request the same page for as long as the list
+    // stays empty; the footer's Retry is the single recovery, as `onEndReached`
+    // already assumes.
+    if (
+      authToken == null ||
+      items.length > 0 ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      isFetchNextPageError
+    ) {
+      return;
+    }
+    void fetchNextPage();
+  }, [
+    authToken,
+    fetchNextPage,
+    hasNextPage,
+    isFetchNextPageError,
+    isFetchingNextPage,
+    items.length,
+  ]);
   // A query that is disabled never leaves `pending`; only a signed-in read can.
   // The push banner and the filter chips both sit above the list, so the list
   // waits for the same reads they do: a row that settles first is pushed down
@@ -124,23 +156,13 @@ export function NotificationHistoryScreen() {
 
   const openRow = useCallback(
     (payload: Record<string, unknown>) => {
-      const target = notificationHistoryTarget(payload, WEB_BASE_URL);
+      const target = notificationHistoryTarget(payload);
       if (target === null) {
         toast.error(t('notifications.history.openFailed'));
         return;
       }
-      if (target.destination.kind === 'external') {
-        // A KiloClaw row has no mobile screen to open: it opens its web page
-        // in the in-app browser, like a tap on the notification itself.
-        void openClawNotificationWebUrl(target.destination.url);
-        return;
-      }
       // The same slot a notification response fills: the root layout navigates.
-      setPendingDeepLink(
-        target.destination.href,
-        'notification',
-        pendingDeepLinkOptionsForData(target.data)
-      );
+      setPendingDeepLink(target.href, 'notification', pendingDeepLinkOptionsForData(target.data));
     },
     [t]
   );

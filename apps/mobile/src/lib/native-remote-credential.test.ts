@@ -26,7 +26,7 @@ beforeEach(() => {
   mocks.tearingDown = false;
   mocks.expiresAtMs = null;
   mocks.token.mockReset().mockResolvedValue('native-device-token');
-  mocks.refresh.mockReset().mockResolvedValue({ ok: true });
+  mocks.refresh.mockReset().mockResolvedValue({ kind: 'ok' });
 });
 
 describe('native remote credential', () => {
@@ -64,7 +64,7 @@ describe('native remote credential', () => {
   });
 
   it('fences an account change during refresh', async () => {
-    const pending = Promise.withResolvers<{ ok: boolean }>();
+    const pending = Promise.withResolvers<{ kind: 'ok' }>();
     mocks.expiresAtMs = Date.now();
     mocks.refresh.mockReturnValueOnce(pending.promise);
     const request = nativeRemoteCredential(1);
@@ -72,7 +72,7 @@ describe('native remote credential', () => {
       expect(mocks.refresh).toHaveBeenCalledTimes(1);
     });
     mocks.epoch = 2;
-    pending.resolve({ ok: true });
+    pending.resolve({ kind: 'ok' });
     await expect(request).rejects.toThrow('account changed');
     expect(mocks.token).toHaveBeenCalledTimes(1);
   });

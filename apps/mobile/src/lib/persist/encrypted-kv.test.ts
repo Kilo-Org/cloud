@@ -128,7 +128,7 @@ function nativeStatement(source: string): FakeStatement {
       if (failNextMigration && source.includes('__drizzle_migrations')) {
         failNextMigration = false;
         if (failNextMigrationNonError !== undefined) {
-          // oxlint-disable-next-line no-throw-literal -- the seam models a caller that throws a non-Error
+          // oxlint-disable-next-line no-throw-literal, typescript-eslint/only-throw-error -- the seam models a caller that throws a non-Error
           throw failNextMigrationNonError;
         }
         throw failNextMigrationCause === undefined

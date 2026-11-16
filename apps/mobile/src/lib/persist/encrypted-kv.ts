@@ -268,7 +268,8 @@ function isCorruptionSignal(error: unknown): boolean {
   // error in `cause`, so the signal can sit one level down.
   let current = error;
   for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
-    if (CORRUPTION_SIGNALS.some(signal => current.message.includes(signal))) {
+    const candidate = current;
+    if (CORRUPTION_SIGNALS.some(signal => candidate.message.includes(signal))) {
       return true;
     }
     current = current.cause;
@@ -452,8 +453,9 @@ export function resetEncryptedKvOpenForTests(): void {
  * The chat store is the one: it hands this handle to the harness SDK, which
  * keeps the conversations in tables of its own on the same file. One file
  * means one key, one SQLCipher probe, and one delete-and-recreate recovery
- * rather than a second copy of all three. The delete runs on a failed probe
- * only; a failed migration reports and rethrows, and the file stays.
+ * rather than a second copy of all three. The delete runs on a failed probe,
+ * or on a migration rejection that carries a corruption signal; every other
+ * failed migration reports and rethrows, and the file stays.
  */
 export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
   const db = await openDatabase();

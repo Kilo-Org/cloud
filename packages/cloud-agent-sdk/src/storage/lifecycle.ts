@@ -1,5 +1,4 @@
 import type { Part } from '@kilocode/app-shared/opencode';
-import type { ReadonlyPart } from '../types';
 import { forgetPartUpdateTime, publishPartsChanged } from './helpers';
 import type { PartOrderingEvidence, PartsSnapshot, SubscriberRegistry } from './helpers';
 import type { SessionStorage } from './types';

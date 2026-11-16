@@ -2,6 +2,7 @@ import type { Part, TextPart } from '@kilocode/app-shared/opencode';
 import type { ReadonlyPart } from '../types';
 import { partSettledAt } from '../part-utils';
 import { isPreviewOfStoredTool } from '../tool-detail-marker';
+import type { SessionSubscriptionKey } from './types';
 
 /** Sort key of a message id: the id is its own key. */
 function messageIdKey(value: string): string {
@@ -364,9 +365,6 @@ function createSeedTextPart(messageId: string, partId: string, text: string): Te
     text,
   };
 }
-
-/** Channel of a granular storage subscription. */
-type SessionSubscriptionKey = 'messageIds' | `message:${string}` | `parts:${string}`;
 
 const messageIdsKey: SessionSubscriptionKey = 'messageIds';
 

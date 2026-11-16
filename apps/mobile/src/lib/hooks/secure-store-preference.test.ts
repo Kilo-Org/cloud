@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines -- one suite for the SecureStore-backed preference store: the initial read, the write drain, and what a failed read reports all drive the same mocked keychain */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSecureStorePreference } from './secure-store-preference';

@@ -177,19 +177,26 @@ const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 404, 409,
 const FORBIDDEN_STATUS = 403;
 
 /**
- * Procedures whose `FORBIDDEN` is the refusal the screen already presents: the
- * caller is no longer an active member of the organization it has selected, or
- * the provider installation no longer grants the repository. The attachment
+ * Whether a procedure's `FORBIDDEN` is the refusal the screen already presents:
+ * the caller is no longer an active member of the organization it has selected,
+ * or the provider installation no longer grants the repository. The attachment
  * presign and the branch listing both render that answer as a permanent state
  * with no retry, and the app can only learn about the lost access by asking, so
  * the request cannot be avoided. A `FORBIDDEN` on any other procedure still
  * names app code that asked for something the caller may hold.
  */
-const HANDLED_FORBIDDEN_PROCEDURES: Readonly<Record<string, true>> = {
-  'cloudAgentNext.listRepositoryBranches': true,
-  'organizations.cloudAgentNext.getAttachmentUploadUrl': true,
-  'organizations.cloudAgentNext.listRepositoryBranches': true,
-};
+function isHandledForbiddenProcedure(path: string): boolean {
+  switch (path) {
+    case 'cloudAgentNext.listRepositoryBranches':
+    case 'organizations.cloudAgentNext.getAttachmentUploadUrl':
+    case 'organizations.cloudAgentNext.listRepositoryBranches': {
+      return true;
+    }
+    default: {
+      return false;
+    }
+  }
+}
 
 /**
  * True when a status is an expected answer: one of
@@ -206,14 +213,11 @@ function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   if (status !== FORBIDDEN_STATUS) {
     return false;
   }
-  return trpc.code === undefined || isHandledForbidden(trpc);
-}
-
-function isHandledForbidden(trpc: TrpcErrorContext): boolean {
+  if (trpc.code === undefined) {
+    return true;
+  }
   return (
-    trpc.code === 'FORBIDDEN' &&
-    trpc.path !== undefined &&
-    HANDLED_FORBIDDEN_PROCEDURES[trpc.path] === true
+    trpc.code === 'FORBIDDEN' && trpc.path !== undefined && isHandledForbiddenProcedure(trpc.path)
   );
 }
 
@@ -725,6 +729,7 @@ function recordNetworkErrorBreadcrumb(context: NetworkErrorContext): void {
 const TRANSPORT_FAILURE_KEY = 'kiloTransportFailure';
 
 const TransportFailureSchema = z.looseObject({ [TRANSPORT_FAILURE_KEY]: z.literal(true) });
+const ObjectValueSchema = z.looseObject({});
 
 /**
  * True when the fetch wrapper already recorded this rejection as a transport
@@ -742,7 +747,7 @@ export function isTransportFailure(error: unknown): boolean {
 
 function markTransportFailure(error: unknown): void {
   try {
-    if (typeof error !== 'object' || error === null) {
+    if (!ObjectValueSchema.safeParse(error).success) {
       return;
     }
     Object.defineProperty(error, TRANSPORT_FAILURE_KEY, { value: true, configurable: true });

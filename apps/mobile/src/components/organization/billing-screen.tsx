@@ -188,7 +188,6 @@ export function OrganizationBillingScreen() {
           label={t('organization.hub.plan')}
           value={planName}
           valueFace="text"
-          valueTone={planEnded ? 'danger' : 'default'}
         />
         <KvRow
           label={t('organization.billing.state')}

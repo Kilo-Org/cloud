@@ -369,6 +369,22 @@ describe('OrganizationBillingScreen change plan placement', () => {
     unmount();
   });
 
+  it('keeps the plan name in the neutral tone while the banner carries the ended state', async () => {
+    // The banner already reports the ended plan, so a second danger value on
+    // the plan row reads as a second, separate error.
+    boundary.isTrialExpiredForEnforcement = true;
+    queries.subscription.data = subscriptionReadout();
+    const { renderer, unmount } = await mount();
+
+    const row = renderer.root
+      .findAllByType('KvRow' as never)
+      .find(node => node.props.label === 'Organization plan');
+    expect(row).toBeDefined();
+    expect(row?.props.valueTone).toBeUndefined();
+    expect(renderer.root.findAllByType('OrganizationPlanRefusal' as never).length).toBe(1);
+    unmount();
+  });
+
   it('renders no banner and keeps the card copy while the plan is active', async () => {
     const { renderer, unmount } = await mount();
 

@@ -3,10 +3,20 @@ import { describe, expect, it } from 'vitest';
 import {
   emailsError,
   parseEmails,
+  parseThreshold,
   saveErrorCopy,
+  thresholdError,
 } from '@/components/organization/low-balance-alert-validators';
 import { i18n } from '@/i18n';
+import { formatCurrency } from '@/lib/format';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
+
+// `pnpm check:i18n` owns the copy; these assert which sentence a value earns,
+// echoing the spending-alert’s fixture instead of repeating the wording here.
+const CAP_SENTENCE = i18n.t('spendAlerts.thresholdMaxError', {
+  max: formatCurrency(1_000_000_000, i18n.language, 0),
+});
+const GREATER_THAN_ZERO_SENTENCE = i18n.t('organization.lowBalanceAlert.thresholdError');
 
 describe('emailsError', () => {
   const invalidCopy = i18n.t('organization.lowBalanceAlert.emailsInvalid');
@@ -77,5 +87,37 @@ describe('saveErrorCopy', () => {
       field: 'form',
       message: i18n.t('common.organizationTrialEnded'),
     });
+  });
+});
+
+describe('thresholdError', () => {
+  it('names the maximum once the value can no longer be a saved balance', () => {
+    // A pasted literal longer than a JS number still reads as Infinity, a
+    // number, and one far above the cap; it must not be reported as "enter an
+    // amount greater than 0". One over the cap earns the same sentence.
+    for (const value of ['1'.repeat(300), '1000000001']) {
+      expect(thresholdError(value)).toBe(CAP_SENTENCE);
+      expect(thresholdError(value)).not.toBe(GREATER_THAN_ZERO_SENTENCE);
+    }
+  });
+
+  it('reads a value at the cap and a fractional balance as valid', () => {
+    for (const value of ['1000000000', '250.5']) {
+      expect(thresholdError(value)).toBeNull();
+      expect(parseThreshold(value)).not.toBeNull();
+    }
+  });
+
+  it('parses nothing outside the bounds, never a clamped amount', () => {
+    for (const value of ['1'.repeat(300), '1000000001']) {
+      expect(parseThreshold(value)).toBeNull();
+    }
+  });
+
+  it('keeps the "greater than 0" copy for empty, unparsable, and non-positive values', () => {
+    for (const value of ['', '0', '-5', 'abc']) {
+      expect(thresholdError(value)).toBe(GREATER_THAN_ZERO_SENTENCE);
+      expect(parseThreshold(value)).toBeNull();
+    }
   });
 });

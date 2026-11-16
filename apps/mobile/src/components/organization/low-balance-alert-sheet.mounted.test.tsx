@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LowBalanceAlertSheet } from '@/components/organization/low-balance-alert-sheet';
 import { i18n } from '@/i18n';
+import { formatCurrency } from '@/lib/format';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const boundary = vi.hoisted(() => ({
@@ -79,11 +80,21 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 }));
 vi.mock('@/lib/format', () => ({
   formatNumber: String,
+  formatCurrency: String,
+  normalizeLocalizedNumber: (value: string) => {
+    const text = value.trim().replaceAll(',', '');
+    return /^-?\d+(\.\d+)?$/.test(text) ? text : null;
+  },
   parseLocalizedNumber: (value: string) => {
     const parsed = Number(value.trim().replaceAll(',', ''));
     return Number.isFinite(parsed) ? parsed : null;
   },
 }));
+
+const thresholdFieldOf = (renderer: ReactTestRenderer): ReactTestInstance =>
+  fieldByLabel(renderer, i18n.t('organization.lowBalanceAlert.thresholdLabel'));
+const saveButtonOf = (renderer: ReactTestRenderer): ReactTestInstance =>
+  renderer.root.find(node => String(node.type) === 'Button');
 
 const EMOJI_REJECTION =
   '[{"validation":"email","code":"invalid_format","path":["minimum_balance_alert_email"]}]';
@@ -222,6 +233,34 @@ describe('low balance alert sheet', () => {
     // Correcting the field leaves Save usable.
     const button = renderer.root.find(node => String(node.type) === 'Button');
     expect(button.props.disabled).toBe(false);
+    unmount();
+  });
+
+  it('disables Save for a threshold too large to store, then re-enables it once corrected', async () => {
+    const { renderer, unmount } = await mountSheet();
+    const toggle = renderer.root.find(node => String(node.type) === 'Switch');
+    await act(() => {
+      (toggle.props.onValueChange as (value: boolean) => void)(true);
+    });
+
+    const threshold = thresholdFieldOf(renderer);
+    const paste = '1'.repeat(300);
+    await act(() => {
+      (threshold.props.onChangeText as (value: string) => void)(paste);
+    });
+
+    const capSentence = i18n.t('spendAlerts.thresholdMaxError', {
+      max: formatCurrency(1_000_000_000, i18n.language, 0),
+    });
+    expect(saveButtonOf(renderer).props.disabled).toBe(true);
+    expect(
+      (thresholdFieldOf(renderer).props.validate as (value: string) => string | null)(paste)
+    ).toBe(capSentence);
+
+    await act(() => {
+      (threshold.props.onChangeText as (value: string) => void)('250');
+    });
+    expect(saveButtonOf(renderer).props.disabled).toBe(false);
     unmount();
   });
 

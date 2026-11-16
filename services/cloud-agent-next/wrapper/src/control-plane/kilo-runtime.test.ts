@@ -443,7 +443,7 @@ describe('Kilo startup lifecycle', () => {
     await runtime.shutdown();
   });
   it.each(['rejection', 'timeout'])(
-    'does not reject general credential installation when MCP refresh fails by %s',
+    'recovers an MCP refresh %s when a sibling reuses the installed proxy handle',
     async failure => {
       const spawner = createSpawner();
       const { runtime, logs, restarts } = createRuntime({
@@ -452,6 +452,7 @@ describe('Kilo startup lifecycle', () => {
         probe: createProbe(true),
         scheduler: createScheduler(),
         isIdle: () => true,
+        env: { KILOCODE_TOKEN: proxyHandle(1_800_000_000) },
       });
       const client = await runtime.ensure();
       const grant = {
@@ -465,14 +466,21 @@ describe('Kilo startup lifecycle', () => {
           signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
         });
       };
-      await runtime.installCredentials({ HOME: '/new' }, grant);
+      await runtime.installCredentials(
+        { HOME: '/new', KILOCODE_TOKEN: proxyHandle(1_800_000_000) },
+        grant
+      );
       expect(runtime.env.HOME).toBe('/new');
       expect(logs).toContain(
         'control-plane MCP credential refresh failed; retaining pending credential restart'
       );
       expect(logs.join('\n')).not.toContain(grant.token);
+      expect(await runtime.applyPendingCredentials(() => false)).toBe(false);
+      expect(spawner.spawnCount()).toBe(1);
       expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
       expect(restarts).toEqual([{ reason: 'credentials' }]);
+      expect(spawner.spawnCount()).toBe(2);
+      expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
       await runtime.shutdown();
     },
     15_000

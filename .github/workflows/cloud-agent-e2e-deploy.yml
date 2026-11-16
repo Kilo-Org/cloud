@@ -2,6 +2,12 @@ name: Cloud Agent E2E deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      runtime_source_sha:
+        description: 'Main SHA whose published runtime to use (for a branch run); empty uses the run SHA'
+        required: false
+        type: string
+        default: ''
   workflow_call:
 
 permissions:
@@ -27,11 +33,15 @@ jobs:
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
       E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
       FAKE_LLM_WORKER_URL: https://fake-llm.engineering-e11.workers.dev
+      # Runtime publication runs only for main SHAs. A branch run can borrow the
+      # runtime of a main SHA; the Worker and fake LLM still deploy from the run SHA.
+      RUNTIME_SOURCE_SHA: ${{ inputs.runtime_source_sha || github.sha }}
       # The e2e Worker writes to production Postgres and R2, so this deployed
       # stack is a deliberate opt-in, not an isolation boundary.
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
+          ref: ${{ env.RUNTIME_SOURCE_SHA }}
           lfs: true
 
       - name: Setup pnpm
@@ -51,14 +61,10 @@ jobs:
         with:
           bun-version: 1.4.4
 
-      - name: Deploy fake-LLM Worker
-        working-directory: services/cloud-agent-next
-        run: test/e2e/deploy/deploy-fake-llm.sh deploy
-
       - name: Prepare downloaded Cloud Agent runtime
         working-directory: services/cloud-agent-next
         env:
-          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_SHA: ${{ env.RUNTIME_SOURCE_SHA }}
           RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
           RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
@@ -67,6 +73,31 @@ jobs:
           # Read-only: lets preparation stop waiting once the SHA's publication has failed.
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$SOURCE_SHA"
+
+      - name: Switch to the run SHA
+        if: env.RUNTIME_SOURCE_SHA != github.sha
+        env:
+          RUN_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          generated=services/cloud-agent-next/wrangler.runtime-generated.json
+          mv "$generated" "$RUNNER_TEMP/wrangler.runtime-generated.json"
+          git fetch --no-tags --depth=1 origin "$RUN_SHA"
+          # The prepared config is rendered from the runtime SHA's Worker config.
+          # Borrowing it is only valid when the run SHA has the same config.
+          if ! git diff --quiet "$RUNTIME_SOURCE_SHA" "$RUN_SHA" -- \
+            services/cloud-agent-next/wrangler.jsonc \
+            services/cloud-agent-next/runtime-targets.json; then
+            echo "::error::wrangler.jsonc or runtime-targets.json differs from the runtime SHA"
+            exit 1
+          fi
+          git checkout --detach "$RUN_SHA"
+          pnpm install --frozen-lockfile
+          mv "$RUNNER_TEMP/wrangler.runtime-generated.json" "$generated"
+
+      - name: Deploy fake-LLM Worker
+        working-directory: services/cloud-agent-next
+        run: test/e2e/deploy/deploy-fake-llm.sh deploy
 
       - name: Deploy Cloud Agent e2e Worker
         working-directory: services/cloud-agent-next

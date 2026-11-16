@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { timestampToIso } from '@kilocode/app-shared/utils';
 import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
-import { withTimeout } from '@kilocode/worker-utils';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -337,14 +336,6 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
   return mapped;
 }
 
-function throwOrgContextFailure(error: unknown): never {
-  throw new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: 'Failed to resolve the organization context for active sessions',
-    cause: error,
-  });
-}
-
 export type ListActiveSessionsInput = {
   userId: string;
   /**
@@ -401,8 +392,15 @@ async function withinRemainingBudget<T>(
   label: string
 ): Promise<T> {
   const budgetMs = deadlineAt - Date.now();
-  if (budgetMs <= 0) throw new ActiveSessionsBudgetError(label);
-  return withTimeout(Promise.resolve(work), budgetMs, `${label} exceeded its remaining budget`);
+  const budgetError = new ActiveSessionsBudgetError(label);
+  if (budgetMs <= 0) throw budgetError;
+  const expired = Promise.withResolvers<never>();
+  const timer = setTimeout(() => expired.reject(budgetError), budgetMs);
+  try {
+    return await Promise.race([Promise.resolve(work), expired.promise]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function throwOrgContextFailure(error: unknown): never {

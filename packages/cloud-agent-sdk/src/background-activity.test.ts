@@ -246,6 +246,17 @@ describe('authoritative reader', () => {
     reader.stop();
   });
 
+  test('an offline sandbox hides the strip instead of reporting unavailable', async () => {
+    const read = jest.fn().mockResolvedValue(null);
+    const publish = jest.fn();
+    const reader = createBackgroundActivityReader({ sessionID: 'ses_root', read, publish });
+    reader.start();
+    await jest.advanceTimersByTimeAsync(5000);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenLastCalledWith({ status: 'inactive' });
+    reader.stop();
+  });
+
   test('a different chat response cannot restore liveness', async () => {
     const publish = jest.fn();
     const reader = createBackgroundActivityReader({

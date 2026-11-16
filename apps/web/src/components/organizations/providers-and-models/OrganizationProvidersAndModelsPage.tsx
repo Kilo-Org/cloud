@@ -571,6 +571,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         </Tabs>
 
         <ModelDetailsDialog
+          organizationId={organizationId}
+          showGatewayAvailability={showGatewaysTab}
           open={state.infoModelId !== null}
           canEdit={canEdit}
           infoModel={infoModel}

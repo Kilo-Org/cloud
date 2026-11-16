@@ -126,6 +126,40 @@ describe('Claude billing refusal transitions', () => {
       'user_profile_not_billable',
       true,
     ],
+    [
+      403,
+      {
+        error: {
+          type: 'permission_error',
+          details: { error_code: 'user_profile_billing_not_authorized' },
+        },
+      },
+      'user_profile_billing_not_authorized',
+      true,
+    ],
+    [
+      402,
+      {
+        error: {
+          type: 'billing_error',
+          details: { error_code: 'linked_organization_billing_unavailable' },
+        },
+      },
+      'linked_organization_billing_unavailable',
+      false,
+    ],
+    [
+      402,
+      { error: { type: 'billing_error', details: { error_code: 'linked_organization_limit' } } },
+      'billing_error',
+      false,
+    ],
+    [
+      403,
+      { error: { type: 'permission_error', details: { error_code: 'organization_not_allowed' } } },
+      'permission_error',
+      false,
+    ],
     [402, { error: { code: 'billing_error' } }, 'billing_error', false],
     [
       402,

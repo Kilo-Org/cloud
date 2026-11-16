@@ -3,7 +3,10 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  GatewayResponsesRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
 import {
@@ -280,6 +283,17 @@ export async function tagOpenAiChatGptByokModels<
   );
 }
 
+function defaultFunctionToolStrict(tools: GatewayResponsesRequest['tools']): void {
+  if (!Array.isArray(tools)) return;
+
+  // Avoid Responses auto-strict reinterpretation of caller-supplied function schemas.
+  for (const tool of tools) {
+    if (tool?.type === 'function' && tool.strict === undefined) {
+      tool.strict = false;
+    }
+  }
+}
+
 /**
  * Builds the provider that serves the delegated request. Returns null when the
  * partner key is missing: the deployment is misconfigured for token sharing, so
@@ -336,6 +350,7 @@ export function buildOpenAiChatGptProvider(
       // with `unsupported_parameter`.
       delete body.temperature;
       delete body.top_p;
+      defaultFunctionToolStrict(body.tools);
       if (
         typeof body.max_output_tokens === 'number' &&
         body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS

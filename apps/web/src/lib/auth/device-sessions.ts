@@ -33,11 +33,7 @@ function isWithinLostRotationGrace(consumedAt: string): boolean {
 }
 
 async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promise<void> {
-  await db
-    .update(device_sessions)
-    .set({ revoked_at: revokedAt, revoked_reason: 'refresh_reuse_detected' })
-    .where(eq(device_sessions.id, deviceSessionId));
-  invalidateDeviceSession(deviceSessionId);
+  await revokeDeviceSession(deviceSessionId, 'refresh_reuse_detected', revokedAt);
   console.warn('[native-refresh] refresh token reuse detected; session revoked', {
     deviceSessionId,
   });
@@ -230,7 +226,6 @@ async function mintSessionCredentials(
 
 /**
  * Issue an access token + refresh token pair for a device session.
- * The access token is short-lived (one hour). The refresh token is 30 days.
  */
 export async function issueSessionCredentials(
   user: User,
@@ -526,12 +521,18 @@ export async function createDeviceSessionWithAttestedKey(params: {
 
 /**
  * Revoke a device session and all its refresh tokens.
+ * `revokedAt` stamps the revocation; callers that must record the request time
+ * (refresh-token reuse) pass it explicitly.
  */
-export async function revokeDeviceSession(sessionId: string, reason: string): Promise<void> {
+export async function revokeDeviceSession(
+  sessionId: string,
+  reason: string,
+  revokedAt?: string
+): Promise<void> {
   await db
     .update(device_sessions)
     .set({
-      revoked_at: new Date().toISOString(),
+      revoked_at: revokedAt ?? new Date().toISOString(),
       revoked_reason: reason,
     })
     .where(eq(device_sessions.id, sessionId));

@@ -22,8 +22,24 @@ import {
 import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { captureException } from '@sentry/nextjs';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import type { CustomPricingConfig } from '@kilocode/db/schema-types';
+import type * as LlmProxyHelpers from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 
-import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+const actualLlmProxyHelpers = jest.requireActual<typeof LlmProxyHelpers>(
+  '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'
+);
+
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureException: jest.fn(),
@@ -58,9 +74,33 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'),
   countAndStoreEmbeddingUsage: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage'),
+  logMicrodollarUsageAndReportToBouncer: jest.fn(),
+  processTokenData: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   emitGatewayApiMetrics: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
+  gatewayRateLimitKey: jest.fn(),
+  isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -151,12 +191,12 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       isFree: false,
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     mockedGetKiloEmbeddingModelCatalogFromDatabase.mockResolvedValue(null);
-    jest.mocked(countAndStoreEmbeddingUsage).mockReturnValue({
-      // Metrics are mocked, so the parsed stats never need to settle.
-      statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
-      usagePromise: Promise.resolve(null),
-    });
+    jest
+      .mocked(countAndStoreEmbeddingUsage)
+      .mockImplementation(actualLlmProxyHelpers.countAndStoreEmbeddingUsage);
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(EMPTY_CUSTOM_PRICING_CONFIG);
     mockedFetch.mockResolvedValue(
       new Response(JSON.stringify({ object: 'list', data: [] }), {
         status: 200,
@@ -305,6 +345,165 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     });
   });
 
+  it('rate limits the account before reading the body or authenticating', async () => {
+    jest.mocked(gatewayRateLimitKey).mockReturnValue('account-key');
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(true);
+    const request = makeRequest();
+
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(request);
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    });
+    expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '127.0.0.1');
+    expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'account-key');
+    expect(request.bodyUsed).toBe(false);
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  describe('free-model rate limit', () => {
+    const freeModel = 'acme/embedding-free:free';
+
+    function setAnonymousAuth() {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: new Response('unauthorized', { status: 401 }),
+        organizationId: undefined,
+      } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    }
+
+    it('limits anonymous callers of a free model per IP', async () => {
+      setAnonymousAuth();
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get('x-should-retry')).toBe('false');
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'PROMOTION_MODEL_LIMIT_REACHED' },
+        error_type: ProxyErrorType.rate_limit_exceeded,
+      });
+      expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+        kind: 'ip',
+        ipAddress: '127.0.0.1',
+      });
+      expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('limits signed-in callers of a free model per account', async () => {
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(429);
+      const body = await response.json();
+      expect(body).toMatchObject({ error_type: ProxyErrorType.rate_limit_exceeded });
+      expect(JSON.stringify(body)).not.toContain('PROMOTION_MODEL_LIMIT_REACHED');
+      expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+        kind: 'account',
+        kiloUserId: 'user-123',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('serves an anonymous free-model caller under the limit', async () => {
+      setAnonymousAuth();
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(false);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest({ model: freeModel }));
+
+      expect(response.status).toBe(200);
+      expect(isFreeModelRateLimited).toHaveBeenCalledTimes(1);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not count paid models', async () => {
+      jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(isFreeModelRateLimited).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('readable upstream errors', () => {
+    it('explains an OpenRouter refusal for lack of an allowed provider', async () => {
+      mockedFetch.mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              message: 'No allowed providers are available for the selected model.',
+              code: 404,
+              metadata: { available_providers: ['openai'], requested_providers: ['azure'] },
+            },
+          },
+          { status: 404 }
+        )
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'No eligible provider can serve the selected model.',
+        error_type: ProxyErrorType.provider_not_allowed,
+      });
+      expect(countAndStoreEmbeddingUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks an upstream context-length error', async () => {
+      const upstreamBody = {
+        error: {
+          message:
+            "This model's maximum context length is 8192 tokens, however you requested 9000 tokens.",
+        },
+      };
+      mockedFetch.mockResolvedValue(Response.json(upstreamBody, { status: 400 }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        ...upstreamBody,
+        error_type: ProxyErrorType.context_length_exceeded,
+      });
+    });
+
+    it('explains a rejected BYOK key', async () => {
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: VERCEL_AI_GATEWAY,
+        userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
+        isFree: false,
+      });
+      mockedFetch.mockResolvedValue(
+        Response.json({ error: { message: 'Incorrect API key provided' } }, { status: 401 })
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.byok_error,
+        message: expect.stringContaining('Provider message: Incorrect API key provided'),
+      });
+    });
+  });
+
   it('never forwards a custom LLM id to an embeddings upstream', async () => {
     await insertCustomLlmForTest('acme/embedding-custom-model');
     try {
@@ -369,17 +568,19 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       headers: { 'content-type': 'application/json' },
     });
     const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    if (!upstreamResponse.body) throw new Error('expected a response body');
+    const getReaderSpy = jest.spyOn(upstreamResponse.body, 'getReader');
     mockedFetch.mockResolvedValue(upstreamResponse);
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(makeRequest({ provider }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
-    expect(cloneSpy).toHaveBeenCalledTimes(1);
+    // The accounting reads the upstream body once, for the ledger and the response.
+    expect(cloneSpy).not.toHaveBeenCalled();
+    expect(getReaderSpy).toHaveBeenCalledTimes(1);
     expect(countAndStoreEmbeddingUsage).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[0]).toBe(
-      cloneSpy.mock.results[0]?.value
-    );
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[0]).toBe(upstreamResponse);
     expect(emitApiMetricsForResponse).toHaveBeenCalledWith(
       expect.objectContaining({ statusCode: 200 }),
       expect.any(Promise),
@@ -406,6 +607,44 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
     expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
       expect.objectContaining({ statusCode: 402, completeRequestMs: expect.any(Number) })
+    );
+  });
+
+  it.each([
+    {
+      name: 'a response',
+      upstreamStatus: 200,
+      metricsParams: () => jest.mocked(emitApiMetricsForResponse).mock.calls[0]?.[0],
+    },
+    {
+      name: 'an upstream error',
+      upstreamStatus: 402,
+      metricsParams: () => jest.mocked(emitGatewayApiMetrics).mock.calls[0]?.[0],
+    },
+  ])('reports the mode in the gateway metrics of $name, as chat does', async testCase => {
+    mockedFetch.mockResolvedValue(Response.json({ data: [] }, { status: testCase.upstreamStatus }));
+    const request = new NextRequest('http://localhost:3000/api/gateway/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '127.0.0.1',
+        'x-kilocode-mode': 'code',
+      },
+      body: JSON.stringify({ model, input: 'hello world' }),
+    });
+
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    await handleEmbeddingsRequest(request);
+
+    expect(testCase.metricsParams()).toMatchObject({ mode: 'code' });
+  });
+
+  it('records the time to the upstream response headers on the usage context', async () => {
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    await handleEmbeddingsRequest(makeRequest());
+
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].ttfb_ms).toEqual(
+      expect.any(Number)
     );
   });
 
@@ -556,6 +795,174 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     });
   });
 
+  describe('organization gateway settings', () => {
+    const vercelByok = {
+      provider: VERCEL_AI_GATEWAY,
+      userByok: [{ providerId: 'openai' as const, decryptedAPIKey: 'test-byok-key' }],
+      isFree: false,
+    };
+
+    function enableGatewaySettings() {
+      jest
+        .mocked(getRuntimeOrganizationFeatures)
+        .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-123'] });
+    }
+
+    it('rejects an OpenRouter-routed request when the organization disabled OpenRouter', async () => {
+      setUserAuth({ disable_openrouter: true });
+      enableGatewaySettings();
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'This request would be routed through OpenRouter, which your organization has disabled.',
+        error_type: ProxyErrorType.provider_not_allowed,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('ignores a disabled gateway while the organization feature is off', async () => {
+      setUserAuth({ disable_openrouter: true });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves Vercel BYOK requests when OpenRouter is disabled, pinned to the data region', async () => {
+      setUserAuth({ disable_openrouter: true, data_region: 'eu' });
+      enableGatewaySettings();
+      mockedGetEmbeddingProvider.mockResolvedValue(vercelByok);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toEqual({
+        gateway: {
+          only: ['openai'],
+          byok: { openai: [{ apiKey: 'test-byok-key' }] },
+          inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+        },
+      });
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region).toBe(
+        'eu'
+      );
+    });
+
+    it('keeps OpenRouter requests unpinned when a data region is set', async () => {
+      setUserAuth({ data_region: 'eu' });
+      enableGatewaySettings();
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toBeUndefined();
+      expect(
+        jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region
+      ).toBeNull();
+    });
+  });
+
+  describe('ledger and response cost', () => {
+    const vercelByok = {
+      provider: VERCEL_AI_GATEWAY,
+      userByok: [{ providerId: 'openai' as const, decryptedAPIKey: 'test-byok-key' }],
+      isFree: false,
+    };
+    const customPricing: CustomPricingConfig = {
+      models: [
+        {
+          model,
+          pricing: [
+            {
+              start_context_length: 0,
+              pricing: {
+                prompt_per_million: 0.5,
+                completion_per_million: 0,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    it.each([
+      {
+        name: 'a paid OpenRouter embedding',
+        upstream: { usage: { prompt_tokens: 12, cost: 0.000004, is_byok: false } },
+        cost: 0.000004,
+      },
+      {
+        name: 'a BYOK-served OpenRouter embedding',
+        upstream: {
+          usage: {
+            prompt_tokens: 3000,
+            cost: 0.0000225,
+            is_byok: true,
+            cost_details: { upstream_inference_cost: 0.00045 },
+          },
+        },
+        cost: 0.00045,
+      },
+      {
+        name: 'a Vercel BYOK embedding',
+        provider: vercelByok,
+        upstream: {
+          usage: { prompt_tokens: 3000 },
+          providerMetadata: { gateway: { cost: '0', marketCost: '0.00045' } },
+        },
+        cost: 0,
+      },
+      {
+        name: 'a free model',
+        provider: { provider: OPENROUTER, userByok: null, isFree: true },
+        upstream: { usage: { prompt_tokens: 12, cost: 0.000004, is_byok: false } },
+        cost: 0,
+      },
+      {
+        name: 'a custom-priced model',
+        customPricing,
+        upstream: { usage: { prompt_tokens: 1000, cost: 0.00002, is_byok: false } },
+        cost: 0.0005,
+      },
+      {
+        name: 'a body with snake_case Vercel metadata',
+        upstream: {
+          usage: { prompt_tokens: 12 },
+          provider_metadata: { gateway: { cost: '0.000006', marketCost: '0.000006' } },
+        },
+        cost: 0.000006,
+      },
+    ])('bills what the response reports for $name', async testCase => {
+      if (testCase.provider) mockedGetEmbeddingProvider.mockResolvedValue(testCase.provider);
+      if (testCase.customPricing) {
+        jest.mocked(getCustomPricingConfig).mockResolvedValue(testCase.customPricing);
+      }
+      mockedFetch.mockResolvedValue(
+        Response.json({ object: 'list', data: [], model: 'upstream/model', ...testCase.upstream })
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+      const reported = (await response.json()) as { usage: { cost: number } };
+      await jest.mocked(countAndStoreEmbeddingUsage).mock.results[0]?.value.usagePromise;
+
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
+      const [billed] = jest.mocked(logMicrodollarUsageAndReportToBouncer).mock.calls[0] ?? [];
+      expect(reported.usage.cost).toBe(testCase.cost);
+      expect(billed?.cost_mUsd).toBe(Math.round(testCase.cost * 1_000_000));
+    });
+  });
+
   describe('bouncer wiring', () => {
     function verdict(fields: Partial<DecideResponse>): DecideResponse {
       return { enforced: false, flags: [], spendWatch: false, ...fields } as DecideResponse;
@@ -592,6 +999,132 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
         samples: null,
         promptSimHash: null,
         spendWatch: true,
+      });
+    });
+  });
+
+  describe('upstream fetch failures', () => {
+    function requestWithSignal(signal: AbortSignal) {
+      return new NextRequest('http://localhost:3000/api/gateway/embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+        body: JSON.stringify({ model, input: 'hello world' }),
+        signal,
+      });
+    }
+
+    function expectFailureMetrics(statusCode: number) {
+      expect(countAndStoreEmbeddingUsage).not.toHaveBeenCalled();
+      expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
+      expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode, completeRequestMs: expect.any(Number) })
+      );
+    }
+
+    it('answers a network failure with a classified 503', async () => {
+      mockedFetch.mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+        })
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.upstream_disconnect,
+        message: 'The upstream provider closed the connection before sending a response.',
+      });
+      expect(captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            source: 'ai-gateway-upstream-fetch',
+            failure_family: 'conn_reset',
+          }),
+        })
+      );
+      expectFailureMetrics(503);
+    });
+
+    it('uses the ten-minute upstream budget and answers a classified 503 on expiry', async () => {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+      const budgetTimer = new AbortController();
+      const timeoutSpy = jest
+        .spyOn(AbortSignal, 'timeout')
+        .mockImplementation(ms =>
+          ms === UPSTREAM_DURATION_BUDGET_MS ? budgetTimer.signal : originalTimeout(ms)
+        );
+      mockedFetch.mockImplementation(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            signal?.addEventListener('abort', () => reject(signal.reason));
+            budgetTimer.abort();
+          })
+      );
+
+      try {
+        const response = await handleEmbeddingsRequest(makeRequest());
+
+        expect(timeoutSpy).toHaveBeenCalledWith(600_000);
+        expect(response.status).toBe(503);
+        await expect(response.json()).resolves.toMatchObject({
+          error_type: ProxyErrorType.upstream_disconnect,
+          message:
+            'The upstream provider did not send response headers before the gateway timeout.',
+        });
+        expectFailureMetrics(503);
+      } finally {
+        timeoutSpy.mockRestore();
+      }
+    });
+
+    it('answers 499 without reporting an upstream failure when the client leaves', async () => {
+      const controller = new AbortController();
+      mockedFetch.mockImplementation(async () => {
+        controller.abort();
+        throw new DOMException('This operation was aborted', 'AbortError');
+      });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(requestWithSignal(controller.signal));
+
+      expect(response.status).toBe(499);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.client_disconnect,
+      });
+      expect(captureException).not.toHaveBeenCalled();
+      expectFailureMetrics(499);
+    });
+
+    describe('client disconnect reported by Next.js', () => {
+      class ResponseAborted extends Error {
+        override readonly name = 'ResponseAborted';
+      }
+
+      it('answers 499 when the request signal aborts with ResponseAborted', async () => {
+        const controller = new AbortController();
+        mockedFetch.mockImplementation(
+          (_input, init) =>
+            new Promise<Response>((_resolve, reject) => {
+              const signal = init?.signal;
+              signal?.addEventListener('abort', () => reject(signal.reason));
+              controller.abort(new ResponseAborted());
+            })
+        );
+
+        const { handleEmbeddingsRequest } = await import('./embeddings');
+        const response = await handleEmbeddingsRequest(requestWithSignal(controller.signal));
+
+        expect(response.status).toBe(499);
+        await expect(response.json()).resolves.toMatchObject({
+          error_type: ProxyErrorType.client_disconnect,
+        });
+        expect(captureException).not.toHaveBeenCalled();
+        expectFailureMetrics(499);
       });
     });
   });

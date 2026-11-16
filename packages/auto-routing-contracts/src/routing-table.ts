@@ -250,12 +250,12 @@ type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   p50LatencyMs: number | null;
 };
 
-export function wilsonLowerBound(accuracy: number, n: number, z = 1.0): number {
+export function wilsonLowerBound(accuracy: number, n: number, zScore = 1.0): number {
   if (n <= 0) return 0;
-  const zSquared = z * z;
+  const zSquared = zScore * zScore;
   const denominator = 1 + zSquared / n;
   const center = accuracy + zSquared / (2 * n);
-  const margin = z * Math.sqrt((accuracy * (1 - accuracy) + zSquared / (4 * n)) / n);
+  const margin = zScore * Math.sqrt((accuracy * (1 - accuracy) + zSquared / (4 * n)) / n);
   return Math.max(0, (center - margin) / denominator);
 }
 

@@ -13,7 +13,11 @@ import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.he
 // jest.resetModules() with a doMock factory, because the static import above is
 // bound to the real constants module.
 const withOverriddenAppUrl = async (
-  run: (load: () => Promise<{ getAuthoritativeClaudeBillingState: typeof getAuthoritativeClaudeBillingState }>) => Promise<void>
+  run: (
+    load: () => Promise<{
+      getAuthoritativeClaudeBillingState: typeof getAuthoritativeClaudeBillingState;
+    }>
+  ) => Promise<void>
 ): Promise<void> => {
   jest.resetModules();
   jest.doMock('@kilocode/web-shared/lib/constants', () => ({

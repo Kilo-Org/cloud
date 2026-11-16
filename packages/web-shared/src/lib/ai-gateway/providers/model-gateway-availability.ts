@@ -4,8 +4,6 @@ import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
-import { isVercelRoutingOptOut } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 export type ModelGatewayAvailability = {
@@ -13,25 +11,18 @@ export type ModelGatewayAvailability = {
   openrouter: { available: boolean };
 };
 
-/**
- * Whether each gateway serves the model. A model opted out of Vercel routing counts as unavailable
- * on Vercel, because Kilo never sends it there.
- */
+/** Whether each gateway serves the model, and the inference regions Vercel offers it in. */
 export async function getModelGatewayAvailability(
   modelId: string
 ): Promise<ModelGatewayAvailability> {
-  const [vercelModelId, vercelModels, vercelMetadata, openRouterModels, routingConfig] =
-    await Promise.all([
-      mapModelIdToVercel(modelId),
-      getVercelModelsFromDatabase(),
-      getVercelModelsMetadataFromDatabase(),
-      getOpenRouterModelsFromDatabase(),
-      getRuntimeGatewayRoutingConfig(),
-    ]);
+  const [vercelModelId, vercelModels, vercelMetadata, openRouterModels] = await Promise.all([
+    mapModelIdToVercel(modelId),
+    getVercelModelsFromDatabase(),
+    getVercelModelsMetadataFromDatabase(),
+    getOpenRouterModelsFromDatabase(),
+  ]);
 
-  const vercelAvailable =
-    vercelModels.has(vercelModelId) &&
-    !isVercelRoutingOptOut(modelId, routingConfig.vercelOptOutModels);
+  const vercelAvailable = vercelModels.has(vercelModelId);
   const regions = vercelAvailable
     ? OrganizationDataRegionSchema.options.filter(region =>
         vercelMetadata[vercelModelId]?.regions?.includes(region)

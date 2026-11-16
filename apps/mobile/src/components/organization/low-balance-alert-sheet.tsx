@@ -62,6 +62,13 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       (thresholdError(thresholdRef.current) == null && emailsError(emailsRef.current) == null)
   );
 
+  // A stored amount outside the field's bounds would otherwise leave Save
+  // disabled with nothing under the field; the mount names it, and the first
+  // edit hands the field back to its own live rule.
+  const [storedThresholdError, setStoredThresholdError] = useState<string | null>(() =>
+    thresholdRef.current.trim() === '' ? null : thresholdError(thresholdRef.current)
+  );
+
   const revalidate = (nextEnabled: boolean, thresholdValue: string, emailsValue: string) => {
     setCanSave(
       !nextEnabled || (thresholdError(thresholdValue) == null && emailsError(emailsValue) == null)
@@ -126,8 +133,10 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
+            error={storedThresholdError ?? undefined}
             onChangeText={value => {
               thresholdRef.current = value;
+              setStoredThresholdError(null);
               revalidate(enabled, value, emailsRef.current);
               clearSaveError();
             }}

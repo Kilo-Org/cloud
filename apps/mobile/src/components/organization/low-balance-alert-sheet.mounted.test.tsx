@@ -237,6 +237,12 @@ describe('low balance alert sheet', () => {
   });
 
   it('disables Save for a threshold too large to store, then re-enables it once corrected', async () => {
+    const capSentence = i18n.t('spendAlerts.thresholdMaxError', {
+      max: formatPrefixedUsd(1_000_000_000, i18n.language, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }),
+    });
     const { renderer, unmount } = await mountSheet();
     const toggle = renderer.root.find(node => String(node.type) === 'Switch');
     await act(() => {
@@ -249,12 +255,6 @@ describe('low balance alert sheet', () => {
       (threshold.props.onChangeText as (value: string) => void)(paste);
     });
 
-    const capSentence = i18n.t('spendAlerts.thresholdMaxError', {
-      max: formatPrefixedUsd(1_000_000_000, i18n.language, {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }),
-    });
     expect(saveButtonOf(renderer).props.disabled).toBe(true);
     expect(
       (thresholdFieldOf(renderer).props.validate as (value: string) => string | null)(paste)
@@ -265,6 +265,26 @@ describe('low balance alert sheet', () => {
     });
     expect(saveButtonOf(renderer).props.disabled).toBe(false);
     unmount();
+
+    // A stored amount above the ceiling names itself at the mount, with no
+    // interaction: the field shows the cap and Save stays disabled.
+    query.data = {
+      settings: {
+        minimum_balance: 2_000_000_000,
+        minimum_balance_alert_email: ['one@example.com'],
+      },
+    };
+    const seeded = await mountSheet();
+    expect(thresholdFieldOf(seeded.renderer).props.error).toBe(capSentence);
+    expect(saveButtonOf(seeded.renderer).props.disabled).toBe(true);
+
+    const seededThreshold = thresholdFieldOf(seeded.renderer);
+    await act(() => {
+      (seededThreshold.props.onChangeText as (value: string) => void)('250');
+    });
+    expect(thresholdFieldOf(seeded.renderer).props.error).toBeUndefined();
+    expect(saveButtonOf(seeded.renderer).props.disabled).toBe(false);
+    seeded.unmount();
   });
 
   it('keeps a transport failure to the localized form line, never its raw text', async () => {

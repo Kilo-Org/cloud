@@ -9,8 +9,10 @@ import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
- * A distance from zero the form reports as too large instead of handing the
- * server an amount a double can no longer hold between the field and the wire.
+ * The largest amount the balance alert form accepts. The settings schema stores
+ * any positive number, so this ceiling belongs to the form: an amount above it
+ * is past any balance the alert would watch, and the field reports the ceiling
+ * instead of storing the amount.
  */
 const MAX_THRESHOLD_USD = 1_000_000_000;
 

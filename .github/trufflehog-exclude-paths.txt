@@ -45,3 +45,7 @@ apps/web/src/app/api/organizations/\[id\]/guardrails/mcp-connections/route\.test
 # credential-free value; the earlier commit stays in branch history. Exclude the
 # fixture path so the synthetic URI does not fail the scan.
 dev/seed/lib/db\.test\.ts
+
+# Sentry privacy fixtures use synthetic URL credentials to test sanitization.
+# Exclude this fixture path because the literal URI remains in branch history.
+services/cloud-agent-next/src/shared/sentry\.test\.ts

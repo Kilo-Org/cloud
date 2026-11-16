@@ -4,7 +4,7 @@ import {
   createStreamProgressLogger,
   logTerminalStreamEvent,
   partialCapturedBody,
-  readResponseText,
+  rewriteJsonResponse,
   rewriteSseStream,
   rewriteResponseMetadata,
   rewriteUsage,
@@ -45,41 +45,21 @@ export async function rewriteModelResponse_Messages({
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(
+    return rewriteJsonResponse<
+      Anthropic.Messages.Message & ResponseMetadata & { usage?: MessagesApiUsage }
+    >({
       response,
       headers,
       vercelRequestId,
       capture,
-      reasoningEffort
-    );
-    if ('errorResponse' in textResult) {
-      capture?.setReadError(textResult.error);
-      return textResult.errorResponse;
-    }
-    capture?.setBody(textResult.text);
-    const { text } = textResult;
-    let json: Anthropic.Messages.Message & ResponseMetadata & { usage?: MessagesApiUsage };
-    try {
-      json = JSON.parse(text) as Anthropic.Messages.Message &
-        ResponseMetadata & {
-          usage?: MessagesApiUsage;
-        };
-    } catch {
-      // Upstream returned invalid/empty JSON body — pass through as-is
-      return new NextResponse(text, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
-    }
-    if (json.usage) {
-      rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
-    }
-    rewriteResponseMetadata(json, usageContext);
-    return NextResponse.json(json, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
+      reasoningEffort,
+      mutate: json => {
+        if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
+        if (json.usage) {
+          rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
+        }
+        rewriteResponseMetadata(json, usageContext);
+      },
     });
   }
 
@@ -128,6 +108,7 @@ export async function rewriteModelResponse_Messages({
               e.message.provider_metadata ?? e.message.providerMetadata ?? providerMetadata;
             if (generationId === undefined && e.message.id) {
               generationId = e.message.id;
+              capture?.setGenerationId(generationId);
               logExceptInTest('[rewriteModelResponse] received generation ID', {
                 kind: 'messages',
                 generationId,

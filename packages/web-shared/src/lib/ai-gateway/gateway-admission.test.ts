@@ -7,15 +7,47 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  freeModelRateLimitRejection,
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
+  managedGatewayRejection,
+  organizationGatewayPolicy,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import {
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
+  type OrganizationGatewaySettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
 
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
+  gatewayRateLimitKey: jest.fn(),
+  isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
 }));
 
 const user = { id: 'user-1', google_user_email: 'user@example.com', microdollars_used: 5 } as User;
@@ -334,4 +366,179 @@ describe('gatewayUsageContextBase', () => {
 
     expect(base.clientAttributed).toBe(clientAttributed);
   });
+});
+
+describe('gatewayAccountRateLimitRejection', () => {
+  const request = new NextRequest('http://localhost:3000/api/v1/embeddings', { method: 'POST' });
+
+  beforeEach(() => {
+    jest.mocked(gatewayRateLimitKey).mockReset().mockReturnValue('account-key');
+    jest.mocked(isGatewayAccountRateLimited).mockReset();
+  });
+
+  it('admits an account under the cap', async () => {
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
+
+    await expect(gatewayAccountRateLimitRejection(request, '192.0.2.1')).resolves.toBeNull();
+    expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '192.0.2.1');
+    expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'account-key');
+  });
+
+  it('answers an account over the cap with the rate limit response', async () => {
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(true);
+
+    const response = await gatewayAccountRateLimitRejection(request, undefined);
+
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toEqual({
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    });
+  });
+});
+
+describe('freeModelRateLimitRejection', () => {
+  const request = new NextRequest('http://localhost:3000/api/v1/embeddings', { method: 'POST' });
+  const signedIn = { kind: 'signed-in', user, organizationId: undefined } as const;
+  const anonymous = { kind: 'anonymous', user: createAnonymousContext('192.0.2.1') } as const;
+
+  function reject(caller: typeof signedIn | typeof anonymous) {
+    return freeModelRateLimitRejection({
+      request,
+      caller,
+      model: 'vendor/model:free',
+      feature: null,
+    });
+  }
+
+  beforeEach(() => {
+    jest.mocked(isFreeModelRateLimited).mockReset();
+  });
+
+  it('counts a signed-in caller per account', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(false);
+
+    await expect(reject(signedIn)).resolves.toBeNull();
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(request, {
+      kind: 'account',
+      kiloUserId: 'user-1',
+    });
+  });
+
+  it('answers a limited account with the account response', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await reject(signedIn);
+
+    expect(response?.status).toBe(429);
+    expect(response?.headers.get('x-should-retry')).toBe('false');
+    const body = await response?.json();
+    expect(body).toMatchObject({ error_type: ProxyErrorType.rate_limit_exceeded });
+    expect(JSON.stringify(body)).not.toContain('PROMOTION_MODEL_LIMIT_REACHED');
+  });
+
+  it('counts an anonymous caller per IP and answers with the sign-up prompt', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await reject(anonymous);
+
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(request, {
+      kind: 'ip',
+      ipAddress: '192.0.2.1',
+    });
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: 'PROMOTION_MODEL_LIMIT_REACHED' },
+      error_type: ProxyErrorType.rate_limit_exceeded,
+    });
+  });
+
+  it('exempts the default benchmark user without counting it', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    await expect(
+      reject({ ...signedIn, user: { ...user, id: DEFAULT_BENCHMARK_USER_ID } })
+    ).resolves.toBeNull();
+    expect(isFreeModelRateLimited).not.toHaveBeenCalled();
+  });
+});
+
+describe('managedGatewayRejection', () => {
+  const openRouterDisabled: OrganizationGatewaySettings = {
+    disabledGateways: new Set(['openrouter']),
+    dataRegion: null,
+  };
+
+  it.each([
+    { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
+    { type: 'custom', apiUrl: 'https://openrouter.ai/api/v1' },
+  ] as const)('rejects a $type provider at $apiUrl', async ({ type, apiUrl }) => {
+    const response = managedGatewayRejection(openRouterDisabled, type, apiUrl);
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toMatchObject({
+      error:
+        'This request would be routed through OpenRouter, which your organization has disabled.',
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
+  });
+
+  it.each([
+    { settings: openRouterDisabled, type: 'vercel', apiUrl: 'https://ai-gateway.vercel.sh/v1' },
+    { settings: openRouterDisabled, type: 'custom', apiUrl: 'https://notopenrouter.ai/v1' },
+    {
+      settings: NO_ORGANIZATION_GATEWAY_SETTINGS,
+      type: 'openrouter',
+      apiUrl: 'https://openrouter.ai/api/v1',
+    },
+  ] as const)('admits a $type provider at $apiUrl', ({ settings, type, apiUrl }) => {
+    expect(managedGatewayRejection(settings, type, apiUrl)).toBeNull();
+  });
+});
+
+describe('organizationGatewayPolicy', () => {
+  const openRouter = { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' } as const;
+  const vercel = { type: 'vercel', apiUrl: 'https://ai-gateway.vercel.sh/v1' } as const;
+
+  beforeEach(() => {
+    jest
+      .mocked(getRuntimeOrganizationFeatures)
+      .mockReset()
+      .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-1'] });
+  });
+
+  it('rejects a route through a gateway the organization disabled', async () => {
+    const policy = await organizationGatewayPolicy({
+      organizationId: 'org-1',
+      settings: { disable_openrouter: true, data_region: 'eu' },
+      provider: openRouter,
+    });
+
+    expect(policy.kind).toBe('rejected');
+    if (policy.kind === 'rejected') expect(policy.response.status).toBe(403);
+  });
+
+  it('returns the data region for an allowed route', async () => {
+    await expect(
+      organizationGatewayPolicy({
+        organizationId: 'org-1',
+        settings: { disable_openrouter: true, data_region: 'eu' },
+        provider: vercel,
+      })
+    ).resolves.toEqual({ kind: 'allowed', dataRegion: 'eu' });
+  });
+
+  it.each([
+    { organizationId: 'org-2', settings: { disable_openrouter: true, data_region: 'eu' } },
+    { organizationId: undefined, settings: { disable_openrouter: true, data_region: 'eu' } },
+    { organizationId: 'org-1', settings: undefined },
+  ] as const)(
+    'ignores the settings of $organizationId without the organization feature or settings',
+    async ({ organizationId, settings }) => {
+      await expect(
+        organizationGatewayPolicy({ organizationId, settings, provider: openRouter })
+      ).resolves.toEqual({ kind: 'allowed', dataRegion: null });
+    }
+  );
 });

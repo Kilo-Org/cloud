@@ -15,7 +15,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { type ShareCliSpawnRow } from './share-cli-spawn';
@@ -96,7 +98,15 @@ function CliInstanceRows({
   const { t } = useTranslation();
   return (
     <View>
-      <SessionListSectionHeader title={t('share.connectedCli')} count={instances.length} />
+      <SessionListSectionHeader
+        title={t('share.connectedCli')}
+        count={instances.length}
+        accessibilityLabel={t('share.connectedCliAccessibility', {
+          title: t('share.connectedCli'),
+          count: instances.length,
+          displayCount: formatNumber(instances.length, i18n.language),
+        })}
+      />
       {instances.map(row => (
         <DestinationOptionRow
           key={row.connectionId}

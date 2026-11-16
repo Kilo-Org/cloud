@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { ProductionTokenProfileSchema, type ProductionTokenProfile } from './routing-table';
+import {
+  ProductionTokenProfileSchema,
+  type ProductionTokenProfile,
+} from './production-token-profile';
 
 /**
  * Every policy setting an admin can see on the router Policy tab.
@@ -112,6 +115,13 @@ export const POLICY_SETTING_VALUE_SCHEMAS = {
   classifierMaxP95LatencyMs: z.number().int().positive(),
 } as const satisfies Record<PolicySettingKey, z.ZodType>;
 
+/** Stored value a saved config uses for an auto setting the admin form leaves blank. */
+export const POLICY_SETTING_VALUE_DEFAULTS = {
+  accuracyNoiseBand: 0.05,
+  productionTokenProfile: null,
+  switchHorizonTurns: null,
+} as const satisfies Partial<Record<PolicySettingKey, PolicySettingValue>>;
+
 const VALUE = POLICY_SETTING_VALUE_SCHEMAS;
 
 type AutoPolicySettingKey = {
@@ -198,13 +208,21 @@ export type PolicySettingState = z.infer<typeof PolicySettingStateSchema>;
 export const PolicySettingsStateSchema = z.record(PolicySettingKeySchema, PolicySettingStateSchema);
 export type PolicySettingsState = Record<PolicySettingKey, PolicySettingState>;
 
-/** The stored config values a policy setting falls back to when nothing is computed. */
+/**
+ * The stored config values a policy setting falls back to when nothing is
+ * computed. Only the auto settings are stored; a fixed setting has no stored
+ * form, its served value is `POLICY_SETTINGS[key].fixed`.
+ */
 export type PolicySettingDefaults = {
   minAccuracy: number;
   accuracyNoiseBand: number;
-  frontierMinAccuracyDelta: number;
   productionTokenProfile: ProductionTokenProfile | null;
   switchHorizonTurns: number | null;
+};
+
+/** Every effective policy value in its concrete type, auto and fixed. */
+export type PolicySettingValues = PolicySettingDefaults & {
+  frontierMinAccuracyDelta: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
   lowConfidenceThreshold: number | null;
@@ -253,13 +271,13 @@ export function resolvePolicySettings(config: PolicySettingSource): PolicySettin
 }
 
 /** Effective values in their concrete types, for read sites that build tables. */
-export function resolveEffectivePolicy(config: PolicySettingSource): PolicySettingDefaults {
+export function resolveEffectivePolicy(config: PolicySettingSource): PolicySettingValues {
   const overrides = parseStoredPolicyOverrides(config.policyOverrides);
   const computed = parseStoredPolicyComputed(config.policyComputed);
   // Overrides and computed values passed their own key's schema above, defaults
   // are typed per key, and each fixed value is authored for its key.
   const value = <K extends PolicySettingKey>(key: K) =>
-    resolveValue(key, config, overrides, computed) as PolicySettingDefaults[K];
+    resolveValue(key, config, overrides, computed) as PolicySettingValues[K];
   return {
     minAccuracy: value('minAccuracy'),
     accuracyNoiseBand: value('accuracyNoiseBand'),

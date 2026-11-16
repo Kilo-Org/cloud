@@ -1,8 +1,6 @@
 import * as z from 'zod';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
-export const DEFAULT_VERCEL_ROUTING_ENABLED = true;
-
 export const NOTE_MAX_LENGTH = 500;
 
 export const VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH = 200;
@@ -11,19 +9,12 @@ export const VERCEL_ROUTING_OPT_OUT_MODELS_MAX_COUNT = 200;
 const note = z.string().max(NOTE_MAX_LENGTH);
 
 /**
- * Saved configurations from before the switch only contain the obsolete
- * percentage fields, so a missing value parses as the compiled default.
- */
-const vercelRoutingEnabled = z.boolean().default(DEFAULT_VERCEL_ROUTING_ENABLED);
-
-/**
  * Saved configurations from before the field existed carry no list, so a
  * missing value parses as an empty one.
  */
 const storedVercelRoutingOptOutModels = z.array(z.string().min(1)).default([]);
 
 export const GatewayConfigSchema = z.object({
-  vercel_routing_enabled: vercelRoutingEnabled,
   vercel_routing_opt_out_models: storedVercelRoutingOptOutModels,
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),
@@ -41,7 +32,6 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = GatewayConfigSchema.parse({
 
 /** Schema for parsing the routing settings on the hot path. */
 export const GatewayRoutingConfigSchema = z.object({
-  vercel_routing_enabled: vercelRoutingEnabled,
   vercel_routing_opt_out_models: storedVercelRoutingOptOutModels,
 });
 
@@ -58,7 +48,6 @@ const vercelRoutingOptOutModels = z
 
 /** Schema for the admin set-mutation input. */
 export const GatewayConfigInputSchema = z.object({
-  vercel_routing_enabled: z.boolean(),
   vercel_routing_opt_out_models: vercelRoutingOptOutModels,
   note: note.nullable(),
 });
@@ -96,7 +85,7 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
   gateway_settings: {
     label: 'Gateway settings',
     description:
-      'Lets the organization turn off OpenRouter or the Vercel AI Gateway, and pin Vercel AI Gateway requests to a region, on its Providers & Models page.',
+      'Lets the organization turn off OpenRouter, and pin Vercel AI Gateway requests to a region, on its Providers & Models page.',
   },
 } as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
 

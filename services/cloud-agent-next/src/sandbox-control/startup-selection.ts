@@ -29,8 +29,9 @@ export type StartupCohortContext = {
 
 const orgIdsSchema = z.array(z.uuid()).min(1);
 
-function configuredOrgIds(raw: string | undefined): string[] | undefined {
+function configuredOrgIds(raw: string | undefined): '*' | string[] | undefined {
   if (raw === undefined) return undefined;
+  if (raw.trim() === '*') return '*';
   const values = raw
     .split(',')
     .map(value => value.trim())
@@ -54,8 +55,10 @@ function isIsolatedNativeSandbox(cohort: StartupCohortContext | undefined): bool
 function inOrgScope(
   provider: AgentSandboxProvider,
   cohort: StartupCohortContext | undefined,
-  orgIds: readonly string[]
+  orgIds: '*' | readonly string[]
 ): boolean {
+  if (provider === 'cloudflare-containers' && !isIsolatedNativeSandbox(cohort)) return false;
+  if (orgIds === '*') return true;
   if (orgIds.length === 0) return false;
   const routes = cohort?.preparingRoutes ?? [];
   if (routes.length === 0) return false;
@@ -65,11 +68,7 @@ function inOrgScope(
     if (orgId !== undefined && route.orgId !== orgId) return false;
     orgId = route.orgId;
   }
-  return (
-    orgId !== undefined &&
-    orgIds.includes(orgId) &&
-    (provider !== 'cloudflare-containers' || isIsolatedNativeSandbox(cohort))
-  );
+  return orgId !== undefined && orgIds.includes(orgId);
 }
 
 type StartupEnv = Pick<
@@ -102,7 +101,7 @@ function startupTarget(
 /**
  * The harness a sandbox's first allocation selects. Only a downloaded start in
  * the `RUNTIME_KILO2_ORG_IDS` scope runs v2 when every route has the trusted
- * cloud-agent-web origin.
+ * cloud-agent-web origin. `*` includes all organizations and personal accounts.
  * An unset list keeps v1 everywhere.
  */
 export function newSandboxHarness(
@@ -112,9 +111,11 @@ export function newSandboxHarness(
 ): RuntimeHarness {
   startupTarget(env, provider);
   const orgIds = configuredOrgIds(env.RUNTIME_KILO2_ORG_IDS);
+  const routes = cohort?.preparingRoutes ?? [];
   return orgIds !== undefined &&
     inOrgScope(provider, cohort, orgIds) &&
-    cohort?.preparingRoutes?.every(route => route.billingOrigin === 'cloud-agent-web')
+    routes.length > 0 &&
+    routes.every(route => route.billingOrigin === 'cloud-agent-web')
     ? 'kilo2'
     : 'kilo';
 }

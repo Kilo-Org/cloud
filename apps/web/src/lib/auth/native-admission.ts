@@ -374,7 +374,6 @@ async function verifyAppleAdmission(
   // (we return the existing user id for that check)
 
   const assertionResult = await verifyAppleAssertion(
-    keyId,
     appAttestClientDataHash(challenge),
     payload,
     existingKey.public_key

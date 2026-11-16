@@ -40,7 +40,6 @@ export function EnvVarsDialog({ value, onChange }: EnvVarsDialogProps) {
   const handleOpen = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen) {
-      // Reset to current value when opening
       setJsonText(JSON.stringify(value, null, 2));
       setError(null);
     }
@@ -50,20 +49,17 @@ export function EnvVarsDialog({ value, onChange }: EnvVarsDialogProps) {
     try {
       const parsed = JSON.parse(jsonText);
 
-      // Validate it's an object
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         setError('Must be a valid JSON object');
         return;
       }
 
-      // Validate count
       const keys = Object.keys(parsed);
       if (keys.length > MAX_VARS) {
         setError(`Maximum ${MAX_VARS} environment variables allowed`);
         return;
       }
 
-      // Validate keys and values
       for (const [key, val] of Object.entries(parsed)) {
         const keyError = profileVarKeyError(key);
         if (keyError !== null) {
@@ -80,7 +76,6 @@ export function EnvVarsDialog({ value, onChange }: EnvVarsDialogProps) {
         }
       }
 
-      // All validations passed
       onChange(parsed as Record<string, string>);
       setError(null);
       setOpen(false);

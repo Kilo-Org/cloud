@@ -118,7 +118,8 @@ export function renderRuntimeTarget(input: {
   if (startup.kilo2 !== undefined) {
     if (release.kilo2DescriptorSha256 === undefined)
       throw new Error('Kilo v2 target requires a verified Kilo v2 runtime handoff');
-    target.vars.RUNTIME_KILO2_ORG_IDS = startup.kilo2.orgIds.join(',');
+    target.vars.RUNTIME_KILO2_ORG_IDS =
+      startup.kilo2.orgIds === '*' ? '*' : startup.kilo2.orgIds.join(',');
     target.vars.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = z
       .string()
       .regex(/^[a-f0-9]{64}$/)

@@ -21,7 +21,6 @@ import {
   serial,
   vector,
   type AnyPgColumn,
-  bigserial,
 } from 'drizzle-orm/pg-core';
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -2919,30 +2918,6 @@ export const microdollar_usage_metadata = pgTable(
       .using('btree', table.session_id)
       .where(isNotNull(table.session_id)),
   ]
-);
-
-/** Replaced by `api_request_log_2`; no longer written or read, and will be dropped. */
-export const api_request_log = pgTable(
-  'api_request_log',
-  {
-    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    kilo_user_id: text(),
-    organization_id: text(),
-    session_id: text(),
-    vercel_request_id: text(),
-    provider: text(),
-    model: text(),
-    status_code: integer(),
-    /** Unused and always empty; the request body is stored in R2 under `request_r2_key`. */
-    request: jsonb(),
-    /** Unused and always empty; the response body is stored in R2 under `response_r2_key`. */
-    response: text(),
-    error: jsonb(),
-    request_r2_key: text(),
-    response_r2_key: text(),
-  },
-  table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
 /**

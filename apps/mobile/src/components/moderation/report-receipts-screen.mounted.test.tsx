@@ -140,13 +140,7 @@ vi.mock('@/components/empty-state', () => ({
   }) => createElement('EmptyState', { title, description }, action),
 }));
 vi.mock('@/components/query-error', () => ({
-  QueryError: ({
-    title,
-    onRetry,
-  }: {
-    title?: string;
-    onRetry?: () => void;
-  }) =>
+  QueryError: ({ title, onRetry }: { title?: string; onRetry?: () => void }) =>
     createElement(
       'QueryError',
       { title },

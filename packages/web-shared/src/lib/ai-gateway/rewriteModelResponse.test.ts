@@ -2064,9 +2064,9 @@ describe('JSON bodies that are not objects', () => {
 
   test.each(
     rewriters.flatMap(([name, kind, rewrite]) =>
-      ['null', '[]', '"text"', '42', 'true'].map(text => [name, kind, rewrite, text] as const)
+      ['null', '[]', '"text"', '42', 'true'].map(text => [name, text, kind, rewrite] as const)
     )
-  )('%s passes the JSON body %s through unchanged', async (_name, kind, rewrite, text) => {
+  )('%s passes the JSON body %s through unchanged', async (_name, text, kind, rewrite) => {
     const setBody = jest.fn();
     const result = await rewrite({
       response: new Response(text, {

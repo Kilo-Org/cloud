@@ -73,6 +73,7 @@ export default defineProject({
       'src/lib/pr-review/**/*.test.ts',
       'src/lib/app-actions/**/*.test.ts',
       'src/lib/cloud-environments/**/*.test.ts',
+      'src/lib/cloud-triggers/**/*.test.ts',
       'src/lib/app-actions/**/!(*.mounted).test.tsx',
       'modules/kilo-app-actions/*.test.ts',
       'modules/kilo-apple-model/*.test.ts',

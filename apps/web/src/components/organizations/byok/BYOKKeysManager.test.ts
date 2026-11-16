@@ -42,6 +42,12 @@ jest.mock('@/lib/trpc/utils', () => ({
         listCatalogModeSupportedModels: {
           queryOptions: () => ({ queryKey: ['byok', 'catalog-models'], queryFn: async () => ({}) }),
         },
+        listEndpointCatalogModelIds: {
+          queryOptions: (input: object) => ({
+            queryKey: ['byok', 'endpoint-catalog-models', input],
+            queryFn: async () => [],
+          }),
+        },
         experimentalByokEnabled: {
           queryOptions: () => ({ queryKey: ['byok', 'experimental'], queryFn: async () => false }),
         },

@@ -93,7 +93,9 @@ import {
   isByokEndpointProviderId,
   parseByokEndpointCredentials,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
 import {
+  BYOK_ENDPOINT_MAX_MODELS,
   ByokEndpointDefinitionSchema,
   type ByokEndpointCredentials,
   type ByokEndpointDefinition,
@@ -104,6 +106,7 @@ import {
   findByokEndpointBaseUrlViolation,
 } from '@/lib/byok/endpoint-upstream';
 import { testByokEndpoint } from '@/lib/byok/endpoint-test';
+import { endpointOriginChanged } from '@/lib/byok/endpoint-origin';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const KEY_DECRYPTION_FAILURE_MESSAGE =
@@ -114,6 +117,7 @@ const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try aga
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const ENDPOINT_NOT_FOUND_MESSAGE = 'BYOK endpoint not found';
+const ENDPOINT_HOST_CHANGED_MESSAGE = 'Enter the credentials again to use a different host';
 const ENDPOINT_CREDENTIALS_UNREADABLE_MESSAGE =
   'The stored endpoint credentials could not be read. Try again, or enter the credentials again.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
@@ -204,6 +208,14 @@ function canChangeCatalogMode(organizationRole: OrganizationRole | null) {
   return organizationRole === null || canManageOrganization(organizationRole);
 }
 
+/** The endpoint definition names the organization's upstream, so only the roles that manage keys see it. */
+function canReadEndpointDefinition(organizationRole: OrganizationRole | null) {
+  return (
+    organizationRole === null ||
+    (ORGANIZATION_BILLING_ROLES as OrganizationRole[]).includes(organizationRole)
+  );
+}
+
 /** A stored definition that no longer parses is listed without it, so the rest of the list still loads. */
 function readEndpointDefinition(keyId: string, endpoint: unknown): ByokEndpointDefinition | null {
   const parsed = ByokEndpointDefinitionSchema.safeParse(endpoint);
@@ -230,7 +242,7 @@ async function toBYOKApiKeyResponse(
     ...key,
     provider_name: definition?.name ?? getByokProviderDisplayName(key.provider_id),
     is_endpoint: isEndpoint,
-    endpoint: definition,
+    endpoint: definition && canReadEndpointDefinition(organizationRole) ? definition : null,
     serve_catalog_models: serveCatalogModels,
     supports_catalog_mode: supportsCatalog,
     // An enabled key can always leave catalog mode, even after its provider loses its mappings.
@@ -271,6 +283,7 @@ async function findOrganizationEndpointKey(organizationId: string, id: string) {
       provider_id: byok_api_keys.provider_id,
       encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
       management_source: byok_api_keys.management_source,
+      endpoint: byok_api_keys.endpoint,
     })
     .from(byok_api_keys)
     .where(and(eq(byok_api_keys.id, id), eq(byok_api_keys.organization_id, organizationId)));
@@ -278,6 +291,14 @@ async function findOrganizationEndpointKey(organizationId: string, id: string) {
     throw new TRPCError({ code: 'NOT_FOUND', message: ENDPOINT_NOT_FOUND_MESSAGE });
   }
   return key;
+}
+
+/** Stored credentials may only be sent to the host they were saved for. */
+function rejectEndpointHostChange(storedEndpoint: unknown, baseUrl: string) {
+  const stored = ByokEndpointDefinitionSchema.safeParse(storedEndpoint);
+  if (!stored.success || endpointOriginChanged(stored.data.base_url, baseUrl)) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: ENDPOINT_HOST_CHANGED_MESSAGE });
+  }
 }
 
 async function decryptEndpointCredentials(
@@ -991,6 +1012,25 @@ export const byokRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * Which of the given endpoint model ids a catalog-mode endpoint would serve, that is, which are
+   * live Kilo catalog ids that the endpoint may take over.
+   */
+  listEndpointCatalogModelIds: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        modelIds: z.array(z.string().max(200)).max(BYOK_ENDPOINT_MAX_MODELS * 10),
+      })
+    )
+    .output(z.array(z.string()))
+    .query(async ({ input, ctx }) => {
+      await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
+      const modelIds = [...new Set(input.modelIds)];
+      const served = await Promise.all(modelIds.map(isByokEndpointCatalogModelCandidate));
+      return modelIds.filter((_, index) => served[index]);
+    }),
+
   /** Adds an organization's own endpoint as a BYOK key. */
   createEndpoint: baseProcedure
     .input(CreateByokEndpointInputSchema)
@@ -1054,6 +1094,7 @@ export const byokRouter = createTRPCRouter({
       );
       const existingKey = await findOrganizationEndpointKey(organizationId, id);
       rejectManagedKeyMutation(existingKey.management_source);
+      if (!credentials) rejectEndpointHostChange(existingKey.endpoint, definition.base_url);
       await rejectDisallowedEndpointUrl(definition.base_url);
 
       const envelope = credentials
@@ -1098,6 +1139,7 @@ export const byokRouter = createTRPCRouter({
       let credentials = input.credentials;
       if (!credentials && id) {
         const key = await findOrganizationEndpointKey(organizationId, id);
+        rejectEndpointHostChange(key.endpoint, base_url);
         const stored = await decryptEndpointCredentials(key);
         if (!stored) {
           throw new TRPCError({

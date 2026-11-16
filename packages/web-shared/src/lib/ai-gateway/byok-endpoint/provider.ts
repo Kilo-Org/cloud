@@ -15,6 +15,8 @@ import {
   hasByokEndpointModelPlaceholder,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 
+const ANTHROPIC_VERSION = '2023-06-01';
+
 /** The request fields `applyTrackingIds` sets; `prompt_cache_key` stays because it only aids caching. */
 function removeTrackingIds(body: Record<string, unknown>) {
   delete body.user;
@@ -57,6 +59,10 @@ export function buildByokEndpointProvider(
       const body = context.request.body as Record<string, unknown>;
       if (!definition.forward_provider_routing) delete body.provider;
       if (!definition.forward_tracking_ids) removeTrackingIds(body);
+      // Anthropic's own API rejects Messages requests without it; compatible upstreams ignore it.
+      if (context.request.kind === 'messages') {
+        context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
+      }
     },
   };
 }

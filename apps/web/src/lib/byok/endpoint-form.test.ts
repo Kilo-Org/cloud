@@ -137,4 +137,21 @@ describe('mergeImportedModels', () => {
       ['other', 'Other'],
     ]);
   });
+
+  test('keeps renamed ids within the length limit', () => {
+    const longId = 'a'.repeat(200);
+    const existing = [toEndpointModelRow({ ...MODEL, id: longId, internal_id: 'first' })];
+
+    const merged = mergeImportedModels(existing, [
+      { ...MODEL, id: longId, internal_id: 'second' },
+      { ...MODEL, id: longId, internal_id: 'third' },
+    ]);
+
+    expect(merged.map(row => row.id)).toEqual([
+      longId,
+      `${'a'.repeat(198)}-2`,
+      `${'a'.repeat(198)}-3`,
+    ]);
+    expect(merged.every(row => row.id.length <= 200)).toBe(true);
+  });
 });

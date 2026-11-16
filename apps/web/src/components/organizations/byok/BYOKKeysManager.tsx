@@ -64,6 +64,10 @@ import {
 import type { BYOKApiKeyResponse } from '@/lib/byok/types';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
+import {
+  useEndpointCatalogModelIds,
+  type EndpointCatalogModelIds,
+} from './useEndpointCatalogModelIds';
 import { ByokEndpointDialog } from './ByokEndpointDialog';
 
 export {
@@ -96,6 +100,29 @@ function endpointModelLabels(key: BYOKApiKeyResponse): string[] {
     const id = key.serve_catalog_models ? model.id : `${key.provider_id}/${model.id}`;
     return model.name ? `${model.name} (${id})` : id;
   });
+}
+
+/** Warns about the models of a catalog-mode endpoint that no catalog id names, which it does not serve. */
+function EndpointCatalogModelWarning({
+  models,
+  catalogModelIds,
+}: {
+  models: string[];
+  catalogModelIds: EndpointCatalogModelIds | null;
+}) {
+  if (!catalogModelIds) return null;
+  const unserved = models.filter(
+    id => catalogModelIds.checked.has(id) && !catalogModelIds.served.has(id)
+  );
+  if (unserved.length === 0) return null;
+  const all = unserved.length === models.length;
+  return (
+    <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+      {all
+        ? 'None of this endpoint’s model IDs is a Kilo catalog model ID, so it serves no requests in catalog mode.'
+        : `${unserved.length} of this endpoint’s model IDs ${unserved.length === 1 ? 'is' : 'are'} not Kilo catalog model IDs and ${unserved.length === 1 ? 'is' : 'are'} not served in catalog mode: ${unserved.slice(0, 3).join(', ')}${unserved.length > 3 ? ', …' : ''}.`}
+    </p>
+  );
 }
 
 function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: boolean }) {
@@ -665,6 +692,15 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   // it never appears here with edit, toggle, test or delete controls.
   const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
   const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
+  const catalogModeEndpointModelIds =
+    listedKeys
+      ?.filter(key => key.is_endpoint && key.serve_catalog_models)
+      .flatMap(key => key.endpoint?.models.map(model => model.id) ?? []) ?? [];
+  const endpointCatalogModelIds = useEndpointCatalogModelIds(
+    organizationId ?? '',
+    catalogModeEndpointModelIds,
+    !!organizationId && catalogModeEndpointModelIds.length > 0
+  );
   const canReorder = listedKeyIds.length > 1;
 
   // A key in catalog mode serves catalog ids instead of the provider's prefixed ids.
@@ -781,8 +817,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           <div className="break-words">{displayName}</div>
                           {key.is_endpoint ? (
                             <p className="text-muted-foreground mt-1 text-xs">
-                              Endpoint · {key.endpoint?.models.length ?? 0} model
-                              {key.endpoint?.models.length === 1 ? '' : 's'}
+                              Endpoint
+                              {key.endpoint
+                                ? ` · ${key.endpoint.models.length} model${key.endpoint.models.length === 1 ? '' : 's'}`
+                                : ''}
                             </p>
                           ) : null}
                           {isManaged ? (
@@ -797,6 +835,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                 : getProviderModels(key.provider_id, key.serve_catalog_models)
                             }
                           />
+                          {key.is_endpoint && key.serve_catalog_models && key.endpoint ? (
+                            <EndpointCatalogModelWarning
+                              models={key.endpoint.models.map(model => model.id)}
+                              catalogModelIds={endpointCatalogModelIds}
+                            />
+                          ) : null}
                           {/* Shown while enabled so a key can leave catalog mode after its
                                 provider loses every catalog mapping. */}
                           {key.supports_catalog_mode || key.serve_catalog_models ? (

@@ -132,7 +132,16 @@ describe('BYOK endpoints', () => {
 
       const caller = await createCallerForUser(member.id);
       const [listed] = await caller.byok.list({ organizationId: organization.id });
-      expect(listed).toMatchObject({ id: created.id, provider_name: 'Internal gateway' });
+      expect(listed).toMatchObject({
+        id: created.id,
+        provider_name: 'Internal gateway',
+        is_endpoint: true,
+        endpoint: null,
+      });
+
+      const ownerCaller = await createCallerForUser(owner.id);
+      const [ownerListed] = await ownerCaller.byok.list({ organizationId: organization.id });
+      expect(ownerListed).toMatchObject({ id: created.id, endpoint: DEFINITION });
 
       const logs = await db
         .select()
@@ -235,6 +244,47 @@ describe('BYOK endpoints', () => {
       expect(JSON.parse(decryptStoredKey(await storedRow(created.id)))).toEqual(credentials);
     });
 
+    test('requires credentials when the host changes', async () => {
+      const created = await createEndpoint();
+      const caller = await createCallerForUser(owner.id);
+      const definition = { ...DEFINITION, base_url: 'https://attacker.example.com/v1' };
+
+      await expect(
+        caller.byok.updateEndpoint({ organizationId: organization.id, id: created.id, definition })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Enter the credentials again to use a different host',
+      });
+      expect((await storedRow(created.id)).endpoint).toEqual(DEFINITION);
+
+      const credentials: ByokEndpointCredentials = { type: 'api_key', api_key: 'new-host-secret' };
+      await caller.byok.updateEndpoint({
+        organizationId: organization.id,
+        id: created.id,
+        definition,
+        credentials,
+      });
+      const row = await storedRow(created.id);
+      expect(row.endpoint).toEqual(definition);
+      expect(JSON.parse(decryptStoredKey(row))).toEqual(credentials);
+    });
+
+    test('keeps the stored credentials when only the path changes', async () => {
+      const created = await createEndpoint();
+      const caller = await createCallerForUser(owner.id);
+      const definition = { ...DEFINITION, base_url: 'https://llm.example.com/v2' };
+
+      await caller.byok.updateEndpoint({
+        organizationId: organization.id,
+        id: created.id,
+        definition,
+      });
+
+      const row = await storedRow(created.id);
+      expect(row.endpoint).toEqual(definition);
+      expect(JSON.parse(decryptStoredKey(row))).toEqual(API_KEY_CREDENTIALS);
+    });
+
     test('only updates endpoints of the organization', async () => {
       const created = await createEndpoint();
       const providerKey = await (
@@ -258,6 +308,24 @@ describe('BYOK endpoints', () => {
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
+  });
+
+  test('listEndpointCatalogModelIds is limited to roles that manage keys', async () => {
+    const memberCaller = await createCallerForUser(member.id);
+    await expect(
+      memberCaller.byok.listEndpointCatalogModelIds({
+        organizationId: organization.id,
+        modelIds: ['my-model'],
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    const ownerCaller = await createCallerForUser(owner.id);
+    await expect(
+      ownerCaller.byok.listEndpointCatalogModelIds({
+        organizationId: organization.id,
+        modelIds: [],
+      })
+    ).resolves.toEqual([]);
   });
 
   test('setCatalogMode turns catalog mode on for an endpoint', async () => {
@@ -313,15 +381,57 @@ describe('BYOK endpoints', () => {
 
       await caller.byok.listModelsFromEndpoint({
         organizationId: organization.id,
-        base_url: 'https://other.example.com/v1',
+        base_url: 'https://llm.example.com/other/v2',
         id: created.id,
       });
 
       const headers = headersOf(upstream.calls[0]);
-      expect(upstream.calls[0].url).toBe('https://other.example.com/v1/models');
+      expect(upstream.calls[0].url).toBe('https://llm.example.com/other/v2/models');
       expect(headers.get('x-api-key')).toBe('stored');
       expect(headers.get('anthropic-version')).toBe('2023-06-01');
       expect(headers.has('authorization')).toBe(false);
+    });
+
+    test.each([
+      ['another host', 'https://attacker.example.com/v1'],
+      ['another port', 'https://llm.example.com:8443/v1'],
+      ['another scheme', 'http://llm.example.com/v1'],
+      ['a host that only looks the same', 'https://llm.example.com.attacker.example/v1'],
+    ])('does not send the stored credentials to %s', async (_case, base_url) => {
+      const created = await createEndpoint();
+      const upstream = mockUpstream(() => Response.json(MODELS_RESPONSE));
+      restoreFetch = upstream.restore;
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.byok.listModelsFromEndpoint({
+          organizationId: organization.id,
+          base_url,
+          id: created.id,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Enter the credentials again to use a different host',
+      });
+      expect(upstream.calls).toHaveLength(0);
+    });
+
+    test('compares the host of a per-model URL with the {model} placeholder filled in', async () => {
+      const created = await createEndpoint({
+        ...DEFINITION,
+        base_url: 'https://llm.example.com/{model}/v1',
+      });
+      const upstream = mockUpstream(() => Response.json(MODELS_RESPONSE));
+      restoreFetch = upstream.restore;
+      const caller = await createCallerForUser(owner.id);
+
+      await caller.byok.listModelsFromEndpoint({
+        organizationId: organization.id,
+        base_url: 'https://llm.example.com/v1',
+        id: created.id,
+      });
+
+      expect(upstream.calls).toHaveLength(1);
     });
 
     test('signs AWS requests with SigV4', async () => {

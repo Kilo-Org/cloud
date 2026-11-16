@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Download, Eye, EyeOff, Info, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,7 +54,12 @@ import {
   type EndpointForm,
   type EndpointModelRow,
 } from '@/lib/byok/endpoint-form';
+import { endpointOriginChanged } from '@/lib/byok/endpoint-origin';
 import { ByokEndpointImportDialog } from './ByokEndpointImportDialog';
+import {
+  useEndpointCatalogModelIds,
+  type EndpointCatalogModelIds,
+} from './useEndpointCatalogModelIds';
 
 export type ByokEndpointDialogKey = {
   id: string;
@@ -224,16 +229,20 @@ function SecretInput({
 function CredentialsFields({
   value,
   onChange,
-  isEditing,
+  notice,
+  onKeepSaved,
 }: {
   value: EndpointCredentialsForm;
   onChange: (update: Partial<EndpointCredentialsForm>) => void;
-  isEditing: boolean;
+  /** Why the credentials must be entered, when they must. */
+  notice?: ReactNode;
+  /** Goes back to the saved credentials; absent when they cannot be kept. */
+  onKeepSaved?: () => void;
 }) {
-  const keep = isEditing ? 'Leave blank to keep the saved value' : undefined;
   return (
     <fieldset className="space-y-3">
       <legend className="type-label mb-2">Credentials</legend>
+      {notice}
       <div className="space-y-2">
         <Label htmlFor="endpoint-credentials-type">Authentication</Label>
         <Select
@@ -259,7 +268,7 @@ function CredentialsFields({
             id="endpoint-api-key"
             value={value.api_key}
             onChange={api_key => onChange({ api_key })}
-            placeholder={keep ?? 'Enter API key'}
+            placeholder="Enter API key"
           />
           <p className="text-muted-foreground text-xs">
             {value.type === 'api_key'
@@ -276,7 +285,7 @@ function CredentialsFields({
               id="endpoint-aws-region"
               value={value.region}
               onChange={e => onChange({ region: e.target.value })}
-              placeholder={isEditing ? 'Keep saved' : 'us-east-1'}
+              placeholder="us-east-1"
             />
           </div>
           <div className="space-y-2">
@@ -285,7 +294,7 @@ function CredentialsFields({
               id="endpoint-aws-access-key-id"
               value={value.access_key_id}
               onChange={access_key_id => onChange({ access_key_id })}
-              placeholder={isEditing ? 'Keep saved' : 'AKIA…'}
+              placeholder="AKIA…"
             />
           </div>
           <div className="space-y-2">
@@ -294,7 +303,7 @@ function CredentialsFields({
               id="endpoint-aws-secret"
               value={value.secret_access_key}
               onChange={secret_access_key => onChange({ secret_access_key })}
-              placeholder={isEditing ? 'Keep saved' : 'Secret access key'}
+              placeholder="Secret access key"
             />
           </div>
           <p className="text-muted-foreground text-xs sm:col-span-3">
@@ -310,7 +319,7 @@ function CredentialsFields({
             id="endpoint-service-account"
             value={value.service_account_json}
             onChange={service_account_json => onChange({ service_account_json })}
-            placeholder={keep ?? '{"type": "service_account", "project_id": "...", ...}'}
+            placeholder='{"type": "service_account", "project_id": "...", ...}'
             multiline
           />
           <p className="text-muted-foreground text-xs">
@@ -320,10 +329,13 @@ function CredentialsFields({
         </div>
       ) : null}
       <p className="text-muted-foreground text-xs">
-        {isEditing
-          ? 'The saved credentials cannot be viewed. Leave the fields blank to keep them.'
-          : 'Credentials are encrypted and stored securely. Once saved, they cannot be viewed again.'}
+        Credentials are encrypted and stored securely. Once saved, they cannot be viewed again.
       </p>
+      {onKeepSaved ? (
+        <Button type="button" variant="ghost" size="sm" onClick={onKeepSaved}>
+          Keep saved credentials
+        </Button>
+      ) : null}
     </fieldset>
   );
 }
@@ -385,10 +397,13 @@ function hasOverrides(row: EndpointModelRow) {
 function ModelsTable({
   rows,
   endpointApiKinds,
+  catalogModelIds,
   onChange,
 }: {
   rows: EndpointModelRow[];
   endpointApiKinds: CustomLlmApiKind[];
+  /** Set in catalog mode, once looked up. */
+  catalogModelIds: EndpointCatalogModelIds | null;
   onChange: (rows: EndpointModelRow[]) => void;
 }) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
@@ -446,6 +461,12 @@ function ModelsTable({
                       aria-label={`Model ID of ${label}`}
                       className={`${cellInput} font-mono`}
                     />
+                    {catalogModelIds?.checked.has(row.id.trim()) &&
+                    !catalogModelIds.served.has(row.id.trim()) ? (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                        Not a Kilo catalog model id — not served in catalog mode
+                      </p>
+                    ) : null}
                   </td>
                   <td className="p-2">
                     <Input
@@ -545,11 +566,24 @@ function ByokEndpointForm({
     toEndpointForm(editingKey?.endpoint ?? null)
   );
   const [credentials, setCredentials] = useState(EMPTY_ENDPOINT_CREDENTIALS_FORM);
+  const [replacingCredentials, setReplacingCredentials] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [importedModels, setImportedModels] = useState<ByokEndpointModel[] | null>(null);
   const updateForm = (update: Partial<EndpointForm>) =>
     setForm(current => ({ ...current, ...update }));
   const hasPlaceholder = form.base_url.includes(BYOK_ENDPOINT_MODEL_PLACEHOLDER);
+  // Saved credentials only go to the host they were saved for.
+  const hostChanged = editingKey
+    ? !editingKey.endpoint || endpointOriginChanged(editingKey.endpoint.base_url, form.base_url)
+    : false;
+  const credentialsRequired = !isEditing || hostChanged;
+  const showsCredentialInputs = credentialsRequired || replacingCredentials;
+  const catalogModelIds = useEndpointCatalogModelIds(
+    organizationId,
+    form.models.map(row => row.id),
+    editingKey?.serve_catalog_models ?? false
+  );
+  const credentialsInput = showsCredentialInputs ? credentials : EMPTY_ENDPOINT_CREDENTIALS_FORM;
 
   const mutationOptions = {
     onSuccess: () => {
@@ -575,7 +609,9 @@ function ByokEndpointForm({
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleImport = () => {
-    const builtCredentials = buildEndpointCredentials(credentials, { optional: isEditing });
+    const builtCredentials = buildEndpointCredentials(credentialsInput, {
+      optional: !credentialsRequired,
+    });
     if (!builtCredentials.success) {
       setErrors(builtCredentials.errors);
       return;
@@ -592,7 +628,9 @@ function ByokEndpointForm({
 
   const handleSave = () => {
     const definition = buildEndpointDefinition(form);
-    const builtCredentials = buildEndpointCredentials(credentials, { optional: isEditing });
+    const builtCredentials = buildEndpointCredentials(credentialsInput, {
+      optional: !credentialsRequired,
+    });
     const nextErrors = [
       ...(definition.success ? [] : definition.errors),
       ...(builtCredentials.success ? [] : builtCredentials.errors),
@@ -656,11 +694,48 @@ function ByokEndpointForm({
           </p>
         </div>
 
-        <CredentialsFields
-          value={credentials}
-          onChange={update => setCredentials(current => ({ ...current, ...update }))}
-          isEditing={isEditing}
-        />
+        {showsCredentialInputs ? (
+          <CredentialsFields
+            value={credentials}
+            onChange={update => setCredentials(current => ({ ...current, ...update }))}
+            notice={
+              isEditing && hostChanged ? (
+                <Alert>
+                  <Info className="size-4" />
+                  <AlertDescription>
+                    The base URL points to a different host than the saved one. Enter the
+                    credentials again; saved credentials are never sent to another host.
+                  </AlertDescription>
+                </Alert>
+              ) : undefined
+            }
+            onKeepSaved={
+              isEditing && !hostChanged
+                ? () => {
+                    setCredentials(EMPTY_ENDPOINT_CREDENTIALS_FORM);
+                    setReplacingCredentials(false);
+                  }
+                : undefined
+            }
+          />
+        ) : (
+          <fieldset className="space-y-3">
+            <legend className="type-label mb-2">Credentials</legend>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-muted-foreground text-sm">
+                Saved credentials are kept. They cannot be viewed.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReplacingCredentials(true)}
+              >
+                Replace credentials
+              </Button>
+            </div>
+          </fieldset>
+        )}
 
         <fieldset className="space-y-4">
           <legend className="type-label mb-2">APIs</legend>
@@ -786,6 +861,7 @@ function ByokEndpointForm({
           <ModelsTable
             rows={form.models}
             endpointApiKinds={form.api_kinds}
+            catalogModelIds={catalogModelIds}
             onChange={models => updateForm({ models })}
           />
         </section>

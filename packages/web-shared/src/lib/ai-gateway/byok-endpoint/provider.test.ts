@@ -36,18 +36,19 @@ async function transform(endpoint: ByokEndpointDefinition, request: GatewayReque
     API_KEY_AUTH
   );
   applyTrackingIds(request, provider, 'user-1', 'task-1');
+  const extraHeaders: Record<string, string> = {};
   await provider.transformRequest({
     provider,
     model: `${PROVIDER_ID}/acme/coder`,
     request,
     originalHeaders: EmptyFraudDetectionHeaders,
-    extraHeaders: {},
+    extraHeaders,
     userByok: null,
     kilo_user_id: 'user-1',
     organization_id: 'org-1',
     session_id: null,
   });
-  return { provider, body: request.body as Record<string, unknown> };
+  return { provider, body: request.body as Record<string, unknown>, extraHeaders };
 }
 
 function chatRequest(): GatewayRequest {
@@ -118,6 +119,14 @@ describe('buildByokEndpointProvider', () => {
     request.body.metadata = { user_id: 'client', trace: 'kept' } as typeof request.body.metadata;
     const { body: withOtherMetadata } = await transform(definition(), request);
     expect(withOtherMetadata.metadata).toEqual({ trace: 'kept' });
+  });
+
+  it('sends anthropic-version on Messages requests only', async () => {
+    const { extraHeaders } = await transform(definition(), messagesRequest());
+    expect(extraHeaders['anthropic-version']).toBe('2023-06-01');
+
+    const { extraHeaders: chatHeaders } = await transform(definition(), chatRequest());
+    expect(chatHeaders).not.toHaveProperty('anthropic-version');
   });
 
   it('forwards provider routing and tracking ids when the endpoint asks for them', async () => {

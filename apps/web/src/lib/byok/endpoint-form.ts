@@ -85,6 +85,8 @@ export const EMPTY_ENDPOINT_CREDENTIALS_FORM: EndpointCredentialsForm = {
   service_account_json: '',
 };
 
+const MAX_MODEL_ID_LENGTH = 200;
+
 let nextRowKey = 0;
 
 export function toEndpointModelRow(model?: ByokEndpointModel): EndpointModelRow {
@@ -263,7 +265,9 @@ export function mergeImportedModels(
   for (const model of imported) {
     if (internalIds.has(model.internal_id)) continue;
     let id = model.id;
-    for (let suffix = 2; ids.has(id); suffix++) id = `${model.id}-${suffix}`;
+    for (let suffix = 2; ids.has(id); suffix++) {
+      id = `${model.id.slice(0, MAX_MODEL_ID_LENGTH - String(suffix).length - 1)}-${suffix}`;
+    }
     ids.add(id);
     internalIds.add(model.internal_id);
     added.push(toEndpointModelRow({ ...model, id }));

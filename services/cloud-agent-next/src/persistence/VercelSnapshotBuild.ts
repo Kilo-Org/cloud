@@ -49,11 +49,10 @@ import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-
 import { resolveSecret } from '../auth.js';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../shared/control-plane-protocol.js';
 import {
+  VERCEL_BASE_INSTALL_COMMAND,
   VERCEL_BASE_SYSTEM_SETUP,
-  VERCEL_BASE_NODE_SETUP,
-  VERCEL_BASE_GH_STACK_SETUP,
+  VERCEL_BASE_VERIFICATION,
 } from '../byoc/vercel-runtime-base.js';
-import { toolchainVerificationScript } from '../shared/runtime-toolchain.js';
 import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
 import {
   hasStartupMarker,
@@ -687,13 +686,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         );
         await this.runCommand(state, client, builderSessionId, 'bash', [
           '-lc',
-          [
-            VERCEL_BASE_NODE_SETUP,
-            VERCEL_BASE_GH_STACK_SETUP,
-            toolchainVerificationScript(['bun']),
-            'case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac',
-            'git --version >/dev/null',
-          ].join('\n'),
+          VERCEL_BASE_INSTALL_COMMAND,
         ]);
         return this.next(state, {
           step: 'snapshot_builder',
@@ -767,6 +760,12 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           throw new VercelSandboxRestError('request_failed', 'get-session');
         }
         if (session.status !== 'running') throw new Error('validator_not_running');
+        // The ready projection records the deployed base digest, so prove that this
+        // snapshot, which older code may have installed, has the base tools.
+        await this.runCommand(state, client, validatorSessionId, 'bash', [
+          '-lc',
+          VERCEL_BASE_VERIFICATION,
+        ]);
         const credential = generateSandboxCredential();
         const credentialHash = await this.external(state, () => hashSandboxCredential(credential));
         const allocationId = state.build_generation;

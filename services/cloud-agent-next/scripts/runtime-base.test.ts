@@ -4,7 +4,16 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { localDirectoryArtifactStore } from './publish-runtime.js';
-import { ensureRuntimeBase, runtimeBaseInputId, withRuntimeRegistry } from './runtime-base.js';
+import { baseBinaryCheckScript } from '../src/shared/runtime-toolchain.js';
+import { RUNTIME_BASE_ABI } from '../src/sandbox-control/runtime-release.js';
+import {
+  RUNTIME_BASE_PLATFORM,
+  ensureRuntimeBase,
+  runtimeBaseCheckScript,
+  runtimeBaseInputId,
+  verifyRuntimeBase,
+  withRuntimeRegistry,
+} from './runtime-base.js';
 
 it('publication builds once across wrapper, CLI and Worker changes, then rebuilds for base changes', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-base-matrix-'));
@@ -131,6 +140,59 @@ for (const withPlugins of [true, false])
       await fs.rm(root, { recursive: true, force: true });
     }
   });
+
+it('checks the published image for every required base command and no baked runtime', () => {
+  const script = runtimeBaseCheckScript();
+  expect(script).toContain(baseBinaryCheckScript());
+  expect(script).toContain('test -x /usr/bin/flock');
+  expect(script).toContain('test ! -e /usr/local/bin/kilo;');
+  expect(script).toContain('test ! -e /opt/kilo-cloud/kilo-git-credential');
+});
+
+it('runs the base check in the published image before it accepts the base', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-base-verify-'));
+  const previousPath = process.env.PATH;
+  try {
+    const bin = path.join(root, 'bin');
+    await fs.mkdir(bin);
+    const inputId = 'b'.repeat(64);
+    const calls = path.join(root, 'calls');
+    // Records each docker argv as one JSON line, so a multi-line script stays one argument.
+    await fs.writeFile(
+      path.join(bin, 'docker'),
+      '#!' +
+        process.execPath +
+        `\nconst args=process.argv.slice(2);require("node:fs").appendFileSync(${JSON.stringify(calls)},JSON.stringify(args)+"\\n");` +
+        `if(args[0]==="image"&&args[1]==="inspect")process.stdout.write(${JSON.stringify(
+          JSON.stringify({
+            Os: 'linux',
+            Architecture: 'amd64',
+            Config: { Labels: { 'io.kilo.runtime-base-input': inputId } },
+          })
+        )});`,
+      { mode: 0o755 }
+    );
+    process.env.PATH = bin + path.delimiter + previousPath;
+    const image = `registry.cloudflare.com/${'c'.repeat(32)}/kilo-runtime-base@sha256:${'d'.repeat(64)}`;
+
+    verifyRuntimeBase(
+      { format: 1, inputId, platform: RUNTIME_BASE_PLATFORM, abi: RUNTIME_BASE_ABI, image },
+      root
+    );
+
+    const argv = (await fs.readFile(calls, 'utf8'))
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as string[]);
+    const run = argv.find(args => args[0] === 'run');
+    expect(run).toBeDefined();
+    expect(run?.slice(-3)).toEqual([image, '-ec', runtimeBaseCheckScript()]);
+    expect(run?.at(-1)).toContain(baseBinaryCheckScript());
+  } finally {
+    process.env.PATH = previousPath;
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
 
 it('changes the base identity when only the runtime ABI changes', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-base-abi-'));

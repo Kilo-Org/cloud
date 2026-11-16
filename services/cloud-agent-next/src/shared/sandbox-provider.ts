@@ -71,8 +71,9 @@ export const PROVIDER_DESCRIPTORS = {
     label: 'Vercel',
     // Vercel reserves 23456 for its runtime.
     reservedPreviewPorts: [23456],
-    // The Vercel node24 snapshot installs Bun and global CLIs in /usr/local/bin.
-    // Supply the runtime path directly instead of reading a snapshot's login profile.
+    // Only the bootstrap shell gets this PATH. The bootstrap starts the supervisor,
+    // and so Kilo, with `RUNTIME_PROCESS_PATH`, so the base snapshot links every
+    // base tool into /usr/local/bin.
     launchEnv: {
       PATH: '/usr/local/bin:/vercel/runtimes/node24/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin',
     },

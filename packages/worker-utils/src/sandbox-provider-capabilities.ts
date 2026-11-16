@@ -47,7 +47,7 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
     environmentSnapshots: true,
     egressPolicy: false,
     multiRepository: false,
-    scmCliTools: false,
+    scmCliTools: true,
     meteredBilling: false,
   },
   'cloudflare-containers': {

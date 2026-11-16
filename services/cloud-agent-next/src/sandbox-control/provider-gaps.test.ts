@@ -55,12 +55,6 @@ const PROVIDER_GAPS: readonly ProviderGap[] = [
   },
   {
     provider: 'vercel',
-    feature: 'scmCliTools',
-    class: 'gap',
-    reason: 'The base snapshot does not install gh, glab, gh-stack, pnpm or rg.',
-  },
-  {
-    provider: 'vercel',
     feature: 'meteredBilling',
     class: 'intentional',
     reason: 'The customer pays Vercel; Kilo does not meter BYOC compute.',

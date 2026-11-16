@@ -27,6 +27,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   assertSandboxAllocationAvailable,
+  assertVercelRuntimeSupports,
   getSandboxSelectionCapabilities,
   isRetiredSandboxAllocation,
   isSandboxAllocationAvailable,
@@ -1060,6 +1061,7 @@ async function allocateNewSession(
   await assertSandboxAllocationMembership(input, ctx);
   const requestedAllocation = requestedSandboxAllocation(input);
   const orgId = input.options?.kilocodeOrganizationId;
+  const capability = allocationCapabilityFor(input, options?.billingOrigin);
   // Every allocation is validated when it is allocated, whether the client chose
   // it or saved settings resolved it, so a pinned retry cannot outlive the
   // owner's access to sandbox selection.
@@ -1069,7 +1071,7 @@ async function allocateNewSession(
       { userId: ctx.userId, orgId },
       requestedAllocation,
       input.repository.type,
-      allocationCapabilityFor(input, options?.billingOrigin)
+      capability
     );
   }
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
@@ -1183,6 +1185,7 @@ async function allocateNewSession(
       if (enrollment.setupStatus !== 'ready') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
       }
+      await assertVercelRuntimeSupports(enrollment, capability);
       sandboxProviderBinding = {
         kind: 'vercel',
         source: {

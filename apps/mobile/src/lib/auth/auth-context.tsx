@@ -679,7 +679,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     const handler = async () => {
       const outcome = await performRefresh();
 
-      if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
+      if (outcome.kind === 'ok' && isCurrentAuthEpoch(outcome.sessionVersion)) {
         setToken(outcome.token);
         // Invalidate all queries so failed authenticated work recovers
         // with the new token. UNAUTHORIZED errors have retry=0, so a
@@ -697,8 +697,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // session at all: the bootstrap gate already routes it to login, so it
       // reaches neither branch here.
       if (
-        !outcome.ok &&
-        outcome.unrenewable &&
+        outcome.kind === 'unrenewable' &&
         isCurrentAuthEpoch(outcome.sessionVersion) &&
         !isSignedOutReference.current
       ) {
@@ -714,8 +713,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // refresh from an older session — so re-check before tearing down: a
       // newer session must not be signed out by an older refusal.
       if (
-        !outcome.ok &&
-        outcome.refused &&
+        outcome.kind === 'refused' &&
         isCurrentAuthEpoch(outcome.sessionVersion) &&
         !isSignedOutReference.current
       ) {
@@ -760,7 +758,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
           const outcome = await performRefresh();
 
-          if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
+          if (outcome.kind === 'ok' && isCurrentAuthEpoch(outcome.sessionVersion)) {
             setToken(outcome.token);
             return;
           }
@@ -773,8 +771,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // inside the refresh awaits, so a refusal from a superseded session
           // must not sign out the newer one.
           if (
-            !outcome.ok &&
-            outcome.refused &&
+            outcome.kind === 'refused' &&
             isCurrentAuthEpoch(outcome.sessionVersion) &&
             !isSignedOutReference.current
           ) {
@@ -784,8 +781,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // token. End it now, once, instead of letting every later request
           // fail against a token nothing can renew.
           if (
-            !outcome.ok &&
-            outcome.unrenewable &&
+            outcome.kind === 'unrenewable' &&
             isCurrentAuthEpoch(outcome.sessionVersion) &&
             !isSignedOutReference.current
           ) {

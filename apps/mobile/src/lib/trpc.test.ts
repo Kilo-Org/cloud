@@ -278,6 +278,53 @@ describe('getAuthHeaders', () => {
     }
   });
 
+  it('shares one unlock wait across concurrent requests and releases both', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+    // `afterEach` resets the module registry: the gate must come from the same
+    // graph as `./trpc`, so it is loaded here rather than statically.
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const first = headers();
+      const second = headers();
+      await vi.advanceTimersByTimeAsync(1);
+      // One lock window, one shared wait: a second request joins the first
+      // instead of registering its own deadline timer.
+      expect(vi.getTimerCount()).toBe(1);
+
+      setProtectedDataAvailable(true);
+      await vi.advanceTimersByTimeAsync(1);
+      const [firstHeaders, secondHeaders] = await Promise.all([first, second]);
+      expect(firstHeaders).toMatchObject({ Authorization: 'Bearer stored-token' });
+      expect(secondHeaders).toMatchObject({ Authorization: 'Bearer stored-token' });
+      // The shared wait cleared itself, so the next lock starts a fresh one.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends an unauthenticated request without waiting while protected data is available', async () => {
+    // Android has no protected-data source, so the gate always reports
+    // available there and this is the only path a foreground request takes: no
+    // wait, no timer, and therefore no way for the deferral to hold up the UI.
+    const headers = await loadHeaders();
+    vi.useFakeTimers();
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(0);
+      const sent = await pending;
+      expect(sent).not.toHaveProperty('Authorization');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('sends the request unauthenticated when the lock outlasts the request budget', async () => {
     // Not resolving is worse than sending: a background request must not
     // outlive the app's own control-plane budget. Past the bound the request

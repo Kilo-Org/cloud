@@ -66,3 +66,26 @@ export async function whenProtectedDataAvailable(): Promise<void> {
     waiters.add(resolve);
   });
 }
+
+/**
+ * Resolves at the next unlock or after `deadlineMs`, whichever comes first.
+ *
+ * A caller that cannot wait for the unlock forever — a background request must
+ * not outlive the app's own request budget — gets the same wake-up as
+ * {@link whenProtectedDataAvailable}, but its waiter leaves the set when the
+ * deadline wins instead of sitting there until the device happens to unlock.
+ */
+export async function whenProtectedDataAvailableWithin(deadlineMs: number): Promise<void> {
+  if (available) {
+    return;
+  }
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  const release = (): void => {
+    clearTimeout(timer);
+    waiters.delete(release);
+    resolve(undefined);
+  };
+  const timer = setTimeout(release, deadlineMs);
+  waiters.add(release);
+  await promise;
+}

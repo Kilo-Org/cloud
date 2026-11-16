@@ -2644,7 +2644,7 @@ describe('reactive auth epoch', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome.ok).toBe(true);
+    expect(outcome.kind).toBe('ok');
     expect(tokens.getActiveToken()?.token).toBe('refreshed-token');
     expect(scope.getAuthenticatedOwner()).toBe(owner);
     expect(scope.isAuthenticatedOwner(owner)).toBe(true);

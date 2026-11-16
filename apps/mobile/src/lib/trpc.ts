@@ -20,7 +20,7 @@ import {
   getAuthTokenForRequest,
   publishActiveTokenExpiry,
 } from '@/lib/auth/token-owner';
-import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/protected-data';
+import { isProtectedDataAvailable, whenProtectedDataAvailableWithin } from '@/lib/protected-data';
 import { TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
@@ -189,15 +189,32 @@ async function readColdExpiry(active: ActiveTokenSnapshot | null): Promise<numbe
  * the control-plane deadline so a background request can never outlive the
  * app's own request budget. Past the bound the request proceeds exactly as it
  * did before — no token, no event.
+ *
+ * One wait is shared by every request that needs it: an unlock releases them
+ * all, and past the deadline a single timer leaves the protected-data waiter
+ * set, so a long lock under repeated requests accumulates nothing.
+ *
+ * Android never reaches the wait: it has no protected-data source, so
+ * `isProtectedDataAvailable()` is always true there and foreground requests take
+ * the held-token path.
  */
+let unlockWait: Promise<void> | null = null;
+
 async function waitForProtectedData(): Promise<void> {
   if (isProtectedDataAvailable()) {
     return;
   }
-  const deadline = new Promise<void>(resolve => {
-    setTimeout(resolve, CONTROL_PLANE_DEADLINE_MS);
-  });
-  await Promise.race([whenProtectedDataAvailable(), deadline]);
+  unlockWait ??= whenProtectedDataAvailableWithin(CONTROL_PLANE_DEADLINE_MS);
+  const wait = unlockWait;
+  try {
+    await wait;
+  } finally {
+    // Only the wait that settled may clear the slot: a newer one created after
+    // an unlock belongs to the requests behind it.
+    if (unlockWait === wait) {
+      unlockWait = null;
+    }
+  }
 }
 
 async function getAuthHeaders() {

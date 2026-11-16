@@ -391,7 +391,7 @@ describe('refresh rotation', () => {
     try {
       const outcome = await performRefresh();
 
-      expect(outcome.ok).toBe(true);
+      expect(outcome.kind).toBe('ok');
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
@@ -425,9 +425,7 @@ describe('refresh rotation', () => {
       const outcome = await performRefresh();
 
       expect(outcome).toEqual({
-        ok: false,
-        refused: false,
-        unrenewable: true,
+        kind: 'unrenewable',
         sessionVersion: currentAuthEpoch(),
       });
       expect(fetchMock).not.toHaveBeenCalled();
@@ -448,7 +446,7 @@ describe('refresh rotation', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     try {
-      await expect(performRefresh()).resolves.toEqual({ ok: false, refused: false });
+      await expect(performRefresh()).resolves.toEqual({ kind: 'transient' });
       expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
@@ -469,7 +467,7 @@ describe('refresh rotation', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     try {
-      await expect(performRefresh()).resolves.toEqual({ ok: false, refused: false });
+      await expect(performRefresh()).resolves.toEqual({ kind: 'transient' });
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       setProtectedDataAvailable(true);
@@ -490,11 +488,7 @@ describe('refresh rotation', () => {
 
       // A null member never refuses: even an empty set is an unreadable read,
       // not a signed-out session.
-      expect(outcome).toEqual({
-        ok: false,
-        refused: false,
-        unreadable: true,
-      });
+      expect(outcome).toEqual({ kind: 'unreadable' });
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
@@ -521,7 +515,7 @@ describe('refresh rotation', () => {
     try {
       const outcome = await performRefresh();
 
-      expect(outcome.ok).toBe(true);
+      expect(outcome.kind).toBe('ok');
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
@@ -547,8 +541,7 @@ describe('refresh rotation', () => {
       // A refusal is scoped to the session that owned the refresh: it carries
       // that session's epoch so a handler can drop it once the epoch has moved.
       expect(outcome).toEqual({
-        ok: false,
-        refused: true,
+        kind: 'refused',
         sessionVersion: currentAuthEpoch(),
       });
       expect(fetchMock).toHaveBeenCalledTimes(1);

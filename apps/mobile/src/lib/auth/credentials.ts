@@ -37,43 +37,42 @@ export const IOS_BEARER_SECURE_STORE_OPTIONS = {
 // concurrent callers await the same promise.
 let refreshPromise: Promise<RefreshOutcome> | null = null;
 
+/**
+ * The answer to one refresh attempt, tagged by the one state it is in. A caller
+ * switches on `kind`; no state is spelled as optional flags on another, so a
+ * combination such as "refused and unreadable" cannot be constructed.
+ */
 type RefreshSuccess = {
-  ok: true;
+  kind: 'ok';
   token: string;
   refreshToken: string;
   expiresIn: number;
+  /** The session that asked. A handler publishes the pair only while this is
+   *  still the current epoch: the epoch can move while the rotation awaits. */
   sessionVersion: number;
 };
+/** The server refused the stored pair: the session that owned it is over. */
 type RefreshRefused = {
-  ok: false;
-  refused: true;
-  superseded?: false;
-  unreadable?: false;
+  kind: 'refused';
   /** The session that owned the refusal. A handler must drop the refusal when
    *  this is no longer the current epoch: the epoch can move while the clear
    *  awaits, and signing out then would tear down the newer session. */
   sessionVersion: number;
 };
+/** Anything that leaves the stored pair untouched and worth retrying later. */
 type RefreshTransient = {
-  ok: false;
-  refused: false;
-  superseded?: false;
-  unreadable?: false;
+  kind: 'transient';
   /** The server's own back-off from a 429/503 `Retry-After`, when it sent one. */
   retryAfterMs?: number;
 };
-type RefreshSuperseded = { ok: false; refused: false; superseded: true; unreadable?: false };
+/** The session moved or sign-out began while the rotation awaited. */
+type RefreshSuperseded = { kind: 'superseded' };
 /**
  * The refresh-token read spent its whole budget on `null` and no member of the
  * credential set is present: there is no session to renew. Never a refusal —
  * a null member is not a signed-out session, so the caller must not sign out.
  */
-type RefreshUnreadable = {
-  ok: false;
-  refused: false;
-  superseded?: false;
-  unreadable: true;
-};
+type RefreshUnreadable = { kind: 'unreadable' };
 /**
  * The credential set holds a member but no refresh token, and the read that
  * found this was reliable (the device was unlocked, so the null is an absence,
@@ -82,11 +81,7 @@ type RefreshUnreadable = {
  * of retrying a rotation that has no credential to present.
  */
 type RefreshUnrenewable = {
-  ok: false;
-  refused: false;
-  superseded?: false;
-  unreadable?: false;
-  unrenewable: true;
+  kind: 'unrenewable';
   /** The session that owned the read. A handler drops this outcome once the
    *  epoch has moved: the set it describes no longer belongs to the person. */
   sessionVersion: number;
@@ -291,12 +286,12 @@ async function doRefresh(): Promise<RefreshOutcome> {
   const superseded = (): boolean =>
     !isCurrentAuthEpoch(sessionVersion) || isSignOutTeardownActive();
   if (superseded()) {
-    return { ok: false, refused: false, superseded: true };
+    return { kind: 'superseded' };
   }
   try {
     let storedRefreshToken = await readStoredValueWithRetry(REFRESH_TOKEN_KEY);
     if (superseded()) {
-      return { ok: false, refused: false, superseded: true };
+      return { kind: 'superseded' };
     }
     if (storedRefreshToken === null) {
       // A null is not proof of an absent session: a keychain item written
@@ -305,13 +300,13 @@ async function doRefresh(): Promise<RefreshOutcome> {
       // concluding the credential set cannot refresh.
       storedRefreshToken = await readStoredValueRetryingNull(REFRESH_TOKEN_KEY);
       if (superseded()) {
-        return { ok: false, refused: false, superseded: true };
+        return { kind: 'superseded' };
       }
     }
     if (storedRefreshToken === null && !isProtectedDataAvailable()) {
       // The device locked during the reads: the null is a refused read, not an
       // unreadable credential set. Retry later; never raise the restore error.
-      return { ok: false, refused: false };
+      return { kind: 'transient' };
     }
     if (storedRefreshToken === null) {
       // The credential set is one unit: a refresh-token absence is never a
@@ -323,9 +318,9 @@ async function doRefresh(): Promise<RefreshOutcome> {
         // legacy exchange) can never rotate. The device was unlocked, so this
         // null is a real absence: the rotation is unrenewable, and the caller
         // ends the session once rather than retrying forever.
-        return { ok: false, refused: false, unrenewable: true, sessionVersion };
+        return { kind: 'unrenewable', sessionVersion };
       }
-      return { ok: false, refused: false, unreadable: true };
+      return { kind: 'unreadable' };
     }
 
     // Bound the refresh network I/O at the control-plane deadline so a hung
@@ -342,7 +337,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
     });
 
     if (superseded()) {
-      return { ok: false, refused: false, superseded: true };
+      return { kind: 'superseded' };
     }
 
     if (!response.ok) {
@@ -366,14 +361,14 @@ async function doRefresh(): Promise<RefreshOutcome> {
           await clearStoredCredentialsAtEpoch(sessionVersion);
         }
         reportAuthTerminalFailure(REFRESH_PATH, classified.status);
-        return { ok: false, refused: true, sessionVersion };
+        return { kind: 'refused', sessionVersion };
       }
       if (classified.kind === 'retry') {
-        return { ok: false, refused: false, retryAfterMs: classified.retryAfterMs };
+        return { kind: 'transient', retryAfterMs: classified.retryAfterMs };
       }
       // A 2xx that failed `response.ok` is impossible; fall through to the
-      // retryable answer rather than inventing a fourth outcome.
-      return { ok: false, refused: false };
+      // retryable state rather than inventing a seventh one.
+      return { kind: 'transient' };
     }
 
     const body: unknown = await response.json();
@@ -381,11 +376,11 @@ async function doRefresh(): Promise<RefreshOutcome> {
 
     // A refresh response must include a full token pair with expiry.
     if (!parsed?.refreshToken || !parsed.expiresIn) {
-      return { ok: false, refused: false };
+      return { kind: 'transient' };
     }
 
     if (superseded()) {
-      return { ok: false, refused: false, superseded: true };
+      return { kind: 'superseded' };
     }
 
     const published = await persistSignInCredentialsAtEpoch(parsed.token, parsed.refreshToken, {
@@ -393,17 +388,17 @@ async function doRefresh(): Promise<RefreshOutcome> {
       expectedEpoch: sessionVersion,
     });
     if (!published) {
-      return { ok: false, refused: false, superseded: true };
+      return { kind: 'superseded' };
     }
 
     return {
-      ok: true,
+      kind: 'ok',
       token: parsed.token,
       refreshToken: parsed.refreshToken,
       expiresIn: parsed.expiresIn,
       sessionVersion,
     };
   } catch {
-    return { ok: false, refused: false };
+    return { kind: 'transient' };
   }
 }

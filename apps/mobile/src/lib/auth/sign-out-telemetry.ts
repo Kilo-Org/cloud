@@ -13,13 +13,13 @@ import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-
 
 export type AuthSignOutCause = 'user' | 'session_ended' | 'session_unrenewable';
 
-export type AuthBranch = 'explicit' | 'refresh_401' | 'refresh_token_absent';
+type AuthBranch = 'explicit' | 'refresh_401' | 'refresh_token_absent';
 
 /**
  * The branch each sign-out cause reports: the person signed out, the server
  * refused the credential set, or the set can never rotate again.
  */
-export const AUTH_BRANCH_BY_CAUSE = {
+const AUTH_BRANCH_BY_CAUSE = {
   user: 'explicit',
   session_ended: 'refresh_401',
   session_unrenewable: 'refresh_token_absent',

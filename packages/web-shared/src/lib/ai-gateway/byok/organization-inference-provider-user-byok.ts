@@ -1,8 +1,9 @@
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
-  getOrganizationByokProviderIds,
+  getEnabledByokProviders,
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getByokEndpointCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
 import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
@@ -29,18 +30,25 @@ export async function getAllowedDirectByokCatalogModelIds(
 }
 
 /**
- * The models among `modelIds` that the organization's provider keys sent through Vercel serve
- * although the provider allow-list admits none of their providers (see
- * `hasInferenceProviderUserByokForModel`).
+ * The models among `modelIds` that the organization's own keys serve although the provider
+ * allow-list admits none of their providers: provider keys sent through Vercel (see
+ * `hasInferenceProviderUserByokForModel`) and catalog-mode endpoints, which the allow-list never
+ * restricts.
  */
 export async function modelsServedByOrganizationInferenceProviderUserByok(
   organizationId: string,
   modelIds: readonly string[]
 ): Promise<string[]> {
   if (modelIds.length === 0) return [];
-  const providerIds = await getOrganizationByokProviderIds(readDb, organizationId);
+  const keys = await getEnabledByokProviders(readDb, { type: 'organization', id: organizationId });
+  const providerIds = keys.map(key => key.providerId);
+  const endpointCatalogModelIds = await getByokEndpointCatalogModelIds(keys);
   const served = await Promise.all(
-    modelIds.map(modelId => hasInferenceProviderUserByokForModel(modelId, providerIds))
+    modelIds.map(
+      async modelId =>
+        endpointCatalogModelIds.has(modelId) ||
+        (await hasInferenceProviderUserByokForModel(modelId, providerIds))
+    )
   );
   return modelIds.filter((_modelId, index) => served[index]);
 }

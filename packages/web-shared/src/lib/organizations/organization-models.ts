@@ -21,9 +21,13 @@ import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organization
 import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
-  getOrganizationByokProviderIds,
+  getEnabledByokProviders,
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  getByokEndpointCatalogModelIds,
+  getByokEndpointModels,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import {
@@ -75,25 +79,31 @@ export async function getAvailableModelsForOrganization(
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
-  const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
+  const [responseData, byokKeys, directByokCatalogModelIds] = await Promise.all([
     getEnhancedOpenRouterModels({ countryCode, fromDb }),
-    getOrganizationByokProviderIds(readDb, organizationId),
+    getEnabledByokProviders(readDb, { type: 'organization', id: organizationId }),
     getAllowedDirectByokCatalogModelIds(organizationId, policy),
   ]);
+  const byokProviderIds = byokKeys.map(key => key.providerId);
+  const endpointCatalogModelIds = await getByokEndpointCatalogModelIds(byokKeys);
   const restrictionCandidates = [...responseData.data];
 
   const { filteredModels, allowedProvidersByModel } = await applyModelPolicyToCatalog(
     policy,
     restrictionCandidates,
     byokProviderIds,
-    directByokCatalogModelIds
+    directByokCatalogModelIds,
+    endpointCatalogModelIds
   );
 
   let availableModels = addDirectByokCatalogAvailability(
-    await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
-      allowedProvidersByModel.get(modelId)
+    addDirectByokCatalogAvailability(
+      await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
+        allowedProvidersByModel.get(modelId)
+      ),
+      directByokCatalogModelIds
     ),
-    directByokCatalogModelIds
+    endpointCatalogModelIds
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {
@@ -105,6 +115,7 @@ export async function getAvailableModelsForOrganization(
   }
 
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
+  availableModels.push(...getByokEndpointModels(byokKeys));
   availableModels.push(
     ...(await listAvailableCustomLlms(organizationId, context.groupIds, countryCode))
   );
@@ -134,7 +145,8 @@ async function applyModelPolicyToCatalog(
   policy: EffectiveOrganizationModelPolicy,
   candidates: readonly OpenRouterModel[],
   byokProviderIds: readonly UserByokProviderId[],
-  directByokCatalogModelIds: ReadonlySet<string>
+  directByokCatalogModelIds: ReadonlySet<string>,
+  endpointCatalogModelIds: ReadonlySet<string>
 ): Promise<{
   filteredModels: OpenRouterModel[];
   allowedProvidersByModel: Map<string, ReadonlySet<string>>;
@@ -151,6 +163,12 @@ async function applyModelPolicyToCatalog(
     const decision = await getEffectiveModelDecision(policy, model.id);
     if (!decision.allowed && !directByokCatalogModelIds.has(model.id)) {
       if (!allowsInferenceProviderUserByok(decision)) {
+        continue;
+      }
+      // Like provider keys the allow-list cannot name, the organization's own endpoints are
+      // subject only to its model policy.
+      if (endpointCatalogModelIds.has(model.id)) {
+        filteredModels.push(model);
         continue;
       }
       inferenceCheck.checked += 1;

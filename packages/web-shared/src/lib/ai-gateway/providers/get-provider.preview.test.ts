@@ -215,6 +215,8 @@ function previewRouteOf(steps: ByokRoutePreviewStep[]): RouteSignature {
       return { route: step.route, gateway: step.gateway };
     case 'chatgpt':
       throw new Error('a ChatGPT step is never used');
+    case 'endpoint-byok':
+      throw new Error('these scenarios have no endpoint');
   }
 }
 

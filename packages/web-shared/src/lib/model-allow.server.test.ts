@@ -130,6 +130,20 @@ describe('model access predicates', () => {
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
+  test('exempts endpoint model ids, like bespoke direct BYOK ids', async () => {
+    const isAllowed = createAllowPredicateFromRestrictions(
+      {
+        requireModelInCurrentSnapshot: true,
+        providerAllowList: [],
+        modelDenyList: ['endpoint-a1b2c3d4e5/acme/coder'],
+      },
+      lookup({})
+    );
+
+    await expect(isAllowed('endpoint-a1b2c3d4e5/acme/coder')).resolves.toBe(true);
+    await expect(isAllowed('endpoint-short/acme/coder')).resolves.toBe(false);
+  });
+
   describe('custom LLMs', () => {
     const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
     const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';

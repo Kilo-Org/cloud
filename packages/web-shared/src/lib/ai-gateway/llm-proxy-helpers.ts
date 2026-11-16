@@ -296,12 +296,17 @@ const DIRECT_BYOK_PROVIDER_NAMES = new Map<string, string>(
 export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
   supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
-  directByokProviderId?: string
+  directByokProviderId?: string,
+  byokEndpointName?: string
 ) {
   const providerName =
     directByokProviderId &&
     (DIRECT_BYOK_PROVIDER_NAMES.get(directByokProviderId) ?? directByokProviderId);
-  const through = providerName ? ` through your ${providerName} key` : '';
+  const through = providerName
+    ? ` through your ${providerName} key`
+    : byokEndpointName
+      ? ` through your ${byokEndpointName} endpoint`
+      : '';
   const error = `This model does not support the ${apiKind} API${through}, please use any of: ${supportedApiKinds.join()}`;
   warnExceptInTest(`[apiKindNotSupportedResponse] ${error}`);
   return NextResponse.json(
@@ -634,6 +639,17 @@ export function directByokCatalogOnlyMessage(params: {
   return params.catalogModelId
     ? `${reason} Use '${params.catalogModelId}' instead.`
     : `${reason} This model has no catalog ID; turn off catalog mode for the key to use it.`;
+}
+
+export function byokEndpointCatalogOnlyMessage(params: {
+  model: string;
+  endpointName: string;
+  catalogModelId: string | null;
+}) {
+  const reason = `'${params.model}' is disabled because the ${params.endpointName} endpoint uses Kilo catalog model IDs.`;
+  return params.catalogModelId
+    ? `${reason} Use '${params.catalogModelId}' instead.`
+    : `${reason} This model has no catalog ID; turn off catalog mode for the endpoint to use it.`;
 }
 
 export function directByokCatalogOnlyResponse(message: string) {

@@ -55,6 +55,9 @@ jest.mock('@/lib/trpc/utils', () => ({
           mutationOptions: (options: object) => ({ ...options, mutationFn: mockReorder }),
         },
         testApiKey: mutation,
+        createEndpoint: mutation,
+        updateEndpoint: mutation,
+        listModelsFromEndpoint: mutation,
       },
     };
   },
@@ -169,6 +172,8 @@ describe('BYOK key priorities', () => {
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
       created_by: 'test-user',
+      is_endpoint: false,
+      endpoint: null,
     }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient = client;

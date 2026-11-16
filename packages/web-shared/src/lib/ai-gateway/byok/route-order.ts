@@ -3,15 +3,18 @@ import {
   GatewayUserByokProviderIdSchema,
   isGatewayUserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { isByokEndpointProviderId } from '@kilocode/db/schema-types';
 
 const directProviderIds: readonly string[] = DIRECT_BYOK_PROVIDERS.map(provider => provider.id);
 
 /**
- * The default route order for keys the owner never prioritized: provider keys that can use Kilo
- * catalog model IDs in `DIRECT_BYOK_PROVIDERS` order (the order catalog candidates are found in),
- * then provider keys sent through Vercel, then the Vercel AI Gateway key, then the OpenRouter key.
+ * The default route order for keys the owner never prioritized: the organization's own endpoints,
+ * then provider keys that can use Kilo catalog model IDs in `DIRECT_BYOK_PROVIDERS` order (the
+ * order catalog candidates are found in), then provider keys sent through Vercel, then the Vercel
+ * AI Gateway key, then the OpenRouter key.
  */
 export function getByokKeyDefaultRank(providerId: string): number {
+  if (isByokEndpointProviderId(providerId)) return -1;
   if (isGatewayUserByokProviderId(providerId)) {
     return 2 + GatewayUserByokProviderIdSchema.options.indexOf(providerId);
   }

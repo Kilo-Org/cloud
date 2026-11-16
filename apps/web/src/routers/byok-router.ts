@@ -28,6 +28,10 @@ import {
   TestBYOKKeyInputSchema,
   PreviewBYOKRoutingInputSchema,
   BYOKApiKeyResponseSchema,
+  CreateByokEndpointInputSchema,
+  UpdateByokEndpointInputSchema,
+  ListByokEndpointModelsInputSchema,
+  ListByokEndpointModelsResponseSchema,
   type BYOKApiKeyResponse,
 } from '@/lib/byok/types';
 import {
@@ -84,6 +88,22 @@ import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
 import { ADD_BYOK_PROVIDERS, getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import {
+  generateByokEndpointProviderId,
+  isByokEndpointProviderId,
+  parseByokEndpointCredentials,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import {
+  ByokEndpointDefinitionSchema,
+  type ByokEndpointCredentials,
+  type ByokEndpointDefinition,
+} from '@kilocode/db/schema-types';
+import {
+  ByokEndpointRequestError,
+  fetchByokEndpointModels,
+  findByokEndpointBaseUrlViolation,
+} from '@/lib/byok/endpoint-upstream';
+import { testByokEndpoint } from '@/lib/byok/endpoint-test';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const KEY_DECRYPTION_FAILURE_MESSAGE =
@@ -93,6 +113,9 @@ const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
 const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
+const ENDPOINT_NOT_FOUND_MESSAGE = 'BYOK endpoint not found';
+const ENDPOINT_CREDENTIALS_UNREADABLE_MESSAGE =
+  'The stored endpoint credentials could not be read. Try again, or enter the credentials again.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
 
 const EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS = {
@@ -133,6 +156,7 @@ const BYOK_KEY_COLUMNS = {
   management_source: byok_api_keys.management_source,
   is_enabled: byok_api_keys.is_enabled,
   settings: byok_api_keys.settings,
+  endpoint: byok_api_keys.endpoint,
 };
 
 function inRouteOrder<T extends { provider_id: string; settings: unknown }>(keys: T[]): T[] {
@@ -164,8 +188,13 @@ async function writeKeyPriorities(
 
 type BYOKKeyRow = Omit<
   BYOKApiKeyResponse,
-  'provider_name' | 'serve_catalog_models' | 'supports_catalog_mode' | 'can_change_catalog_mode'
-> & { settings: unknown };
+  | 'provider_name'
+  | 'serve_catalog_models'
+  | 'supports_catalog_mode'
+  | 'can_change_catalog_mode'
+  | 'is_endpoint'
+  | 'endpoint'
+> & { settings: unknown; endpoint: ByokEndpointDefinition | null };
 
 /**
  * Catalog mode decides whether organization model and provider policies apply to the key, so on organization
@@ -175,15 +204,33 @@ function canChangeCatalogMode(organizationRole: OrganizationRole | null) {
   return organizationRole === null || canManageOrganization(organizationRole);
 }
 
+/** A stored definition that no longer parses is listed without it, so the rest of the list still loads. */
+function readEndpointDefinition(keyId: string, endpoint: unknown): ByokEndpointDefinition | null {
+  const parsed = ByokEndpointDefinitionSchema.safeParse(endpoint);
+  if (!parsed.success) {
+    logByokWarning('Stored BYOK endpoint definition is invalid', { keyId });
+    return null;
+  }
+  return parsed.data;
+}
+
+async function supportsCatalogMode(providerId: string) {
+  return isByokEndpointProviderId(providerId) || offersCatalogMode(providerId);
+}
+
 async function toBYOKApiKeyResponse(
-  { settings, ...key }: BYOKKeyRow,
+  { settings, endpoint, ...key }: BYOKKeyRow,
   organizationRole: OrganizationRole | null
 ): Promise<BYOKApiKeyResponse> {
-  const supportsCatalog = await offersCatalogMode(key.provider_id);
+  const isEndpoint = isByokEndpointProviderId(key.provider_id);
+  const definition = isEndpoint ? readEndpointDefinition(key.id, endpoint) : null;
+  const supportsCatalog = await supportsCatalogMode(key.provider_id);
   const serveCatalogModels = servesCatalogModels(settings);
   return {
     ...key,
-    provider_name: getByokProviderDisplayName(key.provider_id),
+    provider_name: definition?.name ?? getByokProviderDisplayName(key.provider_id),
+    is_endpoint: isEndpoint,
+    endpoint: definition,
     serve_catalog_models: serveCatalogModels,
     supports_catalog_mode: supportsCatalog,
     // An enabled key can always leave catalog mode, even after its provider loses its mappings.
@@ -206,6 +253,44 @@ async function rejectUnavailableExperimentalProvider(
       code: 'FORBIDDEN',
       message: `Provider ${providerId} is not available yet.`,
     });
+  }
+}
+
+async function rejectDisallowedEndpointUrl(baseUrl: string) {
+  const violation = await findByokEndpointBaseUrlViolation(baseUrl);
+  if (violation) throw new TRPCError({ code: 'BAD_REQUEST', message: violation });
+}
+
+/** The organization's endpoint key `id`, or NOT_FOUND for any other key. */
+async function findOrganizationEndpointKey(organizationId: string, id: string) {
+  const [key] = await db
+    .select({
+      id: byok_api_keys.id,
+      organization_id: byok_api_keys.organization_id,
+      kilo_user_id: byok_api_keys.kilo_user_id,
+      provider_id: byok_api_keys.provider_id,
+      encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
+      management_source: byok_api_keys.management_source,
+    })
+    .from(byok_api_keys)
+    .where(and(eq(byok_api_keys.id, id), eq(byok_api_keys.organization_id, organizationId)));
+  if (!key || !isByokEndpointProviderId(key.provider_id)) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: ENDPOINT_NOT_FOUND_MESSAGE });
+  }
+  return key;
+}
+
+async function decryptEndpointCredentials(
+  row: Parameters<typeof decryptByokRow>[0]
+): Promise<ByokEndpointCredentials | null> {
+  try {
+    return parseByokEndpointCredentials((await decryptByokRow(row)).decryptedAPIKey);
+  } catch (e) {
+    logByokWarning('Could not decrypt BYOK endpoint credentials', {
+      providerId: row.provider_id,
+      message: e instanceof Error ? e.message : undefined,
+    });
+    return null;
   }
 }
 
@@ -458,6 +543,12 @@ export const byokRouter = createTRPCRouter({
         ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
 
+      if (isByokEndpointProviderId(provider_id)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Endpoints are added with createEndpoint.',
+        });
+      }
       await rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
 
@@ -549,6 +640,12 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
+      if (isByokEndpointProviderId(existingKey.provider_id)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Endpoints are updated with updateEndpoint.',
+        });
+      }
       await rejectUnavailableExperimentalProvider(
         existingKey.provider_id,
         existingKey.organization_id
@@ -681,7 +778,7 @@ export const byokRouter = createTRPCRouter({
 
       rejectManagedKeyMutation(existingKey.management_source);
       // Turning catalog mode off stays possible after a provider loses its catalog mappings.
-      if (serve_catalog_models && !(await offersCatalogMode(existingKey.provider_id))) {
+      if (serve_catalog_models && !(await supportsCatalogMode(existingKey.provider_id))) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `Provider ${existingKey.provider_id} does not support Kilo catalog model IDs.`,
@@ -714,7 +811,7 @@ export const byokRouter = createTRPCRouter({
     .input(TestBYOKKeyInputSchema)
     .output(z.object({ success: z.boolean(), message: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, id } = input;
+      const { organizationId, id, modelId } = input;
 
       if (organizationId) {
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
@@ -728,6 +825,7 @@ export const byokRouter = createTRPCRouter({
           provider_id: byok_api_keys.provider_id,
           encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
           management_source: byok_api_keys.management_source,
+          endpoint: byok_api_keys.endpoint,
         })
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, id));
@@ -765,6 +863,26 @@ export const byokRouter = createTRPCRouter({
         return { success: false, message: KEY_DECRYPTION_FAILURE_MESSAGE };
       }
 
+      if (isByokEndpointProviderId(existingKey.provider_id)) {
+        const definition = readEndpointDefinition(existingKey.id, existingKey.endpoint);
+        const credentials = parseByokEndpointCredentials(decryptedKey.decryptedAPIKey);
+        if (!definition || !credentials) {
+          return {
+            success: false,
+            message: 'API key test failed: the stored endpoint configuration is invalid.',
+          };
+        }
+        try {
+          return await testByokEndpoint({ definition, credentials, modelId });
+        } catch (e) {
+          logByokWarning('BYOK endpoint test request failed', {
+            providerId: existingKey.provider_id,
+            message: e instanceof Error ? e.message : undefined,
+          });
+          return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
+        }
+      }
+
       // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,
       // which the gateway test path below cannot reach (it routes codestral to api.mistral.ai).
       // Decline to test it rather than returning a misleading failure for a still-valid key.
@@ -777,6 +895,7 @@ export const byokRouter = createTRPCRouter({
 
       async function setup() {
         const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
+        if (isByokEndpointProviderId(provider)) throw new Error('Endpoint keys are tested above');
         const model = UserByokTestModels[provider];
 
         const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === provider);
@@ -869,6 +988,142 @@ export const byokRouter = createTRPCRouter({
           success: false,
           message: message ? `API key test failed: ${message}` : GENERIC_TEST_FAILURE_MESSAGE,
         };
+      }
+    }),
+
+  /** Adds an organization's own endpoint as a BYOK key. */
+  createEndpoint: baseProcedure
+    .input(CreateByokEndpointInputSchema)
+    .output(BYOKApiKeyResponseSchema)
+    .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
+      const { organizationId, definition, credentials } = input;
+      const organizationRole = await ensureOrganizationAccess(
+        ctx,
+        organizationId,
+        ORGANIZATION_BILLING_ROLES
+      );
+      await rejectDisallowedEndpointUrl(definition.base_url);
+
+      const keyId = crypto.randomUUID();
+      const providerId = generateByokEndpointProviderId();
+      const envelope = await encryptByokForStorage({
+        apiKey: JSON.stringify(credentials),
+        context: {
+          key_id: keyId,
+          owner_type: 'organization',
+          owner_id: organizationId,
+          provider_id: providerId,
+        },
+        actorUserId: ctx.user.id,
+      });
+
+      const [newKey] = await db
+        .insert(byok_api_keys)
+        .values({
+          id: keyId,
+          organization_id: organizationId,
+          provider_id: providerId,
+          encrypted_api_key_envelope: envelope,
+          endpoint: definition,
+          created_by: ctx.user.id,
+        })
+        .returning(BYOK_KEY_COLUMNS);
+
+      await createAuditLog({
+        action: 'organization.settings.change',
+        actor_email: ctx.user.google_user_email,
+        actor_id: ctx.user.id,
+        actor_name: ctx.user.google_user_name,
+        message: `Added BYOK endpoint ${definition.name} (${providerId})`,
+        organization_id: organizationId,
+      });
+
+      return toBYOKApiKeyResponse(newKey, organizationRole);
+    }),
+
+  /** Replaces an endpoint's definition, and its credentials when given. */
+  updateEndpoint: baseProcedure
+    .input(UpdateByokEndpointInputSchema)
+    .output(BYOKApiKeyResponseSchema)
+    .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
+      const { organizationId, id, definition, credentials } = input;
+      const organizationRole = await ensureOrganizationAccess(
+        ctx,
+        organizationId,
+        ORGANIZATION_BILLING_ROLES
+      );
+      const existingKey = await findOrganizationEndpointKey(organizationId, id);
+      rejectManagedKeyMutation(existingKey.management_source);
+      await rejectDisallowedEndpointUrl(definition.base_url);
+
+      const envelope = credentials
+        ? await encryptByokForStorage({
+            apiKey: JSON.stringify(credentials),
+            context: getByokKmsContext(existingKey),
+            actorUserId: ctx.user.id,
+          })
+        : undefined;
+      const [updatedKey] = await db
+        .update(byok_api_keys)
+        .set({ endpoint: definition, ...(envelope && { encrypted_api_key_envelope: envelope }) })
+        .where(and(eq(byok_api_keys.id, id), eq(byok_api_keys.organization_id, organizationId)))
+        .returning(BYOK_KEY_COLUMNS);
+      if (!updatedKey) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: ENDPOINT_NOT_FOUND_MESSAGE });
+      }
+
+      await createAuditLog({
+        action: 'organization.settings.change',
+        actor_email: ctx.user.google_user_email,
+        actor_id: ctx.user.id,
+        actor_name: ctx.user.google_user_name,
+        message: `Updated BYOK endpoint ${definition.name} (${existingKey.provider_id})${credentials ? ' and its credentials' : ''}`,
+        organization_id: organizationId,
+      });
+
+      return toBYOKApiKeyResponse(updatedKey, organizationRole);
+    }),
+
+  /**
+   * The models an endpoint lists at `GET <base_url>/models`, ready to add to its definition. Uses
+   * the given credentials, or the stored credentials of endpoint key `id`.
+   */
+  listModelsFromEndpoint: baseProcedure
+    .input(ListByokEndpointModelsInputSchema)
+    .output(ListByokEndpointModelsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, base_url, id } = input;
+      await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
+
+      let credentials = input.credentials;
+      if (!credentials && id) {
+        const key = await findOrganizationEndpointKey(organizationId, id);
+        const stored = await decryptEndpointCredentials(key);
+        if (!stored) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: ENDPOINT_CREDENTIALS_UNREADABLE_MESSAGE,
+          });
+        }
+        credentials = stored;
+      }
+      if (!credentials) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Enter credentials to import models' });
+      }
+
+      try {
+        return { models: await fetchByokEndpointModels({ baseUrl: base_url, credentials }) };
+      } catch (e) {
+        if (e instanceof ByokEndpointRequestError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: e.message });
+        }
+        logByokWarning('BYOK endpoint model import failed', {
+          message: e instanceof Error ? e.message : undefined,
+        });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'The endpoint models could not be imported. Check the URL and credentials.',
+        });
       }
     }),
 

@@ -18,7 +18,15 @@ import {
   getDirectByokModel,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getByokCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  getByokCredentials,
+  getEnabledByokProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  getByokEndpointModelApiKinds,
+  parseByokEndpointModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KILO_AUTO_BALANCED_MODEL,
@@ -201,6 +209,44 @@ export async function validateOrganizationAutoTarget(
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' is not a custom router of this organization.`,
       };
+    }
+    return { kind: 'ok', modelId: rawModelId };
+  }
+
+  const endpointTarget = parseByokEndpointModelId(rawModelId);
+  if (endpointTarget) {
+    const key = (
+      await getEnabledByokProviders(options.dbClient ?? readDb, {
+        type: 'organization',
+        id: organization.id,
+      })
+    ).find(candidate => candidate.providerId === endpointTarget.providerId);
+    const model = key?.endpoint?.models.find(candidate => candidate.id === endpointTarget.modelId);
+    if (!key?.endpoint || !model) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' is unavailable because no enabled endpoint of this organization serves it.`,
+      };
+    }
+    if (
+      options.apiKind &&
+      !getByokEndpointModelApiKinds(key.endpoint, model).includes(options.apiKind)
+    ) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
+      };
+    }
+    // Like a catalog-mode direct BYOK key, a catalog-mode endpoint serves the model only under its
+    // catalog id, which organization model policies cover.
+    if (key.serveCatalogModels) {
+      if (!(await isByokEndpointCatalogModelCandidate(model.id))) {
+        return {
+          kind: 'error',
+          message: `Organization Auto route target '${targetModelId}' is unavailable because the ${key.endpoint.name} endpoint uses Kilo catalog model IDs and this model has no catalog ID.`,
+        };
+      }
+      return validateOrganizationAutoTarget(organization, model.id, options);
     }
     return { kind: 'ok', modelId: rawModelId };
   }

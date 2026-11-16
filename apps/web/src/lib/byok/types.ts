@@ -1,4 +1,9 @@
 import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  ByokEndpointCredentialsSchema,
+  ByokEndpointDefinitionSchema,
+  ByokEndpointModelSchema,
+} from '@kilocode/db/schema-types';
 import * as z from 'zod';
 
 // Shared wire constraints for the BYOK procedures.
@@ -27,6 +32,10 @@ export const BYOKApiKeyResponseSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   created_by: z.string(),
+  /** The key is an organization's own endpoint; its `provider_name` is the endpoint name. */
+  is_endpoint: z.boolean(),
+  /** The endpoint's non-secret configuration, or null for provider keys. */
+  endpoint: ByokEndpointDefinitionSchema.nullable(),
 });
 
 export type BYOKApiKeyResponse = z.infer<typeof BYOKApiKeyResponseSchema>;
@@ -72,6 +81,33 @@ export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 
 export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   id: BYOKKeyIdSchema,
+  /** For endpoint keys, the model to test; the first model when omitted. */
+  modelId: z.string().min(1).max(200).optional(),
+});
+
+const OrganizationIdSchema = z.object({ organizationId: z.string().uuid() });
+
+export const CreateByokEndpointInputSchema = OrganizationIdSchema.extend({
+  definition: ByokEndpointDefinitionSchema,
+  credentials: ByokEndpointCredentialsSchema,
+});
+
+/** Omitted credentials keep the stored ones. */
+export const UpdateByokEndpointInputSchema = OrganizationIdSchema.extend({
+  id: BYOKKeyIdSchema,
+  definition: ByokEndpointDefinitionSchema,
+  credentials: ByokEndpointCredentialsSchema.optional(),
+});
+
+/** Uses `credentials`, or the stored credentials of endpoint key `id` when they are omitted. */
+export const ListByokEndpointModelsInputSchema = OrganizationIdSchema.extend({
+  base_url: ByokEndpointDefinitionSchema.shape.base_url,
+  credentials: ByokEndpointCredentialsSchema.optional(),
+  id: BYOKKeyIdSchema.optional(),
+}).refine(input => input.credentials || input.id, 'Enter credentials to import models');
+
+export const ListByokEndpointModelsResponseSchema = z.object({
+  models: z.array(ByokEndpointModelSchema),
 });
 
 export const PreviewBYOKRoutingInputSchema = OptionalOrganizationIdSchema.extend({

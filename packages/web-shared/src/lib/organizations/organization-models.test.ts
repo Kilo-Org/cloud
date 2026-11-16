@@ -66,7 +66,14 @@ const mockCustom = jest.fn<
   Promise<OpenRouterModel[]>,
   [string, readonly string[], string | null]
 >();
-const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
+type MockByokKey = { providerId: string; serveCatalogModels: boolean };
+const mockEnabledKeys = jest.fn(async (_db: unknown, _owner: unknown): Promise<MockByokKey[]> => [
+  { providerId: 'openai', serveCatalogModels: false },
+]);
+const mockEndpointCatalogModelIds = jest.fn(
+  async (_keys: readonly MockByokKey[]): Promise<ReadonlySet<string>> => new Set()
+);
+const mockEndpointModels = jest.fn((_keys: readonly MockByokKey[]): OpenRouterModel[] => []);
 /** Replica snapshot loads a test expects; anything else fails the test teardown. */
 let expectedReplicaLoads = 0;
 const mockCatalogModelIds = new Set(['provider/allowed']);
@@ -142,8 +149,12 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-auto-model', () =
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addDirectByokCatalogAvailability: mockCatalogAvailability,
   addUserByokAvailability: mockAvailability,
-  getOrganizationByokProviderIds: mockProviderIds,
+  getEnabledByokProviders: mockEnabledKeys,
   hasInferenceProviderUserByokForModel: mockInferenceProviderUserByok,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models', () => ({
+  getByokEndpointCatalogModelIds: mockEndpointCatalogModelIds,
+  getByokEndpointModels: mockEndpointModels,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
@@ -417,7 +428,10 @@ describe('organization model producer publication', () => {
     expect(mockEvaluatePolicy).toHaveBeenCalledWith(mockContext);
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
     expect(mockByok).toHaveBeenCalledWith('fixture-org');
-    expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
+    expect(mockEnabledKeys).toHaveBeenCalledWith(expect.anything(), {
+      type: 'organization',
+      id: 'fixture-org',
+    });
     expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
     expect(mockAvailability).toHaveBeenCalledWith(
       [mockCatalog.data[0], mockCatalog.data[2]],
@@ -601,7 +615,10 @@ describe('organization model producer publication', () => {
       'provider/ungranted-catalog',
     ]);
     mockDirectByokCatalogModelIds.mockResolvedValueOnce(catalogModelIds);
-    mockProviderIds.mockResolvedValueOnce(['moonshotai', 'openrouter']);
+    mockEnabledKeys.mockResolvedValueOnce([
+      { providerId: 'moonshotai', serveCatalogModels: false },
+      { providerId: 'openrouter', serveCatalogModels: false },
+    ]);
     mockCatalog = {
       ...mockCatalog,
       data: [
@@ -641,6 +658,51 @@ describe('organization model producer publication', () => {
     );
     const getAllowedProviders = mockAvailability.mock.calls[0][2];
     expect(getAllowedProviders?.('provider/ceiling-inference')).toBeUndefined();
+  });
+
+  it("lists the organization's endpoint models and the catalog models its endpoints serve", async () => {
+    const keys = [
+      { providerId: 'endpoint-aaaaaaaaaa', serveCatalogModels: false },
+      { providerId: 'endpoint-bbbbbbbbbb', serveCatalogModels: true },
+    ];
+    mockEnabledKeys.mockResolvedValueOnce(keys);
+    const endpointCatalogModelIds = new Set([
+      'provider/ceiling-gateway',
+      'provider/deny-listed-inference',
+      'provider/ungranted-catalog',
+    ]);
+    mockEndpointCatalogModelIds.mockResolvedValueOnce(endpointCatalogModelIds);
+    mockEndpointModels.mockReturnValueOnce([catalogModel('endpoint-aaaaaaaaaa/my-model')]);
+    mockCatalog = {
+      ...mockCatalog,
+      data: [
+        catalogModel('provider/allowed'),
+        catalogModel('provider/ceiling-gateway'),
+        catalogModel('provider/deny-listed-inference'),
+        catalogModel('provider/ungranted-catalog'),
+      ],
+    };
+
+    const result = await resultFor();
+
+    // An endpoint serves a model the policy denies only for its providers, never one it denies.
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/ceiling-gateway',
+      'morph-byok/private',
+      'endpoint-aaaaaaaaaa/my-model',
+      'kilo-internal/private',
+    ]);
+    expect(mockEndpointCatalogModelIds).toHaveBeenCalledWith(keys);
+    expect(mockEndpointModels).toHaveBeenCalledWith(keys);
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(
+      expect.any(Array),
+      endpointCatalogModelIds
+    );
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalledWith(
+      'provider/ceiling-gateway',
+      expect.anything()
+    );
   });
 
   it('logs one aggregated record for a catalog wider than the allowed models', async () => {

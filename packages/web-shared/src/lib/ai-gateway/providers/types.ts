@@ -15,6 +15,7 @@ export { ReasoningDetailsTransform };
 export const ProviderTypeSchema = z.enum([
   'openrouter',
   'direct-byok',
+  'byok-endpoint',
   'inception',
   'mistral',
   'vercel',
@@ -82,6 +83,8 @@ export type Provider = {
   /** Anthropic's user profile for `claudeBillingOwner`; every billed request names it. */
   claudeBillingUserProfileId?: string;
   claudeBillingConnectedAt?: string;
+  /** The organization's name for the endpoint that serves a `byok-endpoint` provider. */
+  byokEndpointName?: string;
   apiUrl: string;
   apiUrlOverrides: ProviderApiUrlOverrides;
   disableUrlSuffix: boolean;

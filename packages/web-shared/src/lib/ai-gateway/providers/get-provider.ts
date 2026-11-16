@@ -34,8 +34,17 @@ import {
   type KeyPlanStep,
   type RoutePlanInputs,
   type RoutePlanStep,
+  type UnsupportedApiKindPlanStep,
   type VercelByokPlanStep,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/route-plan';
+import {
+  getByokEndpointModelApiKinds,
+  parseByokEndpointCredentials,
+  resolveByokEndpointAuth,
+  type ByokEndpointProviderId,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { buildByokEndpointProvider } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/provider';
+import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
 import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
@@ -71,7 +80,12 @@ import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/open
 import { checkClaudeBilling } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
-import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
+import {
+  CustomLlmCredentialsSchema,
+  type ByokEndpointDefinition,
+  type ByokEndpointModel,
+  type CustomLlmCredentials,
+} from '@kilocode/db/schema-types';
 import {
   isPublicCustomLlm,
   type CustomLlm,
@@ -137,8 +151,22 @@ export type DirectByokCatalogOnlyResult = {
   catalogModelId: string | null;
 };
 
+/** A bespoke endpoint model id whose endpoint serves only catalog ids. */
+export type ByokEndpointCatalogOnlyResult = {
+  kind: 'byok-endpoint-catalog-only';
+  endpointName: string;
+  /** The catalog id that serves the same model through the endpoint, when one exists. */
+  catalogModelId: string | null;
+};
+
 export type GetProviderResult =
   | GetProviderProviderResult
+  /**
+   * The endpoint model id names no enabled endpoint model of the caller's organization, or the
+   * endpoint's credentials are unusable. Answered like an unknown model.
+   */
+  | { kind: 'byok-endpoint-unavailable' }
+  | ByokEndpointCatalogOnlyResult
   | { kind: 'chatgpt-reconnect'; message: string }
   /**
    * The owner's Claude billing connection cannot bill. Serving the request any
@@ -227,6 +255,94 @@ async function resolveDirectByokModel(
   return servedBy(
     await directByokRoute(directByok, directByokModel, credential, requestedModel, request, false)
   );
+}
+
+class InvalidByokEndpointCredentialsError extends Error {
+  override readonly name = 'InvalidByokEndpointCredentialsError';
+}
+
+/**
+ * Serves `model` with the organization's endpoint. Its credentials pay, so the request is user
+ * funded like any BYOK request.
+ */
+async function byokEndpointRoute(
+  providerId: ByokEndpointProviderId,
+  endpoint: ByokEndpointDefinition,
+  model: ByokEndpointModel,
+  credential: BYOKResult,
+  requestedModel: string,
+  servesCatalogId: boolean
+): Promise<ProviderRoute> {
+  const credentials = parseByokEndpointCredentials(credential.decryptedAPIKey);
+  if (!credentials) {
+    throw new InvalidByokEndpointCredentialsError(`Endpoint ${providerId} has invalid credentials`);
+  }
+  return {
+    provider: buildByokEndpointProvider(
+      providerId,
+      endpoint,
+      model,
+      await resolveByokEndpointAuth(credentials)
+    ),
+    userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId }],
+    isFree: isFreeModel(requestedModel),
+    // Like bespoke direct BYOK ids, a bespoke endpoint id is exempt from the organization model
+    // policy: the organization configured the endpoint itself. Catalog ids stay covered.
+    bypassAccessCheck: !servesCatalogId,
+  };
+}
+
+/**
+ * An endpoint model id names an organization's own endpoint, which owns the id: when that endpoint
+ * cannot serve it, no other route may.
+ */
+async function resolveByokEndpointModel(
+  providerId: ByokEndpointProviderId,
+  modelId: string,
+  { user, organizationId, requestedModel }: GetProviderInput,
+  decision: RoutingDecisionRecorder
+): Promise<GetProviderResult> {
+  const reject = (
+    reason: 'no-organization' | 'no-key' | 'disabled' | 'unknown-model' | 'invalid-credentials'
+  ): GetProviderResult => {
+    decision.step({
+      step: 'byok-endpoint-model',
+      outcome: 'rejected',
+      provider_id: providerId,
+      reason,
+    });
+    return { kind: 'byok-endpoint-unavailable' };
+  };
+  if (isAnonymousContext(user) || !organizationId) return reject('no-organization');
+  const storedKeys = await getStoredByokKeys(readDb, { type: 'organization', id: organizationId });
+  const key = storedKeys.keys.find(candidate => candidate.providerId === providerId);
+  if (!key?.endpoint) return reject('no-key');
+  if (!key.isEnabled) return reject('disabled');
+  const { endpoint } = key;
+  const model = endpoint.models.find(candidate => candidate.id === modelId);
+  if (!model) return reject('unknown-model');
+  if (key.serveCatalogModels) {
+    const catalogModelId = (await isByokEndpointCatalogModelCandidate(model.id)) ? model.id : null;
+    decision.step({
+      step: 'byok-endpoint-model',
+      outcome: 'rejected',
+      provider_id: providerId,
+      reason: 'catalog-only',
+      catalog_model_id: catalogModelId,
+    });
+    return { kind: 'byok-endpoint-catalog-only', endpointName: endpoint.name, catalogModelId };
+  }
+  const credential = await storedKeys.decrypt(providerId);
+  let route: ProviderRoute;
+  try {
+    route = await byokEndpointRoute(providerId, endpoint, model, credential, requestedModel, false);
+  } catch (error) {
+    if (!(error instanceof InvalidByokEndpointCredentialsError)) throw error;
+    console.error('[getProvider] Endpoint credentials are invalid', { providerId });
+    return reject('invalid-credentials');
+  }
+  decision.step({ step: 'byok-endpoint-model', outcome: 'selected', provider_id: providerId });
+  return servedBy(route);
 }
 
 async function isEligibleForCustomLlm(
@@ -379,6 +495,10 @@ export type GetProviderInput = {
    * the provider it names (see `getDirectByokPolicyProviderId` and
    * `isModelAllowedForProviderKey`). Keys it rejects are skipped. */
   isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
+  /** Whether the organization model policy admits the model served by a catalog-mode endpoint, as
+   * for provider keys the provider allow-list cannot name (see `allowsInferenceProviderUserByok`).
+   * Endpoints it rejects are skipped. */
+  isByokEndpointModelAllowed: () => Promise<boolean>;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
   /** Receives the steps and BYOK candidates behind the result, when the call returns. */
@@ -413,6 +533,12 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 function reasonToPass(step: KeyPlanStep): ByokCandidateSkipReason | null {
   if (step.decision !== 'serves') return step.decision;
   return step.route === 'vercel-byok' && step.ignoredByRequest ? 'ignored-by-request' : null;
+}
+
+function unsupportedApiKindStepApis(step: UnsupportedApiKindPlanStep): GatewayChatApiKind[] {
+  return step.route === 'endpoint-byok'
+    ? getByokEndpointModelApiKinds(step.endpoint, step.model)
+    : [...getDirectByokModelChatApis(step.provider, step.model)];
 }
 
 type ByokSkippedKey = { providerId: UserByokProviderId; reason: ByokCandidateSkipReason };
@@ -452,6 +578,9 @@ async function selectProvider(
     );
   }
   decision.step({ step: 'custom-llm', outcome: 'skipped', reason: 'no-match' });
+  if (model.kind === 'byok-endpoint-model') {
+    return await resolveByokEndpointModel(model.providerId, model.modelId, input, decision);
+  }
   if (model.kind === 'direct-byok-model') {
     const result = await resolveDirectByokModel(model.provider, model.model, input, decision);
     if (result) return result;
@@ -498,6 +627,7 @@ async function selectProvider(
     apiKind: request.kind,
     loadKeys: isAnonymousContext(user) ? null : async () => (await loadStoredKeys()).keys,
     isDirectByokProviderAllowed: input.isDirectByokProviderAllowed,
+    isByokEndpointModelAllowed: input.isByokEndpointModelAllowed,
     getAllowedProviders: input.getAllowedProviders,
     getRoutingProviderConfig: input.getRoutingProviderConfig,
     requestIgnoredProviders: getRequestIgnoredVercelProviderIds(request.body.provider),
@@ -526,9 +656,29 @@ async function selectProvider(
 
   const resolveKey = async (step: KeyPlanStep): Promise<ProviderRoute> => {
     const credential = await decryptKey(step);
-    return step.route === 'direct-byok'
-      ? directByokRoute(step.provider, step.model, credential, requestedModel, request, true)
-      : gatewayRoutedByokRoute(step, credential, requestedModel);
+    switch (step.route) {
+      case 'endpoint-byok':
+        return byokEndpointRoute(
+          step.providerId,
+          step.endpoint,
+          step.model,
+          credential,
+          requestedModel,
+          true
+        );
+      case 'direct-byok':
+        return directByokRoute(
+          step.provider,
+          step.model,
+          credential,
+          requestedModel,
+          request,
+          true
+        );
+      case 'vercel-byok':
+      case 'gateway-byok':
+        return gatewayRoutedByokRoute(step, credential, requestedModel);
+    }
   };
 
   /** The serving keys after `planIndex`, then the key the request ignores. */
@@ -600,6 +750,7 @@ async function selectProvider(
 
   for (const [planIndex, step] of plan.entries()) {
     switch (step.route) {
+      case 'endpoint-byok':
       case 'direct-byok':
       case 'vercel-byok':
       case 'gateway-byok': {
@@ -622,18 +773,15 @@ async function selectProvider(
         return await takeKey(step.step, planIndex);
       case 'unsupported-api-kind': {
         recordNoKeyServed();
-        const { provider, model, key } = step.step;
-        const credential = await decryptKey(step.step);
+        const route = await resolveKey(step.step);
         decision.markByokCandidate(step.step, 'selected');
         decision.step({
           step: 'unsupported-api-kind',
           outcome: 'selected',
-          provider_id: key.providerId,
-          supported_api_kinds: [...getDirectByokModelChatApis(provider, model)],
+          provider_id: step.step.key.providerId,
+          supported_api_kinds: unsupportedApiKindStepApis(step.step),
         });
-        return servedBy(
-          await directByokRoute(provider, model, credential, requestedModel, request, true)
-        );
+        return servedBy(route);
       }
       case 'kilo': {
         recordNoKeyServed();
@@ -670,6 +818,13 @@ async function selectProvider(
 const ByokRoutePreviewOutcomeSchema = z.enum(['used', 'skipped', 'unreached', 'conditional']);
 
 export const ByokRoutePreviewStepSchema = z.discriminatedUnion('route', [
+  z.object({
+    route: z.literal('endpoint-byok'),
+    outcome: ByokRoutePreviewOutcomeSchema,
+    providerId: UserByokProviderIdSchema,
+    reason: z.enum(['serves', 'unsupported-api-kind', 'disabled']),
+    supportedApiKinds: z.array(GatewayChatApiKindSchema),
+  }),
   z.object({
     route: z.literal('direct-byok'),
     outcome: ByokRoutePreviewOutcomeSchema,
@@ -729,6 +884,16 @@ async function previewStep(
   requestedModel: string
 ): Promise<ByokRoutePreviewStep[]> {
   switch (step.route) {
+    case 'endpoint-byok':
+      return [
+        {
+          route: 'endpoint-byok',
+          outcome: step.decision === 'serves' ? 'used' : 'skipped',
+          providerId: step.providerId,
+          reason: step.decision,
+          supportedApiKinds: getByokEndpointModelApiKinds(step.endpoint, step.model),
+        },
+      ];
     case 'direct-byok':
       return [
         {
@@ -768,7 +933,7 @@ async function previewStep(
           route: 'unsupported-api-kind',
           outcome: 'used',
           providerId: step.step.key.providerId,
-          supportedApiKinds: [...getDirectByokModelChatApis(step.step.provider, step.step.model)],
+          supportedApiKinds: unsupportedApiKindStepApis(step.step),
         },
       ];
     case 'kilo':
@@ -809,7 +974,7 @@ export async function previewByokRouting({
 }): Promise<ByokRoutingPreview> {
   const model = await classifyRequestedModel(requestedModel);
   if (model.kind === 'custom-llm') return { kind: 'custom-llm' };
-  if (model.kind === 'direct-byok-model' || !(await isValidOpenRouterModelId(requestedModel))) {
+  if (model.kind !== 'catalog' || !(await isValidOpenRouterModelId(requestedModel))) {
     return { kind: 'not-catalog-model' };
   }
 
@@ -818,6 +983,7 @@ export async function previewByokRouting({
     apiKind,
     loadKeys: () => getByokKeyStates(fromDb, owner),
     isDirectByokProviderAllowed: async () => true,
+    isByokEndpointModelAllowed: async () => true,
     getAllowedProviders: async () => undefined,
     getRoutingProviderConfig: async () => undefined,
     requestIgnoredProviders: new Set<string>(),

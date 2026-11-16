@@ -77,6 +77,21 @@ function describeStepReason(
       }
       break;
     }
+    case 'endpoint-byok': {
+      const title = `${getProviderName(step.providerId)} endpoint`;
+      switch (step.reason) {
+        case 'serves':
+          return { title, detail: 'Serves this model with Kilo catalog model IDs.' };
+        case 'unsupported-api-kind':
+          return {
+            title,
+            detail: `Skipped: the endpoint serves this model over ${formatApiKinds(step.supportedApiKinds)} only.`,
+          };
+        case 'disabled':
+          return { title, detail: 'Skipped: the endpoint is disabled.' };
+      }
+      break;
+    }
     case 'chatgpt':
       return {
         title: 'Sign in with ChatGPT',

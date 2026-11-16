@@ -1,6 +1,11 @@
 import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
-import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
+import {
+  ByokApiKeySettingsSchema,
+  ByokEndpointDefinitionSchema,
+  isByokEndpointProviderId,
+  type ByokEndpointDefinition,
+} from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
@@ -177,6 +182,8 @@ export type EnabledByokProvider = {
   providerId: UserByokProviderId;
   /** Catalog mode as stored; only providers that support it can store true. */
   serveCatalogModels: boolean;
+  /** The definition of an organization's endpoint key; set exactly for endpoint provider ids. */
+  endpoint?: ByokEndpointDefinition;
 };
 
 export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean; priority?: number };
@@ -200,22 +207,39 @@ const byokKeyStateColumns = {
   provider_id: byok_api_keys.provider_id,
   settings: byok_api_keys.settings,
   is_enabled: byok_api_keys.is_enabled,
+  endpoint: byok_api_keys.endpoint,
 };
+
+/** The stored definition of an endpoint key, or null when it no longer parses. */
+function parseStoredByokEndpoint(providerId: string, endpoint: unknown) {
+  const parsed = ByokEndpointDefinitionSchema.safeParse(endpoint);
+  if (!parsed.success) {
+    console.error('[byok] Ignoring an endpoint key with an invalid definition', {
+      providerId,
+      issues: parsed.error.issues.map(issue => ({ path: issue.path, code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
+}
 
 function toByokKeyState(row: {
   provider_id: string;
   settings: unknown;
   is_enabled: boolean;
+  endpoint: unknown;
 }): ByokKeyState | null {
   const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
-  return providerId.success
-    ? {
-        providerId: providerId.data,
-        serveCatalogModels: servesCatalogModels(row.settings),
-        isEnabled: row.is_enabled,
-        priority: getByokKeyPriority(row.settings),
-      }
-    : null;
+  if (!providerId.success) return null;
+  const state: ByokKeyState = {
+    providerId: providerId.data,
+    serveCatalogModels: servesCatalogModels(row.settings),
+    isEnabled: row.is_enabled,
+    priority: getByokKeyPriority(row.settings),
+  };
+  if (!isByokEndpointProviderId(providerId.data)) return state;
+  const endpoint = parseStoredByokEndpoint(providerId.data, row.endpoint);
+  return endpoint ? { ...state, endpoint } : null;
 }
 
 async function selectByokKeyStates(
@@ -242,7 +266,11 @@ export async function getEnabledByokProviders(
   owner: ByokOwner
 ): Promise<EnabledByokProvider[]> {
   const keys = await selectByokKeyStates(fromDb, owner, { enabledOnly: true });
-  return keys.map(({ providerId, serveCatalogModels }) => ({ providerId, serveCatalogModels }));
+  return keys.map(({ providerId, serveCatalogModels, endpoint }) => ({
+    providerId,
+    serveCatalogModels,
+    ...(endpoint && { endpoint }),
+  }));
 }
 
 /**

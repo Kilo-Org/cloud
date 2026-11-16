@@ -2979,6 +2979,124 @@ export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
 
+/**
+ * An organization's own upstream endpoint, stored as a BYOK key whose provider id is
+ * `endpoint-` plus a random suffix. Its models are listed as `<provider id>/<model id>`, or, in
+ * catalog mode, serve the Kilo catalog ids they are named after.
+ */
+export const BYOK_ENDPOINT_PROVIDER_ID_PREFIX = 'endpoint-';
+
+export type ByokEndpointProviderId = `${typeof BYOK_ENDPOINT_PROVIDER_ID_PREFIX}${string}`;
+
+const BYOK_ENDPOINT_PROVIDER_ID_PATTERN = /^endpoint-[a-z0-9]{10}$/;
+
+export function isByokEndpointProviderId(value: unknown): value is ByokEndpointProviderId {
+  return typeof value === 'string' && BYOK_ENDPOINT_PROVIDER_ID_PATTERN.test(value);
+}
+
+export const ByokEndpointProviderIdSchema = z.custom<ByokEndpointProviderId>(
+  isByokEndpointProviderId,
+  { message: 'must be an endpoint provider id such as "endpoint-a1b2c3d4e5"' }
+);
+
+/** Replaced by the model's `internal_id` in `base_url`; the request body then carries no model. */
+export const BYOK_ENDPOINT_MODEL_PLACEHOLDER = '{model}';
+
+/** How the upstream returns reasoning; `reasoning-details` is OpenRouter's shape and needs no transform. */
+export const ByokEndpointReasoningFormatSchema = z.enum([
+  'reasoning-details',
+  ReasoningDetailsTransform.ReasoningContent,
+  ReasoningDetailsTransform.Reasoning,
+  ReasoningDetailsTransform.GeminiThought,
+]);
+
+export type ByokEndpointReasoningFormat = z.infer<typeof ByokEndpointReasoningFormatSchema>;
+
+/** Lowercase like every gateway model id, without the `:` variant and `~` alias markers. */
+export const ByokEndpointModelIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^[a-z0-9._/-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / _ -');
+
+/** Settings that the endpoint sets for every model and a model may override. */
+const ByokEndpointModelOverridesSchema = z.object({
+  api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
+  client_provider: CustomLlmProviderSchema.optional(),
+  reasoning_format: ByokEndpointReasoningFormatSchema.optional(),
+});
+
+export const ByokEndpointModelSchema = ByokEndpointModelOverridesSchema.extend({
+  /** The id clients use after the provider id; in catalog mode, the Kilo catalog id it serves. */
+  id: ByokEndpointModelIdSchema,
+  /** The id the upstream knows the model by. */
+  internal_id: z.string().trim().min(1).max(500),
+  name: z.string().trim().min(1).max(200).optional(),
+  context_length: z.number().int().positive(),
+  max_completion_tokens: z.number().int().positive(),
+  supports_image_input: z.boolean().optional(),
+});
+
+export type ByokEndpointModel = z.infer<typeof ByokEndpointModelSchema>;
+
+export const BYOK_ENDPOINT_MAX_MODELS = 500;
+
+export const ByokEndpointDefinitionSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    /** The API root without a trailing slash, optionally with `{model}`. */
+    base_url: z
+      .url({ protocol: /^https?$/ })
+      .refine(url => !url.endsWith('/'), 'must not end with a slash')
+      .refine(url => !url.includes('?') && !url.includes('#'), 'must not have a query or fragment'),
+    /** Gateway APIs the upstream serves. */
+    api_kinds: z.array(CustomLlmApiKindSchema).min(1),
+    /** The API clients use: `anthropic` Messages, `openai` Responses, `openrouter` Chat Completions. */
+    client_provider: CustomLlmProviderSchema,
+    reasoning_format: ByokEndpointReasoningFormatSchema,
+    /** Forward OpenRouter's `provider` routing object, which only OpenRouter-compatible upstreams accept. */
+    forward_provider_routing: z.boolean().optional(),
+    /** Forward the hashed user and session ids Kilo adds (`user`, `safety_identifier`, ...). */
+    forward_tracking_ids: z.boolean().optional(),
+    models: z.array(ByokEndpointModelSchema).min(1).max(BYOK_ENDPOINT_MAX_MODELS),
+  })
+  .superRefine((definition, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, model] of definition.models.entries()) {
+      if (seen.has(model.id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['models', index, 'id'],
+          message: `Duplicate model id ${model.id}`,
+        });
+      }
+      seen.add(model.id);
+      const apiKinds = model.api_kinds ?? definition.api_kinds;
+      const clientApiKind = getCustomLlmClientApiKind(
+        model.client_provider ?? definition.client_provider
+      );
+      if (!apiKinds.includes(clientApiKind)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: model.api_kinds || model.client_provider ? ['models', index] : ['api_kinds'],
+          message: `The supported APIs must include ${clientApiKind}, the API clients use`,
+        });
+      }
+    }
+  });
+
+export type ByokEndpointDefinition = z.infer<typeof ByokEndpointDefinitionSchema>;
+
+export const ByokEndpointCredentialsSchema = z.discriminatedUnion('type', [
+  CustomLlmApiKeyCredentialsSchema,
+  CustomLlmXApiKeyCredentialsSchema,
+  CustomLlmAwsBedrockCredentialsSchema,
+  GoogleServiceAccountKeySchema,
+]);
+
+export type ByokEndpointCredentials = z.infer<typeof ByokEndpointCredentialsSchema>;
+
 export const GatewayModelIdSchema = z
   .string()
   .trim()

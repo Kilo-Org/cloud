@@ -195,4 +195,47 @@ describe('upstreamRequest upstream URL policy', () => {
       expect(init?.redirect).toBe('follow');
     }
   );
+
+  describe('for an organization endpoint on a preview deployment', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    function endpointProvider(base_url: string) {
+      return buildDirectProvider(
+        'byok-endpoint',
+        ['chat_completions'],
+        { base_url },
+        { type: 'api_key', apiKey: 'upstream-key', apiKeyHeader: null }
+      );
+    }
+
+    beforeEach(() => {
+      setTargetEnv('preview');
+      Object.assign(process.env, { NODE_ENV: 'production' });
+    });
+
+    afterEach(() => {
+      Object.assign(process.env, { NODE_ENV: originalNodeEnv });
+    });
+
+    it('rejects a URL that is not public, unlike an admin-configured upstream', async () => {
+      const fetchMock = mockFetch();
+
+      const result = await send(endpointProvider('https://169.254.169.254/latest'));
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.response.status).toBe(502);
+      await expect(send(directProvider('https://169.254.169.254/latest'))).resolves.toMatchObject({
+        type: 'success',
+      });
+    });
+
+    it('sends to a public HTTPS endpoint without following redirects', async () => {
+      const fetchMock = mockFetch();
+
+      const result = await send(endpointProvider(PUBLIC_IP_URL));
+
+      expect(result.type).toBe('success');
+      expect(fetchMock.mock.calls[0]?.[1]?.redirect).toBe('manual');
+    });
+  });
 });

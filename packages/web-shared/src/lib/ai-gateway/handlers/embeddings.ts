@@ -13,6 +13,7 @@ import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import {
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
@@ -129,8 +130,11 @@ export async function handleEmbeddingsRequest(
   const { user } = caller;
   const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
 
-  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
-  if (await isCustomLlm(requestedModelLowerCased)) {
+  // Custom LLMs and endpoints are served only through chat routes; never forward their ids elsewhere.
+  if (
+    isByokEndpointModelId(requestedModelLowerCased) ||
+    (await isCustomLlm(requestedModelLowerCased))
+  ) {
     return modelDoesNotExistResponse();
   }
 

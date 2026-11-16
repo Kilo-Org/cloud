@@ -10,7 +10,7 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
-  getOrganizationByokProviderIds,
+  getEnabledByokProviders,
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -36,7 +36,7 @@ jest.mock(
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/byok'),
-  getOrganizationByokProviderIds: jest.fn(async () => []),
+  getEnabledByokProviders: jest.fn(async () => []),
   hasInferenceProviderUserByokForModel: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
@@ -198,7 +198,10 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
   ] as const;
 
   beforeEach(() => {
-    jest.mocked(getOrganizationByokProviderIds).mockClear().mockResolvedValue(['openai']);
+    jest
+      .mocked(getEnabledByokProviders)
+      .mockClear()
+      .mockResolvedValue([{ providerId: 'openai', serveCatalogModels: false }]);
     jest
       .mocked(getDirectByokCatalogModelIds)
       .mockClear()
@@ -221,7 +224,7 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
   });
 
   afterEach(() => {
-    jest.mocked(getOrganizationByokProviderIds).mockResolvedValue([]);
+    jest.mocked(getEnabledByokProviders).mockResolvedValue([]);
     jest.mocked(getDirectByokCatalogModelIds).mockReset().mockResolvedValue(new Set());
     jest.mocked(hasInferenceProviderUserByokForModel).mockResolvedValue(false);
   });
@@ -237,7 +240,9 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
     );
 
     expect(denied.sort()).toEqual(['deepseek/deepseek-v4', 'openai/o3']);
-    expect(jest.mocked(getOrganizationByokProviderIds).mock.calls).toEqual([[readDb, 'org-1']]);
+    expect(jest.mocked(getEnabledByokProviders).mock.calls).toEqual([
+      [readDb, { type: 'organization', id: 'org-1' }],
+    ]);
     expect(getDirectByokCatalogModelIds).toHaveBeenCalledWith(
       { type: 'organization', id: 'org-1' },
       expect.any(Function)
@@ -265,7 +270,7 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
     );
 
     expect(denied).toEqual(['openai/gpt-5']);
-    expect(getOrganizationByokProviderIds).not.toHaveBeenCalled();
+    expect(getEnabledByokProviders).not.toHaveBeenCalled();
   });
 
   it('admits a catalog model only when the provider allow-list names its key provider', async () => {

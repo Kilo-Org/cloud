@@ -22,6 +22,7 @@ import { providerPreferencesSchema } from '@kilocode/web-shared/lib/ai-gateway/p
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import {
   emitApiMetricsForResponse,
   emitGatewayApiMetrics,
@@ -172,7 +173,10 @@ export async function handleAudioTranscriptionsRequest(
 
   // Custom LLMs are served only through chat routes; never forward their ids
   // elsewhere. Checked after auth so anonymous callers cannot probe for them.
-  if (await isCustomLlm(requestedModelLowerCased)) {
+  if (
+    isByokEndpointModelId(requestedModelLowerCased) ||
+    (await isCustomLlm(requestedModelLowerCased))
+  ) {
     return modelDoesNotExistResponse();
   }
 

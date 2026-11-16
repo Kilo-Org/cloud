@@ -2,6 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { custom_llm2 } from '@kilocode/db/schema';
 import {
+  BYOK_ENDPOINT_PROVIDER_ID_PREFIX,
   CustomLlmCredentialsSchema,
   CustomLlmDefinitionSchema,
   CustomLlmPublicIdSchema,
@@ -46,6 +47,11 @@ async function assertPublicIdIsClaimable(publicId: string) {
   );
   if (directByokProvider) {
     badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
+  }
+  if (modelId.startsWith(BYOK_ENDPOINT_PROVIDER_ID_PREFIX)) {
+    badRequest(
+      `public_id must not start with "${BYOK_ENDPOINT_PROVIDER_ID_PREFIX}", which endpoints use`
+    );
   }
   if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
     badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);

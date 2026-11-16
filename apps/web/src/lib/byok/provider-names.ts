@@ -7,6 +7,10 @@ import {
   type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import {
+  BYOK_ENDPOINT_PROVIDER_ID_PREFIX,
+  isByokEndpointProviderId,
+} from '@kilocode/db/schema-types';
 
 // Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
 // clause forces new entries here whenever a provider is added to
@@ -101,7 +105,14 @@ export const ADD_BYOK_PROVIDERS: readonly ByokProviderOption[] = BYOK_PROVIDERS.
   provider => !isLegacyOnlyByokProviderId(provider.id)
 );
 
+/**
+ * The display name of a provider. Endpoints are named by their organization, which only the key
+ * row knows, so callers that have the row should prefer its name.
+ */
 export function getByokProviderDisplayName(providerId: string): string {
+  if (isByokEndpointProviderId(providerId)) {
+    return `Endpoint ${providerId.slice(BYOK_ENDPOINT_PROVIDER_ID_PREFIX.length)}`;
+  }
   const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
   return provider?.name || providerId;
 }

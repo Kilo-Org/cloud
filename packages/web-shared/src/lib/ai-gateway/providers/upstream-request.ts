@@ -26,6 +26,7 @@ import {
   rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
+import { isByokEndpointUrlPolicyEnforced } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -423,7 +424,10 @@ async function sendUpstreamFetch({
 
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.
-    const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
+    const enforceUrlPolicy =
+      provider.type === 'byok-endpoint'
+        ? isByokEndpointUrlPolicyEnforced()
+        : isUpstreamUrlPolicyEnforced();
     const urlRejection = enforceUrlPolicy
       ? await rejectDisallowedUpstreamUrls({
           urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],

@@ -9,6 +9,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
@@ -54,6 +55,8 @@ export async function isModelRestrictionExempt(
       )
     );
   }
+  // An endpoint model id names the organization's own endpoint, which it configured itself.
+  if (isByokEndpointModelId(requestedModelId)) return true;
   const directByokModel = await getDirectByokModel(requestedModelId);
   return directByokModel.provider !== null && directByokModel.model !== null;
 }

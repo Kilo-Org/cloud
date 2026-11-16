@@ -30,9 +30,16 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import {
+  allowsInferenceProviderUserByok,
   resolveOrganizationMemberModelDecision,
+  type EffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import {
+  isByokEndpointProviderId,
+  parseByokEndpointModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { getByokEndpointCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
 import type { User } from '@kilocode/db/schema';
 
 export type BalanceCheckModelEligibility = {
@@ -55,8 +62,8 @@ export type BalanceCheckModelEligibility = {
  * Skips the check when either:
  * - the model is Kilo-funded (free for the user), or
  * - the user has a BYOK credential that serves it: a Vercel-routed inference
- *   provider key, a gateway key, a direct BYOK key (bespoke or catalog mode),
- *   a "Sign in with ChatGPT" connection, or a Claude billing link, so the
+ *   provider key, a gateway key, a direct BYOK key or organization endpoint
+ *   (bespoke or catalog mode), a "Sign in with ChatGPT" connection, or a Claude billing link, so the
  *   session is billed against the user's own key, plan, or Claude organization
  *   rather than their balance.
  */
@@ -123,7 +130,15 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
       enabledProviderIds: enabled,
       modelId: params.modelId,
       policy: memberDecision?.policy,
-    }));
+    })) ||
+    (params.organizationId !== undefined &&
+      enabledProviderIds.some(isByokEndpointProviderId) &&
+      (await hasByokEndpointForModel({
+        fromDb: params.fromDb,
+        organizationId: params.organizationId,
+        modelId: params.modelId,
+        decision,
+      })));
   const hasChatGptAvailable = await hasOpenAiChatGptByokForModel(params);
   const claudeBilling = await resolveClaudeBillingForModel(params);
   return withClaudeBilling(
@@ -181,6 +196,37 @@ async function hasDirectByokForModel(params: {
       ? await getAllowedDirectByokCatalogModelIds(params.owner.id, params.policy)
       : await getDirectByokCatalogModelIds(params.owner);
   return catalogModelIds.has(modelId);
+}
+
+/**
+ * Whether one of the organization's endpoints serves `modelId`, as `getProvider` routes it: a
+ * bespoke `endpoint-.../<model>` id to its enabled endpoint outside catalog mode, or a catalog id
+ * to a catalog-mode endpoint when the model policy admits it for keys outside the provider
+ * allow-list.
+ */
+async function hasByokEndpointForModel(params: {
+  fromDb: typeof db;
+  organizationId: string;
+  modelId: string;
+  decision?: EffectiveModelDecision;
+}): Promise<boolean> {
+  const modelId = params.modelId.toLowerCase();
+  const endpointModelId = parseByokEndpointModelId(modelId);
+  const keys = await getEnabledByokProviders(params.fromDb, {
+    type: 'organization',
+    id: params.organizationId,
+  });
+  if (endpointModelId) {
+    const key = keys.find(candidate => candidate.providerId === endpointModelId.providerId);
+    return (
+      key?.endpoint !== undefined &&
+      !key.serveCatalogModels &&
+      key.endpoint.models.some(model => model.id === endpointModelId.modelId)
+    );
+  }
+  if (params.decision && !allowsInferenceProviderUserByok(params.decision)) return false;
+  if (await isCustomLlm(modelId)) return false;
+  return (await getByokEndpointCatalogModelIds(keys)).has(modelId);
 }
 
 /**

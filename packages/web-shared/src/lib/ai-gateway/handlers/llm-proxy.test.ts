@@ -2016,6 +2016,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
       | 'a Vercel BYOK inference provider key'
       | 'an OpenRouter key'
       | 'a Vercel AI Gateway key'
+      | 'a catalog-mode endpoint'
       | 'no BYOK key';
     const byokRoutes: Record<ByokRoute, Pick<ProviderRoute, 'provider' | 'userByok'>> = {
       'a catalog-mode direct BYOK key': {
@@ -2033,6 +2034,10 @@ describe('POST /api/v1/chat/completions request handling', () => {
       'a Vercel AI Gateway key': {
         provider: { ...provider, type: 'vercel' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
+      },
+      'a catalog-mode endpoint': {
+        provider: { ...provider, type: 'byok-endpoint', byokEndpointName: 'Acme' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'endpoint-a1b2c3d4e5' }],
       },
       'no BYOK key': { provider, userByok: null },
     };
@@ -2175,6 +2180,39 @@ describe('POST /api/v1/chat/completions request handling', () => {
         expect(response.status).toBe(404);
         expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it('serves a catalog-mode endpoint whatever the provider allow-list says', async () => {
+      const response = await sendThrough('a catalog-mode endpoint', {
+        allowed: false,
+        denialSource: 'organization_provider',
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalled();
+      const isByokEndpointModelAllowed =
+        mockedGetProvider.mock.calls[0]?.[0].isByokEndpointModelAllowed;
+      expect(await isByokEndpointModelAllowed?.()).toBe(true);
+    });
+
+    it.each([
+      ['the organization model deny list', 'organization_model'],
+      ['a missing group grant', 'no_grant'],
+    ] as const)(
+      'denies a catalog-mode endpoint for a model excluded by %s',
+      async (_name, denialSource) => {
+        const response = await sendThrough('a catalog-mode endpoint', {
+          allowed: false,
+          denialSource,
+        });
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        const isByokEndpointModelAllowed =
+          mockedGetProvider.mock.calls[0]?.[0].isByokEndpointModelAllowed;
+        expect(await isByokEndpointModelAllowed?.()).toBe(false);
       }
     );
 
@@ -3335,6 +3373,68 @@ describe('kilo-auto/efficient classifier billing', () => {
         "'synthetic/hf:moonshotai/kimi-k2.6' is disabled because the Synthetic key uses Kilo catalog model IDs. Use 'moonshotai/kimi-k2.6' instead.",
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('answers an endpoint model id the organization cannot use like an unknown model', async () => {
+    mockedGetProvider.mockResolvedValue({ kind: 'byok-endpoint-unavailable' });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('endpoint-a1b2c3d4e5/acme/coder')) as never
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error_type: 'model_not_found' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bespoke endpoint id whose endpoint serves catalog ids, naming the catalog id', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'byok-endpoint-catalog-only',
+      endpointName: 'Acme',
+      catalogModelId: 'moonshotai/kimi-k2.6',
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('endpoint-a1b2c3d4e5/moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'direct_byok_catalog_only',
+      message:
+        "'endpoint-a1b2c3d4e5/moonshotai/kimi-k2.6' is disabled because the Acme endpoint uses Kilo catalog model IDs. Use 'moonshotai/kimi-k2.6' instead.",
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('names the endpoint when it cannot serve the API kind', async () => {
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: {
+          ...provider,
+          type: 'byok-endpoint',
+          byokEndpointName: 'Acme',
+          supportedChatApis: ['messages'],
+        },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'endpoint-a1b2c3d4e5' }],
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'api_kind_not_supported',
+      message:
+        'This model does not support the chat_completions API through your Acme endpoint, please use any of: messages',
+    });
   });
 
   it('names the BYOK key when it cannot serve the API kind', async () => {

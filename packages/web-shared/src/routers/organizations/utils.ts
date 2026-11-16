@@ -608,13 +608,7 @@ function supportRoleForCurrentSurface(ctx: TRPCContext, access: SupportContext):
   return supportStandInRole(entry);
 }
 
-/**
- * Resolves the caller's effective role for each of `organizationIds` in a fixed
- * number of queries (vs one per org). Mirrors {@link ensureOrganizationAccess}:
- * admins get 'owner' everywhere, otherwise direct memberships are unioned with
- * roles inherited from a parent org (owner/billing_manager). Orgs the caller has
- * no access to are simply absent from the returned map.
- */
+/** Groups caller role rows by organization id. */
 function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, OrganizationRole[]> {
   const rolesByOrg = new Map<string, OrganizationRole[]>();
   for (const row of rows) {
@@ -625,6 +619,22 @@ function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, Organizati
   return rolesByOrg;
 }
 
+/**
+ * Resolves the caller's effective role for each of `organizationIds` in a fixed
+ * number of queries instead of one per organization.
+ *
+ * With support access OFF and a platform admin caller, every live organization
+ * (not deleted) gets `owner`, and the elevation is recorded once with reason
+ * `organization_access_batch`. In every other case, including support access ON,
+ * the role is the highest one among the caller's direct and inherited membership
+ * rows (a parent org owner, admin, or billing_manager inherits on its children;
+ * only live organizations contribute rows). Organizations without such a role
+ * are absent from the returned map.
+ *
+ * The batch path reads membership rows only. Support grants are resolved per
+ * organization by {@link resolveOrganizationAccess} against the procedure
+ * allowlist, and no procedure that gates on this helper is on that allowlist.
+ */
 export async function getOrganizationsAccessRoles(
   ctx: TRPCContext,
   organizationIds: Organization['id'][],
@@ -703,8 +713,9 @@ export async function getOrganizationsAccessRoles(
 }
 
 /**
- * Batched variant of {@link ensureOrganizationAccess} for many orgs at once.
- * Throws unless the caller has an allowed role on *every* org in the list.
+ * Batched access check over {@link getOrganizationsAccessRoles}: throws
+ * `UNAUTHORIZED` unless every requested organization carries one of the allowed
+ * roles. It resolves memberships only, as that helper documents.
  */
 export async function ensureOrganizationsAccess(
   ctx: TRPCContext,

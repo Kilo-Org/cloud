@@ -651,7 +651,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   );
 
   it.each([{ data_collection: 'invalid' }, { only: [['openai']] }, { ignore: 'azure' }])(
-    'rejects malformed request provider preferences on JSON requests: %j',
+    'rejects malformed request provider preferences on JSON requests before reading the balance: %j',
     async provider => {
       setUserAuth();
       mockedGetBalanceAndOrgSettings.mockResolvedValue({
@@ -674,6 +674,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       );
 
       expect(response.status).toBe(400);
+      // Counted rather than matched: a failure would print the database client argument.
+      expect(mockedGetBalanceAndOrgSettings.mock.calls.length).toBe(0);
       expect(mockedFetch).not.toHaveBeenCalled();
     }
   );

@@ -9,8 +9,7 @@
  * the accessor the list now hands it, so both regressions fail again if the
  * patch is dropped or an upgrade reverts it.
  */
-import { createElement, createRef, type ReactElement } from 'react';
-import { type FlashListProps } from '@shopify/flash-list';
+import { createElement, createRef, type ReactElement, type RefObject } from 'react';
 import {
   type RVLayout,
   ViewHolderCollection,
@@ -51,7 +50,7 @@ type CollectionOptions = {
  */
 function collectionOf(
   options: CollectionOptions,
-  ref: React.RefObject<ViewHolderCollectionRef | null>
+  ref: RefObject<ViewHolderCollectionRef | null>
 ): ReactElement {
   const props: ViewHolderCollectionProps<Row> = {
     data: options.rows,
@@ -77,11 +76,40 @@ function collectionOf(
     isInLastRow: () => false,
     inverted: false,
   };
-  return createElement(ViewHolderCollection<Row>, props);
+  return createElement(ViewHolderCollection, props);
 }
 
-function cellsOf(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.findAllByType('View').filter(node => node.props.index !== undefined);
+/** One rendered cell: the index it was drawn for and the box it was given. */
+type CellBox = { index: number; top: number; height: number };
+
+function cellsOf(renderer: TestRenderer.ReactTestRenderer): CellBox[] {
+  return renderer.root
+    .findAllByType('View')
+    .filter(node => node.props.index !== undefined)
+    .map(node => {
+      const index = node.props.index as number;
+      const style = node.props.style as { top?: number; height?: number };
+      return { index, top: style.top ?? 0, height: style.height ?? 0 };
+    });
+}
+
+/**
+ * Mount one collection. The renderer lives in a holder because the mount runs
+ * inside `act`, and the component tree is not readable until it returns.
+ */
+async function mountCollection(
+  options: CollectionOptions,
+  ref: RefObject<ViewHolderCollectionRef | null>
+): Promise<TestRenderer.ReactTestRenderer> {
+  const holder: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+  await act(async () => {
+    await Promise.resolve();
+    holder.current = TestRenderer.create(collectionOf(options, ref));
+  });
+  if (holder.current === null) {
+    throw new Error('the collection did not render');
+  }
+  return holder.current;
 }
 
 describe('FlashList ViewHolderCollection over the layout table', () => {
@@ -94,32 +122,24 @@ describe('FlashList ViewHolderCollection over the layout table', () => {
     ]);
 
     // The list shrank to two rows while the render stack still names the third.
-    let renderer: TestRenderer.ReactTestRenderer | undefined;
-    await act(async () => {
-      renderer = TestRenderer.create(
-        collectionOf(
-          {
-            rows: [{ key: 'a' }, { key: 'b' }],
-            stack: [
-              ['a', 0],
-              ['b', 1],
-              ['stale', 2],
-            ],
-            layouts,
-            onRender: () => undefined,
-          },
-          ref
-        )
-      );
-    });
-    if (!renderer) {
-      throw new Error('the collection did not render');
-    }
+    const renderer = await mountCollection(
+      {
+        rows: [{ key: 'a' }, { key: 'b' }],
+        stack: [
+          ['a', 0],
+          ['b', 1],
+          ['stale', 2],
+        ],
+        layouts,
+        onRender: () => undefined,
+      },
+      ref
+    );
 
     const cells = cellsOf(renderer);
-    expect(cells.map(node => node.props.index)).toEqual([0, 1]);
+    expect(cells.map(cell => cell.index)).toEqual([0, 1]);
     // The stale entry used to draw an empty box at the container's origin.
-    expect(cells.map(node => node.props.style.top)).toEqual([0, rowHeight]);
+    expect(cells.map(cell => cell.top)).toEqual([0, rowHeight]);
 
     renderer.unmount();
   });
@@ -132,28 +152,20 @@ describe('FlashList ViewHolderCollection over the layout table', () => {
       [1, box(50, 50)],
     ]);
 
-    let renderer: TestRenderer.ReactTestRenderer | undefined;
-    await act(async () => {
-      renderer = TestRenderer.create(
-        collectionOf(
-          {
-            rows: [{ key: 'a' }, { key: 'b' }],
-            stack: [
-              ['a', 0],
-              ['b', 1],
-            ],
-            layouts,
-            onRender: () => {
-              renders += 1;
-            },
-          },
-          ref
-        )
-      );
-    });
-    if (!renderer) {
-      throw new Error('the collection did not render');
-    }
+    const renderer = await mountCollection(
+      {
+        rows: [{ key: 'a' }, { key: 'b' }],
+        stack: [
+          ['a', 0],
+          ['b', 1],
+        ],
+        layouts,
+        onRender: () => {
+          renders += 1;
+        },
+      },
+      ref
+    );
 
     const afterMount = renders;
     expect(afterMount).toBeGreaterThan(0);
@@ -182,7 +194,7 @@ describe('FlashList ViewHolderCollection over the layout table', () => {
       ref.current?.commitLayout();
     });
     expect(renders).toBeGreaterThan(afterFirstCommit);
-    expect(cellsOf(renderer).map(node => node.props.style.height)).toEqual([120, 50]);
+    expect(cellsOf(renderer).map(cell => cell.height)).toEqual([120, 50]);
 
     renderer.unmount();
   });

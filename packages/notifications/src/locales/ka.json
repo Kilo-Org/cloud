@@ -34,17 +34,17 @@
       "title": "ხარჯის შეტყობინება",
       "body": "{{scopeName}}-ის ხარჯმა გადააჭარბა ${{amountUsd}}-ს"
     },
-    "securityFindingNew": {
-      "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} {{repoFullName}}-ში"
+    },
+    "securityFindingNew": {
+      "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA გაფრთხილება",
-      "body": "{{findingTitle}} {{repoFullName}}-ში"
+      "title": "SLA გაფრთხილება"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA დარღვევა",
-      "body": "{{findingTitle}} {{repoFullName}}-ში"
+      "title": "SLA დარღვევა"
     },
     "securityLifecycle": {
       "title": "Kilo",

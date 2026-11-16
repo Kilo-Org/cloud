@@ -49,6 +49,11 @@ import {
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import {
+  responseUsageContext,
+  rewriteUsageEndpointBody,
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.usageEndpoints';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import { bouncerPayerKey } from '@kilocode/web-shared/lib/bouncer/request';
@@ -478,10 +483,15 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   const cost = toMicrodollars(providerCost);
-  stats.cost_mUsd = isFree ? 0 : cost;
+  stats.cost_mUsd = cost;
   stats.market_cost = cost;
+  // Keeps the provider cost as `market_cost`, then applies custom pricing and zeroes a free model.
+  applyUsagePricing(stats, context, customPricingConfig);
   after(async () => {
     await logMicrodollarUsageAndReportToBouncer(stats, context);
   });
-  return NextResponse.json(responseBody);
+  // The caller gets the model id it asked for and the cost the ledger row bills, as on chat.
+  const answer = systemOneResponseSchema.parse(responseBody);
+  rewriteUsageEndpointBody(answer, responseUsageContext(context, customPricingConfig));
+  return NextResponse.json(answer);
 }

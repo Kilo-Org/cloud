@@ -38,9 +38,14 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * and the `/` suggestion list's skill-row keys
  * (`agentChat.slashCommands.skillBadge` and
  * `agentChat.slashCommands.useSkillCommand`, added by
- * `slash-command-suggestions.tsx`), and the `credits.*` keys of the Buy
- * credits screen have all landed in every catalog, so the missing-key
- * assertion is strict again.
+ * `slash-command-suggestions.tsx`), the `credits.*` keys of the Buy credits
+ * screen, and the new-session footer's reasons that hold Start
+ * (`agentChat.newSession.profileLoadingToStart`,
+ * `agentChat.newSession.attachmentUploadingToStart`,
+ * `agentChat.newSession.modelMissingToStart`,
+ * `agentChat.newSession.staleRepositoryToStart`, so a disabled Start is never
+ * silent) have all landed in every catalog, so the missing-key assertion is
+ * strict again and nothing is pending.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 

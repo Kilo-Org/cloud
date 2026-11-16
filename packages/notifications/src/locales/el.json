@@ -34,17 +34,17 @@
       "title": "Ειδοποίηση δαπάνης",
       "body": "Οι δαπάνες του {{scopeName}} ξεπέρασαν τα ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Νέο εύρημα ασφαλείας ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} στο {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Νέο εύρημα ασφαλείας ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Προειδοποίηση SLA",
-      "body": "{{findingTitle}} στο {{repoFullName}}"
+      "title": "Προειδοποίηση SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Παραβίαση SLA",
-      "body": "{{findingTitle}} στο {{repoFullName}}"
+      "title": "Παραβίαση SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

@@ -41,7 +41,6 @@ const RoutingStepSchema = z.object({
   supported_api_kinds: optionalStrings,
   gateway: optionalString,
   bounded_spending: optionalBoolean,
-  organization_disabled_vercel_ai_gateway: optionalBoolean,
   kilo_ignored_providers: optionalStrings,
 });
 

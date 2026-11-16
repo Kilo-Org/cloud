@@ -25,6 +25,27 @@ describe('notificationHistoryCopy', () => {
     expect(copy.detail).toBe('Das Guthaben von Acme fiel unter $5');
   });
 
+  it('renders the shared body entry of a security finding row in the requested language', () => {
+    const copy = notificationHistoryCopy(
+      {
+        i18nKey: 'internal.securityFindingSlaBreach',
+        i18nParams: {
+          severity: 'high',
+          findingTitle: 'XSS in admin',
+          repoFullName: 'acme/api',
+        },
+        title: 'SLA breach',
+        body: 'XSS in admin in acme/api',
+      },
+      'es'
+    );
+
+    expect(copy).toEqual({
+      headline: 'Incumplimiento de SLA',
+      detail: 'XSS in admin en acme/api',
+    });
+  });
+
   it('renders English copy for a locale the push catalog does not carry', () => {
     const copy = notificationHistoryCopy(
       { i18nKey: 'internal.lowBalance', i18nParams: LOW_BALANCE_PARAMS, title: '', body: '' },

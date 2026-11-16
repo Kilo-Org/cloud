@@ -46,6 +46,9 @@ jest.mock('./processUsage', () => ({
   ) => mockedProcessTokenData(stats, ctx, servingProvider),
 }));
 
+jest.mock('./custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(async () => ({ models: [] })),
+}));
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureMessage: jest.fn(),

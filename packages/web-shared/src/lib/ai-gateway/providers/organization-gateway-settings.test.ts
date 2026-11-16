@@ -15,9 +15,9 @@ describe('getManagedGatewayFromUrl', () => {
     ['https://OPENROUTER.AI.:8443/api/v1', 'openrouter'],
     ['https://%6fpenrouter.ai/api/v1', 'openrouter'],
     ['https://user:password@openrouter.ai/api/v1', 'openrouter'],
-    ['https://ai-gateway.vercel.sh/v1', 'vercel'],
-    ['https://vercel.sh/v1', 'vercel'],
-    ['https://other.VERCEL.SH.:8443/v1', 'vercel'],
+    ['https://ai-gateway.vercel.sh/v1', undefined],
+    ['https://vercel.sh/v1', undefined],
+    ['https://other.VERCEL.SH.:8443/v1', undefined],
     ['https://openrouter.ai.attacker.example/v1', undefined],
     ['https://notopenrouter.ai/v1', undefined],
     ['https://openrouter.ai@api.example.com/v1', undefined],
@@ -42,10 +42,10 @@ describe('getOrganizationGatewaySettings', () => {
     const settings = getOrganizationGatewaySettings(
       { ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: [organizationId] },
       organizationId.toUpperCase(),
-      { disable_openrouter: true, disable_vercel_ai_gateway: true, data_region: 'eu' }
+      { disable_openrouter: true, data_region: 'eu' }
     );
 
-    expect([...settings.disabledGateways].sort()).toEqual(['openrouter', 'vercel']);
+    expect([...settings.disabledGateways].sort()).toEqual(['openrouter']);
     expect(settings.dataRegion).toBe('eu');
     expect(isManagedGatewayDisabled(settings, 'openrouter')).toBe(true);
     expect(isManagedGatewayDisabled(settings, 'direct-byok')).toBe(false);

@@ -34,17 +34,17 @@
       "title": "ការជូនដំណឹងការចំណាយ",
       "body": "ការចំណាយរបស់ {{scopeName}} បានលើស ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "ការរកឃើញសុវត្ថិភាពថ្មី ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ការរកឃើញសុវត្ថិភាពថ្មី ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "ការព្រមាន SLA",
-      "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+      "title": "ការព្រមាន SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "ការរំលោភ SLA",
-      "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+      "title": "ការរំលោភ SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

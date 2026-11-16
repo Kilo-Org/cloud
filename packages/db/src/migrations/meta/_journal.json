@@ -2518,8 +2518,22 @@
     {
       "idx": 359,
       "version": "7",
-      "when": 1794807635339,
-      "tag": "0359_github_connection_role_personal_backfill",
+      "when": 1794820654243,
+      "tag": "0359_api_request_log_2",
+      "breakpoints": true
+    },
+    {
+      "idx": 360,
+      "version": "7",
+      "when": 1794825694660,
+      "tag": "0360_drop_legacy_api_request_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 361,
+      "version": "7",
+      "when": 1794829844334,
+      "tag": "0361_github_connection_role_personal_backfill",
       "breakpoints": true
     }
   ]

@@ -186,7 +186,6 @@ export async function resolveProviderAndPolicy(
     organizationId: input.organizationId,
     botId: input.botId,
     boundedSpending: input.boundedSpending,
-    organizationDisabledVercelAiGateway: organizationGatewaySettings.disabledGateways.has('vercel'),
     countryCode: input.countryCode,
     getRoutingProviderConfig: async () =>
       (isAnonymous ? undefined : (await getAccessCheck()).effectiveProviderConfig) ??

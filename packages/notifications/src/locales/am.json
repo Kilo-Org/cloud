@@ -34,17 +34,17 @@
       "title": "የወጪ ማንቂያ",
       "body": "የ{{scopeName}} ወጪ ${{amountUsd}} አልፏል"
     },
-    "securityFindingNew": {
-      "title": "አዲስ የደህንነት ግኝት ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} በ{{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "አዲስ የደህንነት ግኝት ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "የSLA ማስጠንቀቂያ",
-      "body": "{{findingTitle}} በ{{repoFullName}}"
+      "title": "የSLA ማስጠንቀቂያ"
     },
     "securityFindingSlaBreach": {
-      "title": "የSLA ጥሰት",
-      "body": "{{findingTitle}} በ{{repoFullName}}"
+      "title": "የSLA ጥሰት"
     },
     "securityLifecycle": {
       "title": "Kilo",

@@ -2015,6 +2015,69 @@ describe('tool previews and authorized tool details', () => {
     ).toEqual({ kind: 'not_found' });
   });
 
+  it.each(['v1', 'v2'] as const)(
+    'keeps %s preview pages on user-turn boundaries without skipping the partial older turn',
+    async version => {
+      const { stub, kiloSessionId } = await fixture();
+      const source = {
+        version: 'v2',
+        session: {
+          id: kiloSessionId,
+          location: { directory: '/workspace/app' },
+          time: { created: 1, updated: 8 },
+        },
+      };
+      if (version === 'v2')
+        await publish(stub, 'conversation.source', { sessionID: kiloSessionId, source });
+      for (let index = 1; index <= 8; index++) {
+        const role = index % 3 === 1 ? 'user' : 'assistant';
+        if (version === 'v1') {
+          await publish(stub, 'message.updated', {
+            info: { ...message(kiloSessionId, `msg_turn_${index}`, index), role },
+          });
+          await publish(stub, 'message.part.updated', {
+            part: part(kiloSessionId, `msg_turn_${index}`, `prt_turn_${index}`),
+          });
+        } else {
+          await publish(stub, 'conversation.message.updated', {
+            sessionID: kiloSessionId,
+            source,
+            message: {
+              id: `msg_turn_${index}`,
+              type: index === 4 ? 'synthetic' : role,
+              time: { created: index },
+              content: [{ type: 'text', text: `Message ${index}` }],
+            },
+          });
+        }
+      }
+      const ids = (page: Awaited<ReturnType<typeof stub.getSessionMessagesPage>>) =>
+        page?.messages.map(item => ('info' in item ? item.info.id : item.message.id));
+      expect(ids(await stub.getSessionMessagesPage({ limit: 4 }))).toEqual([
+        'msg_turn_5',
+        'msg_turn_6',
+        'msg_turn_7',
+        'msg_turn_8',
+      ]);
+      const first = await stub.getSessionMessagesPage({ limit: 4, toolDisplay: 'preview' });
+      expect(ids(first)).toEqual(['msg_turn_7', 'msg_turn_8']);
+      const second = await stub.getSessionMessagesPage({
+        limit: 4,
+        toolDisplay: 'preview',
+        cursor: first?.nextCursor ?? undefined,
+      });
+      expect(ids(second)).toEqual(['msg_turn_4', 'msg_turn_5', 'msg_turn_6']);
+      const last = await stub.getSessionMessagesPage({
+        limit: 4,
+        toolDisplay: 'preview',
+        cursor: second?.nextCursor ?? undefined,
+      });
+      expect(ids(last)).toEqual(['msg_turn_1', 'msg_turn_2', 'msg_turn_3']);
+      expect(last?.nextCursor).toBeNull();
+      expect([first, second, last].map(page => page?.omittedItemCount)).toEqual([0, 0, 0]);
+    }
+  );
+
   it('continues preview pages at the soft budget instead of omitting messages', async () => {
     const { stub, kiloSessionId } = await fixture();
     const text = 'x'.repeat(400_000);

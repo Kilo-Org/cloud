@@ -15,7 +15,7 @@ import dynamic from 'next/dynamic';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
-import { ArrowDown, MessageSquare } from 'lucide-react';
+import { ArrowDown, Loader2, MessageSquare, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -78,6 +78,7 @@ import { WorkspaceSnapshotRecovery } from './WorkspaceSnapshotRecovery';
 import { EnvironmentBuildRecovery } from './EnvironmentBuildRecovery';
 import { environmentBuildRecoveryOffered } from './environment-build-recovery';
 import { workspaceSnapshotRecoveryOffered } from './workspace-snapshot-recovery';
+import { failedMessageRetryTarget, type FailedMessageRetryTarget } from './failed-message-retry';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
@@ -787,6 +788,26 @@ export default function CloudChatPage({
     ]
   );
 
+  const [retryingFailedMessageId, setRetryingFailedMessageId] = useState<string | null>(null);
+  const handleRetryFailedMessage = useCallback(
+    async (target: FailedMessageRetryTarget) => {
+      // Captured before the await: the user can switch chats while the re-send
+      // is in flight, and the resolution belongs to the chat that owns the row.
+      const ownerSessionId = fetchedSessionData?.kiloSessionId;
+      setRetryingFailedMessageId(target.messageId);
+      try {
+        // The re-send is a new user turn. Once it is accepted, the failed row
+        // and its error are resolved so the prompt does not show twice.
+        if (await handleSendMessage(target.prompt)) {
+          manager.clearFailedMessage(target.messageId, ownerSessionId);
+        }
+      } finally {
+        setRetryingFailedMessageId(null);
+      }
+    },
+    [fetchedSessionData?.kiloSessionId, handleSendMessage, manager]
+  );
+
   const handleSendSlashCommand = useCallback(
     async (command: string, args: string, attachments?: CloudAgentAttachments) => {
       // A command send takes the position over exactly as a message send does,
@@ -1422,6 +1443,10 @@ export default function CloudChatPage({
     transcriptPhase !== 'opening' && !billingFailure && statusIndicator?.type === 'error'
       ? readableSessionError(statusIndicator.message)
       : null;
+  const failedMessageRetry =
+    sessionErrorMessage !== null && !isReadOnly && canSend
+      ? failedMessageRetryTarget(shownMessages, shownTranscript.pendingMessages)
+      : null;
   const failedPreparationAttemptId =
     cloudStatus?.type === 'error'
       ? (preparationAttempts.filter(attempt => attempt.status === 'failed').at(-1)?.id ?? null)
@@ -1929,16 +1954,37 @@ export default function CloudChatPage({
                                       message={sessionErrorMessage}
                                       hint={
                                         workspaceSnapshotRecoveryState !== null
-                                          ? 'Start fresh to discard the snapshot, or send your message again to retry.'
+                                          ? failedMessageRetry !== null
+                                            ? 'Retry usually fixes this. Start fresh discards the snapshot.'
+                                            : 'Send your message again to retry. Start fresh discards the snapshot.'
                                           : environmentBuildRecoveryId !== null
                                             ? 'Send your message again once the environment snapshot is ready.'
                                             : undefined
                                       }
                                       actions={
+                                        failedMessageRetry !== null ||
                                         environmentBuildRecoveryId !== null ||
                                         workspaceSnapshotRecoveryState !== null ||
                                         failedPreparationAttemptId !== null ? (
                                           <>
+                                            {failedMessageRetry !== null && (
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                disabled={retryingFailedMessageId !== null}
+                                                onClick={() =>
+                                                  void handleRetryFailedMessage(failedMessageRetry)
+                                                }
+                                              >
+                                                {retryingFailedMessageId ===
+                                                failedMessageRetry.messageId ? (
+                                                  <Loader2 className="size-4 animate-spin" />
+                                                ) : (
+                                                  <RotateCw className="size-4" />
+                                                )}
+                                                Retry
+                                              </Button>
+                                            )}
                                             {environmentBuildRecoveryId !== null && (
                                               <EnvironmentBuildRecovery
                                                 environmentId={environmentBuildRecoveryId}

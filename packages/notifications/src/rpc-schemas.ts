@@ -83,7 +83,7 @@ export const perRecipientOutcomeSchema = z.enum([
 export type PerRecipientOutcome = z.infer<typeof perRecipientOutcomeSchema>;
 
 export const perRecipientResultSchema = z.object({
-  userId: z.string(),
+  userId: nonEmptyStringSchema,
   outcome: perRecipientOutcomeSchema,
   // Stable, content-free failure classification (e.g. 'expo_ticket_rejected'),
   // populated by the internal dispatch path for `failed` outcomes. Optional:
@@ -358,6 +358,22 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('failed'), error: z.string() }),
 ]);
 export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
+
+/**
+ * The dispatch outcome's discriminator set is the shared delivery vocabulary
+ * plus `delivered`, and nothing else. The builder above catches a reason
+ * renamed in the tuples; this catches one dropped from or added to the union,
+ * so the hand-written member list above cannot drift from that vocabulary.
+ */
+type SameUnion<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type AssertTrue<T extends true> = T;
+export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
+  SameUnion<
+    DispatchPushOutcome['kind'],
+    'delivered' | DeliveryOutcomeReason | ChannelDeliveryOutcomeReason | 'suppressed_rate_limit'
+  >
+>;
 
 // ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
 

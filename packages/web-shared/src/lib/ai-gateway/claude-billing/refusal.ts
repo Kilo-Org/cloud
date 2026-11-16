@@ -6,13 +6,15 @@ export const CLAUDE_BILLING_REFUSALS = {
   spendingLimit: 'linked_organization_spend_limit_reached',
   billingUnavailable: 'linked_organization_billing_unavailable',
   notBillable: 'user_profile_not_billable',
-  profileRequired: 'user_profile_required',
+  notAuthorized: 'user_profile_billing_not_authorized',
   forbiddenWithoutCode: 'permission_error',
   paymentRequiredWithoutCode: 'billing_error',
 } as const;
 
 export type ClaudeBillingRefusal =
   (typeof CLAUDE_BILLING_REFUSALS)[keyof typeof CLAUDE_BILLING_REFUSALS];
+
+const recognizedRefusalCodes: ReadonlySet<string> = new Set(Object.values(CLAUDE_BILLING_REFUSALS));
 
 const refusalBodySchema = z.object({
   error: z.object({
@@ -27,10 +29,12 @@ export function readClaudeBillingRefusalCode(body: unknown): string | null {
   return parsed.data.error.details?.error_code ?? parsed.data.error.code ?? null;
 }
 
-// A status-only refusal remains visible without changing the connection state.
+// Anthropic is still consolidating its 402 codes, so a code Kilo does not know
+// is reported by its status. A status-only refusal remains visible without
+// changing the connection state.
 export function claudeBillingRefusalCodeFor(status: number, body: unknown): string | null {
   const code = readClaudeBillingRefusalCode(body);
-  if (code) return code;
+  if (code && recognizedRefusalCodes.has(code)) return code;
   if (status === 403) return CLAUDE_BILLING_REFUSALS.forbiddenWithoutCode;
   if (status === 402) return CLAUDE_BILLING_REFUSALS.paymentRequiredWithoutCode;
   return null;
@@ -38,7 +42,7 @@ export function claudeBillingRefusalCodeFor(status: number, body: unknown): stri
 
 export function isClaudeBillingConnectionDead(code: string): boolean {
   return (
-    code === CLAUDE_BILLING_REFUSALS.notBillable || code === CLAUDE_BILLING_REFUSALS.profileRequired
+    code === CLAUDE_BILLING_REFUSALS.notBillable || code === CLAUDE_BILLING_REFUSALS.notAuthorized
   );
 }
 

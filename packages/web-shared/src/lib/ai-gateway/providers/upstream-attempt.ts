@@ -182,11 +182,12 @@ export async function sendUpstreamAttempt({
 
 /**
  * Keeps the stored Claude billing connection in step with Anthropic's answer.
- * A `user_profile_not_billable` response means the connection can no longer
- * bill, so later requests fail without an upstream call; the other refusals
- * leave it usable and are recorded for the owner to explain. A billed request
- * that succeeds clears the record. Best-effort: a database failure never
- * changes the upstream response the caller already has.
+ * A `user_profile_not_billable` or `user_profile_billing_not_authorized`
+ * response means the connection can no longer bill, so later requests fail
+ * without an upstream call; the other refusals leave it usable and are recorded
+ * for the owner to explain. A billed request that succeeds clears the record.
+ * Best-effort: a database failure never changes the upstream response the
+ * caller already has.
  */
 async function recordClaudeBillingRefusalResponse(
   response: Response,

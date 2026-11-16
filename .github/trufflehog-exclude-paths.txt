@@ -56,3 +56,7 @@ packages/db/src/schema-types\.test\.ts
 # account key ("type": "service_account", "private_key", ...) without values, which
 # the GCP detector reports. The file is generated from code and holds no values.
 services/kilo-mcp/catalog\.json
+
+# Sentry privacy fixtures use synthetic URL credentials to test sanitization.
+# Exclude this fixture path because the literal URI remains in branch history.
+services/cloud-agent-next/src/shared/sentry\.test\.ts

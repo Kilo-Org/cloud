@@ -313,7 +313,10 @@ export type UpstreamFetchResult =
     };
 
 type UpstreamFetchInput = {
-  provider: Provider;
+  provider: Pick<
+    Provider,
+    'type' | 'apiUrl' | 'apiKey' | 'apiKeyHeader' | 'secureProxy' | 'awsBedrock'
+  >;
   method: string;
   /** Sent as JSON, or as multipart when it is `FormData`, which lets fetch set the boundary. */
   body: object;
@@ -476,6 +479,10 @@ async function sendUpstreamFetch({
     // aborts this fetch as well. Those aborts are client-side cancellations and
     // must not be reported (or alerted on) as upstream failures.
     const clientDisconnected = signal?.aborted === true;
+    // An aborted fetch rejects with the signal's abort reason. Next.js aborts the request signal
+    // with its own `ResponseAborted` error, so the error name alone misses client aborts; the
+    // reason does not, and a duration budget that fired first leaves its timeout as the reason.
+    const abortedByClient = clientDisconnected && error === signal.reason;
     // Stays `undefined` when diagnostic enrichment below throws before classifying.
     let failureFamily: UpstreamFetchFailureFamily | undefined;
     try {
@@ -485,7 +492,9 @@ async function sendUpstreamFetch({
       const causeCode = getCauseCode(cause);
       const causeName = getCauseName(cause);
       const causeMessage = getCauseMessage(cause);
-      failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
+      failureFamily = abortedByClient
+        ? 'abort'
+        : classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
       const failureMetadata = {
         providerId: provider.type,
         targetHost: getProviderTargetHost(apiUrl),

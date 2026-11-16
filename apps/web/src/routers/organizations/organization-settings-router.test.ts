@@ -1458,6 +1458,33 @@ describe('organizations settings trpc router', () => {
       );
     });
 
+    it('reports model gateway availability while the feature is enabled', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).resolves.toEqual({
+        vercel: { available: false, regions: [] },
+        openrouter: { available: false },
+      });
+    });
+
+    it('rejects model gateway availability while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
     it('rejects gateway settings while the feature is not enabled', async () => {
       await enableGatewaySettings([orgWithSettings.id]);
       const caller = await createCallerForUser(owner.id);

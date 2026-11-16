@@ -17,6 +17,9 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import {
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
@@ -105,6 +108,18 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   ...jest.requireActual<typeof LlmProxyHelpers>(
@@ -333,6 +348,7 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
       .mocked(getOpenRouterSystemOneModelsFromDatabase)
@@ -573,6 +589,62 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
+  it('reports the custom-priced cost the ledger row bills', async () => {
+    const customPricing: CustomPricingConfig = {
+      models: [
+        {
+          model: TYPESAFE_MODEL,
+          pricing: [
+            {
+              start_context_length: 0,
+              pricing: {
+                prompt_per_million: 2,
+                completion_per_million: 10,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+          ],
+        },
+      ],
+    };
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(customPricing);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    // 23 input tokens at $2/M plus 7 output tokens at $10/M.
+    expect(await response.json()).toEqual({
+      ...billedBody,
+      usage: { ...billedBody.usage, cost: 0.000116 },
+    });
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 116, market_cost: 124 }),
+      expect.anything()
+    );
+  });
+
+  it('reports the provider cost the ledger row bills even when the body claims BYOK', async () => {
+    const usage = {
+      ...upstreamBody.usage,
+      is_byok: true,
+      cost_details: { upstream_inference_cost: 0.002 },
+    };
+    mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage }));
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(await response.json()).toEqual({
+      ...billedBody,
+      usage: { ...usage, cost: 0.000124, is_byok: false },
+    });
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 124, market_cost: 124 }),
+      expect.anything()
+    );
+  });
+
   it('forwards privacy without exposing client routing, credentials, or identity', async () => {
     const response = await handleSystemOneRequest(
       makeRequest({
@@ -671,11 +743,72 @@ describe('handleSystemOneRequest', () => {
     const response = await handleSystemOneRequest(request);
 
     expect(response.status).toBe(429);
-    expect(await response.json()).toMatchObject({ error_type: 'rate_limit_exceeded' });
+    // The same response chat and the other inference routes answer.
+    expect(await response.json()).toEqual({
+      error: 'Rate limit exceeded',
+      error_type: 'rate_limit_exceeded',
+      message: 'Too many requests. Please try again later.',
+    });
     expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '192.0.2.1');
     expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'test-rate-limit-key');
     expect(getUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('limits a free System One model per account before reading the balance', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('x-should-retry')).toBe('false');
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'rate_limit_exceeded' });
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: user.id,
+    });
+    expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { features: ['org-123'], status: 403 },
+    { features: [], status: 200 },
+  ])(
+    'rejects a request when the organization disabled OpenRouter, with feature organizations $features',
+    async ({ features, status }) => {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1_000_000,
+        settings: { disable_openrouter: true },
+      });
+      jest
+        .mocked(getRuntimeOrganizationFeatures)
+        .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: features });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(status);
+      if (status === 403) {
+        await expect(response.json()).resolves.toMatchObject({
+          error:
+            'This request would be routed through OpenRouter, which your organization has disabled.',
+          error_type: 'provider_not_allowed',
+        });
+      }
+      expect(mockedFetch).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
+    }
+  );
+
+  it('does not count a paid System One model against the free-model limit', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(isFreeModelRateLimited).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -936,6 +1069,35 @@ describe('handleSystemOneRequest', () => {
         market_cost: 0,
       }),
       expect.objectContaining({ api_kind: 'systemone', status_code: 402 })
+    );
+  });
+
+  it('explains an OpenRouter refusal for lack of an allowed provider', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json(
+        {
+          error: {
+            message: 'No allowed providers are available for the selected model.',
+            code: 404,
+            metadata: { available_providers: ['openai'], requested_providers: ['azure'] },
+          },
+        },
+        { status: 404 }
+      )
+    );
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: 'provider_not_allowed',
+    });
+    expect(wrapInSafeNextResponse).not.toHaveBeenCalled();
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, status_code: 404, cost_mUsd: 0 }),
+      expect.objectContaining({ status_code: 404 })
     );
   });
 

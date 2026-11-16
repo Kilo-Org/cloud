@@ -99,7 +99,7 @@ export function GatewayAvailabilityTable({
                 <AvailabilityPill available={data.openrouter.available} />
               </TableCell>
               <TableCell>
-                <span className="text-muted-foreground text-xs">Not supported</span>
+                <span className="text-muted-foreground text-xs">—</span>
               </TableCell>
             </TableRow>
           </>

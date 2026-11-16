@@ -55,6 +55,11 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
+// `openModelPicker` now takes the guarded push, so the hook hands back this file's
+// spy and the picker assertions keep observing the destination.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => push,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Cpu: 'Cpu',
   Globe: 'Globe',

@@ -17,6 +17,12 @@ import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
+// The account row opens the shared picker through the press-burst guard; this
+// suite asserts the screen, not the navigation, so the guarded push is a stub.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
+}));
+
 describe('ProfileScreen linked accounts', () => {
   beforeEach(() => {
     vi.useRealTimers();

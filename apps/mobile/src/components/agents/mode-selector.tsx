@@ -1,5 +1,5 @@
 import { Pressable } from 'react-native';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
@@ -14,6 +14,7 @@ import {
 } from '@/components/agents/mode-normalize';
 import { Text } from '@/components/ui/text';
 import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -33,7 +34,7 @@ export function ModeSelector({
   disabled = false,
   customOptions = [],
 }: Readonly<ModeSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { 'session-id': rawSessionId } = useLocalSearchParams<{ 'session-id'?: string }>();
@@ -57,7 +58,7 @@ export function ModeSelector({
       onSelect: onChange,
       customOptions,
     });
-    router.push(`/(app)/agent-chat/mode-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
+    pushOnce(`/(app)/agent-chat/mode-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
   }
 
   return (

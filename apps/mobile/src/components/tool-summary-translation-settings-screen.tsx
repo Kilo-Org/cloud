@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { Cpu, WandSparkles } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -12,6 +11,7 @@ import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useOrganization } from '@/lib/organization-context';
 import { useToolSummaryTranslationPreference } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
 
@@ -38,7 +38,7 @@ export function ToolSummaryTranslationSettingsScreen() {
     organizationId ?? undefined
   );
   const { t } = useTranslation();
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
 
   // TanStack Query v5 resets a no-data query to `pending` when it refetches,
   // clearing `error` and setting `isLoading`, so `isError` alone would unmount
@@ -109,7 +109,7 @@ export function ToolSummaryTranslationSettingsScreen() {
           last
           disabled={modelRowDisabled}
           onPress={() => {
-            openModelPicker(router, {
+            openModelPicker(pushOnce, {
               options: models,
               value: model.id,
               variant: '',

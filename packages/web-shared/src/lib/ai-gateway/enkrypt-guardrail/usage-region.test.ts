@@ -2,9 +2,15 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/drizzle'),
   isUSRegion: jest.fn(() => false),
 }));
+jest.mock('next/server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('next/server'),
+  after: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
   INTERNAL_API_SECRET: 'test-internal-secret',
+  USAGE_INGEST_URL: undefined,
+  USAGE_INGEST_PUBLISH_SECRET: undefined,
 }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
@@ -220,7 +226,14 @@ describe('recordEnkryptUsage region routing', () => {
       const handedOff = EnkryptUsageWriteSchema.parse(
         readJsonBody(mockFetch.mock.calls[0][1]?.body)
       );
-      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledTimes(2);
+      expect(consoleWarn).toHaveBeenCalledWith('usage enqueue unavailable', {
+        usageId: handedOff.id,
+        usage_kind: 'enkrypt_usage',
+        execution_region: expect.any(String),
+        kind: 'unavailable',
+        reason: 'publisher_not_configured',
+      });
       expect(consoleWarn).toHaveBeenCalledWith(warning, {
         usage_id: handedOff.id,
         error_name: errorName,

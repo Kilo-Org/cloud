@@ -124,8 +124,8 @@ describe('Claude customer-billed routing', () => {
       },
     };
     const headers: Record<string, string> = {
-      'anthropic-beta': '[REDACTED by s1-secret-redact]',
-      'x-anthropic-beta': '[REDACTED by s1-secret-redact]',
+      'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
+      'x-anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
     };
 
     const context = {
@@ -164,7 +164,7 @@ describe('Claude customer-billed routing', () => {
     for (const header of ['anthropic-beta', 'x-anthropic-beta']) {
       expect(headers[header].split(',')).toEqual(
         expect.arrayContaining([
-          '[REDACTED by s1-secret-redact]',
+          'fine-grained-tool-streaming-2025-05-14',
           'oauth-2025-04-20',
           'user-profiles-billing-2026-10-01',
           'thinking-binding-controls-2026-08-01',

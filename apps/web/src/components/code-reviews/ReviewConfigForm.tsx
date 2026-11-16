@@ -48,6 +48,7 @@ import {
   COUNCIL_MAX_REQUIRED_LABELS,
   COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
   DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
+  ReviewGuidelineSourceRepositoriesSchema,
   type CouncilAggregationStrategy,
 } from '@kilocode/db/schema-types';
 import {
@@ -272,6 +273,8 @@ export function ReviewConfigForm({
   // Optional council label gate, edited as a comma-separated string; parsed to a list on save.
   const [councilRequiredLabelsInput, setCouncilRequiredLabelsInput] = useState<string>('');
   const [useReviewMd, setUseReviewMd] = useState(true);
+  const [guidelineSourcesInput, setGuidelineSourcesInput] = useState('');
+  const [guidelineSourcesError, setGuidelineSourcesError] = useState('');
   // Feature-level guardrail; defaults to skipping bot PRs (matches the server default).
   const [skipBotPullRequests, setSkipBotPullRequests] = useState(true);
   // GitLab-specific: auto-configure webhooks
@@ -464,6 +467,7 @@ export function ReviewConfigForm({
         )
       );
       setUseReviewMd(!(configData.disableReviewMd ?? false));
+      setGuidelineSourcesInput((configData.reviewGuidelineSourceRepositories ?? []).join('\n'));
       setSkipBotPullRequests(configData.skipBotPullRequests ?? true);
     }
   }, [configData, isGitLab]);
@@ -628,6 +632,17 @@ export function ReviewConfigForm({
   };
 
   const handleSave = () => {
+    const sources = ReviewGuidelineSourceRepositoriesSchema.safeParse(
+      guidelineSourcesInput
+        .split('\n')
+        .map(value => value.trim())
+        .filter(Boolean)
+    );
+    if (!sources.success) {
+      setGuidelineSourcesError('Enter up to 100 repositories, one owner/repo per line.');
+      return;
+    }
+    setGuidelineSourcesError('');
     // Clear previous webhook sync result
     setWebhookSyncResult(null);
 
@@ -726,6 +741,7 @@ export function ReviewConfigForm({
         council: councilPayload,
         councilEnabledRepositoryIds: councilEnabledRepositoryIdsPayload,
         disableReviewMd: !useReviewMd,
+        reviewGuidelineSourceRepositories: sources.data,
         skipBotPullRequests,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
@@ -744,6 +760,7 @@ export function ReviewConfigForm({
         manuallyAddedRepositories,
         repositoryModelOverrides: repositoryModelOverridesPayload,
         disableReviewMd: !useReviewMd,
+        reviewGuidelineSourceRepositories: sources.data,
         skipBotPullRequests,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
@@ -930,6 +947,49 @@ export function ReviewConfigForm({
                 disabled={orgSaveMutation.isPending || personalSaveMutation.isPending || !isEnabled}
               />
             </div>
+
+            {!isGitLab && (
+              <div className="space-y-2">
+                <Label htmlFor="review-guideline-sources">
+                  Allowed guideline source repositories
+                </Label>
+                <Textarea
+                  id="review-guideline-sources"
+                  value={guidelineSourcesInput}
+                  onChange={event => setGuidelineSourcesInput(event.target.value)}
+                  onBlur={() => {
+                    const valid = ReviewGuidelineSourceRepositoriesSchema.safeParse(
+                      guidelineSourcesInput
+                        .split('\n')
+                        .map(value => value.trim())
+                        .filter(Boolean)
+                    ).success;
+                    setGuidelineSourcesError(
+                      valid ? '' : 'Enter up to 100 repositories, one owner/repo per line.'
+                    );
+                  }}
+                  placeholder="acme/review-guidelines"
+                  rows={3}
+                  disabled={
+                    !isEnabled || orgSaveMutation.isPending || personalSaveMutation.isPending
+                  }
+                  aria-invalid={!!guidelineSourcesError}
+                  aria-describedby="review-guideline-sources-help review-guideline-sources-error"
+                />
+                <p id="review-guideline-sources-help" className="text-muted-foreground text-sm">
+                  Allow REVIEW.md extends imports from these GitHub repositories. Enter one
+                  owner/repo per line. The same GitHub App installation must have access. An empty
+                  list blocks all imports.
+                </p>
+                <p
+                  id="review-guideline-sources-error"
+                  className="text-destructive text-sm"
+                  role="alert"
+                >
+                  {guidelineSourcesError}
+                </p>
+              </div>
+            )}
 
             {/* GitHub only: bot detection relies on the GitHub-authoritative user.type, which
                 GitLab/Bitbucket webhooks do not provide, so the toggle is hidden there. */}

@@ -12,6 +12,7 @@ import {
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig, RepositoryModelOverride } from '@/lib/agent-config/core/types';
+import { ReviewGuidelineSourceRepositoriesSchema } from '@kilocode/db/schema-types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
@@ -112,6 +113,7 @@ const SaveReviewConfigInputSchema = z.object({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  reviewGuidelineSourceRepositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks
@@ -152,6 +154,7 @@ const PatchReviewConfigInputSchema = z.object({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  reviewGuidelineSourceRepositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // GitHub only: skip automated reviews of bot-authored PRs. Omission preserves
   // the stored value (field-merge); mobile exposes this toggle.
   skipBotPullRequests: z.boolean().optional(),
@@ -291,6 +294,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           council: null,
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
+          reviewGuidelineSourceRepositories: [],
           skipBotPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -325,6 +329,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: cfg.disable_review_md ?? true,
+        reviewGuidelineSourceRepositories: cfg.review_guideline_source_repositories ?? [],
         skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
         // Council is org-only; personal configs never set it, but expose it so the query shape
         // matches the org query (the form's `configData` is a union of the two).
@@ -389,6 +394,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             manually_added_repositories: input.manuallyAddedRepositories || [],
             repository_model_overrides: repositoryModelOverrides,
             disable_review_md: input.disableReviewMd ?? true,
+            review_guideline_source_repositories: input.reviewGuidelineSourceRepositories ?? [],
             skip_bot_pull_requests: input.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
@@ -567,6 +573,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             thinkingEffort: o.thinking_effort ?? null,
           })),
           disableReviewMd: prevCfg.disable_review_md ?? true,
+          reviewGuidelineSourceRepositories: prevCfg.review_guideline_source_repositories ?? [],
           skipBotPullRequests: prevCfg.skip_bot_pull_requests ?? true,
           manuallyAddedRepositories: prevCfg.manually_added_repositories || [],
         };
@@ -623,6 +630,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             manually_added_repositories: merged.manuallyAddedRepositories ?? [],
             repository_model_overrides: repositoryModelOverrides,
             disable_review_md: merged.disableReviewMd ?? true,
+            review_guideline_source_repositories: merged.reviewGuidelineSourceRepositories ?? [],
             // `skipBotPullRequests` is GitHub-only. Mobile exposes it, so the
             // patch schema accepts it; a patch that omits it keeps the stored
             // value (field-merge), never the bare default.

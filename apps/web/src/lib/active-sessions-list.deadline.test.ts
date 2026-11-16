@@ -10,13 +10,44 @@
 
 const liveSessions = [{ id: 'live-1', status: 'busy', title: 'Live', connectionId: 'cli' }];
 
-const where = jest.fn(() => new Promise<never>(() => {}));
-const chain: Record<string, jest.Mock> = {
-  from: jest.fn((): unknown => chain),
-  leftJoinLateral: jest.fn((): unknown => chain),
-  where,
-};
-const selectMock = jest.fn((): unknown => chain);
+/**
+ * The answer's own budget (`ACTIVE_SESSIONS_LIST_BUDGET_MS` in the module under
+ * test). Restated here so the boundary assertions below read as the time the
+ * caller actually waits.
+ */
+const ANSWER_BUDGET_MS = 7_000;
+
+const limitCalls = jest.fn();
+
+/**
+ * One fake Drizzle select chain. `rows` resolves the terminal await, `'stall'`
+ * never settles, and `'fail'` rejects, so one phase can be stalled while the
+ * other still settles. Every builder method — `orderBy`/`limit` included, as the
+ * cloud query ends with them — returns the same thenable.
+ */
+function fakeQuery(outcome: unknown[] | 'stall' | 'fail'): unknown {
+  const query: Record<string, unknown> = {
+    from: () => query,
+    leftJoinLateral: () => query,
+    where: () => query,
+    orderBy: () => query,
+    limit: () => {
+      limitCalls();
+      return query;
+    },
+  };
+  query.then = (resolve: (value: unknown[]) => void, reject: (error: unknown) => void): void => {
+    if (outcome === 'stall') return;
+    if (outcome === 'fail') {
+      reject(new Error('read failed'));
+      return;
+    }
+    resolve(outcome);
+  };
+  return query;
+}
+
+const selectMock = jest.fn((): unknown => fakeQuery('stall'));
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   get db() {
@@ -51,9 +82,28 @@ jest.mock('@/lib/session-associated-pr', () => {
 
 import { listActiveSessions } from './active-sessions-list';
 
+/**
+ * Resolves once the answer settles, and says whether it had by then. A phase
+ * that no budget bounds would leave this pending until the test times out,
+ * which is the failure this file exists to catch.
+ */
+function trackSettled(pending: Promise<unknown>): { settled: () => boolean } {
+  let settled = false;
+  void pending.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    }
+  );
+  return { settled: () => settled };
+}
+
 beforeEach(() => {
-  selectMock.mockClear();
-  where.mockClear();
+  selectMock.mockReset();
+  selectMock.mockImplementation(() => fakeQuery('stall'));
+  limitCalls.mockClear();
 });
 
 describe('listActiveSessions budgets', () => {
@@ -66,8 +116,12 @@ describe('listActiveSessions budgets', () => {
         organizationId: undefined,
         includeCloudAgentSessions: false,
       });
-      await jest.advanceTimersByTimeAsync(8_000);
+      const { settled } = trackSettled(pending);
 
+      await jest.advanceTimersByTimeAsync(ANSWER_BUDGET_MS - 1);
+      expect(settled()).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
       await expect(pending).resolves.toEqual({ sessions: liveSessions });
       expect(warn).toHaveBeenCalledWith(
         '[active-sessions] enrichment db query failed:',
@@ -83,14 +137,30 @@ describe('listActiveSessions budgets', () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
+      // The enrichment read fails fast, so the only phase left to end is the
+      // cloud read's own stall. Its chain ends with `orderBy`/`limit`, which is
+      // also what makes this the regression for a chain that threw instead of
+      // waiting.
+      selectMock.mockReturnValueOnce(fakeQuery('fail'));
+      selectMock.mockImplementation(() => fakeQuery('stall'));
+
       const pending = listActiveSessions({
         userId: 'user-1',
         organizationId: undefined,
         includeCloudAgentSessions: true,
       });
-      await jest.advanceTimersByTimeAsync(8_000);
+      const { settled } = trackSettled(pending);
 
+      await jest.advanceTimersByTimeAsync(ANSWER_BUDGET_MS - 1);
+      expect(settled()).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
       await expect(pending).resolves.toEqual({ sessions: liveSessions });
+      expect(limitCalls).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        '[active-sessions] cloud candidates db query failed:',
+        expect.anything()
+      );
     } finally {
       warn.mockRestore();
       jest.useRealTimers();
@@ -110,7 +180,12 @@ describe('listActiveSessions budgets', () => {
         code: 'SERVICE_UNAVAILABLE',
         message: 'Active sessions took too long to resolve',
       });
-      await jest.advanceTimersByTimeAsync(8_000);
+      const { settled } = trackSettled(pending);
+
+      await jest.advanceTimersByTimeAsync(ANSWER_BUDGET_MS - 1);
+      expect(settled()).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
       await assertion;
     } finally {
       warn.mockRestore();

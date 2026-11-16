@@ -453,4 +453,64 @@ describe('notifications-worker-client endpoint transport', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     errorSpy.mockRestore();
   });
+
+  it('distinguishes an unset notifications worker URL from an endpoint outside the rule', async () => {
+    fetchMock.mockReset();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      INTERNAL_API_SECRET: 'internal-secret',
+      NOTIFICATIONS_WORKER_URL: 'http://notifications.example.test',
+    }));
+    const clientWithRejectedEndpoint = await import('./notifications-worker-client');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
+
+    await expect(
+      clientWithRejectedEndpoint.dispatchAgentBriefingPush({
+        userId: 'user-1',
+        localDate: '2026-10-15',
+        expiresAt: '2026-10-15T12:00:00.000Z',
+      })
+    ).resolves.toBe(false);
+    await expect(
+      clientWithRejectedEndpoint.refreshGlanceableScope({ userId: 'user-1', organizationId: null })
+    ).resolves.toBeUndefined();
+
+    const outsideRuleMessages = errorSpy.mock.calls.map(([message]) => String(message));
+    expect(outsideRuleMessages).toHaveLength(2);
+    for (const message of outsideRuleMessages) {
+      expect(message).toContain('is not an https or loopback http endpoint');
+    }
+
+    errorSpy.mockClear();
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      INTERNAL_API_SECRET: 'internal-secret',
+      NOTIFICATIONS_WORKER_URL: '',
+    }));
+    const clientWithoutEndpoint = await import('./notifications-worker-client');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
+
+    await expect(
+      clientWithoutEndpoint.dispatchAgentBriefingPush({
+        userId: 'user-1',
+        localDate: '2026-10-15',
+        expiresAt: '2026-10-15T12:00:00.000Z',
+      })
+    ).resolves.toBe(false);
+    await expect(
+      clientWithoutEndpoint.refreshGlanceableScope({ userId: 'user-1', organizationId: null })
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    const unsetMessages = errorSpy.mock.calls.map(([message]) => String(message));
+    expect(unsetMessages).toHaveLength(2);
+    for (const message of unsetMessages) {
+      expect(message).toContain('is not configured');
+    }
+
+    errorSpy.mockRestore();
+  });
 });

@@ -20,3 +20,15 @@ export function parseInternalServiceUrl(value: string | undefined): URL | null {
     return null;
   }
 }
+
+/**
+ * Resolves a request path against an endpoint that passed the rule.
+ *
+ * The base is the parsed value, so the request URL is built from the same value
+ * the rule accepted instead of from string concatenation.
+ */
+export function parseInternalServiceEndpoint(value: string | undefined, path: string): URL | null {
+  const base = parseInternalServiceUrl(value);
+  if (!base) return null;
+  return new URL(path, base);
+}

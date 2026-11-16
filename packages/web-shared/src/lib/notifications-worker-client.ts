@@ -14,7 +14,7 @@ import {
   INTERNAL_API_SECRET,
   NOTIFICATIONS_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
-import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
+import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 
 type DispatchBody =
   | InternalDispatchAgentBriefingRequest
@@ -50,9 +50,19 @@ function sleep(ms: number): Promise<void> {
  * structured warning, never an alert.
  */
 async function dispatchInternal(body: DispatchBody): Promise<boolean> {
-  if (!NOTIFICATIONS_WORKER_URL || !parseInternalServiceUrl(NOTIFICATIONS_WORKER_URL)) {
+  if (!NOTIFICATIONS_WORKER_URL) {
     console.error(
       '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping push dispatch'
+    );
+    return false;
+  }
+  const dispatchUrl = parseInternalServiceEndpoint(
+    NOTIFICATIONS_WORKER_URL,
+    '/internal/v1/dispatch'
+  );
+  if (!dispatchUrl) {
+    console.error(
+      '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not an https or loopback http endpoint; skipping push dispatch'
     );
     return false;
   }
@@ -78,7 +88,7 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
   const tags = { source: 'notifications-worker-client', endpoint: 'dispatch', kind: body.kind };
   try {
     for (let attempt = 0; ; attempt++) {
-      const response = await fetch(`${NOTIFICATIONS_WORKER_URL}/internal/v1/dispatch`, {
+      const response = await fetch(dispatchUrl.toString(), {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -246,9 +256,19 @@ export async function dispatchSecurityLifecyclePush(
  * card.
  */
 export async function refreshGlanceableScope(input: GlanceableScopeRefreshRequest): Promise<void> {
-  if (!NOTIFICATIONS_WORKER_URL || !parseInternalServiceUrl(NOTIFICATIONS_WORKER_URL)) {
+  if (!NOTIFICATIONS_WORKER_URL) {
     console.error(
       '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping glanceable refresh'
+    );
+    return;
+  }
+  const refreshUrl = parseInternalServiceEndpoint(
+    NOTIFICATIONS_WORKER_URL,
+    '/internal/v1/glanceable-refresh'
+  );
+  if (!refreshUrl) {
+    console.error(
+      '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not an https or loopback http endpoint; skipping glanceable refresh'
     );
     return;
   }
@@ -260,7 +280,7 @@ export async function refreshGlanceableScope(input: GlanceableScopeRefreshReques
   }
 
   try {
-    const response = await fetch(`${NOTIFICATIONS_WORKER_URL}/internal/v1/glanceable-refresh`, {
+    const response = await fetch(refreshUrl.toString(), {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

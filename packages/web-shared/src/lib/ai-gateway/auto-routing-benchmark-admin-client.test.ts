@@ -298,6 +298,34 @@ describe('auto routing benchmark admin client', () => {
     });
   });
 
+  it('resolves the registration path from an endpoint with a trailing slash', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ statuses: [] }),
+    });
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      AUTO_ROUTING_BENCHMARK_WORKER_URL: 'https://benchmark-worker.example.com/',
+      INTERNAL_API_SECRET: 'test-internal-secret',
+    }));
+    const clientWithTrailingSlash = await import('./auto-routing-benchmark-admin-client');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
+
+    const result = await clientWithTrailingSlash.registerOwnerBenchmarkProfiles({
+      router: 'frontier',
+      ownerType: 'org',
+      ownerId: 'org-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+
+    expect(result).toEqual({ ok: true });
+    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      'https://benchmark-worker.example.com/admin/profiles/register?router=frontier'
+    );
+  });
+
   it('requires an https or loopback benchmark worker endpoint', async () => {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/config.server', () => ({

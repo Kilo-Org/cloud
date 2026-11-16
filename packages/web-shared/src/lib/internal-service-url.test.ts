@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { parseInternalServiceUrl } from './internal-service-url';
+import { parseInternalServiceEndpoint, parseInternalServiceUrl } from './internal-service-url';
 
 describe('parseInternalServiceUrl', () => {
   test.each([
@@ -26,4 +26,19 @@ describe('parseInternalServiceUrl', () => {
   test('treats an unset value as unconfigured', () => {
     expect(parseInternalServiceUrl(undefined)).toBeNull();
   });
+});
+
+describe('parseInternalServiceEndpoint', () => {
+  test('resolves the request path against an accepted endpoint', () => {
+    expect(
+      parseInternalServiceEndpoint('https://worker.example.com/', '/admin/x')?.toString()
+    ).toBe('https://worker.example.com/admin/x');
+  });
+
+  test.each(['http://worker.example.com', 'ftp://worker.example.com', '', undefined])(
+    'treats the path of a rejected value as unconfigured: %s',
+    value => {
+      expect(parseInternalServiceEndpoint(value, '/admin/x')).toBeNull();
+    }
+  );
 });

@@ -1,5 +1,5 @@
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
+import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import * as z from 'zod';
 
 export type WorkerAdminResult<T> = {
@@ -23,15 +23,15 @@ export function createWorkerAdminFetch(options: {
     init: WorkerAdminRequestInit,
     schema: z.ZodType<T>
   ): Promise<WorkerAdminResult<T | ErrorBody>> {
-    if (!INTERNAL_API_SECRET || !parseInternalServiceUrl(options.workerUrl)) {
+    const endpoint = parseInternalServiceEndpoint(options.workerUrl, path);
+    if (!INTERNAL_API_SECRET || !endpoint) {
       return {
         status: 500,
         body: { error: options.unconfiguredError },
       };
     }
 
-    const workerUrl = options.workerUrl;
-    const response = await fetch(`${workerUrl}${path}`, {
+    const response = await fetch(endpoint.toString(), {
       ...init,
       headers: {
         authorization: `Bearer ${INTERNAL_API_SECRET}`,

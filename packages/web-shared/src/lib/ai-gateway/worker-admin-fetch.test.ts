@@ -40,6 +40,20 @@ describe('createWorkerAdminFetch', () => {
     });
   });
 
+  test('sends an admin request to an https worker endpoint with a trailing slash', async () => {
+    const fetchAdmin = configuredFetch('https://worker.example.com/');
+
+    await expect(fetchAdmin('/admin/x', { method: 'GET' }, responseSchema)).resolves.toEqual({
+      status: 200,
+      body: { ok: true },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith('https://worker.example.com/admin/x', {
+      method: 'GET',
+      headers: { authorization: 'Bearer test-internal-secret' },
+    });
+  });
+
   test('sends an admin request to a loopback http worker endpoint', async () => {
     const fetchAdmin = configuredFetch('http://127.0.0.1:8799');
 

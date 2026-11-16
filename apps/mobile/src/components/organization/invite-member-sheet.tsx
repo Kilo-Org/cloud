@@ -223,6 +223,7 @@ export function InviteMemberSheet() {
           key={formEpoch}
           label={t('common.email')}
           required
+          validateWhileTyping
           placeholder={t('organization.inviteMember.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"

@@ -286,6 +286,7 @@ export function RemoteMcpServerForm({
       <FormField
         label={t('modelChat.mcp.fieldName')}
         defaultValue={initialName}
+        validateWhileTyping
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="next"
@@ -298,6 +299,7 @@ export function RemoteMcpServerForm({
       <FormField
         label={t('modelChat.mcp.fieldUrl')}
         defaultValue={initialUrl}
+        validateWhileTyping
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"
@@ -332,6 +334,7 @@ export function RemoteMcpServerForm({
           key={tokenFieldKey}
           label={t('modelChat.mcpOAuth.fieldToken')}
           defaultValue={tokenText(tokenField.current, initialToken)}
+          validateWhileTyping
           error={
             tokenField.current.kind === 'retargeted' && errors?.token !== undefined
               ? t(errors.token)

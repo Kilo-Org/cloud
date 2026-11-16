@@ -122,6 +122,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           <FormField
             label={t('organization.lowBalanceAlert.thresholdLabel')}
             required
+            validateWhileTyping
             placeholder={t('organization.lowBalanceAlert.thresholdPlaceholder')}
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
@@ -137,6 +138,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             <FormField
               label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
               required
+              validateWhileTyping
               placeholder={t('organization.inviteMember.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"

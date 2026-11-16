@@ -42,6 +42,14 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      * which is how a rejected submit is reported without a blur.
      */
     validate?: (value: string) => string | null;
+    /**
+     * Show the field's own rule while the person types, not only after a blur.
+     * Use it when this value gates a submit that is disabled live: a disabled
+     * Save with no message leaves the person with nothing to fix. An empty value
+     * still waits for the first blur, so a form that opens empty does not greet
+     * the reader with a required error.
+     */
+    validateWhileTyping?: boolean;
   };
 
 /**
@@ -63,6 +71,7 @@ function FormField({
   className,
   ref,
   validate,
+  validateWhileTyping,
   defaultValue,
   style,
   onChangeText,
@@ -115,7 +124,7 @@ function FormField({
         onChangeText={value => {
           valueRef.current = value;
           onChangeText?.(value);
-          if (validate && validationError) {
+          if (validate && (validationError || (validateWhileTyping && value.trim() !== ''))) {
             setValidationError(validate(value));
           }
         }}

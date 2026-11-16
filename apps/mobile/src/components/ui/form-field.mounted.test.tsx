@@ -186,6 +186,89 @@ describe('FormField errors known from elsewhere', () => {
   });
 });
 
+describe('FormField validation while typing', () => {
+  const label = i18n.t('login.emailAddress');
+  const ownError = i18n.t('authErrors.invalidEmail');
+  const validEmail = 'dev@example.com';
+
+  function mount(props: { validateWhileTyping?: boolean } = {}) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label,
+          validate: (value: string) => (value === validEmail ? null : ownError),
+          ...props,
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  function shownError(mounted: TestRenderer.ReactTestRenderer) {
+    return mounted.root
+      .findByType(AccessibleStatus)
+      .findAllByType('Text')
+      .map(node => node.props.children);
+  }
+
+  function inputHandlers(mounted: TestRenderer.ReactTestRenderer) {
+    return mounted.root.findByType('TextInput').props as {
+      onBlur: (event: unknown) => void;
+      onChangeText: (value: string) => void;
+    };
+  }
+
+  it('shows the rule on a non-empty invalid value without a blur', () => {
+    const mounted = mount({ validateWhileTyping: true });
+
+    act(() => {
+      inputHandlers(mounted).onChangeText('dev@example');
+    });
+
+    expect(shownError(mounted)).toEqual([ownError]);
+  });
+
+  it('waits for the first blur while the value is empty', () => {
+    const mounted = mount({ validateWhileTyping: true });
+
+    act(() => {
+      inputHandlers(mounted).onChangeText('');
+    });
+    expect(shownError(mounted)).toEqual([]);
+
+    act(() => {
+      inputHandlers(mounted).onBlur({});
+    });
+    expect(shownError(mounted)).toEqual([ownError]);
+  });
+
+  it('clears the message once the typed value becomes valid', () => {
+    const mounted = mount({ validateWhileTyping: true });
+
+    act(() => {
+      inputHandlers(mounted).onChangeText('dev@example');
+    });
+    act(() => {
+      inputHandlers(mounted).onChangeText(validEmail);
+    });
+
+    expect(shownError(mounted)).toEqual([]);
+  });
+
+  it('keeps blur-only validation for a field that does not opt in', () => {
+    const mounted = mount();
+
+    act(() => {
+      inputHandlers(mounted).onChangeText('dev@example');
+    });
+
+    expect(shownError(mounted)).toEqual([]);
+  });
+});
+
 describe('FormField direction-aware content alignment', () => {
   function mountInput(props: { style?: { textAlign: 'center' }; textAlign?: 'center' } = {}) {
     act(() => {

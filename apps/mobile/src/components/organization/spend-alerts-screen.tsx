@@ -497,6 +497,7 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.limitLabel')}
               required={thresholdEnabled}
+              validateWhileTyping
               placeholder={thresholdPlaceholder()}
               keyboardType="decimal-pad"
               defaultValue={thresholdRef.current || undefined}
@@ -550,6 +551,7 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.multiplierLabel')}
               required={anomalyEnabled}
+              validateWhileTyping
               placeholder={String(DEFAULT_MULTIPLIER)}
               keyboardType="decimal-pad"
               defaultValue={multiplierRef.current || undefined}

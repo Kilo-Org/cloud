@@ -14,8 +14,10 @@ import { TRPCError } from '@trpc/server';
 import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
 import {
   createRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
+import type * as RuntimeAuthorizationModule from '@kilocode/worker-utils/runtime-authorization';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
@@ -73,6 +75,7 @@ const {
   selectControlPlaneSandboxMock,
   fetchByocVercelEnrollmentMock,
   fetchByocVercelEnrollmentForUserMock,
+  logRuntimeAuthorizationDiagnosticMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   settleOperationMock: vi.fn().mockResolvedValue({ settled: true }),
@@ -90,11 +93,16 @@ const {
   selectControlPlaneSandboxMock: vi.fn(),
   fetchByocVercelEnrollmentMock: vi.fn(),
   fetchByocVercelEnrollmentForUserMock: vi.fn(),
+  logRuntimeAuthorizationDiagnosticMock: vi.fn(),
 }));
 
-vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
+vi.mock('@kilocode/worker-utils/runtime-authorization', async importOriginal => ({
+  ...(await importOriginal<typeof RuntimeAuthorizationModule>()),
   createRuntimeAuthorization: vi.fn(),
   sealRuntimeAuthorization: vi.fn(),
+}));
+vi.mock('./runtime-authorization-diagnostics.js', () => ({
+  logRuntimeAuthorizationDiagnostic: logRuntimeAuthorizationDiagnosticMock,
 }));
 vi.mock('../model-validation.js', () => ({ assertKiloModelAvailable: vi.fn() }));
 // These cases cover allocation and ledger behavior, not the unverified Vercel SCM gate.
@@ -5854,13 +5862,42 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       } else {
         vi.mocked(assertKiloModelAvailable).mockRejectedValueOnce(new Error('Model unavailable'));
       }
-      await expect(runCreate(ctx, input)).rejects.toThrow();
+      await expect(runCreate(ctx, input)).rejects.toThrow(
+        failure === 'admission' ? 'Invalid runtime admission' : 'Model unavailable'
+      );
       expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
       expect(deleteCliSessionMock).not.toHaveBeenCalled();
       expect(settleOperationMock).not.toHaveBeenCalled();
     }
   );
+
+  it('maps a refused runtime delegation to a FORBIDDEN authorization denial', async () => {
+    const input = request();
+    const stub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = modernContext(context(stub));
+    const progress = await canonicalProgress(input);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+    vi.mocked(createRuntimeAuthorization).mockRejectedValueOnce(
+      new RuntimeAuthorizationRevokedError()
+    );
+    await expect(runCreate(ctx, input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Runtime authorization denied',
+    });
+    expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    const [runtimeInput] = vi.mocked(createRuntimeAuthorization).mock.calls.at(-1) ?? [];
+    runtimeInput?.onBindingRejected?.('device_session_inactive');
+    expect(logRuntimeAuthorizationDiagnosticMock).toHaveBeenCalledWith(
+      expect.any(String),
+      'binding_check',
+      'device_session_inactive'
+    );
+  });
 
   it('reconciles the original BYOC worktree binding after enrollment changes without reallocating', async () => {
     const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d488';
@@ -7872,6 +7909,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         resourceKind: 'cloud-agent-next',
         resourceId: SANDBOX_SESSION_ID,
         ...(organizationId ? { organizationId } : {}),
+        onBindingRejected: expect.any(Function),
       });
       expect(stub.registerSessionFromMetadata).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -18,7 +18,8 @@ import type { VercelProviderLocator } from '../../sandbox-control/vercel-provide
 import type { SandboxKind } from '../../sandbox-placement.js';
 import type { AgentSandboxProvider, Env } from '../../types.js';
 import { createByocAwsProviderAdapter } from '../../byoc/aws-provider.js';
-import { awsOperationStorage } from './aws-operation-storage.js';
+import { createByocAwsEcsProviderAdapter } from '../../byoc/aws-ecs-provider.js';
+import { awsOperationStorage, awsEcsOperationStorage } from './aws-operation-storage.js';
 
 /**
  * The provider registry for adapter construction. Provider facts are in
@@ -58,6 +59,15 @@ export function createProviderAdapter(
 ): ProviderAdapter {
   const allocationName = pin.allocationName ?? deps.sandboxId;
   switch (pin.provider) {
+    case 'aws-ecs': {
+      if (!pin.byoc) throw new ProviderCreationError('invalid_configuration');
+      return createByocAwsEcsProviderAdapter({
+        env: deps.env,
+        source: pin.byoc,
+        sandboxId: deps.sandboxId,
+        storage: awsEcsOperationStorage(deps.operationStorage),
+      });
+    }
     case 'aws': {
       if (!pin.byoc) throw new ProviderCreationError('invalid_configuration');
       return createByocAwsProviderAdapter({

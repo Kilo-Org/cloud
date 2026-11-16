@@ -185,7 +185,8 @@ export function buildControlPlaneSandboxSelection(
   const sandboxKind = metadata.workspace?.sandboxKind;
   const binding = metadata.workspace?.sandboxProviderBinding;
   const byoc =
-    (binding?.kind === 'vercel' || binding?.kind === 'aws') && binding.source.kind === 'byoc'
+    (binding?.kind === 'vercel' || binding?.kind === 'aws' || binding?.kind === 'aws-ecs') &&
+    binding.source.kind === 'byoc'
       ? { ...byocVercelOwnerFields(binding.source), credentialId: binding.source.credentialId }
       : undefined;
   if (provider === 'vercel') {
@@ -198,7 +199,7 @@ export function buildControlPlaneSandboxSelection(
       ...(sandboxKind ? { sandboxKind } : {}),
     };
   }
-  if (provider === 'aws') {
+  if (provider === 'aws' || provider === 'aws-ecs') {
     if (!byoc) throw new ControlPlaneRegistrationError('AWS requires a customer connection');
     return {
       provider,

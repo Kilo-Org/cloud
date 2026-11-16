@@ -622,6 +622,11 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 - `PREVIEW_HOST_SUFFIX` - Hostname suffix the Cloud Agent Next Worker dispatches preview hosts under; a preview host is `p<port>-<workspace-uuid-hex>.<suffix>`. Unset or empty disables preview dispatch and the `/preview/open` hop, and the web app hides the preview button (it reads availability from the Worker's `getPreviewOptions`). The web app needs no preview setting. Production `wrangler.jsonc` sets `cloud-agent.kiloapps.ai`. `services/cloud-agent-next/.dev.vars.example` sets `localhost`. [SERVER]
 - `E2E_MODEL_VALIDATION_BASE_URL` - E2E-only base URL for Cloud Agent Next model validation. Only the deployed e2e Worker config sets it (`test/e2e/deploy/render-e2e-worker-config.mjs`), to point validation at the fake-LLM catalogue. It is honoured only when its origin equals the origin of `KILO_OPENROUTER_BASE`; otherwise validation uses `KILOCODE_BACKEND_BASE_URL`. Unset in production. [SERVER]
 - `BYOC_VERCEL_IDS` - Comma-separated user or organization IDs enrolled in customer-paid Vercel compute. Empty is off; `*` enrolls both personal accounts and organizations. An enrolled owner fails closed when its ready credential is absent. [SERVER]
+- `BYOC_AWS_IDS` - User or organization IDs enrolled in the AWS MVP. Empty is off; `*` enrolls all owners. [SERVER]
+- `AWS_BYOC_KILO_ROLE_ARN` - Fixed Kilo role assumed before the customer role. [SERVER]
+- `AWS_BYOC_CREDENTIALS` - Private bootstrap credentials that can only assume the Kilo role. [SERVER]
+- `AWS_BYOC_RELEASE` - Operator JSON manifest for the private, immutable MicroVM template, runtime ZIP, proxy image, and authorized customer accounts. [SERVER]
+- `AWS_ECS_BYOC_RELEASE` - Separate operator JSON manifest for the private ECS template, digest-pinned runtime and proxy images, and authorized customer accounts. Missing manifests disable setup for that provider. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Auto Routing Worker

@@ -379,7 +379,10 @@ describe('AWS durable allocation lifecycle', () => {
     await adapter.launch(ref, startup);
     const reads = f.runtimeReads();
     const runs = f.submitted.length;
-    expect(await adapter.lifetimeDeadlineAt(ref)).toBe(10_000 + 28_800_000 - 120_000);
+    expect(await adapter.allocationDeadline(ref)).toEqual({
+      at: 10_000 + 28_800_000 - 120_000,
+      reason: 'provider_lifetime_exhausted',
+    });
     await adapter.ensureLeaseAtLeast(ref, 1000);
     await adapter.reconcileLaunch(ref);
     expect(f.runtimeReads()).toBe(reads);

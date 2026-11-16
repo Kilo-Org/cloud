@@ -16,7 +16,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => {
   };
 });
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or, inArray } from 'drizzle-orm';
 import {
   byoc_connections,
   organizations,
@@ -27,10 +27,10 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import {
-  awsSetupEnvelopeAad,
-  AWS_BYOC_SETUP_ENVELOPE_SCHEME,
-} from '@kilocode/worker-utils/aws-onboarding';
-import { AWS_BYOC_ENVELOPE_SCHEME } from '@kilocode/worker-utils/aws-byoc';
+  awsProviderSetupEnvelope,
+  awsProviderConfigurationEnvelope,
+} from '@kilocode/worker-utils/aws-ecs-onboarding';
+import type { AwsSetupProvider } from '@kilocode/worker-utils/aws-onboarding';
 import { awsStatusFromRow } from '@/lib/byoc/aws-connection';
 import { personalAwsComputeRouter, organizationAwsComputeRouter } from './aws-compute-router';
 
@@ -40,7 +40,7 @@ const accountId = '999999999999';
 const hash = 'a'.repeat(64);
 const roleArn = `arn:aws:iam::${accountId}:role/customer`;
 const stackId = `arn:aws:cloudformation:us-east-1:${accountId}:stack/kilo-test/11111111-1111-4111-8111-111111111111`;
-const configuration = {
+const microvmConfiguration = {
   region: 'us-east-1',
   roleArn,
   externalId: 'secret-external-id-'.repeat(4),
@@ -74,6 +74,33 @@ const release = {
   },
   customerAccounts: [accountId],
 };
+const ecsConfiguration = {
+  region: 'us-east-1',
+  roleArn,
+  externalId: microvmConfiguration.externalId,
+  stackId,
+  bucket: microvmConfiguration.bucket,
+  templateVersion: 1,
+  proxyProtocolVersion: 1,
+  proxy: microvmConfiguration.proxy,
+  clusterArn: `arn:aws:ecs:us-east-1:${accountId}:cluster/customer`,
+  taskDefinitionArn: `arn:aws:ecs:us-east-1:${accountId}:task-definition/customer:1`,
+  capacityProvider: 'customer-managed',
+  subnetId: 'subnet-0123456789abcdef0',
+  securityGroupId: 'sg-0123456789abcdef0',
+  executionRoleArn: `arn:aws:iam::${accountId}:role/execution`,
+  runtimeImage: `123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime@sha256:${hash}`,
+};
+const ecsRelease = {
+  ...release,
+  provider: 'aws-ecs',
+  templateVersion: 1,
+  runtime: {
+    imageUri: ecsConfiguration.runtimeImage,
+    repositoryArn: release.runtime.repositoryArn,
+  },
+};
+let wrongEngineReply = false;
 let user: User;
 let admin: User;
 let member: User;
@@ -94,12 +121,24 @@ beforeAll(async () => {
   process.env.CLOUD_AGENT_NEXT_API_URL = 'https://worker.example.com';
 });
 beforeEach(async () => {
-  await db.delete(byoc_connections).where(eq(byoc_connections.provider, 'aws'));
+  await db
+    .delete(byoc_connections)
+    .where(
+      and(
+        inArray(byoc_connections.provider, ['aws', 'aws-ecs']),
+        or(
+          eq(byoc_connections.user_id, user.id),
+          eq(byoc_connections.organization_id, organizationId)
+        )
+      )
+    );
+  wrongEngineReply = false;
   requests = [];
   remoteFailure = undefined;
   beforeReply = async () => {};
   jest.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
     const input = JSON.parse(String(options?.body)) as Record<string, unknown>;
+    const provider = input.provider === 'aws-ecs' ? 'aws-ecs' : 'aws';
     requests.push(input);
     await beforeReply(input);
     if (remoteFailure) return Response.json({ error: remoteFailure }, { status: 422 });
@@ -109,12 +148,15 @@ beforeEach(async () => {
         format: 1,
         accountId,
         stackName: `kilo-${String(input.credentialId).replaceAll('-', '')}`,
-        externalId: configuration.externalId,
+        externalId: microvmConfiguration.externalId,
         kiloRoleArn: 'arn:aws:iam::123456789012:role/kilo',
         controlPlaneUrl: 'https://worker.example.com',
-        release,
+        ...(provider === 'aws-ecs' ? { provider, release: ecsRelease } : { release }),
       });
-    if (input.action === 'validate') return Response.json(configuration);
+    if (input.action === 'validate') {
+      const ecs = (provider === 'aws-ecs') !== wrongEngineReply;
+      return Response.json(ecs ? ecsConfiguration : microvmConfiguration);
+    }
     if (input.action === 'revalidate') return Response.json({ verified: true });
     return Response.json({
       launchUrl: 'https://us-east-1.console.aws.amazon.com/cloudformation/home',
@@ -126,9 +168,9 @@ beforeEach(async () => {
   });
 });
 afterEach(() => jest.restoreAllMocks());
-async function row() {
+async function connectionRow(provider: AwsSetupProvider) {
   const result = await db.query.byoc_connections.findFirst({
-    where: and(eq(byoc_connections.provider, 'aws'), eq(byoc_connections.user_id, user.id)),
+    where: and(eq(byoc_connections.provider, provider), eq(byoc_connections.user_id, user.id)),
   });
   if (!result) throw new Error('Missing test AWS row');
   return result;
@@ -147,21 +189,27 @@ function decrypt(envelope: unknown, scheme: string, aad: string) {
   );
 }
 
-describe('AWS compute owner and persistence contracts', () => {
+describe.each(['aws', 'aws-ecs'] as const)('%s owner and persistence contracts', provider => {
+  const configuration = provider === 'aws' ? microvmConfiguration : ecsConfiguration;
+  const row = () => connectionRow(provider);
   it('persists an owner-bound encrypted draft before launch and redacts browser status', async () => {
     const caller = personalCaller({ user });
-    const status = await caller.prepare({ accountId });
+    const status = await caller.prepare({ accountId, provider });
     const stored = await row();
     expect(stored.setup_status).toBe('pending');
     expect(JSON.stringify(stored.credentials_encrypted)).not.toContain(configuration.externalId);
     const intent = decrypt(
       stored.credentials_encrypted,
-      AWS_BYOC_SETUP_ENVELOPE_SCHEME,
-      awsSetupEnvelopeAad({
+      awsProviderSetupEnvelope(provider, {
         owner: { userId: user.id },
         credentialId: stored.id,
         generation: stored.build_generation,
-      })
+      }).scheme,
+      awsProviderSetupEnvelope(provider, {
+        owner: { userId: user.id },
+        credentialId: stored.id,
+        generation: stored.build_generation,
+      }).aad
     );
     expect(intent.externalId).toBe(configuration.externalId);
     expect(Object.keys(status).sort()).toEqual([
@@ -171,14 +219,14 @@ describe('AWS compute owner and persistence contracts', () => {
       'state',
       'templateVersion',
     ]);
-    await caller.instructions();
+    await caller.instructions({ provider });
     expect(requests.at(-1)?.envelope).toEqual(stored.credentials_encrypted);
     expect(requests.at(-1)?.owner).toEqual({ userId: user.id });
   });
   it('concurrent preparation returns the same persisted winner', async () => {
     const caller = personalCaller({ user });
     const statuses = await Promise.all(
-      Array.from({ length: 5 }, () => caller.prepare({ accountId }))
+      Array.from({ length: 5 }, () => caller.prepare({ accountId, provider }))
     );
     expect(new Set(statuses.map(status => status.generation)).size).toBe(1);
     const stored = await row();
@@ -186,15 +234,15 @@ describe('AWS compute owner and persistence contracts', () => {
   });
   it('saves ready credentials with the runtime purpose and exposes only public metadata', async () => {
     const caller = personalCaller({ user });
-    await caller.prepare({ accountId });
-    const status = await caller.validate({ roleArn });
+    await caller.prepare({ accountId, provider });
+    const status = await caller.validate({ roleArn, provider });
     const stored = await row();
     expect(status.state).toBe('ready');
     expect(
       decrypt(
         stored.credentials_encrypted,
-        AWS_BYOC_ENVELOPE_SCHEME,
-        `byoc-aws-configuration:v1:user:${user.id}:${stored.id}`
+        awsProviderConfigurationEnvelope(provider, { userId: user.id }, stored.id).scheme,
+        awsProviderConfigurationEnvelope(provider, { userId: user.id }, stored.id).aad
       )
     ).toEqual(configuration);
     expect(Object.keys(status).sort()).toEqual([
@@ -211,17 +259,19 @@ describe('AWS compute owner and persistence contracts', () => {
   });
   it('failed validation preserves the draft and returns fixed recovery text', async () => {
     const caller = personalCaller({ user });
-    await caller.prepare({ accountId });
+    await caller.prepare({ accountId, provider });
     const previous = await row();
     remoteFailure = 'byoc_aws_external_id_not_enforced';
-    await expect(caller.validate({ roleArn })).rejects.toThrow('must require the ExternalId');
+    await expect(caller.validate({ roleArn, provider })).rejects.toThrow(
+      'must require the ExternalId'
+    );
     expect((await row()).credentials_encrypted).toEqual(previous.credentials_encrypted);
     remoteFailure = undefined;
-    await expect(caller.validate({ roleArn })).resolves.toMatchObject({ state: 'ready' });
+    await expect(caller.validate({ roleArn, provider })).resolves.toMatchObject({ state: 'ready' });
   });
   it('generation CAS refuses a stale validation response', async () => {
     const caller = personalCaller({ user });
-    await caller.prepare({ accountId });
+    await caller.prepare({ accountId, provider });
     beforeReply = async input => {
       if (input.action === 'validate')
         await db
@@ -229,19 +279,21 @@ describe('AWS compute owner and persistence contracts', () => {
           .set({ build_generation: crypto.randomUUID() })
           .where(eq(byoc_connections.user_id, user.id));
     };
-    await expect(caller.validate({ roleArn })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(caller.validate({ roleArn, provider })).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
     expect((await row()).setup_status).toBe('pending');
   });
   it('ready revalidation preserves ciphertext and pins, including on failure', async () => {
     const caller = personalCaller({ user });
-    await caller.prepare({ accountId });
-    await caller.validate({ roleArn });
+    await caller.prepare({ accountId, provider });
+    await caller.validate({ roleArn, provider });
     const ready = await row();
-    await caller.validate({ roleArn });
+    await caller.validate({ roleArn, provider });
     expect((await row()).credentials_encrypted).toEqual(ready.credentials_encrypted);
     expect((await row()).config).toEqual(ready.config);
     remoteFailure = 'byoc_aws_connection_update_required';
-    await expect(caller.validate({ roleArn })).rejects.toThrow('release update');
+    await expect(caller.validate({ roleArn, provider })).rejects.toThrow('release update');
     expect((await row()).credentials_encrypted).toEqual(ready.credentials_encrypted);
   });
   it('ready revalidation keeps runtime keys written during the AWS check', async () => {
@@ -262,40 +314,51 @@ describe('AWS compute owner and persistence contracts', () => {
   });
   it('normalizes production PostgreSQL verification timestamps', async () => {
     const caller = personalCaller({ user });
-    await caller.prepare({ accountId });
-    await caller.validate({ roleArn });
+    await caller.prepare({ accountId, provider });
+    await caller.validate({ roleArn, provider });
     const stored = await row();
     expect(
-      awsStatusFromRow({ ...stored, runtime: { last_verified_at: '2026-04-29 01:16:12.945+00' } })
+      awsStatusFromRow(
+        { ...stored, runtime: { last_verified_at: '2026-04-29 01:16:12.945+00' } },
+        provider
+      )
     ).toMatchObject({ lastVerifiedAt: '2026-04-29T01:16:12.945Z' });
   });
   it('discards only the current unfinished draft, never ready credentials', async () => {
     const caller = personalCaller({ user });
-    const status = await caller.prepare({ accountId });
-    await expect(caller.discardDraft({ generation: crypto.randomUUID() })).rejects.toMatchObject({
+    const status = await caller.prepare({ accountId, provider });
+    await expect(
+      caller.discardDraft({ provider, generation: crypto.randomUUID() })
+    ).rejects.toMatchObject({
       code: 'CONFLICT',
     });
-    await caller.discardDraft({ generation: status.generation });
-    expect(await caller.getStatus()).toBeNull();
-    const next = await caller.prepare({ accountId });
-    await caller.validate({ roleArn });
-    await expect(caller.discardDraft({ generation: next.generation })).rejects.toMatchObject({
+    await caller.discardDraft({ provider, generation: status.generation });
+    expect(await caller.getStatus({ provider })).toBeNull();
+    const next = await caller.prepare({ accountId, provider });
+    await caller.validate({ roleArn, provider });
+    await expect(
+      caller.discardDraft({ provider, generation: next.generation })
+    ).rejects.toMatchObject({
       code: 'CONFLICT',
     });
   });
   it('rejects browser-supplied ciphertext and other owner fields', async () => {
     await expect(
-      personalCaller({ user }).prepare({ accountId, envelope: {} } as never)
+      personalCaller({ user }).prepare({ provider, accountId, envelope: {} } as never)
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(requests).toHaveLength(0);
   });
   it('isolates personal credentials and requires organization admin authorization', async () => {
-    await personalCaller({ user }).prepare({ accountId });
-    expect(await personalCaller({ user: member }).getStatus()).toBeNull();
+    await personalCaller({ user }).prepare({ accountId, provider });
+    expect(await personalCaller({ user: member }).getStatus({ provider })).toBeNull();
     await expect(
-      orgCaller({ user: member }).prepare({ organizationId, accountId })
+      orgCaller({ user: member }).prepare({ organizationId, accountId, provider })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-    const status = await orgCaller({ user: admin }).prepare({ organizationId, accountId });
+    const status = await orgCaller({ user: admin }).prepare({
+      organizationId,
+      accountId,
+      provider,
+    });
     expect(status.accountId).toBe(accountId);
     expect(requests.at(-1)?.owner).toEqual({ organizationId });
     const orgRow = await db.query.byoc_connections.findFirst({
@@ -307,11 +370,36 @@ describe('AWS compute owner and persistence contracts', () => {
     expect(orgRow?.user_id).toBeNull();
     expect((await row()).organization_id).toBeNull();
   });
+  it('rejects a successful reply containing another engine configuration', async () => {
+    const caller = personalCaller({ user });
+    await caller.prepare({ accountId, provider });
+    const previous = await row();
+    wrongEngineReply = true;
+    await expect(caller.validate({ roleArn, provider })).rejects.toThrow();
+    expect((await row()).credentials_encrypted).toEqual(previous.credentials_encrypted);
+    expect((await row()).setup_status).toBe('pending');
+  });
   it('sanitizes an unknown upstream error body', async () => {
     remoteFailure = 'private-provider-error-must-not-return';
-    await expect(personalCaller({ user }).prepare({ accountId })).rejects.toMatchObject({
+    await expect(personalCaller({ user }).prepare({ accountId, provider })).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
       message: 'AWS setup is unavailable. Try again later.',
     });
   });
+});
+
+it('keeps omitted-provider clients on MicroVM and isolates two providers for one owner', async () => {
+  const caller = personalCaller({ user });
+  const microvm = await caller.prepare({ accountId });
+  const ecs = await caller.prepare({ accountId, provider: 'aws-ecs' });
+  const ecsBefore = await connectionRow('aws-ecs');
+  expect(microvm.generation).not.toBe(ecs.generation);
+  expect(await caller.getStatus()).toEqual(microvm);
+  expect(await caller.getStatus({ provider: 'aws-ecs' })).toEqual(ecs);
+  await caller.validate({ roleArn });
+  expect((await connectionRow('aws')).setup_status).toBe('ready');
+  expect(await connectionRow('aws-ecs')).toEqual(ecsBefore);
+  await caller.discardDraft({ provider: 'aws-ecs', generation: ecs.generation });
+  expect(await caller.getStatus({ provider: 'aws-ecs' })).toBeNull();
+  expect(await caller.getStatus()).toMatchObject({ state: 'ready' });
 });

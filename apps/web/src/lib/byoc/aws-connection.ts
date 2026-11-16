@@ -6,17 +6,14 @@ import { byoc_connections, type ByocConnection } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import { encryptKeyedEnvelope, parseKeyedEnvelope } from '@kilocode/encryption';
+import type { AwsSetupOwner, AwsSetupProvider } from '@kilocode/worker-utils/aws-onboarding';
 import {
-  AWS_BYOC_ENVELOPE_KEY_ID,
-  AWS_BYOC_ENVELOPE_SCHEME,
-  awsByocConfigurationSchema,
-} from '@kilocode/worker-utils/aws-byoc';
-import {
-  AWS_BYOC_SETUP_ENVELOPE_SCHEME,
-  awsSetupEnvelopeAad,
-  awsSetupIntentSchema,
-  type AwsSetupOwner,
-} from '@kilocode/worker-utils/aws-onboarding';
+  awsProviderSetupEnvelope,
+  awsProviderConfigurationEnvelope,
+  awsProviderSetupIntentSchemaFor,
+  awsProviderConfigurationSchemaFor,
+} from '@kilocode/worker-utils/aws-ecs-onboarding';
+import { AWS_BYOC_ENVELOPE_KEY_ID } from '@kilocode/worker-utils/aws-byoc';
 import {
   awsEnrollmentSchema,
   awsInstructionsSchema,
@@ -33,23 +30,23 @@ const pendingMetadata = z
   })
   .strict();
 
-function ownerCondition(owner: AwsSetupOwner) {
+function ownerCondition(owner: AwsSetupOwner, provider: AwsSetupProvider) {
   return and(
-    eq(byoc_connections.provider, 'aws'),
+    eq(byoc_connections.provider, provider),
     owner.organizationId !== undefined
       ? eq(byoc_connections.organization_id, owner.organizationId)
       : eq(byoc_connections.user_id, owner.userId)
   );
 }
-async function find(owner: AwsSetupOwner) {
-  return db.query.byoc_connections.findFirst({ where: ownerCondition(owner) });
+async function find(owner: AwsSetupOwner, provider: AwsSetupProvider) {
+  return db.query.byoc_connections.findFirst({ where: ownerCondition(owner, provider) });
 }
 function binding(owner: AwsSetupOwner, row: ByocConnection) {
   return { owner, credentialId: row.id, generation: row.build_generation };
 }
-function unchangedDraft(owner: AwsSetupOwner, row: ByocConnection) {
+function unchangedDraft(owner: AwsSetupOwner, row: ByocConnection, provider: AwsSetupProvider) {
   return and(
-    ownerCondition(owner),
+    ownerCondition(owner, provider),
     eq(byoc_connections.id, row.id),
     eq(byoc_connections.build_generation, row.build_generation),
     inArray(byoc_connections.setup_status, ['pending', 'failed'])
@@ -83,8 +80,8 @@ function seal(value: unknown, scheme: string, aad: string) {
 }
 
 /** Explicit projection: ciphertext, ExternalId and proxy credentials never enter a browser response. */
-export function awsStatusFromRow(row: ByocConnection) {
-  if (row.provider !== 'aws') throw new Error('Expected AWS connection');
+export function awsStatusFromRow(row: ByocConnection, provider: AwsSetupProvider) {
+  if (row.provider !== provider) throw new Error('Expected AWS connection');
   if (row.setup_status === 'ready') {
     const metadata = awsPublicConfigurationSchema.parse(row.config);
     const verified = row.runtime.last_verified_at ?? row.setup_completed_at;
@@ -101,36 +98,37 @@ export function awsStatusFromRow(row: ByocConnection) {
     ...pendingMetadata.parse(row.config),
   };
 }
-export async function getAwsComputeStatus(owner: AwsSetupOwner) {
-  const row = await find(owner);
-  return row ? awsStatusFromRow(row) : null;
+export async function getAwsComputeStatus(owner: AwsSetupOwner, provider: AwsSetupProvider) {
+  const row = await find(owner, provider);
+  return row ? awsStatusFromRow(row, provider) : null;
 }
-export function getAwsComputeEnrollment(owner: AwsSetupOwner) {
-  return awsSetupRequest({ action: 'enrollment', owner }, awsEnrollmentSchema);
+export function getAwsComputeEnrollment(owner: AwsSetupOwner, provider: AwsSetupProvider) {
+  return awsSetupRequest({ action: 'enrollment', owner, provider }, awsEnrollmentSchema);
 }
 
-export async function prepareAwsCompute(owner: AwsSetupOwner, accountId: string) {
-  let row = await find(owner);
+export async function prepareAwsCompute(
+  owner: AwsSetupOwner,
+  accountId: string,
+  provider: AwsSetupProvider
+) {
+  let row = await find(owner, provider);
   if (!row) {
     const draft = { owner, credentialId: crypto.randomUUID(), generation: crypto.randomUUID() };
     const intent = await awsSetupRequest(
-      { action: 'prepare', ...draft, accountId },
-      awsSetupIntentSchema
+      { action: 'prepare', ...draft, accountId, provider },
+      awsProviderSetupIntentSchemaFor(provider)
     );
+    const purpose = awsProviderSetupEnvelope(provider, draft);
     const now = new Date().toISOString();
     await db
       .insert(byoc_connections)
       .values({
         id: draft.credentialId,
-        provider: 'aws',
+        provider,
         organization_id: owner.organizationId ?? null,
         user_id: owner.userId ?? null,
         build_generation: draft.generation,
-        credentials_encrypted: seal(
-          intent,
-          AWS_BYOC_SETUP_ENVELOPE_SCHEME,
-          awsSetupEnvelopeAad(draft)
-        ),
+        credentials_encrypted: seal(intent, purpose.scheme, purpose.aad),
         config: {
           accountId: intent.accountId,
           stackName: intent.stackName,
@@ -141,10 +139,10 @@ export async function prepareAwsCompute(owner: AwsSetupOwner, accountId: string)
       })
       .onConflictDoNothing();
     // A concurrent request can win the unique owner/provider key. Always use the persisted winner.
-    row = await find(owner);
+    row = await find(owner, provider);
   }
   if (!row) changed();
-  const status = awsStatusFromRow(row);
+  const status = awsStatusFromRow(row, provider);
   if (status.state === 'ready') changed();
   if (status.accountId !== accountId) {
     throw new TRPCError({
@@ -155,14 +153,19 @@ export async function prepareAwsCompute(owner: AwsSetupOwner, accountId: string)
   }
   return status;
 }
-export async function getAwsComputeInstructions(owner: AwsSetupOwner) {
-  const row = await find(owner);
+export async function getAwsComputeInstructions(owner: AwsSetupOwner, provider: AwsSetupProvider) {
+  const row = await find(owner, provider);
   if (!row || row.setup_status === 'ready') changed();
   const instructions = await awsSetupRequest(
-    { action: 'instructions', ...binding(owner, row), envelope: row.credentials_encrypted },
+    {
+      action: 'instructions',
+      ...binding(owner, row),
+      envelope: row.credentials_encrypted,
+      provider,
+    },
     awsInstructionsSchema
   );
-  const current = await find(owner);
+  const current = await find(owner, provider);
   if (
     !current ||
     current.id !== row.id ||
@@ -172,10 +175,14 @@ export async function getAwsComputeInstructions(owner: AwsSetupOwner) {
     changed();
   return instructions;
 }
-export async function validateAwsCompute(owner: AwsSetupOwner, roleArn: string) {
-  const row = await find(owner);
+export async function validateAwsCompute(
+  owner: AwsSetupOwner,
+  roleArn: string,
+  provider: AwsSetupProvider
+) {
+  const row = await find(owner, provider);
   if (!row) changed();
-  const input = { ...binding(owner, row), envelope: row.credentials_encrypted, roleArn };
+  const input = { ...binding(owner, row), envelope: row.credentials_encrypted, roleArn, provider };
   const now = () => new Date().toISOString();
   if (row.setup_status === 'ready') {
     await awsSetupRequest({ action: 'revalidate', ...input }, awsVerificationSchema);
@@ -186,7 +193,7 @@ export async function validateAwsCompute(owner: AwsSetupOwner, roleArn: string) 
       })
       .where(
         and(
-          ownerCondition(owner),
+          ownerCondition(owner, provider),
           eq(byoc_connections.id, row.id),
           eq(byoc_connections.build_generation, row.build_generation),
           eq(byoc_connections.setup_status, 'ready')
@@ -194,22 +201,18 @@ export async function validateAwsCompute(owner: AwsSetupOwner, roleArn: string) 
       )
       .returning();
     if (!updated[0]) changed();
-    return awsStatusFromRow(updated[0]);
+    return awsStatusFromRow(updated[0], provider);
   }
   const configuration = await awsSetupRequest(
     { action: 'validate', ...input },
-    awsByocConfigurationSchema
+    awsProviderConfigurationSchemaFor(provider)
   );
-  const ownerKey = owner.organizationId ?? `user:${owner.userId}`;
+  const purpose = awsProviderConfigurationEnvelope(provider, owner, row.id);
   const verifiedAt = now();
   const updated = await db
     .update(byoc_connections)
     .set({
-      credentials_encrypted: seal(
-        configuration,
-        AWS_BYOC_ENVELOPE_SCHEME,
-        `byoc-aws-configuration:v1:${ownerKey}:${row.id}`
-      ),
+      credentials_encrypted: seal(configuration, purpose.scheme, purpose.aad),
       config: {
         accountId: configuration.roleArn.split(':')[4],
         roleArn: configuration.roleArn,
@@ -223,19 +226,23 @@ export async function validateAwsCompute(owner: AwsSetupOwner, roleArn: string) 
       setup_error: null,
       runtime: { last_verified_at: verifiedAt },
     })
-    .where(unchangedDraft(owner, row))
+    .where(unchangedDraft(owner, row, provider))
     .returning();
   if (!updated[0]) changed();
-  return awsStatusFromRow(updated[0]);
+  return awsStatusFromRow(updated[0], provider);
 }
 
 /** This removes only an unfinished local draft. It never deletes customer AWS resources. */
-export async function discardAwsComputeDraft(owner: AwsSetupOwner, generation: string) {
+export async function discardAwsComputeDraft(
+  owner: AwsSetupOwner,
+  generation: string,
+  provider: AwsSetupProvider
+) {
   const removed = await db
     .delete(byoc_connections)
     .where(
       and(
-        ownerCondition(owner),
+        ownerCondition(owner, provider),
         eq(byoc_connections.build_generation, generation),
         inArray(byoc_connections.setup_status, ['pending', 'failed'])
       )

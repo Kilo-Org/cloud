@@ -1,13 +1,18 @@
 import type { ScmAdmissionDependencies } from '../../src/scm-broker/admission.js';
 import { vi } from 'vitest';
 import type { Env } from '../../src/types.js';
+import { ECS_TEST_CONFIG } from './aws-ecs.js';
+import { encodeAwsEcsProviderRef } from '../../src/sandbox-control/aws-ecs-operation.js';
 import { AWS_TEST_CONFIGURATION } from './aws-provider.js';
 import { encodeAwsProviderRef } from '../../src/sandbox-control/aws-operation.js';
 import {
   mintSandboxLaunchCredential,
   hashSandboxCredential,
 } from '../../src/sandbox-control/credential.js';
-import { mintAwsEgressCredential } from '../../src/egress/aws-credential.js';
+import {
+  mintAwsEgressCredential,
+  mintAwsEgressCredentialUntil,
+} from '../../src/egress/aws-credential.js';
 import { grant, logicalId } from '../../src/scm-broker/test-fixtures.js';
 import { createAwsEgressAdmission, type AwsEgressContext } from '../../src/egress/aws-admission.js';
 
@@ -15,8 +20,11 @@ const generation = '22222222-2222-4222-8222-222222222222';
 const allocationId = '11111111-1111-4111-8111-111111111111';
 const secret = 'worker-signing-test';
 const credential = 'a'.repeat(64);
-export async function awsEgressFixture(options: { now?: () => number } = {}) {
-  const now = options.now?.() ?? Date.now();
+export async function awsEgressFixture(
+  options: { provider?: 'aws' | 'aws-ecs'; now?: () => number } = {}
+) {
+  const provider = options.provider ?? 'aws';
+  let now = options.now?.() ?? Date.now();
   const config = {
     ...AWS_TEST_CONFIGURATION,
     proxy: { generation, hostname: 'proxy.kilo.internal', caFingerprint: 'b'.repeat(64) },
@@ -32,7 +40,6 @@ export async function awsEgressFixture(options: { now?: () => number } = {}) {
     intentId: allocationId,
     createdAt: now,
   };
-  if (!scope.outboundContainerId) throw new Error('Missing fixture allocation binding');
   const context: AwsEgressContext = {
     sandboxId: logicalId,
     ownerId: scope.userId,
@@ -44,7 +51,7 @@ export async function awsEgressFixture(options: { now?: () => number } = {}) {
       credentialId: '22222222-2222-4222-8222-222222222222',
     },
     credentialHash: await hashSandboxCredential(credential),
-    outboundContainerId: scope.outboundContainerId,
+    outboundContainerId: scope.outboundContainerId ?? null,
     grants: [scope],
     liveSessionIds: scope.members.map(member => member.sessionId),
     organizationId: scope.orgId,
@@ -70,6 +77,40 @@ export async function awsEgressFixture(options: { now?: () => number } = {}) {
       },
     },
   };
+  if (provider === 'aws-ecs') {
+    const configuration = { ...ECS_TEST_CONFIG, proxy: config.proxy };
+    const ecsRef = { ...ref, provider: 'aws-ecs' as const };
+    scope.provider = 'aws-ecs';
+    context.provider = 'aws-ecs';
+    context.allocation.providerRef = encodeAwsEcsProviderRef(ecsRef);
+    context.operation = {
+      ref: ecsRef,
+      config: configuration,
+      phase: 'launching',
+      requestAt: now,
+      request: {
+        cluster: configuration.clusterArn,
+        taskDefinition: configuration.taskDefinitionArn,
+        capacityProviderStrategy: [{ capacityProvider: configuration.capacityProvider, weight: 1 }],
+        count: 1,
+        clientToken: allocationId,
+        startedBy: allocationId,
+        networkConfiguration: {
+          awsvpcConfiguration: {
+            subnets: [configuration.subnetId],
+            securityGroups: [configuration.securityGroupId],
+            assignPublicIp: 'DISABLED',
+          },
+        },
+        overrides: {
+          containerOverrides: [{ name: 'sandbox', command: ['-e', 'void 0'], environment: [] }],
+        },
+        enableExecuteCommand: false,
+      },
+    };
+  }
+  if (!context.operation) throw new Error('Missing operation');
+  const pinnedConfiguration = context.operation.config;
   const metadata = {
     deployment: {
       protocolVersion: 1 as const,
@@ -89,7 +130,10 @@ export async function awsEgressFixture(options: { now?: () => number } = {}) {
     },
   };
   const proof = {
-    credential: mintAwsEgressCredential(
+    credential: (provider === 'aws'
+      ? mintAwsEgressCredential
+      : (identity: Parameters<typeof mintAwsEgressCredential>[0], key: string) =>
+          mintAwsEgressCredentialUntil(identity, key, Date.parse(metadata.deployment.expiresAt)))(
       {
         launchCredential: mintSandboxLaunchCredential(
           { sandboxId: logicalId, allocationId, credential },
@@ -102,14 +146,13 @@ export async function awsEgressFixture(options: { now?: () => number } = {}) {
     ),
     identity: metadata.identity.secret,
   };
-  const resolveConfiguration = vi.fn(async () => config);
+  const resolveConfiguration = vi.fn(async () => pinnedConfiguration);
   const readMetadata = vi.fn(async () => structuredClone(metadata));
-  const resolve = vi.fn(
-    async ({ grant: current }: Parameters<ScmAdmissionDependencies['resolve']>[0]) => {
-      const capability = current.scm?.capability;
-      return capability ? { grant: current, credential: capability.credential } : null;
-    }
-  );
+  const resolve = vi.fn<ScmAdmissionDependencies['resolve']>(async ({ grant: current }) => {
+    const credential = current.scm?.capability?.credential;
+    if (!credential) throw new Error('Missing fixture capability');
+    return { grant: current, credential };
+  });
   const persist = vi.fn();
   const recordEgressRequest = vi.fn(async (_row: unknown) => undefined);
   const redeem = vi.fn(async () => ({ success: true, authorization: 'Bearer upstream-secret' }));
@@ -126,7 +169,7 @@ export async function awsEgressFixture(options: { now?: () => number } = {}) {
     signingSecret: async () => secret,
     resolve,
     persist,
-    now: options.now ?? (() => now),
+    now: () => options.now?.() ?? now,
   });
   return {
     api,
@@ -134,7 +177,7 @@ export async function awsEgressFixture(options: { now?: () => number } = {}) {
     metadata,
     proof,
     context,
-    config,
+    config: pinnedConfiguration,
     scope,
     resolveConfiguration,
     readMetadata,
@@ -143,5 +186,8 @@ export async function awsEgressFixture(options: { now?: () => number } = {}) {
     recordEgressRequest,
     redeem,
     now,
+    setNow: (value: number) => {
+      now = value;
+    },
   };
 }

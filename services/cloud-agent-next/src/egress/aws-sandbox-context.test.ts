@@ -2,15 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { awsEgressPolicySchema } from '@kilocode/worker-utils/aws-egress';
 import { awsEgressFixture } from '../../test/fixtures/aws-egress.js';
 import { awsOperationSchema } from '../sandbox-control/aws-operation.js';
+import { awsEcsOperationSchema } from '../sandbox-control/aws-ecs-operation.js';
 import { buildNativeEgressAllowlist } from '../sandbox-control/egress-policy.js';
 import * as admission from './aws-admission.js';
 import { createAwsSandboxEgress } from './aws-sandbox-context.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-async function sandboxEgress(allowlist?: readonly string[]) {
-  const f = await awsEgressFixture();
-  awsOperationSchema.parse(f.context.operation);
+async function sandboxEgress(provider: 'aws' | 'aws-ecs', allowlist?: readonly string[]) {
+  const f = await awsEgressFixture({ provider });
+  (provider === 'aws' ? awsOperationSchema : awsEcsOperationSchema).parse(f.context.operation);
   const createAdmission = admission.createAwsEgressAdmission;
   // Keep context assembly and admission real. Replace only remote authority and clock dependencies.
   vi.spyOn(admission, 'createAwsEgressAdmission').mockImplementation(deps =>
@@ -27,7 +28,12 @@ async function sandboxEgress(allowlist?: readonly string[]) {
     admission: { serial: async operation => operation(), resolve: f.resolve, persist: f.persist },
     readContext: async () => structuredClone(f.context),
     operationStorage: {
-      get: vi.fn().mockImplementation(async () => structuredClone(f.context.operation)),
+      get: vi.fn().mockImplementation(async (key: string) => {
+        expect(key).toBe(
+          `${provider === 'aws' ? 'aws-operation:' : 'aws-ecs-operation:'}${f.context.operation?.ref.intentId}`
+        );
+        return structuredClone(f.context.operation);
+      }),
       transaction: vi.fn().mockRejectedValue(new Error('Unexpected egress operation update')),
       list: vi.fn().mockResolvedValue(new Map()),
       delete: vi.fn().mockRejectedValue(new Error('Unexpected egress operation deletion')),
@@ -38,7 +44,7 @@ async function sandboxEgress(allowlist?: readonly string[]) {
   return { f, api };
 }
 
-describe('AWS sandbox policy assembly', () => {
+describe.each(['aws', 'aws-ecs'] as const)('%s sandbox policy assembly', provider => {
   it('adds the pinned bucket through the shared builder without changing the stored pin', async () => {
     const pin = Object.freeze(
       buildNativeEgressAllowlist({
@@ -47,7 +53,7 @@ describe('AWS sandbox policy assembly', () => {
       })
     );
     const before = [...pin];
-    const { f, api } = await sandboxEgress(pin);
+    const { f, api } = await sandboxEgress(provider, pin);
     const host = `${f.config.bucket}.s3.${f.config.region}.amazonaws.com`;
     for (let refresh = 0; refresh < 2; refresh++) {
       const response = await api.policy(f.proof);
@@ -63,7 +69,7 @@ describe('AWS sandbox policy assembly', () => {
   });
 
   it('keeps unrestricted allocations unrestricted', async () => {
-    const { f, api } = await sandboxEgress();
+    const { f, api } = await sandboxEgress(provider);
     const response = await api.policy(f.proof);
     expect(response.status).toBe(200);
     expect(await response.json()).not.toHaveProperty('allowlist');

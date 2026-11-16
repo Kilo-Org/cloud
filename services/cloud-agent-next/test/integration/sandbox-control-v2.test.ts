@@ -590,23 +590,28 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.createCalls).toBe(1);
   });
 
-  it('arms an absolute provider lifetime and reports its specific failure before cleanup', async () => {
-    const provider = createFakeProvider();
-    let deadline = Date.now() + 5_000;
-    provider.adapter.lifetimeDeadlineAt = async () => deadline;
-    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
-    await awaitStarting(provider, stub);
-    const { wrapper } = await connectAndHello(provider, stub);
-    expect(await readAlarm(stub)).toBe(deadline);
-    deadline = Date.now() - 1;
-    await runAlarm(stub);
-    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
-    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
-      state: 'failed',
-      reason: 'provider_lifetime_exhausted',
-    });
-    wrapper.close();
-  });
+  it.each(['provider_lifetime_exhausted', 'byoc_aws_proxy_expired'] as const)(
+    'arms a durable deadline and reports %s before cleanup',
+    async reason => {
+      const provider = createFakeProvider({ gateStop: true });
+      let deadline = Date.now() + 5_000;
+      provider.adapter.allocationDeadline = async () => ({ at: deadline, reason });
+      const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+      await awaitStarting(provider, stub);
+      const { wrapper } = await connectAndHello(provider, stub);
+      expect(await readAlarm(stub)).toBe(deadline);
+      deadline = Date.now() - 1;
+      await runAlarm(stub);
+      await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason,
+      });
+      expect(await readState(stub)).toMatchObject({ kind: 'stopping' });
+      expect(provider.createCalls).toBe(1);
+      wrapper.close();
+    }
+  );
 
   it.each([
     { stage: 'create', failure: { failFirstCreate: true } },

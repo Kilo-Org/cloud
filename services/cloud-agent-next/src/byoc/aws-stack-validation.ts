@@ -4,6 +4,10 @@ import {
   awsByocConfigurationSchema,
   type AwsByocConfiguration,
 } from '@kilocode/worker-utils/aws-byoc';
+import type {
+  AwsProviderSetupIntent,
+  AwsEcsSetupIntent,
+} from '@kilocode/worker-utils/aws-ecs-onboarding';
 import type { AwsStack } from '@kilocode/worker-utils/aws-cloudformation';
 import {
   AWS_SETUP_ERRORS,
@@ -17,7 +21,7 @@ export class AwsSetupError extends Error {
     this.name = 'AwsSetupError';
   }
 }
-function complete(stack: AwsStack) {
+export function assertAwsStackComplete(stack: AwsStack) {
   if (!['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE'].includes(stack.status))
     throw new AwsSetupError('byoc_aws_stack_not_ready');
 }
@@ -26,24 +30,55 @@ function version(value: string | undefined): number | null {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
-export function assertAwsStackVersions(stack: AwsStack): void {
+export function assertAwsStackVersions(
+  stack: AwsStack,
+  minimumTemplateVersion = AWS_BYOC_TEMPLATE_VERSION
+): void {
   const template = version(stack.outputs.TemplateVersion);
-  if (template === null || template < AWS_BYOC_TEMPLATE_VERSION)
+  if (template === null || template < minimumTemplateVersion)
     throw new AwsSetupError('byoc_aws_stack_outdated');
   if (version(stack.outputs.ProxyProtocolVersion) !== AWS_BYOC_PROXY_PROTOCOL_VERSION)
     throw new AwsSetupError('byoc_aws_proxy_protocol_unsupported');
 }
-export function awsSetupParameters(intent: AwsSetupIntent): Record<string, string> {
+function sharedSetupParameters(intent: AwsProviderSetupIntent): Record<string, string> {
   return {
     KiloRoleArn: intent.kiloRoleArn,
     ExternalId: intent.externalId,
-    RuntimeArtifactBucket: intent.release.runtime.bucket,
-    RuntimeArtifactKey: intent.release.runtime.key,
     RuntimeRepositoryArn: intent.release.runtime.repositoryArn,
     ProxyImageUri: intent.release.proxy.imageUri,
     ProxyRepositoryArn: intent.release.proxy.repositoryArn,
     ControlPlaneUrl: new URL(intent.controlPlaneUrl).origin,
   };
+}
+export function awsSetupParameters(intent: AwsSetupIntent): Record<string, string> {
+  return {
+    ...sharedSetupParameters(intent),
+    RuntimeArtifactBucket: intent.release.runtime.bucket,
+    RuntimeArtifactKey: intent.release.runtime.key,
+  };
+}
+export function awsEcsSetupParameters(intent: AwsEcsSetupIntent): Record<string, string> {
+  return { ...sharedSetupParameters(intent), RuntimeImageUri: intent.release.runtime.imageUri };
+}
+export function assertAwsSetupStackBinding(input: {
+  intent: AwsProviderSetupIntent;
+  roleArn: string;
+  stack: AwsStack;
+  parameters: Record<string, string>;
+}): void {
+  const { intent, roleArn, stack, parameters } = input;
+  assertAwsStackComplete(stack);
+  assertAwsStackVersions(stack, intent.release.templateVersion);
+  if (
+    roleArn.split(':')[4] !== intent.accountId ||
+    stack.stackId.split(':')[4] !== intent.accountId ||
+    stack.stackId.split(':')[3] !== 'us-east-1' ||
+    stack.stackName !== intent.stackName ||
+    stack.outputs.RoleArn !== roleArn ||
+    version(stack.outputs.TemplateVersion) !== intent.release.templateVersion ||
+    Object.entries(parameters).some(([key, value]) => stack.parameters[key] !== value)
+  )
+    throw new AwsSetupError('byoc_aws_stack_mismatch');
 }
 
 /** Initial Save proves the stack belongs to this intent and uses the approved release parameters. */
@@ -53,20 +88,7 @@ export function awsConfigurationFromSetupStack(input: {
   stack: AwsStack;
 }): AwsByocConfiguration {
   const { intent, roleArn, stack } = input;
-  complete(stack);
-  assertAwsStackVersions(stack);
-  if (
-    roleArn.split(':')[4] !== intent.accountId ||
-    stack.stackId.split(':')[4] !== intent.accountId ||
-    stack.stackId.split(':')[3] !== 'us-east-1' ||
-    stack.stackName !== intent.stackName ||
-    stack.outputs.RoleArn !== roleArn ||
-    version(stack.outputs.TemplateVersion) !== intent.release.templateVersion ||
-    Object.entries(awsSetupParameters(intent)).some(
-      ([key, value]) => stack.parameters[key] !== value
-    )
-  )
-    throw new AwsSetupError('byoc_aws_stack_mismatch');
+  assertAwsSetupStackBinding({ intent, roleArn, stack, parameters: awsSetupParameters(intent) });
   const result = awsByocConfigurationSchema.safeParse({
     region: 'us-east-1',
     roleArn,
@@ -88,7 +110,7 @@ export function assertAwsAllocationStack(
   stack: AwsStack,
   configuration: AwsByocConfiguration
 ): void {
-  complete(stack);
+  assertAwsStackComplete(stack);
   assertAwsStackVersions(stack);
   const expected: Record<string, string> = {
     RoleArn: configuration.roleArn,

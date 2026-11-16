@@ -1,26 +1,53 @@
-import type { ScmAdmissionDependencies } from '../scm-broker/admission.js';
+import type { SessionCredentialGrant } from '../sandbox-control/session-credentials.js';
 import {
-  createAwsEgressIdentity,
-  type AwsEgressIdentityDeps,
-  type AwsEgressProof,
-} from './aws-egress-identity.js';
-import { awsEgressPolicy } from './aws-egress-policy.js';
-import { recordAwsEgressAudit } from './aws-egress-audit.js';
-import { admitAwsScm, type AwsScmAdmission } from './aws-scm-admission.js';
+  sessionScmAdmissionContext,
+  sessionScmMemberIds,
+  type ScmAdmissionContext,
+  type ScmAdmissionDependencies,
+} from '../scm-broker/admission.js';
+import type { Env } from '../types.js';
+import type { ByocSource } from '../byoc/owner.js';
+import type { AwsProxyMetadata } from '../byoc/aws-proxy.js';
+import { verifyAwsEgressCredential } from './aws-credential.js';
+import {
+  createAwsScopedEgressAdmission,
+  type AwsEgressOperation,
+  type AwsEgressConfiguration,
+} from './aws-scoped-admission.js';
+export type { AwsEgressProof, AwsEgressOperation } from './aws-scoped-admission.js';
 
-export type { AwsEgressProof, AwsEgressContext } from './aws-egress-identity.js';
-export type { AwsScmAdmission } from './aws-scm-admission.js';
+export type AwsEgressContext = ScmAdmissionContext & {
+  byoc?: ByocSource;
+  operation: AwsEgressOperation | null;
+  credentialHash?: string;
+  allowlist?: readonly string[];
+  audit: boolean;
+};
 
-/** One identity owner, separate endpoint decisions, and no request-body transport. */
-export function createAwsEgressAdmission(
-  deps: AwsEgressIdentityDeps & Pick<ScmAdmissionDependencies, 'resolve' | 'persist'>
-) {
-  const identity = createAwsEgressIdentity(deps);
-  return {
-    policy: (proof: AwsEgressProof) => awsEgressPolicy(identity, proof),
-    audit: (proof: AwsEgressProof, value: unknown) =>
-      recordAwsEgressAudit({ env: deps.env, identity }, proof, value),
-    admitScm: (proof: AwsEgressProof, request: AwsScmAdmission) =>
-      admitAwsScm({ identity, resolve: deps.resolve, persist: deps.persist }, proof, request),
-  };
+/** Session authority retains runtime readiness and live Session DO membership. */
+export function createAwsEgressAdmission(deps: {
+  env: Env;
+  serial: ScmAdmissionDependencies['serial'];
+  readContext: () => Promise<AwsEgressContext>;
+  resolve: ScmAdmissionDependencies['resolve'];
+  persist: ScmAdmissionDependencies['persist'];
+  resolveConfiguration?: (
+    source: ByocSource,
+    provider: 'aws' | 'aws-ecs'
+  ) => Promise<AwsEgressConfiguration>;
+  readMetadata?: (configuration: AwsEgressConfiguration) => Promise<AwsProxyMetadata>;
+  signingSecret?: () => Promise<string | undefined>;
+  now?: () => number;
+}) {
+  type Context = ReturnType<typeof sessionScmAdmissionContext<AwsEgressContext>>;
+  return createAwsScopedEgressAdmission<SessionCredentialGrant, Context>({
+    ...deps,
+    readContext: async () =>
+      sessionScmAdmissionContext({ ...(await deps.readContext()), identityBinding: 'session' }),
+    memberIds: sessionScmMemberIds,
+    verifyCredential: (token, secret, _context, now) =>
+      verifyAwsEgressCredential(token, secret, now),
+  });
 }
+
+export type { AwsScmAdmission } from './aws-scm-admission.js';

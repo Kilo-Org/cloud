@@ -10,8 +10,13 @@ import type {
   AwsEgressSharedIdentity,
 } from '@kilocode/worker-utils/aws-egress';
 import type { ProviderStartup } from '../sandbox-control/provider.js';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
+import type { AwsEcsProviderRef } from '../sandbox-control/aws-ecs-operation.js';
 import type { AwsProviderRef } from '../sandbox-control/aws-operation.js';
-import { verifyAwsEgressCredential, mintAwsEgressCredential } from '../egress/aws-credential.js';
+import {
+  verifyAwsEgressCredential,
+  mintAwsEgressCredentialUntil,
+} from '../egress/aws-credential.js';
 import { ByocAwsProviderError } from './aws-credential-resolver.js';
 
 export type AwsProxyMetadata = {
@@ -21,7 +26,7 @@ export type AwsProxyMetadata = {
 
 /** Safe metadata reads retry transient AWS failures only. A missing or changed deployment needs setup repair. */
 export async function readPinnedAwsProxyDeployment(
-  config: AwsByocConfiguration,
+  config: Pick<AwsByocConfiguration, 'proxy' | 'proxyProtocolVersion' | 'stackId'>,
   read: (signal?: AbortSignal) => Promise<AwsProxyMetadata>
 ): Promise<AwsProxyMetadata> {
   if (!config.proxy || config.proxyProtocolVersion !== AWS_EGRESS_PROTOCOL_VERSION)
@@ -58,31 +63,51 @@ export async function readPinnedAwsProxyDeployment(
   return metadata;
 }
 
-/** Admission of a new allocation requires a certificate that covers its entire maximum lifetime. */
-export async function prepareAwsProxyStartup(input: {
+type ProxyStartupInput = {
   startup: ProviderStartup;
-  ref: AwsProviderRef;
-  configuration: AwsByocConfiguration;
+  ref: { sandboxId: string; intentId: string };
+  configuration: Pick<AwsByocConfiguration, 'proxy' | 'proxyProtocolVersion' | 'stackId'>;
   readMetadata: (signal?: AbortSignal) => Promise<AwsProxyMetadata>;
   signingSecret: string;
   now?: number;
-}): Promise<ProviderStartup> {
+};
+
+export function prepareAwsProxyStartup(
+  input: ProxyStartupInput & { ref: AwsProviderRef; configuration: AwsByocConfiguration }
+): Promise<ProviderStartup> {
+  return prepareProxyStartup(input, () => Date.now() + AWS_MICROVM_MAXIMUM_DURATION_SECONDS * 1000);
+}
+
+/** ECS credentials end at the verified deployment certificate expiry, rather than eight hours after launch. */
+export function prepareAwsEcsProxyStartup(
+  input: ProxyStartupInput & { ref: AwsEcsProviderRef; configuration: AwsEcsByocConfiguration }
+): Promise<ProviderStartup> {
+  return prepareProxyStartup(input, deployment => Date.parse(deployment.expiresAt));
+}
+
+async function prepareProxyStartup(
+  input: ProxyStartupInput,
+  expiresAt: (deployment: AwsEgressPublicDeployment) => number
+): Promise<ProviderStartup> {
   const { deployment } = await readPinnedAwsProxyDeployment(
     input.configuration,
     input.readMetadata
   );
+  // The reserve checks certificate health. It does not impose an ECS compute deadline.
   if (
+    !Number.isFinite(Date.parse(deployment.expiresAt)) ||
     Date.parse(deployment.expiresAt) <=
-    (input.now ?? Date.now()) + AWS_MICROVM_MAXIMUM_DURATION_SECONDS * 1000
+      (input.now ?? Date.now()) + AWS_MICROVM_MAXIMUM_DURATION_SECONDS * 1000
   )
     throw new ByocAwsProviderError('byoc_aws_proxy_expired');
-  const token = mintAwsEgressCredential(
+  const token = mintAwsEgressCredentialUntil(
     {
       launchCredential: input.startup.env.SANDBOX_CONTROL_CREDENTIAL ?? '',
       generation: deployment.generation,
       stackId: deployment.stackId,
     },
-    input.signingSecret
+    input.signingSecret,
+    expiresAt(deployment)
   );
   const claims = verifyAwsEgressCredential(token, input.signingSecret);
   if (claims?.sandboxId !== input.ref.sandboxId || claims.allocationId !== input.ref.intentId)

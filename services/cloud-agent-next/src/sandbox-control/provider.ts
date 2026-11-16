@@ -66,6 +66,7 @@ export class ProviderCreationError extends AgentSandboxUnavailableError {
 
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('aws') }).strict(),
+  z.object({ provider: z.literal('aws-ecs') }).strict(),
   z.object({ provider: z.literal('cloudflare') }).strict(),
   z
     .object({ provider: z.literal('vercel'), resources: vercelSandboxResourcesSchema.optional() })
@@ -138,7 +139,7 @@ export type ProviderSnapshotStart = {
   /** The image the snapshot was captured from. */
   baseImage: string;
   /** The provider that captured it; absent only for callers that predate BYOC. */
-  provider?: 'cloudflare-containers' | 'vercel';
+  provider?: 'cloudflare-containers' | 'vercel' | 'aws' | 'aws-ecs';
 };
 
 export type ProviderLaunchOptions = {
@@ -180,11 +181,16 @@ export type ProviderStartupCommand = {
 
 export type ProviderStartup = { command: ProviderStartupCommand; env: Record<string, string> };
 
+export type ProviderDeadline = {
+  at: number;
+  reason: 'provider_lifetime_exhausted' | 'byoc_aws_proxy_expired' | 'invalid_configuration';
+};
+
 export type ProviderAdapter = {
   /** Recover an issued launch after coordinator restart. Unlike observe, this may replay provisioning. */
   reconcileLaunch?(ref: string): Promise<ProviderLaunchResult | undefined>;
-  /** Absolute provider lifetime, including a cleanup margin. This is not a renewable lease. */
-  lifetimeDeadlineAt?(ref: string): Promise<number | undefined>;
+  /** Read the earliest nonrenewable compute or access deadline from durable allocation state. */
+  allocationDeadline?(ref: string): Promise<ProviderDeadline | undefined>;
   /** Authenticated wrapper admission can revoke the one-time launch document. */
   confirmAdmission?(ref: string): Promise<void>;
   /** Validate launch-owned runtime configuration before welcoming the authenticated wrapper. */

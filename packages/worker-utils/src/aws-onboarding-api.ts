@@ -1,11 +1,16 @@
 import { z } from 'zod';
 import { awsByocConfigurationSchema } from './aws-byoc';
-import { awsSetupBindingSchema, awsSetupOwnerSchema } from './aws-onboarding';
+import {
+  awsSetupBindingSchema,
+  awsSetupOwnerSchema,
+  awsSetupProviderSchema,
+} from './aws-onboarding';
 
-const binding = awsSetupBindingSchema.shape;
+const provider = { provider: awsSetupProviderSchema.default('aws') };
+const binding = { ...awsSetupBindingSchema.shape, ...provider };
 const stored = { ...binding, envelope: z.unknown() };
 export const awsSetupRequestSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('enrollment'), owner: awsSetupOwnerSchema }).strict(),
+  z.object({ action: z.literal('enrollment'), ...provider, owner: awsSetupOwnerSchema }).strict(),
   z
     .object({ action: z.literal('prepare'), ...binding, accountId: z.string().regex(/^\d{12}$/) })
     .strict(),
@@ -25,7 +30,7 @@ export const awsSetupRequestSchema = z.discriminatedUnion('action', [
     })
     .strict(),
 ]);
-export type AwsSetupRequest = z.infer<typeof awsSetupRequestSchema>;
+export type AwsSetupRequest = z.input<typeof awsSetupRequestSchema>;
 export const awsEnrollmentSchema = z
   .object({ enrolled: z.boolean(), available: z.boolean() })
   .strict();

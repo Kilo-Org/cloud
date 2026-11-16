@@ -569,6 +569,7 @@ export type Env = {
   AWS_BYOC_KILO_ROLE_ARN?: string;
   /** Pinned operator release and preauthorized customer accounts for AWS onboarding. */
   AWS_BYOC_RELEASE?: string;
+  AWS_ECS_BYOC_RELEASE?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
   /**

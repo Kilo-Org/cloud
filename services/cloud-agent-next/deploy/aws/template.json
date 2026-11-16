@@ -1122,17 +1122,8 @@
         "VpcId": {
           "Ref": "Vpc"
         },
-        "Priority": 100,
+        "Priority": 101,
         "MutationProtection": "DISABLED"
-      }
-    },
-    "DnsFailClosed": {
-      "Type": "AWS::Route53Resolver::FirewallConfig",
-      "Properties": {
-        "ResourceId": {
-          "Ref": "Vpc"
-        },
-        "FirewallFailOpen": "DISABLED"
       }
     }
   },

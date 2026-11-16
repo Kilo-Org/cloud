@@ -6,6 +6,13 @@ import { providerFailureReason } from './provider-failure.js';
 
 describe('AWS provider failure policy', () => {
   it.each([
+    [new AwsRequestError(0, 'TaskIdentityMismatch'), 'provider_identity_mismatch'],
+    [new AwsRequestError(0, 'TaskDefinitionMismatch'), 'invalid_configuration'],
+    [new AwsRequestError(400, 'InvalidParameterException'), 'invalid_configuration'],
+  ])('preserves rejected ECS configuration: %s', (error, reason) => {
+    expect(providerFailureReason(normalizeAwsProviderFailure(error))).toBe(reason);
+  });
+  it.each([
     new AwsRequestError(403, 'RequestRejected'),
     new AwsRequestError(400, 'AccessDeniedException'),
     new ByocAwsProviderError('byoc_aws_forbidden'),

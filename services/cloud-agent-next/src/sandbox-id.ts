@@ -33,6 +33,7 @@ const SANDBOX_ALLOCATION_ID_PREFIX: Record<SandboxAllocation, 'istd' | 'ses' | u
   'vercel-small': 'ses',
   'vercel-large': 'ses',
   'aws-microvm-8g': 'ses',
+  'aws-ecs-8g': 'ses',
 };
 
 export const RETIRED_SHARED_SANDBOX_MESSAGE =

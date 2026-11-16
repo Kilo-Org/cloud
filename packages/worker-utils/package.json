@@ -84,7 +84,9 @@
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts",
-    "./aws-onboarding-api": "./src/aws-onboarding-api.ts"
+    "./aws-onboarding-api": "./src/aws-onboarding-api.ts",
+    "./aws-ecs": "./src/aws-ecs.ts",
+    "./aws-ecs-onboarding": "./src/aws-ecs-onboarding.ts"
   },
   "scripts": {
     "test": "vitest run",

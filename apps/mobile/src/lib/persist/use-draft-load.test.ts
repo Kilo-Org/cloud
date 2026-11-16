@@ -23,7 +23,8 @@ vi.mock('@sentry/react-native', () => ({
 }));
 
 /* eslint-disable import/first */
-import { isMergeDraft, prMergeDraftKey } from './drafts';
+import { prMergeDraftKey } from './drafts';
+import { isMergeDraft } from './merge-draft';
 import { useFencedDraftLoad } from './use-draft-load';
 /* eslint-enable import/first */
 

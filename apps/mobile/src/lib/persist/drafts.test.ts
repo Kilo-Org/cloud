@@ -31,7 +31,6 @@ import {
   DRAFT_MAX_ENTRIES,
   draftScope,
   flushDraft,
-  isMergeDraft,
   isStringDraft,
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
@@ -47,6 +46,7 @@ import {
   securityDismissDraftKey,
 } from './drafts';
 import { forgetShapeMismatchesForTests } from './draft-read-report';
+import { isMergeDraft } from './merge-draft';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { inFlightSaveCount } from '@/lib/hooks/save-chain';
 /* eslint-enable import/first */
@@ -155,6 +155,12 @@ describe('draft scope and entity keys', () => {
   it('isMergeDraft accepts a title+message object and rejects other shapes', () => {
     expect(isMergeDraft({ title: 'T', message: 'M' })).toBe(true);
     expect(isMergeDraft({ title: '', message: '' })).toBe(true);
+    // The persisted method is optional: a legacy record and a chosen method both load.
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 'squash' })).toBe(true);
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 'merge' })).toBe(true);
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 'rebase' })).toBe(true);
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 'octopus' })).toBe(false);
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 1 })).toBe(false);
     expect(isMergeDraft({ title: 'T' })).toBe(false);
     expect(isMergeDraft({ message: 'M' })).toBe(false);
     expect(isMergeDraft({ title: 1, message: 'M' })).toBe(false);
@@ -236,6 +242,17 @@ describe('merge, reply, and comment keys restore per account and destination', (
     saveDraft('u1', key, { title: 'T', message: 'M' });
     await flushDraft('u1', key);
     await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({ title: 'T', message: 'M' });
+  });
+
+  it('round-trips the chosen merge method with the draft', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, { title: 'T', message: 'M', method: 'squash' });
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({
+      title: 'T',
+      message: 'M',
+      method: 'squash',
+    });
   });
 
   it('does not restore a merge draft under a different account or PR', async () => {

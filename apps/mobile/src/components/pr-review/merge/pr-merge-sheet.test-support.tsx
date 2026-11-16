@@ -138,16 +138,17 @@ export async function submit(renderer: ReactTestRenderer, label = 'Merge') {
   await press(renderer, label);
   await press(renderer, `Confirm ${label}`);
 }
-export function seedDraft(
-  userId: string,
-  entityKey: string,
-  value: { title: string; message: string }
-) {
+type StoredMergeDraft = {
+  title: string;
+  message: string;
+  method?: 'merge' | 'squash' | 'rebase';
+};
+export function seedDraft(userId: string, entityKey: string, value: StoredMergeDraft) {
   state.rows.set(`draft:${userId}\u0000${entityKey}`, JSON.stringify(value));
 }
 export function storedDraft(userId = 'u1', entityKey = draftKey) {
   const raw = state.rows.get(`draft:${userId}\u0000${entityKey}`);
-  return raw ? (JSON.parse(raw) as { title: string; message: string }) : null;
+  return raw ? (JSON.parse(raw) as StoredMergeDraft) : null;
 }
 export function visibleText(renderer: ReactTestRenderer): string {
   return (

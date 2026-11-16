@@ -707,6 +707,53 @@ describe('countAndStoreEmbeddingUsage', () => {
   });
 });
 
+describe.each([
+  {
+    apiKind: 'embeddings' as const,
+    countUsage: countAndStoreEmbeddingUsage,
+    recordedStats: () => mockedLogMicrodollarUsage.mock.calls[0]?.[0],
+    chunks: [
+      [500, '{"id":"embedding-timed","model":"test/embedding",'],
+      [540, '"usage":{"prompt_tokens":10,"cost":0.001,"is_byok":false}}'],
+    ] satisfies [number, string][],
+  },
+  {
+    apiKind: 'audio_transcriptions' as const,
+    countUsage: countAndStoreTranscriptionUsage,
+    recordedStats: () => mockedProcessTokenData.mock.calls[0]?.[0],
+    chunks: [
+      [500, '{"id":"transcription-timed","model":"test/transcribe",'],
+      [540, '"text":"hello","usage":{"cost":0.001,"is_byok":false}}'],
+    ] satisfies [number, string][],
+  },
+])('$apiKind response timing', ({ apiKind, countUsage, recordedStats, chunks }) => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+  });
+
+  it('measures the response from the request start', async () => {
+    const clockSpy = clock.install();
+    try {
+      countUsage(
+        new Response(clock.bodyArrivingAt(chunks)),
+        {
+          ...createMockUsageContext('timing-user', 'unused@example.com', 0),
+          api_kind: apiKind,
+          requested_model: 'test/model',
+          requestStartedAt: 200,
+        },
+        undefined
+      );
+      await waitForUsageWrite();
+    } finally {
+      clockSpy.mockRestore();
+    }
+
+    expect(recordedStats()).toMatchObject({ latency: 300, generation_time: 40 });
+  });
+});
+
 describe.each(['openrouter', 'vercel'] as const)(
   'countAndStoreTranscriptionUsage %s credentials',
   provider => {

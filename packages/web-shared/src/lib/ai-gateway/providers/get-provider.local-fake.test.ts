@@ -322,23 +322,6 @@ describe('getProvider auto small free model routing', () => {
       expect.any(Function)
     );
   });
-
-  test('forwards the organization Vercel AI Gateway setting to the Vercel routing decision', async () => {
-    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
-
-    const result = await getProvider(
-      getProviderInput({
-        ...providerInput('openai/gpt-5-nano'),
-        organizationDisabledVercelAiGateway: true,
-      })
-    );
-
-    expect((await firstRoute(result)).provider).toBe(OPENROUTER);
-    expect(shouldRouteToVercel).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationDisabledVercelAiGateway: true }),
-      expect.any(Function)
-    );
-  });
 });
 
 describe('getProvider ChatGPT connection routing order', () => {

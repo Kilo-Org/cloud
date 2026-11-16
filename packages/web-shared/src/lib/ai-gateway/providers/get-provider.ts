@@ -381,7 +381,6 @@ export type GetProviderInput = {
   isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
   /** Kilo's own route falls back to OpenRouter, like the global Vercel routing switch. BYOK routes
    * are unaffected; the caller rejects a route through a disabled gateway. */
-  organizationDisabledVercelAiGateway: boolean;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
   /** Receives the steps and BYOK candidates behind the result, when the call returns. */
@@ -641,9 +640,8 @@ async function selectProvider(
       case 'kilo': {
         recordNoKeyServed();
         const { kiloIgnoredProviders = [], boundedSpending = false } = input;
-        const { organizationDisabledVercelAiGateway } = input;
         const routesToVercel = await shouldRouteToVercel(
-          { requestedModel, boundedSpending, organizationDisabledVercelAiGateway },
+          { requestedModel, boundedSpending },
           async () =>
             withIgnoredProviders(await input.getRoutingProviderConfig(), kiloIgnoredProviders)
         );
@@ -652,7 +650,6 @@ async function selectProvider(
           outcome: 'selected',
           gateway: routesToVercel ? 'vercel' : 'openrouter',
           bounded_spending: boundedSpending,
-          organization_disabled_vercel_ai_gateway: organizationDisabledVercelAiGateway,
           kilo_ignored_providers: kiloIgnoredProviders,
         });
         return servedBy({
@@ -783,7 +780,7 @@ async function previewStep(
           outcome: 'used',
           // The preview explains the unrestricted route, so no request can carry a spend ceiling here.
           gateway: (await shouldRouteToVercel(
-            { requestedModel, boundedSpending: false, organizationDisabledVercelAiGateway: false },
+            { requestedModel, boundedSpending: false },
             async () => undefined
           ))
             ? 'vercel'

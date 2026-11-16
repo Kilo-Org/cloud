@@ -201,7 +201,6 @@ describe('getVercelOnlyCatalogModels', () => {
     jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue(vercelMetadata);
     jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
     jest.mocked(getRuntimeGatewayRoutingConfig).mockResolvedValue({
-      vercelEnabled: true,
       vercelOptOutModels: new Set(['openai/gpt-5-codex']),
     });
   });
@@ -266,17 +265,6 @@ describe('getVercelOnlyCatalogModels', () => {
     const models = await getVercelOnlyCatalogModels({ openRouterModels, openRouterMetadata: {} });
 
     expect(ids(models)).toEqual(['anthropic/claude-opus-5-fast']);
-  });
-
-  it('lists nothing when Vercel routing is disabled', async () => {
-    jest.mocked(getRuntimeGatewayRoutingConfig).mockResolvedValue({
-      vercelEnabled: false,
-      vercelOptOutModels: new Set(),
-    });
-
-    await expect(
-      getVercelOnlyCatalogModels({ openRouterModels, openRouterMetadata: {} })
-    ).resolves.toEqual([]);
   });
 
   it('treats models in the stored OpenRouter metadata as covered', async () => {

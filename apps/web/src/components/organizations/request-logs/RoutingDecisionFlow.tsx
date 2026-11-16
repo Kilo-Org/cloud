@@ -120,12 +120,7 @@ function ByokCandidates({ candidates }: { candidates: RequestLogByokCandidate[] 
 }
 
 function KiloStepDetails({ step }: { step: RequestLogRoutingStep }) {
-  const notes = [
-    step.bounded_spending ? 'Bounded spending' : null,
-    step.organization_disabled_vercel_ai_gateway
-      ? 'Vercel AI Gateway turned off by the organization'
-      : null,
-  ].filter(note => note !== null);
+  const notes = [step.bounded_spending ? 'Bounded spending' : null].filter(note => note !== null);
   const ignored = step.kilo_ignored_providers ?? [];
   if (notes.length === 0 && ignored.length === 0) return null;
   return (

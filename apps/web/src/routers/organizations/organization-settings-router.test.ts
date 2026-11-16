@@ -1427,7 +1427,6 @@ describe('organizations settings trpc router', () => {
       ).resolves.toEqual({
         available: true,
         disable_openrouter: false,
-        disable_vercel_ai_gateway: false,
         data_region: null,
       });
     });
@@ -1438,16 +1437,15 @@ describe('organizations settings trpc router', () => {
 
       const result = await caller.organizations.settings.updateGatewaySettings({
         organizationId: testOrganization.id,
-        disable_vercel_ai_gateway: true,
+        disable_openrouter: true,
         data_region: 'eu',
       });
 
-      expect(result.settings).toMatchObject({ disable_vercel_ai_gateway: true, data_region: 'eu' });
+      expect(result.settings).toMatchObject({ disable_openrouter: true, data_region: 'eu' });
       await expect(
         caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
       ).resolves.toMatchObject({
-        disable_openrouter: false,
-        disable_vercel_ai_gateway: true,
+        disable_openrouter: true,
         data_region: 'eu',
       });
       const auditLogs = await db
@@ -1456,7 +1454,7 @@ describe('organizations settings trpc router', () => {
         .where(eq(organization_audit_logs.organization_id, testOrganization.id))
         .orderBy(organization_audit_logs.id);
       expect(auditLogs.map(log => log.message)).toContain(
-        'Updated gateway settings: Vercel AI Gateway disabled; Data region: European Union'
+        'Updated gateway settings: OpenRouter disabled; Data region: European Union'
       );
     });
 

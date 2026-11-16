@@ -29324,7 +29324,7 @@
   "organizations.settings.getModelGatewayAvailability": {
     "path": "organizations.settings.getModelGatewayAvailability",
     "kind": "query",
-    "summary": "Check whether a given model is available through each AI gateway (Vercel and OpenRouter), including which data regions Vercel serves it in. Use this to see if a model is reachable and where it runs before configuring gateway or model routing settings.",
+    "summary": "List which AI gateways (Vercel and OpenRouter) serve a given model. Use this to see if a model is reachable before configuring gateway or model routing settings.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -29351,7 +29351,7 @@
       "organizationid",
       "modelid"
     ],
-    "searchBlob": "organizations.settings.getModelGatewayAvailability Check whether a given model is available through each AI gateway (Vercel and OpenRouter), including which data regions Vercel serves it in. Use this to see if a model is reachable and where it runs before configuring gateway or model routing settings. organizations settings getmodelgatewayavailability organizationid modelid organizationId modelId"
+    "searchBlob": "organizations.settings.getModelGatewayAvailability List which AI gateways (Vercel and OpenRouter) serve a given model. Use this to see if a model is reachable before configuring gateway or model routing settings. organizations settings getmodelgatewayavailability organizationid modelid organizationId modelId"
   },
   "organizations.settings.listAvailableModels": {
     "path": "organizations.settings.listAvailableModels",

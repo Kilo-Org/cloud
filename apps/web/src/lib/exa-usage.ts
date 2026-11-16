@@ -1,6 +1,12 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import {
+  exa_monthly_usage,
+  exa_usage_log,
+  kilocode_users,
+  organization_memberships,
+  type User,
+} from '@kilocode/db/schema';
+import { and, eq, sql } from 'drizzle-orm';
 import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
@@ -74,7 +80,8 @@ const WRITE_IDLE_TIMEOUT_MS = 60_000;
 /**
  * Records the source row, monthly counter, and charged owner mutation atomically.
  * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge.
- * Low-balance notification scheduling happens only after commit.
+ * A record whose named payer cannot be resolved resolves to `rejected` and writes
+ * nothing; low-balance notification scheduling happens only after a commit.
  */
 export async function recordExaUsage(
   record: ExaUsageRecord,
@@ -105,6 +112,14 @@ export async function recordExaUsage(
       await tx.execute(
         sql.raw(`SET LOCAL idle_in_transaction_session_timeout = '${idleTimeoutMs}'`)
       );
+    }
+
+    const rejectionReason = await unresolvablePayer(tx, {
+      userId,
+      organizationId: organizationId ?? null,
+    });
+    if (rejectionReason) {
+      return { status: 'rejected' as const, organizationUsage: null, rejectionReason };
     }
 
     const [inserted] = await tx
@@ -153,11 +168,52 @@ export async function recordExaUsage(
     return { status: 'recorded' as const, organizationUsage };
   });
 
+  if (outcome.status === 'rejected') {
+    console.error('[exa-usage] usage record rejected: payer could not be resolved', {
+      usage_id: id,
+      reason: outcome.rejectionReason,
+    });
+    return 'rejected';
+  }
+
   if (organizationId && outcome.organizationUsage) {
     scheduleOrganizationLowBalanceAlert(organizationId, outcome.organizationUsage);
   }
 
   return outcome.status;
+}
+
+/**
+ * Resolves the payer a record names inside the writing transaction. A record is
+ * written only when its user exists and a non-null organization is one the user
+ * belongs to; otherwise the payer cannot be charged and nothing may be recorded.
+ */
+async function unresolvablePayer(
+  tx: DrizzleTransaction,
+  params: { userId: string; organizationId: string | null }
+): Promise<'user_not_found' | 'organization_membership_missing' | null> {
+  const [user] = await tx
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, params.userId))
+    .limit(1);
+  if (!user) return 'user_not_found';
+
+  if (params.organizationId === null) return null;
+
+  const [membership] = await tx
+    .select({ kilo_user_id: organization_memberships.kilo_user_id })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, params.organizationId),
+        eq(organization_memberships.kilo_user_id, params.userId)
+      )
+    )
+    .limit(1);
+  if (!membership) return 'organization_membership_missing';
+
+  return null;
 }
 
 /**

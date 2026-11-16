@@ -194,7 +194,8 @@ async function processMessage(
   const writerStatus =
     outcome.kind === 'unavailable' && outcome.reason === 'http_error' ? outcome.status : undefined;
   const overloaded = writerStatus === 429 || writerStatus === 503;
-  const acknowledged = outcome.kind === 'recorded' || outcome.kind === 'duplicate';
+  const acknowledged =
+    outcome.kind === 'recorded' || outcome.kind === 'duplicate' || outcome.kind === 'rejected';
   const admissionReason =
     outcome.kind === 'unavailable' && outcome.reason === 'http_error' && outcome.status === 429
       ? outcome.admissionReason

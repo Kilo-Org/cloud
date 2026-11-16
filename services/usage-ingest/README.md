@@ -199,7 +199,7 @@ The consumer reads the tag before anything else:
 |---|---|---|---|
 | Untagged | Existing LLM writer at `USAGE_WRITER_URL` | Unchanged | Unchanged |
 | `enkrypt_usage`, `v: 1`, valid record | `/api/internal/enkrypt-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
-| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id`, or `rejected` for the same id, which means the writer resolved no payer, recorded nothing, and the message is not redelivered | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
 | `enkrypt_usage` or `exa_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
 | Any other `kind`, or another `v` | None | Never | Conservative retry (`unsupported_kind`) |
 

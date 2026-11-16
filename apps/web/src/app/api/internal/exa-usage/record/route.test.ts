@@ -2,7 +2,11 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
-import { EXA_USAGE_WRITE_PATH, type ExaUsageRecord } from '@kilocode/usage-contracts';
+import {
+  EXA_MAX_COST_MICRODOLLARS_PER_CALL,
+  EXA_USAGE_WRITE_PATH,
+  type ExaUsageRecord,
+} from '@kilocode/usage-contracts';
 import {
   exa_monthly_usage,
   exa_usage_log,
@@ -243,6 +247,37 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
       expect(await debitedMicrodollars(record)).toBe(cost);
     }
   );
+
+  test('returns a rejected status for a record naming an unknown user and writes no row', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const record = await personalRecord();
+    const unknownUserRecord = { ...record, userId: `missing-exa-user-${randomUUID()}` };
+
+    const response = await post(unknownUserRecord);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: 'rejected', usageId: record.id });
+    expect(consoleError).toHaveBeenCalledWith(
+      '[exa-usage] usage record rejected: payer could not be resolved',
+      { usage_id: record.id, reason: 'user_not_found' }
+    );
+    expect(await logRows(unknownUserRecord.userId)).toEqual([]);
+  });
+
+  test('rejects a cost above the per-call maximum with 400 and writes nothing', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const record = await personalRecord();
+
+    const response = await post({
+      ...record,
+      costMicrodollars: EXA_MAX_COST_MICRODOLLARS_PER_CALL + 1,
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(await logRows(record.userId)).toEqual([]);
+  });
 
   test('returns the overload body for a queue write when admission is full, without writing', async () => {
     const record = await personalRecord();

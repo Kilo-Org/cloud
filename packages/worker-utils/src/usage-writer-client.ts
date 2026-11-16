@@ -38,7 +38,9 @@ type UnavailableWrite = {
   admissionReason?: AdmissionReason;
 };
 
-type AcknowledgedWrite<Result> = { kind: 'recorded' | 'duplicate'; result: Result };
+type WriteSettlement<Result, Status extends string> = { kind: Status; result: Result };
+type WriterStatus = 'recorded' | 'duplicate' | 'rejected';
+type AcknowledgedWrite<Result> = WriteSettlement<Result, 'recorded' | 'duplicate'>;
 
 export type LlmUsageWriteOutcome =
   | AcknowledgedWrite<NonNullable<UsageRecordResponse['result']>>
@@ -48,13 +50,19 @@ export type EnkryptUsageWriteOutcome =
   | AcknowledgedWrite<EnkryptUsageWriteResponse>
   | UnavailableWrite;
 
-export type ExaUsageWriteOutcome = AcknowledgedWrite<ExaUsageWriteResponse> | UnavailableWrite;
+/**
+ * `rejected` is a settled outcome: the writer resolved no payer and recorded nothing, so the
+ * delivery is acknowledged and must not be resent.
+ */
+export type ExaUsageWriteOutcome =
+  | WriteSettlement<ExaUsageWriteResponse, 'recorded' | 'duplicate' | 'rejected'>
+  | UnavailableWrite;
 
-type WriterRequest<Result> = {
+type WriterRequest<Result, Status extends WriterStatus> = {
   usageId: string;
   usageKind?: 'enkrypt_usage' | 'exa_usage';
   body: unknown;
-  acknowledge: (value: unknown) => AcknowledgedWrite<Result> | 'not_recorded' | 'invalid';
+  acknowledge: (value: unknown) => WriteSettlement<Result, Status> | 'not_recorded' | 'invalid';
 };
 
 // The existing writer allows 150 seconds for its database transaction.
@@ -74,11 +82,11 @@ function errorName(error: unknown): string {
     : typeof error;
 }
 
-async function sendUsageWrite<Result>(
-  request: WriterRequest<Result>,
+async function sendUsageWrite<Result, Status extends WriterStatus>(
+  request: WriterRequest<Result, Status>,
   config: UsageWriterConfig,
   fetchWriter: typeof fetch
-): Promise<AcknowledgedWrite<Result> | UnavailableWrite> {
+): Promise<WriteSettlement<Result, Status> | UnavailableWrite> {
   const kindField = request.usageKind === undefined ? {} : { usageKind: request.usageKind };
   const unavailable = (
     reason: UnavailableWrite['reason'],

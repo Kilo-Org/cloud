@@ -7,6 +7,7 @@ export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 export type { AbuseClassification, GatewayApiKind } from './schema-types';
 export {
   EXA_ALLOWED_PATHS,
+  EXA_MAX_COST_MICRODOLLARS_PER_CALL,
   EXA_USAGE_FEATURE_ID_MAX_LENGTH,
   EXA_USAGE_TYPE_MAX_LENGTH,
   EXA_USAGE_WRITE_PATH,

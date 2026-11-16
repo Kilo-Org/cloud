@@ -69,15 +69,17 @@ vi.mock('@shopify/flash-list', () => ({
     renderItem,
     ListFooterComponent,
     onEndReached,
+    refreshControl,
   }: {
     data: readonly unknown[];
     renderItem: (info: { item: unknown; index: number }) => ReactNode;
     ListFooterComponent?: ReactNode;
     onEndReached?: () => void;
+    refreshControl?: ReactNode;
   }) =>
     createElement(
       'FlashList',
-      { onEndReached },
+      { onEndReached, refreshControl },
       ...data.map((item, index) =>
         createElement(Fragment, { key: index }, renderItem({ item, index }))
       ),
@@ -106,6 +108,10 @@ const trpcProxy = {
     listReportReceipts: {
       infiniteQueryOptions: buildReceiptsQueryOptions,
       pathFilter: () => ({ queryKey: ['moderation.listReportReceipts'] }),
+      // The two keys a refresh reads: the path resets every variant of the read,
+      // and the infinite key is the entry the list observes.
+      pathKey: () => ['moderation.listReportReceipts'],
+      infiniteQueryKey: (input: { limit: number }) => ['moderation.listReportReceipts', input],
     },
   },
 };
@@ -135,6 +141,10 @@ vi.mock('@/components/query-error', () => ({
       onRetry === undefined ? null : createElement('Retry', { onPress: onRetry })
     ),
 }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+// The package ships TypeScript source the mounted project does not transform;
+// the screen only needs the one call it makes on a failed refresh.
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -328,6 +338,20 @@ async function scrollToEnd(root: ReactTestRenderer['root']) {
 async function loadPage(root: ReactTestRenderer['root'], pageNumber: number) {
   await scrollToEnd(root);
   await waitFor(() => rows(root).length === pageNumber * PAGE_ROWS);
+}
+
+/** The pull control the list carries, as the reader's pull reads it. */
+function pullControl(root: ReactTestRenderer['root']) {
+  const list = mustExist(
+    root.findAll(node => Object.is(node.type, FLASH_LIST))[0],
+    'the receipts list'
+  );
+  return mustExist(
+    list.props.refreshControl as
+      | { props: { refreshing: boolean; onRefresh: () => void } }
+      | undefined,
+    "the list's refresh control"
+  );
 }
 
 /** Run the real infinite query: its page bookkeeping is what the bound measures. */
@@ -643,5 +667,45 @@ describe('ReportReceiptsScreen', () => {
     // reader was reading stay, and no full-screen error replaces them.
     expect(rows(reopened)).toHaveLength(3 * PAGE_ROWS);
     expect(reopened.findAll(node => Object.is(node.type, QUERY_ERROR))).toHaveLength(0);
+  });
+
+  it('reloads page one on a pull and keeps the rows it started from', async () => {
+    // The real hook and a real client: a pull is `reconcileFirstPage` over the
+    // cache entry, so the page-one read and the rows it replaces are React
+    // Query's own bookkeeping.
+    await useRealInfiniteQuery();
+    state.answerPage = pageParam => pageOf(pageNumberFor(pageParam));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+
+    const root = await mountWith(queryClient);
+    await waitFor(() => rows(root).length === PAGE_ROWS);
+    state.pageRequests = [];
+
+    // Hold the refreshed page one: the rows the pull keeps are observable only
+    // while that read is still in flight.
+    const refresh = Promise.withResolvers<Page>();
+    state.answerPage = () => refresh.promise;
+
+    act(() => {
+      pullControl(root).props.onRefresh();
+    });
+    expect(pullControl(root).props.refreshing).toBe(true);
+    await waitFor(() => state.pageRequests.length === 1);
+
+    // The list a reader already has stays, and the pull asked for page one only.
+    expect(rows(root)).toHaveLength(PAGE_ROWS);
+    expect(state.pageRequests).toEqual([FIRST_PAGE_PARAM]);
+
+    await act(async () => {
+      refresh.resolve(pageOf(1));
+      await Promise.resolve();
+    });
+    await waitFor(() => queryClient.isFetching() === 0);
+
+    // The spinner ends with the read, and the rows are the refreshed page one.
+    expect(pullControl(root).props.refreshing).toBe(false);
+    expect(rows(root)).toHaveLength(PAGE_ROWS);
   });
 });

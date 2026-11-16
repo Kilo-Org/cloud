@@ -1,9 +1,10 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -11,6 +12,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Flag } from '@/components/ui/icons';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
@@ -52,6 +54,7 @@ export function ReportReceiptsScreen() {
   const { t } = useTranslation();
   const now = useRelativeTimeNow();
   const paddingBottom = useTabBarBottomPadding();
+  const [refreshing, setRefreshing] = useState(false);
 
   const query = useInfiniteQuery(
     withInfiniteRetention(
@@ -99,6 +102,32 @@ export function ReportReceiptsScreen() {
   const retryable = query.isError && isRetryableTrpcError(query.error);
   const capped = !query.hasNextPage && (query.data?.pages.at(-1)?.nextCursor ?? null) !== null;
 
+  const handleRefresh = () => {
+    void (async () => {
+      setRefreshing(true);
+      try {
+        // A retained page is a keyset window that only stays contiguous with
+        // the page above it while page one's newest row is unchanged. A report
+        // the reader filed since would move page one's tail past the older
+        // pages' cursors, so a refresh collapses the list and reloads from the
+        // newest row instead of re-requesting every retained window.
+        //
+        // Three different keys: the path resets every variant of this read, the
+        // infinite key is the entry the list observes, and `getQueryState` only
+        // answers an exact key.
+        const path = trpc.moderation.listReportReceipts.pathKey();
+        const key = trpc.moderation.listReportReceipts.infiniteQueryKey({ limit: PAGE_SIZE });
+        await reconcileFirstPage(queryClient, path);
+        if (queryClient.getQueryState(key)?.status === 'error') {
+          toast.error(t('common.couldNotRefresh'));
+        }
+      } finally {
+        setRefreshing(false);
+      }
+    })();
+  };
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profile.reportReceipts.title')} showBackButton />
@@ -125,6 +154,7 @@ export function ReportReceiptsScreen() {
                 : undefined
             }
             isRetrying={query.isFetching}
+            refreshControl={refreshControl}
           />
         ) : null}
 
@@ -132,6 +162,7 @@ export function ReportReceiptsScreen() {
           <EmptyState
             placement="top"
             icon={Flag}
+            refreshControl={refreshControl}
             title={t('profile.reportReceipts.emptyTitle')}
             description={t('profile.reportReceipts.emptyDescription')}
           />
@@ -159,6 +190,7 @@ export function ReportReceiptsScreen() {
               </Pressable>
             )}
             contentContainerStyle={listContentContainerStyle}
+            refreshControl={refreshControl}
             onEndReached={() => {
               // Once the next page has failed, auto-loading re-fires on every
               // content-size change, so recovery waits for the footer's tap.

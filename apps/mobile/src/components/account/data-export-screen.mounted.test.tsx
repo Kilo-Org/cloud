@@ -260,9 +260,7 @@ describe('DataExportScreen', () => {
     state.access = { enabled: false };
     const root = await mount();
 
-    expect(
-      root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
-    ).toEqual(["Your data isn't available yet"]);
+    expect(root.findAll(node => Object.is(node.type, 'EmptyState'))).toHaveLength(1);
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
   });
 

@@ -407,7 +407,7 @@
       "codeRequired": "E-poçtdakı kodu daxil et.",
       "download": "Faylı endir",
       "downloadFailed": "İxracı endirmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
-      "unavailableTitle": "Məlumatların hələ əlçatan deyil",
+      "unavailableTitle": "Məlumatların ixracı hələ əlçatan deyil",
       "unavailableDescription": "Məlumat ixracı mərhələli şəkildə istifadəyə verilir. Tezliklə yenidən yoxla."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Aktiv sessiya yoxdur",
     "noSessionsDescription": "Başqa cihazda Kilo tətbiqində hesabına daxil ol. Həmin cihaz burada görünəcək.",
     "signedIn": "Giriş: {{signedIn}} · Son fəaliyyət: {{lastSeen}}",
-    "signInScopeNote": "Burada Kilo tətbiqində və Kilo CLI-də açılan sessiyalar görünür. Redaktor sessiyaları siyahıda göstərilmir.",
+    "signInScopeNote": "Burada Kilo tətbiqində, Kilo CLI-də və veb brauzerdə açılan sessiyalar görünür. Redaktor sessiyaları siyahıda göstərilmir.",
     "thisDevice": "Bu cihaz",
     "webBrowser": "Veb brauzer",
     "viewProfile": "Profilə bax",

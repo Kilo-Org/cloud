@@ -407,7 +407,7 @@
       "codeRequired": "Introduce o código do correo electrónico.",
       "download": "Descargar ficheiro",
       "downloadFailed": "Non se puido descargar a exportación. Comproba a conexión e téntao de novo.",
-      "unavailableTitle": "Os teus datos aínda non están dispoñibles",
+      "unavailableTitle": "A exportación de datos aínda non está dispoñible",
       "unavailableDescription": "A exportación de datos estase activando gradualmente. Volve consultalo pronto."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Non hai sesións activas",
     "noSessionsDescription": "Inicia sesión coa aplicación de Kilo noutro dispositivo e aparecerá aquí.",
     "signedIn": "Inicio de sesión: {{signedIn}} · Última actividade: {{lastSeen}}",
-    "signInScopeNote": "Aquí aparecen os inicios de sesión da aplicación de Kilo e da CLI de Kilo. Os inicios de sesión do editor non se inclúen.",
+    "signInScopeNote": "Aquí aparecen os inicios de sesión da aplicación de Kilo, da CLI de Kilo e dun navegador web. Os inicios de sesión do editor non se inclúen.",
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver o perfil",
     "signOutThisDevice": "Pechar a sesión deste dispositivo",

@@ -407,7 +407,7 @@
       "codeRequired": "הזן את הקוד מהדוא״ל.",
       "download": "הורדת הקובץ",
       "downloadFailed": "לא ניתן היה להוריד את הייצוא. בדוק את החיבור ונסה שוב.",
-      "unavailableTitle": "הנתונים שלך עדיין לא זמינים",
+      "unavailableTitle": "ייצוא הנתונים עדיין לא זמין",
       "unavailableDescription": "ייצוא הנתונים נפתח בהדרגה. כדאי לבדוק שוב בקרוב."
     },
     "blockedPeople": {
@@ -2435,7 +2435,7 @@
     "noSessions": "אין חיבורים פעילים",
     "noSessionsDescription": "היכנס לאפליקציית Kilo במכשיר אחר, והמכשיר יופיע כאן.",
     "signedIn": "מועד הכניסה: {{signedIn}} · פעילות אחרונה: {{lastSeen}}",
-    "signInScopeNote": "כאן מופיעים חיבורים מאפליקציית Kilo ומ-Kilo CLI. חיבורים דרך העורך אינם מופיעים ברשימה.",
+    "signInScopeNote": "כאן מופיעים חיבורים מאפליקציית Kilo, מ-Kilo CLI ומדפדפן. חיבורים דרך העורך אינם מופיעים ברשימה.",
     "thisDevice": "המכשיר הזה",
     "viewProfile": "הצגת הפרופיל",
     "signOutThisDevice": "ניתוק המכשיר הזה מהחשבון",

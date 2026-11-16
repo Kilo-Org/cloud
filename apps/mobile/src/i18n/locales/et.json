@@ -407,7 +407,7 @@
       "codeRequired": "Sisesta e-kirjast saadud kood.",
       "download": "Laadi fail alla",
       "downloadFailed": "Eksporti ei õnnestunud alla laadida. Kontrolli ühendust ja proovi uuesti.",
-      "unavailableTitle": "Sinu andmed pole veel saadaval",
+      "unavailableTitle": "Andmete eksport pole veel saadaval",
       "unavailableDescription": "Andmete eksporti võetakse kasutusele järk-järgult. Vaata peagi uuesti."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Aktiivseid seansse pole",
     "noSessionsDescription": "Logi teises seadmes Kilo rakendusse sisse ja see seade ilmub siia.",
     "signedIn": "Sisse logitud {{signedIn}} · Viimati nähtud {{lastSeen}}",
-    "signInScopeNote": "Siin kuvatakse Kilo rakenduse ja Kilo CLI kaudu sisselogimised. Redaktori kaudu sisselogimisi ei kuvata.",
+    "signInScopeNote": "Siin kuvatakse Kilo rakenduse, Kilo CLI ja veebibrauseri kaudu sisselogimised. Redaktori kaudu sisselogimisi ei kuvata.",
     "thisDevice": "See seade",
     "viewProfile": "Vaata profiili",
     "signOutThisDevice": "Logi sellest seadmest välja",

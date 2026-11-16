@@ -407,7 +407,7 @@
       "codeRequired": "メールに記載されたコードを入力してください。",
       "download": "ファイルをダウンロード",
       "downloadFailed": "エクスポートをダウンロードできませんでした。接続を確認して、もう一度お試しください。",
-      "unavailableTitle": "データはまだ利用できません",
+      "unavailableTitle": "エクスポートはまだ利用できません",
       "unavailableDescription": "データのエクスポートは段階的に提供中です。しばらくしてから再度ご確認ください。"
     },
     "blockedPeople": {
@@ -2404,7 +2404,7 @@
     "noSessions": "サインイン中のセッションはありません",
     "noSessionsDescription": "別のデバイスでKiloアプリにサインインすると、ここに表示されます。",
     "signedIn": "サインイン：{{signedIn}}・最終アクセス：{{lastSeen}}",
-    "signInScopeNote": "ここにはKiloアプリとKilo CLIのサインインが表示されます。エディターのサインインは表示されません。",
+    "signInScopeNote": "ここにはKiloアプリ、Kilo CLI、ウェブブラウザーからのサインインが表示されます。エディターのサインインは表示されません。",
     "thisDevice": "このデバイス",
     "viewProfile": "プロフィールを表示",
     "signOutThisDevice": "このデバイスからサインアウト",

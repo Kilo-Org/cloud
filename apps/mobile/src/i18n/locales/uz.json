@@ -407,7 +407,7 @@
       "codeRequired": "Emaildagi kodni kiriting.",
       "download": "Faylni yuklab olish",
       "downloadFailed": "Eksportni yuklab bo'lmadi. Internet aloqasini tekshirib, qayta urinib ko'ring.",
-      "unavailableTitle": "Ma'lumotlaringiz hali tayyor emas",
+      "unavailableTitle": "Ma'lumotlar eksporti hali mavjud emas",
       "unavailableDescription": "Ma'lumotlarni eksport qilish bosqichma-bosqich joriy qilinmoqda. Tez orada qayta tekshiring."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Faol sessiyalar yo'q",
     "noSessionsDescription": "Boshqa qurilmadagi Kilo ilovasida tizimga kiring. Shunda u shu yerda ko'rinadi.",
     "signedIn": "Kirilgan vaqt: {{signedIn}} · Oxirgi faollik: {{lastSeen}}",
-    "signInScopeNote": "Bu yerda Kilo ilovasi va Kilo CLI orqali kirilgan sessiyalar ko'rsatiladi. Muharrir orqali kirilgan sessiyalar ko'rsatilmaydi.",
+    "signInScopeNote": "Bu yerda Kilo ilovasi, Kilo CLI va veb-brauzer orqali kirilgan sessiyalar ko'rsatiladi. Muharrir orqali kirilgan sessiyalar ko'rsatilmaydi.",
     "thisDevice": "Bu qurilma",
     "webBrowser": "Veb-brauzer",
     "viewProfile": "Profilni ko'rish",

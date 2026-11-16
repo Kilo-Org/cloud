@@ -407,7 +407,7 @@
       "codeRequired": "Masukkan kode dari email.",
       "download": "Unduh file",
       "downloadFailed": "Tidak dapat mengunduh ekspor. Periksa koneksimu dan coba lagi.",
-      "unavailableTitle": "Datamu belum tersedia",
+      "unavailableTitle": "Ekspor data belum tersedia",
       "unavailableDescription": "Ekspor data sedang diluncurkan secara bertahap. Periksa lagi nanti."
     },
     "blockedPeople": {
@@ -2404,7 +2404,7 @@
     "noSessions": "Tidak ada sesi aktif",
     "noSessionsDescription": "Masuk ke aplikasi Kilo di perangkat lain agar perangkat tersebut muncul di sini.",
     "signedIn": "Masuk {{signedIn}} · Terakhir aktif {{lastSeen}}",
-    "signInScopeNote": "Sesi masuk melalui aplikasi Kilo dan Kilo CLI muncul di sini. Sesi masuk melalui editor tidak ditampilkan.",
+    "signInScopeNote": "Sesi masuk melalui aplikasi Kilo, Kilo CLI, dan Peramban web muncul di sini. Sesi masuk melalui editor tidak ditampilkan.",
     "thisDevice": "Perangkat ini",
     "viewProfile": "Lihat profil",
     "signOutThisDevice": "Keluar dari perangkat ini",

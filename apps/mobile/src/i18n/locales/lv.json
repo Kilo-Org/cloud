@@ -407,7 +407,7 @@
       "codeRequired": "Ievadi kodu no e-pasta.",
       "download": "Lejupielādēt failu",
       "downloadFailed": "Neizdevās lejupielādēt eksportu. Pārbaudi savienojumu un mēģini vēlreiz.",
-      "unavailableTitle": "Tavi dati vēl nav pieejami",
+      "unavailableTitle": "Datu eksports vēl nav pieejams",
       "unavailableDescription": "Datu eksports tiek ieviests pakāpeniski. Drīzumā ieskaties vēlreiz."
     },
     "blockedPeople": {
@@ -3001,7 +3001,7 @@
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
     "signedIn": "Pierakstīšanās: {{signedIn}} · Pēdējā aktivitāte: {{lastSeen}}",
-    "signInScopeNote": "Šeit ir redzamas Kilo lietotnes un Kilo CLI sesijas. Redaktora sesijas nav iekļautas.",
+    "signInScopeNote": "Šeit ir redzamas Kilo lietotnes, Kilo CLI un tīmekļa pārlūka sesijas. Redaktora sesijas nav iekļautas.",
     "thisDevice": "Šī ierīce",
     "viewProfile": "Skatīt profilu",
     "webBrowser": "Tīmekļa pārlūks",

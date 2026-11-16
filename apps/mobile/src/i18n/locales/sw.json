@@ -407,7 +407,7 @@
       "codeRequired": "Weka msimbo kutoka kwenye barua pepe.",
       "download": "Pakua faili",
       "downloadFailed": "Imeshindikana kupakua uhamishaji. Angalia muunganisho wako kisha ujaribu tena.",
-      "unavailableTitle": "Data yako bado haipatikani",
+      "unavailableTitle": "Uhamishaji wa data bado haupatikani",
       "unavailableDescription": "Uhamishaji wa data unatolewa hatua kwa hatua. Rudi tena hivi karibuni."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "kiloCli": "Kilo CLI",
     "noSessions": "Hakuna vikao vinavyoendelea",
     "noSessionsDescription": "Ingia kwenye akaunti kwa kutumia programu ya Kilo kwenye kifaa kingine. Kifaa hicho kitaonekana hapa.",
-    "signInScopeNote": "Hapa huonekana vikao vya kuingia kupitia programu ya Kilo na Kilo CLI. Vikao vya kihariri havijaorodheshwa.",
+    "signInScopeNote": "Hapa huonekana vikao vya kuingia kupitia programu ya Kilo, Kilo CLI na kivinjari cha wavuti. Vikao vya kihariri havijaorodheshwa.",
     "signedIn": "Kuingia: {{signedIn}} · Kuonekana mara ya mwisho: {{lastSeen}}",
     "thisDevice": "Kifaa hiki",
     "viewProfile": "Tazama wasifu",

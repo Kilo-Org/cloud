@@ -407,7 +407,7 @@
       "codeRequired": "له برېښنالیک څخه کوډ ولیکئ.",
       "download": "فایل ښکته کړئ",
       "downloadFailed": "صادر شوي معلومات ښکته نه شول. خپل اتصال وګورئ او بیا هڅه وکړئ.",
-      "unavailableTitle": "ستاسو معلومات لا د لاسرسي وړ نه دي",
+      "unavailableTitle": "د معلوماتو صادرول لا د لاسرسي وړ نه دی",
       "unavailableDescription": "د معلوماتو صادرول په تدریجي ډول فعالېږي. ژر بیا سر ووهئ."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "kiloCli": "Kilo CLI",
     "noSessions": "هېڅ فعاله ناسته نشته",
     "noSessionsDescription": "په بله وسیله کې د Kilo اپلیکیشن ته ننوځئ، ناسته به یې دلته ښکاره شي.",
-    "signInScopeNote": "دلته د Kilo اپلیکیشن او Kilo CLI ننوتنې ښکاري. د کوډ سمونګر ننوتنې په لېست کې نه راځي.",
+    "signInScopeNote": "دلته د Kilo اپلیکیشن، Kilo CLI او د یو وېب براوزر ننوتنې ښکاري. د کوډ سمونګر ننوتنې په لېست کې نه راځي.",
     "signedIn": "د ننوتلو وخت: {{signedIn}} · وروستی لیدل شوی وخت: {{lastSeen}}",
     "thisDevice": "دا وسیله",
     "viewProfile": "پروفایل وګورئ",

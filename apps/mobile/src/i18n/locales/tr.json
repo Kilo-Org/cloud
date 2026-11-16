@@ -407,7 +407,7 @@
       "codeRequired": "E-postadaki kodu gir.",
       "download": "Dosyayı indir",
       "downloadFailed": "Dışa aktarılan veriler indirilemedi. Bağlantını kontrol edip tekrar dene.",
-      "unavailableTitle": "Verilerin henüz hazır değil",
+      "unavailableTitle": "Dışa aktarma henüz kullanılamıyor",
       "unavailableDescription": "Veri dışa aktarma özelliği kademeli olarak kullanıma sunuluyor. Yakında tekrar göz at."
     },
     "blockedPeople": {
@@ -2404,7 +2404,7 @@
     "noSessions": "Etkin oturum yok",
     "noSessionsDescription": "Başka bir cihazda Kilo uygulamasıyla oturum açtığında o cihaz burada görünür.",
     "signedIn": "Giriş: {{signedIn}} · Son görülme: {{lastSeen}}",
-    "signInScopeNote": "Burada Kilo uygulaması ve Kilo CLI oturumları görünür. Editör oturumları listelenmez.",
+    "signInScopeNote": "Burada Kilo uygulaması, Kilo CLI ve web tarayıcısı oturumları görünür. Editör oturumları listelenmez.",
     "thisDevice": "Bu cihaz",
     "webBrowser": "Web tarayıcısı",
     "viewProfile": "Profili görüntüle",

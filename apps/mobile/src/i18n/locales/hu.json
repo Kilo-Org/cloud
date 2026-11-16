@@ -407,7 +407,7 @@
       "codeRequired": "Add meg az e-mailben kapott kódot.",
       "download": "Fájl letöltése",
       "downloadFailed": "Nem sikerült letölteni az exportált adatokat. Ellenőrizd a kapcsolatot, és próbáld újra.",
-      "unavailableTitle": "Az adataid még nem érhetők el",
+      "unavailableTitle": "Az exportálás még nem érhető el",
       "unavailableDescription": "Az adatexportálás fokozatosan válik elérhetővé. Nézz vissza hamarosan."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Nincs aktív munkamenet",
     "noSessionsDescription": "Jelentkezz be a Kilo alkalmazásba egy másik eszközön, és az eszköz itt is megjelenik.",
     "signedIn": "Bejelentkezés: {{signedIn}} · Utolsó aktivitás: {{lastSeen}}",
-    "signInScopeNote": "Itt a Kilo alkalmazásba és a Kilo CLI-be történő bejelentkezések jelennek meg. A szerkesztőbe történő bejelentkezéseket nem soroljuk fel.",
+    "signInScopeNote": "Itt a Kilo alkalmazásba, a Kilo CLI-be és egy webböngészőbe történő bejelentkezések jelennek meg. A szerkesztőbe történő bejelentkezéseket nem soroljuk fel.",
     "thisDevice": "Ez az eszköz",
     "viewProfile": "Profil megtekintése",
     "signOutThisDevice": "Kijelentkezés erről az eszközről",

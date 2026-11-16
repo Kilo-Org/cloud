@@ -407,7 +407,7 @@
       "codeRequired": "Voer die kode uit die e-pos in.",
       "download": "Laai lêer af",
       "downloadFailed": "Kon nie die uitvoer aflaai nie. Gaan jou verbinding na en probeer weer.",
-      "unavailableTitle": "Jou data is nog nie beskikbaar nie",
+      "unavailableTitle": "Die uitvoer is nog nie beskikbaar nie",
       "unavailableDescription": "Data-uitvoer word geleidelik uitgerol. Kom kyk binnekort weer."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Geen aktiewe sessies nie",
     "noSessionsDescription": "Teken op 'n ander toestel met die Kilo-toep in en dit sal hier verskyn.",
     "signedIn": "Ingeteken {{signedIn}} · Laas gesien {{lastSeen}}",
-    "signInScopeNote": "Sessies wat met die Kilo-toep en die Kilo CLI begin is, verskyn hier. Redigeerder-sessies word nie gelys nie.",
+    "signInScopeNote": "Sessies wat met die Kilo-toep, die Kilo CLI en 'n webblaaier begin is, verskyn hier. Redigeerder-sessies word nie gelys nie.",
     "thisDevice": "Hierdie toestel",
     "webBrowser": "Webblaaier",
     "viewProfile": "Bekyk profiel",

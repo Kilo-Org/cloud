@@ -407,7 +407,7 @@
       "codeRequired": "Idatzi mezu elektronikoko kodea.",
       "download": "Deskargatu fitxategia",
       "downloadFailed": "Ezin izan da esportazioa deskargatu. Egiaztatu konexioa eta saiatu berriro.",
-      "unavailableTitle": "Zure datuak ez daude oraindik erabilgarri",
+      "unavailableTitle": "Datu-esportazioa ez dago oraindik erabilgarri",
       "unavailableDescription": "Datuen esportazioa pixkanaka zabaltzen ari da. Itzuli laster."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Ez dago saio aktiborik",
     "noSessionsDescription": "Hasi saioa Kilo aplikazioarekin beste gailu batean, eta hemen agertuko da.",
     "signedIn": "Saio-hasiera: {{signedIn}} · Azken jarduera: {{lastSeen}}",
-    "signInScopeNote": "Hemen Kilo aplikazioko eta Kilo CLIko saio-hasierak agertzen dira. Editoreko saio-hasierak ez daude zerrendatuta.",
+    "signInScopeNote": "Hemen Kilo aplikazioko, Kilo CLIko eta web-nabigatzaileko saio-hasierak agertzen dira. Editoreko saio-hasierak ez daude zerrendatuta.",
     "thisDevice": "Gailu hau",
     "viewProfile": "Ikusi profila",
     "signOutThisDevice": "Itxi saioa gailu honetan",

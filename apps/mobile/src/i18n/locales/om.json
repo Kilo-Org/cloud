@@ -407,7 +407,7 @@
       "codeRequired": "Koodii imeelii keessaa galchi.",
       "download": "Faayilii buufadhu",
       "downloadFailed": "Daataa baafame buufachuu hin danda'amne. Walqunnamtii kee mirkaneeffadhuutii deebi'ii yaali.",
-      "unavailableTitle": "Daataan kee ammaaf qophaa'aa miti",
+      "unavailableTitle": "Baasiin daataa ammaaf qophaa'aa miti",
       "unavailableDescription": "Daataa baasuun suutuma suutaan babal'achaa jira. Yeroo dhihootti deebi'ii ilaali."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Turtiiwwan hojiirra jiran hin jiran",
     "noSessionsDescription": "Meeshaa biraa irratti appilikeeshinii Kilo tiin seeni; meeshaan sun asitti mul'ata.",
     "signedIn": "Yeroo seene {{signedIn}} · Dhumarratti kan mul'ate {{lastSeen}}",
-    "signInScopeNote": "Seensawwan appilikeeshinii Kilo fi Kilo CLI asitti mul'atu. Seensawwan gulaalaa hin tarreeffaman.",
+    "signInScopeNote": "Seensawwan Appilikeeshinii Kilo, Kilo CLI fi biraawzarii weebii asitti mul'atu. Seensawwan gulaalaa hin tarreeffaman.",
     "thisDevice": "Meeshaa kana",
     "viewProfile": "Piroofaayilii ilaali",
     "signOutThisDevice": "Meeshaa kana herrega keessaa baasi",

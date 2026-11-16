@@ -407,7 +407,7 @@
       "codeRequired": "Fut kodin nga emaili.",
       "download": "Shkarko skedarin",
       "downloadFailed": "Eksportimi nuk u shkarkua. Kontrollo lidhjen dhe provo përsëri.",
-      "unavailableTitle": "Të dhënat e tua nuk janë ende të disponueshme",
+      "unavailableTitle": "Eksporti i të dhënave nuk është ende i disponueshëm",
       "unavailableDescription": "Eksportimi i të dhënave po vihet në dispozicion gradualisht. Kontrollo përsëri së shpejti."
     },
     "blockedPeople": {
@@ -2946,7 +2946,7 @@
     "kiloCli": "Kilo CLI",
     "noSessions": "Nuk ka seanca aktive",
     "noSessionsDescription": "Hyr në aplikacionin Kilo në një pajisje tjetër dhe ajo do të shfaqet këtu.",
-    "signInScopeNote": "Këtu shfaqen hyrjet nga aplikacioni Kilo dhe Kilo CLI. Hyrjet nga redaktori nuk renditen.",
+    "signInScopeNote": "Këtu shfaqen hyrjet nga aplikacioni Kilo, Kilo CLI dhe shfletuesi i uebit. Hyrjet nga redaktori nuk renditen.",
     "signedIn": "Hyrja: {{signedIn}} · Aktiviteti i fundit: {{lastSeen}}",
     "thisDevice": "Kjo pajisje",
     "viewProfile": "Shiko profilin",

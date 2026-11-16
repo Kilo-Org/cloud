@@ -407,7 +407,7 @@
       "codeRequired": "Faka ikhodi esuka ku-imeyili.",
       "download": "Landa ifayela",
       "downloadFailed": "Asikwazanga ukulanda okuthunyelwe ngaphandle. Hlola uxhumano lwakho bese uzama futhi.",
-      "unavailableTitle": "Idatha yakho ayikatholakali okwamanje",
+      "unavailableTitle": "Ukuthunyelwa ngaphandle kwedatha akukatholakali okwamanje",
       "unavailableDescription": "Ukuthumela idatha ngaphandle kwethulwa kancane kancane. Buya maduze."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Azikho iziseshini ezisebenzayo",
     "noSessionsDescription": "Ngena ngemvume ngohlelo lokusebenza lwe-Kilo kwenye idivayisi, bese ivela lapha.",
     "signedIn": "Kungene ngemvume: {{signedIn}} · Kugcine ukubonwa: {{lastSeen}}",
-    "signInScopeNote": "Ukungena ngemvume ngohlelo lokusebenza lwe-Kilo nange-Kilo CLI kuvela lapha. Ukungena ngemvume ngesihleli sekhodi akuveli kulolu hlu.",
+    "signInScopeNote": "Ukungena ngemvume ngohlelo lokusebenza lwe-Kilo, nange-Kilo CLI nangesiphequluli sewebhu kuvela lapha. Ukungena ngemvume ngesihleli sekhodi akuveli kulolu hlu.",
     "thisDevice": "Le divayisi",
     "webBrowser": "Isiphequluli sewebhu",
     "viewProfile": "Buka iphrofayili",

@@ -407,7 +407,7 @@
       "codeRequired": "Antre kòd ki nan imel la.",
       "download": "Telechaje fichye",
       "downloadFailed": "Nou pa t ka telechaje ekspòtasyon an. Verifye koneksyon ou epi eseye ankò.",
-      "unavailableTitle": "Done ou yo poko disponib",
+      "unavailableTitle": "Ekspòtasyon done yo poko disponib",
       "unavailableDescription": "N ap lanse ekspòtasyon done yo piti piti. Tounen byento."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Pa gen sesyon aktif",
     "noSessionsDescription": "Konekte nan aplikasyon Kilo sou yon lòt aparèy pou li parèt isit la.",
     "signedIn": "Konekte {{signedIn}} · Dènye aktivite {{lastSeen}}",
-    "signInScopeNote": "Koneksyon ki fèt nan aplikasyon Kilo ak nan Kilo CLI yo parèt isit la. Koneksyon nan editè a pa nan lis la.",
+    "signInScopeNote": "Koneksyon ki fèt nan aplikasyon Kilo, nan Kilo CLI ak nan yon navigatè entènèt yo parèt isit la. Koneksyon nan editè a pa nan lis la.",
     "thisDevice": "Aparèy sa a",
     "viewProfile": "Gade pwofil la",
     "signOutThisDevice": "Dekonekte aparèy sa a",

@@ -407,7 +407,7 @@
       "codeRequired": "Tinye koodu sitere n'ozi ịntanetị.",
       "download": "Budata faịlụ",
       "downloadFailed": "Enweghị ike ibudata mbupụ ahụ. Lelee njikọ gị ma nwaa ọzọ.",
-      "unavailableTitle": "Data gị adịbeghị",
+      "unavailableTitle": "Mbupụ data adịbeghị",
       "unavailableDescription": "A na-ewepụta mbupụ data nwayọọ nwayọọ. Lọghachi n'oge na-adịghị anya."
     },
     "blockedPeople": {
@@ -2947,7 +2947,7 @@
     "noSessions": "Enweghị nnọkọ na-arụ ọrụ",
     "noSessionsDescription": "Banye na ngwa Kilo na ngwaọrụ ọzọ, ọ ga-apụta ebe a.",
     "signedIn": "A banyere na {{signedIn}} · A hụrụ ikpeazụ na {{lastSeen}}",
-    "signInScopeNote": "Nbanye ngwa Kilo na nbanye Kilo CLI na-apụta ebe a. A naghị edepụta nbanye ihe ndezi koodu.",
+    "signInScopeNote": "Nbanye ngwa Kilo, nbanye Kilo CLI na nbanye ihe nchọgharị weebụ na-apụta ebe a. A naghị edepụta nbanye ihe ndezi koodu.",
     "thisDevice": "Ngwaọrụ a",
     "viewProfile": "Lelee profaịlụ",
     "signOutThisDevice": "Pụọ na ngwaọrụ a",

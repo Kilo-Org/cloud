@@ -407,7 +407,7 @@
       "codeRequired": "Voer de code uit de e-mail in.",
       "download": "Bestand downloaden",
       "downloadFailed": "De export kon niet worden gedownload. Controleer je verbinding en probeer het opnieuw.",
-      "unavailableTitle": "Je gegevens zijn nog niet beschikbaar",
+      "unavailableTitle": "Gegevensexport is nog niet beschikbaar",
       "unavailableDescription": "Gegevensexport wordt geleidelijk uitgerold. Kom binnenkort terug."
     },
     "blockedPeople": {
@@ -2404,7 +2404,7 @@
     "noSessions": "Geen actieve sessies",
     "noSessionsDescription": "Meld je in de Kilo-app aan op een ander apparaat. Dat apparaat verschijnt dan hier.",
     "signedIn": "Aangemeld {{signedIn}} · Laatst gezien {{lastSeen}}",
-    "signInScopeNote": "Aanmeldingen van de Kilo-app en de Kilo CLI verschijnen hier. Aanmeldingen van de editor worden niet vermeld.",
+    "signInScopeNote": "Aanmeldingen van de Kilo-app, de Kilo CLI en een webbrowser verschijnen hier. Aanmeldingen van de editor worden niet vermeld.",
     "thisDevice": "Dit apparaat",
     "viewProfile": "Profiel bekijken",
     "signOutThisDevice": "Dit apparaat afmelden",

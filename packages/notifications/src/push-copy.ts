@@ -23,9 +23,6 @@ const ACTIVE_AGENTS_LEAF: GenericBodyLeaf = 'activeAgentsGlanceable';
 const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
   cloud_agent_session: SESSION_UPDATE_LEAF,
   session_live_update: SESSION_UPDATE_LEAF,
-  'chat.message': 'chatMessage',
-  'instance-lifecycle': 'instanceLifecycle',
-  'scheduled-action': 'scheduledAction',
   low_balance: 'lowBalance',
   spend_alert: 'spendAlert',
   security_finding: 'securityFinding',

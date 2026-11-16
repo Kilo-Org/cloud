@@ -6,7 +6,6 @@ import { type PushData } from './push-data';
  * exactly the category whose switch governs that push.
  */
 export const NOTIFICATION_HISTORY_CATEGORIES = [
-  'chatMessages',
   'agentAttention',
   'sessionStatus',
   'balanceAlerts',
@@ -58,7 +57,6 @@ type PushHistoryDecisions = Record<PushData['type'], PushHistoryDecision>;
  * resolver both derive from it, so adding a kind here is the whole change.
  */
 const PUSH_HISTORY_DECISIONS = {
-  'chat.message': () => 'chatMessages',
   // A needs-input raise is gated by `agentAttention`; a status/ready push by
   // `sessionStatus`, and an omitted tag is a status push (the rolling-deploy
   // default the dispatch gate applies).
@@ -72,8 +70,6 @@ const PUSH_HISTORY_DECISIONS = {
   security_lifecycle: () => 'securityFindings',
   // Briefings have no settings category; they appear under All only.
   agent_briefing: () => null,
-  'instance-lifecycle': NOT_RECORDED,
-  'scheduled-action': NOT_RECORDED,
   active_agents_glanceable: NOT_RECORDED,
   session_live_update: NOT_RECORDED,
 } satisfies PushHistoryDecisions;

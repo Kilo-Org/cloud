@@ -39,11 +39,6 @@ export function notificationPathForData(data: PushData): string | null {
     case 'cloud_agent_session': {
       return `/(app)/agent-chat/${data.cliSessionId}?via=push`;
     }
-    case 'chat.message': {
-      // No app route (see the lifecycle case below): the conversation opens on
-      // the web.
-      return null;
-    }
     case 'low_balance': {
       return `/(app)/(tabs)/(3_profile)/organization/credit-activity?org=${data.organizationId}&via=push`;
     }
@@ -62,12 +57,6 @@ export function notificationPathForData(data: PushData): string | null {
       // visible security_finding push.
       const base = getSecurityAgentPath(data.scope, `findings/${data.findingId}`) as string;
       return `${base}?via=push`;
-    }
-    case 'instance-lifecycle':
-    case 'scheduled-action': {
-      // No app route: KiloClaw has no mobile screen, so a tap on one of these
-      // opens its web page. `notificationDestinationForData` resolves it.
-      return null;
     }
     case 'active_agents_glanceable':
     case 'session_live_update': {

@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "He whakahoutanga tā tō wātū kaihoko",
-      "chatMessage": "He karere hōu tāu",
-      "instanceLifecycle": "He whakahoutanga tā tō wae",
-      "scheduledAction": "He whakahoutanga tā tētahi mahi kua whakaritea",
       "lowBalance": "Me aro ki tō toenga",
       "spendAlert": "Me aro ki tō whakapaunga",
       "securityFinding": "Me aro ki tētahi kitenga haumaru",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Kāore he taitara",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "He whakahoutanga tā tētahi whakamātautau haumaru"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "Kua rite a {{instanceName}}",
-      "body": "Pāwhiri kia tīmata te kōrero."
-    },
-    "startFailed": {
-      "title": "I rahua te tīmata a {{instanceName}}",
-      "body": "I rahua te tīmata."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "Ka tīmata anō a {{instanceName}} ākuanei",
-      "body": "Kua whakaritea kia tīmata anō i {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Kua whakakorea te tīmatanga anō a {{instanceName}}",
-      "body": "Kua whakakorea te tīmatanga anō i whakaritea i mua."
-    },
-    "versionChangeNotice": {
-      "title": "Ka whakamohoatia a {{instanceName}} ākuanei",
-      "bodyWithTag": "Whakamohoa ki {{targetImageTag}} i {{when}}.",
-      "bodyWithoutTag": "Kua whakaritea te whakamohoatanga i {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Kua whakakorea te whakamohoatanga a {{instanceName}}",
-      "body": "Kua whakakorea te whakamohoatanga i whakaritea i mua."
     }
   },
   "sessionReady": {

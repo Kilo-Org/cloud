@@ -113,6 +113,14 @@ export function isBuiltinMode(slug: string): boolean {
   return BUILTIN_AGENT_MODES.has(slug);
 }
 
+/**
+ * Thinking-effort variant for a model. Variants are model- and agent-specific
+ * keys — the catalog's `opencode.variants`, or a stored profile agent's
+ * `config.variant` — so the stored length bound is the only rule here: the
+ * catalog, not this schema, decides which keys exist.
+ */
+export const AgentVariantSchema = z.string().min(1).max(50);
+
 export type Attachments = z.infer<typeof AttachmentsSchema>;
 
 const AttachmentFieldsSchema = {
@@ -150,11 +158,7 @@ export const PromptPayload = z.object({
     'Kilo Code execution mode (built-in slug or a custom slug from runtimeAgents)'
   ),
   model: modelIdSchema.describe('AI model to use (required)'),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: AgentVariantSchema.optional(),
 });
 
 /**
@@ -166,11 +170,7 @@ export const PromptSendPayload = z.object({
   prompt: z.string().min(1, 'Prompt is required'),
   mode: ModeSlugSchema,
   model: modelIdSchema,
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: AgentVariantSchema.optional(),
 });
 
 /**
@@ -193,11 +193,7 @@ export const CommandSendPayload = z.object({
   arguments: z.string().default(''),
   mode: ModeSlugSchema.optional(),
   model: modelIdSchema.optional(),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: AgentVariantSchema.optional(),
 });
 
 export const SendMessageV2Payload = z.discriminatedUnion('type', [
@@ -352,13 +348,6 @@ export const SendMessageV2Input = z
             message: 'Attachments cannot be attached to slash commands',
           });
         }
-        if (input.payload.mode === 'custom') {
-          ctx.addIssue({
-            code: 'custom',
-            path: ['payload', 'mode'],
-            message: 'custom mode requires appendSystemPrompt (use prepareSession/updateSession)',
-          });
-        }
         return;
       }
       rejectEmptyPromptWithoutAttachments(
@@ -387,10 +376,6 @@ export const SendMessageV2Input = z
     }
 
     return input;
-  })
-  .refine(data => !('mode' in data) || data.mode !== 'custom', {
-    message: 'custom mode requires appendSystemPrompt (use prepareSession/updateSession)',
-    path: ['mode'],
   });
 
 export type SendMessageV2InputPayload = z.infer<typeof SendMessageV2Payload>;
@@ -505,11 +490,7 @@ const PrepareSessionSharedFields = {
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
   ),
   model: modelIdSchema.describe('AI model to use'),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: AgentVariantSchema.optional(),
 
   // Repository - one of these pairs required
   githubRepo: githubRepoSchema
@@ -1000,11 +981,7 @@ export const StartSessionInput = z
     agent: z.object({
       mode: ModeSlugSchema,
       model: modelIdSchema,
-      variant: z
-        .string()
-        .max(50)
-        .regex(/^[a-zA-Z]+$/)
-        .optional(),
+      variant: AgentVariantSchema.optional(),
     }),
     finalization: z
       .object({
@@ -1076,43 +1053,34 @@ export const StartSessionOutput = z.object({
  * Repository auth is not accepted; existing session metadata and provider
  * integrations determine auth.
  */
-export const SendMessageInput = z
-  .object({
-    cloudAgentSessionId: sessionIdSchema,
-    message: z
-      .object({
-        prompt: z.string(),
-        ...AttachmentFieldsSchema,
-        id: MessageIdSchema.nullish(),
-      })
-      .superRefine((message, ctx) =>
-        rejectEmptyPromptWithoutAttachments(
-          { prompt: message.prompt, attachments: message.attachments },
-          ctx
-        )
-      ),
-    agent: z
-      .object({
-        mode: ModeSlugSchema,
-        model: modelIdSchema,
-        variant: z
-          .string()
-          .max(50)
-          .regex(/^[a-zA-Z]+$/)
-          .optional(),
-      })
-      .optional(),
-    finalization: z
-      .object({
-        autoCommit: z.boolean().optional(),
-        condenseOnComplete: z.boolean().optional(),
-      })
-      .optional(),
-  })
-  .refine(data => data.agent?.mode !== 'custom', {
-    message: 'custom mode requires appendSystemPrompt on the original session',
-    path: ['agent', 'mode'],
-  });
+export const SendMessageInput = z.object({
+  cloudAgentSessionId: sessionIdSchema,
+  message: z
+    .object({
+      prompt: z.string(),
+      ...AttachmentFieldsSchema,
+      id: MessageIdSchema.nullish(),
+    })
+    .superRefine((message, ctx) =>
+      rejectEmptyPromptWithoutAttachments(
+        { prompt: message.prompt, attachments: message.attachments },
+        ctx
+      )
+    ),
+  agent: z
+    .object({
+      mode: ModeSlugSchema,
+      model: modelIdSchema,
+      variant: AgentVariantSchema.optional(),
+    })
+    .optional(),
+  finalization: z
+    .object({
+      autoCommit: z.boolean().optional(),
+      condenseOnComplete: z.boolean().optional(),
+    })
+    .optional(),
+});
 
 /**
  * Input schema for updateSession endpoint.

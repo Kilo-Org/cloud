@@ -387,6 +387,7 @@
       "edit": "Uredi ključ",
       "editKeyTitle": "Zamenjaj ključ",
       "editKeyDescription": "Shranjene vrednosti ni mogoče prikazati. Za zamenjavo vnesi novo.",
+      "editKeyMappingsWarning": "Zamenjava ključa zamenja tudi shranjene preslikave modelov: znova vnesi vse preslikave, ki jih še potrebuješ.",
       "saveFailed": "Ključa ni bilo mogoče shraniti.",
       "invalidCredentials": "Preveri poverilnice in poskusi znova.",
       "fieldRequired": "Polje {{field}} je obvezno.",

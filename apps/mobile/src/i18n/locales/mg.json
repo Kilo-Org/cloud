@@ -387,6 +387,7 @@
       "edit": "Ovay ny lakile",
       "editKeyTitle": "Soloy ny lakile",
       "editKeyDescription": "Tsy azo aseho ny sanda voatahiry. Ampidiro lakile vaovao hanoloana azy.",
+      "editKeyMappingsWarning": "Ny fanoloana ny lakile dia manolo koa ny fampifandraisana modely voatahiry: ampidiro indray ny fampifandraisana rehetra ilainao.",
       "saveFailed": "Tsy voatahiry ny lakile.",
       "invalidCredentials": "Hamarino ny mari-panamarinana ary andramo indray.",
       "fieldRequired": "Ilaina ny {{field}}.",

@@ -387,6 +387,7 @@
       "edit": "Breyta lykli",
       "editKeyTitle": "Skipta út lykli",
       "editKeyDescription": "Ekki er hægt að sýna vistaða gildið. Sláðu inn nýtt gildi til að skipta því út.",
+      "editKeyMappingsWarning": "Að skipta út lyklinum skiptir einnig út vistuðum líkanavörpunum: sláðu inn aftur hverja vörpun sem þú þarft enn.",
       "saveFailed": "Ekki tókst að vista lykilinn.",
       "invalidCredentials": "Athugaðu innskráningarupplýsingarnar og reyndu aftur.",
       "fieldRequired": "Reiturinn {{field}} er nauðsynlegur.",

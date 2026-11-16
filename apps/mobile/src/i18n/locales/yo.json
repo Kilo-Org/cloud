@@ -387,6 +387,7 @@
       "edit": "Ṣàtúnṣe kọ́kọ́rọ́",
       "editKeyTitle": "Rọ́pò kọ́kọ́rọ́",
       "editKeyDescription": "A kò lè fi iye tí a fi pamọ́ hàn. Tẹ tuntun kan láti rọ́pò rẹ̀.",
+      "editKeyMappingsWarning": "Rọ́pò kọ́kọ́rọ́ náà tún rọ́pò àwọn ìsopọ̀ àwòṣe tí a fi pamọ́: tún tẹ gbogbo ìsopọ̀ tí o ṣì nílò.",
       "saveFailed": "A kò lè fi kọ́kọ́rọ́ náà pamọ́.",
       "invalidCredentials": "Ṣàyẹ̀wò àwọn ìwé-ẹ̀rí ìwọlé náà kí o sì tún gbìyànjú.",
       "fieldRequired": "A nílò {{field}}.",

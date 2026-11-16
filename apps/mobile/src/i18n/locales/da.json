@@ -387,6 +387,7 @@
       "edit": "Rediger nøgle",
       "editKeyTitle": "Erstat nøgle",
       "editKeyDescription": "Den gemte værdi kan ikke vises. Angiv en ny for at erstatte den.",
+      "editKeyMappingsWarning": "Når nøglen erstattes, erstattes de gemte modeltilknytninger også: angiv derfor alle de tilknytninger, du stadig har brug for.",
       "saveFailed": "Nøglen kunne ikke gemmes.",
       "invalidCredentials": "Kontrollér legitimationsoplysningerne, og prøv igen.",
       "fieldRequired": "{{field}} er påkrævet.",

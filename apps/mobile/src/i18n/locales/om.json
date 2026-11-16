@@ -387,6 +387,7 @@
       "edit": "Furtuu gulaali",
       "editKeyTitle": "Furtuu bakka buusi",
       "editKeyDescription": "Gatiin kuufame agarsiifamuu hin danda'u. Bakka buusuuf haaraa galchi.",
+      "editKeyMappingsWarning": "Furtuu bakka buusuun walqabsiisa moodeelaa kuufamees ni bakka buusa: walqabsiisa amma illee barbaachisu hunda irra deebi'ii galchi.",
       "saveFailed": "Furtuu olkaa'uun hin danda'amne.",
       "invalidCredentials": "Ragaalee eenyummaa mirkaneessiitii irra deebi'ii yaali.",
       "fieldRequired": "{{field}} barbaachisaadha.",

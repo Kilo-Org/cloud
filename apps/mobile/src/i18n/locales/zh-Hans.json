@@ -387,6 +387,7 @@
       "edit": "编辑密钥",
       "editKeyTitle": "替换密钥",
       "editKeyDescription": "已存储的值无法显示。请输入新值进行替换。",
+      "editKeyMappingsWarning": "替换密钥也会替换已保存的模型映射：请重新输入所有仍需使用的映射。",
       "saveFailed": "无法保存密钥。",
       "invalidCredentials": "请检查凭据后重试。",
       "fieldRequired": "{{field}} 为必填项。",

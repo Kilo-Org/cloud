@@ -387,6 +387,7 @@
       "edit": "Rediģēt atslēgu",
       "editKeyTitle": "Aizstāt atslēgu",
       "editKeyDescription": "Saglabāto vērtību nevar parādīt. Ievadi jaunu, lai to aizstātu.",
+      "editKeyMappingsWarning": "Aizstājot atslēgu, tiek aizstāti arī saglabātie modeļu kartējumi: ievadi visus kartējumus, kas vēl nepieciešami.",
       "saveFailed": "Neizdevās saglabāt atslēgu.",
       "invalidCredentials": "Pārbaudi akreditācijas datus un mēģini vēlreiz.",
       "fieldRequired": "Lauks “{{field}}” ir obligāts.",

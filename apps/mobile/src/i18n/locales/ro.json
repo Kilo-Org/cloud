@@ -387,6 +387,7 @@
       "edit": "Editează cheia",
       "editKeyTitle": "Înlocuiește cheia",
       "editKeyDescription": "Valoarea stocată nu poate fi afișată. Introdu una nouă pentru a o înlocui.",
+      "editKeyMappingsWarning": "Înlocuirea cheii înlocuiește și mapările de modele salvate: introdu din nou fiecare mapare de care ai încă nevoie.",
       "saveFailed": "Cheia nu a putut fi salvată.",
       "invalidCredentials": "Verifică datele de autentificare și încearcă din nou.",
       "fieldRequired": "Câmpul {{field}} este obligatoriu.",

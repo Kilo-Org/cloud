@@ -3,6 +3,14 @@ import {
   type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
 import { type Href } from 'expo-router';
+import { z } from 'zod';
+
+/** The value form's route: the provider, the key it replaces, and the organization. */
+export const providerKeyNewParams = z.object({
+  provider: z.string().min(1),
+  id: z.uuid().optional(),
+  org: z.uuid().optional(),
+});
 
 /**
  * Whose provider keys a screen shows: the caller's own, or one organization's.
@@ -30,8 +38,6 @@ export function providerKeyScopeInput(scope: ProviderKeyScope): { organizationId
 }
 
 export type ProviderKeyPermissions = Readonly<{
-  /** Any member may read an organization's keys; a personal account is its own owner. */
-  canView: boolean;
   /**
    * Adding, replacing, toggling, testing and deleting an organization key all
    * take `ORGANIZATION_BILLING_ROLES` on the server; a personal key is always
@@ -41,17 +47,18 @@ export type ProviderKeyPermissions = Readonly<{
 }>;
 
 /**
- * What this role may do with the scope's keys, mirroring the byok router: the
- * list takes membership, every write takes a billing role.
+ * Whether this role may change the scope's keys, mirroring the byok router's
+ * write rule. Reading is not decided here: the list itself answers membership,
+ * and the organization boundary owns a list that failed to load.
  */
 export function providerKeyPermissions(
   scope: ProviderKeyScope,
   role: OrganizationRole | undefined
 ): ProviderKeyPermissions {
   if (scope.kind === 'personal') {
-    return { canView: true, canEdit: true };
+    return { canEdit: true };
   }
-  return { canView: role !== undefined, canEdit: canManageOrganizationBilling(role) };
+  return { canEdit: canManageOrganizationBilling(role) };
 }
 
 /** The rows-and-definitions screen for this scope. */

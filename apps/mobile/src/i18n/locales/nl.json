@@ -387,6 +387,7 @@
       "edit": "Sleutel bewerken",
       "editKeyTitle": "Sleutel vervangen",
       "editKeyDescription": "De opgeslagen waarde kan niet worden getoond. Voer een nieuwe in om deze te vervangen.",
+      "editKeyMappingsWarning": "Bij het vervangen van de sleutel worden ook de opgeslagen modelkoppelingen vervangen: voer elke koppeling die u nog nodig hebt opnieuw in.",
       "saveFailed": "Kan de sleutel niet opslaan.",
       "invalidCredentials": "Controleer de inloggegevens en probeer het opnieuw.",
       "fieldRequired": "{{field}} is verplicht.",

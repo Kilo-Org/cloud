@@ -25,7 +25,10 @@ export type CredentialFieldId =
   | 'clientEmail'
   | 'privateKey';
 
-export type CredentialValues = Readonly<Partial<Record<CredentialFieldId, string>>>;
+/** The values typed into one form, keyed by the credential's own field. */
+export type CredentialDraft = Partial<Record<CredentialFieldId, string>>;
+
+export type CredentialValues = Readonly<CredentialDraft>;
 
 /** One Azure custom deployment: a gateway model slug served by a deployment id. */
 export type ModelMapping = Readonly<{ gatewayModelSlug: string; customModelId: string }>;
@@ -245,4 +248,62 @@ export function credentialProblem(input: {
   modelMappings: readonly ModelMapping[];
 }): StructuredCredentialProblem | null {
   return validateStructuredCredential(input.providerId, credentialPayload(input));
+}
+
+/**
+ * What one form's fields add up to: the credential to send, the field still
+ * empty, or a shape the server's own check refuses.
+ */
+export type CredentialRead =
+  | { readonly tag: 'ready'; readonly credential: string }
+  | { readonly tag: 'missing'; readonly field: CredentialFieldId }
+  | { readonly tag: 'refused' };
+
+/**
+ * The credential a structured form holds. `rows` are Azure's mapping rows as
+ * typed; a row with neither side filled asks for nothing.
+ */
+export function readStructuredCredential(input: {
+  providerId: string;
+  mode: BedrockAuthMode;
+  form: CredentialForm;
+  values: CredentialValues;
+  rows: readonly Partial<ModelMapping>[];
+}): CredentialRead {
+  const missing = firstMissingField(input.form, input.values);
+  if (missing) {
+    return { tag: 'missing', field: missing };
+  }
+  const modelMappings = input.rows
+    .map(row => ({
+      gatewayModelSlug: (row.gatewayModelSlug ?? '').trim(),
+      customModelId: (row.customModelId ?? '').trim(),
+    }))
+    .filter(row => row.gatewayModelSlug !== '' || row.customModelId !== '');
+  const credential = {
+    providerId: input.providerId,
+    mode: input.mode,
+    values: input.values,
+    modelMappings,
+  };
+  if (credentialProblem(credential)) {
+    return { tag: 'refused' };
+  }
+  return { tag: 'ready', credential: JSON.stringify(credentialPayload(credential)) };
+}
+
+/**
+ * The draft with only the values this form renders. Bedrock's two methods share
+ * the draft, and a field the next method does not show comes back empty, so
+ * keeping its value would send what the reader cannot see.
+ */
+export function withoutUnshownValues(form: CredentialForm | null, values: CredentialValues) {
+  const kept: CredentialDraft = {};
+  for (const field of form?.fields ?? []) {
+    const value = values[field.id];
+    if (value !== undefined) {
+      kept[field.id] = value;
+    }
+  }
+  return kept;
 }

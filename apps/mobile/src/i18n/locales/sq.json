@@ -387,6 +387,7 @@
       "edit": "Modifiko çelësin",
       "editKeyTitle": "Zëvendëso çelësin",
       "editKeyDescription": "Vlera e ruajtur nuk mund të shfaqet. Fut një të re për ta zëvendësuar.",
+      "editKeyMappingsWarning": "Zëvendësimi i çelësit zëvendëson gjithashtu hartëzimet e ruajtura të modeleve: rifut çdo hartëzim që të nevojitet ende.",
       "saveFailed": "Çelësi nuk u ruajt dot.",
       "invalidCredentials": "Kontrollo kredencialet dhe provo përsëri.",
       "fieldRequired": "Fusha {{field}} është e detyrueshme.",

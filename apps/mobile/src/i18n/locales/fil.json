@@ -387,6 +387,7 @@
       "edit": "I-edit ang key",
       "editKeyTitle": "Palitan ang key",
       "editKeyDescription": "Hindi maipapakita ang nakaimbak na value. Maglagay ng bago para palitan ito.",
+      "editKeyMappingsWarning": "Ang pagpapalit ng key ay pinapalitan din ang mga nakaimbak na model mapping: ilagay muli ang bawat mapping na kailangan mo pa.",
       "saveFailed": "Hindi ma-save ang key.",
       "invalidCredentials": "Suriin ang mga credential at subukang muli.",
       "fieldRequired": "Kailangan ang {{field}}.",

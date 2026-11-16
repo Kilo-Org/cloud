@@ -63,7 +63,13 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   };
 });
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => ({ role: state.role, isResolving: false }),
+  useOrgBoundary: () => ({
+    role: state.role,
+    // The hook reads `org` from the same membership entry it reads the role
+    // from, so a role is exactly what makes the organization resolve.
+    org: state.role === undefined ? undefined : { organizationId: 'org_1', role: state.role },
+    isResolving: false,
+  }),
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
@@ -90,6 +96,9 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/organization/organization-boundary', () => ({
+  OrganizationBoundary: 'OrganizationBoundary',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -335,16 +344,16 @@ describe('ProviderKeysScreen', () => {
     ).toContain('Only an organization owner, admin, or billing manager can change its keys.');
   });
 
-  it('refuses an organization the caller is not a member of, with no retry', async () => {
+  it('leaves an organization it cannot resolve to the boundary', async () => {
+    // A failed organization list leaves the role unknown, which is not a
+    // membership refusal: the boundary reports the failure, retry included.
     state.role = undefined;
     const root = await mount('org_1');
 
-    const [queryError] = root.findAll(node => Object.is(node.type, 'QueryError'));
-    if (!queryError) {
-      throw new Error('missing the refusal state');
-    }
-    expect(queryError.props.variant).toBe('permission');
-    expect(queryError.props.onRetry).toBeUndefined();
+    const [boundary] = root.findAll(node => Object.is(node.type, 'OrganizationBoundary'));
+    expect(boundary?.props.organizationIdOverride).toBe('org_1');
+    expect(boundary?.props.title).toBe('Provider keys');
+    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(0);
   });
 
   it('offers a retry when the list failed for a reason that can change', async () => {

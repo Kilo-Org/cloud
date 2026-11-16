@@ -387,6 +387,7 @@
       "edit": "Editatu gakoa",
       "editKeyTitle": "Ordeztu gakoa",
       "editKeyDescription": "Gordetako balioa ezin da erakutsi. Idatzi berri bat hura ordezteko.",
+      "editKeyMappingsWarning": "Gakoa ordezteak gordetako eredu-esleipenak ere ordezten ditu: sartu berriro oraindik behar dituzun esleipen guztiak.",
       "saveFailed": "Ezin izan da gakoa gorde.",
       "invalidCredentials": "Egiaztatu kredentzialak eta saiatu berriro.",
       "fieldRequired": "{{field}} derrigorrezkoa da.",

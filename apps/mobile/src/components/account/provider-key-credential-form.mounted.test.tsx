@@ -18,6 +18,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 let renderer: ReactTestRenderer | undefined = undefined;
+const onEdit = vi.fn();
 
 async function mount(providerId: string, mode: 'apiKey' | 'accessKeys') {
   const form = credentialForm(providerId, mode);
@@ -31,6 +32,9 @@ async function mount(providerId: string, mode: 'apiKey' | 'accessKeys') {
         form,
         mode,
         onModeChange: () => undefined,
+        onEdit: () => {
+          onEdit();
+        },
         disabled: false,
         values: { current: {} },
         mappings: { current: new Map() },
@@ -69,9 +73,24 @@ function expectNoLearning(props: Record<string, unknown>): void {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  onEdit.mockClear();
 });
 
 describe('ProviderKeyCredentialForm secret inputs', () => {
+  it('reports every typed value as an edit', async () => {
+    const root = await mount('azure', 'apiKey');
+    for (const labelKey of [
+      'profile.providerKeys.apiKeyLabel',
+      'profile.providerKeys.resourceName',
+    ]) {
+      act(() => {
+        (field(root, labelKey).props.onChangeText as (value: string) => void)('typed');
+      });
+    }
+
+    expect(onEdit).toHaveBeenCalledTimes(2);
+  });
+
   it('masks Azure’s key and never suggests or learns from it', async () => {
     const root = await mount('azure', 'apiKey');
     const key = field(root, 'profile.providerKeys.apiKeyLabel');
@@ -107,8 +126,10 @@ describe('ProviderKeyCredentialForm secret inputs', () => {
     const root = await mount('vertex', 'apiKey');
     const privateKey = field(root, 'profile.providerKeys.privateKey');
 
-    // Neither platform masks a multiline input, so the PEM takes no soft-keyboard
-    // input at all: with no keyboard there is nothing to suggest or learn.
+    // Neither platform masks a multiline input. Android takes no soft-keyboard
+    // input for it at all; iOS opens its keyboard because that prop is
+    // Android-only, so the PEM is visible there while typed and the rest of the
+    // props are what keep the keyboard from suggesting or learning it.
     expect(privateKey.props.multiline).toBe(true);
     expect(privateKey.props.secureTextEntry).toBe(true);
     expect(privateKey.props.showSoftInputOnFocus).toBe(false);

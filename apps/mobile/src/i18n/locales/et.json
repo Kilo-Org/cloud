@@ -387,6 +387,7 @@
       "edit": "Muuda võtit",
       "editKeyTitle": "Asenda võti",
       "editKeyDescription": "Salvestatud väärtust ei saa kuvada. Selle asendamiseks sisesta uus.",
+      "editKeyMappingsWarning": "Võtme asendamisel asenduvad ka salvestatud mudelite vastendused: sisesta uuesti kõik vastendused, mida veel vajad.",
       "saveFailed": "Võtme salvestamine ebaõnnestus.",
       "invalidCredentials": "Kontrolli mandaate ja proovi uuesti.",
       "fieldRequired": "{{field}} on kohustuslik.",

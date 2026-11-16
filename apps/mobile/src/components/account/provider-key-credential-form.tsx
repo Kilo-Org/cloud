@@ -11,14 +11,12 @@ import { COMPACT_CONTROL_HIT_SLOP_DP, STATE_ACTION_CLASS } from '@/lib/a11y/tap-
 import { CREDENTIAL_INPUT_PROPS } from '@/lib/byok/credential-input-props';
 import {
   type BedrockAuthMode,
+  type CredentialDraft,
   type CredentialFieldId,
   type CredentialForm,
   type ModelMapping,
 } from '@/lib/byok/credential-fields';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-/** The values typed into one form, keyed by the credential's own field. */
-export type CredentialDraft = Partial<Record<CredentialFieldId, string>>;
 
 /**
  * One Azure custom deployment. The rows are built on the fly, so each keeps an
@@ -31,6 +29,8 @@ type ProviderKeyCredentialFormProps = Readonly<{
   form: CredentialForm;
   mode: BedrockAuthMode;
   onModeChange: (mode: BedrockAuthMode) => void;
+  /** The reader changed the credential, so a refusal about the old value is stale. */
+  onEdit: () => void;
   disabled: boolean;
   values: { current: CredentialDraft };
   mappings: { current: Map<number, Partial<ModelMapping>> };
@@ -51,6 +51,7 @@ export function ProviderKeyCredentialForm({
   form,
   mode,
   onModeChange,
+  onEdit,
   disabled,
   values,
   mappings,
@@ -99,6 +100,7 @@ export function ProviderKeyCredentialForm({
           error={errors[field.id]}
           onChangeText={value => {
             values.current[field.id] = value;
+            onEdit();
           }}
         />
       ))}
@@ -145,6 +147,7 @@ export function ProviderKeyCredentialForm({
                     ...mappings.current.get(row.id),
                     gatewayModelSlug: value,
                   });
+                  onEdit();
                 }}
               />
               <FormField
@@ -158,6 +161,7 @@ export function ProviderKeyCredentialForm({
                     ...mappings.current.get(row.id),
                     customModelId: value,
                   });
+                  onEdit();
                 }}
               />
             </View>

@@ -387,6 +387,7 @@
       "edit": "Redigera nyckel",
       "editKeyTitle": "Ersätt nyckel",
       "editKeyDescription": "Det lagrade värdet kan inte visas. Ange ett nytt för att ersätta det.",
+      "editKeyMappingsWarning": "Att ersätta nyckeln ersätter även de sparade modellmappningarna: ange alla mappningar du fortfarande behöver på nytt.",
       "saveFailed": "Det gick inte att spara nyckeln.",
       "invalidCredentials": "Kontrollera autentiseringsuppgifterna och försök igen.",
       "fieldRequired": "{{field}} måste anges.",

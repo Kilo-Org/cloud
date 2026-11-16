@@ -387,6 +387,7 @@
       "edit": "キーを編集",
       "editKeyTitle": "キーを置き換え",
       "editKeyDescription": "保存されている値は表示できません。置き換えるには新しい値を入力してください。",
+      "editKeyMappingsWarning": "キーを置き換えると保存されているモデルマッピングも置き換わるため、必要なマッピングはすべて再入力してください。",
       "saveFailed": "キーを保存できませんでした。",
       "invalidCredentials": "認証情報を確認して、もう一度お試しください。",
       "fieldRequired": "{{field}}は必須です。",

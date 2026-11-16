@@ -1,9 +1,12 @@
+/* eslint-disable max-lines -- one suite covers the form's states, the organization boundary, both credential shapes and the save failures. */
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+
+import { type ModelMapping } from '@/lib/byok/credential-fields';
 
 import { ProviderKeyNewScreen } from './provider-key-new-screen';
 import type * as ReactQuery from '@tanstack/react-query';
@@ -14,7 +17,7 @@ type ScreenState = {
   params: Record<string, string>;
   providers: { id: string; name: string }[];
   error: boolean;
-  role: string;
+  role: string | undefined;
   mutateAsync: Mock;
   dismissTo: Mock;
 };
@@ -60,7 +63,13 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => ({ role: state.role, isResolving: false }),
+  useOrgBoundary: () => ({
+    role: state.role,
+    // The hook reads `org` from the same membership entry it reads the role
+    // from, so a role is exactly what makes the organization resolve.
+    org: state.role === undefined ? undefined : { organizationId: ORG_ID, role: state.role },
+    isResolving: false,
+  }),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -77,6 +86,9 @@ vi.mock('@/components/account/provider-key-credential-form', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/organization/organization-boundary', () => ({
+  OrganizationBoundary: 'OrganizationBoundary',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -113,6 +125,8 @@ function credentialForm(root: ReactTestRenderer['root']) {
   return {
     values: form.props.values as { current: Record<string, string> },
     form: form.props.form as { kind: string },
+    mappings: form.props.mappings as { current: Map<number, Partial<ModelMapping>> },
+    onModeChange: form.props.onModeChange as (mode: string) => void,
   };
 }
 
@@ -331,6 +345,78 @@ describe('ProviderKeyNewScreen', () => {
     }
     expect(queryError.props.variant).toBe('permission');
     expect(allButtons(root)).toHaveLength(0);
+  });
+
+  it('leaves an organization it cannot resolve to the boundary', async () => {
+    state.params = { provider: 'anthropic', org: ORG_ID };
+    state.role = undefined;
+    const root = await mount();
+
+    const [boundary] = root.findAll(node => Object.is(node.type, 'OrganizationBoundary'));
+    expect(boundary?.props.organizationIdOverride).toBe(ORG_ID);
+    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(0);
+  });
+
+  it('drops the Bedrock values the method it switches to does not show', async () => {
+    state.params = { provider: 'bedrock' };
+    state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];
+    const root = await mount();
+
+    act(() => {
+      credentialForm(root).values.current = { apiKey: 'sk-bedrock', region: 'us-east-1' };
+    });
+    act(() => {
+      credentialForm(root).onModeChange('accessKeys');
+    });
+
+    // The API key field is gone from the form, so its value must be gone from
+    // the draft as well: Save cannot send what the reader cannot see.
+    expect(credentialForm(root).values.current).toEqual({ region: 'us-east-1' });
+  });
+
+  it('refuses a half-filled mapping as a credential problem, not a missing key', async () => {
+    state.params = { provider: 'azure' };
+    state.providers = [{ id: 'azure', name: 'Azure Foundry' }];
+    const root = await mount();
+
+    act(() => {
+      credentialForm(root).values.current = { apiKey: 'azure-key', resourceName: 'foundry' };
+      credentialForm(root).mappings.current.set(0, { gatewayModelSlug: 'gpt-4' });
+    });
+    await act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+
+    expect(state.mutateAsync).not.toHaveBeenCalled();
+    expect(statusMessages(root)).toEqual(['Check the credentials and try again.']);
+  });
+
+  it('warns that replacing a key replaces its model mappings', async () => {
+    state.params = { provider: 'azure', id: KEY_ID };
+    state.providers = [{ id: 'azure', name: 'Azure Foundry' }];
+    const root = await mount();
+
+    expect(
+      root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
+    ).toContain(
+      'Replacing the key also replaces the saved model mappings: re-enter every mapping you still need.'
+    );
+  });
+
+  it('retires a save refusal once the reader edits the value', async () => {
+    state.mutateAsync.mockRejectedValueOnce({
+      data: { code: 'BAD_REQUEST', message: 'That key was rejected by the provider' },
+    });
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+    expect(statusMessages(root)).toEqual(['That key was rejected by the provider']);
+
+    act(() => {
+      (apiKeyField(root).props.onChangeText as (value: string) => void)('sk-test-456');
+    });
+
+    expect(statusMessages(root)).toEqual([]);
   });
 
   it('treats a provider the server does not offer as an invalid link', async () => {

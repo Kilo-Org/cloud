@@ -9,9 +9,12 @@ import { type TextInputProps } from 'react-native';
  *
  * A single-line credential is also masked with `secureTextEntry`. Android
  * ignores that on a multiline input and iOS has no masked text view at all, so
- * the multiline value — the Vertex private key — takes no soft-keyboard input
- * instead: it is pasted, and an input method that never opens cannot suggest or
- * learn it.
+ * the multiline value — the Vertex private key — is visible in the field that
+ * holds it on both platforms. Android also takes no soft-keyboard input for it:
+ * it is pasted, and an input method that never opens cannot suggest or learn
+ * it. iOS honours none of `showSoftInputOnFocus`, so its keyboard does open
+ * there; what keeps it from suggesting, correcting, or learning the value is
+ * the rest of these props, which both platforms do apply.
  */
 export const CREDENTIAL_INPUT_PROPS = {
   autoCapitalize: 'none',

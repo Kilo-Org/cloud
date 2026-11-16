@@ -387,6 +387,7 @@
       "edit": "Wax ka beddel furaha",
       "editKeyTitle": "Beddel furaha",
       "editKeyDescription": "Qiimaha la kaydiyay lama muujin karo. Geli mid cusub si aad ugu beddesho.",
+      "editKeyMappingsWarning": "Beddelidda furaha waxay sidoo kale beddeshaa isku-xidhka moodellada ee la kaydiyay: dib u geli isku-xidh kasta oo aad weli u baahan tahay.",
       "saveFailed": "Furaha lama kaydin karin.",
       "invalidCredentials": "Hubi aqoonsiyada oo isku day mar kale.",
       "fieldRequired": "{{field}} waa qasab.",

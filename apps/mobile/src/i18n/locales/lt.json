@@ -387,6 +387,7 @@
       "edit": "Redaguoti raktą",
       "editKeyTitle": "Pakeisti raktą",
       "editKeyDescription": "Išsaugotos reikšmės parodyti negalima. Įveskite naują, kad ją pakeistumėte.",
+      "editKeyMappingsWarning": "Pakeitus raktą, taip pat pakeičiami išsaugoti modelių susiejimai: iš naujo įveskite visus jums dar reikalingus susiejimus.",
       "saveFailed": "Nepavyko išsaugoti rakto.",
       "invalidCredentials": "Patikrinkite prisijungimo duomenis ir bandykite dar kartą.",
       "fieldRequired": "Laukas „{{field}}“ yra privalomas.",

@@ -387,6 +387,7 @@
       "edit": "Açarı redaktə et",
       "editKeyTitle": "Açarı əvəz et",
       "editKeyDescription": "Saxlanılan dəyər göstərilə bilməz. Onu əvəz etmək üçün yenisini daxil et.",
+      "editKeyMappingsWarning": "Açarın əvəz edilməsi saxlanılan model uyğunlaşdırmalarını da əvəz edir: hələ lazım olan hər bir uyğunlaşdırmanı yenidən daxil et.",
       "saveFailed": "Açarı saxlamaq mümkün olmadı.",
       "invalidCredentials": "Etimadnamələri yoxla və yenidən cəhd et.",
       "fieldRequired": "{{field}} tələb olunur.",

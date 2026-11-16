@@ -387,6 +387,7 @@
       "edit": "Edit kunci",
       "editKeyTitle": "Gantikan kunci",
       "editKeyDescription": "Nilai yang disimpan tidak boleh ditunjukkan. Masukkan nilai baharu untuk menggantikannya.",
+      "editKeyMappingsWarning": "Menggantikan kunci turut menggantikan pemetaan model yang disimpan: masukkan semula setiap pemetaan yang masih anda perlukan.",
       "saveFailed": "Tidak dapat menyimpan kunci.",
       "invalidCredentials": "Semak kelayakan dan cuba lagi.",
       "fieldRequired": "{{field}} diperlukan.",

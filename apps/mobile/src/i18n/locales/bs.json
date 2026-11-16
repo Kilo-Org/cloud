@@ -387,6 +387,7 @@
       "edit": "Uredi ključ",
       "editKeyTitle": "Zamijeni ključ",
       "editKeyDescription": "Sačuvana vrijednost se ne može prikazati. Unesi novu da je zamijeniš.",
+      "editKeyMappingsWarning": "Zamjena ključa zamjenjuje i sačuvana mapiranja modela: ponovo unesi svako mapiranje koje ti je još potrebno.",
       "saveFailed": "Nije moguće sačuvati ključ.",
       "invalidCredentials": "Provjeri akreditive i pokušaj ponovo.",
       "fieldRequired": "Polje {{field}} je obavezno.",

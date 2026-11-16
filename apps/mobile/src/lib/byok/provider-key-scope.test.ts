@@ -46,24 +46,21 @@ describe('providerKeyScope', () => {
 });
 
 describe('providerKeyPermissions', () => {
-  it('lets a personal account read and edit its own keys', () => {
-    expect(providerKeyPermissions({ kind: 'personal' }, undefined)).toEqual({
-      canView: true,
-      canEdit: true,
-    });
+  it('lets a personal account change its own keys', () => {
+    expect(providerKeyPermissions({ kind: 'personal' }, undefined)).toEqual({ canEdit: true });
   });
 
-  it('lets every member read an organization’s keys', () => {
+  it('takes a billing role for an organization’s keys', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member'] as const) {
       expect(
         providerKeyPermissions({ kind: 'organization', organizationId: 'org_1' }, role)
-      ).toEqual({ canView: true, canEdit: role !== 'member' });
+      ).toEqual({ canEdit: role !== 'member' });
     }
   });
 
-  it('refuses a caller who is not a member of the organization', () => {
+  it('offers no change to a caller the organization list does not place', () => {
     expect(
       providerKeyPermissions({ kind: 'organization', organizationId: 'org_1' }, undefined)
-    ).toEqual({ canView: false, canEdit: false });
+    ).toEqual({ canEdit: false });
   });
 });

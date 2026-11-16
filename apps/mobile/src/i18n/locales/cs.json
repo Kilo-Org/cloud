@@ -387,6 +387,7 @@
       "edit": "Upravit klíč",
       "editKeyTitle": "Nahradit klíč",
       "editKeyDescription": "Uloženou hodnotu nelze zobrazit. Zadejte novou, která ji nahradí.",
+      "editKeyMappingsWarning": "Nahrazením klíče se nahradí i uložená mapování modelů: znovu zadejte každé mapování, které ještě potřebujete.",
       "saveFailed": "Klíč se nepodařilo uložit.",
       "invalidCredentials": "Zkontrolujte přihlašovací údaje a zkuste to znovu.",
       "fieldRequired": "Pole {{field}} je povinné.",

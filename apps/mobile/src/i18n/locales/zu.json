@@ -387,6 +387,7 @@
       "edit": "Hlela ukhiye",
       "editKeyTitle": "Shintsha ukhiye",
       "editKeyDescription": "Inani eligciniwe alikwazi ukuboniswa. Faka elisha ukuze ulishintshe.",
+      "editKeyMappingsWarning": "Ukushintsha ukhiye kushintsha futhi ukufaniswa kwamamodeli agciniwe: faka kabusha konke ukufaniswa okusadingayo.",
       "saveFailed": "Akukwazekanga ukulondoloza ukhiye.",
       "invalidCredentials": "Hlola imininingwane yokungena bese uzama futhi.",
       "fieldRequired": "{{field}} kuyadingeka.",

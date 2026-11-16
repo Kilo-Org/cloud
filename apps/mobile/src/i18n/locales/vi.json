@@ -387,6 +387,7 @@
       "edit": "Sửa khóa",
       "editKeyTitle": "Thay khóa",
       "editKeyDescription": "Không thể hiển thị giá trị đã lưu. Nhập giá trị mới để thay thế.",
+      "editKeyMappingsWarning": "Việc thay khóa cũng thay thế các ánh xạ mô hình đã lưu: hãy nhập lại mọi ánh xạ bạn vẫn cần.",
       "saveFailed": "Không thể lưu khóa.",
       "invalidCredentials": "Hãy kiểm tra thông tin xác thực rồi thử lại.",
       "fieldRequired": "Bắt buộc nhập {{field}}.",

@@ -387,6 +387,7 @@
       "edit": "Edita la clau",
       "editKeyTitle": "Substitueix la clau",
       "editKeyDescription": "El valor desat no es pot mostrar. Introdueix-ne un de nou per substituir-lo.",
+      "editKeyMappingsWarning": "Substituir la clau també substitueix les assignacions de models desades: torna a introduir totes les assignacions que encara necessitis.",
       "saveFailed": "No s'ha pogut desar la clau.",
       "invalidCredentials": "Comprova les credencials i torna-ho a provar.",
       "fieldRequired": "El camp {{field}} és obligatori.",

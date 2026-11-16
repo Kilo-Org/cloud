@@ -387,6 +387,7 @@
       "edit": "Modifica chiave",
       "editKeyTitle": "Sostituisci chiave",
       "editKeyDescription": "Il valore salvato non può essere mostrato. Inseriscine uno nuovo per sostituirlo.",
+      "editKeyMappingsWarning": "Sostituire la chiave sostituisce anche le mappature dei modelli salvate: reinserisci ogni mappatura di cui hai ancora bisogno.",
       "saveFailed": "Impossibile salvare la chiave.",
       "invalidCredentials": "Controlla le credenziali e riprova.",
       "fieldRequired": "Il campo {{field}} è obbligatorio.",

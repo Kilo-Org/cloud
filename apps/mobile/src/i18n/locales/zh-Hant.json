@@ -387,6 +387,7 @@
       "edit": "編輯金鑰",
       "editKeyTitle": "更換金鑰",
       "editKeyDescription": "已儲存的值無法顯示。請輸入新的值來取代。",
+      "editKeyMappingsWarning": "更換金鑰也會一併取代已儲存的模型對應：請重新輸入您仍需要的所有對應。",
       "saveFailed": "無法儲存金鑰。",
       "invalidCredentials": "請檢查憑證後再試一次。",
       "fieldRequired": "{{field}} 為必填。",

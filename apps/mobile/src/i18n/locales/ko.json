@@ -387,6 +387,7 @@
       "edit": "키 편집",
       "editKeyTitle": "키 교체",
       "editKeyDescription": "저장된 값은 표시할 수 없습니다. 교체하려면 새 값을 입력하세요.",
+      "editKeyMappingsWarning": "키를 교체하면 저장된 모델 매핑도 함께 교체되므로, 계속 사용할 매핑은 다시 입력하세요.",
       "saveFailed": "키를 저장할 수 없습니다.",
       "invalidCredentials": "자격 증명을 확인한 후 다시 시도하세요.",
       "fieldRequired": "{{field}}은(는) 필수 항목입니다.",

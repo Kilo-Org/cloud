@@ -454,6 +454,7 @@
       "edit": "Edit key",
       "editKeyTitle": "Replace key",
       "editKeyDescription": "The stored value cannot be shown. Enter a new one to replace it.",
+      "editKeyMappingsWarning": "Replacing the key also replaces the saved model mappings: re-enter every mapping you still need.",
       "saveFailed": "Could not save the key.",
       "invalidCredentials": "Check the credentials and try again.",
       "fieldRequired": "{{field}} is required.",

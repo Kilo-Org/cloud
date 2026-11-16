@@ -387,6 +387,7 @@
       "edit": "Edytuj klucz",
       "editKeyTitle": "Zastąp klucz",
       "editKeyDescription": "Zapisanej wartości nie można wyświetlić. Wpisz nową, aby ją zastąpić.",
+      "editKeyMappingsWarning": "Zastąpienie klucza zastępuje również zapisane mapowania modeli: ponownie wprowadź każde mapowanie, którego nadal potrzebujesz.",
       "saveFailed": "Nie udało się zapisać klucza.",
       "invalidCredentials": "Sprawdź dane uwierzytelniające i spróbuj ponownie.",
       "fieldRequired": "Pole {{field}} jest wymagane.",

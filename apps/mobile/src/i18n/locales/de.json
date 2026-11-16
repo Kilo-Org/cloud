@@ -387,6 +387,7 @@
       "edit": "Schlüssel bearbeiten",
       "editKeyTitle": "Schlüssel ersetzen",
       "editKeyDescription": "Der gespeicherte Wert kann nicht angezeigt werden. Gib einen neuen ein, um ihn zu ersetzen.",
+      "editKeyMappingsWarning": "Das Ersetzen des Schlüssels ersetzt auch die gespeicherten Modellzuordnungen: Gib jede Zuordnung, die du noch brauchst, erneut ein.",
       "saveFailed": "Der Schlüssel konnte nicht gespeichert werden.",
       "invalidCredentials": "Überprüfe die Anmeldedaten und versuche es erneut.",
       "fieldRequired": "{{field}} ist erforderlich.",

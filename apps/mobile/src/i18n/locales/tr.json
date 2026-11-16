@@ -387,6 +387,7 @@
       "edit": "Anahtarı düzenle",
       "editKeyTitle": "Anahtarı değiştir",
       "editKeyDescription": "Kayıtlı değer gösterilemez. Değiştirmek için yeni bir değer gir.",
+      "editKeyMappingsWarning": "Anahtarı değiştirmek kayıtlı model eşlemelerini de değiştirir: hâlâ ihtiyaç duyduğun her eşlemeyi yeniden gir.",
       "saveFailed": "Anahtar kaydedilemedi.",
       "invalidCredentials": "Kimlik bilgilerini kontrol edip tekrar dene.",
       "fieldRequired": "{{field}} gerekli.",

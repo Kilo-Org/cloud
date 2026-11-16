@@ -387,6 +387,7 @@
       "edit": "Upraviť kľúč",
       "editKeyTitle": "Nahradiť kľúč",
       "editKeyDescription": "Uloženú hodnotu nie je možné zobraziť. Na jej nahradenie zadaj novú.",
+      "editKeyMappingsWarning": "Nahradenie kľúča nahradí aj uložené mapovania modelov: znova zadaj každé mapovanie, ktoré ešte potrebuješ.",
       "saveFailed": "Kľúč sa nepodarilo uložiť.",
       "invalidCredentials": "Skontroluj prihlasovacie údaje a skús to znova.",
       "fieldRequired": "Pole {{field}} je povinné.",

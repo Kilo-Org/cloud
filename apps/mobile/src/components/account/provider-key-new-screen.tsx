@@ -4,13 +4,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { z } from 'zod';
 
-import {
-  type CredentialDraft,
-  ProviderKeyCredentialForm,
-} from '@/components/account/provider-key-credential-form';
+import { ProviderKeyCredentialForm } from '@/components/account/provider-key-credential-form';
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -24,14 +21,16 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { CREDENTIAL_INPUT_PROPS } from '@/lib/byok/credential-input-props';
 import {
   type BedrockAuthMode,
+  type CredentialDraft,
   type CredentialFieldId,
   credentialForm,
-  credentialPayload,
-  credentialProblem,
-  firstMissingField,
+  type CredentialRead,
   type ModelMapping,
+  readStructuredCredential,
+  withoutUnshownValues,
 } from '@/lib/byok/credential-fields';
 import {
+  providerKeyNewParams,
   providerKeyPermissions,
   providerKeyScope,
   providerKeyScopeInput,
@@ -40,17 +39,11 @@ import {
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
-
-/** The provider, the key it replaces, and the organization whose keys it edits. */
-const ParamsSchema = z.object({
-  provider: z.string().min(1),
-  id: z.uuid().optional(),
-  org: z.uuid().optional(),
-});
 
 type SaveFailure =
   | { readonly kind: 'retryable'; readonly message: string }
@@ -68,7 +61,12 @@ export function ProviderKeyNewScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const params = useLocalSearchParams();
-  const parsedParam = ParamsSchema.safeParse(params);
+  // A repeated `?org=` arrives as an array; every other org route takes its
+  // first value rather than failing the parse this screen answers with.
+  const parsedParam = providerKeyNewParams.safeParse({
+    ...params,
+    org: normalizeOrgQueryParam(params.org),
+  });
   const keyRef = useRef('');
   const valuesRef = useRef<CredentialDraft>({});
   const mappingsRef = useRef(new Map<number, Partial<ModelMapping>>());
@@ -78,7 +76,7 @@ export function ProviderKeyNewScreen() {
   const scope = providerKeyScope(parsedParam.success ? parsedParam.data.org : undefined);
   const scopeInput = providerKeyScopeInput(scope);
   const keyId = parsedParam.success ? parsedParam.data.id : undefined;
-  const { role, isResolving } = useOrgBoundary(
+  const { role, org, isResolving } = useOrgBoundary(
     scope.kind === 'organization' ? scope.organizationId : undefined
   );
   const permissions = providerKeyPermissions(scope, role);
@@ -101,7 +99,14 @@ export function ProviderKeyNewScreen() {
     ? t('profile.providerKeys.editKeyTitle')
     : t('profile.providerKeys.newKeyTitle');
 
-  if (scope.kind === 'organization' && !isResolving && !permissions.canEdit) {
+  if (scope.kind === 'organization' && (isResolving || org == null)) {
+    // Not resolved, a failed organization list, or an id the viewer is not a
+    // member of: the boundary owns all three, and its failed list is retryable
+    // rather than a membership refusal this screen cannot distinguish.
+    return <OrganizationBoundary title={title} organizationIdOverride={scope.organizationId} />;
+  }
+
+  if (scope.kind === 'organization' && !permissions.canEdit) {
     // Every write to an organization's keys takes a billing role, so a member
     // who reads them cannot open this form at all.
     return (
@@ -112,23 +117,18 @@ export function ProviderKeyNewScreen() {
     );
   }
 
-  if (providers.isPending) {
+  if (providers.isPending || providers.isError) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={title} />
-        <View className="gap-6 px-4 pt-4">
-          <Skeleton className="h-[74px] rounded-lg" />
-          <Skeleton className="h-11 rounded-lg" />
-        </View>
-      </View>
-    );
-  }
-
-  if (providers.isError) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title={title} />
-        <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
+        {providers.isError ? (
+          <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
+        ) : (
+          <View className="gap-6 px-4 pt-4">
+            <Skeleton className="h-[74px] rounded-lg" />
+            <Skeleton className="h-11 rounded-lg" />
+          </View>
+        )}
       </View>
     );
   }
@@ -146,46 +146,37 @@ export function ProviderKeyNewScreen() {
     return field ? t(field.labelKey) : t('profile.providerKeys.apiKeyLabel');
   };
 
+  /**
+   * The credential changed: a refusal shown beside the old value is about a
+   * value the reader has already replaced.
+   */
+  const clearFailureOnEdit = () => {
+    save.clearWhere(() => true);
+    setFieldErrors({});
+  };
+
+  /** Switching methods drops the values the next one does not show. */
+  const changeAuthMode = (mode: BedrockAuthMode) => {
+    valuesRef.current = withoutUnshownValues(credentialForm(provider.id, mode), valuesRef.current);
+    clearFailureOnEdit();
+    setAuthMode(mode);
+  };
+
   /** The credential the server stores: the JSON its fields add up to. */
-  const readCredential = ():
-    | { readonly tag: 'ready'; readonly apiKey: string }
-    | { readonly tag: 'missing'; readonly field: CredentialFieldId }
-    | { readonly tag: 'refused' } => {
+  const readCredential = (): CredentialRead => {
     if (!form) {
       const apiKey = keyRef.current.trim();
-      return apiKey === '' ? { tag: 'missing', field: 'apiKey' } : { tag: 'ready', apiKey };
+      return apiKey === ''
+        ? { tag: 'missing', field: 'apiKey' }
+        : { tag: 'ready', credential: apiKey };
     }
-    const missing = firstMissingField(form, valuesRef.current);
-    if (missing) {
-      return { tag: 'missing', field: missing };
-    }
-    // A mapping row the reader added and left empty asks for nothing.
-    const modelMappings = [...mappingsRef.current.values()]
-      .map(row => ({
-        gatewayModelSlug: (row.gatewayModelSlug ?? '').trim(),
-        customModelId: (row.customModelId ?? '').trim(),
-      }))
-      .filter(row => row.gatewayModelSlug !== '' || row.customModelId !== '');
-    const problem = credentialProblem({
+    return readStructuredCredential({
       providerId: provider.id,
       mode: authMode,
+      form,
       values: valuesRef.current,
-      modelMappings,
+      rows: [...mappingsRef.current.values()],
     });
-    if (problem) {
-      return { tag: 'refused' };
-    }
-    return {
-      tag: 'ready',
-      apiKey: JSON.stringify(
-        credentialPayload({
-          providerId: provider.id,
-          mode: authMode,
-          values: valuesRef.current,
-          modelMappings,
-        })
-      ),
-    };
   };
 
   const submit = async () => {
@@ -195,17 +186,28 @@ export function ProviderKeyNewScreen() {
     }
     setFieldErrors({});
     const credential = readCredential();
-    if (credential.tag === 'missing' && form) {
-      setFieldErrors({
-        [credential.field]: t('profile.providerKeys.fieldRequired', {
-          field: fieldLabel(credential.field),
-        }),
+    if (credential.tag === 'missing') {
+      if (form) {
+        setFieldErrors({
+          [credential.field]: t('profile.providerKeys.fieldRequired', {
+            field: fieldLabel(credential.field),
+          }),
+        });
+      }
+      attempt.fail({
+        kind: 'refused',
+        // A structured form names the empty field above, so its summary is the
+        // general refusal; a one-value key has no field to point at.
+        message: form
+          ? t('profile.providerKeys.invalidCredentials')
+          : t('profile.providerKeys.apiKeyRequired'),
       });
-      attempt.fail({ kind: 'refused', message: t('profile.providerKeys.invalidCredentials') });
       return;
     }
-    if (credential.tag !== 'ready') {
-      attempt.fail({ kind: 'refused', message: t('profile.providerKeys.apiKeyRequired') });
+    if (credential.tag === 'refused') {
+      // Every field is filled but the shape they add up to was refused, so
+      // telling the reader to enter the key would name a value they can see.
+      attempt.fail({ kind: 'refused', message: t('profile.providerKeys.invalidCredentials') });
       return;
     }
     try {
@@ -213,9 +215,9 @@ export function ProviderKeyNewScreen() {
         ? create.mutateAsync({
             ...scopeInput,
             provider_id: provider.id,
-            api_key: credential.apiKey,
+            api_key: credential.credential,
           })
-        : update.mutateAsync({ ...scopeInput, id: keyId, api_key: credential.apiKey }));
+        : update.mutateAsync({ ...scopeInput, id: keyId, api_key: credential.credential }));
     } catch (error) {
       attempt.fail({
         kind: isRetryableTrpcError(error) ? 'retryable' : 'refused',
@@ -289,12 +291,18 @@ export function ProviderKeyNewScreen() {
               ? t('profile.providerKeys.newKeyDescription')
               : t('profile.providerKeys.editKeyDescription')}
           </Text>
+          {keyId === undefined || !form?.showsModelMappings ? null : (
+            <Text className="text-xs text-muted-foreground">
+              {t('profile.providerKeys.editKeyMappingsWarning')}
+            </Text>
+          )}
         </View>
         {form ? (
           <ProviderKeyCredentialForm
             form={form}
             mode={authMode}
-            onModeChange={setAuthMode}
+            onModeChange={changeAuthMode}
+            onEdit={clearFailureOnEdit}
             disabled={pending}
             values={valuesRef}
             mappings={mappingsRef}
@@ -311,6 +319,7 @@ export function ProviderKeyNewScreen() {
             error={fieldErrors.apiKey}
             onChangeText={value => {
               keyRef.current = value;
+              clearFailureOnEdit();
             }}
           />
         )}

@@ -387,6 +387,7 @@
       "edit": "Muokkaa avainta",
       "editKeyTitle": "Korvaa avain",
       "editKeyDescription": "Tallennettua arvoa ei voi näyttää. Korvaa se antamalla uusi arvo.",
+      "editKeyMappingsWarning": "Avaimen korvaaminen korvaa myös tallennetut mallien vastaavuudet: anna uudelleen kaikki vastaavuudet, joita vielä tarvitset.",
       "saveFailed": "Avaimen tallentaminen epäonnistui.",
       "invalidCredentials": "Tarkista tunnistetiedot ja yritä uudelleen.",
       "fieldRequired": "{{field}} on pakollinen.",

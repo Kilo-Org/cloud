@@ -387,6 +387,7 @@
       "edit": "Cuir an eochair in eagar",
       "editKeyTitle": "Athsholáthair an eochair",
       "editKeyDescription": "Ní féidir an luach stóráilte a thaispeáint. Cuir ceann nua isteach chun é a athsholáthar.",
+      "editKeyMappingsWarning": "Athsholáthraítear na mapálacha samhlacha stóráilte freisin nuair a athsholáthraítear an eochair: cuir isteach arís gach mapáil a bhfuil gá agat léi fós.",
       "saveFailed": "Níorbh fhéidir an eochair a shábháil.",
       "invalidCredentials": "Seiceáil na dintiúir agus bain triail eile as.",
       "fieldRequired": "Tá {{field}} riachtanach.",

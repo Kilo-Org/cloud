@@ -387,6 +387,7 @@
       "edit": "Whakatikahia te kī",
       "editKeyTitle": "Whakakapia te kī",
       "editKeyDescription": "Kāore e taea te whakaatu i te uara kua penapenahia. Tāurutia he uara hou hei whakakapi.",
+      "editKeyMappingsWarning": "Mā te whakakapi i te kī ka whakakapia hoki ngā hononga tauira kua penapenahia: tāurutia anō ia hononga e hiahia tonu ana koe.",
       "saveFailed": "Kāore i taea te penapena i te kī.",
       "invalidCredentials": "Tirohia ngā tohu tuakiri, ka ngana anō.",
       "fieldRequired": "E hiahiatia ana te {{field}}.",

@@ -387,6 +387,7 @@
       "edit": "ቁልፉን አርትዕ",
       "editKeyTitle": "ቁልፉን ተካ",
       "editKeyDescription": "የተቀመጠው እሴት ሊታይ አይችልም። ለመተካት አዲስ ያስገቡ።",
+      "editKeyMappingsWarning": "ቁልፉን መተካት የተቀመጡትን የሞዴል ማዛመጃዎችም ይተካል፦ አሁንም የሚያስፈልጉዎትን ማዛመጃዎች ሁሉ እንደገና ያስገቡ።",
       "saveFailed": "ቁልፉን ማስቀመጥ አልተቻለም።",
       "invalidCredentials": "የማረጋገጫ መረጃዎቹን ያረጋግጡ እና እንደገና ይሞክሩ።",
       "fieldRequired": "{{field}} ያስፈልጋል።",

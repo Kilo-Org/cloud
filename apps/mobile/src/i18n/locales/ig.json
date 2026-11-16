@@ -387,6 +387,7 @@
       "edit": "Dezie igodo",
       "editKeyTitle": "Dochie igodo",
       "editKeyDescription": "A pụghị igosi uru echekwara. Tinye nke ọhụrụ iji dochie ya.",
+      "editKeyMappingsWarning": "Ịdochi igodo na-edochikwa njikọ model echekwara: tinyegharịa njikọ ọ bụla ị ka chọrọ.",
       "saveFailed": "Enweghị ike ichekwa igodo ahụ.",
       "invalidCredentials": "Lelee ozi nbanye ahụ wee nwaa ọzọ.",
       "fieldRequired": "A chọrọ {{field}}.",

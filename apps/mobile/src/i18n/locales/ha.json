@@ -387,6 +387,7 @@
       "edit": "Gyara maɓalli",
       "editKeyTitle": "Maye gurbin maɓalli",
       "editKeyDescription": "Ba za a iya nuna ƙimar da aka adana ba. Shigar da sabuwa domin maye gurbinta.",
+      "editKeyMappingsWarning": "Maye gurbin maɓallin kuma yana maye gurbin taswirorin samfura da aka adana: sake shigar da duk taswirorin da ake buƙata.",
       "saveFailed": "Ba a iya adana maɓallin ba.",
       "invalidCredentials": "Duba takardun shaidar sannan ka sake gwadawa.",
       "fieldRequired": "Ana buƙatar {{field}}.",

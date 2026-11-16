@@ -387,6 +387,7 @@
       "edit": "Editar chave",
       "editKeyTitle": "Substituir chave",
       "editKeyDescription": "O valor armazenado não pode ser exibido. Insira um novo para substituí-lo.",
+      "editKeyMappingsWarning": "Substituir a chave também substitui os mapeamentos de modelos armazenados: insira novamente cada mapeamento de que ainda precisar.",
       "saveFailed": "Não foi possível salvar a chave.",
       "invalidCredentials": "Verifique as credenciais e tente novamente.",
       "fieldRequired": "O campo {{field}} é obrigatório.",

@@ -387,6 +387,7 @@
       "edit": "Kalitni tahrirlash",
       "editKeyTitle": "Kalitni almashtirish",
       "editKeyDescription": "Saqlangan qiymatni ko'rsatib bo'lmaydi. Uni almashtirish uchun yangisini kiriting.",
+      "editKeyMappingsWarning": "Kalitni almashtirish saqlangan model moslashuvlarini ham almashtiradi: sizga hali kerak bo'lgan har bir moslashuvni qayta kiriting.",
       "saveFailed": "Kalitni saqlab bo'lmadi.",
       "invalidCredentials": "Hisob ma'lumotlarini tekshirib, qaytadan urinib ko'ring.",
       "fieldRequired": "{{field}} kiritilishi shart.",

@@ -387,6 +387,7 @@
       "edit": "Editar a clave",
       "editKeyTitle": "Substituír a clave",
       "editKeyDescription": "O valor gardado non se pode amosar. Introduce un novo para substituílo.",
+      "editKeyMappingsWarning": "Substituír a clave tamén substitúe as correspondencias de modelos gardadas: introduce de novo todas as correspondencias que aínda necesites.",
       "saveFailed": "Non se puido gardar a clave.",
       "invalidCredentials": "Comproba as credenciais e téntao de novo.",
       "fieldRequired": "O campo {{field}} é obrigatorio.",

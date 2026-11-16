@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -156,7 +157,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
   const scope = providerKeyScope(organizationId);
   // A personal scope ignores the role it resolves; only an organization's
   // membership decides what the caller may do with the keys it reads.
-  const { role, isResolving } = useOrgBoundary(organizationId);
+  const { role, org, isResolving } = useOrgBoundary(organizationId);
   const permissions = providerKeyPermissions(scope, role);
   const scopeInput = providerKeyScopeInput(scope);
   const listKey = trpc.byok.list.queryKey(scopeInput);
@@ -227,10 +228,20 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
     });
   };
 
-  const permissionDenied = scope.kind === 'organization' && !isResolving && !permissions.canView;
+  if (scope.kind === 'organization' && (isResolving || org == null)) {
+    // Not resolved, a failed organization list, or an id the viewer is not a
+    // member of. The boundary owns all three, so a list that failed to load is
+    // retryable instead of reading as a membership this screen cannot verify.
+    return (
+      <OrganizationBoundary
+        title={t('profile.providerKeys.title')}
+        organizationIdOverride={organizationId}
+      />
+    );
+  }
 
   let body: ReactNode = null;
-  if (keys.isPending || (scope.kind === 'organization' && isResolving)) {
+  if (keys.isPending) {
     body = (
       <View className="gap-3">
         {SKELETON_ROWS.map(row => (
@@ -238,10 +249,6 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
         ))}
       </View>
     );
-  } else if (permissionDenied) {
-    // A non-retryable refusal: the caller is not a member of this organization,
-    // so no attempt against it can succeed.
-    body = <QueryError variant="permission" />;
   } else if (keys.isError) {
     // A terminal code (a refusal the server will repeat) gets the state its
     // cause names and no retry; anything else may answer differently next time.
@@ -304,7 +311,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
             ? t('profile.providerKeys.orgDescription')
             : t('profile.providerKeys.description')}
         </Text>
-        {scope.kind === 'organization' && permissions.canView && !permissions.canEdit ? (
+        {scope.kind === 'organization' && !permissions.canEdit ? (
           <Text variant="muted" className="text-xs">
             {t('profile.providerKeys.viewOnly')}
           </Text>

@@ -387,6 +387,7 @@
       "edit": "Kulcs szerkesztése",
       "editKeyTitle": "Kulcs cseréje",
       "editKeyDescription": "A tárolt érték nem jeleníthető meg. Adj meg egy újat a cseréjéhez.",
+      "editKeyMappingsWarning": "A kulcs cseréje a mentett modell-megfeleltetéseket is lecseréli: add meg újra az összes még szükséges megfeleltetést.",
       "saveFailed": "Nem sikerült menteni a kulcsot.",
       "invalidCredentials": "Ellenőrizd a hitelesítő adatokat, és próbáld újra.",
       "fieldRequired": "A(z) {{field}} mező kitöltése kötelező.",

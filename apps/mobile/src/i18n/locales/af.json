@@ -387,6 +387,7 @@
       "edit": "Wysig sleutel",
       "editKeyTitle": "Vervang sleutel",
       "editKeyDescription": "Die gestoorde waarde kan nie gewys word nie. Voer 'n nuwe een in om dit te vervang.",
+      "editKeyMappingsWarning": "Om die sleutel te vervang, vervang ook die gestoorde modelkoppelings: voer elke koppeling wat jy nog nodig het, weer in.",
       "saveFailed": "Kon nie die sleutel stoor nie.",
       "invalidCredentials": "Gaan die geloofsbriewe na en probeer weer.",
       "fieldRequired": "{{field}} is verpligtend.",

@@ -387,6 +387,7 @@
       "edit": "Editja ċ-ċavetta",
       "editKeyTitle": "Ibdel iċ-ċavetta",
       "editKeyDescription": "Il-valur maħżun ma jistax jintwera. Daħħal wieħed ġdid biex tissostitwih.",
+      "editKeyMappingsWarning": "Is-sostituzzjoni taċ-ċavetta tissostitwixxi wkoll il-mappjar tal-mudelli maħżun: daħħal mill-ġdid kull mappjar li għadek teħtieġ.",
       "saveFailed": "Iċ-ċavetta ma setgħetx tiġi ssejvjata.",
       "invalidCredentials": "Iċċekkja l-kredenzjali u erġa' pprova.",
       "fieldRequired": "Il-qasam {{field}} huwa meħtieġ.",

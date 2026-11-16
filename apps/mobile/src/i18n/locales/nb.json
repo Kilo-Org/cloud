@@ -387,6 +387,7 @@
       "edit": "Rediger nøkkel",
       "editKeyTitle": "Erstatt nøkkel",
       "editKeyDescription": "Den lagrede verdien kan ikke vises. Skriv inn en ny for å erstatte den.",
+      "editKeyMappingsWarning": "Når du erstatter nøkkelen, erstattes også de lagrede modelltilordningene: skriv inn alle tilordningene du fortsatt trenger.",
       "saveFailed": "Kunne ikke lagre nøkkelen.",
       "invalidCredentials": "Kontroller legitimasjonen og prøv igjen.",
       "fieldRequired": "{{field}} må fylles ut.",

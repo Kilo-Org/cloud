@@ -387,6 +387,7 @@
       "edit": "Hariri ufunguo",
       "editKeyTitle": "Badilisha ufunguo",
       "editKeyDescription": "Thamani iliyohifadhiwa haiwezi kuonyeshwa. Weka mpya ili kuibadilisha.",
+      "editKeyMappingsWarning": "Kubadilisha ufunguo pia hubadilisha ulinganishaji wa modeli uliohifadhiwa: weka tena kila ulinganishaji unaouhitaji.",
       "saveFailed": "Imeshindwa kuhifadhi ufunguo.",
       "invalidCredentials": "Kagua vitambulisho kisha ujaribu tena.",
       "fieldRequired": "{{field}} inahitajika.",

@@ -109,20 +109,31 @@ export function TriggerDetailScreen({
           isRetrying={query.isFetching}
         />
       );
-  } else if (query.data.canEdit) {
+  } else if (query.data.canEdit && query.data.targetType === 'cloud_agent') {
     body = <TriggerEditPanel detail={query.data} organizationId={organizationId} />;
   } else {
+    const editableTarget = query.data.canEdit;
     body = (
       <View className="gap-4">
-        <Text className="text-xs text-destructive">
-          {query.data.canEditReason === 'creator_run'
-            ? t('cloudAgent.triggers.cannotEditCreator')
-            : t('cloudAgent.triggers.permissionDenied')}
-        </Text>
+        {editableTarget ? null : (
+          <Text className="text-xs text-destructive">
+            {query.data.canEditReason === 'creator_run'
+              ? t('cloudAgent.triggers.cannotEditCreator')
+              : t('cloudAgent.triggers.permissionDenied')}
+          </Text>
+        )}
         {query.data.activationMode === 'scheduled' ? null : (
           <TriggerUrlCard url={query.data.inboundUrl} />
         )}
         <ReadOnlyTrigger detail={query.data} />
+        {editableTarget ? (
+          // A legacy KiloClaw Chat trigger that this viewer may write is still
+          // not a Cloud Agent one: this screen has no KiloClaw form, so it says
+          // where the trigger is managed instead of offering the wrong one.
+          <Text variant="muted" className="text-xs">
+            {t('common.manageOnWeb')}
+          </Text>
+        ) : null}
         <View className="gap-2">
           <Text className="text-sm font-medium text-foreground">
             {t('cloudAgent.triggers.deliveries')}

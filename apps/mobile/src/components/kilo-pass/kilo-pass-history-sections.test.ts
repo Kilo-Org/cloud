@@ -91,7 +91,11 @@ type SectionCase = {
   emptyCopy: string;
   /** The entry's description, printed on its row. */
   entryText: string;
-  render: (query: LedgerQuery, entries: 'none' | 'one') => Promise<TestRenderer.ReactTestRenderer>;
+  render: (
+    query: LedgerQuery,
+    entries: 'none' | 'one',
+    hasMore?: boolean
+  ) => Promise<TestRenderer.ReactTestRenderer>;
 };
 
 const SECTIONS: SectionCase[] = [
@@ -99,10 +103,10 @@ const SECTIONS: SectionCase[] = [
     name: 'credit',
     emptyCopy: 'No Kilo Pass credits yet.',
     entryText: CREDIT_DESCRIPTION,
-    render: (query, entries) =>
+    render: (query, entries, hasMore = false) =>
       renderElement(
         createElement(KiloPassCreditHistorySection, {
-          history: { query, entries: entries === 'one' ? [CREDIT_ENTRY] : [], hasMore: false },
+          history: { query, entries: entries === 'one' ? [CREDIT_ENTRY] : [], hasMore },
         })
       ),
   },
@@ -110,10 +114,10 @@ const SECTIONS: SectionCase[] = [
     name: 'billing',
     emptyCopy: 'No billing history yet.',
     entryText: BILLING_DESCRIPTION,
-    render: (query, entries) =>
+    render: (query, entries, hasMore = false) =>
       renderElement(
         createElement(KiloPassBillingHistorySection, {
-          history: { query, entries: entries === 'one' ? [BILLING_ENTRY] : [], hasMore: false },
+          history: { query, entries: entries === 'one' ? [BILLING_ENTRY] : [], hasMore },
         })
       ),
   },
@@ -146,6 +150,13 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
 /** The retry affordance: a control the screen reader names "Retry". */
 function retryControls(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
   return renderer.root.findAll(node => node.props.accessibilityLabel === 'Retry');
+}
+
+/** The paging affordance: a control the screen reader names "Load more". */
+function loadMoreControls(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => node.props.accessibilityLabel === 'Load more');
 }
 
 describe.each(SECTIONS)('$name history section', section => {
@@ -187,6 +198,41 @@ describe.each(SECTIONS)('$name history section', section => {
       expect(allText(renderer)).toContain("Couldn't load");
       expect(retryControls(renderer)).toHaveLength(0);
       expect(nodesOfType(renderer, 'Pressable')).toHaveLength(0);
+      renderer.unmount();
+    }
+  );
+
+  it('offers Load more while the next page has not failed', async () => {
+    const renderer = await section.render(ledgerQuery(), 'one', true);
+    expect(loadMoreControls(renderer)).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('replaces Load more with one Retry when a later page failed retryably', async () => {
+    const renderer = await section.render(
+      ledgerQuery({ isFetchNextPageError: true, error: RETRYABLE_ERROR }),
+      'one',
+      true
+    );
+    expect(allText(renderer)).toContain("Couldn't load more");
+    // The failed page's own line owns the affordance; the button that started it
+    // would only fail again.
+    expect(loadMoreControls(renderer)).toHaveLength(0);
+    expect(retryControls(renderer)).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it.each(PERMANENT_ERRORS)(
+    'leaves no affordance when a later page failed with $code',
+    async permanent => {
+      const renderer = await section.render(
+        ledgerQuery({ isFetchNextPageError: true, error: { data: { code: permanent.code } } }),
+        'one',
+        true
+      );
+      expect(allText(renderer)).toContain("Couldn't load more");
+      expect(loadMoreControls(renderer)).toHaveLength(0);
+      expect(retryControls(renderer)).toHaveLength(0);
       renderer.unmount();
     }
   );

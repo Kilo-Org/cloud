@@ -160,7 +160,7 @@ export function KiloPassCreditHistorySection({
   return (
     <HistorySection title={t('common.creditHistory')}>
       {body}
-      {hasMore && (
+      {hasMore && !query.isFetchNextPageError && (
         <Button
           variant="outline"
           size="sm"
@@ -232,7 +232,7 @@ export function KiloPassBillingHistorySection({
   return (
     <HistorySection title={t('kiloPass.manage.billingHistory')}>
       {body}
-      {hasMore && (
+      {hasMore && !query.isFetchNextPageError && (
         <Button
           variant="outline"
           size="sm"

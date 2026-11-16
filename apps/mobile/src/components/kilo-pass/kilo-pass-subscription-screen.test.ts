@@ -265,8 +265,9 @@ describe('KiloPassSubscriptionScreen', () => {
 
     expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
     expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
-    // The ended page reports history only: no manage, cancel, or buy action.
-    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    // Manage, cancel and buy live in the management block, and a lapsed page
+    // does not render it at all.
+    expect(nodesOfType(renderer, 'KiloPassManagementSections')).toHaveLength(0);
     renderer.unmount();
   });
 

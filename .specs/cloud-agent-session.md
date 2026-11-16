@@ -302,7 +302,8 @@ repository.
 5. If a snapshot start fails transiently, the session MUST retry the same
    snapshot within the preparation deadline. Each attempt MUST have its own
    bound, so a slow or timed-out first attempt MUST NOT prevent the retry. A
-   permanent failure MUST fail with a specific reason that asks to rebuild the
+   slow stop of the failed attempt MUST NOT prevent the retry while the stop
+   completes within its own bound. A permanent failure MUST fail with a specific reason that asks to rebuild the
    environment. A repeated transient failure MUST ask the user to send the
    message again and rebuild only if the failure repeats. In both cases, the
    session MUST NOT continue from the base image.
@@ -359,7 +360,8 @@ repository.
     New chats MUST attach without resetting files.
 12. A transient provider failure MUST retry the same snapshot within the preparation deadline.
     Each attempt MUST have its own bound, so a slow or timed-out first attempt MUST NOT
-    prevent the retry. An expired, missing or incompatible snapshot, an incompatible peer,
+    prevent the retry. A slow stop of the failed attempt MUST NOT prevent the retry while the
+    stop completes within its own bound. An expired, missing or incompatible snapshot, an incompatible peer,
     a permanent or repeated provider failure, or a failed restore step MUST fail with a
     specific reason, keep the
     snapshot and queued message identity, and MUST NOT fall back to another source. That

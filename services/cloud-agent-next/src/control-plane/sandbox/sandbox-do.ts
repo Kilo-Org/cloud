@@ -6284,17 +6284,31 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return latest.kind !== 'creating' || latest.allocationId !== allocationId;
   }
 
+  /**
+   * Stops the failed launch before the retry starts the same sandbox again. A
+   * container wedged in a snapshot start can take minutes to destroy, so the
+   * stop repeats with the ladder's pauses until it is confirmed or the next
+   * attempt would end after the retry stop bound.
+   */
   private async stopForSnapshotRetry(
     createdRef: string,
     allocationId: string
   ): Promise<
     { result: 'retry' | 'owned' } | { result: 'failed'; errorName: string; cause: string }
   > {
-    if (await this.allocationOwnedElsewhere(allocationId)) return { result: 'owned' };
-    const stopped = await this.stopRef(createdRef, allocationId);
-    return stopped.confirmed
-      ? { result: 'retry' }
-      : { result: 'failed', errorName: stopped.errorName, cause: stopped.cause };
+    const timers = this.sandboxTimers();
+    const stopDeadline = Date.now() + timers.snapshotRetryStopMs;
+    const pauses = timers.providerStopLadderMs;
+    for (let stopAttempt = 0; ; stopAttempt += 1) {
+      if (await this.allocationOwnedElsewhere(allocationId)) return { result: 'owned' };
+      const stopped = await this.stopRef(createdRef, allocationId);
+      if (stopped.confirmed) return { result: 'retry' };
+      const pauseMs = pauses[Math.min(stopAttempt, pauses.length - 1)] ?? 0;
+      if (Date.now() + pauseMs + timers.providerStopAttemptMs > stopDeadline) {
+        return { result: 'failed', errorName: stopped.errorName, cause: stopped.cause };
+      }
+      await new Promise(resolve => setTimeout(resolve, pauseMs));
+    }
   }
 
   private snapshotStartFailure(

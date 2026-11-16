@@ -50,7 +50,6 @@ function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
 describe('visibleOrgSettingsRows', () => {
   it('lists every area for an owner of an enterprise organization', () => {
     expect(areas()).toEqual([
-      'usageDetails',
       'providersAndModels',
       'guardrails',
       'byok',
@@ -64,20 +63,15 @@ describe('visibleOrgSettingsRows', () => {
   });
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
-    expect(areas({ role: 'member' })).toEqual(['usageDetails', 'ssoAndDomain', 'integrations']);
+    expect(areas({ role: 'member' })).toEqual(['ssoAndDomain', 'integrations']);
   });
 
   it('drops the enterprise-only rows for a member on teams', () => {
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual([
-      'usageDetails',
-      'dataCollection',
-      'integrations',
-    ]);
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['dataCollection', 'integrations']);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
-      'usageDetails',
       'guardrails',
       'byok',
       'emailPreferences',
@@ -111,9 +105,6 @@ describe('visibleOrgSettingsRows', () => {
     const rows = visibleOrgSettingsRows(gate(), 'org_1');
     const byArea = new Map(rows.map(row => [row.area, row]));
     expect(
-      byArea.get('usageDetails')?.url.endsWith('/organizations/org_1/usage-details?view=ai-usage')
-    ).toBe(true);
-    expect(
       byArea.get('subOrganizations')?.url.endsWith('/organizations/org_1/sub-organizations')
     ).toBe(true);
     expect(
@@ -136,6 +127,7 @@ describe('visibleOrgSettingsRows', () => {
       for (const plan of ['enterprise', 'teams'] as const) {
         const rows = areas({ role, plan });
         expect(rows).not.toContain('auditLogs');
+        expect(rows).not.toContain('usageDetails');
         expect(rows).not.toContain('customModes');
         expect(rows).not.toContain('groups');
       }
@@ -144,19 +136,19 @@ describe('visibleOrgSettingsRows', () => {
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns custom modes and the audit log to every billing role on enterprise', () => {
+  it('returns every in-app area to a billing role on enterprise', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
-      expect(inAppAreas({ role })).toEqual(['customModes', 'groups', 'auditLogs']);
+      expect(inAppAreas({ role })).toEqual(['customModes', 'groups', 'usageDetails', 'auditLogs']);
     }
   });
 
-  it('returns custom modes and groups to a member on enterprise', () => {
-    expect(inAppAreas({ role: 'member' })).toEqual(['customModes', 'groups']);
-    expect(inAppAreas({ role: undefined })).toEqual(['customModes', 'groups']);
+  it('keeps custom modes, groups and usage for a member of an enterprise organization', () => {
+    expect(inAppAreas({ role: 'member' })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ role: undefined })).toEqual(['customModes', 'groups', 'usageDetails']);
   });
 
-  it('returns custom modes alone on the teams plan', () => {
-    expect(inAppAreas({ plan: 'teams' })).toEqual(['customModes']);
+  it('keeps custom modes and usage on the teams plan', () => {
+    expect(inAppAreas({ plan: 'teams' })).toEqual(['customModes', 'usageDetails']);
   });
 
   it('opens the native screen that owns each setting', () => {
@@ -164,6 +156,7 @@ describe('visibleInAppSettingsRows', () => {
     const byArea = new Map(rows.map(row => [row.area, row]));
     expect(byArea.get('customModes')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/modes');
     expect(byArea.get('groups')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/groups');
+    expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
   });
 });

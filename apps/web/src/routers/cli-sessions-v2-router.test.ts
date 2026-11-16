@@ -2158,6 +2158,21 @@ describe('cli-sessions-v2-router', () => {
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
 
+    it('get answers a spent mobile budget retryably instead of reading the session', async () => {
+      // The mobile procedure budget must not be consumed by this read: the
+      // caller sees a retryable answer instead of an opaque internal error.
+      const caller = await createCallerForUser(regularUser.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session details took too long to load. Try again.',
+      });
+    });
+
     it('get distinguishes a session owned by another account from one that does not exist', async () => {
       // The session exists (created for regularUser in beforeEach) but the
       // caller is a different signed-in account: an access denial, not a

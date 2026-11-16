@@ -87,6 +87,7 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import {
   FORK_CUT_NOT_SYNCED_KEY,
   resolveCloneCapabilityRefusal,
@@ -156,6 +157,7 @@ export function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { t } = useTranslation();
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const searchParams = useLocalSearchParams<{
@@ -617,8 +619,8 @@ export function NewSessionScreenBody() {
         setOverrideProfileId(id);
       },
     });
-    router.push('/(app)/agent-chat/profile-picker' as Href);
-  }, [organizationId, overrideProfileId, router]);
+    pushOnce('/(app)/agent-chat/profile-picker' as Href);
+  }, [organizationId, overrideProfileId, pushOnce]);
 
   const handleOpenRepoDefaults = useCallback(() => {
     // The composer's own Stack, so Back returns here with the draft instead of

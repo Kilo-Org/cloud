@@ -218,6 +218,56 @@ export async function readResponseText(
   }
 }
 
+/**
+ * Rewrites a non-streamed JSON response body in place with `mutate`. A body that is not valid
+ * JSON, or whose JSON is not an object, passes through unchanged. A body that cannot be read
+ * returns the read-error response.
+ */
+export async function rewriteJsonResponse<Body extends object>({
+  response,
+  headers,
+  vercelRequestId,
+  capture,
+  reasoningEffort,
+  mutate,
+}: {
+  response: Response;
+  headers: Headers;
+  vercelRequestId: string | null | undefined;
+  capture: RequestLogCapture | null;
+  reasoningEffort: string | null;
+  mutate: (body: Body) => void;
+}): Promise<NextResponse> {
+  // Read the body text once to avoid "Response body object should not be
+  // disturbed or locked" errors that occur when `.clone().json()` fails.
+  const textResult = await readResponseText(
+    response,
+    headers,
+    vercelRequestId,
+    capture,
+    reasoningEffort
+  );
+  if ('errorResponse' in textResult) {
+    capture?.setReadError(textResult.error);
+    return textResult.errorResponse;
+  }
+  const { text } = textResult;
+  capture?.setBody(text);
+  const init = { status: response.status, statusText: response.statusText, headers };
+  let body: Body | null;
+  try {
+    body = JSON.parse(text) as Body | null;
+  } catch {
+    // Upstream returned invalid/empty JSON body — pass through as-is
+    return new NextResponse(text, init);
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return new NextResponse(text, init);
+  }
+  mutate(body);
+  return NextResponse.json(body, init);
+}
+
 export function partialCapturedBody(capturedChunks: string[] | null): string | undefined {
   return capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined;
 }
@@ -304,7 +354,7 @@ export async function rewriteSseStream(
  * BYOK and subscription-funded requests at zero. Shared by every endpoint whose response carries
  * an OpenRouter-style `usage` object.
  */
-export function rewriteUsageCost(
+function rewriteUsageCost(
   usage: ResponseUsage,
   costs: JustTheCostsUsageStats,
   context: ResponseUsageContext,
@@ -332,6 +382,40 @@ export function rewriteUsageCost(
   delete usage.gateway_cost;
 }
 
+/**
+ * Prices `usage` from its token counts and replaces its cost fields with what Kilo bills.
+ * Vercel reports its cost in the provider metadata, which `preferVercelCost` allows when the usage
+ * carries no cost of its own. Returns the computed costs.
+ */
+export function rewriteUsageFromTokens({
+  usage,
+  context,
+  providerMetadata,
+  tokens,
+  preferVercelCost,
+}: {
+  usage: ResponseUsage;
+  context: ResponseUsageContext;
+  providerMetadata: VercelProviderMetaData | undefined;
+  tokens: Pick<
+    JustTheCostsUsageStats,
+    'inputTokens' | 'outputTokens' | 'cacheHitTokens' | 'cacheWriteTokens'
+  >;
+  preferVercelCost: boolean;
+}): JustTheCostsUsageStats {
+  const gateway = providerMetadata?.gateway;
+  const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
+  const costs: JustTheCostsUsageStats = {
+    ...(preferVercelCost && usage.cost == null && usage.is_byok == null && vercelCosts
+      ? vercelCosts
+      : computeOpenRouterCosts(usage, context.provider)),
+    ...tokens,
+    is_byok: usage.is_byok ?? null,
+  };
+  rewriteUsageCost(usage, costs, context, gateway, vercelCosts);
+  return costs;
+}
+
 export function rewriteUsage(
   usage: ResponseUsage,
   context: ResponseUsageContext,
@@ -352,23 +436,24 @@ export function rewriteUsage(
     : isMessages
       ? (usage.cache_creation_input_tokens ?? startUsage?.cache_creation_input_tokens ?? 0)
       : (usage.input_tokens_details?.cache_write_tokens ?? 0);
-  const gateway = providerMetadata?.gateway;
-  const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
-  const costs: JustTheCostsUsageStats = {
-    ...(!isChat && usage.cost == null && usage.is_byok == null && vercelCosts
-      ? vercelCosts
-      : computeOpenRouterCosts(usage, context.provider)),
-    inputTokens: isChat
-      ? (usage.prompt_tokens ?? 0)
-      : isMessages
-        ? (usage.input_tokens ?? startUsage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens
-        : (usage.input_tokens ?? 0),
-    outputTokens: isChat ? (usage.completion_tokens ?? 0) : (usage.output_tokens ?? 0),
-    cacheHitTokens,
-    cacheWriteTokens,
-    is_byok: usage.is_byok ?? null,
-  };
-  rewriteUsageCost(usage, costs, context, gateway, vercelCosts);
+  rewriteUsageFromTokens({
+    usage,
+    context,
+    providerMetadata,
+    tokens: {
+      inputTokens: isChat
+        ? (usage.prompt_tokens ?? 0)
+        : isMessages
+          ? (usage.input_tokens ?? startUsage?.input_tokens ?? 0) +
+            cacheHitTokens +
+            cacheWriteTokens
+          : (usage.input_tokens ?? 0),
+      outputTokens: isChat ? (usage.completion_tokens ?? 0) : (usage.output_tokens ?? 0),
+      cacheHitTokens,
+      cacheWriteTokens,
+    },
+    preferVercelCost: !isChat,
+  });
   if (usage.prompt_tokens_details) {
     if (usage.prompt_tokens_details.cached_tokens === undefined) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent

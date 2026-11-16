@@ -1,22 +1,14 @@
 import type { CustomPricingConfig } from '@kilocode/db/schema-types';
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import {
   getOutputHeaders,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
-  computeOpenRouterCosts,
-  computeVercelCostFields,
-  extractVercelIsByok,
-} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
-import type {
-  JustTheCostsUsageStats,
-  MicrodollarUsageContext,
-} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import {
-  readResponseText,
+  rewriteJsonResponse,
   rewriteResponseMetadata,
-  rewriteUsageCost,
+  rewriteUsageFromTokens,
   type ResponseMetadata,
   type ResponseUsage,
   type ResponseUsageContext,
@@ -55,20 +47,19 @@ export function rewriteUsageEndpointBody(body: UsageEndpointBody, context: Respo
     context.api_kind === 'audio_transcriptions' && usage?.is_byok == null && !context.is_free;
   if (typeof usage === 'object' && usage !== null && !Array.isArray(usage)) {
     const reported = { cost: usage.cost, is_byok: usage.is_byok, cost_details: usage.cost_details };
-    // Vercel reports its cost in the body's provider metadata when `usage.cost` is absent.
-    const gateway = (body.provider_metadata ?? body.providerMetadata)?.gateway;
-    const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
-    const costs: JustTheCostsUsageStats = {
-      ...(usage.cost == null && usage.is_byok == null && vercelCosts
-        ? vercelCosts
-        : computeOpenRouterCosts(usage, context.provider)),
-      inputTokens: usage.prompt_tokens ?? usage.input_tokens ?? 0,
-      outputTokens: usage.completion_tokens ?? usage.output_tokens ?? 0,
-      cacheHitTokens: 0,
-      cacheWriteTokens: 0,
-      is_byok: usage.is_byok ?? null,
-    };
-    rewriteUsageCost(usage, costs, context, gateway, vercelCosts);
+    const costs = rewriteUsageFromTokens({
+      usage,
+      context,
+      // Vercel reports its cost in the body's provider metadata when `usage.cost` is absent.
+      providerMetadata: body.provider_metadata ?? body.providerMetadata,
+      tokens: {
+        inputTokens: usage.prompt_tokens ?? usage.input_tokens ?? 0,
+        outputTokens: usage.completion_tokens ?? usage.output_tokens ?? 0,
+        cacheHitTokens: 0,
+        cacheWriteTokens: 0,
+      },
+      preferVercelCost: true,
+    });
     if (costIsUnverified && costs.cost_mUsd === costs.market_cost) {
       for (const [key, value] of Object.entries(reported)) {
         if (value === undefined) delete usage[key as keyof typeof reported];
@@ -98,29 +89,12 @@ export async function rewriteModelResponse_UsageEndpoint({
   if (!response.headers.get('content-type')?.includes('application/json')) {
     return wrapInSafeNextResponse(response);
   }
-  const headers = getOutputHeaders(response);
-  const textResult = await readResponseText(response, headers, vercelRequestId, null, null);
-  if ('errorResponse' in textResult) return textResult.errorResponse;
-  const { text } = textResult;
-
-  const passThrough = () =>
-    new NextResponse(text, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    return passThrough();
-  }
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return passThrough();
-
-  rewriteUsageEndpointBody(body, usageContext);
-  return NextResponse.json(body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
+  return rewriteJsonResponse<UsageEndpointBody>({
+    response,
+    headers: getOutputHeaders(response),
+    vercelRequestId,
+    capture: null,
+    reasoningEffort: null,
+    mutate: body => rewriteUsageEndpointBody(body, usageContext),
   });
 }

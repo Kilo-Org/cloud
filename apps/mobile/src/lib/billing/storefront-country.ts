@@ -1,4 +1,4 @@
-import { withStoreDeadline } from '@/lib/iap/store-call-deadline';
+import { isStoreDeadlineError, withStoreDeadline } from '@/lib/iap/store-call-deadline';
 
 /**
  * The one storefront whose review guideline permits an in-app link to a web
@@ -8,11 +8,18 @@ export const US_STOREFRONT_COUNTRY = 'USA';
 
 /**
  * The last country the store answered with, for the life of the process. Only
- * a successful read is kept: a storefront that failed or hung must be asked
- * again on the next surface that needs it, so one transient failure cannot pin
- * every later screen to plain text.
+ * a successful read is kept: a storefront that answered with a failure must be
+ * asked again on the next surface that needs it, so one transient failure
+ * cannot pin every later screen to plain text.
  */
 let answeredCountry: string | null = null;
+
+/**
+ * A read already missed the store deadline, so the store stays hung and must
+ * not be asked again (the SDK has no cancellation, and every further call would
+ * spend another deadline). Later reads answer `null` without touching the store.
+ */
+let readExpired = false;
 
 /** One read in flight, so several surfaces mounting together ask the store once. */
 let pendingRead: Promise<string | null> | null = null;
@@ -29,11 +36,16 @@ export function cachedStorefrontCountry(): string | null {
  * The read is bounded by the shared store deadline: StoreKit can leave a cold
  * call unsettled, and a screen that waits forever for a link decision would
  * never settle its own layout. A deadline or a rejection is reported as an
- * unknown country, which every caller treats as "no link".
+ * unknown country, which every caller treats as "no link". Only a rejection is
+ * retried later; a deadline means the store stays hung, so no further read is
+ * issued for the life of the process.
  */
 export function readStorefrontCountry(): Promise<string | null> {
   if (answeredCountry != null) {
     return Promise.resolve(answeredCountry);
+  }
+  if (readExpired) {
+    return Promise.resolve(null);
   }
   pendingRead ??= readOnce();
   return pendingRead;
@@ -48,7 +60,10 @@ async function readOnce(): Promise<string | null> {
     const country = await withStoreDeadline(getStorefront(), 'the App Store storefront');
     answeredCountry = country;
     return country;
-  } catch {
+  } catch (error) {
+    if (isStoreDeadlineError(error)) {
+      readExpired = true;
+    }
     return null;
   } finally {
     pendingRead = null;

@@ -11,8 +11,9 @@ import { cachedStorefrontCountry, readStorefrontCountry } from '@/lib/billing/st
  * so every unsettled case renders plain text: a pending read, a failed read and
  * a country the store did not name. A country the store did answer with is kept
  * for the session, so later surfaces paint settled on their first frame; a
- * failure is not kept, and the next mount asks again. Android never asks the
- * store, because no storefront may show the link there.
+ * failure is not kept, and the next mount asks again, while a read that missed
+ * the store deadline stops further reads for the process. Android never asks
+ * the store, because no storefront may show the link there.
  */
 export function useCanLinkExternalPurchase(): boolean {
   const platformOS = Platform.OS;

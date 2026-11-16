@@ -7,9 +7,10 @@
  * "try again", the second is a defect or a refusal — so the classification
  * lives here instead of being re-derived from message text at every call site.
  *
- * Cloudflare marks its own transient failures with `retryable: true` when the
- * flag survives the RPC boundary; the text checks below cover the same
- * families for the cases where it does not (cross-colo RPC drops the flag).
+ * Cloudflare marks its own transient failures with `retryable: true` and its
+ * infrastructure overloads with `overloaded: true` when the flag survives the
+ * RPC boundary; the text checks below cover the same families for the cases
+ * where it does not (cross-colo RPC drops the flags).
  * Both are platform text, never application text, so an application error is
  * never retryable by accident.
  */
@@ -31,6 +32,12 @@ const OVERLOADED_PREFIX = 'Durable Object is overloaded.';
 export function isTransientDurableObjectFailure(error: unknown): boolean {
   if (error === null || typeof error !== 'object') return false;
   if ('retryable' in error && error.retryable === true) return true;
+  // Cloudflare marks an infrastructure overload with `overloaded` rather than
+  // `retryable` (an overload must not be retried immediately), and it may drop
+  // either flag when the exception crosses an RPC boundary. The caller's answer
+  // is still "come back later", so it belongs here; the immediate retry loop
+  // keys on `retryable` alone.
+  if ('overloaded' in error && error.overloaded === true) return true;
   if (!('message' in error) || typeof error.message !== 'string') return false;
   const message = error.message;
   return (

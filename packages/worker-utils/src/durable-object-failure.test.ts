@@ -32,6 +32,23 @@ describe('isTransientDurableObjectFailure', () => {
     }
   });
 
+  it('accepts an infrastructure overload marked only with the overloaded flag', () => {
+    // Cloudflare sets `overloaded` on infrastructure overloads and does not set
+    // `retryable`; the message wording is undocumented and may change.
+    const error = Object.assign(new Error('Too much traffic for this object'), {
+      overloaded: true,
+    });
+    expect(isTransientDurableObjectFailure(error)).toBe(true);
+  });
+
+  it('rejects an answer the platform flagged as non-transient', () => {
+    expect(
+      isTransientDurableObjectFailure(
+        Object.assign(new Error('Ticket already consumed'), { retryable: false, overloaded: false })
+      )
+    ).toBe(false);
+  });
+
   it('rejects an operation that answered with its own error', () => {
     expect(isTransientDurableObjectFailure(new Error('Ticket already consumed'))).toBe(false);
     expect(isTransientDurableObjectFailure(new Error('Session not found'))).toBe(false);

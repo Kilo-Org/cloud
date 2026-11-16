@@ -85,6 +85,13 @@ export const kilo2MessageSchema = z
   })
   .passthrough();
 export type Kilo2Message = z.infer<typeof kilo2MessageSchema>;
+
+/**
+ * Copied byte for byte into `services/cloud-agent-next` by
+ * `scripts/sync-kilo2-contracts.mjs`, and that service's Docker build context holds
+ * no workspace packages. This file must stay self-contained, so the session id
+ * prefix is written out here rather than imported from `./kilo-session-id`.
+ */
 export const kilo2SessionSchema = z.object({
   id: z.string().startsWith('ses_'),
   parentID: z.string().optional(),

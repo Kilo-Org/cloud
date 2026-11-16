@@ -2,8 +2,21 @@ import * as z from 'zod';
 
 import { encodeBase62 } from './base62';
 
-/** `ses_`, a descending 12-hex-character time prefix, then 14 base62 characters. */
-export const KILO_SESSION_ID_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
+export const KILO_SESSION_ID_PREFIX = 'ses_';
+export const KILO_SESSION_ID_TIME_LENGTH = 12;
+export const KILO_SESSION_ID_RANDOM_LENGTH = 14;
+
+export const KILO_SESSION_ID_LENGTH =
+  KILO_SESSION_ID_PREFIX.length + KILO_SESSION_ID_TIME_LENGTH + KILO_SESSION_ID_RANDOM_LENGTH;
+
+/**
+ * `ses_`, a descending 12-hex-character time prefix, then 14 base62 characters.
+ * Every other reader of the id shape derives from the declarations above, so a
+ * change to the prefix or a length cannot leave one of them on the old shape.
+ */
+export const KILO_SESSION_ID_PATTERN = new RegExp(
+  `^${KILO_SESSION_ID_PREFIX}[0-9a-f]{${KILO_SESSION_ID_TIME_LENGTH}}[0-9A-Za-z]{${KILO_SESSION_ID_RANDOM_LENGTH}}$`
+);
 
 /**
  * A session id as the session store addresses it. Reads must accept every id a
@@ -33,13 +46,11 @@ function descendingTimestampHex(): string {
   // 6-byte mask (48 bits) — invert so newer timestamps sort first
   const descending = ~tick & BigInt(0xffff_ffff_ffff);
 
-  return descending.toString(16).padStart(12, '0');
+  return descending.toString(16).padStart(KILO_SESSION_ID_TIME_LENGTH, '0');
 }
-
-const KILO_SESSION_ID_RANDOM_LENGTH = 14;
 
 export function generateKiloSessionId(): string {
   const bytes = new Uint8Array(KILO_SESSION_ID_RANDOM_LENGTH);
   crypto.getRandomValues(bytes);
-  return `ses_${descendingTimestampHex()}${encodeBase62(bytes)}`;
+  return `${KILO_SESSION_ID_PREFIX}${descendingTimestampHex()}${encodeBase62(bytes)}`;
 }

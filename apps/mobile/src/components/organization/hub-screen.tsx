@@ -68,6 +68,31 @@ type OrganizationHubScreenProps = Readonly<{
   organizationIdOverride?: string;
 }>;
 
+/** Whether the rename control offers the dialog, or states why it cannot. */
+type RenameControl =
+  | { kind: 'ready'; onPress: () => void }
+  | { kind: 'blocked'; reason: string };
+
+/**
+ * The rename control's props for its state. A blocked control keeps the same
+ * box and therefore the same header width: the title beside it cannot reflow to
+ * another line. It is dimmed the way the shared Button dims a disabled
+ * non-primary control, and the reason travels as the control's hint, so the
+ * node reads its label, its disabled state, then the explanation the plan
+ * refusal block above already paints.
+ */
+function renameControlProps(control: RenameControl) {
+  if (control.kind === 'ready') {
+    return { onPress: control.onPress };
+  }
+  return {
+    disabled: true,
+    className: 'opacity-50',
+    accessibilityHint: control.reason,
+    accessibilityState: { disabled: true },
+  };
+}
+
 export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHubScreenProps = {}) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -196,6 +221,20 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     ? t('organization.hub.planEnded')
     : t('common.organizationTrialEnded');
 
+  // The rename control's two states. `organizations.update` runs on the
+  // organization billing mutation procedure, which refuses every mutation once
+  // `classifyOrganizationEntitlement` reports the hard-expired trial, and that is
+  // the same server verdict `planEnded` reads. A lapsed plan therefore states the
+  // blocker on the control instead of opening a field whose save cannot succeed.
+  const renameControl: RenameControl = planEnded
+    ? { kind: 'blocked', reason: t('organization.hub.planEnded') }
+    : {
+        kind: 'ready',
+        onPress: () => {
+          setRenameVisible(true);
+        },
+      };
+
   // The in-app destinations the hub opens itself, and the only card rows that
   // need no payload: their gate reads the role and the plan, which the
   // organization row decides before this screen renders.
@@ -231,10 +270,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         headerRight={
           showMoney ? (
             <IconButton
-              onPress={() => {
-                setRenameVisible(true);
-              }}
               accessibilityLabel={t('organization.hub.renameTitle')}
+              {...renameControlProps(renameControl)}
             >
               <Pencil size={16} color={colors.mutedForeground} />
             </IconButton>

@@ -572,6 +572,57 @@ describe('OrganizationHubScreen rename control', () => {
     unmount();
   });
 
+  it('states why a lapsed plan cannot rename, keeping the box and the control disabled', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const controls = findRenameControl(renderer.root);
+    expect(controls).toHaveLength(1);
+    const control = controls[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+
+    // The server refuses every rename while the trial is expired, so the control
+    // says why instead of opening a field whose save cannot succeed.
+    expect(control.props.disabled).toBe(true);
+    expect(control.props.accessibilityState).toEqual({ disabled: true });
+    expect(control.props.accessibilityHint).toBe(i18n.t('organization.hub.planEnded'));
+    expect(control.props.onPress).toBeUndefined();
+
+    // The control keeps the header's box, so the title above it does not move.
+    expect(sideFromClass(control.props.className, 'h')).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(sideFromClass(control.props.className, 'w')).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(String(control.props.className)).toContain('opacity-50');
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(0);
+    unmount();
+  });
+
+  it('leaves the control enabled and unannotated on an active plan', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const controls = findRenameControl(renderer.root);
+    expect(controls).toHaveLength(1);
+    const control = controls[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+
+    expect(control.props.disabled).not.toBe(true);
+    expect(control.props.accessibilityHint).toBeUndefined();
+    expect(control.props.accessibilityState).toBeUndefined();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(0);
+    act(() => {
+      (control.props.onPress as () => void)();
+    });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(1);
+    unmount();
+  });
+
   it('opens the rename sheet on the whole stored name, up to the server limit', async () => {
     // `RenameModal`'s own default is shorter than a stored organization name can
     // be, and React Native applies `maxLength` to the seeded value: the dialog

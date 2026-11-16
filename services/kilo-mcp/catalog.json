@@ -3833,64 +3833,69 @@
             {
               "anyOf": [
                 {
-                  "type": "string",
-                  "enum": [
-                    "anthropic",
-                    "azure",
-                    "bedrock",
-                    "cohere",
-                    "deepseek",
-                    "fireworks",
-                    "gmicloud",
-                    "google",
-                    "inception",
-                    "openai",
-                    "minimax",
-                    "mistral",
-                    "moonshotai",
-                    "nebius",
-                    "novita",
-                    "perplexity",
-                    "vertex",
-                    "xai",
-                    "xiaomi",
-                    "zai"
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "anthropic",
+                        "azure",
+                        "bedrock",
+                        "cohere",
+                        "deepseek",
+                        "fireworks",
+                        "gmicloud",
+                        "google",
+                        "inception",
+                        "openai",
+                        "minimax",
+                        "mistral",
+                        "moonshotai",
+                        "nebius",
+                        "novita",
+                        "perplexity",
+                        "vertex",
+                        "xai",
+                        "xiaomi",
+                        "zai"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "alibaba-token-plan",
+                        "bedrock-byok",
+                        "byteplus-coding",
+                        "chutes-byok",
+                        "edenai",
+                        "kimi-coding",
+                        "inceptron-byok",
+                        "martian",
+                        "morph-byok",
+                        "neuralwatt",
+                        "nvidia-byok",
+                        "ollama-cloud",
+                        "opencode-go",
+                        "orcarouter",
+                        "synthetic",
+                        "vertex-byok",
+                        "xiaomi-token-plan-ams",
+                        "xiaomi-token-plan-sgp",
+                        "zai-coding",
+                        "codestral"
+                      ]
+                    }
                   ]
                 },
                 {
                   "type": "string",
                   "enum": [
-                    "alibaba-token-plan",
-                    "bedrock-byok",
-                    "byteplus-coding",
-                    "chutes-byok",
-                    "edenai",
-                    "kimi-coding",
-                    "inceptron-byok",
-                    "martian",
-                    "morph-byok",
-                    "neuralwatt",
-                    "nvidia-byok",
-                    "ollama-cloud",
-                    "opencode-go",
-                    "orcarouter",
-                    "synthetic",
-                    "vertex-byok",
-                    "xiaomi-token-plan-ams",
-                    "xiaomi-token-plan-sgp",
-                    "zai-coding",
-                    "codestral"
+                    "vercel-ai-gateway",
+                    "openrouter"
                   ]
                 }
               ]
             },
-            {
-              "type": "string",
-              "enum": [
-                "vercel-ai-gateway",
-                "openrouter"
-              ]
-            }
+            {}
           ]
         },
         "api_key": {
@@ -3911,6 +3916,296 @@
       "api_key"
     ],
     "searchBlob": "byok.create Add a new bring-your-own-key (BYOK) API key for an AI provider, either for the current user or for an organization. Stores the key securely so the user's own provider credentials are used for inference. byok create organizationid provider_id api_key organizationId provider_id api_key"
+  },
+  "byok.createEndpoint": {
+    "path": "byok.createEndpoint",
+    "kind": "mutation",
+    "summary": "Add a new custom bring-your-own-key API endpoint (such as an OpenAI-compatible provider) for an organization, saving its URL, display settings, and encrypted credentials. Use it to connect a new LLM provider with your own key.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "definition": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "base_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "api_kinds": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "chat_completions",
+                  "messages",
+                  "responses"
+                ]
+              }
+            },
+            "client_provider": {
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "openrouter"
+              ]
+            },
+            "reasoning_format": {
+              "type": "string",
+              "enum": [
+                "reasoning-details",
+                "reasoning-content",
+                "reasoning",
+                "gemini-thought"
+              ]
+            },
+            "models": {
+              "minItems": 1,
+              "maxItems": 500,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "flags": {
+                    "readOnly": true,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "recommended",
+                        "vision",
+                        "reasoning"
+                      ]
+                    }
+                  },
+                  "context_length": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_completion_tokens": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "pattern": "^[a-z0-9._/-]+$"
+                  },
+                  "internal_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "api_kinds": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "chat_completions",
+                        "messages",
+                        "responses"
+                      ]
+                    }
+                  },
+                  "client_provider": {
+                    "type": "string",
+                    "enum": [
+                      "anthropic",
+                      "openai",
+                      "openrouter"
+                    ]
+                  },
+                  "reasoning_format": {
+                    "type": "string",
+                    "enum": [
+                      "reasoning-details",
+                      "reasoning-content",
+                      "reasoning",
+                      "gemini-thought"
+                    ]
+                  }
+                },
+                "required": [
+                  "context_length",
+                  "max_completion_tokens",
+                  "id",
+                  "internal_id"
+                ]
+              }
+            }
+          },
+          "required": [
+            "name",
+            "base_url",
+            "api_kinds",
+            "client_provider",
+            "reasoning_format",
+            "models"
+          ]
+        },
+        "credentials": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "api_key"
+                },
+                "api_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "api_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "x-api-key"
+                },
+                "api_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "api_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "aws_bedrock"
+                },
+                "region": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "access_key_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "secret_access_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "region",
+                "access_key_id",
+                "secret_access_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "service_account"
+                },
+                "project_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "private_key_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "private_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "client_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "client_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "auth_uri": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "token_uri": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "auth_provider_x509_cert_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "client_x509_cert_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "universe_domain": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "project_id",
+                "private_key_id",
+                "private_key",
+                "client_email",
+                "client_id",
+                "auth_uri",
+                "token_uri",
+                "auth_provider_x509_cert_url",
+                "client_x509_cert_url"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "definition",
+        "credentials"
+      ]
+    },
+    "tags": [
+      "byok",
+      "createendpoint",
+      "organizationid",
+      "definition",
+      "credentials"
+    ],
+    "searchBlob": "byok.createEndpoint Add a new custom bring-your-own-key API endpoint (such as an OpenAI-compatible provider) for an organization, saving its URL, display settings, and encrypted credentials. Use it to connect a new LLM provider with your own key. byok createendpoint organizationid definition credentials organizationId definition credentials"
   },
   "byok.delete": {
     "path": "byok.delete",
@@ -3997,6 +4292,204 @@
       "listcatalogmodesupportedmodels"
     ],
     "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
+  },
+  "byok.listEndpointCatalogModelIds": {
+    "path": "byok.listEndpointCatalogModelIds",
+    "kind": "query",
+    "summary": "Filter a list of model IDs down to the ones valid for a BYOK endpoint catalog, so callers can check which models an endpoint supports. Use it to validate or match model IDs before configuring a custom endpoint.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        },
+        "modelIds": {
+          "maxItems": 5000,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "required": [
+        "organizationId",
+        "modelIds"
+      ]
+    },
+    "tags": [
+      "byok",
+      "listendpointcatalogmodelids",
+      "organizationid",
+      "modelids"
+    ],
+    "searchBlob": "byok.listEndpointCatalogModelIds Filter a list of model IDs down to the ones valid for a BYOK endpoint catalog, so callers can check which models an endpoint supports. Use it to validate or match model IDs before configuring a custom endpoint. byok listendpointcatalogmodelids organizationid modelids organizationId modelIds"
+  },
+  "byok.listModelsFromEndpoint": {
+    "path": "byok.listModelsFromEndpoint",
+    "kind": "mutation",
+    "summary": "Fetch the models a custom BYOK endpoint offers so they can be discovered and imported, using either newly entered or already stored credentials. Use it to test an endpoint connection and see its available models.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "base_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "credentials": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "api_key"
+                },
+                "api_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "api_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "x-api-key"
+                },
+                "api_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "api_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "aws_bedrock"
+                },
+                "region": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "access_key_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "secret_access_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "region",
+                "access_key_id",
+                "secret_access_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "service_account"
+                },
+                "project_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "private_key_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "private_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "client_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "client_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "auth_uri": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "token_uri": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "auth_provider_x509_cert_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "client_x509_cert_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "universe_domain": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "project_id",
+                "private_key_id",
+                "private_key",
+                "client_email",
+                "client_id",
+                "auth_uri",
+                "token_uri",
+                "auth_provider_x509_cert_url",
+                "client_x509_cert_url"
+              ]
+            }
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId",
+        "base_url"
+      ]
+    },
+    "tags": [
+      "byok",
+      "listmodelsfromendpoint",
+      "organizationid",
+      "base_url",
+      "credentials",
+      "id"
+    ],
+    "searchBlob": "byok.listModelsFromEndpoint Fetch the models a custom BYOK endpoint offers so they can be discovered and imported, using either newly entered or already stored credentials. Use it to test an endpoint connection and see its available models. byok listmodelsfromendpoint organizationid base_url credentials id organizationId base_url credentials id"
   },
   "byok.listProviders": {
     "path": "byok.listProviders",
@@ -4197,6 +4690,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
         }
       },
       "required": [
@@ -4207,9 +4705,10 @@
       "byok",
       "testapikey",
       "organizationid",
-      "id"
+      "id",
+      "modelid"
     ],
-    "searchBlob": "byok.testApiKey Test whether a stored BYOK provider API key works by sending a sample inference request. Returns success status and a message describing the test result. byok testapikey organizationid id organizationId id"
+    "searchBlob": "byok.testApiKey Test whether a stored BYOK provider API key works by sending a sample inference request. Returns success status and a message describing the test result. byok testapikey organizationid id modelid organizationId id modelId"
   },
   "byok.update": {
     "path": "byok.update",
@@ -4247,6 +4746,302 @@
       "api_key"
     ],
     "searchBlob": "byok.update Replace the API key of an existing BYOK provider credential for the current user or an organization. Use to rotate or change a stored provider key without deleting it. byok update organizationid id api_key organizationId id api_key"
+  },
+  "byok.updateEndpoint": {
+    "path": "byok.updateEndpoint",
+    "kind": "mutation",
+    "summary": "Change an existing custom BYOK endpoint's name, URL, or settings, and optionally replace its stored credentials. Use it to fix an endpoint, rotate its API key, or rename a provider.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "definition": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "base_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "api_kinds": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "chat_completions",
+                  "messages",
+                  "responses"
+                ]
+              }
+            },
+            "client_provider": {
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "openrouter"
+              ]
+            },
+            "reasoning_format": {
+              "type": "string",
+              "enum": [
+                "reasoning-details",
+                "reasoning-content",
+                "reasoning",
+                "gemini-thought"
+              ]
+            },
+            "models": {
+              "minItems": 1,
+              "maxItems": 500,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "flags": {
+                    "readOnly": true,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "recommended",
+                        "vision",
+                        "reasoning"
+                      ]
+                    }
+                  },
+                  "context_length": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_completion_tokens": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "pattern": "^[a-z0-9._/-]+$"
+                  },
+                  "internal_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "api_kinds": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "chat_completions",
+                        "messages",
+                        "responses"
+                      ]
+                    }
+                  },
+                  "client_provider": {
+                    "type": "string",
+                    "enum": [
+                      "anthropic",
+                      "openai",
+                      "openrouter"
+                    ]
+                  },
+                  "reasoning_format": {
+                    "type": "string",
+                    "enum": [
+                      "reasoning-details",
+                      "reasoning-content",
+                      "reasoning",
+                      "gemini-thought"
+                    ]
+                  }
+                },
+                "required": [
+                  "context_length",
+                  "max_completion_tokens",
+                  "id",
+                  "internal_id"
+                ]
+              }
+            }
+          },
+          "required": [
+            "name",
+            "base_url",
+            "api_kinds",
+            "client_provider",
+            "reasoning_format",
+            "models"
+          ]
+        },
+        "credentials": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "api_key"
+                },
+                "api_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "api_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "x-api-key"
+                },
+                "api_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "api_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "aws_bedrock"
+                },
+                "region": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "access_key_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "secret_access_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "region",
+                "access_key_id",
+                "secret_access_key"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "service_account"
+                },
+                "project_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "private_key_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "private_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "client_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "client_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "auth_uri": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "token_uri": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "auth_provider_x509_cert_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "client_x509_cert_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "universe_domain": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "project_id",
+                "private_key_id",
+                "private_key",
+                "client_email",
+                "client_id",
+                "auth_uri",
+                "token_uri",
+                "auth_provider_x509_cert_url",
+                "client_x509_cert_url"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "id",
+        "definition"
+      ]
+    },
+    "tags": [
+      "byok",
+      "updateendpoint",
+      "organizationid",
+      "id",
+      "definition",
+      "credentials"
+    ],
+    "searchBlob": "byok.updateEndpoint Change an existing custom BYOK endpoint's name, URL, or settings, and optionally replace its stored credentials. Use it to fix an endpoint, rotate its API key, or rename a provider. byok updateendpoint organizationid id definition credentials organizationId id definition credentials"
   },
   "claudeBilling.remove": {
     "path": "claudeBilling.remove",

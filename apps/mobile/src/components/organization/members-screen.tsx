@@ -111,6 +111,11 @@ export function OrganizationMembersScreen() {
   );
 
   const handleRemovalStarted = (memberId: string) => admitRemoval(removals, memberId);
+  // A refused removal renders until the row's next action for that member
+  // supersedes it; the failure kind check keeps a pending attempt alone.
+  const handleRemovalCleared = (memberId: string) => {
+    removals.clear(memberId, failure => failure.kind === 'removal-refused');
+  };
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t('organization.members.title')} />;
@@ -191,6 +196,7 @@ export function OrganizationMembersScreen() {
               organizationId={organizationId}
               removalFailure={readRemovalFailure(removals.snapshot, item.member.id)}
               onRemovalStarted={handleRemovalStarted}
+              onRemovalCleared={handleRemovalCleared}
               last={item.last}
             />
           </View>

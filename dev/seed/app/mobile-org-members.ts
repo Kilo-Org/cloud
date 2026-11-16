@@ -61,10 +61,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     { email: ownerEmail, name: 'Members lab owner', role: 'owner' as const },
     { email: memberEmail, name: 'Members lab member', role: 'member' as const },
   ];
-  const userIds: Record<'owner' | 'member', string> = {
+  const userIds = {
     owner: '',
     member: '',
-  } as never;
+  } satisfies Record<'owner' | 'member', string>;
   for (const person of people) {
     const userId = `dev-seed:mobile-org-members:${person.email}`;
     const [existing] = await db

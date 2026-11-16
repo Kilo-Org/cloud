@@ -22,10 +22,19 @@ export type MemberRemovalStore = {
     typeof useKeyedSurfaceFeedback<string, MemberRemovalFailure>
   >['snapshot'];
   readonly begin: ReturnType<typeof useKeyedSurfaceFeedback<string, MemberRemovalFailure>>['begin'];
+  /** Retires the member's shown refusal, leaving a pending attempt alone. */
+  readonly clear: ReturnType<
+    typeof useKeyedSurfaceFeedback<string, MemberRemovalFailure>
+  >['clearWhere'];
 };
 
 export function useMemberRemovalFeedback(): MemberRemovalStore {
-  return useKeyedSurfaceFeedback<string, MemberRemovalFailure>();
+  const store = useKeyedSurfaceFeedback<string, MemberRemovalFailure>();
+  return {
+    snapshot: store.snapshot,
+    begin: store.begin,
+    clear: store.clearWhere,
+  };
 }
 
 /** The localized explanation for a removal the server refused. */

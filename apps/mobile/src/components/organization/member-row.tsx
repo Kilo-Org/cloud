@@ -37,6 +37,8 @@ type MemberRowProps = {
   removalFailure?: MemberRemovalFailure | null;
   /** The screen's keyed admission for the member id; a refusal settles its attempt. */
   onRemovalStarted?: (memberId: string) => SurfaceAttempt<MemberRemovalFailure> | null;
+  /** Retires this member's shown removal refusal; the row calls it when a newer action supersedes it. */
+  onRemovalCleared?: (memberId: string) => void;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
 };
@@ -62,6 +64,7 @@ export function MemberRow({
   organizationId,
   removalFailure = null,
   onRemovalStarted,
+  onRemovalCleared,
   last,
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
@@ -71,7 +74,7 @@ export function MemberRow({
   // the hook's toast stays silent: the same announcement must not leave the
   // row in two places, and the toast cannot win the stacking race against the
   // menu sheet's own window it shares that moment with.
-  const mutations = useOrganizationMutations(organizationId, { silenceUpdateMemberToast: true });
+  const mutations = useOrganizationMutations(organizationId, { silenceMemberToast: true });
   const displayName = firstNonEmpty(member.name, member.email);
   // A refused role change is explained from this row's own mutation state; a
   // refused removal comes from the screen's keyed store, because the optimistic
@@ -129,6 +132,9 @@ export function MemberRow({
   ];
 
   function onSelectRole(role: OrgRole) {
+    // A role change is this row's newer action: a refusal the screen still
+    // shows from a refused removal describes an attempt the row superseded.
+    onRemovalCleared?.(member.id);
     mutations.updateMember.mutate(
       { memberId: member.id, role },
       {
@@ -162,6 +168,12 @@ export function MemberRow({
         // A removal is already running for this member.
         if (attempt === null) {
           return;
+        }
+        // This row's next action replaces the refusal it showed: a role-change
+        // error of a settled attempt must not outlive the removal that
+        // superseded it (its state is sticky until the same mutation runs).
+        if (mutations.updateMember.isError) {
+          mutations.updateMember.reset();
         }
         void (async () => {
           try {

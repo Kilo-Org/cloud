@@ -374,11 +374,13 @@ describe('MemberRow menu', () => {
       isError: boolean;
       error: unknown;
       mutateAsync: unknown;
+      reset: () => void;
     }>;
     removeMember?: Partial<{
       isError: boolean;
       error: unknown;
       mutateAsync: unknown;
+      reset: () => void;
     }>;
   }) {
     return {
@@ -388,7 +390,7 @@ describe('MemberRow menu', () => {
   }
 
   it('renders the mapped refusal on the row when the server refuses the role change', async () => {
-    mocks.hookFactory.mockImplementationOnce(() =>
+    mocks.hookFactory.mockImplementation(() =>
       hookMutations({
         updateMember: {
           isError: true,
@@ -424,7 +426,7 @@ describe('MemberRow menu', () => {
         return true;
       },
     }));
-    mocks.hookFactory.mockImplementationOnce(
+    mocks.hookFactory.mockImplementation(
       () =>
         hookMutations({
           removeMember: {
@@ -459,10 +461,55 @@ describe('MemberRow menu', () => {
   });
 
   it('renders no refusal block while the mutations are healthy', async () => {
-    mocks.hookFactory.mockImplementationOnce(() => hookMutations({}));
+    mocks.hookFactory.mockImplementation(() => hookMutations({}));
     const view = await renderRow();
 
     expect(textsOf(view)).not.toContain(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('gives a newer removal the row the refused role change no longer describes', async () => {
+    let resetCalled = false;
+    mocks.hookFactory.mockImplementation(() =>
+      hookMutations({
+        updateMember: {
+          isError: true,
+          error: { data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' } },
+          // The row resets the sticky role-change error to retire the refusal
+          // its newer removal supersedes.
+          get reset() {
+            resetCalled = true;
+            return () => undefined;
+          },
+        },
+        removeMember: {
+          mutateAsync: vi.fn().mockReturnValue(new Promise(() => undefined)),
+        },
+      })
+    );
+    mocks.confirm.mockImplementation((request: { title: string; onConfirm: () => void }) => {
+      request.onConfirm();
+    });
+    const view = await renderRow({
+      onRemovalStarted: () => ({
+        owns: () => true,
+        succeed: () => true,
+        fail: () => true,
+        abandon: () => true,
+      }),
+    });
+
+    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
+    await act(() => {
+      (view.root.findByType('Pressable').props.onPress as () => void)();
+    });
+    await act(() => {
+      actionsMenu().onSelect(2);
+    });
+    await act(() => {
+      actionsMenu().onDismiss();
+    });
+
+    expect(resetCalled).toBe(true);
   });
 });
 

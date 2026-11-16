@@ -1,6 +1,7 @@
 /* oxlint-disable max-lines -- one tRPC client suite; the auth-header, deadline, and observed-fetch cases share one hoisted module-mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 import { type TelemetryBreadcrumb, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const httpLinkMock = vi.hoisted(() => vi.fn());
@@ -236,7 +237,7 @@ describe('getAuthHeaders', () => {
     await expect(headers()).rejects.toThrow('keychain unavailable');
   });
 
-  it('resolves unauthenticated while protected data is unavailable and files nothing', async () => {
+  it('holds an unauthenticated request until the unlock instead of sending it bare', async () => {
     // `afterEach` resets the module registry, so the sink, the owner, and the
     // gate must be loaded from the same graph as `./trpc` inside the case.
     secureStoreMock.store.set('auth-token', 'stored-token');
@@ -250,21 +251,62 @@ describe('getAuthHeaders', () => {
     const { setProtectedDataAvailable } = await import('@/lib/protected-data');
     setProtectedDataAvailable(false);
     try {
-      // The locked request still resolves: no rejection reaches tRPC, so
-      // nothing wraps the lock state into a reported client error.
-      const unauthenticated = await headers();
-      expect(unauthenticated).not.toHaveProperty('Authorization');
-      // The refused read never reached the keychain.
+      // A locked keychain can supply no bearer, so the request waits instead of
+      // going out unauthenticated: the server would refuse it as no-session.
+      let settled = false;
+      const pending = (async () => {
+        try {
+          return await headers();
+        } finally {
+          settled = true;
+        }
+      })();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(settled).toBe(false);
       expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+
+      // The unlock releases it, and the same request reaches the wire with the
+      // stored credential.
+      setProtectedDataAvailable(true);
+      await expect(pending).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+      expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('auth-token');
       expect(events).toEqual([]);
     } finally {
       setProtectedDataAvailable(true);
     }
+  });
 
-    // After unlock the same request resolves the stored token and sends it.
-    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
-    expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('auth-token');
-    expect(events).toEqual([]);
+  it('sends the request unauthenticated when the lock outlasts the request budget', async () => {
+    // Not resolving is worse than sending: a background request must not
+    // outlive the app's own control-plane budget. Past the bound the request
+    // proceeds exactly as it did before the deferral — no credential, no event.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const events: TelemetryEvent[] = [];
+    const { setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    const headers = await loadHeaders();
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS);
+
+      const unauthenticated = await pending;
+      expect(unauthenticated).not.toHaveProperty('Authorization');
+      // The refused read never reached the keychain, and the lock state is not
+      // a reportable failure.
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
   });
 });
 

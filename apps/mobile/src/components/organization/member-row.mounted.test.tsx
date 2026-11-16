@@ -373,8 +373,13 @@ describe('MemberRow menu', () => {
     updateMember?: Partial<{
       isError: boolean;
       error: unknown;
+      mutateAsync: unknown;
     }>;
-    removeMember?: Partial<{ isError: boolean; error: unknown }>;
+    removeMember?: Partial<{
+      isError: boolean;
+      error: unknown;
+      mutateAsync: unknown;
+    }>;
   }) {
     return {
       updateMember: { mutate: mocks.updateMember.mutate, ...overrides.updateMember },
@@ -396,18 +401,61 @@ describe('MemberRow menu', () => {
     expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
   });
 
-  it('renders the mapped refusal on the row when the server refuses the removal', async () => {
-    mocks.hookFactory.mockImplementationOnce(() =>
-      hookMutations({
-        removeMember: {
-          isError: true,
-          error: { data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' } },
-        },
-      })
-    );
-    const view = await renderRow();
+  it('states a refused removal carried by the screen, after the row remounted', async () => {
+    const view = await renderRow({
+      removalFailure: { kind: 'removal-refused', message: 'Organization trial has expired.' },
+    });
 
-    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(textsOf(view)).toContain('Organization trial has expired.');
+  });
+
+  it('publishes the removal refusal to the screen attempt and abandons on success', async () => {
+    let settled: { kind: string; message: string } | undefined = undefined;
+    let abandoned = false;
+    const onRemovalStarted = vi.fn(() => ({
+      owns: () => true,
+      succeed: () => true,
+      fail: (failure: { kind: string; message: string }) => {
+        settled = failure;
+        return true;
+      },
+      abandon: () => {
+        abandoned = true;
+        return true;
+      },
+    }));
+    mocks.hookFactory.mockImplementationOnce(
+      () =>
+        hookMutations({
+          removeMember: {
+            mutateAsync: vi
+              .fn()
+              .mockRejectedValueOnce({ data: { code: 'FORBIDDEN', message: 'No seats' } }),
+          },
+        }) as never
+    );
+    mocks.confirm.mockImplementation((request: { title: string; onConfirm: () => void }) => {
+      request.onConfirm();
+    });
+    const view = await renderRow({ onRemovalStarted });
+    await act(() => {
+      (view.root.findByType('Pressable').props.onPress as () => void)();
+    });
+    // Remove member is the actions menu's third row; the confirm mock confirms
+    // in place, so the attempt starts when the confirm lands.
+    await act(() => {
+      actionsMenu().onSelect(2);
+    });
+    await act(() => {
+      actionsMenu().onDismiss();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onRemovalStarted).toHaveBeenCalledWith('membership-1');
+    expect(settled).toEqual({ kind: 'removal-refused', message: 'Something went wrong' });
+    expect(abandoned).toBe(false);
   });
 
   it('renders no refusal block while the mutations are healthy', async () => {

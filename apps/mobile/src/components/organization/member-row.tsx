@@ -16,8 +16,10 @@ import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
+import { type MemberRemovalFailure, removalRefusalMessage } from './member-removal-feedback';
 import { assignableMemberRoles } from './organization-role-options';
 import { OrganizationPlanRefusal } from './plan-refusal';
+import { type SurfaceAttempt } from '@/lib/surface-feedback';
 
 type MemberRowProps = {
   member: ActiveOrgMember;
@@ -31,6 +33,10 @@ type MemberRowProps = {
   /** Organization is a sales demo, so spend may be paired with its limit. */
   isSalesDemo: boolean;
   organizationId: string;
+  /** A refused removal for this member, owned by the screen: the optimistic removal unmounts the row, so its own hook cannot carry the failure. */
+  removalFailure?: MemberRemovalFailure | null;
+  /** The screen's keyed admission for the member id; a refusal settles its attempt. */
+  onRemovalStarted?: (memberId: string) => SurfaceAttempt<MemberRemovalFailure> | null;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
 };
@@ -46,25 +52,6 @@ export function roleLabel(role: OrgRole): string {
   return i18n.t(ROLE_LABEL_KEYS[role]);
 }
 
-/**
- * The row's mutation that failed, if either did. The role change and the
- * removal share this one failure slot: the two never settle at once (one
- * mutation scope per organization serializes them), so the row can render one
- * refusal at a time without a second flag beside it.
- */
-function failedMemberRefusal<
-  T extends { isError: boolean; error: unknown },
-  U extends { isError: boolean; error: unknown },
->({ updateMember, removeMember }: { updateMember: T; removeMember: U }) {
-  if (updateMember.isError) {
-    return updateMember;
-  }
-  if (removeMember.isError) {
-    return removeMember;
-  }
-  return null;
-}
-
 export function MemberRow({
   member,
   canManage,
@@ -73,6 +60,8 @@ export function MemberRow({
   enableUsageLimits,
   isSalesDemo,
   organizationId,
+  removalFailure = null,
+  onRemovalStarted,
   last,
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
@@ -84,15 +73,15 @@ export function MemberRow({
   // menu sheet's own window it shares that moment with.
   const mutations = useOrganizationMutations(organizationId, { silenceUpdateMemberToast: true });
   const displayName = firstNonEmpty(member.name, member.email);
-  // A refused role change or removal is explained on the row it was refused
-  // for, not in a toast the menu's own window can cover. The removal confirm
-  // keeps its own dialog, so only this row's refusal needs the line; the
-  // copy comes from the same server mapping the hook's toast used.
-  const failedMemberMutation = failedMemberRefusal(mutations);
-  const refusalMessage =
-    failedMemberMutation?.error != null
-      ? organizationErrorMessage(failedMemberMutation.error)
-      : null;
+  // A refused role change is explained from this row's own mutation state; a
+  // refused removal comes from the screen's keyed store, because the optimistic
+  // removal unmounts this row while its request runs and its hook would die
+  // with it. Both name the cause and the owner's next step; the copy comes from
+  // the same server mapping the hook's toast used.
+  const roleChangeFailure = mutations.updateMember.isError
+    ? organizationErrorMessage(mutations.updateMember.error)
+    : null;
+  const refusalMessage = roleChangeFailure ?? removalFailure?.message ?? null;
   const [menu, setMenu] = useState<'actions' | 'role' | null>(null);
   // The action a chosen row will run once its menu is gone. The menu's window
   // owns the back key until it finishes dismissing, so running the choice only
@@ -156,14 +145,36 @@ export function MemberRow({
       message: t('organization.members.removeMemberMessage', { name: displayName }),
       confirmLabel: t('common.remove'),
       onConfirm: () => {
-        mutations.removeMember.mutate(
-          { memberId: member.id },
-          {
-            onSuccess: () => {
-              notificationHaptic(Haptics.NotificationFeedbackType.Success);
-            },
+        // The screen owns the attempt: the optimistic removal unmounts this
+        // row, so the refusal a rollback produces must outlive it there.
+        if (onRemovalStarted === undefined) {
+          mutations.removeMember.mutate(
+            { memberId: member.id },
+            {
+              onSuccess: () => {
+                notificationHaptic(Haptics.NotificationFeedbackType.Success);
+              },
+            }
+          );
+          return;
+        }
+        const attempt = onRemovalStarted(member.id);
+        // A removal is already running for this member.
+        if (attempt === null) {
+          return;
+        }
+        void (async () => {
+          try {
+            await mutations.removeMember.mutateAsync({ memberId: member.id });
+          } catch (error) {
+            attempt.fail({ kind: 'removal-refused', message: removalRefusalMessage(error) });
+            return;
           }
-        );
+          // The row leaving the list is the success outcome itself: the row is
+          // gone, the block with it. Nothing is left to render.
+          attempt.abandon();
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
+        })();
       },
     });
   }

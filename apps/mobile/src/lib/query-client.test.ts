@@ -66,6 +66,35 @@ describe('query retry policy', () => {
       expect(attempts).toBe(expectedAttempts);
     }
   );
+
+  // A tRPC client error carries `data.code`, while a server-shaped one carries
+  // it under `shape.data`. Reading only the first shape retried a validation
+  // failure the server answers identically every time, so the same request went
+  // out three times before the screen showed anything.
+  it.each([
+    { code: 'BAD_REQUEST', expectedAttempts: 1 },
+    { code: 'INTERNAL_SERVER_ERROR', expectedAttempts: 3 },
+  ])(
+    'invokes the query function $expectedAttempts time(s) for a server-shaped $code',
+    async ({ code, expectedAttempts }) => {
+      const queryClient = createKiloAppQueryClient();
+      const error = Object.assign(new Error(code), { shape: { data: { code } } });
+      let attempts = 0;
+
+      await expect(
+        queryClient.query({
+          queryKey: ['session', 'retry-policy', 'shaped', code],
+          retryDelay: 0,
+          queryFn: () => {
+            attempts += 1;
+            throw error;
+          },
+        })
+      ).rejects.toBe(error);
+
+      expect(attempts).toBe(expectedAttempts);
+    }
+  );
 });
 
 describe('permission-denied query removal', () => {

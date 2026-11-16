@@ -283,7 +283,12 @@ export function createKiloAppQueryClient(): QueryClient {
         // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also refetched unfocused tabs.
         refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
-          const code = (error as { data?: { code?: string } } | null)?.data?.code;
+          // Read the code through the one tRPC error reader: a client error
+          // carries `data.code`, while a server-shaped one carries
+          // `shape.data.code`, and a validation failure is permanent either
+          // way. Missing the shape retried a 400 the server will never accept
+          // until the budget ran out.
+          const code = readTrpcErrorField(error, 'code');
           if (code !== undefined && PERMANENT_CODES.has(code)) {
             return false;
           }

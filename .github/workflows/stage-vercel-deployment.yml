@@ -99,11 +99,14 @@ jobs:
 
       - name: Stage Vercel deployment
         id: deploy
+        # The deploy uploads the whole checkout, and the CLI counts every local
+        # file before uploading. The repo is past the 15000-file limit, so the
+        # upload is sent as one tgz archive, which the CLI counts as one file.
         run: |
           if [ "$TARGET_ENVIRONMENT" = "production" ]; then
-            deployment_output=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
+            deployment_output=$(vercel deploy --prod --skip-domain --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
           else
-            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
+            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
           fi
 
           deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)

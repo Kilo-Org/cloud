@@ -51,6 +51,21 @@ wrong-purpose/sandbox envelopes and credentials invalidated by signing-key rotat
 `shutdown` and prompt closure on a short-lived Worker-local socket, without DO lookup. A temporarily
 unavailable signing secret returns 503, so ordinary bounded-backoff reconnect remains possible.
 
+### Sandbox provider owners
+
+| Concern | Owner |
+|---|---|
+| Feature support | `SANDBOX_PROVIDER_CAPABILITIES` in `packages/worker-utils/src/sandbox-provider-capabilities.ts`, read with `providerSupports` |
+| Each unsupported feature and its class (`gap`, `intentional`, `retired`) | `src/sandbox-control/provider-gaps.test.ts` |
+| Provider facts that are not features: label, reserved ports, launch env, customer credential, unique allocation name, credential transport, retired | `PROVIDER_DESCRIPTORS` in `src/shared/sandbox-provider.ts` |
+| Adapter construction | `createProviderAdapter` in `src/control-plane/sandbox/provider-adapters.ts` |
+| Shared adapter behavior | `src/sandbox-control/provider-contract.test.ts` |
+
+Code gates a feature with `providerSupports`, not with a provider-name comparison. A new provider
+adds a table row, a descriptor, a `case` in `createProviderAdapter` and a contract harness. The type
+checker rejects the change until all four exist. The Sandbox DO calls snapshot methods only through
+the adapter's optional members, because a stub adapter has none.
+
 ## 3. Topology and identities
 
 - One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`.

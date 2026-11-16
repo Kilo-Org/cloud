@@ -20,10 +20,8 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type ContainerUsageRpcMethods } from '@kilocode/container-usage';
-import type {
-  SandboxControlV2,
-  StoredProviderPin,
-} from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { StoredProviderPin } from '../../src/control-plane/sandbox/provider-adapters.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
@@ -3115,6 +3113,8 @@ describe('SandboxControlV2 allocation egress policy', () => {
     { provider: 'vercel', sandboxKind: undefined },
     { provider: 'cloudflare-containers', sandboxKind: 'shared' },
     { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
+    // A pin that a newer deployment wrote, read after a rollback.
+    { provider: 'newer-provider', sandboxKind: undefined },
   ])('rejects unsupported audited unrestricted provider pins on reload: %j', async placement => {
     const provider = createFakeProvider();
     const { stub } = await configureEgressSandbox(provider);

@@ -15,6 +15,7 @@ import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
@@ -162,10 +163,17 @@ export function ModelSelector({
         accessibilityLabel={t('common.model')}
         className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"
       >
-        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
-          {t('common.model')}
-        </Text>
-        <ChevronDown size={14} color={colors.mutedForeground} />
+        {/* The catalogue's name slot is a bar of the loaded label's height, so
+            the chip keeps its width class and does not resize when the default
+            model arrives. `bg-muted-soft` for the reason recorded on the
+            repository loading row: the default `bg-skeleton-fill` equals this
+            pill's `bg-secondary` in the light palette and would paint nothing.
+            The wrapper keeps the busy label for assistive tech without a text
+            node that reads as a resolved value. */}
+        <Skeleton className="h-4 w-24 bg-muted-soft" />
+        <View className="opacity-50">
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        </View>
       </View>
     );
   }

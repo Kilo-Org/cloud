@@ -190,7 +190,10 @@ export function ReportReceiptsScreen() {
               </Pressable>
             )}
             contentContainerStyle={listContentContainerStyle}
-            refreshControl={refreshControl}
+            // FlashList adds its own control from this pair; the element
+            // below is for the state scrollers that accept one.
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             onEndReached={() => {
               // Once the next page has failed, auto-loading re-fires on every
               // content-size change, so recovery waits for the footer's tap.

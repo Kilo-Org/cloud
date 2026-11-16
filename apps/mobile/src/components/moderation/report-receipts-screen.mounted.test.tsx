@@ -70,16 +70,22 @@ vi.mock('@shopify/flash-list', () => ({
     ListFooterComponent,
     onEndReached,
     refreshControl,
+    refreshing,
+    onRefresh,
   }: {
     data: readonly unknown[];
     renderItem: (info: { item: unknown; index: number }) => ReactNode;
     ListFooterComponent?: ReactNode;
     onEndReached?: () => void;
     refreshControl?: ReactNode;
+    refreshing?: boolean;
+    onRefresh?: () => void;
   }) =>
     createElement(
       'FlashList',
-      { onEndReached, refreshControl },
+      // The screen forwards the pair, not the element: FlashList owns the
+      // control from `refreshing`/`onRefresh`, like the sibling history list.
+      { onEndReached, refreshControl, refreshing, onRefresh },
       ...data.map((item, index) =>
         createElement(Fragment, { key: index }, renderItem({ item, index }))
       ),
@@ -340,16 +346,24 @@ async function loadPage(root: ReactTestRenderer['root'], pageNumber: number) {
   await waitFor(() => rows(root).length === pageNumber * PAGE_ROWS);
 }
 
-/** The pull control the list carries, as the reader's pull reads it. */
+/** The pull pair FlashList owns itself, as the reader's pull drives it. */
 function pullControl(root: ReactTestRenderer['root']) {
   const list = mustExist(
     root.findAll(node => Object.is(node.type, FLASH_LIST))[0],
     'the receipts list'
   );
   return mustExist(
-    list.props.refreshControl as
-      | { props: { refreshing: boolean; onRefresh: () => void } }
-      | undefined,
+    (() => {
+      const forwarded = list.props as {
+        refreshing?: boolean;
+        onRefresh?: () => void;
+        refreshControl?: { props: { refreshing: boolean; onRefresh: () => void } };
+      };
+      if (typeof forwarded.onRefresh === 'function') {
+        return { props: { refreshing: forwarded.refreshing === true, onRefresh: forwarded.onRefresh } };
+      }
+      return forwarded.refreshControl;
+    })(),
     "the list's refresh control"
   );
 }

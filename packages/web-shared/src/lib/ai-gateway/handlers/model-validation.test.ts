@@ -17,6 +17,10 @@ jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
+  buildAutoModelCatalogEntry: (model: { id: string; name: string }) => ({
+    id: model.id,
+    name: model.name,
+  }),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
@@ -29,6 +33,9 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-models', () => ({
   addAutoRoutingModels: jest.fn(async (models: unknown[]) => models),
+  addCustomRouterModels: jest.requireActual(
+    '@kilocode/web-shared/lib/ai-gateway/auto-routing-models'
+  ).addCustomRouterModels,
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
 
@@ -252,8 +259,18 @@ describe('POST /api/openrouter/models/validate', () => {
     test('validates a custom router usable in the organization context', async () => {
       signInAsOrganizationMember();
       mockedListUsableCustomRouters.mockResolvedValue([
-        { ownerType: 'org', ownerId: 'org-1', slug: 'efficient' },
-      ] as never);
+        {
+          id: '00000000-0000-4000-8000-000000000002',
+          ownerType: 'org',
+          ownerId: 'org-1',
+          slug: 'efficient',
+          name: 'Efficient',
+          baseRouter: 'efficient',
+          mode: 'best_accuracy',
+          entries: [{ kind: 'gateway', model: 'openai/gpt-5.4-mini' }],
+          defaultEntryKey: 'gateway:openai/gpt-5.4-mini',
+        },
+      ]);
 
       const response = await handleModelValidationRequest(
         request('kilo-auto/custom/org/efficient')
@@ -265,6 +282,34 @@ describe('POST /api/openrouter/models/validate', () => {
         userId: 'member-1',
         organizationId: 'org-1',
       });
+    });
+
+    test('answers unavailable when the organization routers cannot be listed', async () => {
+      signInAsOrganizationMember();
+      mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
+
+      const response = await handleModelValidationRequest(
+        request('kilo-auto/custom/org/efficient')
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+    });
+
+    test('answers unavailable when the membership is not visible', async () => {
+      signInAsOrganizationMember();
+      mockedGetAvailableModelsForOrganization.mockRejectedValue(
+        new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have direct access to this organization',
+        })
+      );
+
+      const response = await handleModelValidationRequest(request('org/available'));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+      expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
     });
 
     test('reports unavailable when the organization no longer exists', async () => {

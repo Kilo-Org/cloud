@@ -12,10 +12,8 @@ import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
-import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
-import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { TRPCError } from '@trpc/server';
+import { isUnreadableOrganizationError, organizationMemberCatalog } from './organization-catalog';
 
 type ValidationResult = { valid: true } | { valid: false; reason: 'unavailable' };
 
@@ -37,28 +35,6 @@ function validationResult(available: boolean) {
   );
 }
 
-async function organizationCatalog(
-  organizationId: string,
-  kiloUserId: string,
-  countryCode: string | null
-): Promise<OpenRouterModelsResponse | null> {
-  try {
-    return await getAvailableModelsForOrganization(
-      organizationId,
-      { type: 'member', kiloUserId },
-      'member',
-      { fromDb: readDb, countryCode }
-    );
-  } catch (error) {
-    // An organization that no longer exists is not a server fault and offers nothing
-    // to retry, so it reads as no models rather than a failed check.
-    if (error instanceof TRPCError && error.code === 'NOT_FOUND') {
-      return null;
-    }
-    throw error;
-  }
-}
-
 /**
  * Answers from the member-effective organization catalog, the same catalog the
  * organization model routes list and the gateway enforces at inference time. The
@@ -71,31 +47,29 @@ async function validateForOrganizationMember(params: {
   modelId: string;
   countryCode: string | null;
 }) {
-  const result = await organizationCatalog(
-    params.organizationId,
-    params.kiloUserId,
-    params.countryCode
-  );
-  if (!result) {
+  let catalog: OpenRouterModelsResponse | null;
+  try {
+    catalog = await organizationMemberCatalog({
+      organizationId: params.organizationId,
+      kiloUserId: params.kiloUserId,
+      countryCode: params.countryCode,
+      endpoint: 'openrouter/models/validate',
+    });
+  } catch (error) {
+    // An organization this credential can no longer read offers nothing to retry, and the
+    // catalog route reports the same read as a failure rather than models, so it reads as
+    // no available models instead of a failed check.
+    if (isUnreadableOrganizationError(error)) {
+      return validationResult(false);
+    }
+    throw error;
+  }
+  if (!catalog) {
     return validationResult(false);
   }
-  // The catalog passes the same list through the auto-routing step, which can withhold an
-  // auto id, so membership is read from that result rather than the raw list.
-  const models = await addAutoRoutingModels(result.data);
-  // The catalog lists a custom router as a virtual model, so the model id is not in
-  // `data`; it is usable when the router is usable in this context.
-  const customRouters = isCustomRouterModelId(params.modelId)
-    ? await listUsableCustomRouters({
-        userId: params.kiloUserId,
-        organizationId: params.organizationId,
-      })
-    : [];
-  return validationResult(
-    models.some(model => model.id === params.modelId) ||
-      customRouters.some(
-        router => customRouterModelId(router.ownerType, router.slug) === params.modelId
-      )
-  );
+  // The composed catalog already carries the custom routers usable in this context as
+  // their virtual model ids, so one membership test covers catalog and router ids alike.
+  return validationResult(catalog.data.some(model => model.id === params.modelId));
 }
 
 /**

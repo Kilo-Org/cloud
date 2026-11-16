@@ -46,5 +46,10 @@ export function isTransientDurableObjectFailure(error: unknown): boolean {
  * same way they answer a transient platform failure.
  */
 export function isDurableObjectRetryDeadline(error: unknown): boolean {
-  return error instanceof Error && error.name === 'TimeoutError';
+  // Matched by name rather than `instanceof Error`: the retry scope aborts with
+  // a `DOMException`, whose prototype chain a runtime is not required to root
+  // in `Error`. Only the scope raises this exact name for a hop deadline.
+  return (
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'TimeoutError'
+  );
 }

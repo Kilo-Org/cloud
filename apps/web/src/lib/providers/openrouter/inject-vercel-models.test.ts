@@ -875,7 +875,10 @@ describe('injectVercelModels inference regions', () => {
         name: 'NVIDIA Nemotron 3 Super',
         endpoints: [
           { provider_name: 'nvidia' },
-          { provider_name: 'bedrock', inference_regions: regions('jp', 'xx', 'us', 'us') },
+          {
+            provider_name: 'bedrock',
+            inference_regions: [...(regions('jp', 'xx', 'us', 'us') ?? []), {}],
+          },
           { provider_name: 'vertex', inference_regions: regions('eu') },
           { provider_name: 'vertexAnthropic', inference_regions: regions('us') },
         ],

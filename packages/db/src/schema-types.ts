@@ -3400,6 +3400,10 @@ export const EndpointPricingSchema = z.object({
   discount: z.number().optional(),
 });
 
+export const EndpointInferenceRegionSchema = z.object({
+  geo_region: z.string().optional().catch(undefined),
+});
+
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
@@ -3409,10 +3413,7 @@ export const EndpointSchema = z.object({
   has_zdr: z.boolean().optional().catch(undefined),
   has_no_training: z.boolean().optional().catch(undefined),
   /** Vercel AI Gateway: the regions the endpoint can be pinned to; OpenRouter does not set it. */
-  inference_regions: z
-    .array(z.object({ geo_region: z.string() }))
-    .optional()
-    .catch(undefined),
+  inference_regions: z.array(EndpointInferenceRegionSchema).optional().catch(undefined),
 });
 
 export type Endpoint = z.infer<typeof EndpointSchema>;

@@ -322,7 +322,7 @@ describe('readStoredGatewayModels', () => {
     );
   });
 
-  it('keeps the geo region of each endpoint inference region', async () => {
+  it('keeps only the geo region of each endpoint inference region', async () => {
     await storeList([{ id: 'vendor/regional', name: 'Regional' }]);
     await storeRows([
       endpointsRow(
@@ -332,9 +332,11 @@ describe('readStoredGatewayModels', () => {
             provider_name: 'bedrock',
             inference_regions: [
               { scope: 'zone', geo_region: 'us', pricing: { prompt: '1', completion: '2' } },
+              { scope: 'global' },
               { scope: 'specific', geo_region: 'eu', provider_region: 'eu-central-1' },
             ],
           },
+          { provider_name: 'vertex', inference_regions: null },
         ])
       ),
     ]);
@@ -346,8 +348,9 @@ describe('readStoredGatewayModels', () => {
           [
             {
               provider_name: 'bedrock',
-              inference_regions: [{ geo_region: 'us' }, { geo_region: 'eu' }],
+              inference_regions: [{ geo_region: 'us' }, {}, { geo_region: 'eu' }],
             },
+            { provider_name: 'vertex' },
           ],
         ],
       ])

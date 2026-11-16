@@ -11,6 +11,7 @@ import {
 import { MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH } from '@kilocode/app-shared/code-review';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { isUniqueViolation } from '@/lib/db-errors';
+import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
 import {
   CodeReviewAgentConfigSchema,
   type CodeReviewAgentConfig,
@@ -48,12 +49,7 @@ export const ManualCodeReviewJobInputSchema = z.object({
   platform: z.enum(['github', 'gitlab']),
   url: z.string().url(),
   modelSlug: z.string().min(1).max(512),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
   // Capped by the same constant both review forms bound their field with, so a
   // draft a form accepts is a draft this schema accepts.
   instructions: z.string().max(MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH).optional(),

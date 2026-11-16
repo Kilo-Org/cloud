@@ -46,6 +46,7 @@ import {
   buildEndpointCredentials,
   buildEndpointDefinition,
   mergeImportedModels,
+  setEndpointModelFlag,
   toEndpointForm,
   toEndpointModelRow,
   type ByokEndpointCredentialsType,
@@ -429,6 +430,7 @@ function ModelsTable({
             <th className="w-28 p-2 font-medium">Context window</th>
             <th className="w-28 p-2 font-medium">Max output</th>
             <th className="w-16 p-2 text-center font-medium">Images</th>
+            <th className="w-20 p-2 text-center font-medium">Reasoning</th>
             <th className="w-10 p-2" aria-label="Remove" />
           </tr>
         </thead>
@@ -507,11 +509,24 @@ function ModelsTable({
                   </td>
                   <td className="p-2 text-center">
                     <Checkbox
-                      checked={row.supports_image_input}
-                      onCheckedChange={supports_image_input =>
-                        update(row.rowKey, { supports_image_input })
+                      checked={row.flags.includes('vision')}
+                      onCheckedChange={checked =>
+                        update(row.rowKey, {
+                          flags: setEndpointModelFlag(row.flags, 'vision', checked),
+                        })
                       }
                       aria-label={`${label} accepts images`}
+                    />
+                  </td>
+                  <td className="p-2 text-center">
+                    <Checkbox
+                      checked={row.flags.includes('reasoning')}
+                      onCheckedChange={checked =>
+                        update(row.rowKey, {
+                          flags: setEndpointModelFlag(row.flags, 'reasoning', checked),
+                        })
+                      }
+                      aria-label={`${label} supports reasoning`}
                     />
                   </td>
                   <td className="p-2">
@@ -530,7 +545,7 @@ function ModelsTable({
                 {isExpanded ? (
                   <tr className="bg-muted/20">
                     <td />
-                    <td colSpan={7} className="p-3">
+                    <td colSpan={8} className="p-3">
                       <ModelOverrides
                         row={row}
                         endpointApiKinds={endpointApiKinds}

@@ -7,6 +7,7 @@ import {
   type ByokEndpointReasoningFormat,
   type CustomLlmApiKind,
   type CustomLlmProvider,
+  type DirectByokModelFlag,
 } from '@kilocode/db/schema-types';
 import type * as z from 'zod';
 import { formatZodIssues } from '@/lib/zod/format-zod-error';
@@ -49,7 +50,8 @@ export type EndpointModelRow = {
   name: string;
   context_length: string;
   max_completion_tokens: string;
-  supports_image_input: boolean;
+  /** Kept as stored, so flags the form does not edit, such as `recommended`, survive. */
+  flags: DirectByokModelFlag[];
   /** Null uses the endpoint setting. */
   api_kinds: CustomLlmApiKind[] | null;
   client_provider: CustomLlmProvider | null;
@@ -96,7 +98,7 @@ export function toEndpointModelRow(model?: ByokEndpointModel): EndpointModelRow 
     name: model?.name ?? '',
     context_length: model ? String(model.context_length) : '',
     max_completion_tokens: model ? String(model.max_completion_tokens) : '',
-    supports_image_input: model?.supports_image_input ?? false,
+    flags: [...(model?.flags ?? [])],
     api_kinds: model?.api_kinds ?? null,
     client_provider: model?.client_provider ?? null,
     reasoning_format: model?.reasoning_format ?? null,
@@ -124,6 +126,15 @@ export function toEndpointForm(definition: ByokEndpointDefinition | null): Endpo
   };
 }
 
+export function setEndpointModelFlag(
+  flags: readonly DirectByokModelFlag[],
+  flag: DirectByokModelFlag,
+  enabled: boolean
+): DirectByokModelFlag[] {
+  const others = flags.filter(candidate => candidate !== flag);
+  return enabled ? [...others, flag] : others;
+}
+
 function toNumber(value: string): number {
   return value.trim() === '' ? Number.NaN : Number(value);
 }
@@ -135,7 +146,7 @@ function toEndpointModel(row: EndpointModelRow): Record<string, unknown> {
     ...(row.name.trim() && { name: row.name.trim() }),
     context_length: toNumber(row.context_length),
     max_completion_tokens: toNumber(row.max_completion_tokens),
-    supports_image_input: row.supports_image_input,
+    ...(row.flags.length > 0 && { flags: row.flags }),
     ...(row.api_kinds && { api_kinds: row.api_kinds }),
     ...(row.client_provider && { client_provider: row.client_provider }),
     ...(row.reasoning_format && { reasoning_format: row.reasoning_format }),

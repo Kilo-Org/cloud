@@ -4,6 +4,7 @@ import {
   buildEndpointCredentials,
   buildEndpointDefinition,
   mergeImportedModels,
+  setEndpointModelFlag,
   toEndpointForm,
   toEndpointModelRow,
 } from './endpoint-form';
@@ -32,7 +33,7 @@ describe('buildEndpointDefinition', () => {
         api_kinds: ['chat_completions'],
         client_provider: 'openrouter',
         reasoning_format: 'reasoning-details',
-        models: [{ ...MODEL, supports_image_input: false }],
+        models: [MODEL],
       },
     });
   });
@@ -48,7 +49,7 @@ describe('buildEndpointDefinition', () => {
         {
           ...MODEL,
           name: 'Mine',
-          supports_image_input: true,
+          flags: ['vision' as const, 'recommended' as const],
           api_kinds: ['chat_completions' as const],
           client_provider: 'openrouter' as const,
         },
@@ -81,6 +82,34 @@ describe('buildEndpointDefinition', () => {
         expect.stringMatching(/^Model 2, Context window: /),
       ])
     );
+  });
+});
+
+describe('setEndpointModelFlag', () => {
+  test('sets and clears one flag and keeps the others', () => {
+    expect(setEndpointModelFlag(['recommended'], 'reasoning', true)).toEqual([
+      'recommended',
+      'reasoning',
+    ]);
+    expect(setEndpointModelFlag(['reasoning', 'vision'], 'reasoning', true)).toEqual([
+      'vision',
+      'reasoning',
+    ]);
+    expect(setEndpointModelFlag(['reasoning', 'vision'], 'vision', false)).toEqual(['reasoning']);
+  });
+
+  test('builds a definition with the flags of a row', () => {
+    const row = toEndpointModelRow(MODEL);
+    const form = {
+      ...toEndpointForm(null),
+      name: 'Gateway',
+      base_url: 'https://api.example.com/v1',
+      models: [{ ...row, flags: setEndpointModelFlag(row.flags, 'reasoning', true) }],
+    };
+
+    const result = buildEndpointDefinition(form);
+
+    expect(result.success && result.data.models).toEqual([{ ...MODEL, flags: ['reasoning'] }]);
   });
 });
 

@@ -15,10 +15,12 @@ import {
 } from './index';
 import type { RoutingConstraints } from './index';
 import {
+  BENCHMARK_SCHEDULER_SETTING_KEYS,
   BenchmarkConfigSchema,
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
   BenchmarkProfileStatusesRequestSchema,
+  BenchmarkSchedulerOverridesSchema,
   CustomRoutingTableRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
@@ -27,6 +29,7 @@ import {
   SyncBenchmarkSubscriptionsRequestSchema,
   resolveBenchmarkIdentity,
 } from './benchmark';
+import { POLICY_SETTING_VALUE_DEFAULTS } from './policy-settings';
 
 describe('platform routing mode contracts', () => {
   it.each(['user', 'org'] as const)(
@@ -205,7 +208,6 @@ describe('BenchmarkConfigSchema defaults', () => {
       classifierModels: ['classifier/model'],
       minAccuracy: 0.7,
       benchmarkUserId: null,
-      switchCostFactor: 3,
       updatedAt: null,
       updatedBy: null,
     };
@@ -219,46 +221,65 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(BenchmarkConfigSchema.safeParse({ ...input, deciderModels: [] }).success).toBe(false);
   });
 
-  it('applies config defaults for repetitions, classifier latency, and switch threshold', () => {
+  it('defaults the editable policy fields from the shared declarations', () => {
     const result = BenchmarkConfigSchema.parse({
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
       minAccuracy: 0.8,
       benchmarkUserId: null,
       benchmarkOrgId: null,
-      switchCostFactor: 2,
       updatedAt: null,
       updatedBy: null,
     });
-    expect(result.classifierRepetitions).toBe(1);
-    expect(result.deciderRepetitions).toBe(1);
-    expect(result.classifierMaxP95LatencyMs).toBe(1000);
-    expect(result.bestAccuracySwitchThreshold).toBe(0.05);
+    expect(result.minAccuracy).toBe(0.8);
+    expect(result.accuracyNoiseBand).toBe(POLICY_SETTING_VALUE_DEFAULTS.accuracyNoiseBand);
     expect(result.productionTokenProfile).toBeNull();
     expect(result.switchHorizonTurns).toBeNull();
-    expect(result.lowConfidenceThreshold).toBeNull();
   });
 
-  it('accepts only null or probability-range confidence thresholds', () => {
-    const config = {
+  it('strips the retired fixed policy settings from a config payload', () => {
+    const result = BenchmarkConfigSchema.parse({
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
       minAccuracy: 0.8,
       benchmarkUserId: null,
+      benchmarkOrgId: null,
+      frontierMinAccuracyDelta: 0,
       switchCostFactor: 2,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: 1000,
       updatedAt: null,
       updatedBy: null,
-    };
-    for (const lowConfidenceThreshold of [null, 0, 0.8, 1]) {
-      expect(
-        BenchmarkConfigSchema.parse({ ...config, lowConfidenceThreshold }).lowConfidenceThreshold
-      ).toBe(lowConfidenceThreshold);
+    });
+    for (const key of [
+      'frontierMinAccuracyDelta',
+      'switchCostFactor',
+      'bestAccuracySwitchThreshold',
+      'lowConfidenceThreshold',
+      'classifierRepetitions',
+      'deciderRepetitions',
+      'classifierMaxP95LatencyMs',
+    ]) {
+      expect(result).not.toHaveProperty(key);
     }
-    for (const lowConfidenceThreshold of [-0.1, 1.1]) {
-      expect(BenchmarkConfigSchema.safeParse({ ...config, lowConfidenceThreshold }).success).toBe(
-        false
-      );
-    }
+  });
+
+  it('builds scheduler overrides from the shared scheduler key list', () => {
+    const defaults = BenchmarkSchedulerOverridesSchema.parse({});
+    expect(Object.keys(defaults).sort()).toEqual([...BENCHMARK_SCHEDULER_SETTING_KEYS].sort());
+    for (const key of BENCHMARK_SCHEDULER_SETTING_KEYS) expect(defaults[key]).toBeNull();
+
+    const limits = Object.fromEntries(
+      BENCHMARK_SCHEDULER_SETTING_KEYS.map((key, index) => [key, index + 1])
+    );
+    expect(BenchmarkSchedulerOverridesSchema.parse(limits)).toEqual(limits);
+
+    expect(
+      BenchmarkSchedulerOverridesSchema.safeParse({ slots: 1, notASetting: 1 }).success
+    ).toBe(false);
   });
 
   it.each(['efficient', 'frontier'])(
@@ -274,7 +295,6 @@ describe('BenchmarkConfigSchema defaults', () => {
         autoDeciderMinCostUsd: 30,
         autoDeciderMaxCostUsd: 20,
         minAccuracy: 0.7,
-        switchCostFactor: 3,
         benchmarkUserId: null,
         benchmarkOrgId: null,
         updatedAt: null,
@@ -302,7 +322,6 @@ describe('BenchmarkConfigSchema defaults', () => {
         classifierModels: ['model/a'],
         deciderModels: [{ id: 'model/b' }],
         minAccuracy: 0.7,
-        switchCostFactor: 3,
         maxConcurrency: 100,
         userMaxConcurrency: 100,
         benchmarkUserId: null,
@@ -352,7 +371,6 @@ describe('BenchmarkConfigSchema duplicate model ids', () => {
     minAccuracy: 0.8,
     benchmarkUserId: null,
     benchmarkOrgId: null,
-    switchCostFactor: 2,
     updatedAt: null,
     updatedBy: null,
   };

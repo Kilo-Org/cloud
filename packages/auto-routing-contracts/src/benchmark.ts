@@ -7,7 +7,6 @@ import {
   poolEntryKey,
   benchmarkPairKey,
   RoutingTableSchema,
-  ProductionTokenProfileSchema,
 } from './routing-table';
 import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
@@ -15,6 +14,8 @@ import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 import { OwnerTypeSchema } from './owner';
 import {
+  POLICY_SETTING_VALUE_DEFAULTS,
+  POLICY_SETTING_VALUE_SCHEMAS,
   PolicySettingComputedMapSchema,
   PolicySettingOverridesSchema,
   PolicySettingsStateSchema,
@@ -70,12 +71,17 @@ export const BenchmarkSchedulerLimitSchema = z
  * Admin scheduler overrides. PUT replaces the whole set: a null or missing limit
  * falls back to the worker's `BENCHMARK_SCHEDULER_CONFIG`, then its default.
  */
-export const BenchmarkSchedulerOverridesSchema = z.strictObject({
-  slots: BenchmarkSchedulerLimitSchema.nullable().default(null),
-  modelConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
-  providerConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
-  unknownProviderConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
-});
+export const BenchmarkSchedulerOverridesSchema = z.strictObject(
+  Object.fromEntries(
+    BENCHMARK_SCHEDULER_SETTING_KEYS.map(key => [
+      key,
+      BenchmarkSchedulerLimitSchema.nullable().default(null),
+    ])
+  ) as Record<
+    BenchmarkSchedulerSettingKey,
+    z.ZodDefault<z.ZodNullable<typeof BenchmarkSchedulerLimitSchema>>
+  >
+);
 export type BenchmarkSchedulerOverrides = z.infer<typeof BenchmarkSchedulerOverridesSchema>;
 
 export const BenchmarkSchedulerSettingSourceSchema = z.enum(['admin', 'env', 'default']);
@@ -132,15 +138,21 @@ export const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 // gone from the contract: container lanes come from the shared budget in
 // BENCHMARK_CONTAINER_BUDGET. Zod strips the stale keys from payloads a
 // previous admin UI or a stored config still sends.
+const { minAccuracy, accuracyNoiseBand, productionTokenProfile, switchHorizonTurns } =
+  POLICY_SETTING_VALUE_SCHEMAS;
+
 export const BenchmarkConfigSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
     classifierModels: z.array(z.string().trim().min(1)).min(1),
     deciderModels: z.array(BenchmarkPlatformModelSchema).min(1).optional(),
+    // The editable policy fields, derived from the shared declarations in
+    // policy-settings.ts. The fixed policy settings have no config field left,
+    // so a stored config or old admin payload carrying one parses with that key
+    // stripped, like the retired concurrency knobs above.
     // Accuracy threshold for "gets the job done" (per taxonomy route).
-    minAccuracy: z.number().min(0).max(1),
-    accuracyNoiseBand: z.number().min(0).max(1).default(0.05),
-    frontierMinAccuracyDelta: z.number().min(0).max(1).default(0),
+    minAccuracy,
+    accuracyNoiseBand: accuracyNoiseBand.default(POLICY_SETTING_VALUE_DEFAULTS.accuracyNoiseBand),
     // Optional override for the Kilo user whose identity/billing the decider
     // CLI runs execute under. Null means the worker uses DEFAULT_BENCHMARK_USER_ID.
     // The effective user must be an internal bot (`bot-internal-*`).
@@ -148,27 +160,8 @@ export const BenchmarkConfigSchema = z
     // Optional override for the organization context. Null means the worker
     // uses DEFAULT_BENCHMARK_ORG_ID.
     benchmarkOrgId: z.string().trim().min(1).nullable().default(null),
-    // Session stickiness knob carried into published routing tables: a session
-    // stays on its incumbent model while it meets the route's accuracy
-    // threshold, unless the fresh pick is cheaper by more than this factor.
-    // Model switches discard provider prompt caches (cache reads are far
-    // cheaper than fresh input tokens), so switching only pays off when the
-    // recurring savings clearly outweigh the cache-rebuild penalty.
-    switchCostFactor: z.number().min(1).max(100),
-    productionTokenProfile: ProductionTokenProfileSchema.nullable().default(null),
-    switchHorizonTurns: z.number().int().positive().nullable().default(null),
-    lowConfidenceThreshold: z.number().min(0).max(1).nullable().default(null),
-    // Absolute accuracy delta required before best-accuracy mode switches away
-    // from a session incumbent that still meets the route threshold.
-    bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
-    // How many times to repeat each case for classifier / decider benchmarks.
-    // Repeated runs reduce variance; the default of 1 preserves the current
-    // single-pass behaviour.
-    classifierRepetitions: z.number().int().min(1).max(5).default(1),
-    deciderRepetitions: z.number().int().min(1).max(5).default(1),
-    // Maximum acceptable p95 latency for the classifier winner; null means no
-    // constraint (cost-only selection).
-    classifierMaxP95LatencyMs: z.number().int().positive().nullable().default(1000),
+    productionTokenProfile: productionTokenProfile.nullable().default(null),
+    switchHorizonTurns: switchHorizonTurns.nullable().default(null),
     // Admin overrides for system-optimal policy settings. Null/absent entries
     // mean "use the computed value". Server-owned: the computed map is never
     // written through this schema.

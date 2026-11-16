@@ -17,15 +17,8 @@ const computedAt = '2026-06-01T00:00:00.000Z';
 const base: PolicySettingSource = {
   minAccuracy: 0.7,
   accuracyNoiseBand: 0.05,
-  frontierMinAccuracyDelta: 0.1,
   productionTokenProfile: null,
   switchHorizonTurns: null,
-  switchCostFactor: 3,
-  bestAccuracySwitchThreshold: 0.05,
-  lowConfidenceThreshold: null,
-  classifierRepetitions: 1,
-  deciderRepetitions: 1,
-  classifierMaxP95LatencyMs: null,
   policyOverrides: null,
   policyComputed: null,
 };
@@ -97,12 +90,26 @@ describe('policy setting resolution', () => {
       maxConcurrency: 100,
       benchmarkUserId: null,
       switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      lowConfidenceThreshold: null,
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: 1000,
       updatedAt: null,
       updatedBy: null,
     });
 
     expect(parsed.policyOverrides).toBeUndefined();
     expect(parsed.policyComputed).toBeUndefined();
+    // The fixed policy settings have no config field: a stored config carrying
+    // one parses with that key dropped.
+    expect(parsed).not.toHaveProperty('frontierMinAccuracyDelta');
+    expect(parsed).not.toHaveProperty('switchCostFactor');
+    expect(parsed).not.toHaveProperty('bestAccuracySwitchThreshold');
+    expect(parsed).not.toHaveProperty('lowConfidenceThreshold');
+    expect(parsed).not.toHaveProperty('classifierRepetitions');
+    expect(parsed).not.toHaveProperty('deciderRepetitions');
+    expect(parsed).not.toHaveProperty('classifierMaxP95LatencyMs');
 
     const states = resolvePolicySettings(parsed);
     expect(Object.keys(states).sort()).toEqual([...POLICY_SETTING_KEYS].sort());
@@ -117,7 +124,6 @@ describe('policy setting resolution', () => {
       deciderModels: [{ id: 'platform/a' }],
       minAccuracy: 0.7,
       benchmarkUserId: null,
-      switchCostFactor: 3,
       updatedAt: null,
       updatedBy: null,
     };

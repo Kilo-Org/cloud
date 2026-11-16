@@ -470,6 +470,12 @@ export type GitTokenService = {
 
 export type Env = {
   AI?: Ai;
+  /**
+   * Deployment environment for runtime-token admission checks; the web app
+   * mints control tokens with the same value (`process.env.NODE_ENV`),
+   * production with the top-level config and development with `env.dev`.
+   */
+  ENVIRONMENT?: string;
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;

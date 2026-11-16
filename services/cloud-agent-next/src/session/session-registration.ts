@@ -110,6 +110,7 @@ import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
+import { tokenEnvironment } from '../shared/token-environment.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
@@ -879,6 +880,7 @@ async function issueSessionRuntimeAuthorization(
       connectionString: ctx.env.HYPERDRIVE.connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
+      environment: tokenEnvironment(ctx.env),
       ...(orgId ? { organizationId: orgId } : {}),
     });
     runtimeAuthorization = {

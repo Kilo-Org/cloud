@@ -19,6 +19,10 @@ export const RuntimeAdmissionSchema = z.object({
   authorizationUserId: z.string().min(1),
   authorizationPepper: z.string().nullable(),
 });
+
+/** Deployment environments that can mint and admit runtime authorization tokens. */
+export const RuntimeEnvironmentSchema = z.enum(['production', 'development']);
+export type RuntimeEnvironment = z.infer<typeof RuntimeEnvironmentSchema>;
 export type RuntimeAdmission = z.infer<typeof RuntimeAdmissionSchema>;
 
 const pepperDigest = z.string().regex(/^[a-f0-9]{64}$/);

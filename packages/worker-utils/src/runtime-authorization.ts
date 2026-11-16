@@ -4,10 +4,11 @@ import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-policy.js';
 import { sha256Hex } from './sha256.js';
-import type { RuntimeAuthorization } from './runtime-authorization-contract.js';
+import type { RuntimeAuthorization, RuntimeEnvironment } from './runtime-authorization-contract.js';
 import {
   RuntimeAuthorizationSchema,
   runtimeAuthorizationMaximumLifetimeMs,
+  RuntimeEnvironmentSchema,
   RuntimeResourceKindSchema,
 } from './runtime-authorization-contract.js';
 export { RuntimeAuthorizationSchema };
@@ -202,12 +203,14 @@ export async function createRuntimeAuthorization(
     token: string;
     resourceKind: RuntimeAuthorization['resourceKind'];
     resourceId: string;
+    environment: RuntimeEnvironment;
     organizationId?: string;
     now?: Date;
   }
 ): Promise<{ authorization: RuntimeAuthorization; token: string; expiresAt: string }> {
   const resourceKind = RuntimeResourceKindSchema.parse(input.resourceKind);
   const resourceId = z.string().min(1).parse(input.resourceId);
+  const environment = RuntimeEnvironmentSchema.parse(input.environment);
   const auth = await verifyKiloTokenForPolicy(input.token, input.secret, {
     audience: resourceKind,
     mode: 'allow-legacy',
@@ -232,6 +235,7 @@ export async function createRuntimeAuthorization(
     (admission.source === 'automation' && claims.tokenPurpose !== 'internal-service') ||
     claims.tokenPurpose === 'delegated-workload' ||
     claims.kiloUserId.length === 0 ||
+    claims.env !== environment ||
     input.organizationId !== claims.organizationId
   )
     throw new Error('Invalid runtime admission');
@@ -294,7 +298,7 @@ export async function createRuntimeAuthorization(
       createdOnPlatform: claims.createdOnPlatform,
       admissionSource: admission.source,
     },
-    env: claims.env,
+    env: environment,
   });
   const signed = await issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
   return { authorization, ...signed };

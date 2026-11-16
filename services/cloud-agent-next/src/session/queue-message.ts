@@ -38,6 +38,7 @@ import { resolveSecret } from '../auth.js';
 import { fetchSessionMetadata } from './metadata.js';
 import jwt from 'jsonwebtoken';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
+import { tokenEnvironment } from '../shared/token-environment.js';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -176,6 +177,7 @@ export async function preflightRuntimeAuthorizationRecovery(
     connectionString: ctx.env.HYPERDRIVE.connectionString,
     resourceKind: 'cloud-agent-next',
     resourceId: metadata.identity.sessionId,
+    environment: tokenEnvironment(ctx.env),
     ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
   });
   const runtimeAuthorizationSeal = await sealRuntimeAuthorization(created.authorization, secret);

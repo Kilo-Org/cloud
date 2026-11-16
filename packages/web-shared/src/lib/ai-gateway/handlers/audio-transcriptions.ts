@@ -342,6 +342,7 @@ export async function handleAudioTranscriptionsRequest(
   });
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  usageContext.ttfb_ms = ttfbMs;
 
   const metricsParams = {
     kiloUserId: user.id,
@@ -349,6 +350,7 @@ export async function handleAudioTranscriptionsRequest(
     isAnonymous: false,
     isStreaming: false,
     userByok: !!userByok,
+    mode: usageContext.mode || undefined,
     provider: provider.type,
     requestedModel: requestedModelLowerCased,
     resolvedModel: normalizeModelId(requestedModelLowerCased),

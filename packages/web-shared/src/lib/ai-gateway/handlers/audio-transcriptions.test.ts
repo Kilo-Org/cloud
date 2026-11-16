@@ -481,6 +481,52 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     );
   });
 
+  it.each([
+    {
+      name: 'a response',
+      upstreamStatus: 200,
+      metricsParams: () => jest.mocked(emitApiMetricsForResponse).mock.calls[0]?.[0],
+    },
+    {
+      name: 'an upstream error',
+      upstreamStatus: 402,
+      metricsParams: () => jest.mocked(emitGatewayApiMetrics).mock.calls[0]?.[0],
+    },
+  ])('reports the mode in the gateway metrics of $name, as chat does', async testCase => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hi' }, testCase.upstreamStatus));
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    await handleAudioTranscriptionsRequest(
+      makeRequest(
+        {
+          model: 'openai/gpt-4o-mini-transcribe',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+        },
+        { 'x-kilocode-mode': 'code' }
+      ) as never
+    );
+
+    expect(testCase.metricsParams()).toMatchObject({ mode: 'code' });
+  });
+
+  it('records the time to the upstream response headers on the usage context, as embeddings does', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hi' }));
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[1].ttfb_ms).toEqual(
+      expect.any(Number)
+    );
+  });
+
   it('forwards the organization data collection policy on JSON requests', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({

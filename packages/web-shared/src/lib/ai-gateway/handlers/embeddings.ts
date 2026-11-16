@@ -357,6 +357,7 @@ export async function handleEmbeddingsRequest(
     isAnonymous: isAnonymousContext(user),
     isStreaming: false,
     userByok: !!userByok,
+    mode: usageContext.mode || undefined,
     provider: provider.type,
     requestedModel: requestedModelLowerCased,
     resolvedModel: normalizeModelId(requestedModelLowerCased),

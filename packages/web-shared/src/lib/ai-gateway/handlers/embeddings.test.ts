@@ -592,6 +592,44 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     );
   });
 
+  it.each([
+    {
+      name: 'a response',
+      upstreamStatus: 200,
+      metricsParams: () => jest.mocked(emitApiMetricsForResponse).mock.calls[0]?.[0],
+    },
+    {
+      name: 'an upstream error',
+      upstreamStatus: 402,
+      metricsParams: () => jest.mocked(emitGatewayApiMetrics).mock.calls[0]?.[0],
+    },
+  ])('reports the mode in the gateway metrics of $name, as chat does', async testCase => {
+    mockedFetch.mockResolvedValue(Response.json({ data: [] }, { status: testCase.upstreamStatus }));
+    const request = new NextRequest('http://localhost:3000/api/gateway/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '127.0.0.1',
+        'x-kilocode-mode': 'code',
+      },
+      body: JSON.stringify({ model, input: 'hello world' }),
+    });
+
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    await handleEmbeddingsRequest(request);
+
+    expect(testCase.metricsParams()).toMatchObject({ mode: 'code' });
+  });
+
+  it('records the time to the upstream response headers on the usage context', async () => {
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    await handleEmbeddingsRequest(makeRequest());
+
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].ttfb_ms).toEqual(
+      expect.any(Number)
+    );
+  });
+
   it.each([undefined, { only: ['openai'] }])(
     'does not add privacy when none is set: %j',
     async provider => {

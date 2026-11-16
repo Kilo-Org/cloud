@@ -147,7 +147,7 @@ export function createAwsBuildArchiveStorage(deps: {
             archive: archive.descriptor,
           }),
           baseImage: context.baseImage,
-          capturedAt: verifiedAt,
+          capturedAt: archive.reservedAt,
           size: archive.descriptor.size,
           durationMs: Math.max(0, verifiedAt - archive.reservedAt),
         };

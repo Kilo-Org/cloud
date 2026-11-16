@@ -1,3 +1,5 @@
+import { scmFailureKind } from '../scm-broker/failure.js';
+import type { BuildTrigger } from './sqlite-schema.js';
 import type { WorkerDb } from '@kilocode/db/client';
 import { organization_memberships } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -24,6 +26,14 @@ import type { EnvironmentScope } from './reference.js';
 const ENVIRONMENT_MANAGE_ROLES: ReadonlySet<string> = new Set(['owner', 'admin']);
 
 export type EnvironmentActorAccess = 'manage' | 'read' | 'none';
+
+/** Manual builds need management access; session-triggered builds need read access. */
+export function environmentBuildActorAllowed(
+  access: EnvironmentActorAccess,
+  trigger: BuildTrigger
+): boolean {
+  return access !== 'none' && (trigger !== 'manual' || access === 'manage');
+}
 
 /**
  * A personal environment is managed only by its owner. An organization
@@ -52,12 +62,6 @@ export async function environmentActorAccess(
 export type BuilderGitSource =
   | { ok: true; git: EnvironmentBuildGit }
   | { ok: false; reason: 'repository_unauthorized' | 'unavailable' };
-
-const TRANSIENT_REASONS: ReadonlySet<string> = new Set([
-  'service_not_configured',
-  'rpc_error',
-  'temporarily_unavailable',
-]);
 
 /**
  * A short-lived, repository-scoped Git source for the initiating actor. A
@@ -97,9 +101,10 @@ export async function resolveBuilderGitSource(
       if (!resolved.success) {
         return {
           ok: false,
-          reason: TRANSIENT_REASONS.has(resolved.error.reason)
-            ? 'unavailable'
-            : 'repository_unauthorized',
+          reason:
+            scmFailureKind('github', resolved.error.reason) === 'transient'
+              ? 'unavailable'
+              : 'repository_unauthorized',
         };
       }
       return {
@@ -120,9 +125,10 @@ export async function resolveBuilderGitSource(
       if (!resolved.success) {
         return {
           ok: false,
-          reason: TRANSIENT_REASONS.has(resolved.reason)
-            ? 'unavailable'
-            : 'repository_unauthorized',
+          reason:
+            scmFailureKind('gitlab', resolved.reason) === 'transient'
+              ? 'unavailable'
+              : 'repository_unauthorized',
         };
       }
       return {
@@ -143,9 +149,10 @@ export async function resolveBuilderGitSource(
       if (!resolved.success) {
         return {
           ok: false,
-          reason: TRANSIENT_REASONS.has(resolved.reason)
-            ? 'unavailable'
-            : 'repository_unauthorized',
+          reason:
+            scmFailureKind('bitbucket', resolved.reason) === 'transient'
+              ? 'unavailable'
+              : 'repository_unauthorized',
         };
       }
       return { ok: true, git: { url, token: resolved.token, platform: 'bitbucket' } };

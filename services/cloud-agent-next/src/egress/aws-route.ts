@@ -1,4 +1,10 @@
 import { forwardResolvedScmCapability } from '../scm-broker/managed-forwarding.js';
+import type { AwsScmAdmission } from './aws-scm-admission.js';
+import type { ControlPlaneScmForwardAdmissionResult } from '../shared/control-plane-protocol.js';
+import { z } from 'zod';
+import { resolveSecret } from '../auth.js';
+import { verifyAwsBuildEgressCredential } from '../environment-build/aws-egress-credential.js';
+import type { AwsEgressProof } from './aws-scoped-admission.js';
 import type { Hono } from 'hono';
 import { readAwsResponse } from '@kilocode/worker-utils/aws-client';
 import {
@@ -12,37 +18,37 @@ import type { Env } from '../types.js';
 import { isSafeSandboxId } from '../shared/control-plane-credential.js';
 import { logger } from '../logger.js';
 
-export async function handleAwsEgress(
+type AwsEgressEndpoint = {
+  policy(proof: AwsEgressProof): Promise<Response>;
+  audit(proof: AwsEgressProof, value: unknown): Promise<Response>;
+  admitScm(
+    proof: AwsEgressProof,
+    request: AwsScmAdmission
+  ): Promise<ControlPlaneScmForwardAdmissionResult>;
+};
+async function handleAwsEgressOperation(
   request: Request,
-  env: Env,
-  sandboxId: string,
-  operation: string
+  operation: string,
+  endpoint: AwsEgressEndpoint,
+  env: Env
 ): Promise<Response> {
   const credential = request.headers.get(AWS_EGRESS_CREDENTIAL_HEADER);
   const identity = request.headers.get(AWS_EGRESS_IDENTITY_HEADER);
-  if (
-    !isSafeSandboxId(sandboxId) ||
-    !credential ||
-    credential.length > 4096 ||
-    !identity ||
-    !/^[a-f0-9]{64}$/.test(identity)
-  )
+  if (!credential || credential.length > 4096 || !identity || !/^[a-f0-9]{64}$/.test(identity))
     return Response.json({ code: 'invalid_identity' }, { status: 401 });
   const proof = { credential, identity };
   try {
-    const stub = env.SANDBOX_CONTROL.getByName(sandboxId);
-    if (operation === 'policy' && request.method === 'POST')
-      return await stub.getAwsEgressPolicy(proof);
+    if (operation === 'policy' && request.method === 'POST') return await endpoint.policy(proof);
     if (operation === 'audit' && request.method === 'POST') {
       const value: unknown = JSON.parse(await readAwsResponse(new Response(request.body), 4096));
-      return await stub.recordAwsEgressAudit(proof, value);
+      return await endpoint.audit(proof, value);
     }
     if (operation === 'scm') {
       const target = request.headers.get(AWS_EGRESS_TARGET_HEADER);
       if (!target || target.length > 16_384)
         return Response.json({ code: 'invalid_target' }, { status: 400 });
       const headers = cleanEgressHeaders(request.headers);
-      const admission = await stub.admitAwsScm(proof, {
+      const admission = await endpoint.admitScm(proof, {
         target: { url: target, method: request.method },
         authorization: {
           ...(headers.has('authorization')
@@ -97,7 +103,70 @@ export async function handleAwsEgress(
     return Response.json({ code: 'egress_unavailable' }, { status: 503 });
   }
 }
+
+export async function handleAwsEgress(
+  request: Request,
+  env: Env,
+  sandboxId: string,
+  operation: string
+): Promise<Response> {
+  if (!isSafeSandboxId(sandboxId))
+    return Response.json({ code: 'invalid_identity' }, { status: 401 });
+  const stub = () => env.SANDBOX_CONTROL.getByName(sandboxId);
+  return handleAwsEgressOperation(
+    request,
+    operation,
+    {
+      policy: proof => stub().getAwsEgressPolicy(proof),
+      audit: (proof, value) => stub().recordAwsEgressAudit(proof, value),
+      admitScm: (proof, metadata) => stub().admitAwsScm(proof, metadata),
+    },
+    env
+  );
+}
+
+export async function handleAwsBuildEgress(
+  request: Request,
+  env: Env,
+  environmentId: string,
+  buildId: string,
+  operation: string
+): Promise<Response> {
+  if (!z.uuid().safeParse(environmentId).success || !z.uuid().safeParse(buildId).success)
+    return Response.json({ code: 'invalid_identity' }, { status: 401 });
+  const token = request.headers.get(AWS_EGRESS_CREDENTIAL_HEADER);
+  if (!token || token.length > 4096)
+    return Response.json({ code: 'invalid_identity' }, { status: 401 });
+  const secret = await resolveSecret(env.NEXTAUTH_SECRET).catch(() => undefined);
+  if (!secret) return Response.json({ code: 'egress_unavailable' }, { status: 503 });
+  const claims = verifyAwsBuildEgressCredential(token, secret);
+  if (!claims || claims.environmentId !== environmentId || claims.buildId !== buildId)
+    return Response.json({ code: 'invalid_identity' }, { status: 401 });
+  const stub = () => env.ENVIRONMENT_BUILD.getByName(environmentId);
+  return handleAwsEgressOperation(
+    request,
+    operation,
+    {
+      policy: proof => stub().getAwsBuildEgressPolicy(environmentId, buildId, proof),
+      audit: (proof, value) =>
+        stub().recordAwsBuildEgressAudit(environmentId, buildId, proof, value),
+      admitScm: (proof, metadata) =>
+        stub().admitAwsBuildScm(environmentId, buildId, proof, metadata),
+    },
+    env
+  );
+}
+
 export function registerAwsEgressRoutes(app: Hono<HonoContext>): void {
+  app.all('/environment-build/:environmentId/:buildId/aws-egress/:operation', context =>
+    handleAwsBuildEgress(
+      context.req.raw,
+      context.env,
+      context.req.param('environmentId'),
+      context.req.param('buildId'),
+      context.req.param('operation')
+    )
+  );
   app.all('/aws-egress/:sandboxId/:operation', context =>
     handleAwsEgress(
       context.req.raw,

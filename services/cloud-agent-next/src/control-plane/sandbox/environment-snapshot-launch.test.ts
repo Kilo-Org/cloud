@@ -609,3 +609,16 @@ describe('environmentSnapshotDecision', () => {
     });
   });
 });
+
+describe('BYOC environment snapshot provider identity', () => {
+  it.each(['vercel', 'aws', 'aws-ecs'] as const)(
+    'preserves %s instead of using native restore',
+    provider => {
+      const snapshot = RESOLVED.snapshot;
+      if (!snapshot) throw new Error('Missing fixture snapshot');
+      expect(snapshotStart({ ...RESOLVED, snapshot: { ...snapshot, provider } })).toMatchObject({
+        provider,
+      });
+    }
+  );
+});

@@ -1,25 +1,29 @@
+import type { BuilderRefusal } from './builder-errors.js';
+import type { BuilderPreparation } from './builder-preparation.js';
+import type { StartupFailureCode } from '../sandbox-control/startup-failure.js';
+import { buildStartupFailureDetail } from './build-startup-failure.js';
+import { environmentBuildActorAllowed } from './access.js';
+import { buildInputMembers, buildInputRecordOf } from './build-input.js';
+import { createBuilderLifecycleState } from './builder-state.js';
 import type {
   EnvironmentBuildInput as ProfileBuildInput,
   EnvironmentReference,
   EnvironmentReferenceRepository,
 } from '@kilocode/cloud-agent-profile';
-import { normalizeRepoFullName, repositoryLeaf } from '@kilocode/cloud-agent-profile';
+import { normalizeRepoFullName } from '@kilocode/cloud-agent-profile';
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import { ProviderCreationError } from '../sandbox-control/provider.js';
 import { RUNTIME_BASE_ABI } from '../sandbox-control/runtime-release.js';
 import {
-  ENVIRONMENT_BUILD_WORKSPACE,
   environmentBuildPinGroupSchema,
   type EnvironmentBuildEvents,
   type EnvironmentBuildEventsReply,
   type EnvironmentBuildInput,
-  type EnvironmentBuildMember,
   type EnvironmentBuildPinGroup,
   type EnvironmentBuildResult,
 } from '../shared/environment-build-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../shared/control-plane-timers.js';
-import { environmentWorkspace } from '../shared/environment-workspace.js';
 import type {
   EnvironmentBuildCancelResult,
   EnvironmentBuildLogs,
@@ -30,7 +34,7 @@ import type {
 import type { EnvironmentActorAccess, BuilderGitSource } from './access.js';
 import {
   builderInstance,
-  vercelBuilderSandboxName,
+  builderAllocation,
   BuilderRetryableError,
   type BuilderAllocation,
   type BuilderLifecycleState,
@@ -108,6 +112,7 @@ export type CoordinatorDeps = {
   armAlarm(at: number): Promise<void>;
   environment: CoordinatorEnvironment;
   provider: BuilderProvider;
+  preparation: BuilderPreparation;
   /** The builder's control base URL for `buildId`, or null when the Worker URL is unknown. */
   runnerUrl(environmentId: string, buildId: string): string | null;
   /** The signed runner credential bound to this build and allocation. */
@@ -121,7 +126,6 @@ export type CoordinatorDeps = {
     claims: { environmentId: string; buildId: string; allocationId: string },
     credential: string
   ): Promise<boolean>;
-  decryptSecrets(encrypted: Record<string, unknown>): Record<string, string>;
   billingInput(input: {
     owner: EnvironmentReference['owner'];
     actorUserId: string;
@@ -199,30 +203,6 @@ export type SnapshotResolution = {
 const ACTIVE_RUNNER_STATES: readonly BuildState[] = ['preparing'];
 const CAPTURE_POLL_MS = 15_000;
 const LEASE_RENEW_INTERVAL_MS = 60_000;
-
-/**
- * The repositories a stored build input authorizes and clones. A V1 input stores
- * its path beside the reference; a V2 input carries every repository in the
- * reference.
- */
-function buildInputMembers(record: BuildInputRecord): EnvironmentReferenceRepository[] {
-  if (record.repoFullName === undefined) return [...record.reference.repositories];
-  return [
-    {
-      identity: record.reference.repository,
-      repoFullName: record.repoFullName,
-      leaf: repositoryLeaf(record.repoFullName),
-    },
-  ];
-}
-
-/** The stored input JSON for a profile build input: one path, or the V2 repositories. */
-function buildInputRecordOf(input: ProfileBuildInput): BuildInputRecord {
-  const { reference, commands, plainVars } = input;
-  if (reference.repositories !== undefined) return { reference, commands, plainVars };
-  if (input.repoFullName === undefined) throw new Error('A V1 build input has no repository path');
-  return { reference, repoFullName: input.repoFullName, commands, plainVars };
-}
 
 export class EnvironmentBuildCoordinator {
   private lastLeaseRenewalAt = 0;
@@ -685,7 +665,7 @@ export class EnvironmentBuildCoordinator {
 
   // --- runner callbacks ------------------------------------------------------
 
-  private async authorizeRunner(
+  async authorizeRunner(
     auth: RunnerAuth,
     states: readonly BuildState[]
   ): Promise<BuildRow | RunnerRefusal> {
@@ -705,73 +685,38 @@ export class EnvironmentBuildCoordinator {
   async runnerInput(auth: RunnerAuth): Promise<EnvironmentBuildInput | RunnerRefusal> {
     const build = await this.authorizeRunner(auth, ACTIVE_RUNNER_STATES);
     if ('refused' in build) return build;
-    const input = parseBuildInput(build);
-    const members = buildInputMembers(input);
-    if (members.length === 0) {
-      await this.failRunning(build.id, 'input_unavailable', 'build has no repository');
+    const prepared = await this.deps.preparation.prepareInput(build);
+    if (!('refused' in prepared)) return prepared;
+    if (
+      prepared.refused === 'repository_unauthorized' ||
+      prepared.refused === 'input_unavailable'
+    ) {
+      await this.failRunning(
+        build.id,
+        prepared.refused,
+        'detail' in prepared ? prepared.detail : undefined
+      );
       return { refused: 'gone' };
     }
-    let secrets: Record<string, string>;
-    try {
-      secrets =
-        build.encrypted_secrets === null
-          ? {}
-          : this.deps.decryptSecrets(
-              JSON.parse(build.encrypted_secrets) as Record<string, unknown>
-            );
-    } catch {
-      await this.failRunning(build.id, 'input_unavailable', 'secrets could not be decrypted');
-      return { refused: 'gone' };
-    }
-    const common = {
-      environmentId: this.environmentId,
-      buildId: build.id,
-      allocationId: auth.allocationId,
-      commands: input.commands,
-      env: { ...input.plainVars, ...secrets },
-      secretKeys: Object.keys(secrets),
-      deadlineAt: build.deadline_at,
-    };
-    // The layout comes from the same owner a session asks: the build's directory,
-    // and the directory of each repository, are where a session would have them.
-    const workspace = environmentWorkspace({
-      sessionDirectory: ENVIRONMENT_BUILD_WORKSPACE,
-      environment: input.reference,
+    return { refused: prepared.refused };
+  }
+
+  async runnerStartupFailure(
+    auth: RunnerAuth,
+    code: StartupFailureCode
+  ): Promise<'ok' | RunnerRefusal> {
+    const build = await this.authorizeRunner(auth, ['preparing']);
+    if ('refused' in build) return build;
+    await this.failRunning(build.id, 'builder_start_failed', buildStartupFailureDetail(code));
+    return 'ok';
+  }
+
+  async refuseBuild(buildId: string, reason: BuilderRefusal): Promise<void> {
+    const obsolete = reason === 'environment_deleted' || reason === 'configuration_changed';
+    const changed = this.beginStopping(buildId, ['preparing'], obsolete ? 'obsolete' : 'failed', {
+      reason,
     });
-    if (input.reference.repositories !== undefined) {
-      const sources: EnvironmentBuildMember[] = [];
-      for (const [index, member] of members.entries()) {
-        const git = await this.deps.environment.gitSource({
-          reference: input.reference,
-          member,
-          actorUserId: build.actor_user_id,
-        });
-        if (!git.ok) {
-          if (git.reason === 'unavailable') return { refused: 'unavailable' };
-          await this.failRunning(build.id, 'repository_unauthorized');
-          return { refused: 'gone' };
-        }
-        sources.push({
-          url: git.git.url,
-          ...(git.git.token === undefined ? {} : { token: git.git.token }),
-          ...(git.git.platform === undefined ? {} : { platform: git.git.platform }),
-          directory: workspace.roots[index]?.directory ?? '',
-          repoFullName: member.repoFullName,
-        });
-      }
-      return { ...common, members: sources, directory: workspace.cwd };
-    }
-    const git = await this.deps.environment.gitSource({
-      reference: input.reference,
-      member: members[0],
-      actorUserId: build.actor_user_id,
-    });
-    if (!git.ok) {
-      if (git.reason === 'unavailable') return { refused: 'unavailable' };
-      await this.failRunning(build.id, 'repository_unauthorized');
-      return { refused: 'gone' };
-    }
-    return { ...common, git: git.git, directory: ENVIRONMENT_BUILD_WORKSPACE };
+    if (changed) await this.deps.armAlarm(this.deps.now());
   }
 
   async runnerEvents(
@@ -815,6 +760,10 @@ export class EnvironmentBuildCoordinator {
     if (build.state !== 'preparing') return 'ok';
     const now = this.deps.now();
     if (result.outcome === 'ready') {
+      if (this.deps.preparation.confirmArtifact(build) === 'archive_failed') {
+        await this.failRunning(build.id, 'archive_failed');
+        return { refused: 'gone' };
+      }
       const ready =
         result.members !== undefined
           ? {
@@ -1141,7 +1090,7 @@ export class EnvironmentBuildCoordinator {
     let reason: string;
     try {
       const access = await this.deps.environment.actorAccess(reference.owner, build.actor_user_id);
-      if (access !== 'none' && (build.trigger !== 'manual' || access === 'manage')) return true;
+      if (environmentBuildActorAllowed(access, build.trigger)) return true;
       reason = 'actor_unauthorized';
     } catch (error) {
       const failure = getContainerCapacityFailureReason(error);
@@ -1305,11 +1254,11 @@ export class EnvironmentBuildCoordinator {
   /** Non-secret provider reconciliation state, kept in the build row. */
   private lifecycleOf(buildId: string): BuilderLifecycleState {
     const { store } = this.deps;
-    return {
-      get: async () => store.providerState(buildId),
-      set: async value => store.setProviderState(buildId, value),
-      clear: async () => store.setProviderState(buildId, undefined),
-    };
+    return createBuilderLifecycleState({
+      read: () => store.providerState(buildId),
+      write: value => store.setProviderState(buildId, value),
+      transaction: write => this.deps.transaction(write),
+    });
   }
 
   private targetOf(build: BuildRow, input: BuildInputRecord): EnvironmentBuildTarget {
@@ -1327,21 +1276,15 @@ export class EnvironmentBuildCoordinator {
     target: EnvironmentBuildTarget,
     allocationId: string
   ): BuilderAllocation {
-    if (target.provider === 'vercel') {
-      return {
-        provider: 'vercel',
-        sandboxId: vercelBuilderSandboxName(build.id),
-        allocationId,
-        owner: input.reference.owner,
-        target,
-      };
-    }
-    return {
-      provider: 'cloudflare-containers',
-      sandboxId: this.deps.builderSandboxId,
+    return builderAllocation({
+      target,
+      environmentId: this.environmentId,
+      buildId: build.id,
       allocationId,
-      instance: target.instance,
-    };
+      owner: input.reference.owner,
+      actorUserId: build.actor_user_id,
+      nativeSandboxId: this.deps.builderSandboxId,
+    });
   }
 
   private allocationOf(build: BuildRow): BuilderAllocation {

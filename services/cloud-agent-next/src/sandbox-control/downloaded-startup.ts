@@ -19,6 +19,8 @@ export async function downloadedStartup(input: {
   allocationId: string;
   deadlineAt: number;
   mainProcess?: 'environment-builder';
+  /** The owning coordinator receives builder startup failures. */
+  reportUrl?: string;
   /** The sandbox's stored harness. A release for another harness is a configuration error. */
   harness?: RuntimeHarness;
 }): Promise<ProviderStartupCommand> {
@@ -40,10 +42,12 @@ export async function downloadedStartup(input: {
     command = renderRuntimeBootstrap({
       descriptor: new TextDecoder().decode(serializeRuntimeRelease(release)),
       artifactBaseUrl: new URL(RUNTIME_ARTIFACT_HTTP_PREFIX, input.env.WORKER_URL).toString(),
-      reportUrl: new URL(
-        `/sandbox-control/${encodeURIComponent(input.sandboxId)}/startup-failure`,
-        input.env.WORKER_URL
-      ).toString(),
+      reportUrl:
+        input.reportUrl ??
+        new URL(
+          `/sandbox-control/${encodeURIComponent(input.sandboxId)}/startup-failure`,
+          input.env.WORKER_URL
+        ).toString(),
       allocationId: input.allocationId,
       grant,
       deadlineAt: input.deadlineAt,

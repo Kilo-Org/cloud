@@ -29,3 +29,11 @@ export class BuilderCreateUncertainError extends Error {
     this.name = 'BuilderCreateUncertainError';
   }
 }
+
+/** A current build constraint changed after allocation. */
+export type BuilderRefusal =
+  | 'actor_unauthorized'
+  | 'environment_deleted'
+  | 'configuration_changed'
+  | 'deadline'
+  | 'unsupported';

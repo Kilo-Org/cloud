@@ -10,7 +10,7 @@ def fail(code):
 
 def allowed_xattr(name):
     return (name.startswith('user.') and len(name) > 5) or name in (
-        'security.capability', 'security.selinux', 'system.posix_acl_access', 'system.posix_acl_default')
+        'security.capability', 'system.posix_acl_access', 'system.posix_acl_default')
 
 def canonical(value):
     if not isinstance(value, str) or not value or len(value.encode('utf-8')) > 4096:
@@ -21,8 +21,20 @@ def canonical(value):
         fail('invalid_archive')
     return value
 
+def nested_mounts():
+    found = set()
+    with open('/proc/self/mountinfo', encoding='utf-8') as stream:
+        for line in stream:
+            fields = line.split(' - ', 1)[0].split()
+            if len(fields) < 6:
+                fail('operation_failed')
+            mount = re.sub(r'\\([0-7]{3})', lambda match: chr(int(match[1], 8)), fields[4])
+            if mount != ROOT and mount.startswith(ROOT.rstrip('/') + '/'):
+                found.add(canonical(os.path.relpath(mount, ROOT)))
+    return found
+
 def blocked(value):
-    if any(value == item or value.startswith(item + '/') for item in C['protectedPaths']):
+    if any(value == item or value.startswith(item + '/') for item in (*C['protectedPaths'], *MOUNTS)):
         return True
     parts = value.split('/')
     if parts[0] not in ('root', 'home'):
@@ -31,7 +43,7 @@ def blocked(value):
 
 def writable(value, destructive=False):
     canonical(value)
-    if blocked(value) or (destructive and any(item.startswith(value + '/') for item in C['protectedPaths'])):
+    if blocked(value) or (destructive and any(item.startswith(value + '/') for item in (*C['protectedPaths'], *MOUNTS))):
         fail('invalid_archive')
 
 def metadata(path):
@@ -59,7 +71,8 @@ def inventory():
                     value = metadata(os.path.join(ROOT, name))
                 except FileNotFoundError:
                     continue
-                if value is None or value[7] != device:
+                # Overlay files can use a backing device without being separate mounts.
+                if value is None or (value[0] == 'directory' and value[7] != device):
                     continue
                 encoded_size += len(json.dumps({name: value}, ensure_ascii=True, separators=(',', ':')).encode('utf-8'))
                 if encoded_size > C['maxMetadataBytes'] - 65_536:
@@ -98,6 +111,9 @@ def xattrs(path):
     result = {}
     total = 0
     for name in sorted(names):
+        # SELinux labels belong to the destination policy, not the source container.
+        if name == 'security.selinux':
+            continue
         if not allowed_xattr(name):
             fail('unsupported_metadata')
         value = os.getxattr(path, name, follow_symlinks=False)
@@ -366,7 +382,7 @@ def validate_tree(root_fd, path, seen):
             present = exists(fd, part)
             if present is None:
                 return False
-            if present.st_dev != ROOT_DEVICE:
+            if stat.S_ISDIR(present.st_mode) and present.st_dev != ROOT_DEVICE:
                 fail('invalid_archive')
             if not stat.S_ISDIR(present.st_mode):
                 if expected is not None and expected.isdir():
@@ -388,7 +404,7 @@ def validate_removal(fd, leaf, path):
     if present is None:
         return
     writable(path, True)
-    if present.st_dev != ROOT_DEVICE:
+    if stat.S_ISDIR(present.st_mode) and present.st_dev != ROOT_DEVICE:
         fail('invalid_archive')
     if stat.S_ISDIR(present.st_mode):
         child = os.open(leaf, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
@@ -501,7 +517,7 @@ def restore():
                 if fd is not None:
                     try:
                         present = exists(fd, leaf)
-                        if present is not None and present.st_dev != ROOT_DEVICE:
+                        if present is not None and stat.S_ISDIR(present.st_mode) and present.st_dev != ROOT_DEVICE:
                             fail('invalid_archive')
                         if present is not None and not (member.isdir() and stat.S_ISDIR(present.st_mode)):
                             validate_removal(fd, leaf, path)
@@ -565,6 +581,7 @@ try:
     C = json.loads(data)
     ROOT = os.path.realpath(C['root'])
     ROOT_DEVICE = os.lstat(ROOT).st_dev
+    MOUNTS = nested_mounts()
     REMOVAL_BUDGET = C['maxEntries'] * 4
     result = {'baseline': baseline, 'capture': capture, 'restore': restore}[C['action']]()
     print(json.dumps({'ok': True, 'result': result}, separators=(',', ':')))

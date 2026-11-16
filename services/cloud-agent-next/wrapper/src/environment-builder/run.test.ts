@@ -129,6 +129,7 @@ function harness(
   options: {
     cleanup?: typeof removeBuildCredentials;
     filesystemBaseline?: () => Promise<void>;
+    retireScm?: () => Promise<void>;
     onClone?: (home: string) => Promise<void>;
     /** Real HTTPS remote URL to the local repository that stands in for it. */
     remotes?: Record<string, string>;
@@ -190,6 +191,7 @@ function harness(
       },
       cleanup: options.cleanup ?? removeBuildCredentials,
       filesystemBaseline: options.filesystemBaseline,
+      retireScm: options.retireScm,
       writeStamp: (dir, stamp) => writeWorkspaceStamp(dir, true, stamp),
       signal,
       inherited: { PATH: process.env.PATH, ENVIRONMENT_BUILD_CREDENTIAL: 'jwt', HOME: '/root' },
@@ -226,6 +228,50 @@ describe('environment build run', () => {
     expect(result.outcome).toBe('ready');
     expect(h.steps.slice(0, 2)).toEqual(['archive', 'clone']);
   });
+  it('waits for SCM retirement after stopping setup processes and before cleanup', async () => {
+    const retirement = Promise.withResolvers<void>();
+    const acknowledged = Promise.withResolvers<void>();
+    let cleaned = false;
+    const h = harness({
+      retireScm: async () => {
+        expect(h.stopped()).toBe(1);
+        expect(await fs.readFile(path.join(directory, 'setup-proof'), 'utf8')).toBe('prepared');
+        retirement.resolve();
+        await acknowledged.promise;
+      },
+      cleanup: async input => {
+        cleaned = true;
+        return removeBuildCredentials(input);
+      },
+    });
+    const pending = h.run(buildInput({ commands: ['printf prepared > setup-proof'] }));
+    await retirement.promise;
+    expect(cleaned).toBe(false);
+    acknowledged.resolve();
+    expect(await pending).toMatchObject({ outcome: 'ready' });
+    expect(cleaned).toBe(true);
+  });
+
+  it('does not publish a ready result when SCM retirement is not acknowledged', async () => {
+    let cleaned = false;
+    const h = harness({
+      retireScm: async () => {
+        throw new Error('retirement unavailable');
+      },
+      cleanup: async () => {
+        cleaned = true;
+        return null;
+      },
+    });
+    expect(await h.run(buildInput())).toMatchObject({
+      outcome: 'failed',
+      step: 'cleanup',
+      reason: 'cleanup_failed',
+    });
+    expect(h.stopped()).toBe(1);
+    expect(cleaned).toBe(false);
+  });
+
   it('fails the build before clone when its filesystem baseline fails', async () => {
     const h = harness({
       filesystemBaseline: async () => {

@@ -230,6 +230,13 @@ export type EnvironmentForSession = {
 };
 
 type EnvironmentBuildInputBase = {
+  /**
+   * The environment's saved network policy. Build admission reads it so the
+   * build target skips the same saved defaults as a session of this environment.
+   * Present on current readers; old persisted build inputs omit the network policy.
+   */
+  egressMode?: EgressMode | null;
+  egressAllowlist?: string[] | null;
   reference: EnvironmentReference;
   commands: string[];
   plainVars: Record<string, string>;
@@ -239,11 +246,6 @@ type EnvironmentBuildInputBase = {
    * resolves it with the repository and context settings to pin one target.
    */
   sandboxAllocation: string | null;
-  /**
-   * The environment's saved network policy. Build admission reads it so the
-   * build target skips the same saved defaults as a session of this environment.
-   */
-  egressMode: EgressMode | null;
 };
 
 /**

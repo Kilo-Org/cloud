@@ -2521,6 +2521,13 @@
       "when": 1794820654243,
       "tag": "0359_api_request_log_2",
       "breakpoints": true
+    },
+    {
+      "idx": 360,
+      "version": "7",
+      "when": 1794825694660,
+      "tag": "0360_drop_legacy_api_request_log",
+      "breakpoints": true
     }
   ]
 }

@@ -47,7 +47,11 @@ const queries = vi.hoisted(() => ({
 const boundary = vi.hoisted(() => ({
   requireSeats: true,
   seatCount: { used: 3, total: 3 },
+  isTrialExpiredForEnforcement: false,
 }));
+
+/** The platform's answer for the billing destination: a link, or plain text. */
+const platform = vi.hoisted(() => ({ billingActionKind: 'link' as 'link' | 'text' }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
@@ -60,7 +64,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       plan: 'enterprise',
       seatCount: boundary.seatCount,
       requireSeats: boundary.requireSeats,
-      isTrialExpiredForEnforcement: false,
+      isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
       parentOrganizationId: null,
     },
     isResolving: false,
@@ -82,7 +86,7 @@ vi.mock('@/lib/credits/add-credits-destination', () => ({
 }));
 
 vi.mock('@/lib/external-billing-action', () => ({
-  externalBillingAction: (url: string) => ({ kind: 'link', url }),
+  externalBillingAction: (url: string) => ({ kind: platform.billingActionKind, url }),
 }));
 
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
@@ -199,6 +203,13 @@ function manageOnWebLink(renderer: ReactTestRenderer, url: string): ReactTestIns
     .find(node => node.props.url === url);
 }
 
+/** The lapsed-plan banner's action, narrowed out of the renderer's untyped props. */
+function bannerAction(renderer: ReactTestRenderer): { label?: string } | undefined {
+  const banner = renderer.root.findByType('OrganizationPlanRefusal' as never);
+  const action: unknown = banner.props.action;
+  return action as { label?: string } | undefined;
+}
+
 beforeEach(() => {
   for (const query of Object.values(queries)) {
     query.isPending = false;
@@ -209,6 +220,8 @@ beforeEach(() => {
   }
   boundary.requireSeats = true;
   boundary.seatCount = { used: 3, total: 3 };
+  boundary.isTrialExpiredForEnforcement = false;
+  platform.billingActionKind = 'link';
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
 });
@@ -326,6 +339,41 @@ describe('OrganizationBillingScreen manage-on-web links', () => {
     const { renderer, unmount } = await mount();
 
     expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen change plan placement', () => {
+  it('leads a lapsed plan from the banner and drops the card duplicate', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+    const { renderer, unmount } = await mount();
+
+    expect(bannerAction(renderer)?.label).toBe('Change plan');
+    // The banner above already holds this destination, so the card's own copy
+    // is gone; the block's other destinations stay.
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)).toBeUndefined();
+    expect(manageOnWebLink(renderer, `${SUBSCRIPTIONS_URL}/seats`)?.props.label).toBe('Buy seats');
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.url).toBe(AUTO_TOP_UP_URL);
+    unmount();
+  });
+
+  it('keeps the card copy for a lapsed plan when the platform offers text only', async () => {
+    // iOS may not link to the billing page, so its banner has no action and
+    // the card is the only place the destination appears.
+    boundary.isTrialExpiredForEnforcement = true;
+    platform.billingActionKind = 'text';
+    const { renderer, unmount } = await mount();
+
+    expect(bannerAction(renderer)).toBeUndefined();
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
+    unmount();
+  });
+
+  it('renders no banner and keeps the card copy while the plan is active', async () => {
+    const { renderer, unmount } = await mount();
+
+    expect(renderer.root.findAllByType('OrganizationPlanRefusal' as never).length).toBe(0);
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
     unmount();
   });
 });

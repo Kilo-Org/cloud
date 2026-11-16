@@ -473,8 +473,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   for (const section of SECTIONS) {
     const atCapLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${section.atCapProfileId}/${section.segment}`;
     const belowCapLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${section.belowCapProfileId}/${section.segment}`;
-    console.log(`Deep link (${section.stem}, ${AT_CAP}): ${atCapLink}`);
-    console.log(`Deep link (${section.stem}, ${BELOW_CAP}): ${belowCapLink}`);
     Object.assign(result, {
       [`${section.stem}AtCapProfileId`]: section.atCapProfileId,
       [`${section.stem}AtCapCount`]: section.cap,

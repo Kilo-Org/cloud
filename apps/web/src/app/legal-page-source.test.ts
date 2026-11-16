@@ -42,9 +42,11 @@ const DROPPED_MARKUP_CASES: Array<[label: string, markup: string, expected: stri
     '<a>click</a>',
   ],
   [
+    // The reference decodes only after the target resolves, so the link is now
+    // an absolute kilo.ai URL: a non-legal destination, keeping its words alone.
     'an entity-encoded javascript: link',
     `<a href="&#106;avascript:alert(1)">click</a>`,
-    '<a>click</a>',
+    '<span>click</span>',
   ],
   [
     'a data: link',
@@ -116,6 +118,12 @@ describe('extractLegalMainHtml', () => {
     expect(result).not.toContain('data-sentry');
   });
 
+  test('absolutizes a relative target that carries a query string', () => {
+    expect(extractMain('<img src="/logo.png?w=800&amp;q=75" alt="Logo">')).toBe(
+      '<img src="https://kilo.ai/logo.png?w=800&amp;q=75" alt="Logo" />'
+    );
+  });
+
   test('keeps entity text readable', () => {
     expect(extractMain('<p>a &amp; b &lt;tag&gt;</p>')).toBe('<p>a &amp; b &lt;tag&gt;</p>');
   });
@@ -159,6 +167,11 @@ describe('extractLegalMainHtml', () => {
       '<span>pricing</span>',
     ],
     ['a relative marketing link', '<a href="pricing">pricing</a>', '<span>pricing</span>'],
+    [
+      'a relative marketing link with a query string',
+      '<a href="/pricing?plan=pro&amp;ref=app">pricing</a>',
+      '<span>pricing</span>',
+    ],
     [
       'a copied pricing URL',
       '<a href="https://kilo.ai/pricing?plan=pro">pricing</a>',

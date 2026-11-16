@@ -76,10 +76,13 @@ const KILO_LEGAL_PATH = /^\/(?:terms|privacy)(?:\/|$)/;
 
 // Every path the document links to resolves against the page it came from, so a
 // relative href names the same kilo.ai destination as the live page and the
-// marketing-link rule below sees it. An absolute URL, a scheme, a fragment, a
-// protocol-relative target and anything carrying an entity stay as written: the
-// sanitizer's own scheme allowlist decides what survives them.
-const NOT_A_PATH = /^(?:[a-z][a-z0-9+.-]*:|#|\/\/)|&/i;
+// marketing-link rule below sees it. An absolute URL, a scheme, a fragment and a
+// protocol-relative target stay as written: the sanitizer's own scheme allowlist
+// decides what survives them. An `&amp;` in a relative target is not an exemption
+// either — the value reaches this transform still relative, and leaving it alone
+// would keep a marketing link such as `/pricing?plan=pro` (or an image with a
+// query string) pointing at app.kilo.ai.
+const NOT_A_PATH = /^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i;
 
 function absolutizeKiloLinks(html: string, sourceUrl: string): string {
   return html.replaceAll(/(href|src)="([^"]*)"/g, (match, attribute: string, target: string) =>

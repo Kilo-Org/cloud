@@ -104,8 +104,10 @@ Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone
 Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
-`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, new-session,
-conversation, manual-review and PR-discussion surfaces; the Agents list and the stored history render
+`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, conversation and
+manual-review surfaces. The new-session form and the PR-discussion comment bar render
+`@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard state
+and animates it with the keyboard's own motion progress. The Agents list and the stored history render
 `@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
 writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
 the property it last applied stays on the native view). The pad never takes more room than the body can spare:
@@ -118,9 +120,13 @@ render a rotation produces, so a frame measured in the previous window is releas
 being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
-pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
-(`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
-without the reduction the content floats a navigation-bar height above the keyboard.
+pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to
+`@/components/keyboard-lift-view` — the provider's Android height spans the translucent navigation bar, so
+without the reduction the content floats a navigation-bar height above the keyboard. That view pads by the
+height the screen computes from `useKeyboardState` and animates it with the keyboard's own motion progress;
+a library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
+frame that has not landed yet leaves the lift short by the container's own top (the pinned new-session footer
+stayed behind the keyboard that way).
 
 Nothing else may read the keyboard: no surface adds a listener beside the provider.
 

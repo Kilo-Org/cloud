@@ -35,8 +35,8 @@ design, invariants, and rollout/rollback.
 `router` is `efficient` or `frontier`; omitted API selectors default to `efficient`.
 Each router owns its saved decider model list, catalog-expanded effort entries, registry,
 runs, routing table, and publication cache key. Accuracy thresholds, `accuracyNoiseBand`,
-`frontierMinAccuracyDelta`, token profile, switch horizon and thresholds are configured
-independently. The classifier and its winner remain shared:
+token profile, and switch horizon are configured independently.
+The classifier and its winner remain shared:
 classifier runs use the efficient configuration even when requested from the frontier view.
 Classifier inference billing is owned by the routing worker. Usage IDs and durable delivery
 objects include the router, so an otherwise identical call on another router cannot be
@@ -63,7 +63,7 @@ global history for link selection, including owner-requested platform-key measur
 
 The daily platform sync recomputes each router's policy settings before publishing, and stores
 the result on the router's `benchmark_config` row (`policy_computed`) with its `computedAt`,
-`source`, and a short evidence string. The effective value of a setting is
+`source`, and a short evidence string. The effective value of an auto setting is
 `override ?? computed ?? stored default`, so an admin override always wins and clearing it
 falls back to the system value. Publishing reads effective values only.
 
@@ -83,9 +83,10 @@ falls back to the system value. Publishing reads effective values only.
   fit its setting (400), and stored overrides or computed values that do not fit are ignored.
 - `frontierMinAccuracyDelta`, `switchCostFactor`, `bestAccuracySwitchThreshold`,
   `lowConfidenceThreshold`, classifier/decider repetitions, and `classifierMaxP95LatencyMs` are
-  fixed constants: the held-out benchmark scores single requests, so session-economics and
-  measurement-effort knobs have no measured basis for a daily recomputation. The Policy tab
-  shows their value and the reason they are read-only.
+  fixed serving constants with no config field and no admin override: the held-out benchmark
+  scores single requests, so session-economics and measurement-effort knobs have no measured
+  basis for a daily recomputation. The Policy tab shows each value and the reason it is fixed,
+  read-only. A stored config that still carries one keeps parsing, and its value is ignored.
 
 An omitted Frontier pool uses its router-specific alias preset.
 The worker benchmarks that pool before it publishes a complete Frontier table.
@@ -351,7 +352,7 @@ Expand a route to inspect every ranked model/effort pair.
 
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
-- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is fixed at 0, so the frontier router uses its own system-computed `minAccuracy`.
+- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is a fixed policy constant of 0, not a configured value, so the frontier router uses its own system-computed `minAccuracy`.
 - Both routers share candidate ranking, with separate validation objectives over their own measured pools.
 - Efficient minimizes estimated request cost without reducing the current policy's validation accuracy.
 - Frontier maximizes validation accuracy without increasing the current policy's estimated request cost.
@@ -1150,7 +1151,7 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 
 - An upload for another engine identity returns `stale_engine_identity` (409); the CLI
   requests a new plan. Unknown cases, variants outside the entry, and repetitions beyond
-  the base router's `deciderRepetitions` return `invalid_request`.
+  the fixed decider repetitions constant (1) return `invalid_request`.
 - Grading matches the platform: a nonzero exit, a timeout, or empty output scores 0;
   otherwise the case's mechanical check or the System One judge grades it.
 - Judged grading cost is billed to `billing.userId` and `billing.organizationId` as usage
@@ -1213,7 +1214,7 @@ curl -s -X PUT 'http://localhost:8814/admin/config?router=efficient' \
   -H "Authorization: Bearer $SECRET" -H 'content-type: application/json' \
   -H 'x-updated-by: you@kilocode.ai' \
   -d '{"classifierModels":["<system-one-model>"],"deciderModels":[{"id":"<catalog-model>"}],
-       "minAccuracy":0.7,"switchCostFactor":3,"benchmarkUserId":null,
+       "minAccuracy":0.7,"benchmarkUserId":null,
        "updatedAt":null,"updatedBy":null}'
 ```
 

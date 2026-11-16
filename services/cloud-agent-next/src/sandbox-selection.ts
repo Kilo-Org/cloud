@@ -1,6 +1,6 @@
 import { enrolledByocVercelOwner } from './byoc/vercel-owner.js';
 import { enrolledByocOwner } from './byoc/owner.js';
-import { fetchAwsByocConnection } from './byoc/aws-credential-resolver.js';
+import { fetchAwsProviderConnection } from './byoc/aws-credential-resolver.js';
 import {
   fetchByocVercelEnrollment,
   fetchByocVercelEnrollmentForUser,
@@ -108,7 +108,6 @@ export function sandboxAllocationUnavailableReason(
   const provider = getSandboxAllocationProvider(allocation);
   switch (provider) {
     case 'aws-ecs':
-      return 'AWS ECS setup is not available yet';
     case 'aws':
       return enrolledByocOwner(env.BYOC_AWS_IDS, owner) === undefined
         ? 'Configure AWS BYOC in Cloud Agent settings to use AWS compute'
@@ -127,6 +126,11 @@ export function sandboxAllocationUnavailableReason(
       return `Sandbox allocation provider ${String(exhaustive)} is not supported`;
     }
   }
+}
+
+function awsAllocationProvider(allocation: SandboxAllocation) {
+  const provider = getSandboxAllocationProvider(allocation);
+  return provider === 'aws' || provider === 'aws-ecs' ? provider : undefined;
 }
 
 export async function getSandboxSelectionCapabilities(
@@ -150,7 +154,7 @@ export async function getSandboxSelectionCapabilities(
   const candidates = await Promise.all(
     SELECTABLE_SANDBOX_ALLOCATIONS.filter(
       allocation =>
-        getSandboxAllocationProvider(allocation) !== 'aws' ||
+        awsAllocationProvider(allocation) === undefined ||
         enrolledByocOwner(env.BYOC_AWS_IDS, owner) !== undefined
     ).map(async allocation => {
       let unavailableReason = sandboxAllocationUnavailableReason(
@@ -160,11 +164,13 @@ export async function getSandboxSelectionCapabilities(
         capability,
         options?.vercelUnavailableReason
       );
-      if (getSandboxAllocationProvider(allocation) === 'aws' && unavailableReason === undefined) {
+      const awsProvider = awsAllocationProvider(allocation);
+      if (awsProvider !== undefined && unavailableReason === undefined) {
         try {
-          const connection = await fetchAwsByocConnection(
+          const connection = await fetchAwsProviderConnection(
             env,
-            owner.orgId !== undefined ? { organizationId: owner.orgId } : { userId: owner.userId }
+            owner.orgId !== undefined ? { organizationId: owner.orgId } : { userId: owner.userId },
+            awsProvider
           );
           if (connection.setupStatus !== 'ready')
             unavailableReason = 'AWS compute setup is not ready';

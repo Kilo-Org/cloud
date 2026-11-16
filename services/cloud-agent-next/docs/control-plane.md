@@ -700,6 +700,11 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   reflogs, and writes the workspace stamp. Start commands never run in a build. The coordinator records the capture as issued before it
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
+- **AWS builder SCM.** Display progress does not grant or revoke repository access. After setup descendants stop,
+  the builder calls `POST /environment-build/:envId/:buildId/retire-scm` with its runner credential.
+  The coordinator persists retirement before acknowledgement. The builder waits before cleanup and final archive capture.
+  Archive upload and publication require retirement. Late progress, input, or broker replies cannot restore access.
+  Cancellation and terminal states deny SCM access even when the builder never sends retirement.
 - **Command policy.** The leading `environmentSetupCommandCount` setup commands are the
   environment's build commands. They run only in the environment build, so the wrapper skips them on
   every session start. The remaining setup commands (request-supplied and profile) run as

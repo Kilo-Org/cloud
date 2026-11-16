@@ -221,7 +221,7 @@ describe('sandbox selection policy', () => {
         );
       else if (preset === 'aws-ecs-8g')
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
-          'AWS ECS setup is not available yet'
+          'Configure AWS BYOC'
         );
       else if (preset === 'cloudflare-shared' || preset === 'isolated-standard')
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
@@ -231,6 +231,41 @@ describe('sandbox selection policy', () => {
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).resolves.toBeUndefined();
     }
   });
+
+  it.each([
+    ['aws-microvm-8g', 'aws'],
+    ['aws-ecs-8g', 'aws-ecs'],
+  ] as const)(
+    'uses only the matching ready AWS connection for %s',
+    async (allocation, provider) => {
+      const userId = 'oauth/aws-selection-user';
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+        const url = new URL(input instanceof Request ? input.url : input);
+        if (url.searchParams.get('provider') !== provider)
+          return new Response(null, { status: 404 });
+        return Response.json({
+          credentialId: '11111111-1111-4111-8111-111111111111',
+          userId,
+          setupStatus: 'ready',
+          credentialsEncrypted: {},
+        });
+      });
+      try {
+        const env = {
+          ...configured,
+          BYOC_AWS_IDS: userId,
+          KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
+          INTERNAL_API_SECRET_PROD: { get: async () => 'synthetic-internal-secret' },
+        } as Env;
+        const capabilities = await getSandboxSelectionCapabilities(env, { userId });
+        const available = availableOptions(capabilities).map(getSandboxAllocation);
+        expect(available).toContain(allocation);
+        expect(available).not.toContain(provider === 'aws' ? 'aws-ecs-8g' : 'aws-microvm-8g');
+      } finally {
+        fetchMock.mockRestore();
+      }
+    }
+  );
 
   it.each(Object.keys(configured).filter(key => key.startsWith('VERCEL_')))(
     'disables only Vercel when operational configuration %s is absent',

@@ -183,6 +183,24 @@ These controls make ZIP bytes deterministic for the same input. Debian package u
 Publish and retain the resulting immutable MicroVM image version; do not claim reproducible image builds.
 Prepared-environment activation remains disabled until its authenticated builder and restore paths pass provider verification.
 
+## Build preparation and repository denial
+
+The coordinator uses neutral `prepareInput` and `confirmArtifact` steps.
+AWS build callbacks have a separate module; the compute provider does not own egress transport.
+A broker refusal after initial admission preserves `repository_unauthorized` and starts cleanup immediately.
+Service, transport and unknown broker failures return `unavailable`. The builder can retry within the existing build deadline.
+Initial repository authorization and later capability issuance use the same failure classification.
+These rules do not enable MicroVM prepared environments or change the provider acceptance requirements.
+
+## Build SCM retirement
+
+Build progress reports do not change SCM authority. The filesystem baseline may report `archive` before cloning starts.
+After setup, the builder stops setup descendants and calls the authenticated `retire-scm` endpoint.
+It waits for acknowledgement before credential cleanup and final archive capture.
+The environment build DO stores `scm: retired` before acknowledgement. Retries are idempotent.
+Late input and renewal requests cannot restore retired grants. Archive upload and publication require retirement.
+Cancellation and terminal build states still deny SCM access, even if the builder never sends the transition.
+
 ## Internal M1 verification
 
 A local Worker used the encrypted connection and two chained STS roles to start the actual runtime on the test image.
@@ -234,7 +252,7 @@ Raw tunnels do not expose inner SNI, Host, method, path or content. The allowlis
 One constrained CA signs a static certificate for supported public SCM hosts. Its signing key is destroyed during initialization.
 Only the leaf private key persists in the proxy-private S3 object. The customer role cannot read that object.
 Managed custom GitLab hosts fail before capability issuance, including additional environment repositories.
-Public roots remain in the runtime trust bundle. New allocations require certificate validity for their full eight-hour lifetime.
+Public roots remain in the runtime trust bundle. New allocations require at least eight hours of certificate validity.
 Existing allocations and replacement proxy tasks use the certificate until its actual expiry.
 
 The proxy image is an immutable ECR digest supplied to the template. This exploratory stack has no automatic image or CA update.
@@ -315,6 +333,44 @@ Local tests verify the shared parsers, encryption, HTTP boundary, database races
 The AWS read test confirms that the live version-1 stack fails the new startup gate after one read.
 Final proxy deployment, prepared environment activation and two-account onboarding remain unverified.
 
+## Shared compute recovery and failure handling
+
+MicroVM and ECS use the same durable lifecycle rules. Each engine retains its own stored reference and request codec.
+A new request records whether submission is prepared, pending or uncertain. Legacy records without this field remain uncertain.
+The first Run request claims the prepared record atomically, after runtime access resolves.
+A concurrent claim makes rejection uncertain. A late refusal cannot retire a concurrent successful launch.
+
+A definite first refusal can retire its own uncontested pending request without physical cleanup.
+For ECS, this requires HTTP 403 or HTTP 400 with an `AccessDeniedException` or `InvalidParameterException` typed header.
+An untyped response, transport failure, server failure or token conflict does not establish this result.
+The same error from a later inspection does not prove that Run failed.
+Known physical identities remain available for cleanup after the replay bound.
+After five minutes, ECS calls `ListTasks` with the pinned cluster and saved `startedBy` value, without replaying `RunTask`.
+One complete result must match the task ARN, cluster and `startedBy` returned by `DescribeTasks`.
+The lifecycle saves that identity before checking mutable runtime metadata. Stop can then terminate a task that fails admission.
+The customer role grants read-only `ecs:ListTasks` access restricted to the stack cluster and region.
+Existing customer stacks need the updated role policy before using this recovery path.
+
+Discovery reads one bounded page. Partial, ambiguous or temporarily missing results never prove termination.
+They retain `provider_cleanup_required` and block replacement. A later attempt can recover when exact identity becomes available.
+`ListTasks` returns only tasks whose desired status is `RUNNING`. A complete empty page therefore means that no live task exists.
+No replay starts after five minutes. One more minute lets a replay that started inside the bound settle.
+After that, an empty page retires the operation, so a task that stopped after a lost reply does not block the sandbox.
+ECS keeps stopped tasks for about an hour. After that, `DescribeTasks` reports the stored ARN as missing and `StopTask` rejects it with HTTP 400.
+When both happen after the same settle period, Stop confirms termination. A recently launched task that reads missing stays retryable.
+MicroVM has no corresponding intent lookup; unidentified requests still require operator repair after five minutes.
+See [ListTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html)
+and [ECS IAM actions](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ecs.html).
+
+The lifecycle persists confirmed compute termination before deleting the launch document.
+If S3 cleanup fails, a recreated adapter retries that deletion without repeating the compute launch or stop.
+Task identity and configuration failures preserve their specific reason through provider coordination.
+Wrapper admission performs provider reads outside the Sandbox DO queue, then checks the allocation and connection again before binding.
+ECS retains its issued proxy-token deadline and snapshot startup path. It does not inherit the MicroVM lifetime cap.
+
+Local regressions verify both engines, concurrent refusal/success, interrupted cleanup, hello races and deadline handling.
+AWS responses are simulated. Live uncertain recovery and customer deployment acceptance remain unverified.
+
 
 
 ## Operator repair of a ready connection
@@ -382,57 +438,3 @@ The RPC carries no request or response body. The Worker route owns header cleanu
 A denied request leaves the body unread. An ambiguous push failure never retries the upstream write.
 The local proxy flow test connects real CONNECT/TLS handling and the control client to this route and admission implementation.
 That test simulates AWS metadata and the broker; it does not prove customer VPC or live provider behavior.
-
-
-## Shared compute recovery and failure handling
-
-MicroVM and ECS use the same durable lifecycle rules. Each engine retains its own stored reference and request codec.
-A new request records whether submission is prepared, pending or uncertain. Legacy records without this field remain uncertain.
-The first Run request claims the prepared record atomically, after runtime access resolves.
-A concurrent claim makes rejection uncertain. A late refusal cannot retire a concurrent successful launch.
-
-A definite first refusal can retire its own uncontested pending request without physical cleanup.
-For ECS, this requires HTTP 403 or HTTP 400 with an `AccessDeniedException` or `InvalidParameterException` typed header.
-An untyped response, transport failure, server failure or token conflict does not establish this result.
-The same error from a later inspection does not prove that Run failed.
-Known physical identities remain available for cleanup after the replay bound.
-After five minutes, ECS calls `ListTasks` with the pinned cluster and saved `startedBy` value, without replaying `RunTask`.
-One complete result must match the task ARN, cluster and `startedBy` returned by `DescribeTasks`.
-The lifecycle saves that identity before checking mutable runtime metadata. Stop can then terminate a task that fails admission.
-The customer role grants read-only `ecs:ListTasks` access restricted to the stack cluster and region.
-Existing customer stacks need the updated role policy before using this recovery path.
-
-Discovery reads one bounded page. Partial, ambiguous or temporarily missing results never prove termination.
-They retain `provider_cleanup_required` and block replacement. A later attempt can recover when exact identity becomes available.
-`ListTasks` returns only tasks whose desired status is `RUNNING`. A complete empty page therefore means that no live task exists.
-No replay starts after five minutes. One more minute lets a replay that started inside the bound settle.
-After that, an empty page retires the operation, so a task that stopped after a lost reply does not block the sandbox.
-ECS keeps stopped tasks for about an hour. After that, `DescribeTasks` reports the stored ARN as missing and `StopTask` rejects it with HTTP 400.
-When both happen after the same settle period, Stop confirms termination. A recently launched task that reads missing stays retryable.
-MicroVM has no corresponding intent lookup; unidentified requests still require operator repair after five minutes.
-See [ListTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html)
-and [ECS IAM actions](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ecs.html).
-
-The lifecycle persists confirmed compute termination before deleting the launch document.
-If S3 cleanup fails, a recreated adapter retries that deletion without repeating the compute launch or stop.
-Task identity and configuration failures preserve their specific reason through provider coordination.
-Wrapper admission performs provider reads outside the Sandbox DO queue, then checks the allocation and connection again before binding.
-ECS retains its issued proxy-token deadline. It does not inherit the MicroVM lifetime cap.
-
-Local regressions verify both engines, concurrent refusal/success, interrupted cleanup, hello races and deadline handling.
-AWS responses are simulated. Live uncertain recovery and customer deployment acceptance remain unverified.
-
-## Prepared environment integration boundary
-
-This layer wires shared archive restore and builder coordination for both AWS engines.
-Public ECS selection and snapshot capability remain disabled until the activation layer.
-MicroVM prepared environments remain disabled pending separate live acceptance.
-
-The builder retires SCM authority through an authenticated, durable acknowledgement.
-It stops repository processes before retirement and uploads the archive only after acknowledgement.
-Display progress does not authorize archive upload or credential removal.
-Known SCM denial fails with a specific reason. Transient issuance failures use bounded retry.
-
-The archive preserves the engine and immutable base identity. Restore failures distinguish
-retryable storage faults from archive faults that require a rebuild. General AWS egress
-stays in the customer VPC; the Worker forwards authenticated SCM traffic.

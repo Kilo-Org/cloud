@@ -12,7 +12,12 @@ import { z } from 'zod';
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 import { reportTrpcError } from '@/lib/force-update-signal';
 import { reportAppError } from '@/lib/telemetry/app-error-reporting';
-import { isPermissionDeniedError, isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
+import {
+  isPermissionDeniedError,
+  isTerminalTrpcCode,
+  isTrpcClientError,
+  readTrpcErrorField,
+} from '@/lib/trpc-error';
 
 const acceptedActiveSessionsDataSchema = z.object({
   sessions: z.array(z.looseObject({ id: z.string() })),
@@ -283,14 +288,16 @@ export function createKiloAppQueryClient(): QueryClient {
         // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also refetched unfocused tabs.
         refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
-          // Read the code through the one tRPC error reader: a client error
-          // carries `data.code`, while a server-shaped one carries
-          // `shape.data.code`, and a validation failure is permanent either
-          // way. Missing the shape retried a 400 the server will never accept
-          // until the budget ran out.
-          const code = readTrpcErrorField(error, 'code');
-          if (code !== undefined && PERMANENT_CODES.has(code)) {
-            return false;
+          // Only a real tRPC envelope carries a server verdict: a client error
+          // has `data.code`, a server-shaped one `shape.data.code`, and a
+          // validation failure is permanent either way. A bare top-level `code`
+          // also appears on filesystem, transport and domain errors, so it never
+          // stops a retry.
+          if (isTrpcClientError(error)) {
+            const code = readTrpcErrorField(error, 'code');
+            if (code !== undefined && PERMANENT_CODES.has(code)) {
+              return false;
+            }
           }
           return failureCount < 2;
         },

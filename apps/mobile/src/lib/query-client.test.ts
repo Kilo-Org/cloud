@@ -95,6 +95,27 @@ describe('query retry policy', () => {
       expect(attempts).toBe(expectedAttempts);
     }
   );
+
+  // A bare top-level `code` also appears on filesystem, transport and domain
+  // errors, so it is not a server verdict and keeps the transient retries.
+  it('retries a non-tRPC error that carries only a top-level code', async () => {
+    const queryClient = createKiloAppQueryClient();
+    const error = Object.assign(new Error('native refusal'), { code: 'UNAUTHORIZED' });
+    let attempts = 0;
+
+    await expect(
+      queryClient.query({
+        queryKey: ['session', 'retry-policy', 'top-level'],
+        retryDelay: 0,
+        queryFn: () => {
+          attempts += 1;
+          throw error;
+        },
+      })
+    ).rejects.toBe(error);
+
+    expect(attempts).toBe(3);
+  });
 });
 
 describe('permission-denied query removal', () => {

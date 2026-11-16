@@ -12,6 +12,9 @@ import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+
+type ValidationResult = { valid: true } | { valid: false; reason: 'unavailable' };
 
 async function tryGetUserFromAuth() {
   try {
@@ -25,6 +28,56 @@ async function tryGetUserFromAuth() {
   }
 }
 
+function validationResult(available: boolean) {
+  return NextResponse.json<ValidationResult>(
+    available ? { valid: true } : { valid: false, reason: 'unavailable' }
+  );
+}
+
+/**
+ * Answers from the member-effective organization catalog, the same catalog the
+ * organization model routes list and the gateway enforces at inference time. The
+ * caller's authentication already proved the membership, so the member subject
+ * needs no `allowNonMember`.
+ */
+async function validateForOrganizationMember(params: {
+  organizationId: string;
+  kiloUserId: string;
+  modelId: string;
+  countryCode: string | null;
+}) {
+  const result = await getAvailableModelsForOrganization(
+    params.organizationId,
+    { type: 'member', kiloUserId: params.kiloUserId },
+    'member',
+    { fromDb: readDb, countryCode: params.countryCode }
+  );
+  if (!result) {
+    return validationResult(false);
+  }
+  // The catalog lists a custom router as a virtual model, so the model id is not
+  // in `data`; it is usable when the router is usable in this context.
+  const customRouters = isCustomRouterModelId(params.modelId)
+    ? await listUsableCustomRouters({
+        userId: params.kiloUserId,
+        organizationId: params.organizationId,
+      })
+    : [];
+  return validationResult(
+    result.data.some(model => model.id === params.modelId) ||
+      customRouters.some(
+        router => customRouterModelId(router.ownerType, router.slug) === params.modelId
+      )
+  );
+}
+
+/**
+ * Scope rule: this route answers for the credential's own scope. An anonymous caller
+ * or a personal credential is answered from the personal catalog, personal BYOK keys
+ * and personal custom routers. A credential bound to an organization is answered from
+ * the member-effective organization catalog. A request that selects an organization
+ * with the request header must use the organization route instead.
+ */
 export async function handleModelValidationRequest(request: NextRequest) {
   const bodyResult = await parseModelValidationRequest(request);
   if (!bodyResult.success) {
@@ -39,9 +92,19 @@ export async function handleModelValidationRequest(request: NextRequest) {
   }
 
   const auth = await tryGetUserFromAuth();
+  const countryCode = requestCountryCode(request.headers);
   try {
+    if (auth?.organizationId && auth.user) {
+      return await validateForOrganizationMember({
+        organizationId: auth.organizationId,
+        kiloUserId: auth.user.id,
+        modelId: bodyResult.data.modelId,
+        countryCode,
+      });
+    }
+
     const models = await getEnhancedOpenRouterModels({
-      countryCode: requestCountryCode(request.headers),
+      countryCode,
       fromDb: readDb,
     });
     if (!Array.isArray(models.data)) {
@@ -59,7 +122,7 @@ export async function handleModelValidationRequest(request: NextRequest) {
       customRouters.some(
         router => customRouterModelId(router.ownerType, router.slug) === bodyResult.data.modelId
       );
-    return NextResponse.json(available ? { valid: true } : { valid: false, reason: 'unavailable' });
+    return validationResult(available);
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models/validate' },

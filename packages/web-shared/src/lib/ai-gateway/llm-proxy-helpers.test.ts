@@ -60,6 +60,7 @@ jest.mock('./processUsage.shared', () => {
   return {
     ...actual,
     computeOpenRouterCostFields: jest.fn(actual.computeOpenRouterCostFields),
+    selectUsageCostFields: jest.fn(actual.selectUsageCostFields),
   };
 });
 
@@ -480,7 +481,7 @@ describe('countAndStoreEmbeddingUsage', () => {
     mockedLogMicrodollarUsage.mockClear();
     mockedProcessTokenData.mockClear();
     jest.mocked(after).mockClear();
-    jest.mocked(sharedUsage.computeOpenRouterCostFields).mockClear();
+    jest.mocked(sharedUsage.selectUsageCostFields).mockClear();
     jest.mocked(captureException).mockClear();
     jest.mocked(captureMessage).mockClear();
   });
@@ -546,7 +547,7 @@ describe('countAndStoreEmbeddingUsage', () => {
         );
         expect(mockedProcessTokenData.mock.calls[0][2]).toBe(servingProvider);
         expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
-        expect(sharedUsage.computeOpenRouterCostFields).not.toHaveBeenCalled();
+        expect(sharedUsage.selectUsageCostFields).not.toHaveBeenCalled();
       }
     );
 
@@ -605,6 +606,53 @@ describe('countAndStoreEmbeddingUsage', () => {
       expect(mockedProcessTokenData).not.toHaveBeenCalled();
       expect(captureException).not.toHaveBeenCalled();
     });
+  });
+
+  it('hands the read body and the billed stats to the response', async () => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+    };
+    const text = JSON.stringify({
+      id: 'embedding-id',
+      model: 'test/embedding',
+      usage: { prompt_tokens: 10, cost: 0.001, is_byok: false },
+    });
+
+    const accounting = countAndStoreEmbeddingUsage(new Response(text), usageContext, undefined);
+    await accounting.usagePromise;
+
+    await expect(accounting.bodyPromise).resolves.toEqual({
+      text,
+      json: { value: JSON.parse(text) },
+    });
+    const billed = await accounting.pricedStatsPromise;
+    expect(billed).toMatchObject({ cost_mUsd: 1000, market_cost: 1000 });
+    expect(mockedLogMicrodollarUsage.mock.calls[0]?.[0]).toBe(billed);
+  });
+
+  it('rejects the read body and prices nothing when the body cannot be read', async () => {
+    const readError = new TypeError('terminated');
+    const accounting = countAndStoreEmbeddingUsage(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.error(readError);
+          },
+        })
+      ),
+      {
+        ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+        api_kind: 'embeddings',
+      },
+      undefined
+    );
+    await accounting.usagePromise;
+
+    await expect(accounting.bodyPromise).rejects.toBe(readError);
+    await expect(accounting.pricedStatsPromise).resolves.toBeNull();
+    expect(mockedProcessTokenData).toHaveBeenCalledTimes(1);
   });
 
   it.each([400, 429])(
@@ -1493,7 +1541,11 @@ describe.each<{
   if (apiKind === 'embeddings' || apiKind === 'audio_transcriptions') {
     it('does not recover from pricing failures', async () => {
       const accountingError = new Error('usage pricing failed');
-      jest.mocked(sharedUsage.computeOpenRouterCostFields).mockImplementationOnce(() => {
+      const pricing =
+        apiKind === 'embeddings'
+          ? sharedUsage.selectUsageCostFields
+          : sharedUsage.computeOpenRouterCostFields;
+      jest.mocked(pricing).mockImplementationOnce(() => {
         throw accountingError;
       });
       countUsage(new Response(JSON.stringify(validPayload)), makeContext(), undefined);
@@ -1796,6 +1848,19 @@ describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {
 
     expect(result.cost_mUsd).toBe(450);
     expect(result.is_byok).toBe(true);
+  });
+
+  it('reads Vercel AI Gateway cost from snake_case provider_metadata, as the response does', () => {
+    const response = JSON.stringify({
+      object: 'list',
+      model: 'mistral/codestral-embed',
+      usage: { prompt_tokens: 3000, total_tokens: 3000 },
+      provider_metadata: { gateway: { cost: '0.00045', marketCost: '0.00045' } },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(450);
   });
 });
 

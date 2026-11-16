@@ -29,8 +29,16 @@ import {
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import type { CustomPricingConfig } from '@kilocode/db/schema-types';
+import type * as LlmProxyHelpers from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 
-import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+const actualLlmProxyHelpers = jest.requireActual<typeof LlmProxyHelpers>(
+  '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'
+);
+
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureException: jest.fn(),
@@ -64,6 +72,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-m
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'),
   countAndStoreEmbeddingUsage: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage'),
+  logMicrodollarUsageAndReportToBouncer: jest.fn(),
+  processTokenData: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
@@ -176,11 +192,10 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     mockedMapModelIdToVercel.mockResolvedValue(model);
     jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     mockedGetKiloEmbeddingModelCatalogFromDatabase.mockResolvedValue(null);
-    jest.mocked(countAndStoreEmbeddingUsage).mockReturnValue({
-      // Metrics are mocked, so the parsed stats never need to settle.
-      statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
-      usagePromise: Promise.resolve(null),
-    });
+    jest
+      .mocked(countAndStoreEmbeddingUsage)
+      .mockImplementation(actualLlmProxyHelpers.countAndStoreEmbeddingUsage);
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(EMPTY_CUSTOM_PRICING_CONFIG);
     mockedFetch.mockResolvedValue(
       new Response(JSON.stringify({ object: 'list', data: [] }), {
         status: 200,
@@ -552,17 +567,19 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       headers: { 'content-type': 'application/json' },
     });
     const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    if (!upstreamResponse.body) throw new Error('expected a response body');
+    const getReaderSpy = jest.spyOn(upstreamResponse.body, 'getReader');
     mockedFetch.mockResolvedValue(upstreamResponse);
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(makeRequest({ provider }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
-    expect(cloneSpy).toHaveBeenCalledTimes(1);
+    // The accounting reads the upstream body once, for the ledger and the response.
+    expect(cloneSpy).not.toHaveBeenCalled();
+    expect(getReaderSpy).toHaveBeenCalledTimes(1);
     expect(countAndStoreEmbeddingUsage).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[0]).toBe(
-      cloneSpy.mock.results[0]?.value
-    );
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[0]).toBe(upstreamResponse);
     expect(emitApiMetricsForResponse).toHaveBeenCalledWith(
       expect.objectContaining({ statusCode: 200 }),
       expect.any(Promise),
@@ -849,6 +866,99 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       expect(
         jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region
       ).toBeNull();
+    });
+  });
+
+  describe('ledger and response cost', () => {
+    const vercelByok = {
+      provider: VERCEL_AI_GATEWAY,
+      userByok: [{ providerId: 'openai' as const, decryptedAPIKey: 'test-byok-key' }],
+      isFree: false,
+    };
+    const customPricing: CustomPricingConfig = {
+      models: [
+        {
+          model,
+          pricing: [
+            {
+              start_context_length: 0,
+              pricing: {
+                prompt_per_million: 0.5,
+                completion_per_million: 0,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    it.each([
+      {
+        name: 'a paid OpenRouter embedding',
+        upstream: { usage: { prompt_tokens: 12, cost: 0.000004, is_byok: false } },
+        cost: 0.000004,
+      },
+      {
+        name: 'a BYOK-served OpenRouter embedding',
+        upstream: {
+          usage: {
+            prompt_tokens: 3000,
+            cost: 0.0000225,
+            is_byok: true,
+            cost_details: { upstream_inference_cost: 0.00045 },
+          },
+        },
+        cost: 0.00045,
+      },
+      {
+        name: 'a Vercel BYOK embedding',
+        provider: vercelByok,
+        upstream: {
+          usage: { prompt_tokens: 3000 },
+          providerMetadata: { gateway: { cost: '0', marketCost: '0.00045' } },
+        },
+        cost: 0,
+      },
+      {
+        name: 'a free model',
+        provider: { provider: OPENROUTER, userByok: null, isFree: true },
+        upstream: { usage: { prompt_tokens: 12, cost: 0.000004, is_byok: false } },
+        cost: 0,
+      },
+      {
+        name: 'a custom-priced model',
+        customPricing,
+        upstream: { usage: { prompt_tokens: 1000, cost: 0.00002, is_byok: false } },
+        cost: 0.0005,
+      },
+      {
+        name: 'a body with snake_case Vercel metadata',
+        upstream: {
+          usage: { prompt_tokens: 12 },
+          provider_metadata: { gateway: { cost: '0.000006', marketCost: '0.000006' } },
+        },
+        cost: 0.000006,
+      },
+    ])('bills what the response reports for $name', async testCase => {
+      if (testCase.provider) mockedGetEmbeddingProvider.mockResolvedValue(testCase.provider);
+      if (testCase.customPricing) {
+        jest.mocked(getCustomPricingConfig).mockResolvedValue(testCase.customPricing);
+      }
+      mockedFetch.mockResolvedValue(
+        Response.json({ object: 'list', data: [], model: 'upstream/model', ...testCase.upstream })
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+      const reported = (await response.json()) as { usage: { cost: number } };
+      await jest.mocked(countAndStoreEmbeddingUsage).mock.results[0]?.value.usagePromise;
+
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
+      const [billed] = jest.mocked(logMicrodollarUsageAndReportToBouncer).mock.calls[0] ?? [];
+      expect(reported.usage.cost).toBe(testCase.cost);
+      expect(billed?.cost_mUsd).toBe(Math.round(testCase.cost * 1_000_000));
     });
   });
 

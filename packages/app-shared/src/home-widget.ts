@@ -256,6 +256,23 @@ function scheduledWake(
   return { at: timestampMs(snapshot.scheduledAt), iso: timestampToIso(snapshot.scheduledAt) };
 }
 
+/**
+ * The one status precedence: a terminal snapshot outranks content, content
+ * outranks a request for input, and an acknowledged snapshot that is neither is
+ * either empty or unavailable.
+ */
+function presentationStatus(
+  snapshot: GlanceableAgentsSnapshot,
+  terminal: boolean,
+  primaryKind: GlanceableStatusKind | null
+): HomeWidgetPresentation['status'] {
+  if (terminal) return snapshot.status === 'privacy' ? 'privacy' : 'signed_out';
+  if (primaryKind !== null) return 'content';
+  if (snapshot.status === 'waiting') return 'waiting';
+  if (snapshot.status === 'empty') return 'empty';
+  return 'unavailable';
+}
+
 /** Pure policy: counts survive activity expiry; only explicit privacy/auth clears hide them. */
 export function buildHomeWidgetPresentation(
   data: HomeWidgetData,
@@ -269,17 +286,7 @@ export function buildHomeWidgetPresentation(
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
   return {
-    status: terminal
-      ? snapshot.status === 'privacy'
-        ? 'privacy'
-        : 'signed_out'
-      : primaryKind !== null
-        ? 'content'
-        : snapshot.status === 'waiting'
-          ? 'waiting'
-          : snapshot.status === 'empty'
-            ? 'empty'
-            : 'unavailable',
+    status: presentationStatus(snapshot, terminal, primaryKind),
     primaryKind,
     primaryCount: primaryKind === null ? 0 : snapshot[primaryKind],
     secondaryCounts: terminal

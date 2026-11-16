@@ -285,29 +285,25 @@ async function hasStoredCredentialMember(): Promise<boolean> {
 const REFUSAL_BODY_MAX_CHARS = 1_024;
 
 /**
- * The parsed body of a 403, read inside the refresh's own deadline and capped.
- * A body that stalls after its headers cannot hold the single-flight refresh
- * open, and anything past the cap cannot be the route's short refusal, so it
- * answers `undefined` and the 403 stays an intermediary's refusal.
+ * The first {@link REFUSAL_BODY_MAX_CHARS} of a 403 body, read inside the
+ * deadline that bounds the refresh. A body that stalls after its headers cannot
+ * hold the single-flight refresh open, and nothing past the cap can be the
+ * route's own short refusal. An unreadable body answers `null`.
  */
-async function readCappedRefusalBody(response: Response): Promise<unknown> {
+async function readRefusalText(response: Response): Promise<string | null> {
   try {
     const text = await response.text();
-    if (text.length === 0) {
-      return undefined;
-    }
-    const parsed: unknown = JSON.parse(text.slice(0, REFUSAL_BODY_MAX_CHARS));
-    return parsed;
+    return text.slice(0, REFUSAL_BODY_MAX_CHARS);
   } catch {
-    return undefined;
+    return null;
   }
 }
 
 /** The refresh response bodies, read under the deadline that bounds the call. */
 type RefreshResponseBodies = {
   response: Response;
-  /** The parsed 403 body; undefined for every other status. */
-  refusalBody: unknown;
+  /** The capped 403 body text; null for every other status and an unreadable body. */
+  refusalText: string | null;
   /** The parsed 2xx body; undefined while the status is a failure. */
   successBody: unknown;
 };
@@ -363,7 +359,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
     // credential write) waiting forever. Both bodies are read inside that
     // deadline: a body that stalls after its headers would otherwise leave the
     // single-flight refresh pending and block every later refresh.
-    const { response, refusalBody, successBody } = await withDeadline(
+    const { response, refusalText, successBody } = await withDeadline(
       CONTROL_PLANE_DEADLINE_MS,
       async (signal): Promise<RefreshResponseBodies> => {
         const res = await fetch(`${API_BASE_URL}${REFRESH_PATH}`, {
@@ -380,12 +376,12 @@ async function doRefresh(): Promise<RefreshOutcome> {
         if (!res.ok) {
           return {
             response: res,
-            refusalBody: res.status === 403 ? await readCappedRefusalBody(res) : undefined,
+            refusalText: res.status === 403 ? await readRefusalText(res) : null,
             successBody: undefined,
           };
         }
         const body: unknown = await res.json();
-        return { response: res, refusalBody: undefined, successBody: body };
+        return { response: res, refusalText: null, successBody: body };
       }
     );
 
@@ -394,6 +390,15 @@ async function doRefresh(): Promise<RefreshOutcome> {
     }
 
     if (!response.ok) {
+      // Only a 403 body can name the route's own refusal, so only that one is
+      // parsed: a body that is not JSON — empty, an intermediary's page — offers
+      // the classifier no refusal, which keeps the 403 retryable.
+      let refusalBody: unknown = undefined;
+      try {
+        refusalBody = JSON.parse(refusalText ?? '');
+      } catch {
+        refusalBody = undefined;
+      }
       // Classify before deciding: a 401 is terminal (the stored pair is gone),
       // a 429/5xx is retryable and carries the server's own back-off, and any
       // other 4xx is terminal without a retry guidance to honour.

@@ -150,15 +150,26 @@ function anonymousCatalogContext(feature: string): EffectiveCatalogContext {
   return { feature };
 }
 
+/**
+ * The e2e catalogue base, honoured only when it has the same origin as
+ * `KILO_OPENROUTER_BASE`. This keeps a session bearer and an attestation proof
+ * on the origin that already receives the model traffic.
+ */
+function e2eValidationBaseUrl(env: ModelValidationEnv): string | undefined {
+  const value = env.E2E_MODEL_VALIDATION_BASE_URL;
+  if (!value || !env.KILO_OPENROUTER_BASE) return undefined;
+  try {
+    return new URL(value).origin === new URL(env.KILO_OPENROUTER_BASE).origin ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function officialValidationUrl(
   env: ModelValidationEnv,
   organizationId: string | undefined
 ): string {
-  const configured =
-    env.E2E_MODEL_VALIDATION_BASE_URL === undefined ||
-    env.E2E_MODEL_VALIDATION_BASE_URL.length === 0
-      ? env.KILOCODE_BACKEND_BASE_URL
-      : env.E2E_MODEL_VALIDATION_BASE_URL;
+  const configured = e2eValidationBaseUrl(env) ?? env.KILOCODE_BACKEND_BASE_URL;
   const backendUrl = (configured ?? DEFAULT_BACKEND_URL).replace(/\/+$/, '');
   return organizationId
     ? `${backendUrl}/api/organizations/${encodeURIComponent(organizationId)}/models/validate`

@@ -1,5 +1,4 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
 import { Text, View } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -14,15 +13,13 @@ type Harness = {
   toastInfo: Mock;
 };
 
-const harness = vi.hoisted(
-  (): Harness => ({
-    params: {},
-    repositories: [],
-    reposSettled: false,
-    providerQueriesResolved: false,
-    toastInfo: vi.fn(),
-  })
-);
+const harness = vi.hoisted((): Harness => ({
+  params: {},
+  repositories: [],
+  reposSettled: false,
+  providerQueriesResolved: false,
+  toastInfo: vi.fn(),
+}));
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => harness.params,

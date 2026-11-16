@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { hasInheritedOrganizationAccess } from '@kilocode/worker-utils';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils';
 import { z } from 'zod';
 
 import type { Env } from '../env';
@@ -1722,7 +1722,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         UUID_RE.test(organizationId) &&
         (accessibleSession !== null
           ? accessibleSession.organizationId === organizationId
-          : await hasInheritedOrganizationAccess(
+          : await hasEffectiveOrganizationAccess(
               getWorkerDb(this.env.HYPERDRIVE.connectionString),
               {
                 kiloUserId,

@@ -1,6 +1,7 @@
 import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
 import type { WorkerDb } from '@kilocode/db/client';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
+import type { OrganizationRole } from '@kilocode/db/schema-types';
 import { and, eq, inArray, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { alias, type AnyPgColumn } from 'drizzle-orm/pg-core';
 
@@ -27,13 +28,13 @@ const activeTargetOrganization = alias(organizations, 'active_target_organizatio
 const activeParentOrganization = alias(organizations, 'active_parent_organization');
 const activeParentMembership = alias(organization_memberships, 'active_parent_membership');
 
-type OrganizationColumns = {
+export type OrganizationColumns = {
   id: AnyPgColumn;
   parent_organization_id: AnyPgColumn;
   deleted_at: AnyPgColumn;
 };
 
-type OrganizationMembershipColumns = {
+export type OrganizationMembershipColumns = {
   organization_id: AnyPgColumn;
   kilo_user_id: AnyPgColumn;
   role: AnyPgColumn;
@@ -58,8 +59,19 @@ function membershipCondition(
   );
 }
 
-/** The caller holds a membership row in the target organization's parent. */
-function inheritingParentMembershipCondition(
+/**
+ * Condition that the caller holds a permitted role in the target
+ * organization's parent organization. It matches only
+ * `ORGANIZATION_PARENT_ACCESS_ROLES`, so a plain `member` of the parent inherits
+ * nothing.
+ *
+ * This is the one definition of inherited organization access. Callers join
+ * their own membership table and their own target organization, so the
+ * condition works for the aliased joins here and for a caller's unaliased
+ * tables. Add {@link parentOrganizationJoinCondition} so a soft-deleted parent
+ * never matches.
+ */
+export function inheritedParentMembershipJoinCondition(
   membership: OrganizationMembershipColumns,
   targetOrganization: OrganizationColumns,
   kiloUserId: string | AnyPgColumn
@@ -117,7 +129,7 @@ export function parentOrganizationJoinCondition(): SQL {
  * child-organization access match.
  */
 export function parentOrganizationMembershipJoinCondition(kiloUserId: string | AnyPgColumn): SQL {
-  return inheritingParentMembershipCondition(
+  return inheritedParentMembershipJoinCondition(
     parentOrganizationMembershipsTable,
     organizations,
     kiloUserId
@@ -196,7 +208,7 @@ export function activeOrganizationAccessSql(
           liveOrganizationCondition(activeParentOrganization)
         )}
       INNER JOIN ${organization_memberships} AS ${activeParentMembership}
-        ON ${inheritingParentMembershipCondition(
+        ON ${inheritedParentMembershipJoinCondition(
           activeParentMembership,
           activeTargetOrganization,
           kiloUserId
@@ -254,25 +266,59 @@ export async function hasOrganizationAccess(
 }
 
 /**
+ * The caller's role for acting for the organization. This is the one rule for
+ * acting for an organization: the direct membership role in the live
+ * organization, otherwise a permitted role (`ORGANIZATION_PARENT_ACCESS_ROLES`)
+ * in its live parent organization, otherwise `null`.
+ * {@link activeOrganizationAccessSql} holds the same conditions in SQL form for
+ * predicates that must stay inside one statement.
+ *
+ * Both reads run together, so a caller pays one round trip for the pair.
+ */
+export async function findEffectiveOrganizationMemberRole(
+  db: OrganizationMembershipDb,
+  params: { kiloUserId: string; organizationId: string }
+): Promise<OrganizationRole | null> {
+  const [directRows, inheritedRows] = await Promise.all([
+    db
+      .select({ role: organization_memberships.role })
+      .from(organization_memberships)
+      .innerJoin(
+        organizations,
+        activeOrganizationJoinCondition(organization_memberships.organization_id)
+      )
+      .where(
+        and(
+          eq(organization_memberships.organization_id, params.organizationId),
+          eq(organization_memberships.kilo_user_id, params.kiloUserId)
+        )
+      )
+      .limit(1),
+    db
+      .select({ role: parentOrganizationMembershipsTable.role })
+      .from(organizations)
+      .innerJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+      .innerJoin(
+        parentOrganizationMembershipsTable,
+        parentOrganizationMembershipJoinCondition(params.kiloUserId)
+      )
+      .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
+      .limit(1),
+  ]);
+
+  return directRows[0]?.role ?? inheritedRows[0]?.role ?? null;
+}
+
+/**
  * True when the user may act for the organization through any membership the
  * read paths honour: a direct membership in the live organization, or a
  * permitted role in its live parent organization. Session reads gate on
  * {@link activeOrganizationAccessSql}, so a user who can read a session in an
  * organization can also create one there.
  */
-export async function hasInheritedOrganizationAccess(
+export async function hasEffectiveOrganizationAccess(
   db: OrganizationMembershipDb,
   params: { kiloUserId: string; organizationId: string }
 ): Promise<boolean> {
-  const rows = await db
-    .select({ id: organizations.id })
-    .from(organizations)
-    .where(
-      and(
-        eq(organizations.id, params.organizationId),
-        activeOrganizationAccessSql(organizations.id, params.kiloUserId)
-      )
-    )
-    .limit(1);
-  return rows[0] !== undefined;
+  return (await findEffectiveOrganizationMemberRole(db, params)) !== null;
 }

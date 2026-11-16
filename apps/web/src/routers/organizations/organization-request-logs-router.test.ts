@@ -459,6 +459,9 @@ describe('organizations.requestLogs trpc router', () => {
           feature_id: vscodeFeatureId,
           latency: 123.5,
           generation_time: 4567,
+          http_user_agent_id: await httpUserAgentId(
+            'Kilo-Code/1.2.3 ai-sdk/provider-utils/1.0.0 runtime/bun/1.0.0'
+          ),
         }),
         metadataRow(vercel.id, { is_user_byok: false, latency: 50, generation_time: 900 }),
         metadataRow(custom.id, { is_user_byok: false }),
@@ -479,6 +482,7 @@ describe('organizations.requestLogs trpc router', () => {
         user: { id: member.id, name: member.google_user_name, email: member.google_user_email },
         model: 'kilo-auto/balanced',
         provider: 'DeepInfra',
+        user_agent_name: 'Kilo Code',
         cost_microdollars: 1234,
         input_tokens: 1000,
         output_tokens: 200,
@@ -512,6 +516,24 @@ describe('organizations.requestLogs trpc router', () => {
         expect(row.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
       }
     });
+
+    it.each([false, true])(
+      'returns Unknown when user agent is absent with metadata present=%s',
+      async hasMetadata => {
+        const usage = usageRow({ organization_id: organization.id });
+        await db.insert(microdollar_usage).values(usage);
+        if (hasMetadata) {
+          await db.insert(microdollar_usage_metadata).values(metadataRow(usage.id));
+        }
+
+        const caller = await createCallerForUser(owner.id);
+        const result = await caller.organizations.requestLogs.list({
+          organizationId: organization.id,
+        });
+
+        expect(result).toMatchObject([{ id: usage.id, user_agent_name: 'Unknown' }]);
+      }
+    );
 
     describe.each(['openai-chatgpt', 'claude-billing'])('%s legacy requests', provider => {
       it.each([false, true])('returns BYOK when metadata exists=%s', async hasMetadata => {
@@ -1340,9 +1362,6 @@ describe('organizations.requestLogs trpc router', () => {
           cancelled: false,
           is_free: false,
           session_id: 'ses_request_logs_test',
-          http_user_agent_id: await httpUserAgentId(
-            'Kilo-Code/1.2.3 ai-sdk/provider-utils/1.0.0 runtime/bun/1.0.0'
-          ),
         })
       );
 
@@ -1365,7 +1384,6 @@ describe('organizations.requestLogs trpc router', () => {
           streamed: true,
           auto_model: null,
           session_id: 'ses_request_logs_test',
-          user_agent: 'Kilo Code',
           editor_name: null,
           mode: null,
           inference_region: null,
@@ -1373,25 +1391,6 @@ describe('organizations.requestLogs trpc router', () => {
         metadata: { status: 'not-configured' },
       });
     });
-
-    it.each([false, true])(
-      'returns Unknown when user agent is absent with metadata present=%s',
-      async hasMetadata => {
-        const usage = usageRow({ organization_id: organization.id });
-        await db.insert(microdollar_usage).values(usage);
-        if (hasMetadata) {
-          await db.insert(microdollar_usage_metadata).values(metadataRow(usage.id));
-        }
-
-        const caller = await createCallerForUser(owner.id);
-        const result = await caller.organizations.requestLogs.getDetails({
-          organizationId: organization.id,
-          usageId: usage.id,
-        });
-
-        expect(result.request.user_agent).toBe('Unknown');
-      }
-    );
 
     it('returns the auto model of an auto request', async () => {
       const usage = usageRow({

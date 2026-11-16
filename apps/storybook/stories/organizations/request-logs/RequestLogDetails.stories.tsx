@@ -12,6 +12,7 @@ const row: RequestLogRow = {
   user: { id: 'user-1', name: 'Ada Lovelace', email: 'ada@example.com' },
   model: 'anthropic/claude-haiku-5.5',
   provider: 'Amazon Bedrock',
+  user_agent_name: 'Kilo Code',
   cost_microdollars: 0,
   input_tokens: 39_322,
   output_tokens: 294,
@@ -37,7 +38,6 @@ const request: RequestLogDetails['request'] = {
   auto_model: null,
   session_id: 'ses_e3ed1c3b0ffe6jOGmgh5Xk2TqLw9',
   editor_name: 'Visual Studio Code 1.145.2',
-  user_agent: 'Kilo Code',
   mode: 'code',
   inference_region: null,
 };

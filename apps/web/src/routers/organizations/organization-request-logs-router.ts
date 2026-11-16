@@ -235,6 +235,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
             requested_model: microdollar_usage.requested_model,
             provider: microdollar_usage.provider,
             inference_provider: microdollar_usage.inference_provider,
+            user_agent: http_user_agent.http_user_agent,
             cost: microdollar_usage.cost,
             input_tokens: microdollar_usage.input_tokens,
             output_tokens: microdollar_usage.output_tokens,
@@ -250,6 +251,10 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           .leftJoin(
             microdollar_usage_metadata,
             eq(microdollar_usage_metadata.id, microdollar_usage.id)
+          )
+          .leftJoin(
+            http_user_agent,
+            eq(http_user_agent.http_user_agent_id, microdollar_usage_metadata.http_user_agent_id)
           )
           .leftJoin(feature, eq(feature.feature_id, microdollar_usage_metadata.feature_id))
           .leftJoin(kilocode_users, eq(kilocode_users.id, microdollar_usage.kilo_user_id))
@@ -273,6 +278,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
       user: { id: row.kilo_user_id, name: row.user_name, email: row.user_email },
       model: row.requested_model ?? row.model,
       provider: formatRequestLogProvider(row.inference_provider),
+      user_agent_name: getUserAgentName(row.user_agent),
       cost_microdollars: row.cost,
       input_tokens: row.input_tokens,
       output_tokens: row.output_tokens,
@@ -378,7 +384,6 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           streamed: microdollar_usage_metadata.streamed,
           auto_model: auto_model.auto_model,
           session_id: microdollar_usage_metadata.session_id,
-          user_agent: http_user_agent.http_user_agent,
           editor_name: editor_name.editor_name,
           mode: mode.mode,
           inference_region: inference_region.inference_region,
@@ -393,10 +398,6 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           eq(finish_reason.finish_reason_id, microdollar_usage_metadata.finish_reason_id)
         )
         .leftJoin(api_kind, eq(api_kind.api_kind_id, microdollar_usage_metadata.api_kind_id))
-        .leftJoin(
-          http_user_agent,
-          eq(http_user_agent.http_user_agent_id, microdollar_usage_metadata.http_user_agent_id)
-        )
         .leftJoin(
           editor_name,
           eq(editor_name.editor_name_id, microdollar_usage_metadata.editor_name_id)
@@ -422,7 +423,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
       }
 
       return {
-        request: { ...request, user_agent: getUserAgentName(request.user_agent) },
+        request,
         metadata: await readRequestLogMetadata(input.usageId),
       };
     }),

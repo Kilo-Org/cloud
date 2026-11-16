@@ -7,7 +7,6 @@ import type {
   RequestLogRow,
   RequestSummary as RequestSummaryComponent,
 } from './RequestLogDetailsSheet';
-import { ABSENT } from './format';
 
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: jest.fn() }));
 
@@ -30,6 +29,7 @@ const row: RequestLogRow = {
   user: { id: 'user-1', name: 'Example', email: 'user@example.com' },
   model: 'example/model',
   provider: 'Example',
+  user_agent_name: 'Kilo Code',
   cost_microdollars: 0,
   input_tokens: 0,
   output_tokens: 0,
@@ -42,7 +42,7 @@ const row: RequestLogRow = {
   generation_time_ms: null,
 };
 
-function details(userAgent: string): RequestLogDetails {
+function details(): RequestLogDetails {
   return {
     request: {
       model: 'example/model',
@@ -57,7 +57,6 @@ function details(userAgent: string): RequestLogDetails {
       auto_model: null,
       session_id: null,
       editor_name: null,
-      user_agent: userAgent,
       mode: null,
       inference_region: null,
     },
@@ -65,9 +64,12 @@ function details(userAgent: string): RequestLogDetails {
   };
 }
 
-function userAgentValue(requestDetails?: RequestLogDetails) {
+function userAgentValue(userAgent: string, requestDetails?: RequestLogDetails) {
   const markup = renderToStaticMarkup(
-    createElement(RequestSummary, { row, details: requestDetails })
+    createElement(RequestSummary, {
+      row: { ...row, user_agent_name: userAgent },
+      details: requestDetails,
+    })
   );
   const { document } = parseHTML(markup);
   const label = Array.from(document.querySelectorAll('dt')).find(
@@ -79,14 +81,14 @@ function userAgentValue(requestDetails?: RequestLogDetails) {
 
 describe('request-log user agent', () => {
   it('shows the human-readable name in the request details', () => {
-    expect(userAgentValue(details('Kilo Code'))).toBe('Kilo Code');
+    expect(userAgentValue('Kilo Code', details())).toBe('Kilo Code');
   });
 
   it('shows Unknown when no user agent was recorded', () => {
-    expect(userAgentValue(details('Unknown'))).toBe('Unknown');
+    expect(userAgentValue('Unknown', details())).toBe('Unknown');
   });
 
-  it('uses the existing placeholder before details load', () => {
-    expect(userAgentValue()).toBe(ABSENT);
+  it('shows the normalized list-row name before details load', () => {
+    expect(userAgentValue('Kilo CLI')).toBe('Kilo CLI');
   });
 });

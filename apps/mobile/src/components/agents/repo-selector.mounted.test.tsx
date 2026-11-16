@@ -7,6 +7,7 @@ import { RepoSelector } from './repo-selector';
 
 const push = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
+vi.mock('@/lib/hooks/use-single-push-route', () => ({ useSinglePushRoute: () => push }));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: vi.fn() },
   Pressable: 'Pressable',

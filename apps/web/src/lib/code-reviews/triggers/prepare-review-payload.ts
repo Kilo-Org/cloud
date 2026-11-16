@@ -75,6 +75,7 @@ import {
 import type { CodeReviewPlatform } from '../core/schemas';
 import { REVIEW_INSTRUCTIONS_FILE } from '../prompts/repository-review-instructions';
 import {
+  MAX_REVIEW_GUIDELINE_IMPORTS,
   resolveReviewGuidelines,
   unusedRepositoryReviewInstructionsLookup,
   type RepositoryReviewInstructionsLookup,
@@ -1047,7 +1048,23 @@ async function fetchRepositoryReviewInstructions(params: {
       baseRef: params.baseRef,
       found: resolved.used,
       truncated: resolved.truncated,
+      importCount: resolved.imports.length,
     });
+
+    const failedImports = resolved.imports.filter(
+      entry => entry.status !== 'imported' && entry.status !== 'dropped_budget'
+    );
+    if (failedImports.length > 0) {
+      warnExceptInTest('[prepareReviewPayload] Review guideline imports not applied', {
+        platform: params.platform,
+        repoFullName: params.repoFullName,
+        baseRef: params.baseRef,
+        failedImportCount: failedImports.length,
+        failedImports: failedImports
+          .slice(0, MAX_REVIEW_GUIDELINE_IMPORTS)
+          .map(({ source, sha, status }) => ({ source: source.slice(0, 200), sha, status })),
+      });
+    }
 
     return resolved;
   } catch (error) {

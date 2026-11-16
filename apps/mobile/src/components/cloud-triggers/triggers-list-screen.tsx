@@ -61,6 +61,11 @@ function TriggerRow({
       : t('cloudAgent.triggers.activationWebhook');
   const details =
     trigger.githubRepo === null ? activation : `${trigger.githubRepo} · ${activation}`;
+  // A scheduled trigger has no inbound URL, and a row this viewer may not write
+  // (another member's run-as-creator trigger, or a role outside the write
+  // roles) keeps its saved state but not a control the server would refuse.
+  const showsInboundUrl = trigger.activationMode === 'webhook';
+  const canToggle = trigger.canEdit === true;
   return (
     <Pressable
       accessibilityRole="button"
@@ -76,26 +81,28 @@ function TriggerRow({
           accessibilityLabel={t('cloudAgent.triggers.activeTitle')}
           value={trigger.isActive}
           onValueChange={onToggle}
-          disabled={busy}
+          disabled={busy || !canToggle}
         />
       </View>
       <Text variant="muted" className="text-xs" numberOfLines={1}>
         {details}
       </Text>
-      <View className="flex-row items-center gap-2">
-        <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
-          {trigger.inboundUrl}
-        </Text>
-        <IconButton
-          accessibilityLabel={t('common.copyLink')}
-          onPress={() => {
-            void copyWebhookUrl(trigger.inboundUrl);
-          }}
-          className="-my-2"
-        >
-          <Copy size={16} color={colors.mutedForeground} />
-        </IconButton>
-      </View>
+      {showsInboundUrl ? (
+        <View className="flex-row items-center gap-2">
+          <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
+            {trigger.inboundUrl}
+          </Text>
+          <IconButton
+            accessibilityLabel={t('common.copyLink')}
+            onPress={() => {
+              void copyWebhookUrl(trigger.inboundUrl);
+            }}
+            className="-my-2"
+          >
+            <Copy size={16} color={colors.mutedForeground} />
+          </IconButton>
+        </View>
+      ) : null}
     </Pressable>
   );
 }

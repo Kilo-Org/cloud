@@ -337,6 +337,26 @@ function assertCanEditExecutionUserTrigger(
   });
 }
 
+/**
+ * Whether an organization viewer may write a trigger, and why not when they may
+ * not — the same rule `assertCanEditExecutionUserTrigger` enforces on update and
+ * `ensureOrganizationAccess` enforces on the router. A caller that renders a
+ * write control needs the answer before the person taps it.
+ */
+function triggerEditability(
+  actorRole: OrganizationRole | undefined,
+  executionUserId: string | null,
+  userId: string
+): { canEdit: boolean; canEditReason: WebhookTriggerEditRestriction | null } {
+  const canEdit =
+    actorRole !== undefined &&
+    TRIGGER_WRITE_ROLES.includes(actorRole) &&
+    (!executionUserId || executionUserId === userId || canManageOrganization(actorRole));
+  // A creator-run trigger names its creator only when that is someone else.
+  const creatorRunLock = executionUserId !== null && executionUserId !== userId;
+  return { canEdit, canEditReason: canEdit ? null : creatorRunLock ? 'creator_run' : 'role' };
+}
+
 async function getOrganizationTriggerExecutionUserId(
   organizationId: string,
   triggerId: string,
@@ -534,6 +554,14 @@ export const webhookTriggersRouter = createTRPCRouter({
   /**
    * List triggers for current user or organization.
    * Reads from PostgreSQL only (can't enumerate DOs).
+   *
+   * `withEditability` also answers, per organization row, whether this viewer
+   * may write it — the question `get` answers for one trigger. That answer
+   * depends on the execution identity the worker holds for a run-as-creator
+   * trigger, so it costs one worker read per row; a surface that renders a
+   * write control per row asks for it and the web list, which does not, keeps
+   * its single database read. Without the flag an organization row reports
+   * `canEdit: null` (unknown), never a guessed `false`.
    */
   list: baseProcedure
     .input(
@@ -541,14 +569,16 @@ export const webhookTriggersRouter = createTRPCRouter({
         organizationId: z.string().uuid().optional(),
         targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).optional(),
         activationMode: z.enum(['webhook', 'scheduled']).optional(),
+        withEditability: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
       const userId = ctx.user.id;
 
       // Verify org membership if organizationId provided
+      let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
       }
 
       // Query PostgreSQL with ownership + optional target type filter
@@ -583,7 +613,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         .where(whereClause)
         .orderBy(cloud_agent_webhook_triggers.created_at);
 
-      return triggers.map(trigger => ({
+      const rows = triggers.map(trigger => ({
         ...trigger,
         inboundUrl: buildInboundUrl(
           input.organizationId ? undefined : userId,
@@ -591,6 +621,35 @@ export const webhookTriggersRouter = createTRPCRouter({
           trigger.triggerId
         ),
       }));
+
+      // One row shape for every branch: a caller's type must not depend on the
+      // scope or the flag, or a cache write of one list cannot accept another.
+      const projectRow = (
+        row: (typeof rows)[number],
+        canEdit: boolean | null,
+        canEditReason: WebhookTriggerEditRestriction | null
+      ) => ({ ...row, canEdit, canEditReason });
+
+      const organizationId = input.organizationId;
+      const readsEditability = organizationId !== undefined && input.withEditability === true;
+      return Promise.all(
+        rows.map(async row => {
+          if (organizationId === undefined) {
+            return projectRow(row, true, null);
+          }
+          if (!readsEditability) {
+            return projectRow(row, null, null);
+          }
+          const workerResult = await getWorkerTrigger(undefined, organizationId, row.triggerId);
+          // A worker failure or a missing configuration does not prove a
+          // restriction — the write reports the real answer — so that row keeps
+          // what its role alone allows instead of hiding a control that works.
+          const executionUserId =
+            workerResult.found === true ? (workerResult.config.executionUserId ?? null) : null;
+          const editability = triggerEditability(actorRole, executionUserId, userId);
+          return projectRow(row, editability.canEdit, editability.canEditReason);
+        })
+      );
     }),
 
   /**
@@ -662,21 +721,15 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
 
       const executionUserId = workerResult.config.executionUserId ?? null;
-      const canEdit =
-        !input.organizationId ||
-        (actorRole !== undefined &&
-          TRIGGER_WRITE_ROLES.includes(actorRole) &&
-          (!executionUserId || executionUserId === userId || canManageOrganization(actorRole)));
+      // A trigger of the viewer's own is always theirs to change.
+      const { canEdit, canEditReason } = input.organizationId
+        ? triggerEditability(actorRole, executionUserId, userId)
+        : { canEdit: true, canEditReason: null };
       const canRun = !input.organizationId
         ? !executionUserId || executionUserId === userId
         : actorRole !== undefined &&
           TRIGGER_WRITE_ROLES.includes(actorRole) &&
           (!executionUserId || executionUserId === userId);
-      const canEditReason: WebhookTriggerEditRestriction = canEdit
-        ? null
-        : executionUserId && executionUserId !== userId
-          ? 'creator_run'
-          : 'role';
 
       return {
         ...workerResult.config,

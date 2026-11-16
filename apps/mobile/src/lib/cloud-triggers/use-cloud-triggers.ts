@@ -27,10 +27,16 @@ function triggerScope(organizationId: string | undefined): { organizationId?: st
 
 /**
  * The list input. Every screen here manages the Cloud Agent target only, so a
- * legacy KiloClaw trigger is never listed as a row this form cannot save.
+ * legacy KiloClaw trigger is never listed as a row this form cannot save. The
+ * rows also ask whether this viewer may write each one: the list paints a
+ * switch per row, and a row the server would refuse must not offer it.
  */
 function triggerListInput(organizationId: string | undefined) {
-  return { ...triggerScope(organizationId), targetType: 'cloud_agent' as const };
+  return {
+    ...triggerScope(organizationId),
+    targetType: 'cloud_agent' as const,
+    withEditability: true,
+  };
 }
 
 export function useCloudTriggers(organizationId: string | undefined, enabled: boolean) {

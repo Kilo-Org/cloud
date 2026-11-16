@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // This file is what deploys. `pnpm run build` takes the output shell from
+  // the Pages release that ../pages/source.json pins, and fails if the
+  // package's output/wrangler.json disagrees with `main`, `no_bundle` or
+  // `compatibility_date` here.
+  //
+  // The shell holds no credentials and no data: no bindings, variables or
+  // secrets belong in this file. Pages embeds it in a sandboxed iframe on its
+  // own origin, so a widget it runs cannot reach a Pages session.
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  // The name and domain of the Worker first deployed by hand from nteract, so
+  // the first deploy from here replaces it in place.
+  "name": "nteract-pages-outputs",
+  // Built by `pnpm run build` from the pinned package: one ES module with no
+  // imports.
+  "main": "dist/worker.js",
+  "no_bundle": true,
+  "compatibility_date": "2026-11-15",
+  // The custom domain is the shell's only address: the Pages viewer loads its
+  // frames from this origin, and nothing uses a workers.dev one.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "pages.kilousercontent.com",
+      "zone_name": "kilousercontent.com",
+      "custom_domain": true,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+}

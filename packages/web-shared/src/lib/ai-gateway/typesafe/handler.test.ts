@@ -55,6 +55,7 @@ import {
   TYPESAFE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { startBouncerDecide } from '@kilocode/web-shared/lib/bouncer/inference';
 import type * as BouncerInference from '@kilocode/web-shared/lib/bouncer/inference';
 import type { DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
@@ -1401,8 +1402,8 @@ describe('handleSystemOneRequest', () => {
     await runAfter();
 
     expect(response.status).toBe(200);
-    const decideParams = jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
-    if (!decideParams || decideParams instanceof Promise) throw new Error('Expected decide params');
+    const decideParams = await jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
+    if (!decideParams) throw new Error('Expected decide params');
     expect(decideParams.account).toMatchObject({
       accountId: `user:${user.id}`,
       userId: user.id,
@@ -1411,6 +1412,47 @@ describe('handleSystemOneRequest', () => {
       expect.anything(),
       expect.objectContaining({
         bouncer: expect.objectContaining({ spendWatch: true, requestId: decideParams.requestId }),
+      })
+    );
+  });
+
+  it('gives bouncer the raw IP and the usage row the payer-safe IP, under one request id', async () => {
+    const ja4Digest = 'T13D1516H2_8DAAF6152771';
+    jest.mocked(extractFraudAndProjectHeaders).mockReturnValue({
+      fraudHeaders: { ...EmptyFraudDetectionHeaders, http_x_vercel_ja4_digest: ja4Digest },
+      projectId: 'project-123',
+      xKiloCodeVersion: null,
+      numericKiloCodeVersion: 0,
+    });
+    mockVerdict({ enforced: false, spendWatch: false, flags: [] });
+    const cloudflareIp = '104.16.0.1';
+    const headers = { 'x-forwarded-for': cloudflareIp, [FEATURE_HEADER]: 'cloud-agent' };
+
+    const response = await handleSystemOneRequest(makeRequest(requestBody, headers));
+    await runAfter();
+
+    expect(response.status).toBe(200);
+    expect(startBouncerDecide).toHaveBeenCalledTimes(1);
+    const decideParams = await jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
+    expect(decideParams).toMatchObject({
+      ip: cloudflareIp,
+      ja4: ja4Digest.toLowerCase(),
+      account: { accountId: `user:${user.id}`, userId: user.id, tier: 'paid' },
+    });
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        bouncer: {
+          requestId: decideParams?.requestId,
+          occurredAt: expect.any(Date),
+          accountId: `user:${user.id}`,
+          clientIp: undefined,
+          clientAttributed: expect.any(Boolean),
+          requestedLogprobs: false,
+          samples: null,
+          promptSimHash: null,
+          spendWatch: false,
+        },
       })
     );
   });

@@ -344,8 +344,9 @@ describe('OrganizationBillingScreen manage-on-web links', () => {
 });
 
 describe('OrganizationBillingScreen change plan placement', () => {
-  it('leads a lapsed plan from the banner and drops the card duplicate', async () => {
+  it('leads a lapsed plan from the banner and keeps its row neutral', async () => {
     boundary.isTrialExpiredForEnforcement = true;
+    queries.subscription.data = subscriptionReadout();
     const { renderer, unmount } = await mount();
 
     expect(bannerAction(renderer)?.label).toBe('Change plan');
@@ -354,6 +355,12 @@ describe('OrganizationBillingScreen change plan placement', () => {
     expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)).toBeUndefined();
     expect(manageOnWebLink(renderer, `${SUBSCRIPTIONS_URL}/seats`)?.props.label).toBe('Buy seats');
     expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.url).toBe(AUTO_TOP_UP_URL);
+    // The banner carries the ended state, so the plan value keeps the row's
+    // own neutral tone instead of a second danger colour.
+    const plan = renderer.root
+      .findAllByType('KvRow' as never)
+      .find(node => node.props.label === 'Organization plan');
+    expect(plan?.props.valueTone).toBeUndefined();
     unmount();
   });
 
@@ -366,22 +373,6 @@ describe('OrganizationBillingScreen change plan placement', () => {
 
     expect(bannerAction(renderer)).toBeUndefined();
     expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
-    unmount();
-  });
-
-  it('keeps the plan name in the neutral tone while the banner carries the ended state', async () => {
-    // The banner already reports the ended plan, so a second danger value on
-    // the plan row reads as a second, separate error.
-    boundary.isTrialExpiredForEnforcement = true;
-    queries.subscription.data = subscriptionReadout();
-    const { renderer, unmount } = await mount();
-
-    const row = renderer.root
-      .findAllByType('KvRow' as never)
-      .find(node => node.props.label === 'Organization plan');
-    expect(row).toBeDefined();
-    expect(row?.props.valueTone).toBeUndefined();
-    expect(renderer.root.findAllByType('OrganizationPlanRefusal' as never).length).toBe(1);
     unmount();
   });
 

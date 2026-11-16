@@ -332,14 +332,12 @@ const SettingsResponseSchema = z.object({
 
 const UpdateGatewaySettingsInputSchema = OrganizationIdInputSchema.extend({
   disable_openrouter: z.boolean().optional(),
-  disable_vercel_ai_gateway: z.boolean().optional(),
   data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
 
 const GatewaySettingsResponseSchema = z.object({
   available: z.boolean(),
   disable_openrouter: z.boolean(),
-  disable_vercel_ai_gateway: z.boolean(),
   data_region: OrganizationDataRegionSchema.nullable(),
 });
 
@@ -358,11 +356,6 @@ function createGatewaySettingsDiffMessage(
   const changes: string[] = [];
   if (!!oldSettings.disable_openrouter !== !!newSettings.disable_openrouter) {
     changes.push(`OpenRouter ${newSettings.disable_openrouter ? 'disabled' : 'enabled'}`);
-  }
-  if (!!oldSettings.disable_vercel_ai_gateway !== !!newSettings.disable_vercel_ai_gateway) {
-    changes.push(
-      `Vercel AI Gateway ${newSettings.disable_vercel_ai_gateway ? 'disabled' : 'enabled'}`
-    );
   }
   if ((oldSettings.data_region ?? null) !== (newSettings.data_region ?? null)) {
     changes.push(
@@ -387,7 +380,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return {
         available: await isGatewaySettingsAvailable(input.organizationId),
         disable_openrouter: organization.settings.disable_openrouter ?? false,
-        disable_vercel_ai_gateway: organization.settings.disable_vercel_ai_gateway ?? false,
         data_region: organization.settings.data_region ?? null,
       };
     }),
@@ -396,7 +388,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .input(UpdateGatewaySettingsInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, disable_openrouter, disable_vercel_ai_gateway, data_region } = input;
+      const { organizationId, disable_openrouter, data_region } = input;
       if (!(await isGatewaySettingsAvailable(organizationId))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -413,9 +405,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const settingsUpdate: OrganizationSettings = { ...organization.settings };
             if (disable_openrouter !== undefined) {
               settingsUpdate.disable_openrouter = disable_openrouter;
-            }
-            if (disable_vercel_ai_gateway !== undefined) {
-              settingsUpdate.disable_vercel_ai_gateway = disable_vercel_ai_gateway;
             }
             if (data_region !== undefined) {
               settingsUpdate.data_region = data_region;

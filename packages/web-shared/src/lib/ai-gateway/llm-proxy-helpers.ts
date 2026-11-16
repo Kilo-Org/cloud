@@ -272,7 +272,6 @@ export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonl
 
 const MANAGED_GATEWAY_NAMES = {
   openrouter: 'OpenRouter',
-  vercel: 'the Vercel AI Gateway',
 } as const satisfies Record<ManagedGatewayId, string>;
 
 export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {

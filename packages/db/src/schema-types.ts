@@ -1618,7 +1618,6 @@ const OrganizationSettingsSchema = z.object({
   // These apply only while the `gateway_settings` organization feature is enabled in the gateway
   // configuration. A null or absent data_region routes Vercel AI Gateway requests globally.
   disable_openrouter: z.boolean().optional(),
-  disable_vercel_ai_gateway: z.boolean().optional(),
   data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
 

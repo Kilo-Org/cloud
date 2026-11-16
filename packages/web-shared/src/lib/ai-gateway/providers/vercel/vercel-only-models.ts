@@ -63,8 +63,7 @@ function hasRoutableProvider({ id, storedModel }: VercelOnlyModel) {
 }
 
 /**
- * Catalog entries for the chat models only Vercel AI Gateway serves, newest first. Empty when Kilo
- * does not route to Vercel.
+ * Catalog entries for the chat models only Vercel AI Gateway serves, newest first.
  */
 export async function getVercelOnlyCatalogModels({
   openRouterModels,
@@ -81,7 +80,6 @@ export async function getVercelOnlyCatalogModels({
     getVercelModelsMetadataFromDatabase(),
     getVercelModelIdOverrides(),
   ]);
-  if (!routingConfig.vercelEnabled) return [];
 
   const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
   return findVercelOnlyModels({

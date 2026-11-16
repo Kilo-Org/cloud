@@ -625,7 +625,6 @@ describe('getProvider routing decision', () => {
           outcome: 'selected',
           gateway: 'openrouter',
           bounded_spending: true,
-          organization_disabled_vercel_ai_gateway: false,
           kilo_ignored_providers: ['deepinfra'],
         },
       ],

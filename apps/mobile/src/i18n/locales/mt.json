@@ -2317,7 +2317,6 @@
       "attachmentUploadingToStart": "Anness għadu qed jitgħabba. Neħħih biex tibda mingħajru.",
       "modelMissingToStart": "Agħżel mudell biex tibda.",
       "staleRepositoryToStart": "Ir-repożitorju magħżul m'għadux disponibbli. Erġa' agħżel repożitorju biex tibda.",
-      "connectProviderToStart": "Ir-repożitorji jiġu minn kont imqabbad GitHub, GitLab jew Bitbucket.",
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",
       "prefillRepoAndModelUnavailable": "Ir-repożitorju u l-mudell tas-sessjoni oriġinali m'għadhomx disponibbli. Agħżel oħrajn hawn taħt.",

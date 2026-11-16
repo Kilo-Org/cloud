@@ -2191,7 +2191,6 @@
       "attachmentUploadingToStart": "एक संलग्नक अजूनही अपलोड होत आहे. त्याशिवाय प्रारंभ करण्यासाठी तो काढून टाका.",
       "modelMissingToStart": "प्रारंभ करण्यासाठी मॉडेल निवडा.",
       "staleRepositoryToStart": "निवडलेली रिपॉझिटरी आता उपलब्ध नाही. प्रारंभ करण्यासाठी पुन्हा रिपॉझिटरी निवडा.",
-      "connectProviderToStart": "रिपॉझिटरी कनेक्ट झालेल्या GitHub, GitLab किंवा Bitbucket खात्यातून येतात.",
       "promptPlaceholder": "तुम्हाला कशावर काम करायचे आहे?",
       "couldNotLoadModels": "मॉडेल लोड करता आली नाहीत.",
       "prefillRepoAndModelUnavailable": "मूळ सत्रातील रिपॉझिटरी आणि मॉडेल आता उपलब्ध नाहीत. खाली नवीन रिपॉझिटरी आणि मॉडेल निवडा.",

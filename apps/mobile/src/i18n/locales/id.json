@@ -1648,7 +1648,6 @@
       "attachmentUploadingToStart": "Satu lampiran masih diunggah. Hapus lampiran itu untuk memulai tanpanya.",
       "modelMissingToStart": "Pilih model untuk memulai.",
       "staleRepositoryToStart": "Repositori yang dipilih tidak lagi tersedia. Pilih repositori lagi untuk memulai.",
-      "connectProviderToStart": "Repositori berasal dari akun GitHub, GitLab, atau Bitbucket yang terhubung.",
       "promptPlaceholder": "Apa yang ingin kamu kerjakan?",
       "couldNotLoadModels": "Tidak dapat memuat model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model dari sesi asal sudah tidak tersedia. Pilih penggantinya di bawah.",

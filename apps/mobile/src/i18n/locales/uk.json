@@ -1686,7 +1686,6 @@
       "attachmentUploadingToStart": "Вкладення ще завантажується. Видаліть його, щоб почати без нього.",
       "modelMissingToStart": "Виберіть модель, щоб почати.",
       "staleRepositoryToStart": "Вибраний репозиторій більше недоступний. Виберіть репозиторій знову, щоб почати.",
-      "connectProviderToStart": "Репозиторії беруться з підключеного облікового запису GitHub, GitLab або Bitbucket.",
       "promptPlaceholder": "Над чим хочете попрацювати?",
       "couldNotLoadModels": "Не вдалося завантажити моделі.",
       "prefillRepoAndModelUnavailable": "Репозиторій і модель початкового сеансу більше недоступні. Виберіть інші нижче.",

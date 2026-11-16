@@ -2258,7 +2258,6 @@
       "attachmentUploadingToStart": "An attachment is still uploading. Remove it to start without it.",
       "modelMissingToStart": "Pick a model to start.",
       "staleRepositoryToStart": "The selected repository is no longer available. Pick a repository again to start.",
-      "connectProviderToStart": "Repositories come from a connected GitHub, GitLab, or Bitbucket account.",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",
       "prefillRepoAndModelUnavailable": "The original session's repository and model are no longer available. Pick them below.",

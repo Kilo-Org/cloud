@@ -2233,7 +2233,6 @@
       "attachmentUploadingToStart": "Un atașament încă se încarcă. Elimină-l pentru a începe fără el.",
       "modelMissingToStart": "Selectează un model pentru a începe.",
       "staleRepositoryToStart": "Depozitul selectat nu mai este disponibil. Selectează din nou un depozit pentru a începe.",
-      "connectProviderToStart": "Depozitele provin dintr-un cont GitHub, GitLab sau Bitbucket conectat.",
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
       "prefillRepoAndModelUnavailable": "Depozitul și modelul sesiunii inițiale nu mai sunt disponibile. Alege altele mai jos.",

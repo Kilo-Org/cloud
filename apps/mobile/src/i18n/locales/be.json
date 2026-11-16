@@ -2275,7 +2275,6 @@
       "attachmentUploadingToStart": "Адно ўкладанне яшчэ загружаецца. Прыбярыце яго, каб пачаць без яго.",
       "modelMissingToStart": "Выберыце мадэль, каб пачаць.",
       "staleRepositoryToStart": "Выбраны рэпазіторый больш недаступны. Выберыце рэпазіторый зноў, каб пачаць.",
-      "connectProviderToStart": "Рэпазіторыі бяруцца з падключанага ўліковага запісу GitHub, GitLab або Bitbucket.",
       "promptPlaceholder": "Над чым будзем працаваць?",
       "couldNotLoadModels": "Не ўдалося загрузіць мадэлі.",
       "prefillRepoAndModelUnavailable": "Рэпазіторый і мадэль зыходнага сеанса больш недаступныя. Выберыце іншыя ніжэй.",

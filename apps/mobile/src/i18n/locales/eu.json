@@ -2191,7 +2191,6 @@
       "attachmentUploadingToStart": "Eranskin bat oraindik igotzen ari da. Kendu ezazu hura gabe hasteko.",
       "modelMissingToStart": "Hautatu modelo bat hasteko.",
       "staleRepositoryToStart": "Hautatutako biltegia ez dago erabilgarri orain. Hautatu berriro biltegi bat hasteko.",
-      "connectProviderToStart": "Biltegiak konektatuta dagoen GitHub, GitLab edo Bitbucket kontu batetik datoz.",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
       "couldNotLoadModels": "Ezin izan dira modeloak kargatu.",
       "prefillRepoAndModelUnavailable": "Jatorrizko saioaren biltegia eta modeloa jada ez daude erabilgarri. Aukeratu beste batzuk behean.",

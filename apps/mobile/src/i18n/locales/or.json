@@ -2191,7 +2191,6 @@
       "attachmentUploadingToStart": "ଏକ ସଂଲଗ୍ନ ଫାଇଲ୍ ଏବେ ବି ଅପଲୋଡ୍ ହେଉଛି। ଏହା ବିନା ଆରମ୍ଭ କରିବାକୁ ଏହାକୁ ହଟାନ୍ତୁ।",
       "modelMissingToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
       "staleRepositoryToStart": "ବଛା ଯାଇଥିବା ରିପୋଜିଟୋରୀ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆରମ୍ଭ କରିବାକୁ ପୁଣି ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
-      "connectProviderToStart": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକ ଏକ ସଂଯୋଜିତ GitHub, GitLab କିମ୍ବା Bitbucket ଆକାଉଣ୍ଟରୁ ଆସନ୍ତି।",
       "promptPlaceholder": "କେଉଁ କାମ କରିବାକୁ ଚାହୁଁଛନ୍ତି?",
       "couldNotLoadModels": "ମଡେଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "prefillRepoAndModelUnavailable": "ମୂଳ ସେସନର ରିପୋଜିଟୋରୀ ଓ ମଡେଲ୍ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ନିମ୍ନରେ ନୂଆ ରିପୋଜିଟୋରୀ ଓ ମଡେଲ୍ ବାଛନ୍ତୁ।",

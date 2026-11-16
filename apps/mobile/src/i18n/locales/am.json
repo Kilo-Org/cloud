@@ -2191,7 +2191,6 @@
       "attachmentUploadingToStart": "አንድ አባሪ አሁንም በመስቀል ላይ ነው። ያለ እሱ ለመጀመር ያስወግዱት።",
       "modelMissingToStart": "ለመጀመር ሞዴል ይምረጡ።",
       "staleRepositoryToStart": "የተመረጠው ማከማቻ ከእንግዲህ አይገኝም። ለመጀመር እንደገና ማከማቻ ይምረጡ።",
-      "connectProviderToStart": "ማከማቻዎች ከተገናኘ GitHub፣ GitLab ወይም Bitbucket መለያ ይመጣሉ።",
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
       "prefillRepoAndModelUnavailable": "የመጀመሪያው ክፍለ ጊዜ ማከማቻና ሞዴል ከእንግዲህ አይገኙም። ከታች ሌሎችን ይምረጡ።",

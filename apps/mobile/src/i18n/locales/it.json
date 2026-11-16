@@ -1634,7 +1634,6 @@
       "attachmentUploadingToStart": "Un allegato è ancora in caricamento. Rimuovilo per iniziare senza di esso.",
       "modelMissingToStart": "Seleziona un modello per iniziare.",
       "staleRepositoryToStart": "Il repository selezionato non è più disponibile. Seleziona di nuovo un repository per iniziare.",
-      "connectProviderToStart": "I repository provengono da un account GitHub, GitLab o Bitbucket collegato.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
       "prefillRepoAndModelUnavailable": "Il repository e il modello della sessione originale non sono più disponibili. Selezionali qui sotto.",

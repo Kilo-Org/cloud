@@ -1648,7 +1648,6 @@
       "attachmentUploadingToStart": "Ein Anhang wird noch hochgeladen. Entferne ihn, um ohne ihn zu starten.",
       "modelMissingToStart": "Wähle ein Modell aus, um zu starten.",
       "staleRepositoryToStart": "Das ausgewählte Repository ist nicht mehr verfügbar. Wähle erneut ein Repository aus, um zu starten.",
-      "connectProviderToStart": "Repositorys stammen aus einem verbundenen GitHub-, GitLab- oder Bitbucket-Konto.",
       "promptPlaceholder": "Woran möchtest du arbeiten?",
       "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",
       "prefillRepoAndModelUnavailable": "Das Repository und das Modell der ursprünglichen Sitzung sind nicht mehr verfügbar. Wähle unten ein anderes Repository und ein anderes Modell aus.",

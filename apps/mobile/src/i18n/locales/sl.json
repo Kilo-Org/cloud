@@ -2275,7 +2275,6 @@
       "attachmentUploadingToStart": "Priponka se še nalaga. Odstrani jo, da začneš brez nje.",
       "modelMissingToStart": "Izberi model za začetek.",
       "staleRepositoryToStart": "Izbrano skladišče ni več na voljo. Znova izberi skladišče za začetek.",
-      "connectProviderToStart": "Skladišča prihajajo iz povezanega računa GitHub, GitLab ali Bitbucket.",
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
       "prefillRepoAndModelUnavailable": "Skladišče in model prvotne seje nista več na voljo. Izberi ju spodaj.",

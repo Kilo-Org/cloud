@@ -2191,7 +2191,6 @@
       "attachmentUploadingToStart": "Все още се качва прикачен файл. Премахни го, за да започнеш без него.",
       "modelMissingToStart": "Избери модел, за да започнеш.",
       "staleRepositoryToStart": "Избраното хранилище вече не е достъпно. Избери хранилище отново, за да започнеш.",
-      "connectProviderToStart": "Хранилищата идват от свързан акаунт в GitHub, GitLab или Bitbucket.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",
       "prefillRepoAndModelUnavailable": "Хранилището и моделът от първоначалната сесия вече не са достъпни. Избери други по-долу.",

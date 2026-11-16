@@ -2191,7 +2191,6 @@
       "attachmentUploadingToStart": "Viðhengi er enn í upphleðslu. Fjarlægðu það til að byrja án þess.",
       "modelMissingToStart": "Veldu líkan til að byrja.",
       "staleRepositoryToStart": "Valið kóðasafn er ekki lengur tiltækt. Veldu kóðasafn aftur til að byrja.",
-      "connectProviderToStart": "Kóðasöfn koma frá tengdum reikningi á GitHub, GitLab eða Bitbucket.",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",
       "prefillRepoAndModelUnavailable": "Kóðasafn og líkan upprunalegu lotunnar eru ekki lengur tiltæk. Veldu ný hér að neðan.",

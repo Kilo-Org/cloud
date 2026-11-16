@@ -1648,7 +1648,6 @@
       "attachmentUploadingToStart": "Bir ek hâlâ yükleniyor. Onsuz başlamak için kaldır.",
       "modelMissingToStart": "Başlamak için bir model seç.",
       "staleRepositoryToStart": "Seçilen depo artık kullanılamıyor. Başlamak için yeniden bir depo seç.",
-      "connectProviderToStart": "Depolar bağlı bir GitHub, GitLab veya Bitbucket hesabından gelir.",
       "promptPlaceholder": "Ne üzerinde çalışmak istersin?",
       "couldNotLoadModels": "Modeller yüklenemedi.",
       "prefillRepoAndModelUnavailable": "Önceki oturumun deposu ve modeli artık kullanılamıyor. Aşağıdan yeni bir depo ve model seç.",

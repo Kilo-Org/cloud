@@ -2275,7 +2275,6 @@
       "attachmentUploadingToStart": "Příloha se stále nahrává. Odeberte ji, abyste mohli začít bez ní.",
       "modelMissingToStart": "Vyberte model, abyste mohli začít.",
       "staleRepositoryToStart": "Vybraný repozitář už není dostupný. Vyberte repozitář znovu, abyste mohli začít.",
-      "connectProviderToStart": "Repozitáře pocházejí z připojeného účtu GitHub, GitLab nebo Bitbucket.",
       "promptPlaceholder": "Na čem chcete pracovat?",
       "couldNotLoadModels": "Modely se nepodařilo načíst.",
       "prefillRepoAndModelUnavailable": "Repozitář a model původní relace už nejsou dostupné. Níže vyberte jiný repozitář a model.",

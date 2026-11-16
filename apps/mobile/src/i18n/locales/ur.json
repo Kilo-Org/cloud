@@ -2191,7 +2191,6 @@
       "attachmentUploadingToStart": "ایک منسلکہ ابھی اپ لوڈ ہو رہا ہے۔ اس کے بغیر شروع کرنے کے لیے اسے ہٹائیں۔",
       "modelMissingToStart": "شروع کرنے کے لیے ایک ماڈل منتخب کریں۔",
       "staleRepositoryToStart": "منتخب کردہ ریپوزٹری اب دستیاب نہیں ہے۔ شروع کرنے کے لیے دوبارہ ریپوزٹری منتخب کریں۔",
-      "connectProviderToStart": "ریپوزٹریاں منسلک GitHub، GitLab یا Bitbucket اکاؤنٹ سے آتی ہیں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
       "prefillRepoAndModelUnavailable": "اصل سیشن کی ریپوزٹری اور ماڈل اب دستیاب نہیں ہیں۔ نیچے سے نئی ریپوزٹری اور ماڈل منتخب کریں۔",

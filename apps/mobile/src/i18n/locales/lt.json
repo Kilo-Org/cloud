@@ -2275,7 +2275,6 @@
       "attachmentUploadingToStart": "Priedas vis dar įkeliamas. Jei norite pradėti be jo, pašalinkite jį.",
       "modelMissingToStart": "Norėdami pradėti, pasirinkite modelį.",
       "staleRepositoryToStart": "Pasirinktos saugyklos nebepasiekiama. Norėdami pradėti, dar kartą pasirinkite saugyklą.",
-      "connectProviderToStart": "Saugyklos gaunamos iš susietos GitHub, GitLab arba Bitbucket paskyros.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",

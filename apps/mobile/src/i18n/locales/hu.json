@@ -2191,7 +2191,6 @@
       "attachmentUploadingToStart": "Egy csatolmány feltöltése még folyamatban van. Távolítsd el, hogy nélküle indíts.",
       "modelMissingToStart": "Válassz egy modellt az indításhoz.",
       "staleRepositoryToStart": "A kiválasztott adattár már nem érhető el. Válassz újra adattárat az indításhoz.",
-      "connectProviderToStart": "Az adattárak egy csatlakoztatott GitHub-, GitLab- vagy Bitbucket-fiókból származnak.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
       "prefillRepoAndModelUnavailable": "Az eredeti munkamenet adattára és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",

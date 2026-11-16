@@ -65,33 +65,39 @@ export function SettingsSwitchRow({
   onValueChange: (next: boolean) => void;
   disabled?: boolean;
 }>) {
+  // One switch per row: the tap target around the copy is hidden from
+  // accessibility, and the native control carries the switch role, label, and
+  // state, so a tap runs one handler and a screen reader sees one target.
   return (
-    <Pressable
-      className={cn(
-        ROW_TARGET_CLASS,
-        'flex-row items-center justify-between gap-3 py-2 active:opacity-70'
-      )}
-      disabled={disabled}
-      accessibilityRole="switch"
-      accessibilityLabel={label}
-      accessibilityState={{ checked: value, disabled }}
-      onPress={() => {
-        onValueChange(!value);
-      }}
-    >
-      <View className="flex-1 gap-0.5">
-        <Text className={cn('text-sm', disabled ? 'text-muted-foreground' : 'text-foreground')}>
-          {label}
-        </Text>
-        {description ? <Text className="text-xs text-muted-foreground">{description}</Text> : null}
-      </View>
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 py-2')}>
+      <Pressable
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="min-w-0 flex-1 active:opacity-70"
+        disabled={disabled}
+        onPress={() => {
+          onValueChange(!value);
+        }}
+      >
+        <View className="gap-0.5">
+          <Text className={cn('text-sm', disabled ? 'text-muted-foreground' : 'text-foreground')}>
+            {label}
+          </Text>
+          {description ? (
+            <Text className="text-xs text-muted-foreground">{description}</Text>
+          ) : null}
+        </View>
+      </Pressable>
       <Switch
         value={value}
         disabled={disabled}
         onValueChange={onValueChange}
         accessibilityLabel={label}
+        accessibilityHint={description}
+        accessibilityState={{ checked: value, disabled }}
       />
-    </Pressable>
+    </View>
   );
 }
 

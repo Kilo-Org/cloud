@@ -12,6 +12,10 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { useTRPC } from '@/lib/trpc';
 
 import { type CloudTriggerListRow } from './trigger-draft';
@@ -21,10 +25,18 @@ function triggerScope(organizationId: string | undefined): { organizationId?: st
   return organizationId === undefined ? {} : { organizationId };
 }
 
+/**
+ * The list input. Every screen here manages the Cloud Agent target only, so a
+ * legacy KiloClaw trigger is never listed as a row this form cannot save.
+ */
+function triggerListInput(organizationId: string | undefined) {
+  return { ...triggerScope(organizationId), targetType: 'cloud_agent' as const };
+}
+
 export function useCloudTriggers(organizationId: string | undefined, enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.webhookTriggers.list.queryOptions(triggerScope(organizationId), { enabled })
+    trpc.webhookTriggers.list.queryOptions(triggerListInput(organizationId), { enabled })
   );
 }
 
@@ -71,7 +83,9 @@ export function useTriggerMutations(triggerId: string | null, organizationId: st
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const scope = triggerScope(organizationId);
-  const listKey = trpc.webhookTriggers.list.queryKey(scope);
+  const listKey = trpc.webhookTriggers.list.queryKey(triggerListInput(organizationId));
+  // One key per list, so a rollback knows whether a newer toggle has landed since.
+  const listGenerationKey = `webhook-triggers-list:${organizationId ?? 'personal'}`;
 
   const settleList = () => {
     void queryClient.invalidateQueries(trpc.webhookTriggers.list.pathFilter());
@@ -81,6 +95,7 @@ export function useTriggerMutations(triggerId: string | null, organizationId: st
     trpc.webhookTriggers.update.mutationOptions({
       onMutate: async input => {
         await queryClient.cancelQueries({ queryKey: listKey });
+        const generation = nextMutationGeneration(listGenerationKey);
         const previous = queryClient.getQueryData<CloudTriggerListRow[]>(listKey);
         queryClient.setQueryData<CloudTriggerListRow[]>(listKey, rows =>
           rows?.map(row =>
@@ -89,10 +104,16 @@ export function useTriggerMutations(triggerId: string | null, organizationId: st
               : row
           )
         );
-        return { previous };
+        return { generation, previous };
       },
+      // A failed toggle restores only the snapshot it took: a newer toggle's own
+      // write stays in the cache instead of being rolled back to an older list.
       onError: (error, _input, context) => {
-        if (context?.previous !== undefined) {
+        if (
+          context &&
+          isLatestMutationGeneration(listGenerationKey, context.generation) &&
+          context.previous !== undefined
+        ) {
           queryClient.setQueryData(listKey, context.previous);
         }
         toast.error(error.message);

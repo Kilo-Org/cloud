@@ -4,9 +4,10 @@ import { useId, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { MAX_LOG_EXPORT_IDS, splitIdList } from '@/lib/admin/log-export-ids';
 import { toast } from 'sonner';
 
 type LogExportFormProps = {
@@ -16,8 +17,9 @@ type LogExportFormProps = {
   downloadPath: string;
   idLabel: string;
   idPlaceholder: string;
-  idInputMode?: 'numeric';
-  showErrorsOnly?: boolean;
+  showGenerationId?: boolean;
+  /** Accept several IDs and generation IDs, separated by commas, spaces or newlines. */
+  multipleIds?: boolean;
   /** Optional gate that must succeed before the browser navigates. */
   preflight?: () => Promise<void>;
 };
@@ -28,8 +30,8 @@ export function LogExportForm({
   downloadPath,
   idLabel,
   idPlaceholder,
-  idInputMode,
-  showErrorsOnly = false,
+  showGenerationId = false,
+  multipleIds = false,
   preflight,
 }: LogExportFormProps) {
   const fieldId = useId();
@@ -42,12 +44,12 @@ export function LogExportForm({
   const [endTime, setEndTime] = useState('');
   const [model, setModel] = useState('');
   const [sessionId, setSessionId] = useState('');
-  const [errorsOnly, setErrorsOnly] = useState(false);
+  const [generationId, setGenerationId] = useState('');
 
   async function handleDownload() {
     const params = new URLSearchParams();
-    if (id.trim()) {
-      params.set('id', id.trim());
+    for (const value of multipleIds ? splitIdList(id) : [id.trim()].filter(Boolean)) {
+      params.append('id', value);
     }
     if (userId.trim()) {
       params.set('userId', userId.trim());
@@ -73,8 +75,12 @@ export function LogExportForm({
     if (sessionId.trim()) {
       params.set('sessionId', sessionId.trim());
     }
-    if (showErrorsOnly && errorsOnly) {
-      params.set('errorsOnly', 'true');
+    if (showGenerationId) {
+      for (const value of multipleIds
+        ? splitIdList(generationId)
+        : [generationId.trim()].filter(Boolean)) {
+        params.append('generationId', value);
+      }
     }
 
     if (preflight) {
@@ -100,14 +106,59 @@ export function LogExportForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor={`${fieldId}-id`}>{idLabel}</Label>
-            <Input
-              id={`${fieldId}-id`}
-              inputMode={idInputMode}
-              placeholder={idPlaceholder}
-              value={id}
-              onChange={e => setId(e.target.value)}
-            />
+            {multipleIds ? (
+              <Textarea
+                id={`${fieldId}-id`}
+                aria-describedby={`${fieldId}-id-list-help`}
+                placeholder={idPlaceholder}
+                rows={3}
+                value={id}
+                onChange={e => setId(e.target.value)}
+              />
+            ) : (
+              <Input
+                id={`${fieldId}-id`}
+                placeholder={idPlaceholder}
+                value={id}
+                onChange={e => setId(e.target.value)}
+              />
+            )}
           </div>
+
+          {showGenerationId && (
+            <div className="space-y-2">
+              <Label htmlFor={`${fieldId}-generationId`}>
+                {multipleIds ? 'Generation IDs' : 'Generation ID'}
+              </Label>
+              {multipleIds ? (
+                <Textarea
+                  id={`${fieldId}-generationId`}
+                  aria-describedby={`${fieldId}-id-list-help`}
+                  placeholder="Enter upstream generation IDs"
+                  rows={3}
+                  value={generationId}
+                  onChange={e => setGenerationId(e.target.value)}
+                />
+              ) : (
+                <Input
+                  id={`${fieldId}-generationId`}
+                  placeholder="Enter upstream generation ID"
+                  value={generationId}
+                  onChange={e => setGenerationId(e.target.value)}
+                />
+              )}
+            </div>
+          )}
+
+          {multipleIds && (
+            <p
+              id={`${fieldId}-id-list-help`}
+              className="text-muted-foreground text-xs sm:col-span-2"
+            >
+              Separate IDs with commas, spaces or new lines. Up to {MAX_LOG_EXPORT_IDS} of each. A
+              record matches if it has any of the listed IDs.
+            </p>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor={`${fieldId}-userId`}>User ID or email</Label>
@@ -196,19 +247,6 @@ export function LogExportForm({
             whole day, and the end time includes the full minute.
           </p>
         </div>
-
-        {showErrorsOnly && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={`${fieldId}-errorsOnly`}
-              checked={errorsOnly}
-              onCheckedChange={checked => setErrorsOnly(checked === true)}
-            />
-            <Label htmlFor={`${fieldId}-errorsOnly`} className="cursor-pointer">
-              Errors only (status &ge; 400 or error present)
-            </Label>
-          </div>
-        )}
 
         <Button onClick={() => void handleDownload()}>
           <Download />

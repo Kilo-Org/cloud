@@ -9,7 +9,7 @@ All templates use a light-mode design system aligned with the Customer.io market
 | Property | Value |
 |---|---|
 | Font | `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif` |
-| Page background | `#ffffff` |
+| Page background | none — never set `#ffffff`; the client renders its own page background (dark mode via `kc-page`) |
 | Content width | 520px max |
 | H1 / strong / emphasis | `#1a1a1a`, 24px/700 |
 | Body text | `#333`, 14–15px, line-height 1.5–1.7 |
@@ -23,6 +23,23 @@ All templates use a light-mode design system aligned with the Customer.io market
 | Section divider | `1px solid #ebebea` |
 | Footer divider | `1px solid #eee` |
 | Footer legal / address | `#ccc`, 11px |
+
+### Dark mode
+
+`renderTemplate()` injects a `<meta name="color-scheme">` pair and a `prefers-color-scheme: dark` stylesheet into every `emails/` template. Templates must not add their own `<style>` or `<meta>` tags. Every inline palette color needs the matching class on the same element (`email.test.ts` enforces this):
+
+| Inline style on the element | Class |
+|---|---|
+| Page/outer table (no `background-color`; never `#ffffff`) | `kc-page` |
+| `color: #1a1a1a` (not on `background-color: #1a1a1a`) | `kc-strong` |
+| `color: #333` | `kc-text` |
+| `color: #555` | `kc-muted` |
+| `color: #ccc` | `kc-faint` |
+| `background-color: #f6f6f4`, `border: 1px solid #ebebea` | `kc-box` |
+| `border-top: 1px solid #ebebea` or `#eee` | `kc-divider` |
+| Primary CTA `background-color: #1a1a1a` | `kc-btn` |
+
+One element can need several classes (e.g. `class="kc-divider kc-muted"`). Keep the inline styles unchanged — they are the light theme; the classes let dark clients override them. Never set `background-color: #ffffff`; leave the page background unset so the client's own (light or dark) background shows through, with `kc-page` only supplying the dark override. Any new inline palette value requires a corresponding class and dark rule.
 
 ## Content Guidelines
 

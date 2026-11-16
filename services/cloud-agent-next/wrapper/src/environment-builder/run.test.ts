@@ -128,6 +128,7 @@ function v2Input(
 function harness(
   options: {
     cleanup?: typeof removeBuildCredentials;
+    filesystemBaseline?: () => Promise<void>;
     onClone?: (home: string) => Promise<void>;
     /** Real HTTPS remote URL to the local repository that stands in for it. */
     remotes?: Record<string, string>;
@@ -188,6 +189,7 @@ function harness(
         stopped += 1;
       },
       cleanup: options.cleanup ?? removeBuildCredentials,
+      filesystemBaseline: options.filesystemBaseline,
       writeStamp: (dir, stamp) => writeWorkspaceStamp(dir, true, stamp),
       signal,
       inherited: { PATH: process.env.PATH, ENVIRONMENT_BUILD_CREDENTIAL: 'jwt', HOME: '/root' },
@@ -198,6 +200,47 @@ function harness(
 }
 
 describe('environment build run', () => {
+  it('takes the filesystem baseline before cloning or writing repository credentials', async () => {
+    let baseline = false;
+    const h = harness({
+      filesystemBaseline: async () => {
+        expect(await fs.stat(directory).catch(() => null)).toBeNull();
+        const home = directoryHome(directory, homeRoot);
+        expect(await fs.stat(gitCredentialRecordPath(home)).catch(() => null)).toBeNull();
+        baseline = true;
+      },
+      onClone: async home => {
+        expect(baseline).toBe(true);
+        expect(await fs.stat(gitCredentialRecordPath(home)).catch(() => null)).not.toBeNull();
+      },
+    });
+    const result = await h.run(
+      buildInput({
+        git: {
+          url: 'https://github.com/acme/app.git',
+          token: 'synthetic-alias',
+          platform: 'github',
+        },
+      })
+    );
+    expect(result.outcome).toBe('ready');
+    expect(h.steps.slice(0, 2)).toEqual(['archive', 'clone']);
+  });
+  it('fails the build before clone when its filesystem baseline fails', async () => {
+    const h = harness({
+      filesystemBaseline: async () => {
+        throw new Error('inventory failure');
+      },
+    });
+    expect(await h.run(buildInput())).toMatchObject({
+      outcome: 'failed',
+      step: 'archive',
+      reason: 'archive_failed',
+    });
+    expect(await fs.stat(directory).catch(() => null)).toBeNull();
+    expect(h.stopped()).toBe(0);
+  });
+
   it('accepts and executes a full 16,000-character environment script', async () => {
     const commands = [
       ('#' + 'x'.repeat(15900) + '\nprintf prepared > long-script-proof').padEnd(16000, ' '),

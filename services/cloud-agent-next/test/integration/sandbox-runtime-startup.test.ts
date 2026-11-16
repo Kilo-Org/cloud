@@ -21,7 +21,13 @@ import {
   readRepositoryLaunch,
   recordRepositoryLaunch,
 } from '../../src/control-plane/sandbox/repository-launch.js';
-import type { StartupFailureCode } from '../../src/sandbox-control/startup-failure.js';
+import {
+  registerStartupFailureRoute,
+  type StartupFailureCode,
+} from '../../src/sandbox-control/startup-failure.js';
+import { Hono } from 'hono';
+import type { HonoContext } from '../../src/hono-context.js';
+import type { Env } from '../../src/types.js';
 import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
 import { downloadedStartup } from '../../src/sandbox-control/downloaded-startup.js';
 import { runtimeArtifactReleaseKey } from '../../src/sandbox-control/runtime-artifact-keys.js';
@@ -292,6 +298,34 @@ describe('downloaded startup in the allocation owner', () => {
     });
     expect(await report(h, 0, 'artifact_invalid')).toBe(false);
   });
+  it.each(['environment_restore_unavailable', 'environment_restore_failed'] as const)(
+    'keeps the authenticated %s report through route failure and allocation fencing',
+    async code => {
+      const h = await setup(`sbx__restore_${code}`, { holdFirst: true });
+      await prepare(h);
+      const startup = h.provider.launches[0];
+      const app = new Hono<HonoContext>();
+      registerStartupFailureRoute(app);
+      const send = () =>
+        app.request(
+          `/sandbox-control/${h.id}/startup-failure`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${startup.env.SANDBOX_CONTROL_CREDENTIAL}` },
+            body: JSON.stringify({ allocationId: startup.env.CONTROL_PLANE_ALLOCATION_ID, code }),
+          },
+          env as unknown as Env
+        );
+      expect((await send()).status).toBe(204);
+      await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('stopped'));
+      expect(
+        h.peer.routeUpdatesFor(SESSION).some(x => x.state === 'failed' && x.reason === code)
+      ).toBe(true);
+      expect((await send()).status).toBe(409);
+      await release(h, 0);
+      expect(h.provider.launches).toHaveLength(1);
+    }
+  );
   it('stops immediately without image fallback when a permanent report wins', async () => {
     const h = await setup('sbx__runtime_report_first', { holdFirst: true, snapshotFailed: true });
     await prepare(h);

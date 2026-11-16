@@ -113,6 +113,7 @@ export type BuildRunDeps = {
   repository: Pick<RepositoryPreparation, 'cloneRepository' | 'runSetupCommands' | 'headCommit'>;
   runGit: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   stopProcesses: () => Promise<void>;
+  filesystemBaseline?: () => Promise<void>;
   cleanup: (input: CleanupInput) => Promise<string | null>;
   writeStamp: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
   /** Aborted on a cancel reply or at the build deadline. */
@@ -202,6 +203,13 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
 
   let step: EnvironmentBuildRunnerStep = 'clone';
   try {
+    if (deps.filesystemBaseline) {
+      step = 'archive';
+      reporter.setStep('archive');
+      await deps.filesystemBaseline();
+      signal.throwIfAborted();
+    }
+    step = 'clone';
     reporter.setStep('clone');
     if (isV2) {
       await writeGitCredentialRecordSet({
@@ -313,6 +321,7 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
     };
   } catch (error) {
     if (signal.aborted) return failure(step, 'canceled');
+    if (step === 'archive') return failure('archive', 'archive_failed');
     if (step === 'clone') return failure('clone', 'clone_failed');
     if (step === 'setup') return failure('setup', setupFailureReason(error));
     return failure('cleanup', 'cleanup_failed', 'cleanup did not complete');

@@ -1,3 +1,6 @@
+import { setTimeout as delay } from 'node:timers/promises';
+import { environmentBuildArchiveUploadSchema } from '../../../src/shared/environment-build-archive.js';
+import type { BuilderArchiveClient } from './aws-archive.js';
 import {
   environmentBuildEventsReplySchema,
   environmentBuildInputSchema,
@@ -35,7 +38,7 @@ export type BuilderClientDeps = {
   baseUrl: string;
   credential: string;
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** Attempts per call, including the first. */
   attempts?: number;
 };
@@ -44,15 +47,17 @@ function retryable(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
-export function createBuilderClient(deps: BuilderClientDeps): BuilderClient {
+export function createBuilderClient(deps: BuilderClientDeps): BuilderClient & BuilderArchiveClient {
   const send = deps.fetch ?? ((url, init) => fetch(url, init));
-  const sleep = deps.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
+  const sleep = deps.sleep ?? ((ms, signal) => delay(ms, undefined, { signal }));
   const attempts = deps.attempts ?? RETRY_BACKOFF_MS.length + 1;
   const base = deps.baseUrl.replace(/\/$/, '');
 
   async function call(path: string, init: RequestInit): Promise<unknown> {
     let lastError: unknown;
+    const signal = init.signal ?? undefined;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      signal?.throwIfAborted();
       try {
         const response = await send(`${base}/${path}`, {
           ...init,
@@ -60,21 +65,45 @@ export function createBuilderClient(deps: BuilderClientDeps): BuilderClient {
             authorization: `Bearer ${deps.credential}`,
             ...(init.body === undefined ? {} : { 'content-type': 'application/json' }),
           },
-          signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+          signal: signal
+            ? AbortSignal.any([signal, AbortSignal.timeout(CALL_TIMEOUT_MS)])
+            : AbortSignal.timeout(CALL_TIMEOUT_MS),
         });
-        if (response.ok) return response.status === 204 ? undefined : await response.json();
+        if (response.ok) {
+          const result: unknown = response.status === 204 ? undefined : await response.json();
+          signal?.throwIfAborted();
+          return result;
+        }
+        await response.body?.cancel();
         if (!retryable(response.status)) throw new BuilderRefusedError(response.status);
         lastError = new Error(`Environment build endpoint returned ${response.status}`);
       } catch (error) {
+        signal?.throwIfAborted();
         if (error instanceof BuilderRefusedError) throw error;
         lastError = error;
       }
-      if (attempt < attempts) await sleep(RETRY_BACKOFF_MS[attempt - 1] ?? 8_000);
+      if (attempt < attempts) await sleep(RETRY_BACKOFF_MS[attempt - 1] ?? 8_000, signal);
     }
     throw lastError instanceof Error ? lastError : new Error('Environment build endpoint failed');
   }
 
   return {
+    async prepareArchiveUpload(descriptor, signal) {
+      return environmentBuildArchiveUploadSchema.parse(
+        await call('archive', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'prepare', descriptor }),
+          signal,
+        })
+      );
+    },
+    async completeArchiveUpload(signal) {
+      await call('archive', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'complete' }),
+        signal,
+      });
+    },
     async input() {
       return environmentBuildInputSchema.parse(await call('input', { method: 'GET' }));
     },

@@ -127,8 +127,8 @@ describe('AWS sandbox clients', () => {
     ]) {
       await expect(store.downloadUrl(key, 600)).rejects.toThrow('Invalid AWS artifact key');
     }
-    await expect(store.uploadUrl('kilo/launch/allocation-1.json', 600)).rejects.toThrow(
-      'Invalid AWS archive key'
-    );
+    await expect(
+      store.prepareArchiveUpload('kilo/launch/allocation-1.json', 'a'.repeat(64), 600)
+    ).rejects.toThrow('Invalid AWS archive key');
   });
 });

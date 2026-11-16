@@ -41,7 +41,7 @@
     "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs",
     "test:runtime-installer": "tsx --test --test-concurrency=1 test/runtime-installer/*.test.ts",
     "runtime:publish": "tsx scripts/publish-runtime.ts",
-    "test:aws-runtime-bundle": "node --test deploy/aws/runtime/launch-document.test.mjs",
+    "test:aws-runtime-bundle": "node --test deploy/aws/build-runtime-bundle.test.mjs deploy/aws/runtime/launch-document.test.mjs",
     "test:runtime-ci": "node --test scripts/runtime-ci-admission.test.mjs scripts/runtime-manual-admission.test.mjs scripts/runtime-publication-need.test.mjs",
     "build:worker": "tsx scripts/build-sentry-worker.ts",
     "sentry:sourcemaps": "tsx scripts/upload-sentry-source-maps.ts"

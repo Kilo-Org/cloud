@@ -86,7 +86,30 @@ The bucket keeps prepared archives. Only launch objects expire after one day. Th
 read proxy-private prefixes. Launch PUT uses `If-None-Match: *`. Admission deletes the launch object; expiration is a backstop.
 Signed URLs cannot outlive the assumed role credentials. AWS responses and transport errors never enter logs verbatim.
 
-The foundation reuses `aws4fetch`, already a production dependency of worker-utils. It adds no production dependency.
+The AWS API client reuses `aws4fetch`, an existing JavaScript dependency of worker-utils.
+
+## AWS runtime bundle
+
+Build the AWS image bootstrap ZIP with the repository script. It requires Node and the `zip` command.
+
+```sh
+node services/cloud-agent-next/deploy/aws/build-runtime-bundle.mjs \
+  --base-image '<private-ECR-runtime-image>@sha256:<digest>' \
+  --out /tmp/kilo-aws-runtime.zip
+```
+
+The base must be a private ECR image in us-east-1 pinned by digest. The generated Dockerfile selects AMD64
+and installs Debian `python3` only in the AWS image. Other providers keep their current images.
+The filesystem archive helper uses Python standard-library Linux metadata and directory-relative operations.
+TypeScript retains provider access, authentication, lifecycle and archive orchestration. No pip packages are required.
+
+Only the Dockerfile and two named Node loaders enter the ZIP. The script does not copy environment files or a worktree.
+It fixes timestamps, permissions and member order, omits ZIP extra metadata, and refuses to replace an existing output file.
+It returns the ZIP byte count and SHA256. Publish only to private storage after artifact checks.
+
+These controls make ZIP bytes deterministic for the same input. Debian package updates can change resulting image contents.
+Publish and retain the resulting immutable MicroVM image version; do not claim reproducible image builds.
+Prepared-environment activation remains disabled until its authenticated builder and restore paths pass provider verification.
 
 ## Internal M1 verification
 
@@ -149,6 +172,20 @@ The operator must perform this before certificate expiry. Onboarding and the fin
 Local tests cover actual CONNECT/TLS transport, constrained-CA rejection in Node, Bun, Git and gh, policy expiry,
 allocation races, audit effects, and metadata admission through actual Sandbox DO RPC. A 1 MiB SCM stream stays in the Worker route.
 They do not prove the final security groups, DNS Firewall, task replacement or private repository push on AWS.
+
+
+## Prepared archive restore failures
+
+The bootstrap retries transport failures within its download deadline.
+After those attempts fail, the authenticated startup report preserves `environment_restore_unavailable`.
+The session asks the user to send a new message to retry the same selected archive.
+Interrupted extraction or runtime handoff uses the same retry advice.
+
+A missing object, checksum failure, oversized response, or invalid archive produces `environment_restore_failed`.
+The session asks the user to rebuild the prepared environment.
+Failed restoration never starts the fresh runtime. The callback records a fixed code and does not expose URLs or credentials.
+Local Linux process tests cover download retries, restore deadlines, integrity failures and successful reuse of the same archive.
+These tests use a local HTTPS server; they do not prove live customer S3 or VPC behavior.
 
 ## SCM forwarding boundary
 

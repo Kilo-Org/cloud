@@ -107,6 +107,10 @@ export const environmentBuildInputSchema = z.union([
       env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
       /** Names of the secret entries in `env`, so the builder redacts their values. */
       secretKeys: z.array(z.string().min(1).max(128)).max(50),
+      filesystemArchive: z
+        .object({ baseImage: z.string().min(1).max(8192) })
+        .strict()
+        .optional(),
       deadlineAt: z.number().int().positive(),
     })
     .strict(),
@@ -121,6 +125,10 @@ export const environmentBuildInputSchema = z.union([
       commands: z.array(z.string().min(1).max(16_000)).max(20),
       env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
       secretKeys: z.array(z.string().min(1).max(128)).max(50),
+      filesystemArchive: z
+        .object({ baseImage: z.string().min(1).max(8192) })
+        .strict()
+        .optional(),
       deadlineAt: z.number().int().positive(),
     })
     .strict(),
@@ -128,7 +136,7 @@ export const environmentBuildInputSchema = z.union([
 export type EnvironmentBuildInput = z.infer<typeof environmentBuildInputSchema>;
 
 /** Steps the builder reports; the coordinator's own states wrap them. */
-export const ENVIRONMENT_BUILD_RUNNER_STEPS = ['clone', 'setup', 'cleanup'] as const;
+export const ENVIRONMENT_BUILD_RUNNER_STEPS = ['clone', 'setup', 'cleanup', 'archive'] as const;
 export type EnvironmentBuildRunnerStep = (typeof ENVIRONMENT_BUILD_RUNNER_STEPS)[number];
 
 export const environmentBuildEventsSchema = z
@@ -158,6 +166,7 @@ export const ENVIRONMENT_BUILD_RUNNER_FAILURES = [
   'setup_failed',
   'setup_timeout',
   'cleanup_failed',
+  'archive_failed',
   'canceled',
 ] as const;
 export type EnvironmentBuildRunnerFailure = (typeof ENVIRONMENT_BUILD_RUNNER_FAILURES)[number];

@@ -198,4 +198,62 @@ describe('FlashList ViewHolderCollection over the layout table', () => {
 
     renderer.unmount();
   });
+
+  it('draws new row content when the data changes under an unchanged layout table', async () => {
+    const ref = createRef<ViewHolderCollectionRef>();
+    let renders = 0;
+    const layouts = new Map<number, RVLayout>([
+      [0, box(0, 50)],
+      [1, box(50, 50)],
+    ]);
+    const options: CollectionOptions = {
+      rows: [{ key: 'a' }, { key: 'b' }],
+      stack: [
+        ['a', 0],
+        ['b', 1],
+      ],
+      layouts,
+      onRender: () => {
+        renders += 1;
+      },
+    };
+
+    const renderer = await mountCollection(options, ref);
+    act(() => {
+      ref.current?.commitLayout();
+    });
+
+    const cellsBefore = cellsOf(renderer);
+    const afterCommit = renders;
+    const rowsBefore = renderer.root.findAllByType('Row').map(node => node.props.children);
+    expect(rowsBefore).toEqual(['a', 'b']);
+
+    // The list re-renders the collection with the new rows: the keys the stack
+    // holds and every box stay the same, so the guard answers this commit
+    // without a state bump.
+    options.rows = [{ key: 'a2' }, { key: 'b2' }];
+    act(() => {
+      renderer.update(collectionOf(options, ref));
+    });
+
+    const rowsAfter = renderer.root.findAllByType('Row').map(node => node.props.children);
+    expect(rowsAfter).toEqual(['a2', 'b2']);
+    expect(cellsOf(renderer)).toEqual(cellsBefore);
+    const afterUpdate = renders;
+    expect(afterUpdate).toBeGreaterThan(afterCommit);
+
+    // The commits that follow do not re-render, and the fresh content stays.
+    for (let pass = 0; pass < 3; pass += 1) {
+      act(() => {
+        ref.current?.commitLayout();
+      });
+    }
+    expect(renders).toBe(afterUpdate);
+    expect(renderer.root.findAllByType('Row').map(node => node.props.children)).toEqual([
+      'a2',
+      'b2',
+    ]);
+
+    renderer.unmount();
+  });
 });

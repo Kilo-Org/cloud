@@ -23,6 +23,18 @@ const NON_CHAT_MODEL_TYPES = new Set([
   'video',
 ]);
 
+/** Model kinds that `type` or `model_type` can name for a model that serves chat requests. */
+const CHAT_MODEL_TYPES = new Set(['chat', 'completion', 'language', 'llm', 'text']);
+
+/**
+ * Ids of models that cannot serve chat requests. Providers such as OpenAI list them without any
+ * type information, so the id is the only signal left.
+ */
+const NON_CHAT_MODEL_ID_PATTERNS = [
+  /(^|[/:._-])(text-embedding|embed|embedding|embeddings|tts|whisper|dall-e|gpt-image|moderation|omni-moderation|davinci|babbage|sora|transcribe|rerank)(?![a-z])/,
+  /-(realtime|audio-preview|audio|transcribe|tts)(-|$)/,
+];
+
 type JsonObject = Record<string, unknown>;
 
 function isJsonObject(value: unknown): value is JsonObject {
@@ -69,11 +81,16 @@ function supportsImageInput(entry: JsonObject): boolean {
   );
 }
 
-function isChatModel(entry: JsonObject): boolean {
-  for (const type of [entry.type, entry.model_type]) {
-    if (typeof type === 'string' && NON_CHAT_MODEL_TYPES.has(type.toLowerCase())) return false;
-  }
-  return field(entry, 'capabilities', 'completion_chat') !== false;
+function isChatModel(entry: JsonObject, id: string): boolean {
+  const types = [entry.type, entry.model_type].flatMap(type =>
+    typeof type === 'string' ? [type.toLowerCase()] : []
+  );
+  if (types.some(type => NON_CHAT_MODEL_TYPES.has(type))) return false;
+  const chatCapability = field(entry, 'capabilities', 'completion_chat');
+  if (typeof chatCapability === 'boolean') return chatCapability;
+  if (types.some(type => CHAT_MODEL_TYPES.has(type))) return true;
+  const lowerId = id.toLowerCase();
+  return !NON_CHAT_MODEL_ID_PATTERNS.some(pattern => pattern.test(lowerId));
 }
 
 /**
@@ -149,9 +166,14 @@ export function parseByokEndpointModelsResponse(response: unknown): ByokEndpoint
   const internalIds = new Set<string>();
   for (const entry of modelEntries(response)) {
     if (models.length >= MAX_LISTED_MODELS) break;
-    if (!isJsonObject(entry) || !isChatModel(entry)) continue;
+    if (!isJsonObject(entry)) continue;
     const internalId = typeof entry.id === 'string' ? entry.id.trim() : '';
-    if (!internalId || internalId.length > MAX_INTERNAL_ID_LENGTH || internalIds.has(internalId)) {
+    if (
+      !internalId ||
+      !isChatModel(entry, internalId) ||
+      internalId.length > MAX_INTERNAL_ID_LENGTH ||
+      internalIds.has(internalId)
+    ) {
       continue;
     }
     const baseId = toByokEndpointModelId(internalId);

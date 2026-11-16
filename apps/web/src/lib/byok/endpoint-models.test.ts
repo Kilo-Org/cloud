@@ -230,15 +230,50 @@ describe('parseByokEndpointModelsResponse', () => {
         max_completion_tokens: 32000,
         flags: ['reasoning'],
       },
-      {
-        id: 'tts-1',
-        internal_id: 'tts-1',
-        name: 'tts-1',
-        context_length: 200000,
-        max_completion_tokens: 32000,
-        flags: ['reasoning'],
-      },
     ]);
+  });
+
+  test.each([
+    'tts-1',
+    'tts-1-hd',
+    'gpt-4o-mini-tts',
+    'whisper-1',
+    'dall-e-3',
+    'gpt-image-1',
+    'text-embedding-3-small',
+    'omni-moderation-latest',
+    'text-moderation-stable',
+    'davinci-002',
+    'babbage-002',
+    'sora-2',
+    'gpt-4o-transcribe',
+    'gpt-4o-realtime-preview',
+    'gpt-4o-audio-preview',
+    'gpt-realtime',
+    'cohere/embed-english-v3.0',
+    'nomic-embed-text',
+  ])('skips %s, whose id names a model that cannot chat', id => {
+    expect(parseByokEndpointModelsResponse({ data: [{ id }] })).toEqual([]);
+  });
+
+  test.each(['gpt-5.5', 'gpt-4o-mini', 'o3', 'claude-sonnet-5', 'llama-3.3-70b', 'embedded-chat'])(
+    'keeps %s',
+    id => {
+      expect(parseByokEndpointModelsResponse({ data: [{ id }] }).map(m => m.internal_id)).toEqual([
+        id,
+      ]);
+    }
+  );
+
+  test('trusts an explicit chat signal over the id', () => {
+    const models = parseByokEndpointModelsResponse({
+      data: [
+        { id: 'embed-chat-a', type: 'chat' },
+        { id: 'embed-chat-b', capabilities: { completion_chat: true } },
+      ],
+    });
+
+    expect(models.map(model => model.internal_id)).toEqual(['embed-chat-a', 'embed-chat-b']);
   });
 
   test('accepts a bare array and keeps max output within a small context', () => {

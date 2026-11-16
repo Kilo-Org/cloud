@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { ggufModelLocator, ggufModelOptions } from './gguf-models';
+
 const fsMock = vi.hoisted(() => ({
   readIndexFails: true,
   readIndexAttempts: 0,
@@ -109,5 +111,71 @@ describe('the GGUF store bootstrap', () => {
     await expect(ggufModelProvider.availability()).resolves.toMatchObject({ status: 'available' });
     expect(appState.addEventListener).toHaveBeenCalledTimes(1);
     expect(ggufModelProvider.facts('small')).toMatchObject({ contextWindow: 4096 });
+  });
+});
+
+describe('the GGUF model locator', () => {
+  it('names the repository of a Hugging Face resolve link', () => {
+    expect(
+      ggufModelLocator(
+        'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q8_0.gguf'
+      )
+    ).toBe('Qwen/Qwen2.5-0.5B-Instruct-GGUF');
+  });
+
+  it('names the host when a Hugging Face link has no repository', () => {
+    expect(ggufModelLocator('https://huggingface.co/models')).toBe('huggingface.co');
+    expect(ggufModelLocator('https://huggingface.co')).toBe('huggingface.co');
+  });
+
+  it('names the host of any other link', () => {
+    expect(ggufModelLocator('https://example.com/models/tiny.gguf')).toBe('example.com');
+  });
+
+  it('names nothing for a value that is not a URL', () => {
+    expect(ggufModelLocator('not a url')).toBe('');
+  });
+
+  it('decodes a percent-encoded segment and keeps a segment it cannot decode', () => {
+    expect(
+      ggufModelLocator('https://huggingface.co/Qwen%20AI/model-GGUF/resolve/main/x.gguf')
+    ).toBe('Qwen AI/model-GGUF');
+    expect(ggufModelLocator('https://huggingface.co/Qwen%2/model-GGUF')).toBe('Qwen%2/model-GGUF');
+  });
+});
+
+describe('GGUF model options', () => {
+  it('subtitles each model with its source and keys it by its file id', () => {
+    const options = ggufModelOptions([
+      {
+        fileId: 'hf-0123456789abcdef',
+        name: 'Qwen2.5 0.5B Instruct',
+        url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen.gguf',
+        sizeBytes: 10,
+        contextWindow: 4096,
+        tools: false,
+        vision: false,
+        thinking: false,
+      },
+      {
+        fileId: 'url-fedcba9876543210',
+        name: 'Tiny model',
+        url: 'https://example.com/models/tiny.gguf',
+        sizeBytes: 10,
+        contextWindow: 2048,
+        tools: false,
+        vision: false,
+        thinking: false,
+      },
+    ]);
+
+    expect(options.map(option => option.displayId)).toStrictEqual([
+      'Qwen/Qwen2.5-0.5B-Instruct-GGUF',
+      'example.com',
+    ]);
+    expect(options.map(option => option.id)).toStrictEqual([
+      'local:gguf:hf-0123456789abcdef',
+      'local:gguf:url-fedcba9876543210',
+    ]);
   });
 });

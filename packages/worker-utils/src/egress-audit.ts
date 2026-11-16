@@ -22,6 +22,8 @@ export const EgressAuditRequestSchema = z.object({
   requestId: z.string().uuid().toLowerCase(),
   allocationRef: z.string().min(1).max(512),
   timestamp: z.string().datetime(),
+  // Absent on historical rows; do not infer request coverage from an old record.
+  scope: z.enum(['request', 'connection']).optional(),
   method: z
     .string()
     .min(1)
@@ -58,7 +60,38 @@ export const GetEgressAuditResponseSchema = z.object({
   nextCursor: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
 });
 
+export type EgressCredentialAudit = z.infer<typeof credentialAuditSchema>;
 export type EgressAuditRequest = z.infer<typeof EgressAuditRequestSchema>;
 export type EgressAuditRecord = z.infer<typeof EgressAuditRecordSchema>;
 export type GetEgressAuditInput = z.infer<typeof GetEgressAuditInputSchema>;
 export type GetEgressAuditResponse = z.infer<typeof GetEgressAuditResponseSchema>;
+
+/** Records transport metadata only. Paths, query values and headers never enter an audit row. */
+export function buildEgressAuditRequest(input: {
+  requestId: string;
+  allocationRef: string;
+  timestamp: string;
+  method: string;
+  url: URL;
+  decision: 'allowed' | 'denied';
+  scope?: 'request' | 'connection';
+  /** Network secret decisions of this request; one is inlined, several use `credentialDecisions`. */
+  credentials?: readonly EgressCredentialAudit[];
+}): EgressAuditRequest {
+  const credentials = input.credentials ?? [];
+  return EgressAuditRequestSchema.parse({
+    requestId: input.requestId,
+    allocationRef: input.allocationRef,
+    timestamp: input.timestamp,
+    scope: input.scope ?? 'request',
+    method: input.method.slice(0, 32),
+    // A control credential in the hostname must never enter an audit row.
+    hostname: /kcp\d+\./.test(input.url.hostname)
+      ? 'redacted.invalid'
+      : input.url.hostname.slice(0, 253).replace(/[^a-zA-Z0-9._:[\]-]/g, '_'),
+    protocol: input.url.protocol,
+    port: Number(input.url.port || (input.url.protocol === 'https:' ? 443 : 80)),
+    decision: input.decision,
+    ...(credentials.length > 1 ? { credentialDecisions: credentials } : credentials[0]),
+  });
+}

@@ -1,8 +1,11 @@
+import { createAwsRuntimeAccessResolver } from './aws-runtime-access.js';
 import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
 import type { Env } from '../types.js';
 import type { ByocSource } from './owner.js';
-import { awsRuntimeAccess, resolveAwsByocConfiguration } from './aws-credential-resolver.js';
+import { resolveAwsByocConfiguration } from './aws-credential-resolver.js';
 import { createAwsProviderAdapter } from '../sandbox-control/aws-provider.js';
+import { resolveSecret } from '../auth.js';
+import { prepareAwsProxyStartup } from './aws-proxy.js';
 import type { AwsOperationStorage } from '../sandbox-control/aws-operation.js';
 
 export function createByocAwsProviderAdapter(deps: {
@@ -11,35 +14,22 @@ export function createByocAwsProviderAdapter(deps: {
   sandboxId: string;
   storage: AwsOperationStorage;
 }) {
-  let cached: Awaited<ReturnType<typeof awsRuntimeAccess>> | undefined;
-  let pending: Promise<Awaited<ReturnType<typeof awsRuntimeAccess>>> | undefined;
-  let pendingKey: string | undefined;
+  const access = createAwsRuntimeAccessResolver(deps.env);
+  const resolveRuntime = async (pinned?: AwsByocConfiguration) =>
+    access(pinned ?? (await resolveAwsByocConfiguration(deps.env, deps.source)));
   return createAwsProviderAdapter({
     sandboxId: deps.sandboxId,
     storage: deps.storage,
-    async resolveRuntime(pinned?: AwsByocConfiguration) {
-      const config = pinned ?? (await resolveAwsByocConfiguration(deps.env, deps.source));
-      const key = JSON.stringify(config);
-      if (
-        cached &&
-        JSON.stringify(cached.config) === key &&
-        cached.expiresAt > Date.now() + 15 * 60_000
-      )
-        return cached;
-      if (pending && pendingKey === key) return pending;
-      const request = awsRuntimeAccess(deps.env, config);
-      pending = request;
-      pendingKey = key;
-      try {
-        const resolved = await request;
-        cached = resolved;
-        return resolved;
-      } finally {
-        if (pending === request) {
-          pending = undefined;
-          pendingKey = undefined;
-        }
-      }
+    resolveRuntime,
+    async prepareStartup(input) {
+      const access = await resolveRuntime(input.configuration);
+      const signingSecret = await resolveSecret(deps.env.NEXTAUTH_SECRET);
+      if (!signingSecret) throw new Error('AWS egress signing unavailable');
+      return prepareAwsProxyStartup({
+        ...input,
+        signingSecret,
+        readMetadata: access.readProxyMetadata,
+      });
     },
   });
 }

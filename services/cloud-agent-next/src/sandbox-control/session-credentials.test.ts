@@ -506,3 +506,52 @@ describe('hosted multi-repository grants', () => {
     expect(issue).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('AWS managed SCM certificate scope', () => {
+  it('rejects a custom additional repository before issuing any capability', async () => {
+    const input = localPreparation();
+    input.provider = 'aws';
+    input.source.repository = { type: 'github', repo: 'acme/widgets' };
+    input.environment = {
+      repositories: [
+        {
+          identity: { platform: 'github', repoFullName: 'acme/widgets' },
+          repoFullName: 'acme/widgets',
+          leaf: 'widgets',
+        },
+        {
+          identity: {
+            platform: 'gitlab',
+            cloneUrl: 'https://custom.gitlab.example/group/repo.git',
+          },
+          repoFullName: 'group/repo',
+          leaf: 'repo',
+        },
+      ],
+    };
+    const issue = vi.fn();
+    input.env.GIT_TOKEN_SERVICE = {
+      issueGitHubSessionCapability: issue,
+    } as unknown as typeof input.env.GIT_TOKEN_SERVICE;
+    await expect(prepareCredentialGrant(input)).rejects.toMatchObject({
+      reason: 'byoc_aws_scm_host_unsupported',
+    });
+    expect(issue).not.toHaveBeenCalled();
+  });
+  it('rejects a custom managed GitLab host before credential issuance', async () => {
+    const input = localPreparation();
+    input.provider = 'aws';
+    input.source.repository = {
+      type: 'gitlab',
+      url: 'https://custom.gitlab.example/acme/repo.git',
+    };
+    const issue = vi.fn();
+    input.env.GIT_TOKEN_SERVICE = {
+      issueGitLabSessionCapability: issue,
+    } as unknown as typeof input.env.GIT_TOKEN_SERVICE;
+    await expect(prepareCredentialGrant(input)).rejects.toMatchObject({
+      reason: 'byoc_aws_scm_host_unsupported',
+    });
+    expect(issue).not.toHaveBeenCalled();
+  });
+});

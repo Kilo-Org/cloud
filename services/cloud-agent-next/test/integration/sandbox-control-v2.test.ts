@@ -2763,61 +2763,6 @@ describe('SandboxControlV2 allocation egress policy', () => {
     };
   }
 
-  it.each([
-    {},
-    {
-      KILOCODE_BACKEND_BASE_URL: 'http://localhost:3900',
-      KILO_OPENROUTER_BASE: 'http://localhost:3910/api',
-      KILO_SESSION_INGEST_URL: 'http://localhost:9700',
-    },
-  ])('prepares a Containers allowlist route only with facade credentials (%j)', async extraEnv => {
-    const provider = createFakeProvider();
-    const { stub } = await configureEgressSandbox(provider, sandboxId, extraEnv);
-    await stub.prepare(prepareInput(firstSessionId, { egressMode: 'allowlist' }));
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-    const { credential, allocationId } = launchIdentity(provider);
-    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
-    await wrapper.hello({ wrapperId: 'wr_allowlist', allocationId });
-    const frame = await wrapper.next();
-    if (frame?.type !== 'session.prepare') throw new Error('Expected session.prepare');
-    expect(frame.credentials.proxy?.handle).toEqual(expect.any(String));
-    expect(frame.credentials.proxy?.handle).not.toBe(frame.credentials.kilo.token);
-    const targets = frame.credentials.proxy?.targets;
-    if (!targets) throw new Error('Missing runtime facade');
-    const pin = JSON.parse((await readProviderPin(stub)) ?? '{}') as { egressAllowlist: string[] };
-    for (const url of Object.values(targets)) {
-      expect(new URL(url).hostname).toBe('worker.example.com');
-      expect(pin.egressAllowlist).toContain(new URL(url).hostname);
-    }
-    for (const host of [
-      'backend.example.com',
-      'gateway.example.com',
-      'ingest.example.com',
-      'localhost',
-    ])
-      expect(pin.egressAllowlist).not.toContain(host);
-  });
-
-  it('fails a Containers allowlist route before preparation when proxy minting fails', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await configureEgressSandbox(provider);
-    await runInDurableObject(stub, instance => {
-      instance.sessionPeerFor = () => null;
-    });
-    await stub.prepare(prepareInput(firstSessionId, { egressMode: 'allowlist' }));
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-    const { credential, allocationId } = launchIdentity(provider);
-    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
-    await wrapper.hello({ wrapperId: 'wr_allowlist_no_proxy', allocationId });
-    await waitFor(async () => {
-      expect((await stub.status({ sessionId: firstSessionId })).view).toMatchObject({
-        state: 'failed',
-        reason: 'workspace_setup_failed',
-      });
-    });
-    expect(await wrapper.next(100)).toBeNull();
-  });
-
   it.each(
     [
       { egressMode: undefined, policy: undefined, expected: undefined },

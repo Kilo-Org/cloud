@@ -76,6 +76,26 @@ function sameAllocation(
   );
 }
 
+/** The grants of the context that admit a request now. */
+export function activeCredentialGrants<G extends CredentialAuthority>(
+  context: CredentialAdmissionContext<G>,
+  now: number,
+  grantAdmitted: (grant: G) => boolean
+): G[] {
+  return context.grants.filter(
+    grant =>
+      grantAdmitted(grant) &&
+      grant.userId === context.ownerId &&
+      grant.sandboxId === context.sandboxId &&
+      grant.provider === context.provider &&
+      grant.outboundContainerId === context.outboundContainerId &&
+      grant.preparedAt <= now &&
+      grant.expiresAt > now &&
+      grant.members.some(member => context.liveSessionIds.includes(member.sessionId)) &&
+      (context.organizationId === undefined || grant.orgId === context.organizationId)
+  );
+}
+
 export async function withCredentialAdmission<
   G extends CredentialAuthority,
   C extends CredentialAdmissionContext<G>,
@@ -92,19 +112,7 @@ export async function withCredentialAdmission<
     use(context, async () => {
       const current = await deps.readContext();
       if (!sameAllocation(current, context) || !identity.isCurrent()) return null;
-      const now = (deps.now ?? Date.now)();
-      return current.grants.filter(
-        grant =>
-          deps.grantAdmitted(grant) &&
-          grant.userId === current.ownerId &&
-          grant.sandboxId === current.sandboxId &&
-          grant.provider === current.provider &&
-          grant.outboundContainerId === current.outboundContainerId &&
-          grant.preparedAt <= now &&
-          grant.expiresAt > now &&
-          grant.members.some(member => current.liveSessionIds.includes(member.sessionId)) &&
-          (current.organizationId === undefined || grant.orgId === current.organizationId)
-      );
+      return activeCredentialGrants(current, (deps.now ?? Date.now)(), deps.grantAdmitted);
     })
   );
 }

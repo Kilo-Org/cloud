@@ -1,3 +1,4 @@
+import { registerAwsEgressRoutes } from './egress/aws-route.js';
 import { byocVercelOwnerSchema } from './byoc/vercel-owner.js';
 import { Hono } from 'hono';
 import { billingSubjectSchema } from '@kilocode/container-usage';
@@ -297,6 +298,7 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
 });
 
 registerVercelEgressRoute(app);
+registerAwsEgressRoutes(app);
 
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({

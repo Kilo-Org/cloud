@@ -1,0 +1,50 @@
+/**
+ * Platform failures a retry can clear.
+ *
+ * A Durable Object hop fails for two very different reasons: the object, its
+ * storage or the platform carrying the request was momentarily busy, or the
+ * operation itself rejected. The caller's answer differs — the first is
+ * "try again", the second is a defect or a refusal — so the classification
+ * lives here instead of being re-derived from message text at every call site.
+ *
+ * Cloudflare marks its own transient failures with `retryable: true` when the
+ * flag survives the RPC boundary; the text checks below cover the same
+ * families for the cases where it does not (cross-colo RPC drops the flag).
+ * Both are platform text, never application text, so an application error is
+ * never retryable by accident.
+ */
+
+const TRANSIENT_PLATFORM_MESSAGES: readonly string[] = [
+  'Your account is generating too much load on Durable Objects. Please back off and try again later.',
+  "Durable Object's isolate exceeded its memory limit and was reset.",
+  'Durable Object reset because its code was updated.',
+  'Durable Object reset because its code was updated',
+  'Network connection lost.',
+];
+
+const OVERLOADED_PREFIX = 'Durable Object is overloaded.';
+
+/**
+ * True when `error` is a Durable Object / platform failure that a retry can
+ * clear, false for everything else (including an operation that rejected).
+ */
+export function isTransientDurableObjectFailure(error: unknown): boolean {
+  if (error === null || typeof error !== 'object') return false;
+  if ('retryable' in error && error.retryable === true) return true;
+  if (!('message' in error) || typeof error.message !== 'string') return false;
+  const message = error.message;
+  return (
+    message.startsWith(OVERLOADED_PREFIX) ||
+    TRANSIENT_PLATFORM_MESSAGES.some(candidate => message.startsWith(candidate))
+  );
+}
+
+/**
+ * True when `error` is the retry scope's own deadline (`createRetryScope`
+ * aborts with a `TimeoutError`), i.e. the hop did not answer in time. Absent
+ * an answer the operation is unknown, not failed, so callers answer it the
+ * same way they answer a transient platform failure.
+ */
+export function isDurableObjectRetryDeadline(error: unknown): boolean {
+  return error instanceof Error && error.name === 'TimeoutError';
+}

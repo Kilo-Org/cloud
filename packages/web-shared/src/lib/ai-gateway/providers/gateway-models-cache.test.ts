@@ -480,11 +480,13 @@ describe('gateway model metadata readers', () => {
 
 describe('isValidOpenRouterModelId', () => {
   it.each([
+    'alibaba/qwen3.8-omni-flash',
     'anthropic/claude-haiku-4-5',
     'anthropic/claude-sonnet-4-5',
     'claude-sonnet-5',
     'deepseek-v4-flash',
     'deepseek-v4-pro',
+    'gpt-4o',
     'gpt-4o-mini',
     'gpt-5.4',
     'gpt-5.6-luna',
@@ -493,10 +495,12 @@ describe('isValidOpenRouterModelId', () => {
     'inclusionai/ling-3.0-flash-fin',
     'minimax-m3',
     'minimax/minimax-m2.5-20260211',
+    'nvidia/nemotron-3.5-lightning-free',
     'poolside/laguna-s-2.1',
     'qwen/qwen3.8-max',
     'zai/glm-5.3',
     'zai/glm-5.3-flash',
+    'zai/glm-5.3-flashx',
   ])('accepts retained legacy alias %s without consulting the database', async modelId => {
     const execute = jest.spyOn(readDb, 'execute');
 
@@ -515,7 +519,6 @@ describe('isValidOpenRouterModelId', () => {
     'glm-5.1',
     'glm-5.2',
     'gpt-4.1-mini',
-    'gpt-4o',
     'gpt-5.2',
     'gpt-5.2-codex',
     'gpt-5.4-mini',

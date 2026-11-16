@@ -1,14 +1,16 @@
 /**
- * Legacy OpenRouter model IDs that remain valid but are absent from the
- * OpenRouter and models.dev catalogs, with the Vercel AI Gateway model ID that
+ * Compatibility model IDs retained outside the public catalog, including legacy
+ * aliases and raw Vercel spellings, with the Vercel AI Gateway model ID that
  * serves each one.
  */
 export const LEGACY_OPENROUTER_MODEL_ID_OVERRIDES: Readonly<Record<string, string>> = {
+  'alibaba/qwen3.8-omni-flash': 'alibaba/qwen3.8-omni-flash',
   'anthropic/claude-haiku-4-5': 'anthropic/claude-haiku-4.5',
   'anthropic/claude-sonnet-4-5': 'anthropic/claude-sonnet-4.5',
   'claude-sonnet-5': 'anthropic/claude-sonnet-5',
   'deepseek-v4-flash': 'deepseek/deepseek-v4-flash',
   'deepseek-v4-pro': 'deepseek/deepseek-v4-pro',
+  'gpt-4o': 'openai/gpt-4o',
   'gpt-4o-mini': 'openai/gpt-4o-mini',
   'gpt-5.4': 'openai/gpt-5.4',
   'gpt-5.6-luna': 'openai/gpt-5.6-luna',
@@ -17,10 +19,12 @@ export const LEGACY_OPENROUTER_MODEL_ID_OVERRIDES: Readonly<Record<string, strin
   'inclusionai/ling-3.0-flash-fin': 'inclusionai/ling-3.0-flash-fin',
   'minimax-m3': 'minimax/minimax-m3',
   'minimax/minimax-m2.5-20260211': 'minimax/minimax-m2.5',
+  'nvidia/nemotron-3.5-lightning-free': 'nvidia/nemotron-3.5-lightning-free',
   'poolside/laguna-s-2.1': 'poolside/laguna-s-2.1',
   'qwen/qwen3.8-max': 'alibaba/qwen3.8-max',
   'zai/glm-5.3': 'zai/glm-5.3',
   'zai/glm-5.3-flash': 'zai/glm-5.3-flash',
+  'zai/glm-5.3-flashx': 'zai/glm-5.3-flashx',
 };
 
 export const legacyOpenRouterAliases: ReadonlySet<string> = new Set(

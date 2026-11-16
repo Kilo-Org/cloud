@@ -43,6 +43,7 @@ import {
   unknownModelResponse,
   modelNotAllowedResponse,
   organizationAutoConfigurationResponse,
+  temporarilyUnavailableResponse,
   unavailableModelResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type { BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -52,6 +53,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { isAnonymousContext, type AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { inferenceModelCatalogAdmission } from '@kilocode/web-shared/lib/ai-gateway/inference-model-catalog';
+import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -276,6 +279,15 @@ export async function resolveProviderAndPolicy(
     if (modelResolution.kind === 'direct' && (await isUnavailableModel(model))) {
       console.warn(`User requested unavailable model ${model}; rejecting.`);
       return unavailableModelResponse();
+    }
+
+    if (
+      !route.bypassAccessCheck &&
+      !(modelResolution.kind === 'routed' && isAutoSmallFreeModel(model))
+    ) {
+      const catalogAdmission = await inferenceModelCatalogAdmission(model);
+      if (catalogAdmission === 'unlisted') return unknownModelResponse(model);
+      if (catalogAdmission === 'unavailable') return temporarilyUnavailableResponse();
     }
 
     // Skip balance/org checks for anonymous users - they can only use free models

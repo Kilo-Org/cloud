@@ -829,8 +829,9 @@ export type ImpactAdvocateRewardRedemptionState =
 /**
  * - `pending`: the owner's Anthropic user profile exists; no approval completed yet.
  * - `connected`: Anthropic issued a connection; Claude requests bill the customer.
- * - `billing_unavailable`: Anthropic answered `user_profile_not_billable`; requests
- *   fail without an upstream call until an admin reconnects or removes it.
+ * - `billing_unavailable`: Anthropic answered `user_profile_not_billable` or
+ *   `user_profile_billing_not_authorized`; requests fail without an upstream
+ *   call until an admin reconnects or removes it.
  * - `removed`: removed in Kilo; the profile is kept so a reconnect reuses it.
  */
 export const ClaudeBillingConnectionStatus = {
@@ -1572,6 +1573,10 @@ export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
 const OrganizationSettingsSchema = z.object({
+  // The default model and provider access for organization members. Group
+  // policies set the access of their own members. Organization admins manage
+  // both. See `evaluateEffectiveModelAccessPolicy` in
+  // `packages/web-shared/src/lib/organizations/group-policies/model-access/model-access.server.ts`.
   provider_allow_list: z.array(z.string()).optional(),
 
   model_deny_list: z.array(z.string()).optional(),
@@ -2544,6 +2549,12 @@ export const OpenRouterEndpoint = z.object({
       retainsPrompts: z.boolean().optional(),
     })
     .nullish(),
+  /**
+   * The inference regions Vercel AI Gateway can pin the model to at this provider, in a fixed
+   * order. Absent when Vercel does not serve the model through the provider or has no regional
+   * inference for it there.
+   */
+  vercel_inference_regions: z.array(OrganizationDataRegionSchema).optional().catch(undefined),
 });
 
 export type OpenRouterModel = z.infer<typeof OpenRouterModel>;
@@ -3393,6 +3404,10 @@ export const EndpointPricingSchema = z.object({
   discount: z.number().optional(),
 });
 
+export const EndpointInferenceRegionSchema = z.object({
+  geo_region: z.string().optional().catch(undefined),
+});
+
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
@@ -3401,6 +3416,8 @@ export const EndpointSchema = z.object({
   // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
   has_zdr: z.boolean().optional().catch(undefined),
   has_no_training: z.boolean().optional().catch(undefined),
+  /** Vercel AI Gateway: the regions the endpoint can be pinned to; OpenRouter does not set it. */
+  inference_regions: z.array(EndpointInferenceRegionSchema).optional().catch(undefined),
 });
 
 export type Endpoint = z.infer<typeof EndpointSchema>;

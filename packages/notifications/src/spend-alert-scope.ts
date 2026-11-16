@@ -12,6 +12,9 @@ export const spendAlertScopeShape = {
   organizationId: nonEmptyStringSchema.optional(),
 };
 
+/** The shape's own type, so the refinement below reads the scope vocabulary from the enum. */
+const spendAlertScopeSchema = z.object(spendAlertScopeShape);
+
 /**
  * A spend alert's scope and its id must agree. The tap routes by the scope, so
  * an organization alert without its id would open the personal spend view, and
@@ -19,7 +22,7 @@ export const spendAlertScopeShape = {
  * Both the push payload and the internal dispatch request carry the same rule.
  */
 export function refineSpendAlertScope(
-  data: { scope: 'personal' | 'organization'; organizationId?: string | undefined },
+  data: z.infer<typeof spendAlertScopeSchema>,
   ctx: z.RefinementCtx
 ): void {
   if (data.scope === 'organization' && data.organizationId === undefined) {

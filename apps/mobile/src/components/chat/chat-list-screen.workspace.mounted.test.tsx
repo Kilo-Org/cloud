@@ -119,6 +119,12 @@ vi.mock('sonner-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: state.push, back: vi.fn() }),
 }));
+// The scope row opens the shared picker through the press-burst guard; this
+// suite asserts the press reached the route, so the guarded push is the router
+// mock it already checks.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => state.push,
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

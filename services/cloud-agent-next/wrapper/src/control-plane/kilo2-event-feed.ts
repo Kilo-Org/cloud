@@ -19,39 +19,10 @@ import {
 import type { HarnessActivity } from './harness-activity.js';
 import { kilo2MessageActivity, kilo2PartId } from './kilo2-message-activity.js';
 import type { Kilo2Message } from '../../../src/shared/kilo2-conversation.js';
+import { nativeErrorSchema, nativeTurnError } from './kilo2-native-error.js';
 import { logToFile } from '../utils.js';
 
-const nativeErrorSchema = z.object({
-  type: z.string(),
-  message: z.string(),
-  status: z.number().int().optional(),
-});
-
-/** Native error types that the failure classifier knows by an SDK error name. */
-const NATIVE_ERROR_NAMES = new Map([
-  ['provider.auth', 'ProviderAuthError'],
-  ['provider.content-filter', 'ContentFilterError'],
-]);
-
-/**
- * Kilo v2 classifies a rate limit from a provider code or text as well, so the
- * error can arrive without an HTTP status.
- */
-const NATIVE_ERROR_STATUSES = new Map([['provider.rate-limit', 429]]);
-
-/**
- * The native execution error in the shape `classifyAssistantFailure` reads.
- * An HTTP status is the most specific signal, so it becomes an `APIError`.
- */
-export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
-  const status = error.status ?? NATIVE_ERROR_STATUSES.get(error.type);
-  if (status !== undefined)
-    return { name: 'APIError', data: { message: error.message, statusCode: status } };
-  return {
-    name: NATIVE_ERROR_NAMES.get(error.type) ?? 'UnknownError',
-    data: { message: error.message },
-  };
-}
+export { nativeTurnError } from './kilo2-native-error.js';
 
 const MAX_FRAME_CHARS = 4 * 1024 * 1024;
 const MAX_TRACKED_MESSAGES = 1024;

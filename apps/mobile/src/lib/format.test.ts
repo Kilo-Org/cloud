@@ -12,7 +12,6 @@ import {
   formatDurationIncludingZero,
   formatFileSize,
   formatList,
-  formatMoney,
   formatNumber,
   formatPrefixedMoney,
   formatPrefixedUsd,
@@ -20,18 +19,7 @@ import {
   parseLocalizedNumber,
 } from './format';
 
-describe('formatMoney', () => {
-  it('uses the passed locale for currency formatting', () => {
-    const en = formatMoney(1234.5, 'en-US');
-    const de = formatMoney(1234.5, 'de-DE');
-
-    expect(en).toBe('$1,234.50');
-    expect(de).toContain('1.234,50');
-    expect(de).toMatch(/1\.234,50\s\$$/);
-    expect(formatMoney(1234.5, 'ar')).not.toContain('US$');
-    expect(de).not.toBe(en);
-  });
-
+describe('formatPrefixedUsd', () => {
   it("leads the prefixed amount with the symbol and the locale's own sign", () => {
     expect(
       formatPrefixedUsd(1234.5, 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -49,11 +37,6 @@ describe('formatMoney', () => {
     expect(ar.startsWith('$')).toBe(true);
     expect(ar).not.toContain('\u00A0');
   });
-
-  it('uses Portugal rules for Portuguese and Brazil rules for Brazilian Portuguese', () => {
-    expect(formatMoney(1234.5, 'pt')).toMatch(/^1234,50[\s\u00A0\u202F]+\$$/);
-    expect(formatMoney(1234.5, 'pt-BR')).toMatch(/^\$[\s\u00A0\u202F]*1\.234,50$/);
-  });
 });
 
 describe('formatPrefixedMoney', () => {
@@ -62,6 +45,9 @@ describe('formatPrefixedMoney', () => {
     // German writes the same group and decimal separators it writes for the
     // locale money pattern; only the symbol's side changed.
     expect(formatPrefixedMoney(1234.5, 'de-DE')).toBe('$1.234,50');
+    // Brazilian Portuguese used to trail its symbol ("1.234,50 $"); the group
+    // and decimal separators are still its own.
+    expect(formatPrefixedMoney(1234.5, 'pt-BR')).toBe('$1.234,50');
   });
 
   it('pins two fraction digits on a whole amount', () => {

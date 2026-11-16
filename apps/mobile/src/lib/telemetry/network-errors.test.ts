@@ -10,6 +10,7 @@ import {
 import {
   createNetworkErrorFetch,
   isAbortError,
+  isTransportFailure,
   type NetworkErrorContext,
   normalizeUrlPath,
   readTrpcErrorContext,
@@ -312,6 +313,10 @@ describe('createNetworkErrorFetch', () => {
         original
       );
 
+      // The rejection carries the marker a query catch-all reads, so the same
+      // failure is not filed a second time as an app error.
+      expect(isTransportFailure(original)).toBe(true);
+      expect(isTransportFailure({ message: message })).toBe(false);
       expect(events).toHaveLength(0);
       expect(breadcrumbs).toEqual([
         {
@@ -336,6 +341,9 @@ describe('createNetworkErrorFetch', () => {
 
     await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(abort);
 
+    // An abort is the caller cancelling, not a transport failure: nothing was
+    // recorded for it, so it carries no marker.
+    expect(isTransportFailure(abort)).toBe(false);
     expect(events).toHaveLength(0);
     expect(breadcrumbs).toHaveLength(0);
   });
@@ -915,6 +923,58 @@ describe('createNetworkErrorFetch status policy', () => {
       ['network-error', 'trpc', 'user.getMe', 'http.403'],
     ]);
     expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('records the repository-refused FORBIDDEN on the personal branch listing as a breadcrumb', async () => {
+    // The provider installation no longer grants the repository. The screen
+    // names that answer and offers no retry, so it is the app's expected
+    // outcome, not a defect to file.
+    const procedure = 'cloudAgentNext.listRepositoryBranches';
+    await respond(
+      `https://example.com/api/trpc/${procedure}`,
+      Response.json(
+        {
+          error: {
+            message: 'denied',
+            code: -32_003,
+            data: { code: 'FORBIDDEN', httpStatus: 403, path: procedure },
+          },
+        },
+        { status: 403 }
+      )
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      `POST /api/trpc/${procedure} -> 403`,
+    ]);
+  });
+
+  it.each([
+    'organizations.cloudAgentNext.getAttachmentUploadUrl',
+    'organizations.cloudAgentNext.listRepositoryBranches',
+  ])('still reports an organization FORBIDDEN on %s in a batch', async procedure => {
+    // Organization access middleware also answers FORBIDDEN for a transient
+    // support-access lookup failure, so these refusals stay reportable.
+    await respond(
+      `https://example.com/api/trpc/${procedure},user.getMe?batch=1`,
+      Response.json(
+        [
+          {
+            error: {
+              message: 'denied',
+              code: -32_003,
+              data: { code: 'FORBIDDEN', httpStatus: 403, path: procedure },
+            },
+          },
+        ],
+        { status: 207 }
+      )
+    );
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', procedure, 'http.403'],
+    ]);
   });
 
   it.each([400, 500])('still reports a %i exactly once', async status => {

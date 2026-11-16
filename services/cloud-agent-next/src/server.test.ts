@@ -380,7 +380,7 @@ describe('server background reporting', () => {
       messages: [],
     } as unknown as MessageBatch<unknown>;
 
-    await worker.queue(batch, env as unknown as Env);
+    await worker.queue(batch, env as unknown as Env, {} as ExecutionContext);
 
     expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
   });
@@ -392,7 +392,7 @@ describe('server background reporting', () => {
       messages: [],
     } as unknown as MessageBatch<unknown>;
 
-    await worker.queue(batch, env as unknown as Env);
+    await worker.queue(batch, env as unknown as Env, {} as ExecutionContext);
 
     expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
   });
@@ -404,7 +404,7 @@ describe('server background reporting', () => {
       messages: [],
     } as unknown as MessageBatch<unknown>;
 
-    await worker.queue(batch, env as unknown as Env);
+    await worker.queue(batch, env as unknown as Env, {} as ExecutionContext);
 
     expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
   });
@@ -414,7 +414,8 @@ describe('server background reporting', () => {
 
     await worker.scheduled(
       { cron: REPORT_RETENTION_CRON } as ScheduledController,
-      env as unknown as Env
+      env as unknown as Env,
+      {} as ExecutionContext
     );
 
     expect(removeExpiredCloudAgentReportDataMock).toHaveBeenCalledTimes(1);
@@ -429,7 +430,8 @@ describe('server background reporting', () => {
 
     await worker.scheduled(
       { cron: OUTCOME_AGGREGATE_CRON, scheduledTime } as ScheduledController,
-      env as unknown as Env
+      env as unknown as Env,
+      {} as ExecutionContext
     );
 
     expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
@@ -449,7 +451,8 @@ describe('server background reporting', () => {
 
     await worker.scheduled(
       { cron: '*/3 * * * *', scheduledTime } as ScheduledController,
-      env as unknown as Env
+      env as unknown as Env,
+      {} as ExecutionContext
     );
 
     expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
@@ -471,7 +474,8 @@ describe('server background reporting', () => {
     await expect(
       worker.scheduled(
         { cron: OUTCOME_AGGREGATE_CRON } as ScheduledController,
-        env as unknown as Env
+        env as unknown as Env,
+        {} as ExecutionContext
       )
     ).rejects.toBe(outcomeError);
 
@@ -482,7 +486,11 @@ describe('server background reporting', () => {
   it('runs neither branch for an unrecognized cron and warns', async () => {
     const env = createEnv();
 
-    await worker.scheduled({ cron: '0 0 * * 0' } as ScheduledController, env as unknown as Env);
+    await worker.scheduled(
+      { cron: '0 0 * * 0' } as ScheduledController,
+      env as unknown as Env,
+      {} as ExecutionContext
+    );
 
     expect(removeExpiredCloudAgentReportDataMock).not.toHaveBeenCalled();
     expect(runCloudAgentOutcomeCollectionMock).not.toHaveBeenCalled();

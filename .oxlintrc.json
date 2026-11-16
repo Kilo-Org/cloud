@@ -179,22 +179,19 @@
     },
     {
       // Parts of services/ are off-limits to repository tooling, so the
-      // assertion-removal rule cannot be satisfied there. packages/ keeps it.
+      // assertion-removal rule cannot be satisfied there. This override names
+      // the service packages tooling may edit, and `excludeFiles` keeps the
+      // result out of the override array order: those packages inherit the
+      // rule from the shared override above, and every other service file
+      // stays off.
       "files": ["services/**/*.ts"],
-      "rules": {
-        "@typescript-eslint/no-unnecessary-type-assertion": "off"
-      }
-    },
-    {
-      // Every service package this work can edit keeps the rule.
-      "files": [
+      "excludeFiles": [
         "services/ai-attribution/**/*.ts",
         "services/auto-routing/**/*.ts",
         "services/auto-routing-benchmark/**/*.ts",
         "services/cloud-agent-next/**/*.ts",
         "services/code-review-infra/**/*.ts",
         "services/container-usage-meter/**/*.ts",
-        "services/db-proxy/**/*.ts",
         "services/event-service/**/*.ts",
         "services/git-token-service/**/*.ts",
         "services/gmail-push/**/*.ts",
@@ -208,12 +205,13 @@
         "services/security-auto-analysis/**/*.ts",
         "services/security-sync/**/*.ts",
         "services/session-ingest/**/*.ts",
+        "services/session-sync/**/*.ts",
         "services/usage-ingest/**/*.ts",
         "services/user-data-export/**/*.ts",
         "services/webhook-agent-ingest/**/*.ts"
       ],
       "rules": {
-        "@typescript-eslint/no-unnecessary-type-assertion": "error"
+        "@typescript-eslint/no-unnecessary-type-assertion": "off"
       }
     },
     {

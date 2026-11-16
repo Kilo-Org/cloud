@@ -7873,6 +7873,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         resourceKind: 'cloud-agent-next',
         resourceId: SANDBOX_SESSION_ID,
         environment: 'development',
+        onAdmissionRejected: expect.any(Function),
         ...(organizationId ? { organizationId } : {}),
       });
       expect(stub.registerSessionFromMetadata).toHaveBeenCalledWith(

@@ -56,7 +56,8 @@ import type { Env, TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
-import { tokenEnvironment } from '../../shared/token-environment.js';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
@@ -667,7 +668,9 @@ async function createDestinationRuntimeAuthorization(
       connectionString: ctx.env.HYPERDRIVE.connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: progress.cloudAgentSessionId,
-      environment: tokenEnvironment(ctx.env),
+      environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      onAdmissionRejected: reason =>
+        logRuntimeAuthorizationDiagnostic(progress.cloudAgentSessionId, 'admission', reason),
       ...(organizationId ? { organizationId } : {}),
     });
     return {

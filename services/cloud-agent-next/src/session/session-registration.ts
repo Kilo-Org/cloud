@@ -60,6 +60,7 @@ import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 
 import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import {
@@ -110,7 +111,7 @@ import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
-import { tokenEnvironment } from '../shared/token-environment.js';
+import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
@@ -880,7 +881,9 @@ async function issueSessionRuntimeAuthorization(
       connectionString: ctx.env.HYPERDRIVE.connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
-      environment: tokenEnvironment(ctx.env),
+      environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      onAdmissionRejected: reason =>
+        logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
       ...(orgId ? { organizationId: orgId } : {}),
     });
     runtimeAuthorization = {

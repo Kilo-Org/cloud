@@ -125,7 +125,7 @@ const EMAILS_DIR = path.join(process.cwd(), '..', '..', 'packages', 'web-shared'
 type ClassRule = { className: string; declarations: RegExp };
 
 const CLASS_RULES: ClassRule[] = [
-  { className: 'kc-page', declarations: /background-color:\s*#ffffff\b/i },
+  { className: 'kc-page', declarations: /background(?:-color)?:\s*#(?:ffffff|fff)\b/i },
   { className: 'kc-strong', declarations: /(?:^|;)\s*color:\s*#1a1a1a\b/i },
   { className: 'kc-text', declarations: /(?:^|;)\s*color:\s*#333\b/i },
   { className: 'kc-muted', declarations: /(?:^|;)\s*color:\s*#555\b/i },
@@ -135,7 +135,7 @@ const CLASS_RULES: ClassRule[] = [
     declarations: /(?:background-color:\s*#f6f6f4\b|border:\s*1px solid #ebebea\b)/i,
   },
   { className: 'kc-divider', declarations: /border-top:\s*1px solid #(?:ebebea|eee)\b/i },
-  { className: 'kc-btn', declarations: /background-color:\s*#1a1a1a\b/i },
+  { className: 'kc-btn', declarations: /background(?:-color)?:\s*#1a1a1a\b/i },
 ];
 
 function readAttribute(tag: string, name: string): string | undefined {
@@ -155,7 +155,10 @@ function findClassViolations(html: string, source: string): string[] {
     for (const rule of CLASS_RULES) {
       const declaration = normalized.match(rule.declarations)?.[0];
       // background-color: #1a1a1a is the CTA surface, not strong text.
-      if (rule.className === 'kc-strong' && /background-color:\s*#1a1a1a\b/i.test(normalized)) {
+      if (
+        rule.className === 'kc-strong' &&
+        /background(?:-color)?:\s*#1a1a1a\b/i.test(normalized)
+      ) {
         continue;
       }
       if (!declaration || classes.has(rule.className)) continue;
@@ -203,13 +206,16 @@ describe('dark mode support', () => {
 
     // Proton Mail iOS leaves explicit white surfaces white while lightening
     // text; page backgrounds must stay unset so the client's own shows through.
-    expect(html).not.toContain('background-color: #ffffff');
+    expect(html).not.toMatch(/background(?:-color)?:\s*#(?:ffffff|fff)\b/i);
 
     const bodies = [...html.matchAll(/<body\b[^>]*>/gi)].map(match => match[0]);
     if (bodies.length === 0) {
       // Bare fragment templates (e.g. securityFinding*) carry kc-page on their
-      // outer table instead of a body element.
-      expect(html).toContain('kc-page');
+      // outer table instead of a body element. The injected stylesheet also
+      // mentions .kc-page, so inspect the root table tag rather than the text.
+      const rootTable = html.match(/<table\b[^>]*>/i)?.[0] ?? '';
+      expect(rootTable).not.toBe('');
+      expect(readAttribute(rootTable, 'class') ?? '').toContain('kc-page');
     }
     for (const body of bodies) {
       expect(readAttribute(body, 'class') ?? '').toContain('kc-page');

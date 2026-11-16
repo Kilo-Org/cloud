@@ -143,15 +143,13 @@ vi.mock('@/components/query-error', () => ({
   QueryError: ({
     title,
     onRetry,
-    refreshControl,
   }: {
     title?: string;
     onRetry?: () => void;
-    refreshControl?: Record<string, unknown>;
   }) =>
     createElement(
       'QueryError',
-      { title, refreshControl },
+      { title },
       onRetry === undefined ? null : createElement('Retry', { onPress: onRetry })
     ),
 }));
@@ -354,41 +352,22 @@ async function loadPage(root: ReactTestRenderer['root'], pageNumber: number) {
   await waitFor(() => rows(root).length === pageNumber * PAGE_ROWS);
 }
 
-/**
- * The pull the reader drives on the surface currently on screen: the list owns
- * the pair itself, while the empty and failure state scrollers take the
- * `refreshControl` element.
- */
+/** The pull pair FlashList owns itself, as the reader's pull drives it. */
 function pullControl(root: ReactTestRenderer['root']) {
-  const list = root.findAll(node => Object.is(node.type, FLASH_LIST))[0];
-  if (list !== undefined) {
-    const forwarded = list.props as {
-      refreshing?: boolean;
-      onRefresh?: () => void;
-    };
-    if (typeof forwarded.onRefresh === 'function') {
-      return {
-        props: { refreshing: forwarded.refreshing === true, onRefresh: forwarded.onRefresh },
-      };
-    }
-  }
-  const candidates = root.findAll(node => {
-    const props = node.props as { refreshControl?: unknown; onRefresh?: unknown };
-    // FlashList's own pair is the fallback branch's element; a scroller probe
-    // must not hand the reader the control's own element node.
-    return (
-      props.refreshControl !== undefined &&
-      typeof props.refreshControl === 'object' &&
-      typeof props.onRefresh !== 'function'
-    );
-  });
-  const scroller = mustExist(candidates[0], "the surface's refresh control");
-  return mustExist(
-    scroller.props.refreshControl as
-      | { props: { refreshing: boolean; onRefresh: () => void } }
-      | undefined,
-    "the surface's refresh control"
+  const list = mustExist(
+    root.findAll(node => Object.is(node.type, FLASH_LIST))[0],
+    'the receipts list'
   );
+  const forwarded = list.props as {
+    refreshing?: boolean;
+    onRefresh?: () => void;
+  };
+  return {
+    props: {
+      refreshing: forwarded.refreshing === true,
+      onRefresh: forwarded.onRefresh as () => void,
+    },
+  };
 }
 
 /** Run the real infinite query: its page bookkeeping is what the bound measures. */
@@ -709,10 +688,9 @@ describe('ReportReceiptsScreen', () => {
   it('reloads page one on a pull and keeps the rows it started from', async () => {
     // The real hook and a real client: a pull is `reconcileFirstPage` over the
     // cache entry, so the page-one read and the rows it replaces are React
-    // Query's own bookkeeping. (On a failed first page the entry holds no
-    // pages, so the pull re-issues the error state's own retry instead — a
-    // refresh that answers by doing nothing would toast "pull down to try
-    // again" and the gesture could never succeed.)
+    // Query's own bookkeeping. (The failed state renders no pull control and
+    // offers its Retry only: a failed first page holds no cached pages, so a
+    // pull there answers by doing nothing.)
     await useRealInfiniteQuery();
     state.answerPage = pageParam => pageOf(pageNumberFor(pageParam));
     const queryClient = new QueryClient({

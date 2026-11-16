@@ -125,6 +125,15 @@ async function mount(): Promise<TestRenderer.ReactTestRenderer> {
   return ref.current;
 }
 
+/** The sheet shell the screen renders, so a test can drive its header controls. */
+function sheetOf(renderer: TestRenderer.ReactTestRenderer) {
+  const [sheet] = renderer.root.findAll(node => String(node.type) === 'SheetHeader');
+  if (!sheet) {
+    throw new Error('The mode picker sheet header did not mount');
+  }
+  return sheet;
+}
+
 describe('ModePickerScreen hardware Back', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -162,5 +171,18 @@ describe('ModePickerScreen hardware Back', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+
+  it('dismisses from the header Cancel without reporting or clearing a pick', async () => {
+    const renderer = await mount();
+    const cancel = sheetOf(renderer).props.onCancel as () => void;
+
+    act(() => {
+      cancel();
+    });
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(bridge.onSelect).not.toHaveBeenCalled();
+    expect(modePickerSlotClear).not.toHaveBeenCalled();
   });
 });

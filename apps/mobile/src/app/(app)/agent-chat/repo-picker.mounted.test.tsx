@@ -8,6 +8,7 @@ import { type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import RepoPickerScreen from '@/app/(app)/agent-chat/repo-picker';
+import { PickerSheet } from '@/components/picker-sheet';
 import { type RepoOption, type RepoPickerSection } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import '@/i18n';
@@ -82,6 +83,14 @@ async function mount(): Promise<ReactTestRenderer> {
   return mounted.renderer;
 }
 
+function sheetOf(renderer: ReactTestRenderer) {
+  const [sheet] = renderer.root.findAllByType(PickerSheet);
+  if (!sheet) {
+    throw new Error('The picker sheet did not mount');
+  }
+  return sheet;
+}
+
 function rowFor(renderer: ReactTestRenderer, fullName: string) {
   const label = `GitHub ${fullName}`;
   const row = renderer.root.findAll(node => node.props.accessibilityLabel === label)[0];
@@ -124,6 +133,35 @@ describe('repository picker dismissal burst', () => {
     // One pop: the second tap must not close the screen beneath the picker.
     expect(routerMock.back).toHaveBeenCalledTimes(1);
     expect(repoPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
+  });
+});
+
+describe('repository picker header dismissal', () => {
+  it('dismisses from the header Cancel without reporting a pick', async () => {
+    const renderer = await mount();
+    const cancel = sheetOf(renderer).props.onCancel as (() => void) | undefined;
+    expect(typeof cancel).toBe('function');
+
+    act(() => {
+      cancel?.();
+    });
+
+    expect(routerMock.back).toHaveBeenCalledTimes(1);
+    expect(slotBridge.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('offers the same header Cancel when the bridge is gone', async () => {
+    repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
+    const renderer = await mount();
+    const cancel = sheetOf(renderer).props.onCancel as (() => void) | undefined;
+    expect(typeof cancel).toBe('function');
+
+    act(() => {
+      cancel?.();
+    });
+
+    expect(routerMock.back).toHaveBeenCalledTimes(1);
+    expect(slotBridge.onSelect).not.toHaveBeenCalled();
   });
 });
 

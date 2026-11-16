@@ -4,7 +4,6 @@ import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { toast } from 'sonner-native';
 import { z } from 'zod';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -141,7 +140,7 @@ export function ProviderKeyNewScreen() {
           onPress={() => {
             const apiKey = keyRef.current.trim();
             if (apiKey === '') {
-              toast.error(t('profile.providerKeys.apiKeyRequired'));
+              setSubmitError(t('profile.providerKeys.apiKeyRequired'));
               return;
             }
             setSubmitError(null);

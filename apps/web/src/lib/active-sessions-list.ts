@@ -501,7 +501,11 @@ export async function listActiveSessions({
         // runs".
         upstreamReadFailed = true;
       } else {
-        const raw = await readJsonWithinBudget(response, readDeadlineAt - Date.now());
+        const raw = await readJsonWithinBudget(
+          response,
+          readDeadlineAt - Date.now(),
+          SESSION_INGEST_READ_BUDGET_MS
+        );
         parsed = activeSessionsResponseSchema.parse(raw);
       }
     } catch (error) {

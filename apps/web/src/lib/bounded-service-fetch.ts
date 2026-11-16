@@ -13,17 +13,28 @@ export const CONTROL_PLANE_UPSTREAM_BUDGET_MS = 8_000;
 /**
  * Raised when an internal-service fetch does not settle inside its budget.
  *
- * Carries only the budget: the request URL (and its query string), the
+ * Carries only budgets: the request URL (and its query string), the
  * `Authorization` header and the internal-service token are never attached to
  * this error or written to a log.
  */
 export class ServiceFetchTimeoutError extends Error {
+  /** Time the timed phase had left when it expired. */
   readonly budgetMs: number;
 
-  constructor(budgetMs: number) {
-    super(`Internal service did not respond within ${budgetMs}ms`);
+  /**
+   * Budget the phase was configured with. Equal to {@link budgetMs} unless the
+   * phase had already spent part of its budget before the timed operation
+   * started — a body read arms its timer with what the headers left, so
+   * reporting `budgetMs` alone would show a few milliseconds instead of the
+   * read's actual budget in logs and Sentry.
+   */
+  readonly totalBudgetMs: number;
+
+  constructor(budgetMs: number, totalBudgetMs: number = budgetMs) {
+    super(`Internal service did not respond within ${totalBudgetMs}ms`);
     this.name = 'ServiceFetchTimeoutError';
     this.budgetMs = budgetMs;
+    this.totalBudgetMs = totalBudgetMs;
   }
 }
 
@@ -135,12 +146,18 @@ export async function fetchWithinBudget(
  * would leave the abandoned body being buffered for as long as the upstream
  * kept trickling it. Cancelling a reader we hold tears the stream down and ends
  * the transfer.
+ *
+ * `remainingBudgetMs` is what the headers left; `totalBudgetMs` is the budget
+ * this read was configured with, and it is the value the timeout error reports
+ * so logs and Sentry show the configured budget instead of the few milliseconds
+ * that were left when the body started.
  */
 export async function readJsonWithinBudget<T = unknown>(
   response: Response,
-  budgetMs: number
+  remainingBudgetMs: number,
+  totalBudgetMs: number = remainingBudgetMs
 ): Promise<T> {
-  const budgetError = new ServiceFetchTimeoutError(budgetMs);
+  const budgetError = new ServiceFetchTimeoutError(remainingBudgetMs, totalBudgetMs);
   const expired = Promise.withResolvers<never>();
   // A body another reader already holds cannot be taken over; the wait is
   // still bounded, only the cancellation is out of reach.
@@ -153,7 +170,7 @@ export async function readJsonWithinBudget<T = unknown>(
       }
       expired.reject(budgetError);
     },
-    Math.max(0, budgetMs)
+    Math.max(0, remainingBudgetMs)
   );
 
   try {

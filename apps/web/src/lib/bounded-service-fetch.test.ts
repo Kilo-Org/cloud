@@ -208,8 +208,29 @@ describe('readJsonWithinBudget', () => {
     const error = await outcome;
     expect(error).toBeInstanceOf(ServiceFetchTimeoutError);
     expect((error as ServiceFetchTimeoutError).budgetMs).toBe(500);
+    // No separate total was given, so the error reports the same value twice.
+    expect((error as ServiceFetchTimeoutError).totalBudgetMs).toBe(500);
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('reports the read budget it was configured with, not only what the headers left', async () => {
+    // A body read arms its timer with the remainder, which is often a few
+    // hundred milliseconds. Logs and Sentry must still show the budget the read
+    // was configured with, or a 4,500 ms read looks like a 120 ms one.
+    const response = {
+      json: () => new Promise<never>(() => {}),
+      body: null,
+    } as unknown as Response;
+
+    const outcome = readJsonWithinBudget(response, 120, 4_500).catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(120);
+
+    const error = await outcome;
+    expect(error).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect((error as ServiceFetchTimeoutError).budgetMs).toBe(120);
+    expect((error as ServiceFetchTimeoutError).totalBudgetMs).toBe(4_500);
+    expect((error as ServiceFetchTimeoutError).message).toContain('4500ms');
   });
 
   test('leaves a body a reader already holds alone', async () => {

@@ -1,21 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { buildNativeEgressAllowlist } from './egress-policy.js';
+import { buildNativeEgressAllowlist, matchesActiveEgressPolicy } from './egress-policy.js';
 
 const env = { WORKER_URL: 'https://agent.example.com' };
 
 describe('buildNativeEgressAllowlist', () => {
+  it('keeps loopback Worker upstreams behind the public runtime facade', () => {
+    const policy = buildNativeEgressAllowlist({
+      allowlist: [],
+      env: {
+        ...env,
+        KILOCODE_BACKEND_BASE_URL: 'http://localhost:3900',
+        KILO_OPENROUTER_BASE: 'http://localhost:3910/api',
+        KILO_SESSION_INGEST_URL: 'http://localhost:9700',
+      },
+    });
+    expect(policy).toContain('agent.example.com');
+    expect(policy).not.toContain('localhost');
+    expect(policy).not.toContain('host.docker.internal');
+  });
+
   it('allows required Kilo, control-plane, and HTTPS Git destinations with an empty list', () => {
     const policy = buildNativeEgressAllowlist({ allowlist: [], env });
     expect(policy).toEqual([
       'agent.example.com',
       'api.bitbucket.org',
       'api.github.com',
-      'api.kilo.ai',
       'bitbucket.org',
       'codeload.github.com',
       'github.com',
       'gitlab.com',
-      'ingest.kilosessions.ai',
       'media.githubusercontent.com',
       'objects.githubusercontent.com',
       'raw.githubusercontent.com',
@@ -26,7 +39,7 @@ describe('buildNativeEgressAllowlist', () => {
     expect(policy).not.toContain('*');
   });
 
-  it('includes configured infrastructure and the task repository, not arbitrary sandbox env', () => {
+  it('includes only the facade and task repository, without Worker-side upstream hosts', () => {
     const policy = buildNativeEgressAllowlist({
       allowlist: ['EXAMPLE.COM.', 'example.com', 'api.github.com'],
       env: {
@@ -39,40 +52,15 @@ describe('buildNativeEgressAllowlist', () => {
     });
     expect(policy).toEqual([...new Set(policy)].sort());
     expect(policy).toEqual(
-      expect.arrayContaining([
-        'example.com',
-        'git.company.com',
-        'agent.example.com',
-        'backend.example.com',
-        'provider.example.com',
-        'ingest.example.com',
-      ])
+      expect.arrayContaining(['example.com', 'git.company.com', 'agent.example.com'])
     );
-  });
-
-  it('uses the token-encoded provider instead of the configured provider', () => {
-    const policy = buildNativeEgressAllowlist({
-      allowlist: [],
-      env: { ...env, KILO_OPENROUTER_BASE: 'https://configured.example.com/api' },
-      kiloToken: 'https://token-provider.example.com/api:session-token',
-    });
-    expect(policy).toContain('token-provider.example.com');
-    expect(policy).not.toContain('configured.example.com');
-  });
-
-  it.each([
-    'http://localhost/api:session-token',
-    'https://token-provider.example.com:8443/api:session-token',
-    'https://127.0.0.1/api:session-token',
-  ])('rejects unsupported token-encoded provider targets: %s', kiloToken => {
-    expect(() => buildNativeEgressAllowlist({ allowlist: [], env, kiloToken })).toThrow(
-      'Sandbox configuration is invalid or unsupported'
-    );
+    for (const host of ['backend.example.com', 'provider.example.com', 'ingest.example.com'])
+      expect(policy).not.toContain(host);
   });
 
   it('supports the full public list plus mandatory domains', () => {
     const allowlist = Array.from({ length: 100 }, (_, index) => `domain${index}.example.com`);
-    expect(buildNativeEgressAllowlist({ allowlist, env })).toHaveLength(114);
+    expect(buildNativeEgressAllowlist({ allowlist, env })).toHaveLength(112);
   });
 
   it.each([
@@ -80,13 +68,51 @@ describe('buildNativeEgressAllowlist', () => {
     { env: { WORKER_URL: 'http://agent.example.com' } },
     { env: { WORKER_URL: 'https://agent.example.com:8443' } },
     { env: { WORKER_URL: 'https://127.0.0.1' } },
-    { env: { ...env, KILO_OPENROUTER_BASE: 'https://provider.example.com:8443' } },
     { env, repositoryUrl: 'ssh://git@git.company.com/repo.git' },
     { env, repositoryUrl: 'https://git.company.com:8443/repo.git' },
     { env, repositoryUrl: 'https://127.0.0.1/repo.git' },
   ])('fails closed for unsupported required destinations: %j', input => {
     expect(() => buildNativeEgressAllowlist({ allowlist: [], ...input })).toThrow(
       'Sandbox configuration is invalid or unsupported'
+    );
+  });
+});
+
+describe('active deployed egress pins', () => {
+  const request = {
+    egressMode: 'allowlist' as const,
+    egressAllowlist: ['packages.example.com'],
+    egressAudit: true,
+  };
+  const selected = {
+    egressAllowlist: buildNativeEgressAllowlist({ allowlist: request.egressAllowlist, env }),
+    egressAudit: true,
+  };
+  const stored = {
+    egressAllowlist: [...selected.egressAllowlist, 'api.kilo.ai', 'ingest.kilosessions.ai'].sort(),
+    egressAudit: true,
+  };
+  it('accepts an exact old-baseline request without modifying the stored pin', () => {
+    const before = structuredClone(stored);
+    expect(matchesActiveEgressPolicy({ stored, selected, request, env })).toBe(true);
+    expect(stored).toEqual(before);
+  });
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['packages.example.com', 'new.example.com'] },
+    { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+    { egressAudit: false },
+  ])('rejects a changed requested policy: %j', async change => {
+    const changed = { ...request, ...change };
+    const changedPin = {
+      egressAllowlist:
+        changed.egressMode === 'allowlist'
+          ? buildNativeEgressAllowlist({ allowlist: changed.egressAllowlist ?? [], env })
+          : undefined,
+      egressAudit: changed.egressAudit,
+    };
+    expect(matchesActiveEgressPolicy({ stored, selected: changedPin, request: changed, env })).toBe(
+      false
     );
   });
 });

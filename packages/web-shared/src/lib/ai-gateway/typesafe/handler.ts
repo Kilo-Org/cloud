@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -55,15 +54,11 @@ import {
   rewriteUsageEndpointBody,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.usageEndpoints';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
-import { normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
-import { bouncerPayerKey } from '@kilocode/web-shared/lib/bouncer/request';
+import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
 import {
   bareIpLiteral,
   bouncerDecideTier,
-  bouncerRejectionResponse,
-  payerSharingIp,
   rawClientIp,
-  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 
 /**
@@ -197,22 +192,19 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   // Resolve bouncer's identity once for this request. System One is always signed
   // in, so its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
-  const bouncerIp = bareIpLiteral(ipAddress);
-  const bouncerRequestId = randomUUID();
-  const payerAccountId = bouncerPayerKey(user.id, organizationId, payer);
+  const bouncer = signedInBouncerRequest({
+    ip: bareIpLiteral(ipAddress),
+    ja4Digest: usageBase.context.fraudHeaders.http_x_vercel_ja4_digest,
+    userId: user.id,
+    organizationId,
+    feature,
+  });
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerVerdictPromise = startBouncerDecide({
-    requestId: bouncerRequestId,
-    ip: bouncerIp,
-    ja4: normalizeJa4(usageBase.context.fraudHeaders.http_x_vercel_ja4_digest),
-    account: {
-      accountId: payerAccountId,
-      userId: user.id,
-      tier: bouncerDecideTier(organizationId, plan, balance),
-      payer,
-    },
+  const bouncerVerdictPromise = bouncer.decide({
+    tier: bouncerDecideTier(organizationId, plan, balance),
+    payer,
   });
 
   const kiloUserId = user.id;
@@ -238,7 +230,19 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  const bouncerUsage = await bouncer.usage(
+    {
+      occurredAt: new Date(startedAtMs),
+      clientAttributed: usageBase.clientAttributed,
+      requestedLogprobs: false,
+      samples: null,
+      // System One input is a typed classification payload, not a conversation,
+      // so there is no prompt text to hash (and no raw state leaves the gateway).
+      promptSimHash: null,
+    },
+    payer
+  );
+  const bouncerRejection = bouncer.apply(bouncerVerdict, bouncerUsage);
   if (bouncerRejection) return bouncerRejection;
 
   const usageContextOf = (statusCode: number, ttfb: number | null): MicrodollarUsageContext => ({
@@ -254,19 +258,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     has_tools: false,
     feature,
     ttfb_ms: ttfb,
-    bouncer: {
-      requestId: bouncerRequestId,
-      occurredAt: new Date(startedAtMs),
-      accountId: payerAccountId,
-      clientIp: payerSharingIp(bouncerIp, feature),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: false,
-      samples: null,
-      // System One input is a typed classification payload, not a conversation,
-      // so there is no prompt text to hash (and no raw state leaves the gateway).
-      promptSimHash: null,
-      spendWatch: bouncerVerdict?.spendWatch === true,
-    },
+    bouncer: { ...bouncerUsage },
   });
 
   /**

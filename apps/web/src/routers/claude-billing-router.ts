@@ -24,23 +24,20 @@ import {
 } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { isClaudeBillingOrganizationMember } from '@/lib/claude-billing/access';
 import {
   claudeBillingConnectionState,
   type ClaudeBillingConnectionState,
 } from '@/lib/claude-billing/profile';
 import { retireUnreferencedClaudeBillingPayer } from '@/lib/claude-billing/delete';
 /**
- * The caller's Claude billing connections: their personal one, their own in an
- * organization, and the organization's shared-services one. A person manages
- * their own connections. The shared-services connection is an organization
- * setting, so only an organization owner or admin manages it.
+ * The caller's Claude billing connections: their personal one, and the
+ * connection of an organization they belong to. A person manages their own
+ * connection. An organization's connection serves every request in it, so only
+ * an organization owner or admin manages it, while any member may read it.
  */
 
 export const ClaudeBillingOwnerInputSchema = z.object({
   organizationId: z.uuid().optional(),
-  /** `shared_services` reads and manages the organization's service connection. */
-  scope: z.literal('shared_services').optional(),
 });
 
 export const ClaudeBillingShareableLinkSchema = z.object({
@@ -81,8 +78,7 @@ export const ClaudeBillingStatusSchema = z.object({
 export type ClaudeBillingStatus = z.infer<typeof ClaudeBillingStatusSchema>;
 async function resolveOwner(
   ctx: TRPCContext,
-  organizationId: string | undefined,
-  scope: 'shared_services' | undefined
+  organizationId: string | undefined
 ): Promise<{
   userId: string;
   userEmail: string | null;
@@ -93,29 +89,14 @@ async function resolveOwner(
   const userId = ctx.user.id;
   const userEmail = ctx.user.google_user_email;
   if (!organizationId) {
-    if (scope === 'shared_services') {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'A shared-services connection needs an organization.',
-      });
-    }
     return { userId, userEmail, owner: { kind: 'personal', kiloUserId: userId }, canManage: true };
   }
   const role = await ensureOrganizationAccess(ctx, organizationId);
-  if (scope === 'shared_services') {
-    return {
-      userId,
-      userEmail,
-      owner: { kind: 'shared_services', organizationId },
-      canManage: canManageOrganization(role),
-    };
-  }
   return {
     userId,
     userEmail,
-    owner: { kind: 'member', kiloUserId: userId, organizationId },
-    // A member connection needs a direct membership, which inherited access is not.
-    canManage: await isClaudeBillingOrganizationMember(userId, organizationId),
+    owner: { kind: 'organization', organizationId },
+    canManage: canManageOrganization(role),
   };
 }
 
@@ -155,13 +136,9 @@ async function buildScopeStatus(
 }
 
 function forbiddenManageMessage(owner: ClaudeBillingOwner): string {
-  if (owner.kind === 'shared_services') {
-    return 'Only an organization owner or admin with access to this feature can link it.';
-  }
-  if (owner.kind === 'member') {
-    return 'Only a direct member of this organization with access to this feature can link it.';
-  }
-  return 'Linked billing with Claude Platform is not available for your account yet.';
+  return owner.kind === 'organization'
+    ? 'Only an organization owner or admin with access to this feature can link it.'
+    : 'Linked billing with Claude Platform is not available for your account yet.';
 }
 
 async function executeShare(
@@ -169,14 +146,14 @@ async function executeShare(
   sourceInput: z.infer<typeof ClaudeBillingOwnerInputSchema>,
   targetInput: z.infer<typeof ClaudeBillingOwnerInputSchema>
 ): Promise<ClaudeBillingStatus> {
-  const targetResolved = await resolveOwner(ctx, targetInput.organizationId, targetInput.scope);
+  const targetResolved = await resolveOwner(ctx, targetInput.organizationId);
   if (ctx.authViaToken || ctx.credential !== 'session') {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Share a Claude link from the Kilo web app.',
     });
   }
-  const sourceResolved = await resolveOwner(ctx, sourceInput.organizationId, sourceInput.scope);
+  const sourceResolved = await resolveOwner(ctx, sourceInput.organizationId);
   if (claudeBillingOwnerKey(sourceResolved.owner) === claudeBillingOwnerKey(targetResolved.owner)) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -231,11 +208,7 @@ export const claudeBillingRouter = createTRPCRouter({
     .input(ClaudeBillingOwnerInputSchema)
     .output(ClaudeBillingStatusSchema)
     .query(async ({ ctx, input }): Promise<ClaudeBillingStatus> => {
-      const { userId, owner, canManage } = await resolveOwner(
-        ctx,
-        input.organizationId,
-        input.scope
-      );
+      const { userId, owner, canManage } = await resolveOwner(ctx, input.organizationId);
       return await buildScopeStatus(userId, owner, canManage);
     }),
 
@@ -263,18 +236,11 @@ export const claudeBillingRouter = createTRPCRouter({
     .input(ClaudeBillingOwnerInputSchema)
     .output(ClaudeBillingStatusSchema)
     .mutation(async ({ ctx, input }): Promise<ClaudeBillingStatus> => {
-      const { userId, owner, canManage } = await resolveOwner(
-        ctx,
-        input.organizationId,
-        input.scope
-      );
+      const { userId, owner, canManage } = await resolveOwner(ctx, input.organizationId);
       if (!canManage) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message:
-            owner.kind === 'shared_services'
-              ? 'Only an organization owner or admin can remove the shared-services link.'
-              : 'Only a direct member of this organization can manage their own link.',
+          message: 'Only an organization owner or admin can remove the organization link.',
         });
       }
       const unreferencedPayer = await removeClaudeBillingGrant(owner);

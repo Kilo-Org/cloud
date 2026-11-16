@@ -67,39 +67,22 @@ describe('Cross-region Claude payer state', () => {
     await expect(getAuthoritativeClaudeBillingState(owner)).rejects.toThrow();
   });
 
-  it('asks with the owner shape the previous web app release reads', async () => {
+  it('asks with the owner shape the web app reads', async () => {
     const fetchMock = jest
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async () => Response.json({ connection: null }));
-    const organizationId = ORGANIZATION_ID;
-    await getAuthoritativeClaudeBillingState({ kind: 'shared_services', organizationId });
+    await getAuthoritativeClaudeBillingState(owner);
     await getAuthoritativeClaudeBillingState({
-      kind: 'member',
-      kiloUserId: 'owner',
-      organizationId,
+      kind: 'organization',
+      organizationId: ORGANIZATION_ID,
     });
     expect(fetchMock.mock.calls.map(([, init]) => readJsonBody(init?.body))).toEqual([
-      { kind: 'organization', organizationId },
-      { kind: 'organization', organizationId, kiloUserId: 'owner' },
+      { kind: 'personal', kiloUserId: 'owner' },
+      { kind: 'organization', organizationId: ORGANIZATION_ID },
     ]);
   });
 
-  it("does not take the organization's row for a member from the previous web app release", async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({
-        connection: { status: 'connected', user_profile_id: 'uprof_org', connected_at: null },
-      })
-    );
-    await expect(
-      getAuthoritativeClaudeBillingState({
-        kind: 'member',
-        kiloUserId: 'owner',
-        organizationId: ORGANIZATION_ID,
-      })
-    ).resolves.toBeNull();
-  });
-
-  it('returns a personal row that names its owner', async () => {
+  it('returns a personal row that names its owner and no organization', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
         connection: {
@@ -107,6 +90,7 @@ describe('Cross-region Claude payer state', () => {
           user_profile_id: 'uprof_owner',
           connected_at: null,
           kilo_user_id: 'owner',
+          organization_id: null,
         },
       })
     );
@@ -137,76 +121,7 @@ describe('Cross-region Claude payer state', () => {
     }
   );
 
-  it('returns a member row that names its person and its organization', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({
-        connection: {
-          status: 'connected',
-          user_profile_id: 'uprof_member',
-          connected_at: null,
-          kilo_user_id: 'owner',
-          organization_id: ORGANIZATION_ID,
-        },
-      })
-    );
-    await expect(
-      getAuthoritativeClaudeBillingState({
-        kind: 'member',
-        kiloUserId: 'owner',
-        organizationId: ORGANIZATION_ID,
-      })
-    ).resolves.toMatchObject({ user_profile_id: 'uprof_member' });
-  });
-
-  it('returns a member row when the requested organization differs only in case', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({
-        connection: {
-          status: 'connected',
-          user_profile_id: 'uprof_member',
-          connected_at: null,
-          kilo_user_id: 'owner',
-          organization_id: ORGANIZATION_ID,
-        },
-      })
-    );
-    await expect(
-      getAuthoritativeClaudeBillingState({
-        kind: 'member',
-        kiloUserId: 'owner',
-        organizationId: ORGANIZATION_ID.toUpperCase(),
-      })
-    ).resolves.toMatchObject({ user_profile_id: 'uprof_member' });
-  });
-
-  it.each([
-    ['another organization', { kilo_user_id: 'owner', organization_id: OTHER_ORGANIZATION_ID }],
-    ['another person', { kilo_user_id: 'other-person', organization_id: ORGANIZATION_ID }],
-    ['no organization', { kilo_user_id: 'owner' }],
-  ])(
-    'requires a member row to name its person and its organization, given %s',
-    async (_label, identity) => {
-      jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-        Response.json({
-          connection: {
-            status: 'connected',
-            user_profile_id: 'uprof_member',
-            connected_at: null,
-            ...identity,
-          },
-        })
-      );
-      await expect(
-        getAuthoritativeClaudeBillingState({
-          kind: 'member',
-          kiloUserId: 'owner',
-          organizationId: ORGANIZATION_ID,
-        })
-      ).resolves.toBeNull();
-    }
-  );
-
-  it('returns a shared-services row that names the requested organization', async () => {
+  it('returns an organization row that names the requested organization', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
         connection: {
@@ -220,83 +135,55 @@ describe('Cross-region Claude payer state', () => {
     );
     await expect(
       getAuthoritativeClaudeBillingState({
-        kind: 'shared_services',
+        kind: 'organization',
         organizationId: ORGANIZATION_ID,
       })
     ).resolves.toMatchObject({ user_profile_id: 'uprof_org' });
   });
 
-  it('refuses a shared-services row that names another organization', async () => {
+  it('returns an organization row when the requested organization differs only in case', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
         connection: {
           status: 'connected',
           user_profile_id: 'uprof_org',
           connected_at: null,
-          organization_id: OTHER_ORGANIZATION_ID,
-        },
-      })
-    );
-    await expect(
-      getAuthoritativeClaudeBillingState({
-        kind: 'shared_services',
-        organizationId: ORGANIZATION_ID,
-      })
-    ).resolves.toBeNull();
-  });
-
-  it('requires a shared-services row to name the requested organization', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({
-        connection: {
-          status: 'connected',
-          user_profile_id: 'uprof_org',
-          connected_at: null,
-        },
-      })
-    );
-    await expect(
-      getAuthoritativeClaudeBillingState({
-        kind: 'shared_services',
-        organizationId: ORGANIZATION_ID,
-      })
-    ).resolves.toBeNull();
-  });
-
-  it('refuses a shared-services row that names a person', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({
-        connection: {
-          status: 'connected',
-          user_profile_id: 'uprof_org',
-          connected_at: null,
-          kilo_user_id: 'owner',
+          kilo_user_id: null,
           organization_id: ORGANIZATION_ID,
         },
       })
     );
     await expect(
       getAuthoritativeClaudeBillingState({
-        kind: 'shared_services',
-        organizationId: ORGANIZATION_ID,
+        kind: 'organization',
+        organizationId: ORGANIZATION_ID.toUpperCase(),
       })
-    ).resolves.toBeNull();
+    ).resolves.toMatchObject({ user_profile_id: 'uprof_org' });
   });
 
-  it('returns a personal row that names its owner and no organization', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({
-        connection: {
-          status: 'connected',
-          user_profile_id: 'uprof_owner',
-          connected_at: null,
-          kilo_user_id: 'owner',
-          organization_id: null,
-        },
-      })
-    );
-    await expect(getAuthoritativeClaudeBillingState(owner)).resolves.toMatchObject({
-      user_profile_id: 'uprof_owner',
-    });
-  });
+  it.each([
+    ['another organization', { organization_id: OTHER_ORGANIZATION_ID }],
+    ['no organization', {}],
+    ['a person', { kilo_user_id: 'owner', organization_id: ORGANIZATION_ID }],
+  ])(
+    'requires an organization row to name the requested organization and no person, given %s',
+    async (_label, identity) => {
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json({
+          connection: {
+            status: 'connected',
+            user_profile_id: 'uprof_org',
+            connected_at: null,
+            ...identity,
+          },
+        })
+      );
+      await expect(
+        getAuthoritativeClaudeBillingState({
+          kind: 'organization',
+          organizationId: ORGANIZATION_ID,
+        })
+      ).resolves.toBeNull();
+    }
+  );
 });

@@ -47,7 +47,7 @@ export type BalanceCheckModelEligibility = {
   hasUserByokAvailable: boolean;
   /**
    * Set when the model cannot bill until an organization owner reconnects the
-   * shared-services Claude connection, because the account that linked it is
+   * organization's Claude connection, because the account that linked it is
    * gone. Routing refuses every request for the model in that state, so no
    * balance and no other credential runs it; a caller that refuses on the
    * balance reports this requirement instead.
@@ -151,9 +151,9 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
 }
 
 /**
- * Add the reconnect requirement of an organization's shared-services Claude
- * connection. A gone connector does not change `hasUserByokAvailable`: another
- * credential may still exist, and routing decides the billing path.
+ * Add the reconnect requirement of an organization's Claude connection. A gone
+ * connector does not change `hasUserByokAvailable`: another credential may still
+ * exist, and routing decides the billing path.
  */
 function withClaudeBilling(
   eligibility: { isFree: boolean; hasUserByokAvailable: boolean },
@@ -259,9 +259,8 @@ type ClaudeBillingModelEligibility =
   /** A connected Claude billing link serves the model. */
   | 'byok'
   /**
-   * The only relevant link is the organization's shared-services connection,
-   * and the account that linked it is gone, so routing refuses the model with a
-   * reconnect requirement.
+   * An organization link serves the model and the account that linked it is
+   * gone, so routing refuses the model with a reconnect requirement.
    */
   | 'reconnect'
   /** No Claude billing link serves the model. */
@@ -269,41 +268,31 @@ type ClaudeBillingModelEligibility =
 
 /**
  * How a Claude billing link serves the model, so the customer's Claude
- * organization pays instead of the Kilo balance. The candidates and their order
- * match `checkClaudeBilling`: the first link that is neither absent, pending,
- * nor removed decides, and one that cannot bill fails the request. A
- * shared-services link whose recorded connector is gone cannot bill either,
- * because routing answers it with a reconnect requirement instead of another
- * payer.
+ * organization pays instead of the Kilo balance. The owner matches
+ * `checkClaudeBilling`: an organization request uses the organization link,
+ * whether a member or a bot makes it, and a personal request uses only the
+ * person's own link. An organization link whose recorded connector is gone
+ * cannot bill either, because routing answers it with a reconnect requirement
+ * instead of another payer.
  */
 async function resolveClaudeBillingForModel(params: {
   fromDb: typeof db;
   user: Pick<User, 'id'>;
   modelId: string;
   organizationId?: string;
-  includeSharedServicesConnection?: boolean;
 }): Promise<ClaudeBillingModelEligibility> {
   if (!(await resolveClaudeBillingModel(params.modelId))) return 'none';
 
-  const owners: ClaudeBillingOwner[] = [];
-  if (params.includeSharedServicesConnection && params.organizationId) {
-    owners.push({ kind: 'shared_services', organizationId: params.organizationId });
-  }
-  owners.push(
-    params.organizationId
-      ? { kind: 'member', kiloUserId: params.user.id, organizationId: params.organizationId }
-      : { kind: 'personal', kiloUserId: params.user.id }
-  );
+  const owner: ClaudeBillingOwner = params.organizationId
+    ? { kind: 'organization', organizationId: params.organizationId }
+    : { kind: 'personal', kiloUserId: params.user.id };
 
-  for (const owner of owners) {
-    const row = await getGrantedClaudeBillingConnection(owner, params.fromDb);
-    if (row?.status === ClaudeBillingConnectionStatus.BillingUnavailable) return 'none';
-    if (row?.status !== ClaudeBillingConnectionStatus.Connected) continue;
-    if (owner.kind === 'shared_services') {
-      const connector = await resolveClaudeBillingConnector(row.created_by, params.fromDb);
-      if (connector.kind === 'gone') return 'reconnect';
-    }
-    return 'byok';
+  const row = await getGrantedClaudeBillingConnection(owner, params.fromDb);
+  if (row?.status === ClaudeBillingConnectionStatus.BillingUnavailable) return 'none';
+  if (row?.status !== ClaudeBillingConnectionStatus.Connected) return 'none';
+  if (owner.kind === 'organization') {
+    const connector = await resolveClaudeBillingConnector(row.created_by, params.fromDb);
+    if (connector.kind === 'gone') return 'reconnect';
   }
-  return 'none';
+  return 'byok';
 }

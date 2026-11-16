@@ -210,8 +210,8 @@ export async function resolveProviderAndPolicy(
     return reject(chatGptReconnectResponse(getProviderResult.message));
   }
   if (getProviderResult.kind === 'claude-billing-reconnect') {
-    // The organization's shared-services Claude link was connected by a person
-    // who is gone. Only an owner reconnecting it changes the outcome.
+    // The organization's Claude link was connected by a person who is gone.
+    // Only an owner reconnecting it changes the outcome.
     return reject(claudeBillingReconnectResponse(getProviderResult.message, input.organizationId));
   }
   if (getProviderResult.kind === 'claude-billing-unavailable') {

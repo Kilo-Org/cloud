@@ -3035,6 +3035,11 @@ export type ByokEndpointModel = z.infer<typeof ByokEndpointModelSchema>;
 
 export const BYOK_ENDPOINT_MAX_MODELS = 500;
 
+function hasNoUserInfo(url: string): boolean {
+  const { username, password } = new URL(url);
+  return username === '' && password === '';
+}
+
 export const ByokEndpointDefinitionSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
@@ -3042,7 +3047,8 @@ export const ByokEndpointDefinitionSchema = z
     base_url: z
       .url({ protocol: /^https?$/ })
       .refine(url => !url.endsWith('/'), 'must not end with a slash')
-      .refine(url => !url.includes('?') && !url.includes('#'), 'must not have a query or fragment'),
+      .refine(url => !url.includes('?') && !url.includes('#'), 'must not have a query or fragment')
+      .refine(hasNoUserInfo, 'must not contain a username or password'),
     /** Gateway APIs the upstream serves. */
     api_kinds: z.array(CustomLlmApiKindSchema).min(1),
     /** The API clients use: `anthropic` Messages, `openai` Responses, `openrouter` Chat Completions. */

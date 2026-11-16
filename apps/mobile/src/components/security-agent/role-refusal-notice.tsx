@@ -1,7 +1,8 @@
 import { Info } from '@/components/ui/icons';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -23,12 +24,21 @@ type RoleRefusalNoticeProps = {
  * callout at the description's own size and colour: as a bare line in the
  * action's gap it read as a footnote, the faintest text on the screen, leaving
  * the state looking unfinished.
+ *
+ * It arrives without a press — on the repository picker it replaces the action
+ * the reader just used — so it is announced through the shared status channel
+ * instead of appearing silently: the polite live region carries it on Android,
+ * one imperative announcement carries it elsewhere, never both.
  */
 export function RoleRefusalNotice({ message, className }: Readonly<RoleRefusalNoticeProps>) {
   const colors = useThemeColors();
+  useStatusAnnouncement(message);
 
   return (
     <View
+      accessible
+      accessibilityRole="alert"
+      accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
       className={cn(
         'min-h-[44px] w-full flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3',
         className

@@ -170,9 +170,9 @@ export function characterCut(line: string, maxIndex: number): number {
     return maxIndex > 0 && last >= 0xd800 && last <= 0xdbff ? maxIndex - 1 : maxIndex;
   }
   let end = 0;
-  for (const { index } of segmenter.segment(line)) {
-    if (index > maxIndex) break;
-    end = index;
+  for (const { index, segment } of segmenter.segment(line)) {
+    if (index + segment.length > maxIndex) break;
+    end = index + segment.length;
   }
   return end;
 }

@@ -13,11 +13,13 @@ import { createNetworkErrorFetch, readTrpcResponseError } from '@/lib/telemetry/
 import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
 import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
 import { requestUrlString } from '@/lib/telemetry/request-target';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import {
   type ActiveTokenSnapshot,
   getActiveToken,
   getActiveTokenSnapshot,
   getAuthTokenForRequest,
+  isSignOutTeardownActive,
   publishActiveTokenExpiry,
 } from '@/lib/auth/token-owner';
 import { isProtectedDataAvailable, whenProtectedDataAvailableWithin } from '@/lib/protected-data';
@@ -296,7 +298,14 @@ function withUnlockWaitStamp(headers: Record<string, string>, unlockWaitStartMs:
 async function getAuthHeaders(): Promise<Record<string, string>> {
   let token = await getAuthTokenForRequest();
   let unlockWaitStartMs: number | null = null;
-  if (!token && !isProtectedDataAvailable()) {
+  // The app's own knowledge that no session exists — a sign-out in progress or
+  // a sign-out that finished since (its teardown flag stays set until a
+  // sign-in publishes a pair) — means no unlock can bring a bearer back, and
+  // both flags answer without touching the keychain the lock refuses. A cold
+  // launch of a signed-out device is still indistinguishable from a locked
+  // session: every record of a session is a keychain item.
+  const signedOut = isSignOutTeardownActive() || isSignOutActive();
+  if (!token && !isProtectedDataAvailable() && !signedOut) {
     // The keychain supplied no bearer because it refuses every read while the
     // device is locked: wait for the unlock rather than send a request the
     // server would refuse as unauthenticated, then read the token again. A

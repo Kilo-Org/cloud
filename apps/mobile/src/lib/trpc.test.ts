@@ -437,6 +437,34 @@ describe('getAuthHeaders', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('sends a request the app knows is signed out without waiting for the unlock', async () => {
+    // A signed-out device has no credential to bring back at unlock: the
+    // sign-out flags are the app's own answer, need no keychain read, and a
+    // locked request must not sit behind a wait that can only end bare.
+    const headers = await loadHeaders();
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    const { setSignOutActive } = await import('@/lib/auth/sign-out-state');
+    const { setSignOutTeardownActive } = await import('@/lib/auth/token-owner');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    setSignOutActive(true);
+    setSignOutTeardownActive(true);
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(0);
+      const sent = await pending;
+      expect(sent).not.toHaveProperty('Authorization');
+      // No wait was registered, so the lock cannot hold this request.
+      expect(vi.getTimerCount()).toBe(0);
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+    } finally {
+      setSignOutTeardownActive(false);
+      setSignOutActive(false);
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
 });
 
 const mockFetch = vi.fn();

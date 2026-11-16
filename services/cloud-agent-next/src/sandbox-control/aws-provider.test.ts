@@ -284,7 +284,7 @@ describe('AWS durable allocation lifecycle', () => {
     const waiting = gate();
     f.gateRun(waiting.promise);
     const launch = adapter.launch(ref, startup);
-    await vi.waitFor(() => expect(f.submitted).toHaveLength(1));
+    await f.runStarted;
     f.gateRun(undefined);
     expect(await adapter.stop(ref)).toBe('terminal');
     waiting.release();

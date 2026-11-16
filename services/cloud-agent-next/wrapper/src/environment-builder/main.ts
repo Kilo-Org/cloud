@@ -1,3 +1,4 @@
+import { createAwsFilesystemBuildArchive, type FilesystemBuildArchive } from './aws-archive.js';
 import fs from 'node:fs/promises';
 import { appendFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -138,12 +139,14 @@ async function main(): Promise<void> {
   const outsideScope: ProcessSpawn = (command, args, options) => spawn(command, args, options);
   const runGit = (args: string[], options?: Parameters<typeof git>[1]) =>
     git(args, ownedStopped ? { ...options, spawn: outsideScope } : options);
+  let archive: FilesystemBuildArchive | undefined;
   const run = () =>
     runEnvironmentBuild({
       input,
       reporter,
       repository,
       runGit,
+      filesystemBaseline: archive?.baseline,
       stopProcesses: async () => {
         if (ownedScope === undefined) {
           await stopOtherProcesses();
@@ -160,9 +163,31 @@ async function main(): Promise<void> {
       logPath,
     });
   try {
+    if (input.filesystemArchive) {
+      archive = await createAwsFilesystemBuildArchive({
+        identity: input,
+        baseImage: input.filesystemArchive.baseImage,
+        root: '/',
+        signal: controller.signal,
+        client,
+      });
+    }
     result = await (ownedScope === undefined ? run() : ownedScope.run(run));
+    if (result.outcome === 'ready' && archive) {
+      // Setup descendants are stopped and credentials are removed. Capture runs outside their sealed scope.
+      reporter.setStep('archive');
+      await archive.captureAndUpload();
+    }
+  } catch (error) {
+    if (!input.filesystemArchive) throw error;
+    result = {
+      outcome: 'failed',
+      step: 'archive',
+      reason: controller.signal.aborted ? 'canceled' : 'archive_failed',
+    };
   } finally {
     clearTimeout(deadline);
+    await archive?.dispose().catch(() => undefined);
   }
   log(`environment builder finished outcome=${result.outcome}`);
   reporter.stop();

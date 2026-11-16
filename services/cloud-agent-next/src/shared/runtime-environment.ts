@@ -145,3 +145,7 @@ export const CONTROL_HOME_ROOT = '/home';
  * their lifetime; the log uploader reads both roots while they exist.
  */
 export const LEGACY_CONTROL_HOME_DIR_NAME = 'kilo-worktrees';
+
+/** Runtime-owned Git credentials never belong in prepared environment archives. */
+export const CONTROL_GIT_CREDENTIAL_RECORD_PATH = '.local/share/kilo/cloud-agent/git-credentials';
+export const HOME_CREDENTIAL_FILES = ['.git-credentials', '.config/git/credentials'] as const;

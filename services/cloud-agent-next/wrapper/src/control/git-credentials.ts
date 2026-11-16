@@ -19,7 +19,7 @@ type RepositoryCredential = {
  * one `protocol`/`host` pair. The record lives in the runtime home, never in a
  * worktree, so no clone, checkout, diff capture or repository snapshot can carry it.
  */
-const CREDENTIAL_RECORD_PATH = '.local/share/kilo/cloud-agent/git-credentials';
+import { CONTROL_GIT_CREDENTIAL_RECORD_PATH } from '../../../src/shared/runtime-environment.js';
 
 /**
  * The URL a worktree may hold. Git stores `remote.origin.url` verbatim, so the
@@ -65,7 +65,7 @@ export function gitCredentialUsername(platform: GitCredentialPlatform | undefine
 }
 
 export function gitCredentialRecordPath(home: string): string {
-  return path.join(home, CREDENTIAL_RECORD_PATH);
+  return path.join(home, CONTROL_GIT_CREDENTIAL_RECORD_PATH);
 }
 
 /**

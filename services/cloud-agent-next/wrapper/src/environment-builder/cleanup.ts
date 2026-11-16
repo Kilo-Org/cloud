@@ -20,11 +20,8 @@ import {
  * data (plan "Credentials and snapshot contents").
  */
 
-/** Git credential files a setup or the platform may leave in the fixed home. */
-export const HOME_CREDENTIAL_FILES = [
-  '.git-credentials',
-  path.join('.config', 'git', 'credentials'),
-] as const;
+import { HOME_CREDENTIAL_FILES } from '../../../src/shared/runtime-environment.js';
+export { HOME_CREDENTIAL_FILES };
 
 const STOP_GRACE_MS = 2_000;
 

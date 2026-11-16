@@ -40,14 +40,21 @@ export const ADMISSION_READ_TIMEOUT_MS = 10_000;
  * existing balance rule decides; nothing is re-derived here and the
  * initiate-time 402 stays authoritative.
  *
- * A 403 answer is a refusal of the token's authority scope for this
- * organization, and it is decided: the caller must not consume retry attempts
- * for it. A 401 stays unreadable like every other non-OK answer, because the
- * peer's credential verdict can reflect a verification state that a deployment
- * changes (secret version skew, token flags) rather than a decision about the
- * finding, and a single such answer must not settle it. Unreadable answers keep
- * their existing retry classification, so the deploy-ordering window (a peer
- * without this query answers 404) retries instead of failing.
+ * A 403 answer to the request itself is decided: the peer refused the call
+ * instead of reading a payer, so the caller must not consume retry attempts for
+ * it. The payer decision itself arrives in-band on a 200. An organization-scope
+ * denial reaches this service as an unreadable answer, because the peer's
+ * balance read reports every non-OK upstream verdict the same way; that is
+ * intended, and the caller's attempt budget bounds it. The read runs before
+ * triage, so a denied payer spends nothing while it is retried, and giving the
+ * refusal its own status would make the shared balance read mean two different
+ * things for its other callers. A 401 stays unreadable like every other non-OK
+ * answer, because the peer's credential verdict can reflect a verification
+ * state that a deployment changes (secret version skew, token flags) rather
+ * than a decision about the finding, and a single such answer must not settle
+ * it. Unreadable answers keep their existing retry classification, so the
+ * deploy-ordering window (a peer without this query answers 404) retries
+ * instead of failing.
  * Neither the token, the request body nor the peer's error body may appear in
  * the result message.
  *

@@ -17,6 +17,14 @@ export const analysisCreditAdmissionResultSchema = z.discriminatedUnion('outcome
  * inference - and delegates to the same `validateBalanceOnly` the mutation
  * uses, so the payer rules, the minimum balance and the balance endpoint
  * selection stay in one place.
+ *
+ * Only a payer verdict is reported as such: 402 is insufficient credits. Every
+ * other failure of the balance read, including an upstream refusal for an
+ * organization the caller is not authorized for, is `unavailable`, so the
+ * caller applies its existing retry classification rather than settling a
+ * finding on a verdict this read cannot distinguish. The shared balance read
+ * keeps one meaning for those failures because its other callers also gate
+ * spending on it.
  */
 export const getAnalysisCreditAdmission = protectedProcedure
   .input(z.object({ organizationId: z.string().uuid().optional() }).strict())

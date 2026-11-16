@@ -730,7 +730,7 @@ describe('processManualAnalysisStart', () => {
         } as unknown as CloudflareEnv,
         command,
       })
-    ).resolves.toEqual({ status: 'failed' });
+    ).resolves.toEqual({ status: 'failed', resultCode: 'START_CALL_AMBIGUOUS' });
 
     expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
       db,
@@ -787,7 +787,7 @@ describe('processManualAnalysisStart', () => {
         } as unknown as CloudflareEnv,
         command,
       })
-    ).resolves.toEqual({ status: 'failed' });
+    ).resolves.toEqual({ status: 'failed', resultCode: 'PERMISSION_DENIED_PERMANENT' });
 
     expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
       db,

@@ -449,7 +449,10 @@ export async function processManualAnalysisStart(params: {
       });
       await releaseOrphanedStartReservation(params.db, finding.id);
     }
-    return { status: 'failed' };
+    // The command settles with the same code the queue row recorded, so a
+    // declared failure keeps its reason instead of collapsing into the generic
+    // launch failure.
+    return { status: 'failed', resultCode: result.failureCode ?? 'START_CALL_AMBIGUOUS' };
   }
 
   await params.db.insert(security_audit_log).values({

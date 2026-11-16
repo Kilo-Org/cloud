@@ -33,12 +33,7 @@ import {
   RuntimeAgentsSchema,
   RuntimeKiloCommandsSchema,
 } from '../persistence/schemas.js';
-import {
-  AgentModeSchema,
-  AgentVariantSchema,
-  BUILTIN_AGENT_MODES,
-  Limits,
-} from '../schema.js';
+import { AgentModeSchema, AgentVariantSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';

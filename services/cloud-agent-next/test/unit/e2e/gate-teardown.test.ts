@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
       _config: unknown,
       _sessionId: string,
       _signal?: AbortSignal
-    ): Promise<{ worktreeId?: string | null }> => ({})
+    ): Promise<{ worktreeId?: string | null; kiloSessionId?: string }> => ({})
   ),
   deleteWorktree: vi.fn(
     async (
@@ -277,14 +277,17 @@ describe('cleanupRemoteSession last workspace root', () => {
         'tRPC deleteSession failed: 409 Conflict — CONFLICT: workspace_requires_root_session'
       )
     );
-    mocks.getSessionSnapshot.mockResolvedValueOnce({ worktreeId: 'worktree_owned' });
+    mocks.getSessionSnapshot.mockResolvedValueOnce({
+      worktreeId: 'worktree_owned',
+      kiloSessionId: 'ses_owned',
+    });
 
     await cleanupRemoteSession(config, 'workspace_last_root', 'label');
 
     expect(mocks.getSessionSnapshot.mock.calls[0]?.[1]).toBe('workspace_last_root');
     expect(mocks.deleteWorktree.mock.calls[0]?.[1]).toEqual({
       worktreeId: 'worktree_owned',
-      onlyIfSoleSessionId: 'workspace_last_root',
+      onlyIfSoleSessionId: 'ses_owned',
     });
     expect(errorSpy).not.toHaveBeenCalled();
   });

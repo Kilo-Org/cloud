@@ -154,7 +154,6 @@ export function ReportReceiptsScreen() {
                 : undefined
             }
             isRetrying={query.isFetching}
-            refreshControl={refreshControl}
           />
         ) : null}
 

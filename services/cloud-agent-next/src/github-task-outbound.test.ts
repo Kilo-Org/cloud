@@ -168,3 +168,35 @@ describe('GitHub resource host boundary', () => {
     expect(isGitHubTaskDestination(new URL('https://api.github.com.example.org'))).toBe(false);
   });
 });
+
+describe('compressed Git negotiation', () => {
+  it('preserves gzip Git bytes and the encoding header without interpreting the pack', async () => {
+    const bytes = new Uint8Array([31, 139, 8, 0, 1, 2, 3]);
+    const prepared = await prepareGitHubTaskRequest(
+      new Request('https://github.com/acme/repo.git/git-upload-pack', {
+        method: 'POST',
+        headers: {
+          'Content-Encoding': 'gzip',
+          'Content-Type': 'application/x-git-upload-pack-request',
+          Authorization: 'Bearer guest',
+        },
+        body: bytes,
+      })
+    );
+    expect(prepared?.request.headers.get('content-encoding')).toBe('gzip');
+    expect(prepared?.request.headers.has('authorization')).toBe(false);
+    expect(new Uint8Array(await prepared!.request.arrayBuffer())).toEqual(bytes);
+    expect(prepared?.policyBody).toBeUndefined();
+  });
+  it('keeps encoded JSON outside the supported operation boundary', async () => {
+    expect(
+      await prepareGitHubTaskRequest(
+        new Request('https://api.github.com/graphql', {
+          method: 'POST',
+          headers: { 'Content-Encoding': 'gzip', 'Content-Type': 'application/json' },
+          body: 'synthetic',
+        })
+      )
+    ).toBeNull();
+  });
+});

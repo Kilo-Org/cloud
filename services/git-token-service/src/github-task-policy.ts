@@ -56,7 +56,7 @@ const reviewLocation = {
 const pullReviewSchema = z
   .object({
     body: z.string().max(65_536).optional(),
-    event: z.enum(['COMMENT', 'REQUEST_CHANGES', 'APPROVE']),
+    event: z.enum(['COMMENT', 'REQUEST_CHANGES']),
     commit_id: z
       .string()
       .regex(/^[a-f0-9]{40}$/)
@@ -294,10 +294,7 @@ function authorizeRest(
   return deny('operation_not_allowed');
 }
 
-export function authorizeGitHubTaskRequest(
-  request: GitHubTaskRequest,
-  grant: GitHubTaskGrant
-): GitHubTaskDecision {
+function authorizeRequest(request: GitHubTaskRequest, grant: GitHubTaskGrant): GitHubTaskDecision {
   const url = parseUrl(request.url);
   if (!url) return deny('invalid_upstream_url');
   if (url.port || !['github.com', 'api.github.com'].includes(url.hostname)) {
@@ -313,4 +310,15 @@ export function authorizeGitHubTaskRequest(
     return authorizeGitHubTaskGraphql(jsonBody(request), grant);
   }
   return authorizeRest(request, url, grant);
+}
+
+/** Legacy grants default to Contribute, then current workspace policy further restricts them. */
+export function authorizeGitHubTaskRequest(
+  request: GitHubTaskRequest,
+  grant: GitHubTaskGrant
+): GitHubTaskDecision {
+  const decision = authorizeRequest(request, grant);
+  return decision.allowed && decision.operation === 'write' && grant.mode === 'read'
+    ? deny('repository_read_only')
+    : decision;
 }

@@ -2263,3 +2263,109 @@ cp packages/session-ingest-contracts/src/cloud-agent-billing.ts services/cloud-a
 ```
 
 The mirror test requires exact source equality. Verify the standalone Docker wrapper build after schema changes.
+
+## Workspace repository access
+
+Repository access management applies only to new workspaces with task authorization.
+Existing workspaces retain legacy issuance, renewal, aliases, and request policy. They do not
+initialize a permission record. Management requests return `repository_access_new_workspaces_only`.
+Sibling chats and restored sessions inherit their workspace's original authorization policy.
+
+For task workspaces, the logical Sandbox DO owns repository permissions. Its `workspace_repository_access` table
+stores one validated JSON record for each workspace scope. Standalone sessions use their
+session ID as the scope. Sibling chats share one record. Other workspaces cannot use it.
+
+This record is the permission authority. Session credential grants contain execution material
+and attribution metadata. They do not grant repository access. Credential expiry, idle stop,
+allocation replacement, and credential renewal do not delete or rebuild the permission record.
+Workspace deletion removes it. Standalone session deletion removes its record; route release
+and runtime authorization renewal retain it.
+
+The initial record comes from trusted persisted credentials or server-admitted environment
+repositories. Provider repository IDs, integration IDs, and identities are resolved on the
+server. Existing signed task identity claims constrain initialization. Sandbox files,
+environment edits, agent messages, and tool permission answers never grant access.
+
+Each private repository needs an explicit Read or Contribute entry. The same-owner private
+read exception is removed. Repository IDs identify entries. Provider transfers require renewed
+authorization. Each entry pins its integration, user or installation subject, and GitHub App
+type. Provider renewal cannot select a stronger identity. A configured repository with only
+Read authorization starts with Read access.
+
+Contribute permits supported repository writes, including Git pushes across any branch allowed
+by GitHub. It does not permit the merge API, approval reviews, release publication, repository
+administration, or workflow file changes. GitHub permissions and repository rules still apply.
+Read permits supported Git, REST, GraphQL, archive, and LFS reads. Public reads remain available
+under the existing network policy, including after removal of the final private repository.
+
+Only an authenticated workspace owner can change access, subject to current organization
+membership and integration rules. Web control tokens carry the specific `repository-access`
+scope. Runtime, wrapper, alias, and child-management credentials cannot invoke or mint that
+scope. The Worker checks current session ownership before accessing the Sandbox DO.
+Repository grant mutations stay outside the Kilo MCP catalog. An agent cannot use the
+MCP catalog to approve broader repository access for itself; the user changes grants explicitly.
+
+Changes use a revision check. Additions and increases prepare restricted provider credentials
+before committing. Reductions and removals commit immediately. A stale mutation returns the
+current safe view. A stale renewal cannot overwrite the permission record. Audit events contain
+actor, scope, repository ID, modes, and outcome; they do not contain credentials.
+
+Adding access does not clone, mount, index, or enroll a repository for automatic commits.
+The user retries in the existing workspace. Removal blocks subsequent authorization, including
+old backing capabilities. It does not remove downloaded files or undo accepted provider work.
+A rate-limit retry obtains fresh authorization before another upstream request.
+
+New additions are limited to 64 total entries. Environment repository lists have no count
+limit, so larger configured lists initialize intact for new task workspaces. Those lists permit updates and removals,
+but cannot add entries while at the limit. Initialization runs four provider calls at a time.
+Validated policy JSON has a four MiB limit. No migration truncates a configured list.
+
+### Capability and deployment compatibility
+
+The `kgh4` envelope binds user, organization, logical sandbox, scope, outbound identity, and
+expiry. It contains no repository list or provider identity. Every redemption reads current
+canonical permissions and rechecks the selected provider identity. Provider credentials are
+restricted by exact repository IDs and Read or Contribute permissions. Credential caches use
+identity, repository set, permissions, and expiry; they do not cache policy decisions.
+
+Issuance uses a read-only server binding to the canonical Sandbox DO. It validates a current
+admitted preparation or live scope. The preparation marker is temporary coordination state,
+not permission authority. The callback does not enter the lifecycle queue, initialize policy,
+or issue credentials. An expired guest capability alone cannot authorize issuance.
+
+Policy exists before first v4 issuance. Restoration uses the existing policy without resolving
+the original launch repository's provider authorization. Snapshot adoption retains restored
+files and Git configuration. The wrapper does not clone, fetch, or check out removed launch
+repositories on the snapshot adoption path.
+
+Valid `kgh2` envelopes keep the legacy request policy and credential selection. They retain
+signature, expiry, outbound binding, and identity checks without reading repository policy.
+Task `kgh3` envelopes use the current workspace policy. Updated forwarding adapters supply
+the trusted logical locator. Original v3 callers can use an exact signed-scope ledger lookup.
+New task workspaces issue `kgh4` once both services support repository access protocol version 2.
+Legacy workspace renewal never switches to `kgh4`.
+
+Deploy compatible readers and forwarding adapters before final capability writers. Keep
+mutations disabled until both services support repository access protocol version 2. The
+protocol check calls the reader; a configured binding alone is insufficient. Then enable
+server mutations and the panel. Existing guest aliases do not change during this sequence.
+Do not claim compatibility with an arbitrary original-service deployment order.
+
+If the broker or migration cannot read current authority, return a recoverable availability
+error. Retain workspace data and identity. Rollback must keep compatible readers and current
+policy enforcement. Disable new mutations if necessary. Task workspaces must not fall back to legacy
+authority. Existing legacy workspaces retain their original behavior. Do not require workspace recreation.
+
+GraphQL reads can cover approved repositories under one owner and identity. Requests that
+need different credentials return `separate_repository_requests_required`. The broker does
+not split or replay mutations. Unavailable provider authorization remains distinct from
+`repository_access_required`, `repository_read_only`, and `operation_not_supported`.
+
+Local contract and lifecycle tests do not establish live provider enforcement. Release
+verification requires authorized disposable repositories for both GitHub App user tokens and
+installation tokens. It must include denied writes with Read credentials, unselected private
+repositories, administration, workflow changes, and the specified deployment sequence.
+
+Opaque-node GraphQL mutations try at most eight candidate credentials. A target beyond that budget
+returns `operation_not_supported`; use a repository-specific REST operation instead. Large configured
+policies remain intact, and named repository operations select their credential directly.

@@ -20,6 +20,13 @@
     "GITHUB_LITE_APP_SLUG": "kiloconnect-lite",
     "GITHUB_LITE_APP_BOT_USER_ID": "257753004",
   },
+  "services": [
+    {
+      "binding": "REPOSITORY_POLICY",
+      "service": "cloud-agent-next",
+      "entrypoint": "RepositoryPolicyReader",
+    },
+  ],
   "observability": {
     "enabled": true,
   },
@@ -70,6 +77,13 @@
   "env": {
     "dev": {
       "name": "git-token-service-dev",
+      "services": [
+        {
+          "binding": "REPOSITORY_POLICY",
+          "service": "cloud-agent-next-dev",
+          "entrypoint": "RepositoryPolicyReader",
+        },
+      ],
       "vars": {
         "GITHUB_APP_SLUG": "kiloconnect-development",
         "GITHUB_APP_BOT_USER_ID": "242397087",

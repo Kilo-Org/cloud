@@ -1,6 +1,7 @@
 import type { AllocationState } from '../control-plane/sandbox/allocation.js';
 import {
   hasRuntimeCredentialProxy,
+  hasTaskGitHubAuthorization,
   type SessionCredentialGrant,
 } from '../sandbox-control/session-credentials.js';
 import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
@@ -160,9 +161,7 @@ export async function admitScmRequest<C extends ScmAdmissionContext>(
         ok: true,
         authority: {
           type: 'unmanaged',
-          ...(grants.some(grant =>
-            grantScmEntries(grant).some(entry => entry.scm.githubTaskGrant !== undefined)
-          )
+          ...(grants.some(grant => hasTaskGitHubAuthorization(grant))
             ? { githubAuthorization: 'task' as const }
             : {}),
         },

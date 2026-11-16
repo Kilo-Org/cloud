@@ -46,6 +46,9 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
  * agent could otherwise mint the estimate token itself and bypass that consent.
  */
 const NATIVE_ONLY_PATHS: Record<string, true> = {
+  // Repository grants require an explicit user action, not an MCP agent decision.
+  'cloudAgentNext.changeRepositoryAccess': true,
+  'organizations.cloudAgentNext.changeRepositoryAccess': true,
   // Vercel connection uses raw credentials; teardown and builds require app confirmation.
   'vercelCompute.add': true,
   'vercelCompute.discoverProjects': true,

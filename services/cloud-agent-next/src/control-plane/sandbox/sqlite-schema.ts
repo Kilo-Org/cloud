@@ -1,3 +1,4 @@
+import type { WorkspaceRepositoryAccess } from '@kilocode/worker-utils/workspace-repository-access';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { ALLOCATION_KINDS } from './allocation.js';
 
@@ -62,4 +63,10 @@ export const workspaceDiskSnapshots = sqliteTable('workspace_disk_snapshots', {
 export const workspaceDiskAllocation = sqliteTable('workspace_disk_allocation', {
   id: text('id').primaryKey(),
   data: text('data', { mode: 'json' }).notNull(),
+});
+
+/** Permission lifetime is independent of credentials, routes, and physical allocations. */
+export const workspaceRepositoryAccess = sqliteTable('workspace_repository_access', {
+  scope_id: text('scope_id').primaryKey(),
+  data: text('data', { mode: 'json' }).$type<WorkspaceRepositoryAccess>().notNull(),
 });

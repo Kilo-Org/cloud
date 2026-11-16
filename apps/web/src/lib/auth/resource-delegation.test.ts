@@ -744,3 +744,73 @@ describe('explicit delegated organization authority', () => {
     }
   );
 });
+
+describe('repository access control delegation', () => {
+  test('mints the specific server control scope from current human authority', async () => {
+    const current = await user();
+    const control = await createControlTokenForRequest(current, 'cloud-agent-next', {
+      headers: bearer(modernToken(current)),
+      operation: 'repository-access',
+    });
+    const claims = jwt.verify(control.token, secret);
+    expect(claims).toMatchObject({
+      cloudAgentControlScope: 'repository-access',
+      aud: 'cloud-agent-next',
+      credentialExchange: false,
+      tokenPurpose: 'human-api',
+      runtimeAdmission: { source: 'user', authorizationUserId: current.id },
+    });
+  });
+  test('does not let runtime or child-management credentials mint repository control', async () => {
+    const current = await user();
+    const now = Math.floor(Date.now() / 1000);
+    const runtime = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        aud: 'kilo-api',
+        iat: now,
+        exp: now + 60,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        runtimeAuthorization: {
+          id: '00000000-0000-4000-8000-000000000001',
+          resourceKind: 'cloud-agent-next',
+          resourceId: 'workspace_test',
+        },
+      },
+      secret
+    );
+    const child = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        aud: 'kilo-api',
+        iat: now,
+        exp: now + 60,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        cloudAgentAuthority: {
+          version: 1,
+          ownerId: current.id,
+          parentSessionId: 'workspace_parent',
+          organizationId: null,
+          authorizationId: '00000000-0000-4000-8000-000000000002',
+          expiresAt: now + 60,
+        },
+      },
+      secret
+    );
+    for (const token of [runtime, child, 'wrapper-ticket', 'kcp1.alias'])
+      await expect(
+        createControlTokenForRequest(current, 'cloud-agent-next', {
+          headers: bearer(token),
+          operation: 'repository-access',
+        })
+      ).rejects.toThrow();
+  });
+});

@@ -51,7 +51,13 @@ describe('captured GitHub CLI task requests', () => {
       operation: fixture.publication === 'read' ? 'read' : 'write',
       checks:
         fixture.publication === 'read'
-          ? []
+          ? [
+              {
+                kind: 'repository-read',
+                owner: grant.repository.owner,
+                name: grant.repository.name,
+              },
+            ]
           : fixture.publication === 'create'
             ? []
             : fixture.publication === 'comment'

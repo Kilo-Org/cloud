@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
 import { and, eq } from 'drizzle-orm';
+import type * as endpointUpstream from '@/lib/byok/endpoint-upstream';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -18,6 +19,20 @@ import {
   TEST_BYOK_DATA_KEY,
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
+
+let afterEndpointUrlCheck: (() => Promise<void>) | undefined;
+
+jest.mock('@/lib/byok/endpoint-upstream', () => {
+  const actual = jest.requireActual<typeof endpointUpstream>('@/lib/byok/endpoint-upstream');
+  return {
+    ...actual,
+    findByokEndpointBaseUrlViolation: async (baseUrl: string) => {
+      const violation = await actual.findByokEndpointBaseUrlViolation(baseUrl);
+      await afterEndpointUrlCheck?.();
+      return violation;
+    },
+  };
+});
 
 function decryptStoredKey(row: { encrypted_api_key_envelope: BYOKApiKeyEnvelope | null }): string {
   if (!row.encrypted_api_key_envelope) throw new Error('row has no envelope');
@@ -92,6 +107,7 @@ describe('BYOK endpoints', () => {
   afterEach(async () => {
     restoreFetch?.();
     restoreFetch = undefined;
+    afterEndpointUrlCheck = undefined;
     process.env.VERCEL_TARGET_ENV = originalTargetEnv;
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, organization.id));
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, otherOrganization.id));
@@ -292,6 +308,30 @@ describe('BYOK endpoints', () => {
       const row = await storedRow(created.id);
       expect(row.settings.endpoint).toEqual(definition);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(credentials);
+    });
+
+    test('conflicts when the stored host changed after the host check', async () => {
+      const created = await createEndpoint();
+      const caller = await createCallerForUser(owner.id);
+      const changed = { ...DEFINITION, base_url: 'https://attacker.example.com/v1' };
+      afterEndpointUrlCheck = async () => {
+        await db
+          .update(byok_api_keys)
+          .set({ settings: { endpoint: changed } })
+          .where(eq(byok_api_keys.id, created.id));
+      };
+
+      await expect(
+        caller.byok.updateEndpoint({
+          organizationId: organization.id,
+          id: created.id,
+          definition: { ...DEFINITION, base_url: 'https://llm.example.com/v2' },
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'The endpoint changed; reload and try again',
+      });
+      expect((await storedRow(created.id)).settings.endpoint).toEqual(changed);
     });
 
     test('keeps the stored credentials when only the path changes', async () => {

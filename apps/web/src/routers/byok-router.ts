@@ -113,6 +113,7 @@ const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try aga
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const ENDPOINT_NOT_FOUND_MESSAGE = 'BYOK endpoint not found';
+const ENDPOINT_CHANGED_MESSAGE = 'The endpoint changed; reload and try again';
 const ENDPOINT_HOST_CHANGED_MESSAGE = 'Enter the credentials again to use a different host';
 const ENDPOINT_CREDENTIALS_UNREADABLE_MESSAGE =
   'The stored endpoint credentials could not be read. Try again, or enter the credentials again.';
@@ -284,15 +285,19 @@ async function findOrganizationEndpointKey(organizationId: string, id: string) {
   return key;
 }
 
-/** Stored credentials may only be sent to the host they were saved for. */
+/**
+ * Stored credentials may only be sent to the host they were saved for. Returns the stored base
+ * URL, which a write that keeps the credentials must still find in place.
+ */
 function rejectEndpointHostChange(
   key: Parameters<typeof readByokEndpointDefinition>[0],
   baseUrl: string
-) {
+): string {
   const stored = readByokEndpointDefinition(key);
   if (!stored || endpointOriginChanged(stored.base_url, baseUrl)) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: ENDPOINT_HOST_CHANGED_MESSAGE });
   }
+  return stored.base_url;
 }
 
 async function decryptEndpointCredentials(
@@ -1088,7 +1093,9 @@ export const byokRouter = createTRPCRouter({
       );
       const existingKey = await findOrganizationEndpointKey(organizationId, id);
       rejectManagedKeyMutation(existingKey.management_source);
-      if (!credentials) rejectEndpointHostChange(existingKey, definition.base_url);
+      const checkedBaseUrl = credentials
+        ? undefined
+        : rejectEndpointHostChange(existingKey, definition.base_url);
       await rejectDisallowedEndpointUrl(definition.base_url);
 
       const envelope = credentials
@@ -1105,10 +1112,24 @@ export const byokRouter = createTRPCRouter({
           settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ endpoint: definition })}::jsonb`,
           ...(envelope && { encrypted_api_key_envelope: envelope }),
         })
-        .where(and(eq(byok_api_keys.id, id), eq(byok_api_keys.organization_id, organizationId)))
+        .where(
+          and(
+            eq(byok_api_keys.id, id),
+            eq(byok_api_keys.organization_id, organizationId),
+            // The host check above read the stored base URL; without new credentials the write
+            // is valid only while it is still there.
+            checkedBaseUrl === undefined
+              ? undefined
+              : sql`${byok_api_keys.settings}->'endpoint'->>'base_url' = ${checkedBaseUrl}`
+          )
+        )
         .returning(BYOK_KEY_COLUMNS);
       if (!updatedKey) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: ENDPOINT_NOT_FOUND_MESSAGE });
+        throw new TRPCError(
+          checkedBaseUrl === undefined
+            ? { code: 'NOT_FOUND', message: ENDPOINT_NOT_FOUND_MESSAGE }
+            : { code: 'CONFLICT', message: ENDPOINT_CHANGED_MESSAGE }
+        );
       }
 
       await createAuditLog({

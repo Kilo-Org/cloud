@@ -1,11 +1,9 @@
 // Pure error-state selector for the usage screen's sections.
 //
 // A permission loss or a missing resource means the server did answer, so those
-// permanent states win over connectivity: a paused query cannot explain a 403.
-// Otherwise a paused query presents the offline state, and the rest keeps the
-// shared tRPC mapping — one warehouse-failure state and one slow-response
-// state. Retry is offered only for codes a second attempt can satisfy, so no
-// terminal code shows a button that cannot help.
+// permanent states come first, and every permanent refusal ends without Retry:
+// no terminal code shows a button that cannot help. The rest keeps the shared
+// tRPC mapping — one warehouse-failure state and one slow-response state.
 
 import { type QueryErrorVariant } from '@/components/query-error';
 import { isTerminalTrpcCode, readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
@@ -15,14 +13,20 @@ export type UsageErrorView = {
   showRetry: boolean;
 };
 
-export function selectUsageErrorView(error: unknown, paused: boolean): UsageErrorView {
+export function selectUsageErrorView(error: unknown): UsageErrorView {
   const variant = trpcErrorVariant(error);
-  const showRetry = !isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
   if (variant === 'permission' || variant === 'not-found') {
-    return { variant, showRetry };
+    return { variant, showRetry: false };
   }
-  if (paused) {
-    return { variant: 'offline', showRetry };
+  if (isTerminalTrpcCode(readTrpcErrorField(error, 'code'))) {
+    // Any other terminal refusal (a malformed request, an unprocessable read)
+    // is permanent: the screen offers no retry control, and the not-found copy
+    // says the data cannot be loaded instead of the server copy's "please try
+    // again". The profile Overview screen made the same choice for this case.
+    return { variant: 'not-found', showRetry: false };
   }
-  return { variant, showRetry };
+  // Every usage read settles while offline, so a paused status cannot occur
+  // here: this is the retryable states — server, timeout, and an error with no
+  // code at all.
+  return { variant, showRetry: true };
 }

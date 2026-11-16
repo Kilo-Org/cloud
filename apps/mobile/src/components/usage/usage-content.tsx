@@ -89,14 +89,11 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
   // Totals loaded, but a refresh of them failed: keep the numbers and flag them
   // instead of presenting stale data as current.
   const staleTotals = usage.summaryError !== null && summary !== undefined;
-  const summaryErrorView =
-    failed || staleTotals ? selectUsageErrorView(usage.summaryError, usage.isPaused) : null;
+  const summaryErrorView = failed || staleTotals ? selectUsageErrorView(usage.summaryError) : null;
   const seriesErrorView =
-    usage.seriesError === null ? null : selectUsageErrorView(usage.seriesError, usage.isPaused);
+    usage.seriesError === null ? null : selectUsageErrorView(usage.seriesError);
   const breakdownErrorView =
-    usage.breakdownError === null
-      ? null
-      : selectUsageErrorView(usage.breakdownError, usage.isPaused);
+    usage.breakdownError === null ? null : selectUsageErrorView(usage.breakdownError);
   const retryAll = () => {
     usage.refetch();
   };

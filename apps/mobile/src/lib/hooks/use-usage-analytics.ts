@@ -145,7 +145,6 @@ export function useUsageAnalytics(scope: UsageScope, range: UsageRange, metric: 
     seriesError: timeseries.error,
     breakdownError: models.error ?? features.error,
     isFetching: queries.some(query => query.isFetching),
-    isPaused: queries.some(query => query.isPaused),
     refetch: () => {
       for (const query of queries) {
         void query.refetch();

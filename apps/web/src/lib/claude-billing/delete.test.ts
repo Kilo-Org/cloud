@@ -4,6 +4,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => (
 }));
 
 import { afterEach, describe, expect, it } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { claude_billing_connections } from '@kilocode/db/schema';
@@ -46,12 +47,12 @@ describe('Personal Claude profile erasure', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('keeps a payer that shared services still use', async () => {
+  it('keeps a payer the organization still uses', async () => {
     const user = await connectedUser();
     const organization = await createTestOrganization('Claude shared erasure', user.id, 0);
     await shareClaudeBillingConnection(
       { kind: 'personal', kiloUserId: user.id },
-      { kind: 'shared_services', organizationId: organization.id },
+      { kind: 'organization', organizationId: organization.id },
       user.id
     );
     const fetchMock = jest.spyOn(globalThis, 'fetch');
@@ -64,11 +65,11 @@ describe('Personal Claude profile erasure', () => {
     ).toMatchObject({ status: 'connected' });
   });
 
-  it('deletes the profile after both the personal grant and shared-services grant are removed', async () => {
+  it('deletes the profile after both the personal grant and the organization grant are removed', async () => {
     const user = await connectedUser();
     const organization = await createTestOrganization('Claude full removal erasure', user.id, 0);
     const personal = { kind: 'personal' as const, kiloUserId: user.id };
-    const shared = { kind: 'shared_services' as const, organizationId: organization.id };
+    const shared = { kind: 'organization' as const, organizationId: organization.id };
     await shareClaudeBillingConnection(personal, shared, user.id);
     await removeClaudeBillingGrant(personal);
     await removeClaudeBillingGrant(shared);
@@ -85,7 +86,7 @@ describe('Personal Claude profile erasure', () => {
     expect(await getClaudeBillingConnection(personal)).toBeNull();
   });
 
-  it('deletes a removed shared-services row created by the user instead of marking it billing_unavailable', async () => {
+  it('deletes a removed organization row created by the user instead of marking it billing_unavailable', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Claude removed shared erasure', user.id, 0);
     await db.insert(claude_billing_connections).values({
@@ -106,7 +107,7 @@ describe('Personal Claude profile erasure', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`uprof_removed_shared_${user.id}`);
     expect(
-      await getClaudeBillingConnection({ kind: 'shared_services', organizationId: organization.id })
+      await getClaudeBillingConnection({ kind: 'organization', organizationId: organization.id })
     ).toBeNull();
   });
 
@@ -123,7 +124,7 @@ describe('Personal Claude profile erasure', () => {
     ).toMatchObject({ user_profile_id: `uprof_${user.id}`, status: 'billing_unavailable' });
   });
 
-  it("deletes the profiles of the person's own connections and keeps the organization's shared one", async () => {
+  it("deletes the profiles of the person's own rows, including a row a retired scope wrote, and keeps the organization's one", async () => {
     const user = await connectedUser();
     const organization = await createTestOrganization('Claude erasure', user.id, 0);
     await db.insert(claude_billing_connections).values([
@@ -150,7 +151,7 @@ describe('Personal Claude profile erasure', () => {
     const deleted = fetchMock.mock.calls.map(([url]) => String(url).split('/').at(-1));
     expect(deleted.sort()).toEqual([`uprof_${user.id}`, `uprof_member_${user.id}`].sort());
     expect(
-      await getClaudeBillingConnection({ kind: 'shared_services', organizationId: organization.id })
+      await getClaudeBillingConnection({ kind: 'organization', organizationId: organization.id })
     ).toMatchObject({ status: 'connected' });
   });
 
@@ -239,11 +240,10 @@ describe('Personal Claude profile erasure', () => {
       await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
     ).toMatchObject({ user_profile_id: `uprof_fail_${user.id}`, status: 'removed' });
     expect(
-      await getClaudeBillingConnection({
-        kind: 'member',
-        kiloUserId: user.id,
-        organizationId: org.id,
-      })
-    ).toBeNull();
+      await db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.user_profile_id, `uprof_ok_${user.id}`))
+    ).toEqual([]);
   });
 });

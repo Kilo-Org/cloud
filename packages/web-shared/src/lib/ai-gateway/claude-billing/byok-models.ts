@@ -19,9 +19,9 @@ export async function tagClaudeBillingByokModels<
 
   return await Promise.all(
     models.map(async model =>
-      model.hasUserByokAvailable === true || (await resolveClaudeBillingModel(model.id)) === null
+      model.hasUserByokAvailable !== true && (await resolveClaudeBillingModel(model.id)) === null
         ? model
-        : { ...model, hasUserByokAvailable: true }
+        : { ...model, hasUserByokAvailable: true, isFree: false }
     )
   );
 }

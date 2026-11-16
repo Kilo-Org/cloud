@@ -17,8 +17,8 @@ import { tagClaudeBillingByokModels } from './byok-models';
 
 const owner = { kind: 'personal', kiloUserId: 'user-1' } as const;
 const models = [
-  { id: 'anthropic/claude-sonnet-4.6' },
-  { id: 'openai/gpt-5' },
+  { id: 'anthropic/claude-sonnet-4.6', isFree: true },
+  { id: 'openai/gpt-5', isFree: true },
   { id: 'anthropic/claude-opus-4.6', hasUserByokAvailable: true },
 ];
 
@@ -35,11 +35,11 @@ describe('tagClaudeBillingByokModels', () => {
       .mockResolvedValue(connection(ClaudeBillingConnectionStatus.Connected));
   });
 
-  it('tags only the Claude models a connected link serves', async () => {
+  it('tags only the Claude models a connected link serves, and never as free', async () => {
     await expect(tagClaudeBillingByokModels(owner, models)).resolves.toEqual([
-      { id: 'anthropic/claude-sonnet-4.6', hasUserByokAvailable: true },
-      { id: 'openai/gpt-5' },
-      { id: 'anthropic/claude-opus-4.6', hasUserByokAvailable: true },
+      { id: 'anthropic/claude-sonnet-4.6', hasUserByokAvailable: true, isFree: false },
+      { id: 'openai/gpt-5', isFree: true },
+      { id: 'anthropic/claude-opus-4.6', hasUserByokAvailable: true, isFree: false },
     ]);
     const [calledOwner, fromDb] = jest.mocked(getGrantedClaudeBillingConnection).mock.calls[0];
     expect(calledOwner).toEqual(owner);

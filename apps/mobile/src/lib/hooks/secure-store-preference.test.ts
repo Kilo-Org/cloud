@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSecureStorePreference } from './secure-store-preference';
+import {
+  setBreadcrumbSink,
+  setTelemetrySink,
+  type TelemetryBreadcrumb,
+  type TelemetryEvent,
+} from '@/lib/telemetry/error-sink';
 
 const { getItemAsync, setItemAsync, deleteItemAsync } = vi.hoisted(() => ({
   getItemAsync: vi.fn(),
@@ -42,15 +48,20 @@ describe('createSecureStorePreference', () => {
     toastError.mockReset();
   });
 
-  it('logs to Sentry (not a toast) on a read failure and keeps the default value', async () => {
-    // Every attempt rejects, so the retry policy gives up and surfaces the
-    // failure.
+  it('keeps the default value and files no second event on a read failure', async () => {
+    // Every attempt rejects, so the retry policy gives up and the SecureStore
+    // read path reports the failure once. The store must not add a record of
+    // its own for the same rejection.
     getItemAsync.mockRejectedValue(new Error('disk error'));
     const store = createSecureStorePreference<boolean>({
       key: 'k',
       defaultValue: false,
       parse: raw => raw === 'true',
       serialize: value => (value ? 'true' : 'false'),
+    });
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
     });
 
     vi.useFakeTimers();
@@ -63,11 +74,50 @@ describe('createSecureStorePreference', () => {
 
       expect(store.get()).toBe(false);
       expect(store.getHasLoaded()).toBe(true);
-      expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
-        tags: { 'error.subsystem': 'preferences', 'error.operation': 'load_secure_store' },
-      });
+      expect(events.map(event => event.fingerprint)).toEqual([['secure-store-failure', 'read']]);
+      expect(captureException).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
     } finally {
+      setTelemetrySink(null);
+      vi.useRealTimers();
+    }
+  });
+
+  it('files no event for a keychain refusal while the device is locked', async () => {
+    // iOS rejects every read with this message until unlock; the store keeps
+    // its default and the refusal leaves a breadcrumb instead of an event.
+    getItemAsync.mockRejectedValue(new Error('User interaction is not allowed'));
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+    const events: TelemetryEvent[] = [];
+    const breadcrumbs: TelemetryBreadcrumb[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    setBreadcrumbSink(breadcrumb => {
+      breadcrumbs.push(breadcrumb);
+    });
+
+    vi.useFakeTimers();
+    try {
+      const loading = store.whenLoaded();
+      await vi.runAllTimersAsync();
+      await loading;
+
+      expect(store.get()).toBe(false);
+      expect(store.getHasLoaded()).toBe(true);
+      expect(events).toHaveLength(0);
+      expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+        'keychain refused a call while the device was locked',
+      ]);
+      expect(captureException).not.toHaveBeenCalled();
+    } finally {
+      setTelemetrySink(null);
+      setBreadcrumbSink(null);
       vi.useRealTimers();
     }
   });

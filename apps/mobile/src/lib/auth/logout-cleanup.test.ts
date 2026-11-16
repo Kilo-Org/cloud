@@ -56,6 +56,9 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   clearScopePrefix: vi.fn(),
 }));
 
+import { captureException } from '@sentry/react-native';
+import { setItemAsync } from 'expo-secure-store';
+
 import {
   type LogoutCleanupRecord,
   readLogoutCleanupRecords,
@@ -731,6 +734,17 @@ describe('unregisterActivityTokensAndTombstone', () => {
       needsActivityUnregister: true,
       activityTokens: ['activity-token-1', 'activity-token-2'],
     });
+  });
+
+  it('resolves without an event when a locked device refuses the record write', async () => {
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: false, tokens: ['ended-token'] });
+    vi.mocked(setItemAsync).mockRejectedValueOnce(new Error('User interaction is not allowed'));
+
+    await expect(unregisterActivityTokensAndTombstone('activity')).resolves.toBeUndefined();
+
+    // iOS refuses every keychain write until unlock: the pending record simply
+    // stays for the next attempt, and the refusal is not an app defect.
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it('retains scope delivery and records only the failed ended activity', async () => {

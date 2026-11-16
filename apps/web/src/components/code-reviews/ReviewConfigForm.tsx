@@ -48,7 +48,6 @@ import {
   COUNCIL_MAX_REQUIRED_LABELS,
   COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
   DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
-  ReviewGuidelineSourceRepositoriesSchema,
   type CouncilAggregationStrategy,
 } from '@kilocode/db/schema-types';
 import {
@@ -66,6 +65,7 @@ import {
 } from './RepositoryModelOverrides';
 import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
 import { CodeReviewComputeNotice } from './CodeReviewComputeNotice';
+import { parseGuidelineSourceRepositories } from './guideline-source-repositories';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -632,14 +632,9 @@ export function ReviewConfigForm({
   };
 
   const handleSave = () => {
-    const sources = ReviewGuidelineSourceRepositoriesSchema.safeParse(
-      guidelineSourcesInput
-        .split('\n')
-        .map(value => value.trim())
-        .filter(Boolean)
-    );
+    const sources = parseGuidelineSourceRepositories(guidelineSourcesInput);
     if (!sources.success) {
-      setGuidelineSourcesError('Enter up to 100 repositories, one owner/repo per line.');
+      setGuidelineSourcesError(sources.error);
       return;
     }
     setGuidelineSourcesError('');
@@ -958,15 +953,8 @@ export function ReviewConfigForm({
                   value={guidelineSourcesInput}
                   onChange={event => setGuidelineSourcesInput(event.target.value)}
                   onBlur={() => {
-                    const valid = ReviewGuidelineSourceRepositoriesSchema.safeParse(
-                      guidelineSourcesInput
-                        .split('\n')
-                        .map(value => value.trim())
-                        .filter(Boolean)
-                    ).success;
-                    setGuidelineSourcesError(
-                      valid ? '' : 'Enter up to 100 repositories, one owner/repo per line.'
-                    );
+                    const sources = parseGuidelineSourceRepositories(guidelineSourcesInput);
+                    setGuidelineSourcesError(sources.success ? '' : sources.error);
                   }}
                   placeholder="acme/review-guidelines"
                   rows={3}
@@ -978,8 +966,9 @@ export function ReviewConfigForm({
                 />
                 <p id="review-guideline-sources-help" className="text-muted-foreground text-sm">
                   Allow REVIEW.md extends imports from these GitHub repositories. Enter one
-                  owner/repo per line. The same GitHub App installation must have access. An empty
-                  list blocks all imports.
+                  owner/repo per line. Each source must belong to the same GitHub account as the
+                  reviewed repository, and the GitHub App installation must have access to it. An
+                  empty list blocks all imports.
                 </p>
                 <p
                   id="review-guideline-sources-error"

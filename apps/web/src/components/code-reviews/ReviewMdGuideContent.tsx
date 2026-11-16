@@ -157,8 +157,9 @@ export function ReviewMdGuideContent({
             <CardContent className="space-y-4 text-muted-foreground text-sm">
               <p>
                 An administrator must add source repositories to Allowed guideline source
-                repositories in Code Reviewer settings. Personal accounts have the same setting. The
-                GitHub App installation must have access to each source.
+                repositories in Code Reviewer settings. Personal accounts have the same setting.
+                Each source must belong to the same GitHub account as the reviewed repository, and
+                the GitHub App installation must have access to it.
               </p>
               <p>
                 Add an extends list in YAML front matter, as shown above. Each entry uses

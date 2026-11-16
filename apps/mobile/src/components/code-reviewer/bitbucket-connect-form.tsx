@@ -6,6 +6,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { WEB_BASE_URL } from '@/lib/config';
 import {
   BITBUCKET_TOKEN_MAX_LENGTH,
   bitbucketConnectionFailure,
@@ -15,6 +16,7 @@ import {
 import { openExternalUrl } from '@/lib/external-link';
 import { useConnectBitbucket, useReplaceBitbucketToken } from '@/lib/hooks/use-bitbucket';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 
 /** Where Bitbucket sends a workspace admin to mint the token Kilo asks for. */
@@ -111,11 +113,28 @@ export function BitbucketConnectForm({
         onChangeText={value => {
           tokenRef.current = value;
           setHasToken(readBitbucketToken(value).kind === 'ready');
-          clearWhere(() => true);
+          // Only a failure another token can repair is what a new one answers;
+          // a lost role or a connection that changed underneath keeps the submit
+          // disabled until the sheet is reopened.
+          clearWhere(settled => repairNeedsAnotherToken(settled.kind));
         }}
       />
 
       <AccessibleStatus message={failure?.message ?? null} className="text-sm" />
+
+      {failure?.kind === 'connection-changed' ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onPress={() => {
+            void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, 'bitbucket', scope), {
+              label: t('common.manageOnWeb'),
+            });
+          }}
+        >
+          <Text>{t('common.manageOnWeb')}</Text>
+        </Button>
+      ) : null}
 
       <Button
         disabled={submitting || !hasToken || blockedByFailure}
@@ -134,8 +153,9 @@ export function BitbucketConnectForm({
 
 /**
  * Whether the failure leaves this form a next step: a rejected token can be
- * replaced in the field below, while a lost role or a connection that changed
- * underneath needs the sheet reopened.
+ * replaced in the field below. Neither other kind can, so an edit keeps them on
+ * screen: a lost role needs the sheet reopened with one, and a connection that
+ * changed underneath is managed on the page beside its message.
  */
 function repairNeedsAnotherToken(kind: BitbucketFailure['kind']): boolean {
   switch (kind) {

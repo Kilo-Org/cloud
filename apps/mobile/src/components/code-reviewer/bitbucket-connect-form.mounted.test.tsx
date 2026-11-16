@@ -7,6 +7,7 @@ import { createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { openExternalUrl } from '@/lib/external-link';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -18,6 +19,7 @@ const mutations = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/hooks/use-bitbucket', () => ({
   useConnectBitbucket: () => ({ mutateAsync: mutations.connect }),
   useReplaceBitbucketToken: () => ({ mutateAsync: mutations.replace }),
@@ -41,6 +43,25 @@ function submitButton(root: ReactTestRenderer['root']) {
   return button;
 }
 
+/** The action a non-repairable connection failure renders beside its message. */
+function manageButtons(root: ReactTestRenderer['root']) {
+  return root.findAll(
+    node =>
+      Object.is(node.type, BUTTON) &&
+      node
+        .findAll(child => Object.is(child.type, 'Text'))
+        .some(child => Object.values(child.props).includes(i18n.t('common.manageOnWeb')))
+  );
+}
+
+function manageButton(root: ReactTestRenderer['root']) {
+  const [button] = manageButtons(root);
+  if (!button) {
+    throw new Error('missing manage button');
+  }
+  return button;
+}
+
 function statusMessage(root: ReactTestRenderer['root']): string | null {
   const [status] = root.findAll(node => Object.is(node.type, STATUS));
   return status ? (status.props.message as string | null) : null;
@@ -53,7 +74,7 @@ async function mount(integrationId: string | null, onConnected: () => void = vi.
   return { root: view.renderer.root, onConnected };
 }
 
-async function submit(root: ReactTestRenderer['root'], token: string): Promise<void> {
+async function edit(root: ReactTestRenderer['root'], token: string): Promise<void> {
   const [tokenField] = root.findAll(node => Object.is(node.type, FIELD));
   if (!tokenField) {
     throw new Error('missing token field');
@@ -62,6 +83,10 @@ async function submit(root: ReactTestRenderer['root'], token: string): Promise<v
     (tokenField.props.onChangeText as (value: string) => void)(token);
     await Promise.resolve();
   });
+}
+
+async function submit(root: ReactTestRenderer['root'], token: string): Promise<void> {
+  await edit(root, token);
   await act(async () => {
     (submitButton(root).props.onPress as () => void)();
     await Promise.resolve();
@@ -71,6 +96,7 @@ async function submit(root: ReactTestRenderer['root'], token: string): Promise<v
 beforeEach(() => {
   mutations.connect.mockReset();
   mutations.replace.mockReset();
+  vi.mocked(openExternalUrl).mockReset();
 });
 
 describe('BitbucketConnectForm', () => {
@@ -113,6 +139,38 @@ describe('BitbucketConnectForm', () => {
     expect(onConnected).not.toHaveBeenCalled();
     expect(statusMessage(root)).toBe(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
     expect(submitButton(root).props.disabled).toBe(true);
+
+    // A lost role is not a token problem, so a new token neither clears the
+    // sentence nor re-enables the submit that would be refused again.
+    await edit(root, 'another-token');
+
+    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(submitButton(root).props.disabled).toBe(true);
+  });
+
+  it('keeps a connection that changed underneath on screen and names the page that manages it', async () => {
+    mutations.connect.mockRejectedValue({
+      data: { code: 'CONFLICT', message: 'The Bitbucket credential changed during this operation' },
+    });
+    const { root } = await mount(null);
+
+    await submit(root, 'workspace-token');
+
+    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.checkFailedTitleBitbucket'));
+    expect(submitButton(root).props.disabled).toBe(true);
+
+    await edit(root, 'another-token');
+
+    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.checkFailedTitleBitbucket'));
+    expect(submitButton(root).props.disabled).toBe(true);
+
+    const action = manageButton(root);
+    (action.props.onPress as () => void)();
+
+    expect(openExternalUrl).toHaveBeenCalledExactlyOnceWith(
+      'https://app.example.test/organizations/org-1/integrations/bitbucket',
+      { label: i18n.t('common.manageOnWeb') }
+    );
   });
 
   it('keeps submit available for a refused token, which a different one can fix', async () => {
@@ -125,6 +183,12 @@ describe('BitbucketConnectForm', () => {
 
     expect(statusMessage(root)).toBe(i18n.t('prReview.reconnectNotice.bitbucketTitle'));
     expect(submitButton(root).props.disabled).toBe(false);
+
+    // The next token is the repair, so typing retires the sentence.
+    await edit(root, 'another-token');
+
+    expect(statusMessage(root)).toBeNull();
+    expect(manageButtons(root)).toHaveLength(0);
   });
 
   it('holds the token field still while the submitted token is in flight', async () => {

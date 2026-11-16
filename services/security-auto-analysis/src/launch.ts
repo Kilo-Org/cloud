@@ -243,8 +243,8 @@ export async function startSecurityAnalysis(
       };
     }
     if (admission.outcome === 'unavailable') {
-      // The read could not decide and no paid work ran, so both the scheduled
-      // and the manual entrypoint requeue it under the consumer's attempt bound.
+      // The read could not decide and no paid work ran, so the caller retries
+      // under its own consumer's attempt bound and gives up when it ends.
       return {
         started: false,
         error: admission.message,

@@ -376,9 +376,11 @@ export async function ensureManualAnalysisQueueRow(
         : params.finding.severity === 'medium'
           ? 2
           : 3;
-  // Insert a fresh manual-analysis claim, revive a terminal row, or let an
-  // explicit user retry supersede an unclaimed scheduled retry. Pending and
-  // running rows remain untouched because another launch already owns them.
+  // Insert a fresh manual-analysis claim, revive a terminal row, let an
+  // explicit user retry supersede an unclaimed scheduled retry, or let a
+  // re-delivered command take back the pending row its earlier delivery
+  // claimed. A pending or running row owned by any other job remains untouched
+  // because another launch already owns it.
   const rows = await db
     .insert(security_analysis_queue)
     .values({
@@ -408,7 +410,13 @@ export async function ensureManualAnalysisQueueRow(
         last_error_redacted: null,
         updated_at: sql`now()`,
       },
-      setWhere: inArray(security_analysis_queue.queue_status, ['queued', 'completed', 'failed']),
+      setWhere: or(
+        inArray(security_analysis_queue.queue_status, ['queued', 'completed', 'failed']),
+        and(
+          eq(security_analysis_queue.queue_status, 'pending'),
+          eq(security_analysis_queue.claimed_by_job_id, params.jobId)
+        )
+      ),
     })
     .returning({ id: security_analysis_queue.id });
   return rows.length > 0;

@@ -29,7 +29,6 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
-import { nextRetryAt } from './retry-policy.js';
 import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
 import { generateControlToken } from './token.js';
 import {
@@ -73,6 +72,19 @@ export type ManualAnalysisStartCommand = z.infer<typeof ManualAnalysisStartComma
 
 const MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS = 4;
 
+/**
+ * A manual start whose credit admission read could not decide. Nothing is
+ * written for it: the queue row keeps this command's claim and the finding
+ * keeps its pending reservation, so the consumer's retry replays the same
+ * command payload with the same parameters.
+ */
+export class RetryableManualAnalysisStartError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RetryableManualAnalysisStartError';
+  }
+}
+
 function commandOwner(command: ManualAnalysisStartCommand): QueueOwner {
   return command.owner.organizationId
     ? { type: 'org', id: command.owner.organizationId }
@@ -92,6 +104,12 @@ export async function processManualAnalysisStart(params: {
   db: WorkerDb;
   env: CloudflareEnv;
   command: ManualAnalysisStartCommand;
+  /**
+   * Whether this delivery is the last one the consumer's attempt budget
+   * allows. A start that could not decide is replayed through the command
+   * message until then, and settled as failed on the final delivery.
+   */
+  isFinalAttempt: boolean;
 }): Promise<{
   status:
     | 'started'
@@ -266,7 +284,10 @@ export async function processManualAnalysisStart(params: {
     }
   } else {
     claimToken = randomUUID();
-    const jobId = `manual:${claimToken}`;
+    // The job id is stable for the command, so a re-delivered command revives
+    // the pending row its earlier delivery claimed instead of reading it as
+    // another launch's duplicate.
+    const jobId = `manual:${params.command.commandId}`;
     if (!(await ensureManualAnalysisQueueRow(params.db, { finding, claimToken, jobId }))) {
       return { status: 'duplicate' };
     }
@@ -354,9 +375,20 @@ export async function processManualAnalysisStart(params: {
   if (!result.started) {
     if (result.failureNeedsLifecycleTransition) {
       if (result.failureCode === 'REQUEUE_TEMPORARY_PRECONDITION') {
-        // A start that could not decide is retried, not failed: the queue row is
-        // what the scheduled consumer picks up again, and its attempt bound is
-        // the one that gives up eventually.
+        if (!params.isFinalAttempt) {
+          // The admission read could not decide and no paid work ran, so this
+          // attempt writes nothing: the queue row keeps this command's claim
+          // and the finding keeps its reservation. The consumer retries the
+          // command message, and the next delivery replays the same payload
+          // with the same parameters.
+          throw new RetryableManualAnalysisStartError(
+            result.error ?? 'Security analysis start failed'
+          );
+        }
+        // The last allowed delivery gives up. The row is settled terminal, so
+        // the stale-row reconciler cannot hand it to the scheduled consumer,
+        // which would drop a request the user never enabled for automatic
+        // analysis.
         await transitionAnalysisStartLifecycle(params.db, {
           claim: {
             source: 'manual',
@@ -366,10 +398,10 @@ export async function processManualAnalysisStart(params: {
           outcome: {
             type: 'start-failed',
             errorMessage: result.error ?? 'Security analysis start failed',
-            queueStatus: 'queued',
+            queueStatus: 'failed',
             failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
-            incrementAttempt: true,
-            nextRetryAt: nextRetryAt(1).toISOString(),
+            incrementAttempt: false,
+            nextRetryAt: null,
           },
         });
         return { status: 'failed', resultCode: 'REQUEUE_TEMPORARY_PRECONDITION' };
@@ -489,7 +521,12 @@ export async function consumeManualAnalysisBatch(
         continue;
       }
 
-      const result = await processManualAnalysisStart({ db, env, command: parsed.data });
+      const result = await processManualAnalysisStart({
+        db,
+        env,
+        command: parsed.data,
+        isFinalAttempt: message.attempts >= MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS,
+      });
       const terminal = manualAnalysisCommandTerminalState(result);
       const terminalTransition = await transitionSecurityAgentCommandWithCurrentState(db, {
         commandId: parsed.data.commandId,
@@ -507,6 +544,21 @@ export async function consumeManualAnalysisBatch(
       });
       message.ack();
     } catch (error) {
+      if (
+        error instanceof RetryableManualAnalysisStartError &&
+        message.attempts < MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS
+      ) {
+        console.info('Manual security analysis command will replay the start', {
+          command_id: parsed.data.commandId,
+          command_type: 'start_analysis',
+          owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+          attempts: message.attempts,
+          max_attempts: MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS,
+        });
+        message.retry();
+        continue;
+      }
+
       let exhaustionOutcome: SecurityAgentCommandTransitionOutcome | undefined;
       if (message.attempts >= MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS) {
         try {

@@ -787,9 +787,12 @@ function destructiveLabels(object) {
  * Three sets, read from every source root of one catalog:
  * - `called`: keys the catalog's own translate call names as a plain string.
  *   Each must exist.
- * - `referenced`: every string literal in the source. A key named in a lookup
- *   table and passed to t() through a variable is used, so the dead-key check
- *   reads this wider set and never asks anyone to delete a live key.
+ * - `referenced`: every string literal in the source, plus every literal
+ *   written under the static head of a key the source builds as a template
+ *   literal — `` `generic.body.${leaf}` `` reads `generic.body.`, so a leaf
+ *   literal beside it names the key `generic.body.<leaf>`. A key named in a
+ *   lookup table and passed to t() through a variable is used, so the dead-key
+ *   check reads this wider set and never asks anyone to delete a live key.
  * - `destructiveKeys`: keys an object literal paints on a destructive button
  *   while the dialog can also paint the generic Cancel label. See the rule that
  *   reads this set, `destructiveConfirmKeys` below. Only the mobile catalog
@@ -804,6 +807,7 @@ function scanSource(catalog, root) {
   const problems = [];
   const called = new Set();
   const referenced = new Set();
+  const keyPrefixes = new Set();
   const destructiveKeys = new Set();
   const mobile = catalog.name === 'mobile';
   for (const sourceRoot of catalog.sourceRoots) {
@@ -853,7 +857,20 @@ function scanSource(catalog, root) {
         if (key !== null) {
           called.add(key);
         }
+        const prefix = pushKeyPrefix(node);
+        if (prefix !== null) {
+          keyPrefixes.add(prefix);
+        }
       });
+    }
+  }
+  // A key the source builds from the catalog has no literal of its own, so the
+  // literals beside it stand in for it: `generic.body.` plus `chatMessage` is
+  // `generic.body.chatMessage`. The set is copied because the expansion grows
+  // it while it runs.
+  for (const prefix of keyPrefixes) {
+    for (const value of [...referenced]) {
+      referenced.add(`${prefix}${value}`);
     }
   }
   return { called, referenced, destructiveKeys, problems };
@@ -909,6 +926,30 @@ function pushCalledKey(call) {
   return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
     ? value.value
     : null;
+}
+
+/**
+ * The static head of a `translatePush(locale, key, …)` key built as a template
+ * literal, when that head names the dotted parent of the key:
+ * `` `generic.body.${leaf}` `` reads `generic.body.`. A table of leaves builds
+ * its key this way, so the leaf literals beside it name every key under the
+ * head. Any other template literal — `` `${i18nKey}.title` ``, whose head is
+ * empty — names no parent and returns null.
+ */
+function pushKeyPrefix(call) {
+  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+    return null;
+  }
+  const key = call.arguments[1];
+  if (key === undefined) {
+    return null;
+  }
+  const value = unwrap(key);
+  if (value.type !== 'TemplateLiteral' || value.expressions.length === 0) {
+    return null;
+  }
+  const head = value.quasis[0].value.cooked;
+  return typeof head === 'string' && head.endsWith('.') ? head : null;
 }
 
 /**
@@ -1791,12 +1832,7 @@ function checkCatalogLocales({
     // category suffix. The English `_one`/`_other` siblings of a family
     // English declares stay mandatory in the missing-key rule below, except
     // where the locale carries the flat base key instead.
-    const localeFamilies = new Set(
-      [...translated.keys()]
-        .map(pluralParts)
-        .filter(Boolean)
-        .map(parts => parts.base)
-    );
+    const localeFamilies = pluralFamilyBases(translated);
     problems.push(
       ...checkKeyParity({
         label,

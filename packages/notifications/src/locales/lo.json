@@ -34,17 +34,17 @@
       "title": "ການແຈ້ງເຕືອນລາຍຈ່າຍ",
       "body": "ລາຍຈ່າຍ {{scopeName}} ໄດ້ເກີນ ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "ຄຳເຕືອນ SLA",
-      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+      "title": "ຄຳເຕືອນ SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "ການລະເມີດ SLA",
-      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+      "title": "ການລະເມີດ SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

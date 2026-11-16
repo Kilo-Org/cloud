@@ -273,7 +273,12 @@ export function createBillingStub(
     const compat = url.pathname === '/v1/chat/completions';
     const code = overloads-- > 0 ? 'overloaded' : refusal;
     if (code) {
-      const status = code === 'overloaded' ? 503 : code === 'user_profile_not_billable' ? 403 : 402;
+      const status =
+        code === 'overloaded'
+          ? 503
+          : code === 'user_profile_not_billable' || code === 'user_profile_billing_not_authorized'
+            ? 403
+            : 402;
       const type =
         status === 503 ? 'overloaded_error' : status === 403 ? 'permission_error' : 'billing_error';
       if (status === 503) response.setHeader('retry-after', '0');

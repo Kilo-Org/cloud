@@ -34,17 +34,17 @@
       "title": "Alèt depans",
       "body": "Depans {{scopeName}} te depase ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nouvo rezilta sekirite ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} nan {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nouvo rezilta sekirite ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Avètisman SLA",
-      "body": "{{findingTitle}} nan {{repoFullName}}"
+      "title": "Avètisman SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Vyolasyon SLA",
-      "body": "{{findingTitle}} nan {{repoFullName}}"
+      "title": "Vyolasyon SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

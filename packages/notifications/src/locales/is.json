@@ -34,17 +34,17 @@
       "title": "Viðvörun um útgjöld",
       "body": "Útgjöld {{scopeName}} fóru yfir ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nýr öryggisfundur ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} í {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nýr öryggisfundur ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA-viðvörun",
-      "body": "{{findingTitle}} í {{repoFullName}}"
+      "title": "SLA-viðvörun"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA-brot",
-      "body": "{{findingTitle}} í {{repoFullName}}"
+      "title": "SLA-brot"
     },
     "securityLifecycle": {
       "title": "Kilo",

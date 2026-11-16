@@ -34,17 +34,17 @@
       "title": "Ifitonileti inawo",
       "body": "Inawo {{scopeName}} kọja ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Wiwa aabo tuntun ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ninu {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Wiwa aabo tuntun ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Ikilọ SLA",
-      "body": "{{findingTitle}} ninu {{repoFullName}}"
+      "title": "Ikilọ SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Irufin SLA",
-      "body": "{{findingTitle}} ninu {{repoFullName}}"
+      "title": "Irufin SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

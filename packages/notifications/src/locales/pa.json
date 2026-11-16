@@ -34,17 +34,17 @@
       "title": "ਖਰਚ ਚੇਤਾਵਨੀ",
       "body": "{{scopeName}} ਦਾ ਖਰਚ ${{amountUsd}} ਤੋਂ ਵੱਧ ਗਿਆ"
     },
-    "securityFindingNew": {
-      "title": "ਨਵੀਂ ਸੁਰੱਖਿਆ ਲੱਭਤ ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} ਵਿੱਚ {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "ਨਵੀਂ ਸੁਰੱਖਿਆ ਲੱਭਤ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA ਚੇਤਾਵਨੀ",
-      "body": "{{repoFullName}} ਵਿੱਚ {{findingTitle}}"
+      "title": "SLA ਚੇਤਾਵਨੀ"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA ਉਲੰਘਣਾ",
-      "body": "{{repoFullName}} ਵਿੱਚ {{findingTitle}}"
+      "title": "SLA ਉਲੰਘਣਾ"
     },
     "securityLifecycle": {
       "title": "Kilo",

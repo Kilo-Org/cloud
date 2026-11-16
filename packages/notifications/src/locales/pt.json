@@ -34,17 +34,17 @@
       "title": "Alerta de gasto",
       "body": "O gasto de {{scopeName}} ultrapassou ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nova descoberta de segurança ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} em {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nova descoberta de segurança ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Aviso de SLA",
-      "body": "{{findingTitle}} em {{repoFullName}}"
+      "title": "Aviso de SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Incumprimento de SLA",
-      "body": "{{findingTitle}} em {{repoFullName}}"
+      "title": "Incumprimento de SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

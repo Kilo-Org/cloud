@@ -34,17 +34,17 @@
       "title": "Arifa ya matumizi",
       "body": "Matumizi ya {{scopeName}} yalizidi ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Tokeo jipya la usalama ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} katika {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Tokeo jipya la usalama ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Onyo la SLA",
-      "body": "{{findingTitle}} katika {{repoFullName}}"
+      "title": "Onyo la SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Ukiukaji wa SLA",
-      "body": "{{findingTitle}} katika {{repoFullName}}"
+      "title": "Ukiukaji wa SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

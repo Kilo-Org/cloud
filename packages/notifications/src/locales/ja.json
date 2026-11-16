@@ -34,17 +34,17 @@
       "title": "支出アラート",
       "body": "{{scopeName}} の支出が ${{amountUsd}} を超えました"
     },
-    "securityFindingNew": {
-      "title": "新しいセキュリティ検出結果 ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} の {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "新しいセキュリティ検出結果 ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA 警告",
-      "body": "{{repoFullName}} の {{findingTitle}}"
+      "title": "SLA 警告"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA 違反",
-      "body": "{{repoFullName}} の {{findingTitle}}"
+      "title": "SLA 違反"
     },
     "securityLifecycle": {
       "title": "Kilo",

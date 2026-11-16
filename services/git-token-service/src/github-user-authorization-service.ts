@@ -30,7 +30,12 @@ export type ManagedGitHubFallbackReason =
   | 'credential_configuration_error';
 
 export type UserAuthorizationSelection =
-  | { selected: true; token: string; gitAuthor: GitAuthorConfig }
+  | {
+      selected: true;
+      token: string;
+      gitAuthor: GitAuthorConfig;
+      credentialSource: 'github_app' | 'provided_token';
+    }
   | { selected: false; reason: ManagedGitHubFallbackReason };
 
 export type GitHubUserAccessTokenOp =
@@ -174,6 +179,7 @@ export class GitHubUserAuthorizationService extends GitHubAppCredentialLifecycle
       return {
         selected: true,
         token,
+        credentialSource: authorization.credential_source,
         gitAuthor: {
           name: authorization.github_login,
           email: `${authorization.github_user_id}+${authorization.github_login}@users.noreply.github.com`,

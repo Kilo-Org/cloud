@@ -500,15 +500,43 @@ describe('runtime harness selection', () => {
       })
     ).toBe('kilo');
   });
+  it.each([undefined, '', otherOrgId])(
+    'selects v2 for web accounts with organization %s when the scope is all accounts',
+    orgId => {
+      const env = { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: '*' };
+      for (const provider of ['cloudflare-containers', 'vercel'] as const) {
+        expect(
+          newSandboxHarness(env, provider, {
+            ...webCohort,
+            preparingRoutes: [{ billingOrigin: 'cloud-agent-web', orgId }],
+          })
+        ).toBe('kilo2');
+      }
+    }
+  );
+  it('keeps v1 for missing routes and non-isolated native sandboxes with all accounts enabled', () => {
+    const env = { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: '*' };
+    for (const provider of ['cloudflare-containers', 'vercel'] as const) {
+      expect(newSandboxHarness(env, provider)).toBe('kilo');
+      expect(newSandboxHarness(env, provider, { ...webCohort, preparingRoutes: [] })).toBe('kilo');
+    }
+    expect(
+      newSandboxHarness(env, 'cloudflare-containers', { ...webCohort, sandboxKind: 'shared' })
+    ).toBe('kilo');
+  });
   it.each(['code-review', 'desktop', 'agent-manager', 'slack', 'unknown', '', undefined])(
-    'keeps v1 for a listed organization when the origin is %s',
+    'keeps v1 regardless of account scope when the origin is %s',
     billingOrigin => {
       const route = { ...webRoute, billingOrigin, createdOnPlatform: 'cloud-agent-web' };
       for (const provider of ['cloudflare-containers', 'vercel'] as const) {
         for (const preparingRoutes of [[route], [webRoute, route], [route, webRoute]]) {
-          expect(newSandboxHarness(kilo2Env, provider, { ...webCohort, preparingRoutes })).toBe(
-            'kilo'
-          );
+          for (const ids of [interactiveOrgId, '*'])
+            expect(
+              newSandboxHarness({ ...kilo2Env, RUNTIME_KILO2_ORG_IDS: ids }, provider, {
+                ...webCohort,
+                preparingRoutes,
+              })
+            ).toBe('kilo');
         }
       }
     }
@@ -534,7 +562,7 @@ describe('runtime harness selection', () => {
     ).toThrow('configuration');
     expect(() =>
       newSandboxHarness(
-        { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: '*' },
+        { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: `*,${interactiveOrgId}` },
         'cloudflare-containers',
         webCohort
       )

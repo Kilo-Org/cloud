@@ -34,17 +34,17 @@
       "title": "Allert ta' infiq",
       "body": "L-infiq ta' {{scopeName}} qabeż ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Seba ta' sigurtà ġdid ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} f'{{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Seba ta' sigurtà ġdid ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Twissija tal-SLA",
-      "body": "{{findingTitle}} f'{{repoFullName}}"
+      "title": "Twissija tal-SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Ksur tal-SLA",
-      "body": "{{findingTitle}} f'{{repoFullName}}"
+      "title": "Ksur tal-SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

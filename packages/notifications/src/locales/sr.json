@@ -34,17 +34,17 @@
       "title": "Upozorenje o potrošnji",
       "body": "Potrošnja za {{scopeName}} prešla je ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Novi bezbednosni nalaz ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} u {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Novi bezbednosni nalaz ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA upozorenje",
-      "body": "{{findingTitle}} u {{repoFullName}}"
+      "title": "SLA upozorenje"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA kršenje",
-      "body": "{{findingTitle}} u {{repoFullName}}"
+      "title": "SLA kršenje"
     },
     "securityLifecycle": {
       "title": "Kilo",

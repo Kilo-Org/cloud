@@ -34,17 +34,17 @@
       "title": "Avviso di spesa",
       "body": "La spesa di {{scopeName}} ha superato ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nuovo risultato di sicurezza ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nuovo risultato di sicurezza ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Avviso SLA",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Avviso SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Violazione SLA",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Violazione SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

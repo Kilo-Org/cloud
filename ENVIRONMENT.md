@@ -130,7 +130,7 @@ does not require this credential.
 - `SUBSTACK_PUBLICATION_URL` - Substack publication origin used by user-deletion subscriber cleanup; defaults to `https://blog.kilo.ai`. Must be `blog.kilo.ai` or a `*.substack.com` host. The Substack admin search URL is hardcoded to `https://kilocode.substack.com/publish/subscribers`, not this publication. [SERVER]
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
-- `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
+- `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`, `apps/ai-gateway/next.config.mjs`, and Cloud Agent deployment CI. Cloud Agent uploads target `kilo-code/kilo-cloud-agent`; the token must never enter sandbox environments or image build arguments. `[SECRET]`
 - `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for server and Edge runtime error reporting; used in `apps/web/sentry.edge.config.ts` and `packages/web-shared/src/lib/observability/sentry-server.ts`. `[PUBLIC]`
 
 ### Marketing Tags
@@ -545,8 +545,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_ACCESS_KEY_ID` - R2 access key ID for CLI session storage. `[SECRET]`
 - `R2_SECRET_ACCESS_KEY` - R2 secret access key for CLI session storage. `[SECRET]`
 - `R2_CLI_SESSIONS_BUCKET_NAME` - R2 bucket name for CLI session blobs. [SERVER]
-- `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log` request and response bodies. [SERVER]
-- `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
+- `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log_2` request and response bodies, stored as `YYYY/MM/DD/<id>.json`. [SERVER]
+- `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the API request log bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
 - `R2_AI_PROVIDER_METADATA_BUCKET_NAME` - Optional R2 bucket for AI provider metadata; `<microdollar_usage id>.json` contains the version-1 gateway routing decision, optional `vercel: { metadata }`, and optional `enkrypt` (the organization's input guardrail settings and scan steps, without prompt text), and optional `byok_failover_attempts` (each upstream attempt's BYOK provider, status, error code, and duration when a failing BYOK key failed over to the next). [SERVER]
 - `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID` - Dedicated R2 access key ID for the AI provider metadata bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
@@ -602,11 +602,28 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 
 ### Cloud Agent Services
 
+Cloud Agent Sentry coverage is explicit, not blanket Durable Object instrumentation.
+It captures unexpected Worker HTTP/tRPC, queue and scheduled exceptions,
+control-plane wrapper startup/crash failures, and exceptions from the instrumented
+exports in
+`services/cloud-agent-next/src/index.ts`: `SandboxSession`, `SandboxControl`,
+`SandboxContainers`, `StreamTicketNonceDO`, and `UserKiloFacade`.
+
+`EnvironmentBuild` and `VercelSnapshotBuild` are outside this rollout. Their build
+status, failure records and structured logs remain the investigation path;
+unexpected standalone RPC/alarm exceptions in those classes are not guaranteed to
+reach Sentry. Raw `SandboxContainment` and `SandboxSmallContainment` exports are also excluded: they
+retain the SDK container lifecycle, billing hooks and outbound-handler registration
+without Sentry wrapping. The control-plane wrapper's own crash reporting is
+independent of these exports.
+Abrupt OOM/SIGKILL failures and synthetic session failure events are not captured.
 - `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper. `[SECRET]`
 - `KILOCODE_TOKEN_FILE` - Path to a file containing the KiloCode token (alternative to the env var). [SERVER]
 - `KILO_SESSION_INGEST_URL` - URL used by the Cloud Agent Next wrapper to ingest session data. [SERVER]
 - `KILO_PLATFORM` - Target platform identifier used by the Cloud Agent Next wrapper (`darwin`, `linux`, etc.). [SERVER]
 - `WRAPPER_LOG_PATH` - File path for the Cloud Agent Next wrapper's log output. [SERVER]
+- `CLOUD_AGENT_SENTRY_DSN` - Optional Worker-owned Sentry DSN for the `kilo-code/kilo-cloud-agent` project, used for Cloud Agent exceptions and wrapper crashes. Forwarded only at wrapper launch, never taken from agent profiles. Missing or invalid disables reporting. [SERVER]
+- `CLOUD_AGENT_SENTRY_ENVIRONMENT` - Cloud Agent Sentry environment label; defaults to `production` when absent. Invalid nonempty labels disable reporting. Configuration warnings name the variable once per process or Worker isolate, without its value. Use a separate label for nonproduction deployments. [SERVER]
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]

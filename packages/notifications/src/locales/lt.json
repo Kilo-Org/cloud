@@ -34,17 +34,17 @@
       "title": "Išlaidų pranešimas",
       "body": "{{scopeName}} išlaidos viršijo ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Naujas saugumo radinys ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ({{repoFullName}})"
+    },
+    "securityFindingNew": {
+      "title": "Naujas saugumo radinys ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA įspėjimas",
-      "body": "{{findingTitle}} ({{repoFullName}})"
+      "title": "SLA įspėjimas"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA pažeidimas",
-      "body": "{{findingTitle}} ({{repoFullName}})"
+      "title": "SLA pažeidimas"
     },
     "securityLifecycle": {
       "title": "Kilo",

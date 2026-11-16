@@ -34,17 +34,17 @@
       "title": "Cảnh báo chi tiêu",
       "body": "Chi tiêu của {{scopeName}} đã vượt ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Phát hiện bảo mật mới ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} trong {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Phát hiện bảo mật mới ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Cảnh báo SLA",
-      "body": "{{findingTitle}} trong {{repoFullName}}"
+      "title": "Cảnh báo SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Vi phạm SLA",
-      "body": "{{findingTitle}} trong {{repoFullName}}"
+      "title": "Vi phạm SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

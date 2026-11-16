@@ -34,17 +34,17 @@
       "title": "ಖರ್ಚು ಎಚ್ಚರಿಕೆ",
       "body": "{{scopeName}} ಖರ್ಚು ${{amountUsd}} ಮೀರಿದೆ"
     },
-    "securityFindingNew": {
-      "title": "ಹೊಸ ಭದ್ರತಾ ಸಂಶೋಧನೆ ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "ಹೊಸ ಭದ್ರತಾ ಸಂಶೋಧನೆ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA ಎಚ್ಚರಿಕೆ",
-      "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+      "title": "SLA ಎಚ್ಚರಿಕೆ"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA ಉಲ್ಲಂಘನೆ",
-      "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+      "title": "SLA ಉಲ್ಲಂಘನೆ"
     },
     "securityLifecycle": {
       "title": "Kilo",

@@ -34,17 +34,17 @@
       "title": "تنبيه الإنفاق",
       "body": "تجاوز إنفاق {{scopeName}} ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "نتيجة أمان جديدة ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} في {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "نتيجة أمان جديدة ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "تحذير SLA",
-      "body": "{{findingTitle}} في {{repoFullName}}"
+      "title": "تحذير SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "خرق SLA",
-      "body": "{{findingTitle}} في {{repoFullName}}"
+      "title": "خرق SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

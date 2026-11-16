@@ -15,7 +15,11 @@ import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
-import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
+import {
+  type TriggerDraft,
+  type TriggerDraftProblems,
+  withRunAsCreator,
+} from '@/lib/cloud-triggers/trigger-draft';
 
 import { TriggerSwitchRow } from './trigger-form-rows';
 
@@ -181,11 +185,7 @@ export function TriggerFormBehaviour({
             description={t('cloudAgent.triggers.runAsCreatorDescription')}
             value={draft.runAsCreator}
             onValueChange={runAsCreator => {
-              onDraftChange({
-                ...draft,
-                runAsCreator,
-                authEnabled: runAsCreator ? true : draft.authEnabled,
-              });
+              onDraftChange(withRunAsCreator(draft, runAsCreator));
             }}
           />
         )}

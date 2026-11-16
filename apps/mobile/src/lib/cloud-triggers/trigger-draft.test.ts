@@ -10,6 +10,7 @@ import {
   type TriggerDraft,
   triggerDraftFromDetail,
   triggerDraftProblems,
+  withRunAsCreator,
 } from './trigger-draft';
 
 const TIME_ZONE = 'Europe/Belgrade';
@@ -48,6 +49,30 @@ function detail(overrides: Partial<CloudTriggerDetail> = {}): CloudTriggerDetail
     ...overrides,
   };
 }
+
+describe('withRunAsCreator', () => {
+  it('clears a profile picked for the other owner and requires auth for a creator run', () => {
+    const next = withRunAsCreator(
+      webhookDraft({ profileId: 'org-profile', authEnabled: false }),
+      true
+    );
+    expect(next).toMatchObject({ runAsCreator: true, authEnabled: true, profileId: null });
+  });
+
+  it('clears the profile when the run goes back to the organization', () => {
+    const next = withRunAsCreator(
+      webhookDraft({ runAsCreator: true, profileId: 'my-profile' }),
+      false
+    );
+    expect(next.profileId).toBeNull();
+  });
+
+  it('keeps the profile when the switch does not change', () => {
+    expect(withRunAsCreator(webhookDraft({ profileId: 'org-profile' }), false).profileId).toBe(
+      'org-profile'
+    );
+  });
+});
 
 describe('readBodySchema', () => {
   it('treats an empty field as no schema', () => {

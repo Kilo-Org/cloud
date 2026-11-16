@@ -127,6 +127,20 @@ export function createTriggerDraft(timezone: string): TriggerDraft {
   };
 }
 
+/**
+ * The draft after the "Run as creator" switch changes. A creator run requires
+ * webhook auth, and the profile is cleared because the server checks it against
+ * the run's owner: a profile picked for the other owner would be refused.
+ */
+export function withRunAsCreator(draft: TriggerDraft, runAsCreator: boolean): TriggerDraft {
+  return {
+    ...draft,
+    runAsCreator,
+    authEnabled: runAsCreator ? true : draft.authEnabled,
+    profileId: runAsCreator === draft.runAsCreator ? draft.profileId : null,
+  };
+}
+
 /** The draft an existing trigger's configuration fills, for the edit form. */
 export function triggerDraftFromDetail(detail: CloudTriggerDetail): TriggerDraft {
   return {

@@ -20,7 +20,7 @@ import {
   getAuthTokenForRequest,
   publishActiveTokenExpiry,
 } from '@/lib/auth/token-owner';
-import { isProtectedDataAvailable } from '@/lib/protected-data';
+import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/protected-data';
 import { TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
@@ -179,8 +179,38 @@ async function readColdExpiry(active: ActiveTokenSnapshot | null): Promise<numbe
   return resolvedExpiresAtMs;
 }
 
+/**
+ * Waits for the credential gate when no bearer could be served.
+ *
+ * While iOS protected data is unavailable the keychain refuses every read, so a
+ * request built now would go out with no bearer and the server would refuse it
+ * as unauthenticated. That is the documented locked state, not a session
+ * failure: wait for the unlock the startup restore already waits for, bounded by
+ * the control-plane deadline so a background request can never outlive the
+ * app's own request budget. Past the bound the request proceeds exactly as it
+ * did before — no token, no event.
+ */
+async function waitForProtectedData(): Promise<void> {
+  if (isProtectedDataAvailable()) {
+    return;
+  }
+  const deadline = new Promise<void>(resolve => {
+    setTimeout(resolve, CONTROL_PLANE_DEADLINE_MS);
+  });
+  await Promise.race([whenProtectedDataAvailable(), deadline]);
+}
+
 async function getAuthHeaders() {
-  const token = await getAuthTokenForRequest();
+  let token = await getAuthTokenForRequest();
+  if (!token && !isProtectedDataAvailable()) {
+    // The keychain supplied no bearer because it refuses every read while the
+    // device is locked: wait for the unlock rather than send a request the
+    // server would refuse as unauthenticated, then read the token again. A
+    // held token never takes this path, so an already-authenticated request
+    // is not delayed.
+    await waitForProtectedData();
+    token = await getAuthTokenForRequest();
+  }
   if (!token) {
     return { ...buildAuthHeaders(token), ...buildClientMetadataHeaders() };
   }

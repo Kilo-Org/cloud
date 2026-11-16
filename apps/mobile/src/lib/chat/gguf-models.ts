@@ -251,22 +251,40 @@ function decodeSegment(segment: string): string {
   }
 }
 
+const HF_HOST = 'huggingface.co';
+
+/**
+ * The repository a Hugging Face file link points into, or `null` when the link
+ * names no repository file.
+ */
+function hfRepositoryPath(pathname: string): string | null {
+  const [owner, repo, marker] = pathname.split('/').filter(segment => segment !== '');
+  if (owner === undefined || repo === undefined) {
+    return null;
+  }
+  // A downloadable repository file is `<owner>/<repo>/resolve/…`. A dataset or a
+  // space repeats its kind as the first segment, so it names no model repository.
+  if (marker !== 'resolve') {
+    return null;
+  }
+  return `${decodeSegment(owner)}/${decodeSegment(repo)}`;
+}
+
 /**
  * Where a downloaded model came from, for the picker's subtitle: a Hugging Face
- * resolve link reads as its repository, any other link as its host. A link that
- * does not parse has no place to name, so the row shows no subtitle.
+ * repository file reads as its repository, any other link as its host. A link
+ * that does not parse has no place to name, so the row shows no subtitle.
  */
 export function ggufModelLocator(url: string): string {
   const parsed = parseUrl(url);
   if (parsed === null) {
     return '';
   }
-  const segments = parsed.pathname.split('/').filter(segment => segment !== '');
-  if (parsed.hostname === 'huggingface.co' && segments.length >= 2) {
-    return segments
-      .slice(0, 2)
-      .map(segment => decodeSegment(segment))
-      .join('/');
+  if (parsed.hostname === HF_HOST) {
+    const repository = hfRepositoryPath(parsed.pathname);
+    if (repository !== null) {
+      return repository;
+    }
   }
   return parsed.hostname;
 }

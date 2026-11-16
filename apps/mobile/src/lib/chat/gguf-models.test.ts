@@ -123,6 +123,23 @@ describe('the GGUF model locator', () => {
     ).toBe('Qwen/Qwen2.5-0.5B-Instruct-GGUF');
   });
 
+  it('names the host when a Hugging Face link names no repository file', () => {
+    expect(
+      ggufModelLocator('https://huggingface.co/datasets/acme/speech-gguf/resolve/main/tiny.gguf')
+    ).toBe('huggingface.co');
+    expect(ggufModelLocator('https://huggingface.co/spaces/acme/space/raw/main/tiny.gguf')).toBe(
+      'huggingface.co'
+    );
+    expect(
+      ggufModelLocator(
+        'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/blob/main/qwen2.5-0.5b-instruct-q2_k.gguf'
+      )
+    ).toBe('huggingface.co');
+    expect(ggufModelLocator('https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF')).toBe(
+      'huggingface.co'
+    );
+  });
+
   it('names the host when a Hugging Face link has no repository', () => {
     expect(ggufModelLocator('https://huggingface.co/models')).toBe('huggingface.co');
     expect(ggufModelLocator('https://huggingface.co')).toBe('huggingface.co');
@@ -140,7 +157,9 @@ describe('the GGUF model locator', () => {
     expect(
       ggufModelLocator('https://huggingface.co/Qwen%20AI/model-GGUF/resolve/main/x.gguf')
     ).toBe('Qwen AI/model-GGUF');
-    expect(ggufModelLocator('https://huggingface.co/Qwen%2/model-GGUF')).toBe('Qwen%2/model-GGUF');
+    expect(ggufModelLocator('https://huggingface.co/Qwen%2/model-GGUF/resolve/main/x.gguf')).toBe(
+      'Qwen%2/model-GGUF'
+    );
   });
 });
 

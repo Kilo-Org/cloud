@@ -12,16 +12,19 @@ process.env.GITHUB_LITE_APP_PRIVATE_KEY = 'test-lite-private-key';
 
 const mockGetContent = jest.fn();
 const mockGet = jest.fn();
+const mockGetRef = jest.fn();
 
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
     repos: { getContent: mockGetContent, get: mockGet },
+    git: { getRef: mockGetRef },
   })),
 }));
 
 import {
   decodeGitHubBase64Content,
   fetchGitHubRepositorySize,
+  fetchGitHubRepositoryDefaultBranchSha,
   fetchGitHubRootTextFileAtRef,
 } from './adapter';
 
@@ -32,6 +35,7 @@ function httpError(status: number) {
 beforeEach(() => {
   mockGetContent.mockReset();
   mockGet.mockReset();
+  mockGetRef.mockReset();
 });
 
 describe('decodeGitHubBase64Content', () => {
@@ -70,7 +74,7 @@ describe('fetchGitHubRootTextFileAtRef', () => {
       repo: 'widgets',
       path: 'REVIEW.md',
       ref: 'main',
-      request: { timeout: 10_000 },
+      request: { signal: expect.any(AbortSignal) },
     });
   });
 
@@ -103,6 +107,29 @@ describe('fetchGitHubRootTextFileAtRef', () => {
     mockGetContent.mockRejectedValueOnce(error);
 
     await expect(fetchGitHubRootTextFileAtRef(params)).rejects.toBe(error);
+  });
+});
+
+it('resolves the default branch head with abortable requests', async () => {
+  mockGet.mockResolvedValueOnce({ data: { default_branch: 'policy/main' } });
+  mockGetRef.mockResolvedValueOnce({ data: { object: { sha: 'a'.repeat(40) } } });
+  await expect(
+    fetchGitHubRepositoryDefaultBranchSha({
+      token: 'synthetic-token',
+      owner: 'acme',
+      repo: 'guidelines',
+    })
+  ).resolves.toBe('a'.repeat(40));
+  expect(mockGet).toHaveBeenCalledWith({
+    owner: 'acme',
+    repo: 'guidelines',
+    request: { signal: expect.any(AbortSignal) },
+  });
+  expect(mockGetRef).toHaveBeenCalledWith({
+    owner: 'acme',
+    repo: 'guidelines',
+    ref: 'heads/policy/main',
+    request: { signal: expect.any(AbortSignal) },
   });
 });
 

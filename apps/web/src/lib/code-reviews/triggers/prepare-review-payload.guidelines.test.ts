@@ -33,13 +33,16 @@ it('prepares the real prompt and persists import metadata with only GitHub HTTP 
     encoding: 'base64',
     content: Buffer.from(content).toString('base64'),
   });
-  const http = jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+  const http = jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = new URL(
       typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     );
     requests.push(url);
     if (url.origin !== 'https://api.github.com')
       throw new Error('Unexpected non-GitHub HTTP request');
+    if (url.pathname.includes('/contents/') || url.pathname.startsWith('/repos/acme/guidelines')) {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    }
     let body: unknown;
     let status = 200;
     switch (url.pathname) {

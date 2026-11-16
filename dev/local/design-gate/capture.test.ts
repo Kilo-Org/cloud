@@ -1348,6 +1348,9 @@ test('a late layout change on the same route is reported as a shift, not absorbe
     shifts.map(finding => [finding.severity, finding.measured]),
     [['error', 30]]
   );
+  // The bridge adds only the ticks the tail does not cover, so the shift is timed
+  // at the four spacings it really spans, not at the two the tail double-counted.
+  assert.match(shifts[0]?.message ?? '', /within 1000 ms/u);
   assert.ok(
     logs.some(line => line.includes('sampling once more')),
     `expected a retry line, saw ${JSON.stringify(logs)}`

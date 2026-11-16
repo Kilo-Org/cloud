@@ -201,7 +201,7 @@ function isHandledForbiddenProcedure(path: string): boolean {
 /**
  * True when a status is an expected answer: one of
  * {@link EXPECTED_HTTP_STATUSES}, a 403 with no tRPC error code, or a 403 whose
- * body names one of {@link HANDLED_FORBIDDEN_PROCEDURES}. Production 403s come
+ * body names a procedure {@link isHandledForbiddenProcedure} accepts. Production 403s come
  * from the edge firewall (OFAC-sanctioned regions, IP blocks), whose body is not
  * a tRPC error. A 403 from a tRPC procedure carries its code (`FORBIDDEN`) and
  * names app code, so it is still reported unless the caller renders the refusal.

@@ -2801,6 +2801,8 @@ export const ByokModelBaseSchema = z.object({
   max_completion_tokens: z.number(),
 });
 
+export type ByokModelBase = z.infer<typeof ByokModelBaseSchema>;
+
 export const DirectByokModelSchema = ByokModelBaseSchema.extend({
   id: z.string(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),

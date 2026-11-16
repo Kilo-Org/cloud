@@ -16,7 +16,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
-import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import { toByokListedModel } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-listed-model';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
@@ -41,48 +41,16 @@ export function convertByokEndpointModel(
   endpoint: ByokEndpointDefinition,
   model: ByokEndpointModel
 ): OpenRouterModel {
-  const id = formatByokEndpointModelId(providerId, model);
   const clientProvider = getByokEndpointModelClientProvider(endpoint, model);
-  const reasoningOptions =
-    getFallbackReasoningOptions(model.id) ?? getFallbackReasoningOptions(model.internal_id);
-  const supportsImages = model.supports_image_input === true;
-  return {
-    id,
+  return toByokListedModel({
+    id: formatByokEndpointModelId(providerId, model),
     name: `${endpoint.name}: ${model.name ?? model.id}`,
-    created: 0,
-    description: '',
-    context_length: model.context_length,
-    architecture: {
-      modality: supportsImages ? 'text+image->text' : 'text->text',
-      input_modalities: supportsImages ? ['text', 'image'] : ['text'],
-      output_modalities: ['text'],
-      tokenizer: 'Other',
-    },
-    pricing: {
-      prompt: '0',
-      completion: '0',
-      request: '0',
-      image: '0',
-      web_search: '0',
-      internal_reasoning: '0',
-      input_cache_read: '0',
-    },
-    top_provider: {
-      context_length: model.context_length,
-      max_completion_tokens: model.max_completion_tokens,
-      is_moderated: false,
-    },
-    per_request_limits: null,
-    supported_parameters: ['max_tokens', 'temperature', 'tools'].concat(
-      reasoningOptions ? ['reasoning'] : []
-    ),
-    hasUserByokAvailable: true,
-    isFree: false,
-    opencode: withLegacyVariants({
-      ai_sdk_provider: clientProvider === 'openrouter' ? undefined : clientProvider,
-      reasoning_options: reasoningOptions,
-    }),
-  };
+    model,
+    aiSdkProvider: clientProvider === 'openrouter' ? undefined : clientProvider,
+    reasoningOptions: model.flags?.includes('reasoning')
+      ? (getFallbackReasoningOptions(model.id) ?? getFallbackReasoningOptions(model.internal_id))
+      : undefined,
+  });
 }
 
 /** The bespoke models of the enabled endpoints outside catalog mode, which serve them under their own ids. */

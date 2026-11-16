@@ -23,7 +23,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
-import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import { toByokListedModel } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-listed-model';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 
 /**
@@ -71,50 +71,15 @@ function getDirectByokAiSdkProvider(
 
 function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
   const id = formatDirectByokModelId(provider, model);
-  const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
-  return {
+  return toByokListedModel({
     id,
-    canonical_slug: id,
-    hugging_face_id: '',
-    name,
-    created: 631148400, // our clients do not care about this field, we can fix it later if that changes
-    description: model.description ?? '',
-    context_length: model.context_length,
-    architecture: {
-      modality: model.flags?.includes('vision') ? 'text+image-\u003Etext' : 'text-\u003Etext',
-      input_modalities: ['text'].concat(model.flags?.includes('vision') ? ['image'] : []),
-      output_modalities: ['text'],
-      tokenizer: 'Other',
-      instruct_type: null,
-    },
-    pricing: {
-      prompt: '0.0000000',
-      completion: '0.0000000',
-      request: '0',
-      image: '0',
-      web_search: '0',
-      internal_reasoning: '0',
-      input_cache_read: '0.00000000',
-    },
-    top_provider: {
-      context_length: model.context_length,
-      max_completion_tokens: model.max_completion_tokens,
-      is_moderated: false,
-    },
-    per_request_limits: null,
-    supported_parameters: ['max_tokens', 'temperature', 'tools'].concat(
-      model.flags?.includes('reasoning') ? ['reasoning'] : []
-    ),
-    default_parameters: {},
-    hasUserByokAvailable: true,
-    isFree: false,
-    opencode: withLegacyVariants({
-      ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
-      reasoning_options:
-        model.reasoning_options ??
-        (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),
-    }),
-  };
+    name: DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name,
+    model,
+    aiSdkProvider: getDirectByokAiSdkProvider(provider, model, id),
+    reasoningOptions:
+      model.reasoning_options ??
+      (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),
+  });
 }
 
 /** The chat APIs `provider` serves `model` over, known without the stored credential. */

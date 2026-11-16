@@ -38,7 +38,7 @@ describe('convertByokEndpointModel', () => {
     definition.models[0] = {
       ...definition.models[0],
       name: 'Sonnet',
-      supports_image_input: true,
+      flags: ['vision', 'reasoning'],
     };
 
     const model = convertByokEndpointModel('endpoint-a1b2c3d4e5', definition, definition.models[0]);
@@ -49,7 +49,7 @@ describe('convertByokEndpointModel', () => {
       context_length: 200_000,
       top_provider: { context_length: 200_000, max_completion_tokens: 32_000 },
       architecture: { input_modalities: ['text', 'image'] },
-      pricing: { prompt: '0', completion: '0' },
+      pricing: { request: '0', image: '0' },
       hasUserByokAvailable: true,
       isFree: false,
       opencode: { ai_sdk_provider: 'anthropic' },
@@ -70,6 +70,31 @@ describe('convertByokEndpointModel', () => {
     expect(model.architecture.input_modalities).toEqual(['text']);
     expect(model.opencode?.ai_sdk_provider).toBeUndefined();
     expect(model.opencode?.reasoning_options).toBeUndefined();
+  });
+
+  it('offers reasoning options only for models flagged for reasoning', () => {
+    const definition = endpoint('Acme', ['anthropic/claude-sonnet-4.6']);
+
+    const unflagged = convertByokEndpointModel(
+      'endpoint-a1b2c3d4e5',
+      definition,
+      definition.models[0]
+    );
+
+    expect(unflagged.supported_parameters).not.toContain('reasoning');
+    expect(unflagged.opencode?.reasoning_options).toBeUndefined();
+  });
+
+  it('falls back to the upstream id for reasoning options', () => {
+    const definition = endpoint('Acme', ['acme/coder']);
+    const model = convertByokEndpointModel('endpoint-a1b2c3d4e5', definition, {
+      ...definition.models[0],
+      internal_id: 'claude-sonnet-4-6',
+      flags: ['reasoning'],
+    });
+
+    expect(model.opencode?.reasoning_options?.length).toBeGreaterThan(0);
+    expect(model.supported_parameters).toContain('reasoning');
   });
 });
 

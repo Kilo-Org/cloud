@@ -30,7 +30,11 @@ export class ServiceFetchTimeoutError extends Error {
 export type FetchWithinBudgetDeps = {
   /** Injectable for tests; defaults to the ambient `fetch`. */
   fetch?: typeof fetch;
-  /** Overrides {@link CONTROL_PLANE_UPSTREAM_BUDGET_MS} (tests only). */
+  /**
+   * Tightens {@link CONTROL_PLANE_UPSTREAM_BUDGET_MS} for a caller that shares
+   * one answer's budget between several phases, so this fetch cannot spend all
+   * of it. Tests also use it to shorten the budget.
+   */
   budgetMs?: number;
 };
 

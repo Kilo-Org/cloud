@@ -49,9 +49,10 @@ async function followDeviceLanguage(language: SupportedLanguage): Promise<void> 
   }
   // The apply result must not stand when the person picked a language while it
   // ran: the pick changed the i18n instance (a manual pick applies in place
-  // before it persists) or overwrote the stored preference. When either landed,
-  // the pick won and the device follow drops the outcome silently.
-  if (getLanguagePreference() !== 'device') {
+  // before it persists), or its preference write is still in flight, or it
+  // landed and overwrote the stored preference. When either holds, the pick
+  // won and the device follow drops the outcome silently.
+  if (getLanguagePreference() !== 'device' || hasLanguagePreferenceWriteInFlight()) {
     return;
   }
 }

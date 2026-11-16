@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one store, one harness: the write-pending suites stay beside the write suites they mirror */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSecureStorePreference } from './secure-store-preference';
@@ -142,6 +143,51 @@ describe('createSecureStorePreference', () => {
 
     expect(store.get()).toBe(true);
     expect(setItemAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('sees a setAsync target as pending while its own write runs', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    setItemAsync.mockImplementation(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    // A pick that must not change memory until the disk takes it: the write is
+    // the pick's whole file, so the pending-write state it holds while running
+    // is what a racing reader (the device-language follow) observes.
+    const applying = store.setAsync(true);
+    expect(store.hasPendingWrite()).toBe(true);
+    expect(store.getRequested()).toBe(true);
+    expect(store.get()).toBe(false);
+
+    writeGate.resolve(undefined);
+    await expect(applying).resolves.toBe(true);
+
+    expect(store.hasPendingWrite()).toBe(false);
+    expect(store.get()).toBe(true);
+  });
+
+  it('clears the setAsync pending state after a failed write', async () => {
+    getItemAsync.mockResolvedValue(null);
+    setItemAsync.mockRejectedValue(new Error('disk refused'));
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    await expect(store.setAsync(true)).resolves.toBe(false);
+
+    expect(store.hasPendingWrite()).toBe(false);
+    // Memory keeps the previous value; the caller rolls its own apply back.
+    expect(store.get()).toBe(false);
   });
 
   it('writes the newest choice, not every choice, when several land during one write', async () => {

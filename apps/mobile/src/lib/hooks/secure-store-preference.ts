@@ -299,6 +299,12 @@ export function createSecureStorePreference<T>(options: {
       // choice belongs to the account that just left: it must not land on disk
       // (when it has not started yet) and must not repaint memory afterwards.
       const epoch = clearEpoch;
+      // The write is the pick's whole file: the target is visible to a racing
+      // reader (the device-language follow) from the moment the write is
+      // asked, not only once it reaches the disk helper. `drainWrites` sets
+      // the same field for a queued `set()` write. A failed write keeps the
+      // memory value — the caller rolls its own apply back.
+      inFlight = next;
       await whenPersisted();
       if (epoch !== clearEpoch) {
         return false;
@@ -314,6 +320,10 @@ export function createSecureStorePreference<T>(options: {
           );
         }
         return false;
+      } finally {
+        if (inFlight === next) {
+          inFlight = undefined;
+        }
       }
       if (epoch !== clearEpoch) {
         return false;

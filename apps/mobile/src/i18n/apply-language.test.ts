@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { applyLanguagePreference } from './apply-language';
+import { applyDeviceLanguage, applyLanguagePreference } from './apply-language';
 
 const mocks = vi.hoisted(() => ({
   reloadAppAsync: vi.fn(),
@@ -132,13 +132,13 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     mocks.syncRtl.mockReturnValue(true);
     mocks.readDirectionAttemptAsync.mockResolvedValue('ar');
 
-    await expect(applyLanguagePreference('ar', 'ar', 'login')).resolves.toEqual({
+    await expect(applyDeviceLanguage('ar')).resolves.toEqual({
       kind: 'restart-skipped',
     });
 
     // The record names the language the last launch relaunched for: forcing it
-    // again would loop on the retry screen while the platform keeps answering
-    // with the previous direction. No direction or reload runs.
+    // again would loop through the retry screen while the platform keeps
+    // answering with the previous direction. No direction or reload runs.
     expect(mocks.writeDirectionAttemptAsync).not.toHaveBeenCalled();
     expect(mocks.syncRtl).not.toHaveBeenCalled();
     expect(mocks.reloadAppAsync).not.toHaveBeenCalled();
@@ -148,11 +148,27 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     mocks.syncRtl.mockReturnValue(true);
     mocks.readDirectionAttemptAsync.mockResolvedValue('he');
 
-    await expect(applyLanguagePreference('ar', 'ar', 'login')).resolves.toEqual({
+    await expect(applyDeviceLanguage('ar')).resolves.toEqual({
       kind: 'restarting-rtl',
     });
 
     // A different language's attempt never counts for this one.
+    expect(mocks.writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
+    expect(mocks.syncRtl).toHaveBeenCalledWith('ar');
+    expect(mocks.reloadAppAsync).toHaveBeenCalled();
+  });
+
+  it('never reads the attempt record for a manual pick, so its Retry can win', async () => {
+    mocks.syncRtl.mockReturnValue(true);
+    mocks.readDirectionAttemptAsync.mockResolvedValue('ar');
+
+    await expect(applyLanguagePreference('ar', 'ar', 'login')).resolves.toEqual({
+      kind: 'restarting-rtl',
+    });
+
+    // The person asking again is exactly the input the automatic guard
+    // protects: the manual apply relaunches whatever the record names, and the
+    // record write is what keeps the cold start from looping.
     expect(mocks.writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
     expect(mocks.syncRtl).toHaveBeenCalledWith('ar');
     expect(mocks.reloadAppAsync).toHaveBeenCalled();

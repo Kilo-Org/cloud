@@ -48,16 +48,23 @@ function refreshLocalizedNotifications(): void {
   void registerNeedsInputCategories();
 }
 
-/** Force the native direction for `language` and reload the app. */
-async function restartForDirection(language: SupportedLanguage): Promise<ApplyLanguageOutcome> {
-  // A relaunch that does not take the direction reloads on every path that
-  // reaches here, including the language retry screen a failed cold start
-  // showed: a relaunch from there must not run twice for the same language
-  // while the device keeps answering with the previous direction. The record
-  // names the language the last launch relaunched for; when it matches the
-  // running attempt, refuse the relaunch (the in-place follow keeps the old
-  // language; the user-facing retry stays on the manual picker).
-  if ((await readDirectionAttemptAsync()) === language) {
+/**
+ * Force the native direction for `language` and reload the app.
+ *
+ * `respectAttemptRecord` is the automatic follow's loop guard: the record
+ * names the language the last launch relaunches for and only a cold start
+ * whose direction already matches clears it, so a device change the app
+ * re-receives while it sits on the language retry screen must not relaunch
+ * again for the same language — the platform already refused that direction
+ * once and a second reload would repeat with no user input. A manual pick
+ * never reads the record: the person asking again is exactly the input the
+ * guard protects, and the retry path re-runs the apply itself.
+ */
+async function restartForDirection(
+  language: SupportedLanguage,
+  respectAttemptRecord: boolean
+): Promise<ApplyLanguageOutcome> {
+  if (respectAttemptRecord && (await readDirectionAttemptAsync()) === language) {
     return { kind: 'restart-skipped' };
   }
   // Record the relaunch so a cold start that comes back with the previous
@@ -115,7 +122,7 @@ export async function applyLanguagePreference(
     } catch {
       // Ignore: continue to the reload.
     }
-    return restartForDirection(resolved);
+    return restartForDirection(resolved, false);
   }
 
   const previousLanguage = i18n.language;
@@ -145,7 +152,7 @@ export async function applyDeviceLanguage(
   language: SupportedLanguage
 ): Promise<ApplyLanguageOutcome> {
   if (I18nManager.isRTL !== isRtlLanguage(language)) {
-    return restartForDirection(language);
+    return restartForDirection(language, true);
   }
 
   if (!(await changeLanguageInPlace(language))) {

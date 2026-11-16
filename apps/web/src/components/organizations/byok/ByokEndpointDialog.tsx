@@ -492,7 +492,7 @@ function ModelsTable({
                       value={row.context_length}
                       onChange={e => update(row.rowKey, { context_length: e.target.value })}
                       inputMode="numeric"
-                      placeholder="128000"
+                      placeholder="200000"
                       aria-label={`Context window of ${label}`}
                       className={`${cellInput} tabular-nums`}
                     />

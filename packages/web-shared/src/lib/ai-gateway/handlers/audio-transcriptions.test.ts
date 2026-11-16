@@ -263,6 +263,81 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     });
   });
 
+  it('reports the requested model and the billed cost, as chat does', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(
+      makeUpstreamResponse({
+        text: 'hello world',
+        model: 'openai/gpt-4o-mini-transcribe-20250101',
+        usage: { cost: 0.00002, input_tokens: 10, output_tokens: 4, seconds: 3 },
+      })
+    );
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    // The upstream reports no `is_byok`, so the paid cost is left as reported.
+    await expect(response.json()).resolves.toEqual({
+      text: 'hello world',
+      model: 'openai/gpt-4o-mini-transcribe',
+      usage: { cost: 0.00002, input_tokens: 10, output_tokens: 4, seconds: 3 },
+    });
+  });
+
+  it('reports no cost for a free model', async () => {
+    setUserAuth();
+    mockedIsFreeModel.mockReturnValue(true);
+    mockedFetch.mockResolvedValue(
+      makeUpstreamResponse({
+        text: 'hello world',
+        model: 'upstream/transcribe-20250101',
+        usage: { cost: 0.00002, input_tokens: 10, output_tokens: 4 },
+      })
+    );
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'vendor/free-transcribe:free',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      model: 'vendor/free-transcribe:free',
+      usage: { cost: 0 },
+    });
+  });
+
+  it('rewrites the response of a multipart request', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(
+      makeUpstreamResponse({
+        text: 'hi',
+        model: 'upstream/transcribe-20250101',
+        usage: { cost: 0.00001 },
+      })
+    );
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeMultipartRequest(
+        { model: 'openai/gpt-4o-mini-transcribe' },
+        { blob: new Blob(['audio']), filename: 'clip.wav' }
+      ) as never
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      model: 'openai/gpt-4o-mini-transcribe',
+      usage: { cost: 0.00001 },
+    });
+  });
+
   it('emits gateway metrics before accounting a platform-funded upstream error', async () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ error: 'Upstream request failed' }, 402));

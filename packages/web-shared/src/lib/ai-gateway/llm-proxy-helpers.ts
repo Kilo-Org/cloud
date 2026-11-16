@@ -59,6 +59,8 @@ import {
   usageCostSchema,
   vercelProviderMetadataSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -1655,17 +1657,14 @@ export function countAndStoreEmbeddingUsage(
     return stats;
   });
 
-  const usagePromise = usageStatsPromise.then(usageStats => {
+  const usagePromise = usageStatsPromise.then(async usageStats => {
     requestSpan?.end();
     if (!json) return processTokenData(usageStats, usageContext, servingProvider);
     priceEmbeddingUsage(usageStats, json, usageContext.provider);
 
-    // Preserve the real upstream cost before free-model or BYOK zeroing.
-    usageStats.market_cost = usageStats.cost_mUsd;
-
-    if (usageContext.is_free || usageContext.user_byok) {
-      usageStats.cost_mUsd = 0;
-    }
+    // Keeps the real upstream cost as `market_cost`, then applies custom pricing and the free-model
+    // or BYOK zeroing, as chat does.
+    applyUsagePricing(usageStats, usageContext, await getCustomPricingConfig());
 
     return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
   });

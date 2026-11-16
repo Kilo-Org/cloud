@@ -183,6 +183,11 @@ const upstreamBody = {
   usage: { input_tokens: 23, output_tokens: 7, cost: 0.0001236, total_tokens: 30 },
   upstream_metadata: { retained: true },
 };
+// The caller sees the cost the ledger row bills, in whole microdollars.
+const billedBody = {
+  ...upstreamBody,
+  usage: { ...upstreamBody.usage, cost: 0.000124, is_byok: false },
+};
 const memberDecision = {
   policy: {
     requireModelInCurrentSnapshot: false,
@@ -339,7 +344,7 @@ describe('handleSystemOneRequest', () => {
     const { data, response } = await client.systemOne(requestBody).withResponse();
 
     expect(response.status).toBe(200);
-    expect(data).toEqual(upstreamBody);
+    expect(data).toEqual(billedBody);
     expect(data.answers.billing.noul).toBe(0.95);
     expect(data.answers.category.choice).toBe('billing');
     expect(data.answers.urgency.score).toBe(0.75);
@@ -417,7 +422,7 @@ describe('handleSystemOneRequest', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(upstreamBody);
+    expect(await response.json()).toEqual(billedBody);
     expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
     await runAfter();
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
@@ -638,6 +643,11 @@ describe('handleSystemOneRequest', () => {
       const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
 
       expect(response.status).toBe(200);
+      // A free model reports no cost, and an id other than an alias reports the requested model.
+      await expect(response.json()).resolves.toMatchObject({
+        model: model === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : model,
+        usage: { cost: isFree ? 0 : 0.000124 },
+      });
       expect(upstreamRequest().body.model).toBe(model);
       expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
         expect.objectContaining({ modelId: policyModel })

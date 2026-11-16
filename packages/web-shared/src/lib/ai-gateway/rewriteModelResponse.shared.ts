@@ -299,6 +299,39 @@ export async function rewriteSseStream(
   }
 }
 
+/**
+ * Replaces the upstream's cost fields with what Kilo bills: custom pricing applied, and free,
+ * BYOK and subscription-funded requests at zero. Shared by every endpoint whose response carries
+ * an OpenRouter-style `usage` object.
+ */
+export function rewriteUsageCost(
+  usage: ResponseUsage,
+  costs: JustTheCostsUsageStats,
+  context: ResponseUsageContext,
+  gateway: NonNullable<VercelProviderMetaData['gateway']> | undefined,
+  vercelCosts: ReturnType<typeof computeVercelCostFields> | undefined
+) {
+  applyUsagePricing(costs, context, context.custom_pricing_config);
+  usage.cost = costs.cost_mUsd / 1_000_000;
+  usage.is_byok =
+    context.user_byok ||
+    context.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+    context.provider === CLAUDE_BILLING_PROVIDER_ID;
+  if (
+    usage.cost_details?.upstream_inference_cost == null &&
+    gateway &&
+    (gateway.marketCost != null || gateway.cost != null)
+  ) {
+    usage.cost_details = {
+      ...usage.cost_details,
+      upstream_inference_cost:
+        ((vercelCosts?.cost_mUsd ?? 0) - (vercelCosts?.nonInferenceCost_mUsd ?? 0)) / 1_000_000,
+    };
+  }
+  delete usage.market_cost;
+  delete usage.gateway_cost;
+}
+
 export function rewriteUsage(
   usage: ResponseUsage,
   context: ResponseUsageContext,
@@ -335,25 +368,7 @@ export function rewriteUsage(
     cacheWriteTokens,
     is_byok: usage.is_byok ?? null,
   };
-  applyUsagePricing(costs, context, context.custom_pricing_config);
-  usage.cost = costs.cost_mUsd / 1_000_000;
-  usage.is_byok =
-    context.user_byok ||
-    context.provider === OPENAI_CHATGPT_PROVIDER_ID ||
-    context.provider === CLAUDE_BILLING_PROVIDER_ID;
-  if (
-    usage.cost_details?.upstream_inference_cost == null &&
-    gateway &&
-    (gateway.marketCost != null || gateway.cost != null)
-  ) {
-    usage.cost_details = {
-      ...usage.cost_details,
-      upstream_inference_cost:
-        ((vercelCosts?.cost_mUsd ?? 0) - (vercelCosts?.nonInferenceCost_mUsd ?? 0)) / 1_000_000,
-    };
-  }
-  delete usage.market_cost;
-  delete usage.gateway_cost;
+  rewriteUsageCost(usage, costs, context, gateway, vercelCosts);
   if (usage.prompt_tokens_details) {
     if (usage.prompt_tokens_details.cached_tokens === undefined) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent

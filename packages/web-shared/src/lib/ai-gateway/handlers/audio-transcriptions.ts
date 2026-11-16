@@ -15,7 +15,7 @@ import {
   countAndStoreTranscriptionUsage,
   invalidRequestResponse,
   modelDoesNotExistResponse,
-  wrapInSafeNextResponse,
+  extractHeaderAndLimitLength,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -27,6 +27,11 @@ import {
   emitApiMetricsForResponse,
   emitGatewayApiMetrics,
 } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import {
+  responseUsageContext,
+  rewriteModelResponse_UsageEndpoint,
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.usageEndpoints';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
@@ -374,5 +379,9 @@ export async function handleAudioTranscriptionsRequest(
     provider
   );
   emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
-  return wrapInSafeNextResponse(response);
+  return await rewriteModelResponse_UsageEndpoint({
+    response,
+    usageContext: responseUsageContext(usageContext, await getCustomPricingConfig()),
+    vercelRequestId: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+  });
 }

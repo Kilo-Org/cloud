@@ -231,6 +231,80 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(mockedGetKiloEmbeddingModelCatalogFromDatabase).not.toHaveBeenCalled();
   });
 
+  it('reports the requested model and the billed cost, as chat does', async () => {
+    mockedFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          object: 'list',
+          data: [{ object: 'embedding', index: 0, embedding: [0.5, -0.25] }],
+          model: 'openai/text-embedding-3-small-20240125',
+          provider: 'OpenAI',
+          usage: {
+            prompt_tokens: 12,
+            total_tokens: 12,
+            cost: 0.000004,
+            is_byok: false,
+            market_cost: 0.000004,
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      object: 'list',
+      data: [{ object: 'embedding', index: 0, embedding: [0.5, -0.25] }],
+      model,
+      provider: 'OpenAI',
+      usage: { prompt_tokens: 12, total_tokens: 12, cost: 0.000004, is_byok: false },
+    });
+  });
+
+  it('reports no cost for a free model', async () => {
+    mockedGetEmbeddingProvider.mockResolvedValue({
+      provider: OPENROUTER,
+      userByok: null,
+      isFree: true,
+    });
+    mockedFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [],
+          model: 'upstream/embedding-20240125',
+          usage: { prompt_tokens: 12, cost: 0.000004, is_byok: false },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest());
+
+    await expect(response.json()).resolves.toMatchObject({
+      model,
+      usage: { cost: 0, is_byok: false },
+    });
+  });
+
+  it('passes an upstream error body through untouched', async () => {
+    mockedFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'bad input' }, model: 'upstream/model' }), {
+        status: 422,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest());
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      error: { message: 'bad input' },
+      model: 'upstream/model',
+    });
+  });
+
   it('never forwards a custom LLM id to an embeddings upstream', async () => {
     await insertCustomLlmForTest('acme/embedding-custom-model');
     try {

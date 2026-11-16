@@ -775,9 +775,7 @@ describe('appendPartTextChunks', () => {
 
 describe('publishPartsChanged', () => {
   test('invalidates the message snapshot and notifies only its channel', () => {
-    const snapshot = new Map<string, readonly ReadonlyPart[] | null>([
-      ['msg-1', [makePart('a')]],
-    ]);
+    const snapshot = new Map<string, readonly ReadonlyPart[] | null>([['msg-1', [makePart('a')]]]);
     const partsCallback = jest.fn();
     const messageCallback = jest.fn();
     const subscribers = createSubscriberRegistry();

@@ -443,9 +443,4 @@ export {
   upsertPartDroppingStaleSyntheticParts,
 };
 export { orderMessageIds } from './message-order';
-export type {
-  PartOrderingEvidence,
-  PartsSnapshot,
-  SessionSubscriptionKey,
-  SubscriberRegistry,
-};
+export type { PartOrderingEvidence, PartsSnapshot, SessionSubscriptionKey, SubscriberRegistry };

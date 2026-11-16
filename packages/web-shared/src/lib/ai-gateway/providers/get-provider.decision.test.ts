@@ -644,6 +644,27 @@ describe('getProvider routing decision', () => {
     );
   });
 
+  test('tells the Vercel routing decision that OpenRouter is disabled', async () => {
+    const user = await insertTestUser();
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+      openRouterDisabled: true,
+    });
+
+    expect(decision.steps).toContainEqual(
+      expect.objectContaining({ step: 'kilo', outcome: 'selected', gateway: 'vercel' })
+    );
+    expect(shouldRouteToVercel).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: MODEL, openRouterDisabled: true }),
+      expect.any(Function)
+    );
+  });
+
   test('records provider keys the organization policy excludes', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization(

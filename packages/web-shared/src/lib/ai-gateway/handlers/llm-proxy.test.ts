@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { CustomPricingTiers, OrganizationSettings } from '@kilocode/db/schema-types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
@@ -1830,13 +1831,18 @@ describe('POST /api/v1/chat/completions request handling', () => {
       apiUrl: 'https://ai-gateway.vercel.sh/v1',
     } satisfies Provider;
 
+    // Neither Claude nor OpenAI models carry the Kilo provider exclusions, which a Vercel
+    // route needs the inference provider cache to resolve.
+    const VERCEL_MODEL = 'moonshotai/kimi-k2.5';
+
     afterEach(() => {
       mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     });
 
     function setOrganization(
       settings: OrganizationSettings,
-      features: Partial<OrganizationFeatures>
+      features: Partial<OrganizationFeatures>,
+      plan: OrganizationPlan | null = 'enterprise'
     ) {
       mockedGetUserFromAuth.mockResolvedValue({
         user: {
@@ -1850,8 +1856,9 @@ describe('POST /api/v1/chat/completions request handling', () => {
       mockedGetBalanceAndOrgSettings.mockResolvedValue({
         balance: 1000,
         settings,
-        plan: 'enterprise',
+        plan: plan ?? undefined,
       });
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
       mockedGetRuntimeOrganizationFeatures.mockResolvedValue({
         ...DEFAULT_ORGANIZATION_FEATURES,
         ...features,
@@ -1987,7 +1994,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
       );
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
 
       expect(response.status).toBe(200);
       expect(
@@ -1996,10 +2003,74 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBe('jp');
     });
 
-    it('keeps OpenRouter requests on the global base URL when a data region is set', async () => {
+    it('rejects a Kilo OpenRouter route when a data region is set', async () => {
       setOrganization({ data_region: 'eu' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'Your organization requires inference in the European Union region, which this request cannot use.',
+        error_type: 'provider_not_allowed',
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects a custom provider route when a data region is set', async () => {
+      setOrganization({ data_region: 'eu' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...provider, type: 'custom', apiUrl: 'https://api.example.com/v1' },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: true,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(403);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('serves a request on the user’s own OpenRouter key while OpenRouter is disabled', async () => {
+      setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...provider, apiKey: 'sk-user-openrouter' },
+          userByok: [{ decryptedAPIKey: 'sk-user-openrouter', providerId: 'openrouter' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalled();
+    });
+
+    it('serves a request on the user’s own OpenRouter key when a data region is set', async () => {
+      setOrganization({ data_region: 'eu' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...provider, apiKey: 'sk-user-openrouter' },
+          userByok: [{ decryptedAPIKey: 'sk-user-openrouter', providerId: 'openrouter' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
       const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
       expect(response.status).toBe(200);
@@ -2008,6 +2079,121 @@ describe('POST /api/v1/chat/completions request handling', () => {
       );
       expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
     });
+
+    it('does not pin a Vercel route carrying the user’s provider key to the data region', async () => {
+      setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: vercelProvider,
+          userByok: [{ decryptedAPIKey: 'key', providerId: 'moonshotai' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
+
+      expect(response.status).toBe(200);
+      expect(
+        mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions?.gateway?.inferenceRegion
+      ).toBeUndefined();
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
+    });
+
+    it('does not pin a Vercel route carrying the user’s Vercel AI Gateway key to the data region', async () => {
+      setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...vercelProvider, apiKey: 'sk-user-vercel' },
+          userByok: [{ decryptedAPIKey: 'sk-user-vercel', providerId: 'vercel-ai-gateway' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
+
+      expect(response.status).toBe(200);
+      expect(
+        mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions?.gateway?.inferenceRegion
+      ).toBeUndefined();
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
+    });
+
+    it.each(['teams', null] as const)(
+      'ignores the settings of an organization whose plan is %s',
+      async plan => {
+        setOrganization(
+          { disable_openrouter: true, data_region: 'eu' },
+          { gateway_settings: ['org-1'] },
+          plan
+        );
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider,
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: false,
+          })
+        );
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedGetProvider).toHaveBeenCalledWith(
+          expect.objectContaining({ openRouterDisabled: false })
+        );
+        expect(mockedUpstreamRequest.mock.calls[0]?.[0].provider.apiUrl).toBe(
+          'https://openrouter.ai/api/v1'
+        );
+        expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
+      }
+    );
+
+    it('does not pin a Vercel route of a non-enterprise organization to the data region', async () => {
+      setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] }, 'teams');
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: vercelProvider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
+
+      expect(response.status).toBe(200);
+      expect(
+        mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions?.gateway?.inferenceRegion
+      ).toBeUndefined();
+    });
+
+    it.each([
+      ['a disabled OpenRouter', { disable_openrouter: true }, true],
+      ['a data region', { data_region: 'eu' }, true],
+      ['no gateway setting', {}, false],
+    ] as const)(
+      'asks routing to bypass the Vercel opt-out list with %s: %s',
+      async (_name, settings, expected) => {
+        setOrganization(settings, { gateway_settings: ['org-1'] });
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider: vercelProvider,
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: false,
+          })
+        );
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(VERCEL_MODEL)) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedGetProvider).toHaveBeenCalledWith(
+          expect.objectContaining({ openRouterDisabled: expected })
+        );
+      }
+    );
   });
 
   describe('organization BYOK keys and the organization provider allow-list', () => {

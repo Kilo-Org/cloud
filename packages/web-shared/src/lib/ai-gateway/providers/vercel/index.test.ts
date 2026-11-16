@@ -372,6 +372,61 @@ describe('shouldRouteToVercel', () => {
     ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
+
+  describe('with OpenRouter disabled', () => {
+    const openRouterDisabled = { ...unrestrictedRouting, openRouterDisabled: true };
+
+    it('routes a model opted out of Vercel routing to Vercel', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+
+      await expect(shouldRouteToVercel(openRouterDisabled, async () => undefined)).resolves.toBe(
+        true
+      );
+    });
+
+    it('still honors the opt-out list when OpenRouter is not disabled', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+
+      await expect(
+        shouldRouteToVercel(
+          { ...unrestrictedRouting, openRouterDisabled: false },
+          async () => undefined
+        )
+      ).resolves.toBe(false);
+    });
+
+    it('leaves a spend-bounded request off Vercel', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+      const getRoutingProviderConfig = jest.fn(async () => undefined);
+
+      await expect(
+        shouldRouteToVercel(
+          { ...openRouterDisabled, boundedSpending: true },
+          getRoutingProviderConfig
+        )
+      ).resolves.toBe(false);
+      expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+    });
+
+    it('does not route a model Vercel does not serve', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+
+      await expect(
+        shouldRouteToVercel(
+          { ...openRouterDisabled, requestedModel: 'vendor/unknown-model' },
+          async () => undefined
+        )
+      ).resolves.toBe(false);
+    });
+
+    it('still applies the resolved provider policy', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+
+      await expect(
+        shouldRouteToVercel(openRouterDisabled, async () => ({ only: ['google-vertex'] }))
+      ).resolves.toBe(false);
+    });
+  });
 });
 
 describe('canRouteToVercel', () => {

@@ -283,9 +283,13 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     }
   };
 
+  // System One models are listed with their label below.
+  const systemOneModelIds = new Set(getSystemOneModelIds(openRouterModelMetadata));
   const openRouterModels = Object.values(openRouterModelMetadata);
   for (const openRouterModel of openRouterModels) {
-    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
+    if (isAutoSmallFreeModel(openRouterModel.id) || systemOneModelIds.has(openRouterModel.id)) {
+      continue;
+    }
     await addGatewayModel(openRouterModel);
   }
 
@@ -324,7 +328,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
       if (providerId) addSupportedModel(providerId, labelled);
     }
   };
-  for (const modelId of getSystemOneModelIds(openRouterModelMetadata)) {
+  for (const modelId of systemOneModelIds) {
     if (modelId.startsWith('~')) continue;
     const model = openRouterModelMetadata[modelId];
     await addUsageEndpointModel(

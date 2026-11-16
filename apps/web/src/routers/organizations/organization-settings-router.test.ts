@@ -1413,9 +1413,18 @@ describe('organizations settings trpc router', () => {
         .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
     }
 
+    async function setPlan(organizationId: string, plan: 'teams' | 'enterprise') {
+      await db.update(organizations).set({ plan }).where(eq(organizations.id, organizationId));
+    }
+
+    beforeEach(async () => {
+      await setPlan(testOrganization.id, 'enterprise');
+    });
+
     afterEach(async () => {
       await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
       await updateOrganizationSettings(testOrganization.id, {});
+      await setPlan(testOrganization.id, 'teams');
     });
 
     it('reports whether gateway settings are available', async () => {
@@ -1456,6 +1465,44 @@ describe('organizations settings trpc router', () => {
       expect(auditLogs.map(log => log.message)).toContain(
         'Updated advanced policies: OpenRouter disabled; Inference region: European Union'
       );
+    });
+
+    it('reports gateway settings as unavailable for a non-enterprise organization', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({ available: false });
+    });
+
+    it('rejects gateway settings for a non-enterprise organization in the feature', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          disable_openrouter: true,
+        })
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Advanced policies are not available for this organization.',
+      });
+      expect((await getOrganizationById(testOrganization.id))?.settings.disable_openrouter).toBe(
+        undefined
+      );
+    });
+
+    it('reports gateway settings as unavailable for an enterprise organization outside the feature', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({ available: false });
     });
 
     it('rejects gateway settings while the feature is not enabled', async () => {

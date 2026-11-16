@@ -2307,8 +2307,7 @@ describe('explicit sandbox session creation', () => {
             })
           ).rejects.toMatchObject({
             code: 'BAD_REQUEST',
-            message:
-              'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
+            message: 'Restricted network access is not available for Vercel sandboxes.',
           });
           expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
         }

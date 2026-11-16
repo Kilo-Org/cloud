@@ -8,7 +8,7 @@ import {
   isSelectableSandboxAllocation,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { isMultiRepositoryEnvironment } from '../environment-build/reference.js';
 import {
   getSandboxSelectionCapabilities,
@@ -68,10 +68,7 @@ function enforcesRequestedEgress(
   allocation: SandboxAllocation,
   runtime: SessionRuntimeIntent | undefined
 ): boolean {
-  return (
-    !requestNeedsEgressPolicy(runtime) ||
-    providerSupports(getSandboxAllocationProvider(allocation), 'egressPolicy')
-  );
+  return egressRequestSupported(getSandboxAllocationProvider(allocation), runtime ?? {});
 }
 
 /**

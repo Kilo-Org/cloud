@@ -142,7 +142,11 @@ import {
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
-import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import {
+  egressRequestSupported,
+  providerSupports,
+} from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { PROVIDER_DESCRIPTORS } from '../shared/sandbox-provider.js';
 import {
   RUNTIME_BUILTIN_AGENT_SLUGS,
   type RuntimeBuiltinAgents,
@@ -204,13 +208,17 @@ function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
-  if (!requestNeedsEgressPolicy(input.runtime)) return;
-  if (!providerSupports(allocation.sandboxProvider, 'egressPolicy')) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
-    });
-  }
+  const request = input.runtime ?? {};
+  const provider = allocation.sandboxProvider;
+  if (egressRequestSupported(provider, request)) return;
+  const { label } = PROVIDER_DESCRIPTORS[provider];
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message:
+      request.egressMode !== 'allowlist' && providerSupports(provider, 'egressProxy')
+        ? `Egress audit needs an allowlist on ${label} sandboxes.`
+        : `Restricted network access is not available for ${label} sandboxes.`,
+  });
 }
 
 export type SessionRegistrationContext = {

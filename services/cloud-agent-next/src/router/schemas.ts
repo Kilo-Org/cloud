@@ -33,7 +33,12 @@ import {
   RuntimeAgentsSchema,
   RuntimeKiloCommandsSchema,
 } from '../persistence/schemas.js';
-import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
+import {
+  AgentModeSchema,
+  AgentVariantSchema,
+  BUILTIN_AGENT_MODES,
+  Limits,
+} from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
@@ -113,13 +118,8 @@ export function isBuiltinMode(slug: string): boolean {
   return BUILTIN_AGENT_MODES.has(slug);
 }
 
-/**
- * Thinking-effort variant for a model. Variants are model- and agent-specific
- * keys — the catalog's `opencode.variants`, or a stored profile agent's
- * `config.variant` — so the stored length bound is the only rule here: the
- * catalog, not this schema, decides which keys exist.
- */
-export const AgentVariantSchema = z.string().min(1).max(50);
+/** Thinking-effort variant for a model; the shared bound lives in `../schema.js`. */
+export { AgentVariantSchema };
 
 export type Attachments = z.infer<typeof AttachmentsSchema>;
 

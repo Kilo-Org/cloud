@@ -59,6 +59,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
@@ -228,6 +229,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       <ScreenHeader
         title={org.organizationName}
         titleNumberOfLines={2}
+        backFallback={PROFILE_TAB_HREF}
         headerRight={
           showMoney ? (
             <IconButton

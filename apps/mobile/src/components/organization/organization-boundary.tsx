@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Building2, type LucideIcon } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,8 +15,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
-
-const PROFILE_HREF = '/(app)/(tabs)/(3_profile)' as Href;
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
@@ -97,7 +96,7 @@ export function OrganizationBoundary({
         variant="outline"
         className={STATE_ACTION_CLASS}
         onPress={() => {
-          router.replace(PROFILE_HREF);
+          router.replace(PROFILE_TAB_HREF);
         }}
       >
         <Text>{t('organization.boundary.backToProfile')}</Text>
@@ -154,7 +153,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} />
+      <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
       {content}
     </View>
   );

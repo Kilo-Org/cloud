@@ -34,6 +34,7 @@ import {
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 import { buildMembersListItems, type MembersListItem } from './members-list-items';
@@ -219,6 +220,7 @@ export function OrganizationMembersScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('organization.members.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
         headerRight={
           canInvite ? (
             <IconButton

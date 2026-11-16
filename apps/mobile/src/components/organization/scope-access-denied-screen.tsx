@@ -6,8 +6,7 @@ import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type OrganizationScopeAccess } from '@/lib/organization-scope-access';
-
-const PROFILE_HREF = '/(app)/(tabs)/(3_profile)' as Href;
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 /**
  * The organization scope the reader may not see: access was lost, or the
@@ -25,7 +24,7 @@ export function ScopeAccessDeniedScreen({
   kind,
   onRetry,
   isRetrying = false,
-  backFallback,
+  backFallback = PROFILE_TAB_HREF,
 }: Readonly<{
   /** ScreenHeader's title: the product name, or the organization's name. */
   title: string;
@@ -34,7 +33,8 @@ export function ScopeAccessDeniedScreen({
   kind: Exclude<OrganizationScopeAccess, 'granted'>;
   onRetry: () => void;
   isRetrying?: boolean;
-  /** Where the header's Back lands when this state has no history to pop. */
+  /** Where the header's Back lands when this state has no history to pop.
+   * Defaults to the Profile tab root, the route that opened the scope. */
   backFallback?: Href;
 }>) {
   const router = useRouter();
@@ -61,7 +61,7 @@ export function ScopeAccessDeniedScreen({
             variant="outline"
             accessibilityLabel={t('organization.boundary.backToProfile')}
             onPress={() => {
-              router.replace(PROFILE_HREF);
+              router.replace(PROFILE_TAB_HREF);
             }}
           >
             <Text>{t('organization.boundary.backToProfile')}</Text>

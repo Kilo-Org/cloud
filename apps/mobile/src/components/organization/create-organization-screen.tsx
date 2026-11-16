@@ -16,6 +16,7 @@ import { useRouteFocused } from '@/lib/navigation/route-focus';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { useOrganization } from '@/lib/organization-context';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -143,7 +144,7 @@ export function CreateOrganizationScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.create.title')} />
+      <ScreenHeader title={t('organization.create.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-4 pt-4"

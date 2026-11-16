@@ -38,6 +38,7 @@ import {
   useOrgSeats,
   useOrgSeatSubscription,
 } from '@/lib/hooks/use-org-billing-queries';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
 /** A settings block: the raised surface the hub's own cards paint. */
 function BillingCard({ children }: Readonly<{ children: ReactNode }>) {
@@ -112,14 +113,16 @@ export function OrganizationBillingScreen() {
     hasBillingRole && parentLink === null
   );
 
+  const screenTitle = t('organization.billing.title');
+
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.billing.title')} />;
+    return <OrganizationBoundary title={screenTitle} />;
   }
 
   if (!hasBillingRole) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.billing.title')} />
+        <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
         <PermissionDenied description={t('organization.billing.permissionDenied')} />
       </View>
     );
@@ -243,7 +246,7 @@ export function OrganizationBillingScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.billing.title')} />
+      <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"

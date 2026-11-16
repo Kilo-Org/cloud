@@ -9,6 +9,7 @@ import { UsageContent } from '@/components/usage/usage-content';
 import { isMoneyRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { type UsageScope } from '@/lib/hooks/use-usage-analytics';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
 type OrganizationUsageScreenProps = Readonly<{
   /** Explicit org id from a deep link; absent uses the persisted selection. */
@@ -51,7 +52,7 @@ export function OrganizationUsageScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('usage.orgTitle')} />
+      <ScreenHeader title={t('usage.orgTitle')} backFallback={ORGANIZATION_HUB_PATH} />
       <DetailScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-5 pb-6 pt-4"

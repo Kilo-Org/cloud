@@ -20,6 +20,7 @@ import {
   malformedJsonResponse,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  makeErrorReadable,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -394,6 +395,15 @@ export async function handleEmbeddingsRequest(
     effectiveProvider
   );
   emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
+
+  const readableError = await makeErrorReadable({
+    provider: provider.type,
+    requestedModel: requestedModelLowerCased,
+    request: null,
+    response,
+    userByokProviderIds: userByok?.map(byok => byok.providerId) ?? null,
+  });
+  if (readableError) return readableError;
 
   return await rewriteModelResponse_UsageEndpoint({
     response,

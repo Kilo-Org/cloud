@@ -16,6 +16,7 @@ import {
   invalidRequestResponse,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  makeErrorReadable,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { providerPreferencesSchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -385,6 +386,15 @@ export async function handleAudioTranscriptionsRequest(
     provider
   );
   emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
+  const readableError = await makeErrorReadable({
+    provider: provider.type,
+    requestedModel: requestedModelLowerCased,
+    request: null,
+    response,
+    userByokProviderIds: userByok?.map(byok => byok.providerId) ?? null,
+  });
+  if (readableError) return readableError;
+
   return await rewriteModelResponse_UsageEndpoint({
     response,
     usageContext: responseUsageContext(usageContext, await getCustomPricingConfig()),

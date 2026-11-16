@@ -422,6 +422,72 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     });
   });
 
+  describe('readable upstream errors', () => {
+    it('explains an OpenRouter refusal for lack of an allowed provider', async () => {
+      mockedFetch.mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              message: 'No allowed providers are available for the selected model.',
+              code: 404,
+              metadata: { available_providers: ['openai'], requested_providers: ['azure'] },
+            },
+          },
+          { status: 404 }
+        )
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'No eligible provider can serve the selected model.',
+        error_type: ProxyErrorType.provider_not_allowed,
+      });
+      expect(countAndStoreEmbeddingUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks an upstream context-length error', async () => {
+      const upstreamBody = {
+        error: {
+          message:
+            "This model's maximum context length is 8192 tokens, however you requested 9000 tokens.",
+        },
+      };
+      mockedFetch.mockResolvedValue(Response.json(upstreamBody, { status: 400 }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        ...upstreamBody,
+        error_type: ProxyErrorType.context_length_exceeded,
+      });
+    });
+
+    it('explains a rejected BYOK key', async () => {
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: VERCEL_AI_GATEWAY,
+        userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
+        isFree: false,
+      });
+      mockedFetch.mockResolvedValue(
+        Response.json({ error: { message: 'Incorrect API key provided' } }, { status: 401 })
+      );
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.byok_error,
+        message: expect.stringContaining('Provider message: Incorrect API key provided'),
+      });
+    });
+  });
+
   it('never forwards a custom LLM id to an embeddings upstream', async () => {
     await insertCustomLlmForTest('acme/embedding-custom-model');
     try {

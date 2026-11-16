@@ -960,6 +960,36 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(mockedCaptureException).not.toHaveBeenCalled();
   });
 
+  it('explains an OpenRouter refusal for lack of an allowed provider', async () => {
+    setOrganizationMemberAuth(new Set(['azure']));
+    mockedFetch.mockResolvedValue(
+      makeUpstreamResponse(
+        {
+          error: {
+            message: 'No allowed providers are available for the selected model.',
+            code: 404,
+            metadata: { available_providers: ['openai'], requested_providers: ['azure'] },
+          },
+        },
+        404
+      )
+    );
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
+  });
+
   it('passes an upstream 404 through for multipart requests', async () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ error: 'model not found' }, 404));

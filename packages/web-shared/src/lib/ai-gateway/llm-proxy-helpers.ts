@@ -463,7 +463,8 @@ export async function makeErrorReadable({
 }: {
   provider: ProviderType;
   requestedModel: string;
-  request: GatewayRequest;
+  /** Null on the routes that do not send a chat request. */
+  request: GatewayRequest | null;
   response: Response;
   userByokProviderIds: UserByokProviderId[] | null;
 }) {

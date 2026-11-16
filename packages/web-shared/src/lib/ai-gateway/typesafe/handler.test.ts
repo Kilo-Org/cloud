@@ -1016,6 +1016,35 @@ describe('handleSystemOneRequest', () => {
     );
   });
 
+  it('explains an OpenRouter refusal for lack of an allowed provider', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json(
+        {
+          error: {
+            message: 'No allowed providers are available for the selected model.',
+            code: 404,
+            metadata: { available_providers: ['openai'], requested_providers: ['azure'] },
+          },
+        },
+        { status: 404 }
+      )
+    );
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: 'provider_not_allowed',
+    });
+    expect(wrapInSafeNextResponse).not.toHaveBeenCalled();
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, status_code: 404, cost_mUsd: 0 }),
+      expect.objectContaining({ status_code: 404 })
+    );
+  });
+
   it.each([400, 429, 500])(
     'delegates upstream HTTP %s to the safe response wrapper and records the attempt',
     async status => {

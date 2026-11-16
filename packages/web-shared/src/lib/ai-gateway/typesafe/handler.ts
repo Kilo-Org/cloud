@@ -7,6 +7,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   extractHeaderAndLimitLength,
+  makeErrorReadable,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
@@ -423,9 +424,17 @@ export async function handleSystemOneRequest(request: NextRequest) {
     // The row reports the provider's own answer, so it agrees with the metrics
     // and with the ledger of every other upstream error response.
     deferZeroCostUsage(null, response.status, ttfbMs);
-    return response.status === 402
-      ? errorResponse('Service temporarily unavailable', 'upstream_error', 503)
-      : wrapInSafeNextResponse(response);
+    if (response.status === 402) {
+      return errorResponse('Service temporarily unavailable', 'upstream_error', 503);
+    }
+    const readableError = await makeErrorReadable({
+      provider: OPENROUTER.type,
+      requestedModel,
+      request: null,
+      response,
+      userByokProviderIds: null,
+    });
+    return readableError ?? wrapInSafeNextResponse(response);
   }
 
   let responseBody: unknown;

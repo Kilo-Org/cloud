@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BRIEFING_FALLBACK_TITLE,
   BRIEFING_MAX_EXCERPT_BYTES,
   briefingHasActivity,
   briefingSourceSchema,
@@ -130,6 +131,14 @@ describe('scheduled briefing contracts', () => {
     expect(truncateBriefingUtf8('abcdefgh', 5)).toBe('abcde');
     // A full-span cap keeps the whole string.
     expect(truncateBriefingUtf8('ab', 2)).toBe('ab');
+    // The required title is never blank: a title whose first cluster is wider than
+    // the cap truncates to nothing, so the neutral fallback stands in for it.
+    expect(redactBriefingTitle('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 4)).toBe(
+      BRIEFING_FALLBACK_TITLE
+    );
+    expect(redactBriefingTitle(family, 10)).toBe(BRIEFING_FALLBACK_TITLE);
+    // A title that survives the cap keeps its own text.
+    expect(redactBriefingTitle('Release notes', 160)).toBe('Release notes');
   });
   it('redacts sensitive completed-response text before truncation', () => {
     const excerpt = redactBriefingExcerpt(

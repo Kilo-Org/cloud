@@ -457,10 +457,12 @@ export function redactBriefingExcerptOrDrop(
 
 /**
  * A title for a session or a source. The report schema requires one, so a title that
- * screening cannot clear becomes a neutral fallback.
+ * screening cannot clear, or one whose first character is wider than the cap and so
+ * truncates to nothing, becomes a neutral fallback.
  */
 export function redactBriefingTitle(value: string, maxBytes = BRIEFING_MAX_TITLE_LENGTH): string {
-  return redactBriefingExcerptOrDrop(value, maxBytes) ?? BRIEFING_FALLBACK_TITLE;
+  const title = redactBriefingExcerptOrDrop(value, maxBytes);
+  return title === undefined || title === '' ? BRIEFING_FALLBACK_TITLE : title;
 }
 
 export function truncateBriefingUtf8(value: string, maxBytes: number): string {

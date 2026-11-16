@@ -100,6 +100,16 @@ async function settle(action: () => void = () => {}) {
   });
 }
 
+// React schedules the probe re-render on a macrotask that can land after a
+// single settle turn under load; poll bounded turns until the effect is visible.
+async function flushUntil(predicate: () => boolean) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (predicate()) return;
+    await settle();
+  }
+  throw new Error('Timed out flushing mutation state');
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -182,14 +192,15 @@ describe('useModelFavorites', () => {
     mockAdd.mockReturnValueOnce(add.promise);
 
     await settle(() => api().addFavorite({ model: 'openai/gpt-5' }));
+    await flushUntil(() => api().favorites.includes('openai/gpt-5'));
     expect(api().favorites).toEqual([...SERVER_FAVORITES, 'openai/gpt-5']);
     expect(mockGet).toHaveBeenCalledTimes(1);
 
     serverFavorites = [...SERVER_FAVORITES, 'openai/gpt-5'];
     add.resolve({ success: true });
-    await settle();
+    await flushUntil(() => mockGet.mock.calls.length >= 2);
+    await flushUntil(() => api().favorites.length === serverFavorites.length);
 
-    expect(mockGet).toHaveBeenCalledTimes(2);
     expect(api().favorites).toEqual(serverFavorites);
     expect(mockToast.error).not.toHaveBeenCalled();
   });
@@ -201,9 +212,15 @@ describe('useModelFavorites', () => {
     mockAdd.mockRejectedValueOnce(new Error('favorites unavailable'));
 
     await settle(() => api().addFavorite({ model: 'openai/gpt-5' }));
+    await flushUntil(() => mockToast.error.mock.calls.length > 0);
 
-    expect(api().favorites).toEqual(SERVER_FAVORITES);
+    expect(queryClient.getQueryData(GET_KEY)).toEqual({
+      favorites: SERVER_FAVORITES,
+      lastSelected: null,
+    });
     expect(mockToast.error).toHaveBeenCalledWith('favorites unavailable');
+    await flushUntil(() => api().favorites.length === SERVER_FAVORITES.length);
+    expect(api().favorites).toEqual(SERVER_FAVORITES);
 
     refetch.resolve({ favorites: [...serverFavorites], lastSelected: null });
     await settle();
@@ -216,15 +233,21 @@ describe('useModelFavorites', () => {
     mockRemove.mockReturnValueOnce(remove.promise);
 
     await settle(() => api().removeFavorite({ model: SERVER_FAVORITES[0] }));
+    await flushUntil(() => api().favorites.length === 1);
     expect(api().favorites).toEqual([SERVER_FAVORITES[1]]);
 
     const refetch = deferred<Preferences>();
     mockGet.mockReturnValueOnce(refetch.promise);
     remove.reject(new Error('remove failed'));
-    await settle();
+    await flushUntil(() => mockToast.error.mock.calls.length > 0);
 
-    expect(api().favorites).toEqual(SERVER_FAVORITES);
+    expect(queryClient.getQueryData(GET_KEY)).toEqual({
+      favorites: SERVER_FAVORITES,
+      lastSelected: null,
+    });
     expect(mockToast.error).toHaveBeenCalledWith('remove failed');
+    await flushUntil(() => api().favorites.length === SERVER_FAVORITES.length);
+    expect(api().favorites).toEqual(SERVER_FAVORITES);
 
     refetch.resolve({ favorites: [...serverFavorites], lastSelected: null });
     await settle();
@@ -241,6 +264,7 @@ describe('useModelFavorites', () => {
       api().addFavorite({ model: 'openai/gpt-5' });
       api().addFavorite({ model: 'openai/gpt-6' });
     });
+    await flushUntil(() => api().favorites.length === SERVER_FAVORITES.length + 2);
     expect(api().favorites).toEqual([...SERVER_FAVORITES, 'openai/gpt-5', 'openai/gpt-6']);
     expect(mockAdd).toHaveBeenCalledTimes(1);
     expect(mockAdd.mock.calls[0][0]).toEqual({ model: 'openai/gpt-5' });
@@ -248,20 +272,24 @@ describe('useModelFavorites', () => {
     const refetch = deferred<Preferences>();
     mockGet.mockReturnValueOnce(refetch.promise);
     addA.reject(new Error('offline'));
-    await settle();
+    await flushUntil(() => mockToast.error.mock.calls.length > 0);
 
-    expect(api().favorites).toEqual([...SERVER_FAVORITES, 'openai/gpt-5', 'openai/gpt-6']);
+    expect(queryClient.getQueryData<{ favorites: string[] }>(GET_KEY)?.favorites).toEqual([
+      ...SERVER_FAVORITES,
+      'openai/gpt-5',
+      'openai/gpt-6',
+    ]);
     expect(mockToast.error).toHaveBeenCalledWith('offline');
     expect(mockAdd).toHaveBeenCalledTimes(1);
 
     refetch.resolve({ favorites: [...SERVER_FAVORITES], lastSelected: null });
-    await settle();
-    expect(mockAdd).toHaveBeenCalledTimes(2);
+    await flushUntil(() => mockAdd.mock.calls.length >= 2);
     expect(mockAdd.mock.calls[1][0]).toEqual({ model: 'openai/gpt-6' });
 
     serverFavorites = [...SERVER_FAVORITES, 'openai/gpt-6'];
     addB.resolve({ success: true });
-    await settle();
+    await flushUntil(() => mockGet.mock.calls.length >= 3);
+    await flushUntil(() => api().favorites.length === serverFavorites.length);
 
     expect(api().favorites).toEqual(serverFavorites);
   });

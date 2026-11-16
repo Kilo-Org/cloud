@@ -103,6 +103,48 @@ describe('bitbucketRepair', () => {
       )
     ).toEqual({ kind: 'refresh-repositories', integrationId: 'integration-1' });
   });
+
+  it('names the web page for a workspace connected through Bitbucket OAuth', () => {
+    // The readiness read describes workspace access tokens only, so an OAuth
+    // organization reaches the repair looking like one with no integration.
+    expect(
+      bitbucketRepair(
+        readiness({
+          connected: false,
+          ready: false,
+          integrationId: null,
+          workspace: null,
+          missingRequiredScopes: ['account', 'repository'],
+          repositoryCache: { status: 'uninitialized', repositories: [], syncedAt: null },
+        }),
+        { method: 'oauth' }
+      )
+    ).toEqual({ kind: 'manage-connection' });
+  });
+
+  it('keeps replacing the token when the integration is a workspace access token', () => {
+    expect(
+      bitbucketRepair(
+        readiness({
+          connected: false,
+          ready: false,
+          workspace: null,
+          missingRequiredScopes: ['account'],
+          repositoryCache: { status: 'uninitialized', repositories: [], syncedAt: null },
+        }),
+        { method: 'workspace_access_token' }
+      )
+    ).toEqual({ kind: 'replace-token' });
+  });
+
+  it('does not send a usable workspace to the web page for a stale OAuth answer', () => {
+    // One integration per organization: a readiness answer that names a working
+    // token integration outranks a status read that still calls it OAuth.
+    expect(bitbucketRepair(readiness(), { method: 'oauth' })).toEqual({
+      kind: 'refresh-repositories',
+      integrationId: 'integration-1',
+    });
+  });
 });
 
 describe('bitbucketConnectionFailure', () => {

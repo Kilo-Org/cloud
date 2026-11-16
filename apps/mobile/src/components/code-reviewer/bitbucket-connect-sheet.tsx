@@ -9,12 +9,17 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { SheetScrollView } from '@/components/tab-screen';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { WEB_BASE_URL } from '@/lib/config';
+import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
+import { openExternalUrl } from '@/lib/external-link';
 import { notificationHaptic } from '@/lib/haptics';
-import { useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
+import { useBitbucketIntegrationStatus, useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
 /**
@@ -38,6 +43,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const { role, org, isResolving, isError } = useOrgBoundary(scope);
   const readiness = useBitbucketReadiness(scope);
+  // The readiness read describes workspace access tokens only, so this is what
+  // tells a Bitbucket OAuth connection apart from a workspace with none.
+  const status = useBitbucketIntegrationStatus(scope);
   // The contract the connect mutations enforce (`organizationBillingProcedure`),
   // so a deep link never offers a submit the server would refuse.
   const canManage = canManageOrganizationBilling(role);
@@ -67,10 +75,20 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   }
 
   const integrationId = readiness.data?.integrationId ?? null;
-  const title =
-    integrationId === null
-      ? t('common.connectBitbucket')
-      : t('prReview.connect.reconnectTitleBitbucket');
+  const repair =
+    readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data ?? null);
+  // A workspace connected through Bitbucket OAuth has no token integration to
+  // name, so the sheet is about the connection itself rather than about a form.
+  const managesExisting = repair?.kind === 'manage-connection';
+  let title = t('prReview.connect.reconnectTitleBitbucket');
+  let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+  if (managesExisting) {
+    title = t('agentChat.repoPicker.platformBitbucket');
+    deniedDescription = t('integrations.managedByOwner');
+  } else if (integrationId === null) {
+    title = t('common.connectBitbucket');
+    deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
+  }
 
   if (readiness.isError && readiness.data == null) {
     return (
@@ -94,13 +112,34 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     return (
       <>
         <SheetTitle title={title} />
-        <PermissionDenied
-          description={
-            integrationId === null
-              ? t('codeReviewer.bitbucket.notConnectedReadOnly')
-              : t('prReview.connect.gitlabReconnectAdminOnlyDescription')
-          }
-        />
+        <PermissionDenied description={deniedDescription} />
+      </>
+    );
+  }
+
+  // The connect mutation refuses a second Bitbucket integration for the same
+  // organization, and a Bitbucket OAuth connection can only be changed on the
+  // page that runs its callback, so the sheet names that page rather than a
+  // form whose submit the server would refuse.
+  if (managesExisting) {
+    return (
+      <>
+        <SheetTitle title={title} />
+        <View className="gap-4 px-6 pt-2 pb-8">
+          <Text variant="muted" className="text-sm">
+            {t('organization.settingsOnWeb.integrations')}
+          </Text>
+          <Button
+            variant="outline"
+            onPress={() => {
+              void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, 'bitbucket', scope), {
+                label: t('common.manageOnWeb'),
+              });
+            }}
+          >
+            <Text>{t('common.manageOnWeb')}</Text>
+          </Button>
+        </View>
       </>
     );
   }

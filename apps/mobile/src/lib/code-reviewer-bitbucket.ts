@@ -37,21 +37,52 @@ export function readBitbucketToken(value: string): BitbucketTokenField {
 }
 
 /**
+ * The organization's Bitbucket integration as `organizations.bitbucket.getStatus`
+ * reports it: the workspace access token this app connects, or the OAuth
+ * authorization the web page owns. The readiness read above models the token
+ * alone, so this is the only read that can name an OAuth connection.
+ */
+type BitbucketIntegrationStatus = RouterOutputs['organizations']['bitbucket']['getStatus'];
+
+/**
+ * The one fact a repair needs from an existing integration: which method
+ * authorized it. A workspace access token is what this app replaces; an OAuth
+ * authorization is not a connection the token form can touch.
+ */
+export type BitbucketExistingIntegration = Pick<BitbucketIntegrationStatus, 'method'>;
+
+/**
  * The one repair a not-ready Bitbucket workspace needs. A workspace with no
  * integration needs a token; one whose integration exists but whose token was
  * rejected or lacks a required permission needs a replacement token; one whose
  * token reads fine but whose repository cache has not loaded only needs the
  * cache refreshed.
+ *
+ * A workspace authorized through Bitbucket OAuth reads as one with no
+ * integration, because the readiness read only describes workspace access
+ * tokens, but `organizations.bitbucket.connect` refuses a second integration
+ * (`credential_conflict`). That connection can only be changed where the OAuth
+ * flow lives, so its repair names that page instead of a form that cannot
+ * succeed.
  */
 type BitbucketRepair =
   | { readonly kind: 'connect' }
   | { readonly kind: 'replace-token' }
-  | { readonly kind: 'refresh-repositories'; readonly integrationId: string };
+  | { readonly kind: 'refresh-repositories'; readonly integrationId: string }
+  | { readonly kind: 'manage-connection' };
 
-export function bitbucketRepair(readiness: BitbucketReadiness): BitbucketRepair {
+export function bitbucketRepair(
+  readiness: BitbucketReadiness,
+  existingIntegration: BitbucketExistingIntegration | null = null
+): BitbucketRepair {
   const integrationId = readiness.integrationId;
   if (!readiness.connected || readiness.missingRequiredScopes.length > 0) {
-    return integrationId === null ? { kind: 'connect' } : { kind: 'replace-token' };
+    if (integrationId !== null) {
+      return { kind: 'replace-token' };
+    }
+    return existingIntegration?.method === 'oauth'
+      ? { kind: 'manage-connection' }
+      : { kind: 'connect' };
   }
   // A connected workspace always names its integration; the fallback keeps a
   // response that contradicts itself on the path that can still succeed.

@@ -1573,6 +1573,12 @@ export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
 const OrganizationSettingsSchema = z.object({
+  // The provider allow list and the model deny list hold the model and provider
+  // access for organization members. A group policy selects the models and
+  // providers it grants to its own members; organization admins manage both the
+  // organization settings and the group policies. See
+  // `evaluateEffectiveModelAccessPolicy` in
+  // `packages/web-shared/src/lib/organizations/group-policies/model-access/model-access.server.ts`.
   provider_allow_list: z.array(z.string()).optional(),
 
   model_deny_list: z.array(z.string()).optional(),

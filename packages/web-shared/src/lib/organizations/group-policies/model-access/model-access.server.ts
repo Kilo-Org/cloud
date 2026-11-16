@@ -66,6 +66,11 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationProviderCeiling = organizationRestrictionsEnabled
     ? context.organization.settings.provider_allow_list
     : undefined;
+  // `organizationModelDenyList` and `organizationProviderCeiling` are the
+  // organization's model and provider access for members. A selected group grant
+  // is evaluated against the models in the grant's `modelAllowList` and the
+  // providers in the policy's provider list, in addition to the organization
+  // default access.
   // The fields below do not vary by branch; each branch adds only the snapshot
   // requirement and the member grant that its policy mode implies.
   const organizationFields = {
@@ -199,6 +204,9 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.mode === 'organization_baseline') {
     return await decisionWithinOrganizationBaseline();
   }
+  // A selected group grant is evaluated against the models in the grant's
+  // `modelAllowList` and the providers in the policy's provider list. The
+  // organization settings above hold the default access for members.
   if (policy.memberGrant.modelAllowList.includes(normalizedModelId)) {
     return { allowed: true };
   }

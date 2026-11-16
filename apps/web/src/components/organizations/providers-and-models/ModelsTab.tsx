@@ -53,7 +53,7 @@ export function ModelsTab({
     <div className="flex flex-col gap-y-4">
       <p className="text-muted-foreground text-sm">
         {scope === 'organization'
-          ? 'Disable specific models for organization members. New models from enabled providers are enabled by default.'
+          ? 'Disable specific models for organization members. New models from enabled providers are enabled by default. A group policy in "Specific models and providers" mode can add models beyond this list.'
           : 'Grant specific models in addition to the organization default access.'}
       </p>
 

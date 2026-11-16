@@ -39,10 +39,13 @@ const METRIC_OPTIONS = [
 ] as const;
 
 /**
- * One tile of the totals grid. The caption sits directly under the value, and
- * the detail line follows it: a wrapped detail then grows the tile downwards
- * without pushing this tile's caption off the line its row partner uses, and it
- * keeps the full input and output figures readable instead of ellipsized.
+ * One tile of the totals grid: a value, its caption directly under it, and an
+ * optional readable detail line. The minimum height fits a value, a caption and
+ * a two-line detail at the default font scale. The token tile's input/output
+ * detail is one line in most locales and two in the long ones, and it may not
+ * be ellipsized, so the floor keeps the whole 2x2 grid on one height instead of
+ * letting that one tile pull its row taller than the row above it. A floor,
+ * never a cap: a larger font scale grows the content instead of clipping it.
  */
 function StatTile({
   label,
@@ -54,7 +57,7 @@ function StatTile({
   subtext?: string;
 }>) {
   return (
-    <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
+    <View className="min-h-[112px] flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
       <Text className="text-lg font-bold text-foreground">{value}</Text>
       <Text className="text-xs text-muted-foreground">{label}</Text>
       {subtext !== undefined && <Text className="text-xs text-muted-foreground">{subtext}</Text>}
@@ -127,12 +130,12 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[112px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[112px] flex-1 rounded-lg bg-muted-soft" />
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[112px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[112px] flex-1 rounded-lg bg-muted-soft" />
             </View>
           </View>
           <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />

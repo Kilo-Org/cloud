@@ -151,34 +151,43 @@ it('exchanges a legacy CLI credential for a bounded modern Cloud Agent control t
 });
 
 it('returns a token the Worker runtime-admission consumer accepts', async () => {
-  const response = await POST(request());
-  expect(response.status).toBe(200);
-  const body = await response.json();
-  const result = await createRuntimeAuthorization({
-    token: body.token,
-    secret,
-    connectionString: 'unused-test-adapter',
-    resourceKind: 'cloud-agent-next',
-    resourceId: 'workspace_token-exchange-test',
-    adapters: {
-      getPrincipal: async ({ userId }) =>
-        userId === user.id
-          ? {
-              id: user.id,
-              apiTokenPepper: user.api_token_pepper,
-              blockedAt: null,
-              blockedReason: null,
-              isBot: false,
-            }
-          : null,
-    },
-  });
-  expect(result.authorization).toMatchObject({
-    userId: user.id,
-    resourceKind: 'cloud-agent-next',
-    resourceId: 'workspace_token-exchange-test',
-    state: 'active',
-  });
+  // The control issuer stamps its `env` claim from process.env.NODE_ENV, which
+  // is `production` in the deployed web app the Worker admits against.
+  const previousNodeEnv = process.env.NODE_ENV;
+  Object.assign(process.env, { NODE_ENV: 'production' });
+  try {
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const result = await createRuntimeAuthorization({
+      token: body.token,
+      secret,
+      connectionString: 'unused-test-adapter',
+      resourceKind: 'cloud-agent-next',
+      resourceId: 'workspace_token-exchange-test',
+      environment: 'production',
+      adapters: {
+        getPrincipal: async ({ userId }) =>
+          userId === user.id
+            ? {
+                id: user.id,
+                apiTokenPepper: user.api_token_pepper,
+                blockedAt: null,
+                blockedReason: null,
+                isBot: false,
+              }
+            : null,
+      },
+    });
+    expect(result.authorization).toMatchObject({
+      userId: user.id,
+      resourceKind: 'cloud-agent-next',
+      resourceId: 'workspace_token-exchange-test',
+      state: 'active',
+    });
+  } finally {
+    Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+  }
 });
 
 it('does not exchange the returned control token again', async () => {

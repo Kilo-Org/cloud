@@ -7871,6 +7871,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         connectionString: ctx.env.HYPERDRIVE.connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: SANDBOX_SESSION_ID,
+        environment: 'development',
         ...(organizationId ? { organizationId } : {}),
       });
       expect(stub.registerSessionFromMetadata).toHaveBeenCalledWith(

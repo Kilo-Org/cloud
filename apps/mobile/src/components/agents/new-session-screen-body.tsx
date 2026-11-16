@@ -459,7 +459,6 @@ export function NewSessionScreenBody() {
     isRetrying,
     reposSettled,
     providerQueriesResolved,
-    providerAnswersResolved,
     openIntegration,
     connectingProvider,
     refreshReposForceFresh,
@@ -477,13 +476,14 @@ export function NewSessionScreenBody() {
     entityKey: repositoryDraftKey,
   });
 
+  // The seed gate reads the region's own bounded signal, so a list that never
+  // answers cannot withhold the form's rows on a prefilled entry either; the
+  // hook gives the request up at the bound so a late answer cannot mount a
+  // repository the region was declared final without.
   const { selectedRepo, setSelectedRepo, repoSeedPending } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
-    // The seed gate needs the ACTUAL answers, not the bounded signal: a prefill
-    // that lands after the bound would mount a repository the repository region
-    // was already declared final without.
-    providerAnswersResolved,
+    providerQueriesResolved,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
     storedRepo: repositoryDraft.settled ? repositoryDraft.value : null,

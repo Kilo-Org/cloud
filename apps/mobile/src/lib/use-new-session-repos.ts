@@ -45,12 +45,12 @@ type UseNewSessionReposResult = {
   reposSettled: boolean;
   /**
    * True once every provider query has finished its first load, or has outlived
-   * `PROVIDER_QUERY_SETTLE_BOUND_MS` while still loading.
-   *
-   * This is the BOUNDED signal, and it answers "may the repository region stop
-   * withholding the form's rows?" — so the form's rows use it
-   * (`isRepositoryRegionSettled`). It is not evidence that the lists answered:
-   * after the bound it is true while the lists are still in flight.
+   * `PROVIDER_QUERY_SETTLE_BOUND_MS` while still loading. Every consumer reads
+   * this bounded value: the form's rows and the route-prefill seed gate alike,
+   * so a list that never answers withholds nothing. A prefill still unanswered
+   * at the bound is given up rather than deferred (`shouldAbandonRepoSeed`), so
+   * a late answer cannot mount a repository the region was declared final
+   * without.
    *
    * `isLoading` is false for a query that is paused or disabled, so a screen
    * that is offline (or a personal scope, where the Bitbucket query is
@@ -59,18 +59,6 @@ type UseNewSessionReposResult = {
    * `'loading'` whenever a paused query has no data.
    */
   providerQueriesResolved: boolean;
-  /**
-   * True once every provider query has finished its first load — whether or not
-   * it errored and whether or not any rows came back. A paused or disabled
-   * query counts as resolved.
-   *
-   * This is the ACTUAL answers signal, and it answers "is a provider query still
-   * in flight?" — so a route-prefill seed gate uses it (`isRepoSeedPending`). A
-   * prefill can only seed while a list is loading, so a seed gate fed the
-   * bounded signal would declare the region final during a slow load and then
-   * mount the seeded repository when the late answer arrived.
-   */
-  providerAnswersResolved: boolean;
   openIntegration: (platform: RepositoryPlatform) => void;
   /**
    * The provider whose connect flow is running, or null. A control that opens
@@ -491,10 +479,10 @@ export function useNewSessionRepos({
       clearTimeout(timer);
     };
   }, [providerScopeKey, settledScopeKey]);
-  const providerAnswersResolved =
+  const answersResolved =
     !githubQuery.isLoading && !gitlabQuery.isLoading && !bitbucketQuery.isLoading;
 
-  const providerQueriesResolved = providerAnswersResolved || settledScopeKey === providerScopeKey;
+  const providerQueriesResolved = answersResolved || settledScopeKey === providerScopeKey;
 
   const reposSettled =
     !githubQuery.isLoading &&
@@ -512,7 +500,6 @@ export function useNewSessionRepos({
     isRetrying,
     reposSettled,
     providerQueriesResolved,
-    providerAnswersResolved,
     openIntegration,
     connectingProvider,
     refreshReposForceFresh,

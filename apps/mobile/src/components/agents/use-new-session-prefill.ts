@@ -10,6 +10,7 @@ import {
   resolvePrefillModel,
   resolvePrefillRepoSelection,
   resolveStoredRepoSelection,
+  shouldAbandonRepoSeed,
 } from '@/components/agents/new-session-prefill';
 
 /**
@@ -67,23 +68,21 @@ export type UseNewSessionPrefillTargetsInput = {
   // !isLoadingRepos && !isReposError && repositories.length > 0
   reposSettled: boolean;
   /**
-   * The provider queries' own first-load state: true once each finished
-   * loading, whether or not it errored and whether or not any rows came back.
-   * A paused or disabled query counts as resolved.
+   * The repository region's bounded signal: true once each provider query
+   * finished loading, or once the settle bound expired while one was still
+   * loading. A paused or disabled query counts as resolved.
    *
-   * This is the ACTUAL answers signal, never the bounded one
-   * (`providerQueriesResolved`, which turns true after
-   * `PROVIDER_QUERY_SETTLE_BOUND_MS` while the lists are still loading): a
-   * prefill can still land while a list is in flight, so the seed gate must
-   * stay pending until the lists answer or the region would be declared final
-   * and the seeded repository would mount late, moving a settled screen.
+   * Bounded on purpose. A list that never answers must not withhold the form's
+   * rows, here or anywhere else, so a prefill still unanswered at the bound is
+   * given up (`shouldAbandonRepoSeed`) instead of deferred — a late answer then
+   * cannot mount a repository the region was declared final without.
    *
    * This is not `reposSettled`, which also requires no error and at least one
    * row: a prefill can only seed in the render `reposSettled` turns true, so a
    * repo the lists cannot satisfy must let the repository region settle
    * instead of holding it — and the form's rows below it — forever.
    */
-  providerAnswersResolved: boolean;
+  providerQueriesResolved: boolean;
   models: { id: string; variants: string[] }[];
   // !isLoadingModels && !isModelsError && models.length > 0
   modelsSettled: boolean;
@@ -111,7 +110,7 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
   const {
     repositories,
     reposSettled,
-    providerAnswersResolved,
+    providerQueriesResolved,
     models,
     modelsSettled,
     storedRepo = null,
@@ -126,6 +125,22 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
   if (!hasSeededStoredRepo.current && storedSeed) {
     hasSeededStoredRepo.current = true;
     setSelectedRepo(storedSeed);
+  }
+
+  // The bound can settle the region before a prefill lands. Give the request up
+  // then, so a list that answers later cannot mount a repository the form
+  // already painted without. `reposSettled` wins in the same render, because
+  // that is the only render in which the seed can run.
+  if (
+    shouldAbandonRepoSeed({
+      prefillRepo: prefill.repo,
+      applied: hasAppliedRepo.current,
+      selectedRepo,
+      reposSettled,
+      providerQueriesResolved,
+    })
+  ) {
+    hasAppliedRepo.current = true;
   }
 
   if (!hasAppliedRepo.current && reposSettled && !selectedRepo) {
@@ -167,7 +182,7 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
       prefillRepo: prefill.repo,
       applied: hasAppliedRepo.current,
       selectedRepo,
-      providerAnswersResolved,
+      providerQueriesResolved,
     }),
   };
 }

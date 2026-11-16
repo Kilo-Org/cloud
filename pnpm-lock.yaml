@@ -58,8 +58,8 @@ catalogs:
       specifier: 4.1.12
       version: 4.1.12
     '@workos-inc/node':
-      specifier: 11.0.0
-      version: 11.0.0
+      specifier: 12.2.0
+      version: 12.2.0
     aws4fetch:
       specifier: 1.0.20
       version: 1.0.20
@@ -1246,7 +1246,7 @@ importers:
         version: 2.1.2(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.212.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))
       '@workos-inc/node':
         specifier: 'catalog:'
-        version: 11.0.0
+        version: 12.2.0
       '@xterm/addon-clipboard':
         specifier: 0.2.0
         version: 0.2.0
@@ -1974,7 +1974,7 @@ importers:
         version: 11.19.0(typescript@7.0.2)
       '@workos-inc/node':
         specifier: 'catalog:'
-        version: 11.0.0
+        version: 12.2.0
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
@@ -3297,7 +3297,7 @@ importers:
         version: link:../../packages/worker-utils
       '@workos-inc/node':
         specifier: 'catalog:'
-        version: 11.0.0
+        version: 12.2.0
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
@@ -13294,8 +13294,8 @@ packages:
   '@workflow/serde@4.1.0-beta.2':
     resolution: {integrity: sha512-8kkeoQKLDaKXefjV5dbhBj2aErfKp1Mc4pb6tj8144cF+Em5SPbyMbyLCHp+BVrFfFVCBluCtMx+jjvaFVZGww==}
 
-  '@workos-inc/node@11.0.0':
-    resolution: {integrity: sha512-swUT6CbkuVQXMOtUpI70LZ8usjSg8OXcKMjKdoYLeqCApRI0Oo97l+nZ0lKzZ5GxjxgcVZGGVK025h7z9WyCJg==}
+  '@workos-inc/node@12.2.0':
+    resolution: {integrity: sha512-uWzWtPieLqn+juXcIm8YQxh0qokZg0dnjzGm5AHeemiG6VeqzGYc6nlqQ2zw/OI80aYuaPo/ZOURACyQuqYgnA==}
     engines: {node: '>=22.11.0'}
 
   '@wxt-dev/browser@0.1.43':
@@ -34567,7 +34567,7 @@ snapshots:
 
   '@workflow/serde@4.1.0-beta.2': {}
 
-  '@workos-inc/node@11.0.0': {}
+  '@workos-inc/node@12.2.0': {}
 
   '@wxt-dev/browser@0.1.43':
     dependencies:

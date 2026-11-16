@@ -800,6 +800,8 @@ export const CALLBACK_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultConversation: '_',
     defaultApi: 'unified',
     defaultTimeoutMs: CALLBACK_BATCH_TIMEOUT_MS,
+    disabled:
+      'Kilo v1 closes the queued slot for the second follow-up as completed before it answers the third, so the wrapper reports the batch completed early; not fixed for v1 because Cloud Agent moves to Kilo v2',
     run: runCallbackBatchFollowup,
   },
   'callback-interrupt': {

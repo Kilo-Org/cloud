@@ -23,8 +23,10 @@ const Id = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
  * segments; the tree below `src/app/` grows whichever screens the revision has,
  * so a dotted segment is allowed there and still refused below `components/`.
  */
-const COMPONENT_SOURCE = /^apps\/mobile\/src\/components\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.tsx$/;
-const ROUTE_SOURCE = /^apps\/mobile\/src\/app\/(?:[a-zA-Z0-9_()[\]$.-]+\/)*[a-zA-Z0-9_()[\]$.-]+\.tsx$/;
+const COMPONENT_SOURCE =
+  /^apps\/mobile\/src\/components\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.tsx$/;
+const ROUTE_SOURCE =
+  /^apps\/mobile\/src\/app\/(?:[a-zA-Z0-9_()[\]$.-]+\/)*[a-zA-Z0-9_()[\]$.-]+\.tsx$/;
 function isRouteScreen(value: string): boolean {
   if (!ROUTE_SOURCE.test(value)) return false;
   const segments = value.slice('apps/mobile/src/app/'.length).split('/');

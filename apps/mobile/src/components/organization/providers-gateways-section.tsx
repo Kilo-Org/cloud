@@ -128,6 +128,7 @@ export function GatewaySettingsSection({
         cancelLabel={t('common.cancel')}
         onSelect={index => {
           const choice = REGION_CHOICES[index];
+          setRegionPickerOpen(false);
           if (choice !== undefined) {
             save.mutate({
               organizationId,

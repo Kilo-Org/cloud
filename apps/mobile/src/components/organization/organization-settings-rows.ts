@@ -3,7 +3,7 @@ import {
   canManageOrganizationBilling,
   type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
-import type { Href } from 'expo-router';
+import { type Href } from 'expo-router';
 
 import {
   Building2,

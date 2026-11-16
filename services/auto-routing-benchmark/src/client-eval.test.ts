@@ -212,7 +212,12 @@ describe('client eval (real SQLite)', () => {
       await gradeClientEvalResult(
         db,
         CONFIG,
-        upload({ caseId: siblingCase.id, output: 'wrong answer', durationMs: 3000, costUsd: 0.002 }),
+        upload({
+          caseId: siblingCase.id,
+          output: 'wrong answer',
+          durationMs: 3000,
+          costUsd: 0.002,
+        }),
         deps
       )
     ).toEqual({ score: 0 });

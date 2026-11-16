@@ -55,9 +55,11 @@ const DEFINITION: ByokEndpointDefinition = {
   ],
 };
 
+const ENDPOINT_API_KEY = 'endpoint-secret';
+
 const API_KEY_CREDENTIALS: ByokEndpointCredentials = {
   type: 'api_key',
-  api_key: 'endpoint-secret',
+  api_key: ENDPOINT_API_KEY,
 };
 
 type UpstreamCall = { url: string; init: RequestInit | undefined };
@@ -581,6 +583,13 @@ describe('BYOK endpoints', () => {
         'The endpoint could not list its models: HTTP 401: Invalid API key',
       ],
       [
+        'a rejected key the upstream echoes',
+        'https://llm.example.com/v1',
+        () =>
+          Response.json({ error: { message: `Invalid key ${ENDPOINT_API_KEY}` } }, { status: 401 }),
+        'The endpoint could not list its models: HTTP 401: Invalid key [redacted]',
+      ],
+      [
         'a redirect',
         'https://llm.example.com/v1',
         () => new Response(null, { status: 307, headers: { location: 'http://10.0.0.1/' } }),
@@ -694,6 +703,28 @@ describe('BYOK endpoints', () => {
           credentials: API_KEY_CREDENTIALS,
         })
       ).rejects.toThrow('only supported for Chat Completions');
+    });
+
+    test('redacts the credentials the upstream echoes', async () => {
+      const created = await createEndpoint();
+      const upstream = mockUpstream(() =>
+        Response.json(
+          { error: { message: `Bad key sk-...${ENDPOINT_API_KEY.slice(-4)}` } },
+          { status: 401 }
+        )
+      );
+      restoreFetch = upstream.restore;
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.byok.testApiKey({
+        organizationId: organization.id,
+        id: created.id,
+      });
+
+      expect(result).toEqual({
+        success: false,
+        message: 'API key test failed: HTTP 401: Bad key sk-...[redacted]',
+      });
     });
 
     test('reports the upstream error', async () => {

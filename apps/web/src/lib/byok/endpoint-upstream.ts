@@ -46,6 +46,19 @@ export function findByokEndpointBaseUrlViolation(baseUrl: string): Promise<strin
   );
 }
 
+function credentialSecrets(credentials: ByokEndpointCredentials): string[] {
+  switch (credentials.type) {
+    case 'api_key':
+    case 'x-api-key':
+      return [credentials.api_key];
+    case 'aws_bedrock':
+      return [credentials.access_key_id, credentials.secret_access_key];
+    case 'service_account':
+      return [credentials.private_key_id, credentials.private_key];
+  }
+}
+
+/** Headers that authorize the request, and every secret value that went into them. */
 async function authorizedHeaders({
   url,
   method,
@@ -56,10 +69,11 @@ async function authorizedHeaders({
   method: string;
   body: string;
   credentials: ByokEndpointCredentials;
-}): Promise<Headers> {
+}): Promise<{ headers: Headers; secrets: string[] }> {
   const headers = new Headers({ accept: 'application/json' });
   if (body) headers.set('content-type', 'application/json');
   const auth = await resolveByokEndpointAuth(credentials);
+  const secrets = credentialSecrets(credentials);
   switch (auth.type) {
     case 'api_key':
       if (auth.apiKeyHeader === 'x-api-key') {
@@ -68,9 +82,18 @@ async function authorizedHeaders({
       } else {
         headers.set('authorization', `Bearer ${auth.apiKey}`);
       }
-      return headers;
+      return { headers, secrets: [...secrets, auth.apiKey] };
     case 'aws_bedrock':
-      return signBedrockRequest({ url, method, headers, body, credentials: auth.credentials });
+      return {
+        headers: await signBedrockRequest({
+          url,
+          method,
+          headers,
+          body,
+          credentials: auth.credentials,
+        }),
+        secrets,
+      };
     case 'secure_proxy':
       throw new ByokEndpointRequestError('Endpoints do not support secure proxy credentials.');
   }
@@ -94,7 +117,13 @@ async function readTextWithLimit(response: Response): Promise<string> {
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
-export type ByokEndpointResponse = { status: number; ok: boolean; text: string };
+export type ByokEndpointResponse = {
+  status: number;
+  ok: boolean;
+  text: string;
+  /** The secret values sent with the request; an upstream may echo them in an error. */
+  secrets: readonly string[];
+};
 
 /**
  * Sends one request to an organization's endpoint with its credentials. The URL policy applies
@@ -116,7 +145,7 @@ export async function fetchByokEndpoint({
   const violation = await findUrlViolationMessage(url);
   if (violation) throw new ByokEndpointRequestError(violation);
 
-  const headers = await authorizedHeaders({ url, method, body, credentials });
+  const { headers, secrets } = await authorizedHeaders({ url, method, body, credentials });
   for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
 
   let response: Response;
@@ -141,7 +170,12 @@ export async function fetchByokEndpoint({
       'The endpoint responded with a redirect, which is not followed. Use the final URL.'
     );
   }
-  return { status: response.status, ok: response.ok, text: await readTextWithLimit(response) };
+  return {
+    status: response.status,
+    ok: response.ok,
+    text: await readTextWithLimit(response),
+    secrets,
+  };
 }
 
 /** The models the endpoint lists at `GET <base_url>/models`. */
@@ -176,7 +210,47 @@ export async function fetchByokEndpointModels({
   return parseByokEndpointModelsResponse(json);
 }
 
-/** A short, human-readable reason from an upstream error body. */
+const REDACTED = '[redacted]';
+const MAX_ERROR_DETAIL_LENGTH = 300;
+/** Bounds the work of redaction, which scales with the text length. */
+const MAX_REDACTED_TEXT_LENGTH = 4_000;
+const MIN_MASKED_PREFIX_LENGTH = 8;
+const MIN_MASKED_SUFFIX_LENGTH = 4;
+
+/** The values to remove for one secret: all of it, and the ends upstreams show of a masked key. */
+function secretFragments(secret: string): string[] {
+  const fragments = [secret];
+  if (secret.length <= MAX_REDACTED_TEXT_LENGTH / 16) {
+    for (let length = secret.length - 1; length >= MIN_MASKED_PREFIX_LENGTH; length--) {
+      fragments.push(secret.slice(0, length));
+    }
+    for (let length = secret.length - 1; length >= MIN_MASKED_SUFFIX_LENGTH; length--) {
+      fragments.push(secret.slice(-length));
+    }
+  }
+  return fragments;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** `text` without the secrets, or the beginning or end of one, as an upstream may echo them. */
+export function redactByokEndpointSecrets(text: string, secrets: readonly string[]): string {
+  const fragments = [...new Set(secrets.filter(Boolean).flatMap(secretFragments))].sort(
+    (a, b) => b.length - a.length
+  );
+  const bounded = text.slice(0, MAX_REDACTED_TEXT_LENGTH);
+  if (fragments.length === 0) return bounded;
+  // One pass, longest fragment first, so a replacement is never matched again.
+  const pattern = new RegExp(fragments.map(fragment => escapeRegExp(fragment)).join('|'), 'g');
+  return bounded.replace(pattern, REDACTED);
+}
+
+/**
+ * A short, human-readable reason from an upstream error body: the `error.message` of a JSON body,
+ * otherwise the beginning of the text. Credentials the upstream echoes are redacted.
+ */
 export function describeByokEndpointError(response: ByokEndpointResponse): string {
   let detail: string | undefined;
   try {
@@ -193,5 +267,10 @@ export function describeByokEndpointError(response: ByokEndpointResponse): strin
     detail = response.text.trim() || undefined;
   }
   const status = `HTTP ${response.status}`;
-  return detail ? `${status}: ${detail.slice(0, 300)}` : status;
+  if (!detail) return status;
+  const redacted = redactByokEndpointSecrets(detail, response.secrets).slice(
+    0,
+    MAX_ERROR_DETAIL_LENGTH
+  );
+  return `${status}: ${redacted}`;
 }

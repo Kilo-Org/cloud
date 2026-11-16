@@ -76,17 +76,72 @@ const e2eFetch =
   E2E_LATENCY_SESSION_MS > 0 || E2E_LATENCY_MESSAGES_MS > 0 ? e2eLatencyFetch : fetch;
 
 /**
- * Fetch wrapper that adds a control-plane deadline (15 s). When E2E latency
- * values are set the deadline is extended by the applicable delay so the
- * synthetic latency does not eat into the real request budget.
+ * The instant a request's control-plane budget started, carried from the auth
+ * header build to the fetch and removed there before the request reaches the
+ * wire.
+ *
+ * The header build is the one part of a tRPC call that can spend the budget
+ * before the request itself starts: while iOS protected data is unavailable it
+ * waits for the unlock (see `waitForProtectedData`). tRPC resolves the headers
+ * and only then calls the link's fetch, handing the two no shared per-request
+ * object, so the start instant travels in the headers. The deadline then covers
+ * the wait and the request together instead of the wait buying the request a
+ * second full deadline — a locked background run stays inside one
+ * `CONTROL_PLANE_DEADLINE_MS` rather than roughly twice it.
+ */
+const REQUEST_BUDGET_START_HEADER = 'x-kilo-request-budget-start';
+
+/**
+ * The budget left once `startedAt` is spent, or the full deadline when the
+ * stamp is absent or unreadable.
+ */
+function remainingBudgetMs(startedAt: string | null | undefined): number {
+  if (startedAt === null || startedAt === undefined) {
+    return CONTROL_PLANE_DEADLINE_MS;
+  }
+  const startedAtMs = Number(startedAt);
+  if (!Number.isFinite(startedAtMs)) {
+    return CONTROL_PLANE_DEADLINE_MS;
+  }
+  // A header build that spent the whole budget leaves nothing for the request:
+  // it fails as the timeout it is instead of being sent with a fresh deadline.
+  return Math.max(0, CONTROL_PLANE_DEADLINE_MS - (Date.now() - startedAtMs));
+}
+
+/**
+ * The budget a request has left once its header build is done, plus the headers
+ * to send — the same headers without the bookkeeping stamp. A request whose
+ * caller built its own headers carries no stamp and keeps the full deadline.
+ */
+function takeRequestBudget(headers: RequestInit['headers']) {
+  if (headers === undefined || Array.isArray(headers)) {
+    return { remainingMs: CONTROL_PLANE_DEADLINE_MS, headers };
+  }
+  if (headers instanceof Headers) {
+    const remainingMs = remainingBudgetMs(headers.get(REQUEST_BUDGET_START_HEADER));
+    const sent = new Headers(headers);
+    sent.delete(REQUEST_BUDGET_START_HEADER);
+    return { remainingMs, headers: sent };
+  }
+  const sent = Object.fromEntries(
+    Object.entries(headers).filter(([name]) => name !== REQUEST_BUDGET_START_HEADER)
+  );
+  return { remainingMs: remainingBudgetMs(headers[REQUEST_BUDGET_START_HEADER]), headers: sent };
+}
+
+/**
+ * Fetch wrapper that adds a control-plane deadline (15 s), less whatever the
+ * auth header build already spent of it. When E2E latency values are set the
+ * deadline is extended by the applicable delay so the synthetic latency does
+ * not eat into the real request budget.
  */
 export const deadlineFetch: typeof fetch = async (url, init) => {
   const delayMs = e2eLatencyForUrl(requestUrlString(url));
-  const totalDeadline = CONTROL_PLANE_DEADLINE_MS + delayMs;
+  const budget = takeRequestBudget(init?.headers);
   const response = await withDeadline(
-    totalDeadline,
+    budget.remainingMs + delayMs,
     async signal => {
-      const res = await e2eFetch(url, { ...init, signal });
+      const res = await e2eFetch(url, { ...init, headers: budget.headers, signal });
       return res;
     },
     init?.signal ?? undefined
@@ -217,7 +272,21 @@ async function waitForProtectedData(): Promise<void> {
   }
 }
 
-async function getAuthHeaders() {
+/**
+ * The links' header build: the request's headers plus the instant its
+ * control-plane budget began.
+ *
+ * The stamp is taken before {@link resolveAuthHeaders} can wait for the unlock,
+ * so `deadlineFetch` gives the request only what the wait left (see
+ * {@link REQUEST_BUDGET_START_HEADER}).
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const budgetStartMs = Date.now();
+  const headers = await resolveAuthHeaders();
+  return { ...headers, [REQUEST_BUDGET_START_HEADER]: String(budgetStartMs) };
+}
+
+async function resolveAuthHeaders() {
   let token = await getAuthTokenForRequest();
   if (!token && !isProtectedDataAvailable()) {
     // The keychain supplied no bearer because it refuses every read while the

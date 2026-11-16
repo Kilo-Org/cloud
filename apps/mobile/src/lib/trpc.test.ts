@@ -355,6 +355,33 @@ describe('getAuthHeaders', () => {
       vi.useRealTimers();
     }
   });
+
+  it('starts the request budget before the unlock wait it may spend', async () => {
+    // The wait is part of the request's own control-plane budget, not a free
+    // prelude to it: the header build records the instant it began, so the
+    // fetch that follows can be given only what the wait left.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const startedAtMs = Date.now();
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS - 5_000);
+      setProtectedDataAvailable(true);
+
+      const sent = await pending;
+      expect(sent).toMatchObject({ Authorization: 'Bearer stored-token' });
+      // Ten of the fifteen seconds went to the wait, and the stamp still names
+      // the start.
+      expect(Number(sent['x-kilo-request-budget-start'])).toBe(startedAtMs);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
 });
 
 const mockFetch = vi.fn();
@@ -412,6 +439,54 @@ describe('deadlineFetch', () => {
       vi.useRealTimers();
     }
   });
+
+  it.each([
+    [
+      'header record',
+      (startedAtMs: number) => ({ 'x-kilo-request-budget-start': String(startedAtMs) }),
+    ],
+    [
+      'Headers instance',
+      (startedAtMs: number) => new Headers({ 'x-kilo-request-budget-start': String(startedAtMs) }),
+    ],
+  ] as [string, (startedAtMs: number) => HeadersInit][])(
+    'gives a request only the budget its auth headers left (%s)',
+    async (_shape, buildHeaders) => {
+      vi.useFakeTimers();
+      try {
+        let sentHeaders: RequestInit['headers'] = undefined;
+        mockFetch.mockImplementation((_url, init?: RequestInit) => {
+          sentHeaders = init?.headers;
+          // Never settles: only the deadline can end this request.
+          return Promise.withResolvers<Response>().promise;
+        });
+        const { deadlineFetch } = await import('./trpc');
+        // The auth header build spent ten of the fifteen seconds waiting for
+        // the unlock before this request started, so the request gets the five
+        // left instead of a fresh full deadline.
+        const promise = deadlineFetch('https://api.example.com/api/trpc', {
+          headers: buildHeaders(Date.now() - 10_000),
+        });
+        const outcome = (async () => {
+          try {
+            await promise;
+            return 'resolved';
+          } catch (error) {
+            return error instanceof Error ? error.message : String(error);
+          }
+        })();
+
+        await vi.advanceTimersByTimeAsync(5_001);
+        await expect(Promise.race([outcome, Promise.resolve('still waiting')])).resolves.toBe(
+          'Request timed out after 5000ms'
+        );
+        // The bookkeeping entry is the client's: it never reaches the wire.
+        expect(new Headers(sentHeaders).get('x-kilo-request-budget-start')).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it('rejects immediately when the caller signal is already aborted', async () => {
     const { deadlineFetch } = await import('./trpc');

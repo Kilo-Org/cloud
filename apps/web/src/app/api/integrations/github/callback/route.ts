@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { APP_SHELL_EXPIRED_PATH, isAppShellPath } from '@/lib/app-shell/shell-paths';
 import { platform_integrations, type GitHubInstallState, type User } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
@@ -45,9 +47,12 @@ import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
+  checkInstallState,
   consumeInstallState,
+  consumeInstallStateWithoutSession,
   type InstallStateRejectionReason,
 } from '@/lib/integrations/github/install-state';
+import { verifyAppShellFlowToken } from '@/lib/integrations/oauth/app-shell-flow';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { isGitHubSharedInstallationAdmissionEnabled } from '@/lib/integrations/github/multiple-installations';
 
@@ -163,23 +168,57 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
  */
 export async function GET(request: NextRequest) {
   try {
-    // 1. Verify user authentication
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-    if (authFailedResponse) {
-      return NextResponse.redirect(new URL('/', APP_URL));
-    }
-
-    // 2. Extract parameters
+    // 1. Extract parameters
     const searchParams = request.nextUrl.searchParams;
     const installationId = searchParams.get('installation_id') ?? '';
     const setupAction = searchParams.get('setup_action');
     const rawState = searchParams.get('state');
     let rejectionReason: InstallStateRejectionReason | 'missing' = 'missing';
 
+    // 2. Identify the caller. An in-app-browser install has no web session: its
+    // identity is the single-use install state the app shell minted, which is
+    // bound to one user and carries the shell page as its return path. The
+    // install state is a bearer token, so it is not enough by itself — the
+    // callback also requires the flow cookie the shell's start route set for
+    // this exact state, which no other browser holds. Every other signed-out
+    // visitor keeps the existing redirect.
+    const { user: sessionUser } = await getUserFromAuth({ adminOnly: false });
+    let user = sessionUser;
+    let consumedByShell: GitHubInstallState | null = null;
+    if (!user) {
+      const flow = rawState ? verifyAppShellFlowToken(request, rawState) : null;
+      if (!rawState || !flow) {
+        return NextResponse.redirect(new URL('/', APP_URL));
+      }
+      // Preflight first so a tampered pair never burns the user's token.
+      const preflight = await checkInstallState(rawState, flow.userId);
+      if (preflight.status !== 'valid') {
+        return NextResponse.redirect(new URL('/', APP_URL));
+      }
+      const consumed = await consumeInstallStateWithoutSession(rawState);
+      if (
+        consumed.status !== 'success' ||
+        consumed.state.kilo_user_id !== flow.userId ||
+        !consumed.state.return_to ||
+        !isAppShellPath(consumed.state.return_to)
+      ) {
+        return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, APP_URL));
+      }
+      const stateUser = await findUserById(flow.userId);
+      if (!stateUser) {
+        return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, APP_URL));
+      }
+      user = stateUser;
+      consumedByShell = consumed.state;
+    }
+
     // 3. Atomically consume a database-backed install state before attempting
     // bot-link parsing. Database tokens are opaque and unambiguous once found.
     if (rawState) {
-      const result = await consumeInstallState(rawState, user.id);
+      const result =
+        consumedByShell !== null
+          ? ({ status: 'success', state: consumedByShell } as const)
+          : await consumeInstallState(rawState, user.id);
       if (result.status === 'success') {
         return await handleNewInstallFlow(request, user, result.state, installationId, setupAction);
       }

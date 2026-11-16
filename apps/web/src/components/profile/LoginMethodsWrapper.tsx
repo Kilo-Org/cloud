@@ -17,9 +17,19 @@ import { DiscordGuildStatus } from './DiscordGuildStatus';
 
 type LoginMethodsWrapperProps = {
   primaryEmail: string;
+  /**
+   * Where a provider link round trip returns, and whether marketing links stay
+   * out of the page. The app shell passes its own page and sets `shell`.
+   */
+  callbackPath?: string;
+  shell?: boolean;
 };
 
-export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) {
+export function LoginMethodsWrapper({
+  primaryEmail,
+  callbackPath,
+  shell = false,
+}: LoginMethodsWrapperProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [linkedProviderName, setLinkedProviderName] = useState<string | null>(null);
@@ -168,6 +178,7 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
           primaryEmail={primaryEmail}
           providers={providers}
           onError={setErrorMessage}
+          callbackPath={callbackPath}
         />
         <ConnectedAccountsCard
           providers={providers}
@@ -177,7 +188,7 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
         <PasskeysCard />
       </div>
 
-      <DiscordGuildStatus hasDiscordLinked={hasDiscordLinked} />
+      <DiscordGuildStatus hasDiscordLinked={hasDiscordLinked} shell={shell} />
     </div>
   );
 }

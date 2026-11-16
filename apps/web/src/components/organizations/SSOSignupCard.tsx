@@ -15,6 +15,11 @@ import { canManageOrganization } from '@kilocode/app-shared/organizations';
 type SSOSignupCardProps = {
   organization: OrganizationWithMembersResponse;
   role: OrganizationRole;
+  /**
+   * True inside the app shell, whose pages may not send the user to the
+   * marketing site: the setup button becomes a plain statement instead.
+   */
+  shell?: boolean;
 };
 
 // SSO Hooks following the same pattern as hooks.ts
@@ -38,7 +43,7 @@ function useGenerateAdminPortalLink() {
   );
 }
 
-export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
+export function SSOSignupCard({ organization, role, shell = false }: SSOSignupCardProps) {
   const organizationId = organization.id;
   const inheritedPolicy = organization.effectiveSsoPolicy.source === 'direct_parent';
   const {
@@ -237,20 +242,26 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
               Seamless user onboarding
             </div>
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="w-full">
-                <Button onClick={handleSetupSSO} disabled={role !== 'owner'} className="w-full">
-                  Set up SSO
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {role !== 'owner' && (
-              <TooltipContent>
-                <p>Contact your organization administrator to set up SSO</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
+          {shell ? (
+            <p className="text-muted-foreground text-sm">
+              SSO is not configured for this organization. Set it up from the Kilo web app.
+            </p>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="w-full">
+                  <Button onClick={handleSetupSSO} disabled={role !== 'owner'} className="w-full">
+                    Set up SSO
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {role !== 'owner' && (
+                <TooltipContent>
+                  <p>Contact your organization administrator to set up SSO</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          )}
         </div>
       </CardContent>
     </Card>

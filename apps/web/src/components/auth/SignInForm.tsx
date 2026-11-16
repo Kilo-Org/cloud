@@ -37,6 +37,11 @@ type SignInFormProps = {
   ssoMode?: boolean; // If true, triggers SSO-specific messaging and email input view
   accountMismatch?: SsoAccountMismatch; // SSO request for a different account than the session
   storybookInitialState?: SignInFormInitialState;
+  /**
+   * True inside the app shell, which may not link to any page outside it: the
+   * "back to sign in options" link is the one exit this form renders.
+   */
+  shell?: boolean;
 };
 
 export function SignInForm({
@@ -50,6 +55,7 @@ export function SignInForm({
   ssoMode = false,
   accountMismatch,
   storybookInitialState,
+  shell = false,
 }: SignInFormProps) {
   const flow = useSignInFlow({
     searchParams,
@@ -323,13 +329,16 @@ export function SignInForm({
                   />
 
                   {ssoMode ? (
-                    // In SSO mode, show a link back to the main sign-in page
-                    <Link
-                      href={buildNormalSignInHref(searchParams)}
-                      className="text-muted-foreground mt-6 inline-block text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
-                    >
-                      ← Back to sign in options
-                    </Link>
+                    // In SSO mode, show a link back to the main sign-in page,
+                    // except inside the app shell, which has no page to go back to.
+                    shell ? null : (
+                      <Link
+                        href={buildNormalSignInHref(searchParams)}
+                        className="text-muted-foreground mt-6 inline-block text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
+                      >
+                        ← Back to sign in options
+                      </Link>
+                    )
                   ) : !emailOnly && isSignUp ? (
                     // In regular email input mode (not emailOnly), show back button
                     <button

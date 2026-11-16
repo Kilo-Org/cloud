@@ -8,6 +8,14 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
+import {
+  APP_SHELL_FLOW_COOKIE,
+  appShellFlowCookieOptions,
+  createAppShellFlowToken,
+  verifyAppShellFlowToken,
+} from '@/lib/integrations/oauth/app-shell-flow';
 import { beginProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import {
   cancelProviderOAuthAttempt,
@@ -42,6 +50,17 @@ export type HandleStatefulOAuthConnectOptions = ResolveConnectOwnerOptions & {
   platform: StandardOAuthPlatform;
   source: string;
   buildOAuthUrl: (state: string) => string;
+};
+
+export type StartStatefulOAuthConnectOptions = HandleStatefulOAuthConnectOptions & {
+  /** The caller the flow is minted for; the shell supplies its own session. */
+  user: AuthenticatedOAuthUser;
+  /**
+   * Set when the app shell started the flow: the state says so, every redirect
+   * stays on the shell page that owns the connection, and the callback may
+   * identify the user from the state itself.
+   */
+  appShell?: boolean;
 };
 
 function ownerToOAuthStateOwner(owner: Owner): string {
@@ -190,68 +209,151 @@ export async function resolveOAuthConnectOwner(
 
 export async function handleStatefulPlatformOAuthConnect(
   request: NextRequest,
-  {
-    platform,
-    source,
-    buildOAuthUrl,
-    organizationRoles,
-    requireActiveOrganizationSubscription,
-  }: HandleStatefulOAuthConnectOptions
+  options: HandleStatefulOAuthConnectOptions
 ): Promise<Response> {
-  const organizationId = request.nextUrl.searchParams.get('organizationId');
-
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return redirectToSignInForOAuthConnect(request);
     }
-
-    const { owner } = await resolveOAuthConnectOwner(request, user, {
-      organizationRoles,
-      requireActiveOrganizationSubscription,
-    });
-    const returnToParam = request.nextUrl.searchParams.get('returnTo');
-    const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
-    const state = createOAuthState(ownerToOAuthStateOwner(owner), user.id, returnTo ?? undefined, {
-      provider: platform,
-      ...(platform === 'slack' || platform === 'linear' || platform === 'discord'
-        ? { purpose: 'provider_install' as const }
-        : {}),
-    });
-    if (platform === 'slack' || platform === 'linear' || platform === 'discord') {
-      await beginProviderOAuthAttempt({
-        actorUserId: user.id,
-        owner,
-        provider: platform,
-        state,
-        purpose: 'provider_install',
-      });
-    }
-
-    return NextResponse.redirect(buildOAuthUrl(state));
+    return await startStatefulOAuthConnect(request, { ...options, user });
   } catch (error) {
-    const denialCode = organizationAccessDenialErrorCode(error);
-    if (!denialCode) {
-      captureException(error, {
-        tags: {
-          endpoint: `${platform}/connect`,
-          source,
-        },
-        extra: {
-          organizationId,
-        },
-      });
-    }
+    return oauthConnectFailure(request, options.platform, error, options.source);
+  }
+}
 
+/**
+ * Starts the provider dance for an already-identified caller. The web entry
+ * point supplies the web session's user; the app shell supplies the shell
+ * session's user and `appShell`, which keeps the flow inside the shell.
+ */
+export async function startStatefulOAuthConnect(
+  request: NextRequest,
+  options: StartStatefulOAuthConnectOptions
+): Promise<Response> {
+  const { user, appShell, platform, buildOAuthUrl, organizationRoles, requireActiveOrganizationSubscription } =
+    options;
+  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  const { owner } = await resolveOAuthConnectOwner(request, user, {
+    organizationRoles,
+    requireActiveOrganizationSubscription,
+  });
+  const returnToParam = request.nextUrl.searchParams.get('returnTo');
+  const returnTo = appShell
+    ? buildAppShellIntegrationPath(platform, organizationId ?? undefined)
+    : returnToParam
+      ? validateReturnPath(returnToParam)
+      : null;
+  const state = createOAuthState(ownerToOAuthStateOwner(owner), user.id, returnTo ?? undefined, {
+    provider: platform,
+    appShell,
+    ...(platform === 'slack' || platform === 'linear' || platform === 'discord'
+      ? { purpose: 'provider_install' as const }
+      : {}),
+  });
+  if (platform === 'slack' || platform === 'linear' || platform === 'discord') {
+    await beginProviderOAuthAttempt({
+      actorUserId: user.id,
+      owner,
+      provider: platform,
+      state,
+      purpose: 'provider_install',
+    });
+  }
+
+  const response = NextResponse.redirect(buildOAuthUrl(state));
+  if (appShell) {
+    response.cookies.set(
+      APP_SHELL_FLOW_COOKIE,
+      createAppShellFlowToken({ userId: user.id, state }),
+      appShellFlowCookieOptions()
+    );
+  }
+  return response;
+}
+
+/** The redirect an aborted connect lands on: the shell page when the shell started it. */
+function oauthConnectFailure(
+  request: NextRequest,
+  platform: StandardOAuthPlatform,
+  error: unknown,
+  source: string
+): Response {
+  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  const denialCode = organizationAccessDenialErrorCode(error);
+  if (!denialCode) {
+    captureException(error, {
+      tags: {
+        endpoint: `${platform}/connect`,
+        source,
+      },
+      extra: {
+        organizationId,
+      },
+    });
+  }
+
+  if (request.nextUrl.pathname.startsWith(APP_SHELL_PREFIX)) {
+    const errorCode = denialCode ?? 'oauth_init_failed';
     return NextResponse.redirect(
       new URL(
-        buildIntegrationOAuthConnectErrorPath(
-          platform,
-          organizationId,
-          denialCode ?? 'oauth_init_failed'
+        appendIntegrationOAuthRedirectQuery(
+          buildAppShellIntegrationPath(platform, organizationId ?? undefined),
+          `error=${encodeURIComponent(errorCode)}`
         ),
-        APP_URL
+        request.url
       )
     );
   }
+
+  return NextResponse.redirect(
+    new URL(
+      buildIntegrationOAuthConnectErrorPath(
+        platform,
+        organizationId,
+        denialCode ?? 'oauth_init_failed'
+      ),
+      APP_URL
+    )
+  );
+}
+
+export type OAuthCallbackActor =
+  | { status: 'web_session'; user: AuthenticatedOAuthUser }
+  | { status: 'app_shell'; user: AuthenticatedOAuthUser }
+  | { status: 'unauthenticated' };
+
+/**
+ * Who is completing this OAuth callback.
+ *
+ * A web session wins when there is one. Otherwise only a state the app shell
+ * minted can identify the caller, and only together with the flow cookie the
+ * shell's connect route set for that exact state — so a callback URL on its own
+ * never acts as a login. Callbacks re-check organization membership from the
+ * database for whichever user this returns.
+ */
+export async function resolveOAuthCallbackActor(input: {
+  request: NextRequest;
+  rawState: string | null;
+  verified: { userId: string; appShell?: boolean } | null;
+}): Promise<OAuthCallbackActor> {
+  const { user } = await getUserFromAuth({ adminOnly: false });
+  if (user) return { status: 'web_session', user };
+
+  if (!input.verified?.appShell || !input.rawState) return { status: 'unauthenticated' };
+
+  const flow = verifyAppShellFlowToken(input.request, input.rawState);
+  if (!flow || flow.userId !== input.verified.userId) return { status: 'unauthenticated' };
+
+  const stateUser = await findUserById(input.verified.userId);
+  return stateUser ? { status: 'app_shell', user: stateUser } : { status: 'unauthenticated' };
+}
+
+/**
+ * Where a failed OAuth callback lands. A browser that carries the shell's flow
+ * cookie gets the shell's terminal page instead of the full web app's hub.
+ */
+export function oauthCallbackRedirectPath(request: NextRequest, webPath: string): string {
+  if (request.cookies.has(APP_SHELL_FLOW_COOKIE)) return `${APP_SHELL_PREFIX}/expired`;
+  return webPath;
 }

@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
@@ -17,6 +16,7 @@ import {
   upsertLinearInstallation,
 } from '@/lib/integrations/linear-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { oauthCallbackRedirectPath, resolveOAuthCallbackActor } from '@/lib/integrations/oauth/common';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { linkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';
@@ -196,30 +196,41 @@ async function handleLinearBotLinkCallback(
  */
 export async function handleLinearOAuthCallback(request: NextRequest) {
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-    if (authFailedResponse) {
-      return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
-    }
-
     const searchParams = request.nextUrl.searchParams;
-
-    // Bot-link branch: dispatch on the discriminator-bearing state shape
-    // BEFORE running install-flow logic. The two HMACs are over different
-    // payload shapes, so verifyOAuthState returns null for bot-link states
-    // and verifyLinearBotLinkState returns null for install states.
-    const botLinkState = verifyLinearBotLinkState(searchParams.get('state'));
-    if (botLinkState) {
-      return await handleLinearBotLinkCallback(request, user, botLinkState);
-    }
-
-    const code = searchParams.get('code');
     const state = searchParams.get('state');
-    const error = searchParams.get('error');
 
     // Verify the state signature once up-front so subsequent redirects can
     // reuse the resulting owner string without re-running HMAC verification
     // on every error branch.
     const verified = state ? verifyOAuthState(state) : null;
+
+    // The caller is the web session, or — only for a state the app shell
+    // minted — the shell's signed state plus its flow cookie.
+    const actor = await resolveOAuthCallbackActor({ request, rawState: state, verified });
+    if (actor.status === 'unauthenticated') {
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/users/sign_in'), APP_URL)
+      );
+    }
+    const user = actor.user;
+
+    // Bot-link branch: dispatch on the discriminator-bearing state shape
+    // BEFORE running install-flow logic. The two HMACs are over different
+    // payload shapes, so verifyOAuthState returns null for bot-link states
+    // and verifyLinearBotLinkState returns null for install states. A bot link
+    // is always a web flow, so it needs a real web session.
+    const botLinkState = verifyLinearBotLinkState(state);
+    if (botLinkState) {
+      if (actor.status !== 'web_session') {
+        return NextResponse.redirect(
+          new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+        );
+      }
+      return await handleLinearBotLinkCallback(request, user, botLinkState);
+    }
+
+    const code = searchParams.get('code');
+    const error = searchParams.get('error');
     const verifiedOwner = verified?.owner ?? null;
 
     if (error) {
@@ -268,7 +279,9 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
         extra: safeCallbackContext(searchParams),
       });
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
+      );
     }
 
     if (verified.userId !== user.id) {
@@ -277,7 +290,9 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
         extra: { stateUserId: verified.userId, sessionUserId: user.id },
       });
-      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+      );
     }
 
     const ownerStr = verified.owner;
@@ -288,7 +303,9 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
         extra: { code: '***', owner: ownerStr },
       });
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
+      );
     }
 
     // An organization connection carries a shared bot token and model policy, and
@@ -297,11 +314,15 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
     if (owner.type === 'org') {
       await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
-      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+      );
     }
 
     if (verified.provider !== PLATFORM.LINEAR || verified.purpose !== 'provider_install') {
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
+      );
     }
 
     if (

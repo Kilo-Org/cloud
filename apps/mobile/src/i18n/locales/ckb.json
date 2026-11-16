@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "هاوپێچێک هێشتا بار دەکرێت. بیبەرەوە بۆ ئەوەی بەبێ ئەو دەست پێبکەیت.",
       "modelMissingToStart": "بۆ دەستپێکردن مۆدێلێک هەڵبژێرە.",
       "staleRepositoryToStart": "ئەو کۆگایەی هەڵبژێردراوە چیتر بەردەست نییە. بۆ دەستپێکردن دووبارە کۆگایەک هەڵبژێرە.",
-      "connectProviderToStart": "کۆگاکان لە هەژمارێکی GitHub، GitLab، یان Bitbucket کە بەستراوەتەوە، دێن.",
       "promptPlaceholder": "حەز دەکەیت لەسەر چی کار بکەیت؟",
       "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن.",
       "prefillRepoAndModelUnavailable": "کۆگا و مۆدێلی سێشنی سەرەکی چیتر بەردەست نیین. لە خوارەوە هەڵیانبژێرە.",

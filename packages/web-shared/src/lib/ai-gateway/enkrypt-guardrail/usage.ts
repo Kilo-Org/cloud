@@ -24,10 +24,11 @@ import {
   scheduleOrganizationUsageAutoTopUp,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
+import { enqueueEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
 import {
-  enqueueEnkryptUsage,
-  type UsageEnqueueOutcome,
-} from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
+  unexpectedRejection,
+  type PublicationOutcome,
+} from '@kilocode/web-shared/lib/ai-gateway/usage-publication-outcome';
 import type {
   EnkryptUsageWrite,
   EnkryptUsageWriteInput,
@@ -115,22 +116,6 @@ const NOTHING_SENT_REASONS: ReadonlySet<string> = new Set([
   'publisher_not_configured',
   'registration_failed',
 ]);
-
-type PublicationOutcome =
-  | UsageEnqueueOutcome
-  | { kind: 'unavailable'; reason: 'unexpected_rejection'; errorName: string };
-
-/**
- * The publisher reports every transport failure as an outcome, so a rejection is unexpected and may
- * follow a send; it takes the same drop path, keeping only the error's name.
- */
-function unexpectedRejection(error: unknown): PublicationOutcome {
-  return {
-    kind: 'unavailable',
-    reason: 'unexpected_rejection',
-    errorName: error instanceof Error ? error.name : typeof error,
-  };
-}
 
 /** Without a request lifetime the publication would not be kept alive, so it is never started. */
 async function enqueueWithinRequestLifetime(

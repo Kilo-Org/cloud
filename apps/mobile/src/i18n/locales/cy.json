@@ -2358,7 +2358,6 @@
       "attachmentUploadingToStart": "Mae atodiad yn dal i uwchlwytho. Tynnwch ef i ddechrau hebdo.",
       "modelMissingToStart": "Dewiswch fodel i ddechrau.",
       "staleRepositoryToStart": "Nid yw'r ystorfa a ddewiswyd ar gael mwyach. Dewiswch ystorfa eto i ddechrau.",
-      "connectProviderToStart": "Mae ystorfeydd yn dod o gyfrif GitHub, GitLab neu Bitbucket wedi'i gysylltu.",
       "promptPlaceholder": "Ar beth hoffech chi weithio?",
       "couldNotLoadModels": "Methu llwytho'r modelau.",
       "prefillRepoAndModelUnavailable": "Nid yw ystorfa a model y sesiwn wreiddiol ar gael mwyach. Dewiswch rai eraill isod.",

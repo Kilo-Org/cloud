@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Faayiliin qabachiifame tokko ammas ol fe'amaa jira. Isaan malee jalqabuuf isa baasi.",
       "modelMissingToStart": "Jalqabuuf moodela filadhu.",
       "staleRepositoryToStart": "Kuusaan koodii filatame amma hin argamu. Jalqabuuf irra deebi'ii kuusaa koodii filadhu.",
-      "connectProviderToStart": "Kuusaawwan koodii herrega GitHub, GitLab yookiin Bitbucket walqabate irraa dhufu.",
       "promptPlaceholder": "Maal irratti hojjechuu barbaadda?",
       "couldNotLoadModels": "Moodeloota fe'uu hin danda'amne.",
       "prefillRepoAndModelUnavailable": "Kuusaan koodii fi moodeli turtii jalqabaa kana booda hin argaman. Gadiitti isaan filadhu.",

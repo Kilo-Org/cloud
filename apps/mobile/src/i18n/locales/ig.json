@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "A ka na-ebugote otu ihe mgbakwunye. Wepụ ya ka i malite na-enweghị ya.",
       "modelMissingToStart": "Họrọ ihe nlereanya iji malite.",
       "staleRepositoryToStart": "Ebe nchekwa koodu ahọpụtara adịkwaghị. Họrọ ebe nchekwa koodu ọzọ iji malite.",
-      "connectProviderToStart": "Ebe nchekwa koodu na-abịa site na akaụntụ GitHub, GitLab, ma ọ bụ Bitbucket ejikọrọ.",
       "promptPlaceholder": "Gịnị ka ị chọrọ ịrụ ọrụ na ya?",
       "couldNotLoadModels": "Enweghị ike ibudata ihe nlereanya.",
       "prefillRepoAndModelUnavailable": "Ebe nchekwa koodu na ihe nlereanya nke nnọkọ mbụ adịkwaghị. Họrọ ha n'okpuru.",

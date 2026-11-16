@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Lampiran masih dimuat naik. Buangnya untuk bermula tanpanya.",
       "modelMissingToStart": "Pilih model untuk bermula.",
       "staleRepositoryToStart": "Repositori yang dipilih tidak lagi tersedia. Pilih repositori sekali lagi untuk bermula.",
-      "connectProviderToStart": "Repositori datang daripada akaun GitHub, GitLab atau Bitbucket yang disambungkan.",
       "promptPlaceholder": "Apa yang ingin anda usahakan?",
       "couldNotLoadModels": "Tidak dapat memuatkan model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model sesi asal tidak lagi tersedia. Pilih repositori dan model lain di bawah.",

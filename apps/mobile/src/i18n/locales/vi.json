@@ -1647,7 +1647,6 @@
       "attachmentUploadingToStart": "Một tệp đính kèm vẫn đang tải lên. Gỡ nó để bắt đầu mà không có nó.",
       "modelMissingToStart": "Chọn một mô hình để bắt đầu.",
       "staleRepositoryToStart": "Kho mã đã chọn không còn khả dụng. Chọn lại một kho mã để bắt đầu.",
-      "connectProviderToStart": "Kho mã đến từ một tài khoản GitHub, GitLab hoặc Bitbucket đã kết nối.",
       "promptPlaceholder": "Bạn muốn làm gì?",
       "couldNotLoadModels": "Không thể tải danh sách mô hình.",
       "prefillRepoAndModelUnavailable": "Kho mã và mô hình của phiên gốc không còn dùng được. Hãy chọn kho mã và mô hình khác bên dưới.",

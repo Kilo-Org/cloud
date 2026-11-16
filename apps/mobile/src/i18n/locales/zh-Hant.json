@@ -1647,7 +1647,6 @@
       "attachmentUploadingToStart": "附件仍在上傳。移除它即可不帶附件開始。",
       "modelMissingToStart": "選取一個模型以開始。",
       "staleRepositoryToStart": "所選儲存庫已無法使用。請重新選取儲存庫以開始。",
-      "connectProviderToStart": "儲存庫來自已連結的 GitHub、GitLab 或 Bitbucket 帳戶。",
       "promptPlaceholder": "你想處理什麼？",
       "couldNotLoadModels": "無法載入模型。",
       "prefillRepoAndModelUnavailable": "原工作階段的儲存庫與模型已無法使用。請在下方重新選取。",

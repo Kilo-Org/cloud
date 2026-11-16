@@ -4,19 +4,18 @@ import {
   getOutputHeaders,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import {
-  computeOpenRouterCosts,
-  computeVercelCostFields,
-  extractVercelIsByok,
-} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import type { ReadResponseBody } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageContext,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
-  readResponseText,
+  responseReadErrorResponse,
+  rewriteBilledUsage,
+  rewriteJsonBody,
+  rewriteJsonResponse,
   rewriteResponseMetadata,
-  rewriteUsageCost,
+  rewriteUsageFromTokens,
   type ResponseMetadata,
   type ResponseUsage,
   type ResponseUsageContext,
@@ -55,20 +54,19 @@ export function rewriteUsageEndpointBody(body: UsageEndpointBody, context: Respo
     context.api_kind === 'audio_transcriptions' && usage?.is_byok == null && !context.is_free;
   if (typeof usage === 'object' && usage !== null && !Array.isArray(usage)) {
     const reported = { cost: usage.cost, is_byok: usage.is_byok, cost_details: usage.cost_details };
-    // Vercel reports its cost in the body's provider metadata when `usage.cost` is absent.
-    const gateway = (body.provider_metadata ?? body.providerMetadata)?.gateway;
-    const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
-    const costs: JustTheCostsUsageStats = {
-      ...(usage.cost == null && usage.is_byok == null && vercelCosts
-        ? vercelCosts
-        : computeOpenRouterCosts(usage, context.provider)),
-      inputTokens: usage.prompt_tokens ?? usage.input_tokens ?? 0,
-      outputTokens: usage.completion_tokens ?? usage.output_tokens ?? 0,
-      cacheHitTokens: 0,
-      cacheWriteTokens: 0,
-      is_byok: usage.is_byok ?? null,
-    };
-    rewriteUsageCost(usage, costs, context, gateway, vercelCosts);
+    const costs = rewriteUsageFromTokens({
+      usage,
+      context,
+      // Vercel reports its cost in the body's provider metadata when `usage.cost` is absent.
+      providerMetadata: body.provider_metadata ?? body.providerMetadata,
+      tokens: {
+        inputTokens: usage.prompt_tokens ?? usage.input_tokens ?? 0,
+        outputTokens: usage.completion_tokens ?? usage.output_tokens ?? 0,
+        cacheHitTokens: 0,
+        cacheWriteTokens: 0,
+      },
+      preferVercelCost: true,
+    });
     if (costIsUnverified && costs.cost_mUsd === costs.market_cost) {
       for (const [key, value] of Object.entries(reported)) {
         if (value === undefined) delete usage[key as keyof typeof reported];
@@ -77,6 +75,64 @@ export function rewriteUsageEndpointBody(body: UsageEndpointBody, context: Respo
     }
   }
   rewriteResponseMetadata(body, context);
+}
+
+/**
+ * Applies the rewrites of `rewriteUsageEndpointBody`, but reports the cost the ledger already
+ * billed instead of pricing the body again. Mutates `body`.
+ */
+export function rewriteBilledUsageEndpointBody(
+  body: UsageEndpointBody,
+  billed: Pick<JustTheCostsUsageStats, 'cost_mUsd'>,
+  context: ResponseUsageContext
+) {
+  const usage = body.usage;
+  if (typeof usage === 'object' && usage !== null && !Array.isArray(usage)) {
+    rewriteBilledUsage(usage, billed, context, body.provider_metadata ?? body.providerMetadata);
+  }
+  rewriteResponseMetadata(body, context);
+}
+
+/**
+ * Builds the response of an endpoint that is not streamed from the body its accounting already
+ * read, so the body is read and parsed once. A successful JSON body reports the requested model
+ * and the cost the ledger bills, or, when the accounting could not price it, the cost
+ * `rewriteUsageEndpointBody` computes. An error response, a body that is not JSON, and a JSON body
+ * that is not an object pass through.
+ */
+export async function rewriteBilledResponse_UsageEndpoint({
+  response,
+  body,
+  billed,
+  usageContext,
+  vercelRequestId,
+}: {
+  response: Response;
+  body: Promise<ReadResponseBody | null>;
+  billed: Promise<Pick<JustTheCostsUsageStats, 'cost_mUsd'> | null>;
+  usageContext: ResponseUsageContext;
+  vercelRequestId: string | null;
+}): Promise<NextResponse> {
+  const headers = getOutputHeaders(response);
+  const init = { status: response.status, statusText: response.statusText, headers };
+  let read: ReadResponseBody | null;
+  try {
+    read = await body;
+  } catch (error) {
+    const errorResponse = responseReadErrorResponse(error, headers, vercelRequestId, null);
+    if (!errorResponse) throw error;
+    return errorResponse;
+  }
+  if (!read) return new NextResponse(null, init);
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+    return new NextResponse(read.text, init);
+  }
+  // A pricing failure fails the ledger write, not the response.
+  const billedCosts = await billed.catch(() => null);
+  return rewriteJsonBody<UsageEndpointBody>(read, init, responseBody => {
+    if (billedCosts) rewriteBilledUsageEndpointBody(responseBody, billedCosts, usageContext);
+    else rewriteUsageEndpointBody(responseBody, usageContext);
+  });
 }
 
 /**
@@ -98,29 +154,12 @@ export async function rewriteModelResponse_UsageEndpoint({
   if (!response.headers.get('content-type')?.includes('application/json')) {
     return wrapInSafeNextResponse(response);
   }
-  const headers = getOutputHeaders(response);
-  const textResult = await readResponseText(response, headers, vercelRequestId, null, null);
-  if ('errorResponse' in textResult) return textResult.errorResponse;
-  const { text } = textResult;
-
-  const passThrough = () =>
-    new NextResponse(text, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    return passThrough();
-  }
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return passThrough();
-
-  rewriteUsageEndpointBody(body, usageContext);
-  return NextResponse.json(body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
+  return rewriteJsonResponse<UsageEndpointBody>({
+    response,
+    headers: getOutputHeaders(response),
+    vercelRequestId,
+    capture: null,
+    reasoningEffort: null,
+    mutate: body => rewriteUsageEndpointBody(body, usageContext),
   });
 }

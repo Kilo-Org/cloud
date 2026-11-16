@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Прилогот сè уште се прикачува. Отстранете го за да започнете без него.",
       "modelMissingToStart": "Изберете модел за да започнете.",
       "staleRepositoryToStart": "Избраниот репозиториум веќе не е достапен. Изберете репозиториум повторно за да започнете.",
-      "connectProviderToStart": "Репозиториумите доаѓаат од поврзана сметка на GitHub, GitLab или Bitbucket.",
       "promptPlaceholder": "На што сакаш да работиш?",
       "couldNotLoadModels": "Не успеа вчитувањето на моделите.",
       "prefillRepoAndModelUnavailable": "Репозиториумот и моделот од првичната сесија веќе не се достапни. Избери други подолу.",

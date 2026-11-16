@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "یک پیوست هنوز در حال بارگذاری است. برای شروع بدون آن، آن را حذف کنید.",
       "modelMissingToStart": "برای شروع یک مدل انتخاب کنید.",
       "staleRepositoryToStart": "مخزن انتخاب‌شده دیگر در دسترس نیست. برای شروع دوباره یک مخزن انتخاب کنید.",
-      "connectProviderToStart": "مخزن‌ها از یک حساب GitHub، GitLab یا Bitbucket که اتصالش برقرار است می‌آیند.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
       "prefillRepoAndModelUnavailable": "مخزن و مدل نشست اصلی دیگر در دسترس نیستند. از گزینه‌های زیر مخزن و مدل دیگری انتخاب کنید.",

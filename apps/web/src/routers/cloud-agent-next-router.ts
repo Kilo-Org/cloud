@@ -964,7 +964,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
   getBackgroundActivity: baseProcedure
     .input(z.object({ cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/) }).strict())
-    .output(backgroundActivityInventorySchema)
+    .output(backgroundActivityInventorySchema.nullable())
     .query(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
       const token = await createCloudAgentControlToken(ctx.user, ctx.headersList);

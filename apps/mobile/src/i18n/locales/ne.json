@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "एउटा संलग्न फाइल अझै अपलोड हुँदै छ। त्यो बिना सुरु गर्न यसलाई हटाउनुहोस्।",
       "modelMissingToStart": "सुरु गर्नको लागि मोडेल छान्नुहोस्।",
       "staleRepositoryToStart": "छानिएको रिपोजिटरी अब उपलब्ध छैन। सुरु गर्नको लागि फेरि रिपोजिटरी छान्नुहोस्।",
-      "connectProviderToStart": "रिपोजिटरीहरू जडान भएको GitHub, GitLab वा Bitbucket खाताबाट आउँछन्।",
       "promptPlaceholder": "तपाईं केमा काम गर्न चाहनुहुन्छ?",
       "couldNotLoadModels": "मोडेलहरू लोड गर्न सकिएन।",
       "prefillRepoAndModelUnavailable": "मूल सत्रको रिपोजिटरी र मोडेल अब उपलब्ध छैनन्। तल दुवै छान्नुहोस्।",

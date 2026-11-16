@@ -1723,7 +1723,6 @@
       "attachmentUploadingToStart": "لا يزال أحد المرفقات قيد الرفع. أزِل هذا المرفق لتبدأ من دونه.",
       "modelMissingToStart": "اختر نموذجًا للبدء.",
       "staleRepositoryToStart": "المستودع المحدد لم يعد متاحًا. اختر مستودعًا مرة أخرى للبدء.",
-      "connectProviderToStart": "تأتي المستودعات من حساب مرتبط على GitHub أو GitLab أو Bitbucket.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",
       "prefillRepoAndModelUnavailable": "لم يعد مستودع الجلسة الأصلية ونموذجها متاحين. اختر مستودعًا ونموذجًا أدناه.",

@@ -2232,7 +2232,6 @@
       "attachmentUploadingToStart": "Privitak se još prenosi. Ukloni ga da započneš bez njega.",
       "modelMissingToStart": "Odaberi model za početak.",
       "staleRepositoryToStart": "Odabrani repozitorij više nije dostupan. Ponovno odaberi repozitorij za početak.",
-      "connectProviderToStart": "Repozitoriji dolaze s povezanog GitHub, GitLab ili Bitbucket računa.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
       "prefillRepoAndModelUnavailable": "Repozitorij i model izvorne sesije više nisu dostupni. Odaberi ih u nastavku.",

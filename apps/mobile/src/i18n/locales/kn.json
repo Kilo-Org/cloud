@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "ಒಂದು ಲಗತ್ತು ಇನ್ನೂ ಅಪ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ. ಅದಿಲ್ಲದೆ ಪ್ರಾರಂಭಿಸಲು ಅದನ್ನು ತೆಗೆದುಹಾಕಿ.",
       "modelMissingToStart": "ಪ್ರಾರಂಭಿಸಲು ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "staleRepositoryToStart": "ಆಯ್ಕೆಮಾಡಿದ ರೆಪೊಸಿಟರಿ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಪ್ರಾರಂಭಿಸಲು ರೆಪೊಸಿಟರಿಯನ್ನು ಮತ್ತೆ ಆಯ್ಕೆಮಾಡಿ.",
-      "connectProviderToStart": "ರೆಪೊಸಿಟರಿಗಳು ಸಂಪರ್ಕಗೊಂಡ GitHub, GitLab ಅಥವಾ Bitbucket ಖಾತೆಯಿಂದ ಬರುತ್ತವೆ.",
       "promptPlaceholder": "ಯಾವ ಕೆಲಸ ಮಾಡಲು ಬಯಸುತ್ತೀರಿ?",
       "couldNotLoadModels": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "prefillRepoAndModelUnavailable": "ಮೂಲ ಸೆಶನ್‌ನ ರೆಪೊಸಿಟರಿ ಮತ್ತು ಮಾದರಿ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಕೆಳಗೆ ಅವುಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ.",

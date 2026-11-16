@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "ไฟล์แนบยังอัปโหลดไม่เสร็จ ลบออกเพื่อเริ่มต้นโดยไม่ใช้ไฟล์นี้",
       "modelMissingToStart": "เลือกโมเดลเพื่อเริ่มต้น",
       "staleRepositoryToStart": "คลังโค้ดที่เลือกไม่พร้อมใช้งานแล้ว เลือกคลังโค้ดอีกครั้งเพื่อเริ่มต้น",
-      "connectProviderToStart": "คลังโค้ดจะมาจากบัญชี GitHub, GitLab หรือ Bitbucket ที่เชื่อมต่ออยู่",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
       "prefillRepoAndModelUnavailable": "คลังโค้ดและโมเดลของเซสชันเดิมใช้ไม่ได้แล้ว เลือกคลังโค้ดและโมเดลใหม่ด้านล่าง",

@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Ana ci gaba da ɗora wani haɗe. Cire shi don farawa ba tare da shi ba.",
       "modelMissingToStart": "Zaɓi samfuri don farawa.",
       "staleRepositoryToStart": "Ma'ajiyar da aka zaɓa ba ta wanzuwa kuma. Sake zaɓar ma'ajiya don farawa.",
-      "connectProviderToStart": "Ma'ajiyoyi kan fito daga asusun GitHub, GitLab, ko Bitbucket da aka haɗa.",
       "promptPlaceholder": "Me kake so ka yi aiki a kai?",
       "couldNotLoadModels": "An kasa loda samfura.",
       "prefillRepoAndModelUnavailable": "An daina samun ma'ajiya da samfurin da aka yi amfani da su a zaman na asali. Zaɓi wasu a ƙasa.",

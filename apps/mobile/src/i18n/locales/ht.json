@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Yon fichye atache toujou ap voye. Retire l pou kòmanse san li.",
       "modelMissingToStart": "Chwazi yon modèl pou kòmanse.",
       "staleRepositoryToStart": "Depo ou chwazi a pa disponib ankò. Chwazi yon depo ankò pou kòmanse.",
-      "connectProviderToStart": "Depo yo soti nan yon kont GitHub, GitLab, oswa Bitbucket ki konekte.",
       "promptPlaceholder": "Sou ki sa ou ta renmen travay?",
       "couldNotLoadModels": "Nou pa t ka chaje modèl yo.",
       "prefillRepoAndModelUnavailable": "Depo ak modèl sesyon orijinal la pa disponib ankò. Chwazi lòt anba a.",

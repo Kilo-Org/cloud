@@ -283,6 +283,10 @@ describe('useManageRepositoryAccess', () => {
         data: { code: 'UNAUTHORIZED', authRequired: true },
       }),
     },
+    {
+      name: 'a failure that never reached the server',
+      error: new TypeError('Network request failed'),
+    },
   ]) {
     it(`keeps the settings-page fallback for ${failure.name}`, async () => {
       mocks.mintInstallState.mockRejectedValue(failure.error);

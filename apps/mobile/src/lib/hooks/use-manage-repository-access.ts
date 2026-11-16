@@ -12,7 +12,6 @@ import {
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
 import { trpcClient } from '@/lib/trpc';
-import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { isPersonal } from './use-code-reviewer';
 import { isInstallStateRefusal } from '@/components/security-agent/scope-entry-render';
@@ -156,19 +155,16 @@ export function useManageRepositoryAccess(
         // An organization's mint needs `OWNER`/`ADMIN` and refuses everyone else
         // with `UNAUTHORIZED`; a non-multi-installation organization that
         // already has an active GitHub App connection is refused with
-        // `FORBIDDEN`. Neither can mint a token, and the settings page still
-        // works without one: it mints its own state for the signed-in web user.
-        // A caller that presents refusals itself takes the role's answer here
-        // instead, and nothing opens — a refused role should not be handed a
-        // page it cannot act on. Everything else keeps the page fallback in
-        // place of a toast that would leave the control inert in exactly the
-        // state that needs a route to it.
+        // `FORBIDDEN`. A caller that presents refusals itself takes the role's
+        // answer — the one answer no page can act on — and opens nothing. Every
+        // other organization failure keeps the page fallback: the page mints its
+        // own state for the signed-in user, so a toast there would leave the
+        // control inert in exactly the state that still has a route to it.
         if (orgScope && onRoleRefused && isInstallStateRefusal(error)) {
           onRoleRefused();
           return false;
         }
-        const code = readTrpcErrorField(error, 'code');
-        if (orgScope && (code === 'FORBIDDEN' || code === 'UNAUTHORIZED')) {
+        if (orgScope) {
           const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope));
           return opened;
         }

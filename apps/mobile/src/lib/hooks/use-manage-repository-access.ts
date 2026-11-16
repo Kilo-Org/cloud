@@ -117,7 +117,9 @@ export function useManageRepositoryAccess(
     []
   );
 
-  const open = useCallback(async (): Promise<boolean> => {
+  type OpenResult = { kind: 'opened'; opened: boolean } | { kind: 'refused' };
+
+  const open = useCallback(async (): Promise<OpenResult> => {
     const label = t('codeReviewer.repos.repositoryAccess');
     const couldNotOpen = () => {
       toast.error(t('common.couldNotOpen', { label }));
@@ -132,15 +134,15 @@ export function useManageRepositoryAccess(
         return undefined;
       }
     };
-    const openSettings = async (url: string): Promise<boolean> => {
+    const openSettings = async (url: string): Promise<OpenResult> => {
       const wait = await launch(url);
       if (!wait) {
-        return false;
+        return { kind: 'opened', opened: false };
       }
       // A foreground return can settle the wait before the browser reports. A
       // launch that failed after that point never reached the catch above.
       reportLateLaunchFailure(wait, { onFailure: couldNotOpen });
-      return true;
+      return { kind: 'opened', opened: true };
     };
 
     if (platform === 'github') {
@@ -161,8 +163,10 @@ export function useManageRepositoryAccess(
         // own state for the signed-in user, so a toast there would leave the
         // control inert in exactly the state that still has a route to it.
         if (orgScope && onRoleRefused && isInstallStateRefusal(error)) {
-          onRoleRefused();
-          return false;
+          // Returning the answer instead of publishing it here lets the caller
+          // decide with its own attempt guard: a mint that was superseded by a
+          // newer tap must not answer for the control that tap now owns.
+          return { kind: 'refused' };
         }
         if (orgScope) {
           const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope));
@@ -170,13 +174,13 @@ export function useManageRepositoryAccess(
         }
         toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
       }
-      return false;
+      return { kind: 'opened', opened: false };
     }
     if (platform === 'gitlab') {
       const opened = await openSettings(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope));
       return opened;
     }
-    return false;
+    return { kind: 'opened', opened: false };
   }, [orgScope, onRoleRefused, platform, t]);
 
   const handlePress = useCallback(() => {
@@ -212,15 +216,27 @@ export function useManageRepositoryAccess(
     }, HANDOFF_WATCHDOG_MS);
     void (async () => {
       let opened = false;
+      let refused = false;
       try {
-        opened = await open();
+        const result = await open();
+        if (result.kind === 'refused') {
+          refused = true;
+        } else {
+          opened = result.opened;
+        }
       } finally {
         if (settle()) {
+          // The refusal publishes only when this attempt still owns the control:
+          // a mint answered after a newer tap superseded it must not retire the
+          // control that tap now owns.
+          if (refused) {
+            onRoleRefused?.();
+          }
           onReturn?.(opened);
         }
       }
     })();
-  }, [move, onOpen, onReturn, open]);
+  }, [move, onOpen, onReturn, onRoleRefused, open]);
 
   return platform === 'bitbucket' ? undefined : { handlePress, pending: phase.kind === 'busy' };
 }

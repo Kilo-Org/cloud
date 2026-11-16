@@ -1,6 +1,7 @@
 // The Manage-access control's busy state, its mint failures, and the return edge
 // its caller resyncs from. Mocks and mounting live in the helpers module, whose
 // import MUST stay first: it registers the module mocks while it is evaluated.
+/* eslint-disable max-lines -- one native fixture suite for the shared control; splitting it would duplicate the mocks */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -267,6 +268,64 @@ describe('useManageRepositoryAccess', () => {
     expect(mocks.launch).not.toHaveBeenCalled();
     expect(mocks.toastError).not.toHaveBeenCalled();
     expect(requireHook(resultRef).pending).toBe(false);
+  });
+
+  // A mint answered after a newer tap superseded its attempt must not answer for
+  // the control that tap now owns: the refusal publishes only while the attempt
+  // still owns the phase.
+  it('keeps a superseded refusal from retiring the newer attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      const pendingFirstMint = Promise.withResolvers<{ token: string }>();
+      mocks.mintInstallState.mockReturnValueOnce(pendingFirstMint.promise);
+      const onRoleRefused = vi.fn<() => void>();
+      const resultRef = mountHook('org_123', 'github', { onRoleRefused });
+
+      await act(async () => {
+        requireHook(resultRef).handlePress();
+        await Promise.resolve();
+      });
+
+      // The watchdog releases the control while the first mint is still open,
+      // and a newer tap starts the attempt that owns the phase now. Its own
+      // mint stays open on a second deferred answer.
+      const pendingSecondMint = Promise.withResolvers<{ token: string }>();
+      mocks.mintInstallState.mockReturnValueOnce(pendingSecondMint.promise);
+      await act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+      expect(requireHook(resultRef).pending).toBe(false);
+      await act(async () => {
+        requireHook(resultRef).handlePress();
+        await Promise.resolve();
+      });
+      expect(requireHook(resultRef).pending).toBe(true);
+
+      // The superseded mint then answers with the role refusal.
+      await act(async () => {
+        pendingFirstMint.reject(
+          Object.assign(new Error('mint refused'), { data: { code: 'UNAUTHORIZED' } })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(onRoleRefused).not.toHaveBeenCalled();
+
+      // The newer attempt still owns the phase; give it its own answer, which
+      // settles it normally (token → launch → return edge) and does not publish
+      // the superseded refusal.
+      await act(async () => {
+        pendingSecondMint.resolve({ token: 'install-token' });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await vi.waitFor(() => {
+        expect(requireHook(resultRef).pending).toBe(false);
+      });
+      expect(onRoleRefused).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // The single-installation guard and a lost session are not the role answer:

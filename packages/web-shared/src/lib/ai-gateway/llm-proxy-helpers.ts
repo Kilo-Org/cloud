@@ -676,6 +676,17 @@ export function paidModelAuthRequiredResponse() {
 // honor this header.
 const DO_NOT_RETRY_HEADERS = { 'x-should-retry': 'false' };
 
+export function gatewayAccountRateLimitResponse() {
+  return NextResponse.json(
+    {
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    },
+    { status: 429 }
+  );
+}
+
 export function anonymousFreeModelLimitResponse() {
   const message =
     'Sign up for free to continue and explore 500 other models. ' +

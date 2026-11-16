@@ -89,6 +89,22 @@ export type NotificationHistoryTarget = Readonly<{
 }>;
 
 /**
+ * Row kinds this app has no product for. A row of one of these can still be in
+ * a stored page — a build that recorded it wrote the row — so the list filters
+ * it out instead of drawing a notification whose tap can only fail.
+ */
+const RETIRED_HISTORY_PUSH_TYPES = {
+  'chat.message': true,
+  'instance-lifecycle': true,
+  'scheduled-action': true,
+} satisfies Record<string, true>;
+
+/** Whether a recorded row belongs to a kind this app has retired. */
+export function isRetiredHistoryRow(pushType: string): boolean {
+  return Object.hasOwn(RETIRED_HISTORY_PUSH_TYPES, pushType);
+}
+
+/**
  * Drop the `via=push` marker from a destination. The marker tags the landing
  * screen's analytics event as push-originated, and opening a row from the list
  * is not a push tap.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isRetiredHistoryRow,
   NOTIFICATION_HISTORY_FILTERS,
   notificationHistoryCopy,
   notificationHistoryFilters,
@@ -187,6 +188,21 @@ describe('notificationHistoryTarget', () => {
   it('reports no destination for a payload this app cannot parse or route', () => {
     expect(notificationHistoryTarget({ type: 'retired_kind' })).toBeNull();
     expect(notificationHistoryTarget({})).toBeNull();
+  });
+});
+
+describe('isRetiredHistoryRow', () => {
+  it.each(['chat.message', 'instance-lifecycle', 'scheduled-action'])(
+    'retires a %s row',
+    pushType => {
+      expect(isRetiredHistoryRow(pushType)).toBe(true);
+    }
+  );
+
+  it('keeps a kind the app still routes, and anything it does not know', () => {
+    expect(isRetiredHistoryRow('cloud_agent_session')).toBe(false);
+    expect(isRetiredHistoryRow('low_balance')).toBe(false);
+    expect(isRetiredHistoryRow('retired_kind')).toBe(false);
   });
 });
 

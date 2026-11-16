@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 import { pendingDeepLinkOptionsForData } from '@/lib/notification-actions';
 import {
+  isRetiredHistoryRow,
   NOTIFICATION_HISTORY_FILTERS,
   type NotificationHistoryFilter,
   notificationHistoryFilters,
@@ -107,8 +108,24 @@ export function NotificationHistoryScreen() {
   // `reconcileFirstPage` keeps the retained pages until page one arrives, so
   // the rows a refresh started from stay on screen (and scroll survives) even
   // when the refetch is paused by lost connectivity or fails.
-  const items = flatItems;
-  const hasListContent = items.length > 0 || query.isFetchNextPageError;
+  // A stored page can still hold a row of a kind this build retired; the list
+  // never draws one.
+  const items = useMemo(
+    () => flatItems.filter(row => !isRetiredHistoryRow(row.pushType)),
+    [flatItems]
+  );
+  // A page can be nothing but retired rows. Rather than report an account with
+  // no notifications, the list reads on until it has a row to show or the
+  // retention window ends.
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const readingOn = items.length === 0 && (hasNextPage || isFetchingNextPage);
+  const hasListContent = items.length > 0 || readingOn || query.isFetchNextPageError;
+  useEffect(() => {
+    if (authToken == null || items.length > 0 || !hasNextPage || isFetchingNextPage) {
+      return;
+    }
+    void fetchNextPage();
+  }, [authToken, fetchNextPage, hasNextPage, isFetchingNextPage, items.length]);
   // A query that is disabled never leaves `pending`; only a signed-in read can.
   // The push banner and the filter chips both sit above the list, so the list
   // waits for the same reads they do: a row that settles first is pushed down

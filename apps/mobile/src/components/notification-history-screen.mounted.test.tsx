@@ -325,6 +325,37 @@ describe('NotificationHistoryScreen', () => {
     expect(byType('Cell')).toHaveLength(1);
   });
 
+  it('hides a stored row of a retired kind and keeps the rows it still routes', async () => {
+    state.rows = [
+      row({
+        id: 'retired',
+        pushType: 'chat.message',
+        payload: { type: 'chat.message', conversationId: 'c1' },
+      }),
+      row({ id: 'kept' }),
+    ];
+    await mount();
+
+    expect(byType('Cell')).toHaveLength(1);
+    expect(byType('Pressable')).toHaveLength(1);
+  });
+
+  it('reads past a page of retired rows instead of reporting an empty account', async () => {
+    state.rows = [
+      row({
+        id: 'retired',
+        pushType: 'chat.message',
+        payload: { type: 'chat.message', conversationId: 'c1' },
+      }),
+      row({ id: 'kept' }),
+    ];
+    state.pageSize = 1;
+    await mount();
+
+    await waitFor(() => byType('Cell').length === 1);
+    expect(byType('EmptyState')).toHaveLength(0);
+  });
+
   it('states the retention window when the account has no rows', async () => {
     await mount();
 

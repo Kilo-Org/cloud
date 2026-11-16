@@ -411,8 +411,11 @@ function vertexByokModelNotFoundResponse(
   );
 }
 
+const NO_ALLOWED_PROVIDERS_MESSAGE_PREFIX =
+  'No allowed providers are available for the selected model.';
+
 const noAllowedProvidersErrorSchema = z.object({
-  message: z.literal('No allowed providers are available for the selected model.'),
+  message: z.string().startsWith(NO_ALLOWED_PROVIDERS_MESSAGE_PREFIX),
   code: z.literal(404),
   metadata: z.object({
     available_providers: z.array(z.string()),
@@ -421,7 +424,7 @@ const noAllowedProvidersErrorSchema = z.object({
 });
 
 const openRouterErrorResponseSchema = z.object({
-  error: noAllowedProvidersErrorSchema.optional(),
+  error: z.unknown().optional(),
   message: z.string().optional(),
   code: z.number().optional(),
   metadata: z.unknown().optional(),
@@ -440,7 +443,8 @@ async function providerNotAllowedResponse(provider: ProviderType, response: Resp
   const parsedBody = openRouterErrorResponseSchema.safeParse(body);
   if (!parsedBody.success) return undefined;
 
-  const upstreamError = parsedBody.data.error ?? parsedBody.data;
+  const upstreamError =
+    parsedBody.data.error === undefined ? parsedBody.data : parsedBody.data.error;
   if (!noAllowedProvidersErrorSchema.safeParse(upstreamError).success) return undefined;
 
   const error = 'No eligible provider can serve the selected model.';

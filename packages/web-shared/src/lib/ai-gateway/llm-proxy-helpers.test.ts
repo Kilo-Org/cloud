@@ -2493,6 +2493,65 @@ describe('makeErrorReadable', () => {
     expect((await result.json()).error_type).toBe('provider_not_allowed');
   });
 
+  it('recognizes the current OpenRouter error with explanatory text appended to the message', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message:
+            "No allowed providers are available for the selected model. Providers serving openai/gpt-4o-mini: azure, openai, but your request's provider.only preference permits only: nonexistent-provider-slug.",
+          code: 404,
+          metadata: {
+            available_providers: ['azure', 'openai'],
+            requested_providers: ['nonexistent-provider-slug'],
+            routing_funnel: [
+              { step: 'Initial Endpoints', endpoint_count: 3 },
+              { step: 'Filter by Regional Surcharge', endpoint_count: 2 },
+            ],
+            failed_routing_step: 'Filter by Allowed Providers',
+          },
+        },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'openrouter',
+      requestedModel: 'openai/gpt-4o-mini',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect(result?.status).toBe(404);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: 'provider_not_allowed',
+      message:
+        'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
+    });
+  });
+
+  it('recognizes an unwrapped error with appended message text', async () => {
+    const response = Response.json(
+      {
+        message: 'No allowed providers are available for the selected model. Extra detail.',
+        code: 404,
+        metadata: { available_providers: ['alibaba'], requested_providers: ['openai'] },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      provider: 'openrouter',
+      requestedModel: 'qwen/qwen3.7-plus',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect((await result?.json())?.error_type).toBe('provider_not_allowed');
+  });
+
   it('does not rewrite matching errors from other providers', async () => {
     const response = Response.json(
       {
@@ -2528,6 +2587,16 @@ describe('makeErrorReadable', () => {
         { status: 404 }
       ),
       Response.json({ message: 'Model not found', code: 404 }, { status: 404 }),
+      Response.json(
+        {
+          error: {
+            message: 'No endpoints found for this model.',
+            code: 404,
+            metadata: { available_providers: ['alibaba'], requested_providers: ['openai'] },
+          },
+        },
+        { status: 404 }
+      ),
       new Response('not json', { status: 404 }),
     ];
 

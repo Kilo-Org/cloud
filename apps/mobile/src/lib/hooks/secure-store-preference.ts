@@ -274,6 +274,14 @@ export function createSecureStorePreference<T>(options: {
     /** Resolves once every requested value has been written or dropped. */
     whenPersisted,
     /**
+     * Whether a choice is queued or on its way to disk. The language follow
+     * reads this to admit a device change only when no manual pick is
+     * in flight: a pick applies in memory before its write lands, so
+     * `getRequested()` alone misses the window where a pick has changed
+     * the active language but the preference still reads the old one.
+     */
+    hasPendingWrite: () => requested !== undefined || inFlight !== undefined,
+    /**
      * Persist-then-apply write for callers that must not change memory on a
      * failed disk write (e.g. language apply). Writes disk first; on success
      * updates memory and emits, returning true. On failure shows the existing

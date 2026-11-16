@@ -2,7 +2,7 @@ import { reloadAppAsync } from 'expo';
 import { I18nManager } from 'react-native';
 
 import { i18n } from '@/i18n';
-import { writeDirectionAttemptAsync } from '@/i18n/direction-attempt';
+import { readDirectionAttemptAsync, writeDirectionAttemptAsync } from '@/i18n/direction-attempt';
 import { type SupportedLanguage } from '@/i18n/languages';
 import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
 import { type LanguageReturnTarget, writeLanguageReturnTarget } from '@/i18n/return-target';
@@ -31,7 +31,12 @@ async function changeLanguageInPlace(language: string): Promise<boolean> {
   } catch {
     return false;
   }
-  return true;
+  // `changeLanguage` never rejects on a lazy-backend read failure: i18next
+  // records the failed entry and resolves, leaving the previous language
+  // active. The bundle set is the check that matters, and the direct-load
+  // recovery of `activateLanguage` must not run here — a router-level catalog
+  // failure is one the follow reports instead of repairing in place.
+  return i18n.hasResourceBundle(language, 'translation');
 }
 
 /** Re-localize the notification surfaces for the language now applied. */
@@ -45,6 +50,16 @@ function refreshLocalizedNotifications(): void {
 
 /** Force the native direction for `language` and reload the app. */
 async function restartForDirection(language: SupportedLanguage): Promise<ApplyLanguageOutcome> {
+  // A relaunch that does not take the direction reloads on every path that
+  // reaches here, including the language retry screen a failed cold start
+  // showed: a relaunch from there must not run twice for the same language
+  // while the device keeps answering with the previous direction. The record
+  // names the language the last launch relaunched for; when it matches the
+  // running attempt, refuse the relaunch (the in-place follow keeps the old
+  // language; the user-facing retry stays on the manual picker).
+  if ((await readDirectionAttemptAsync()) === language) {
+    return { kind: 'restart-skipped' };
+  }
   // Record the relaunch so a cold start that comes back with the previous
   // direction does not relaunch again for it; the cold start then shows the
   // retry screen instead of reloading forever. Without the record a relaunch

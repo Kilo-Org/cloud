@@ -36,6 +36,15 @@ export function getLanguagePreference(): LanguagePreference {
   return store.getRequested();
 }
 
+/**
+ * Whether a preference write is queued or in flight (`set`/`setAsync`
+ * target not yet persisted). The device-language follow reads it so a manual
+ * pick made while the follow applies wins.
+ */
+export function hasLanguagePreferenceWriteInFlight(): boolean {
+  return store.hasPendingWrite();
+}
+
 /** Apply and persist a preference; returns false when the disk write failed. */
 export async function setLanguagePreferenceAsync(
   preference: LanguagePreference,

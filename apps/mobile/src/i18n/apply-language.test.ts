@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   setLanguagePreferenceAsync: vi.fn(),
   writeLanguageReturnTarget: vi.fn(),
   writeDirectionAttemptAsync: vi.fn(),
+  readDirectionAttemptAsync: vi.fn(),
   renameAndroidNotificationChannels: vi.fn(),
   registerNeedsInputCategories: vi.fn(),
 }));
@@ -26,6 +27,7 @@ vi.mock('@/i18n/return-target', () => ({
 }));
 vi.mock('@/i18n/direction-attempt', () => ({
   writeDirectionAttemptAsync: mocks.writeDirectionAttemptAsync,
+  readDirectionAttemptAsync: mocks.readDirectionAttemptAsync,
 }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   setLanguagePreferenceAsync: mocks.setLanguagePreferenceAsync,
@@ -60,6 +62,7 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     mocks.reloadAppAsync.mockReset().mockResolvedValue(undefined);
     mocks.writeLanguageReturnTarget.mockReset().mockResolvedValue(undefined);
     mocks.writeDirectionAttemptAsync.mockReset().mockResolvedValue(true);
+    mocks.readDirectionAttemptAsync.mockReset().mockResolvedValue(null);
     mocks.syncRtl.mockReset().mockReturnValue(false);
     mocks.i18nManager.isRTL = false;
     mocks.i18nManager.forceRTL.mockReset();
@@ -125,6 +128,36 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     expect(mocks.reloadAppAsync).not.toHaveBeenCalled();
   });
 
+  it('skips the relaunch the running app already attempted for this language', async () => {
+    mocks.syncRtl.mockReturnValue(true);
+    mocks.readDirectionAttemptAsync.mockResolvedValue('ar');
+
+    await expect(applyLanguagePreference('ar', 'ar', 'login')).resolves.toEqual({
+      kind: 'restart-skipped',
+    });
+
+    // The record names the language the last launch relaunched for: forcing it
+    // again would loop on the retry screen while the platform keeps answering
+    // with the previous direction. No direction or reload runs.
+    expect(mocks.writeDirectionAttemptAsync).not.toHaveBeenCalled();
+    expect(mocks.syncRtl).not.toHaveBeenCalled();
+    expect(mocks.reloadAppAsync).not.toHaveBeenCalled();
+  });
+
+  it('relaunches for a different language than the recorded attempt', async () => {
+    mocks.syncRtl.mockReturnValue(true);
+    mocks.readDirectionAttemptAsync.mockResolvedValue('he');
+
+    await expect(applyLanguagePreference('ar', 'ar', 'login')).resolves.toEqual({
+      kind: 'restarting-rtl',
+    });
+
+    // A different language's attempt never counts for this one.
+    expect(mocks.writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
+    expect(mocks.syncRtl).toHaveBeenCalledWith('ar');
+    expect(mocks.reloadAppAsync).toHaveBeenCalled();
+  });
+
   it('registers nothing when the catalog fails to load', async () => {
     const changeLanguageSpy = vi
       .spyOn(i18n, 'changeLanguage')
@@ -136,5 +169,24 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
 
     expect(mocks.registerNeedsInputCategories).not.toHaveBeenCalled();
     changeLanguageSpy.mockRestore();
+  });
+
+  it('reports a catalog read that i18next swallowed instead of applied-ltr', async () => {
+    // The lazy backend hands a read failure to i18next, which records it and
+    // resolves, so the swallowed failure must be read off the bundle set.
+    // The production call awaits the promise, never the TFunction value it
+    // returns, so an undefined resolve keeps the spy's real signature.
+    const changeLanguageSpy = vi
+      .spyOn(i18n, 'changeLanguage')
+      .mockResolvedValueOnce(undefined as never);
+    const hasBundleSpy = vi.spyOn(i18n, 'hasResourceBundle').mockReturnValueOnce(false);
+
+    await expect(applyLanguagePreference('es', 'es', 'login')).resolves.toEqual({
+      kind: 'catalog-failed',
+    });
+
+    expect(mocks.registerNeedsInputCategories).not.toHaveBeenCalled();
+    changeLanguageSpy.mockRestore();
+    hasBundleSpy.mockRestore();
   });
 });

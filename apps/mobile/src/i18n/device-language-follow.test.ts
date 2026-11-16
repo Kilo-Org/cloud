@@ -7,12 +7,14 @@ const mocks = vi.hoisted(() => ({
   applyDeviceLanguage: vi.fn(),
   captureException: vi.fn(),
   preference: 'device' as 'device' | 'es',
+  writeInFlight: false,
 }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: mocks.captureException }));
 vi.mock('@/i18n/apply-language', () => ({ applyDeviceLanguage: mocks.applyDeviceLanguage }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   getLanguagePreference: () => mocks.preference,
+  hasLanguagePreferenceWriteInFlight: () => mocks.writeInFlight,
 }));
 
 /**
@@ -31,6 +33,7 @@ async function drainFollowQueue(): Promise<void> {
 describe('requestDeviceLanguageFollow', () => {
   beforeEach(async () => {
     mocks.preference = 'device';
+    mocks.writeInFlight = false;
     mocks.applyDeviceLanguage.mockReset();
     mocks.applyDeviceLanguage.mockImplementation(async (language: string) => {
       await i18n.changeLanguage(language);
@@ -132,5 +135,50 @@ describe('requestDeviceLanguageFollow', () => {
     });
 
     expect(mocks.applyDeviceLanguage.mock.calls).toEqual([['es'], ['fr']]);
+  });
+
+  it('applies nothing while a manual preference write is in flight', async () => {
+    // A manual in-place pick changes the i18n instance before its preference
+    // write lands, so the stored value can still read `device` here.
+    mocks.writeInFlight = true;
+
+    requestDeviceLanguageFollow('es');
+    await drainFollowQueue();
+
+    expect(mocks.applyDeviceLanguage).not.toHaveBeenCalled();
+    expect(i18n.resolvedLanguage).toBe('en');
+  });
+
+  it('admits a queued request once the pick in flight has persisted', async () => {
+    mocks.writeInFlight = true;
+    requestDeviceLanguageFollow('es');
+    await drainFollowQueue();
+    expect(mocks.applyDeviceLanguage).not.toHaveBeenCalled();
+
+    // The pick's write lands (still on `device`, because the pick was made by
+    // a screen that then reverted) and the follow's queued request runs.
+    mocks.writeInFlight = false;
+    requestDeviceLanguageFollow('es');
+    await vi.waitFor(() => {
+      expect(mocks.applyDeviceLanguage).toHaveBeenCalledWith('es');
+    });
+    expect(i18n.resolvedLanguage).toBe('es');
+  });
+
+  it('admits nothing when the apply lands on a pick made while it ran', async () => {
+    // The apply's own mock lands the language, then the person picks a
+    // different one whose preference write has already committed.
+    mocks.applyDeviceLanguage.mockImplementation(async (picked: string) => {
+      await i18n.changeLanguage(picked);
+      return { kind: 'applied-ltr' };
+    });
+
+    requestDeviceLanguageFollow('es');
+    await vi.waitFor(() => {
+      expect(mocks.applyDeviceLanguage).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.captureException).not.toHaveBeenCalled();
+    expect(i18n.resolvedLanguage).toBe('es');
   });
 });

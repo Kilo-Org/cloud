@@ -3,7 +3,10 @@ import * as Sentry from '@sentry/react-native';
 import { i18n } from '@/i18n';
 import { type ApplyLanguageOutcome } from '@/i18n/apply-language';
 import { type SupportedLanguage } from '@/i18n/languages';
-import { getLanguagePreference } from '@/lib/hooks/use-language-preference';
+import {
+  getLanguagePreference,
+  hasLanguagePreferenceWriteInFlight,
+} from '@/lib/hooks/use-language-preference';
 
 /** The outcomes a follow cannot recover from; the current language stays. */
 function isFollowFailure(outcome: ApplyLanguageOutcome): boolean {
@@ -23,8 +26,16 @@ function reportFailedFollow(outcome: ApplyLanguageOutcome, language: SupportedLa
 
 async function followDeviceLanguage(language: SupportedLanguage): Promise<void> {
   // Re-read the admission once the queue reaches this request: a manual pick or
-  // an earlier apply may have landed while it waited.
-  if (getLanguagePreference() !== 'device' || i18n.resolvedLanguage === language) {
+  // an earlier apply may have landed while it waited. A manual in-place pick
+  // changes the i18n instance before its preference write lands, so the stored
+  // value can still read `device` while the running language is already the
+  // pick: the pending-write check closes that window, at dequeue (below) and
+  // before the queue records the request.
+  if (
+    getLanguagePreference() !== 'device' ||
+    hasLanguagePreferenceWriteInFlight() ||
+    i18n.resolvedLanguage === language
+  ) {
     return;
   }
   // Loaded here, not at module scope: the apply module imports the `expo`
@@ -35,6 +46,13 @@ async function followDeviceLanguage(language: SupportedLanguage): Promise<void> 
   const outcome = await applyDeviceLanguage(language);
   if (isFollowFailure(outcome)) {
     reportFailedFollow(outcome, language);
+  }
+  // The apply result must not stand when the person picked a language while it
+  // ran: the pick changed the i18n instance (a manual pick applies in place
+  // before it persists) or overwrote the stored preference. When either landed,
+  // the pick won and the device follow drops the outcome silently.
+  if (getLanguagePreference() !== 'device') {
+    return;
   }
 }
 
@@ -50,7 +68,11 @@ let queuedApply: Promise<void> = Promise.resolve();
  * follow is reported and keeps the current language.
  */
 export function requestDeviceLanguageFollow(language: SupportedLanguage): void {
-  if (getLanguagePreference() !== 'device' || i18n.resolvedLanguage === language) {
+  if (
+    getLanguagePreference() !== 'device' ||
+    hasLanguagePreferenceWriteInFlight() ||
+    i18n.resolvedLanguage === language
+  ) {
     return;
   }
 

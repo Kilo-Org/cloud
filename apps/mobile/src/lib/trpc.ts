@@ -80,14 +80,16 @@ const e2eFetch =
  * header build to the fetch and removed there before the request reaches the
  * wire.
  *
- * The header build is the one part of a tRPC call that can spend the budget
- * before the request itself starts: while iOS protected data is unavailable it
- * waits for the unlock (see `waitForProtectedData`). tRPC resolves the headers
- * and only then calls the link's fetch, handing the two no shared per-request
- * object, so the start instant travels in the headers. The deadline then covers
- * the wait and the request together instead of the wait buying the request a
- * second full deadline — a locked background run stays inside one
- * `CONTROL_PLANE_DEADLINE_MS` rather than roughly twice it.
+ * The unlock wait is the only part of a tRPC call that spends this budget
+ * before the request itself starts (see `waitForProtectedData`), so only a
+ * build that waited carries the stamp. The header build also runs a proactive
+ * refresh and a cold expiry read, but each of those has its own deadline: a
+ * slow refresh must not eat the budget of the request that follows it. tRPC
+ * resolves the headers and only then calls the link's fetch, handing the two no
+ * shared per-request object, so the wait's start travels in the headers. The
+ * deadline then covers the wait and the request together instead of the wait
+ * buying the request a second full deadline — a locked background run stays
+ * inside one `CONTROL_PLANE_DEADLINE_MS` rather than roughly twice it.
  */
 const REQUEST_BUDGET_START_HEADER = 'x-kilo-request-budget-start';
 
@@ -273,32 +275,42 @@ async function waitForProtectedData(): Promise<void> {
 }
 
 /**
- * The links' header build: the request's headers plus the instant its
- * control-plane budget began.
- *
- * The stamp is taken before {@link resolveAuthHeaders} can wait for the unlock,
- * so `deadlineFetch` gives the request only what the wait left (see
- * {@link REQUEST_BUDGET_START_HEADER}).
+ * Adds the request's budget stamp when the build spent an unlock wait: the
+ * fetch that follows then gets only what the wait left. A build that did not
+ * wait stamps nothing, so its request keeps the whole deadline.
  */
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const budgetStartMs = Date.now();
-  const headers = await resolveAuthHeaders();
-  return { ...headers, [REQUEST_BUDGET_START_HEADER]: String(budgetStartMs) };
+function withUnlockWaitStamp(headers: Record<string, string>, unlockWaitStartMs: number | null) {
+  if (unlockWaitStartMs === null) {
+    return headers;
+  }
+  return { ...headers, [REQUEST_BUDGET_START_HEADER]: String(unlockWaitStartMs) };
 }
 
-async function resolveAuthHeaders() {
+/**
+ * The links' header build.
+ *
+ * The budget stamp is taken only at the unlock wait: a proactive refresh, a
+ * cold expiry read or anything else this build does must not be charged to the
+ * request that follows it (see {@link REQUEST_BUDGET_START_HEADER}).
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
   let token = await getAuthTokenForRequest();
+  let unlockWaitStartMs: number | null = null;
   if (!token && !isProtectedDataAvailable()) {
     // The keychain supplied no bearer because it refuses every read while the
     // device is locked: wait for the unlock rather than send a request the
     // server would refuse as unauthenticated, then read the token again. A
     // held token never takes this path, so an already-authenticated request
     // is not delayed.
+    unlockWaitStartMs = Date.now();
     await waitForProtectedData();
     token = await getAuthTokenForRequest();
   }
   if (!token) {
-    return { ...buildAuthHeaders(token), ...buildClientMetadataHeaders() };
+    return withUnlockWaitStamp(
+      { ...buildAuthHeaders(token), ...buildClientMetadataHeaders() },
+      unlockWaitStartMs
+    );
   }
 
   // Proactive refresh: if the token is expiring within the margin, rotate
@@ -322,10 +334,16 @@ async function resolveAuthHeaders() {
   ) {
     await performRefresh();
     const refreshedToken = getActiveToken()?.token ?? (await getAuthTokenForRequest());
-    return { ...buildAuthHeaders(refreshedToken), ...buildClientMetadataHeaders() };
+    return withUnlockWaitStamp(
+      { ...buildAuthHeaders(refreshedToken), ...buildClientMetadataHeaders() },
+      unlockWaitStartMs
+    );
   }
 
-  return { ...buildAuthHeaders(currentToken), ...buildClientMetadataHeaders() };
+  return withUnlockWaitStamp(
+    { ...buildAuthHeaders(currentToken), ...buildClientMetadataHeaders() },
+    unlockWaitStartMs
+  );
 }
 
 const singleLink = httpLink({

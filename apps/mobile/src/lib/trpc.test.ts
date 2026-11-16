@@ -84,6 +84,7 @@ vi.mock('@/lib/storage-keys', () => ({
   ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',
   ORGANIZATION_STORAGE_KEY: 'organization',
+  REFRESH_TOKEN_KEY: 'auth-refresh-token',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
 }));
 
@@ -358,8 +359,8 @@ describe('getAuthHeaders', () => {
 
   it('starts the request budget before the unlock wait it may spend', async () => {
     // The wait is part of the request's own control-plane budget, not a free
-    // prelude to it: the header build records the instant it began, so the
-    // fetch that follows can be given only what the wait left.
+    // prelude to it: the header build records the instant the wait began, so
+    // the fetch that follows can be given only what the wait left.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const headers = await loadHeaders();
@@ -380,6 +381,60 @@ describe('getAuthHeaders', () => {
     } finally {
       setProtectedDataAvailable(true);
       vi.useRealTimers();
+    }
+  });
+
+  it('leaves the request budget whole across a slow proactive refresh', async () => {
+    // A refresh has its own deadline and is no part of the request's: the
+    // build that waits ten seconds on it must not hand the request five.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('auth-refresh-token', 'stored-refresh');
+    // Inside the five-minute refresh margin, so the build rotates first.
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 60_000));
+    const fetchMock = vi.fn();
+    fetchMock.mockImplementationOnce(async () => {
+      // A refresh that takes ten seconds of the request's fifteen.
+      const refreshDelay = Promise.withResolvers<undefined>();
+      setTimeout(refreshDelay.resolve, 10_000);
+      await refreshDelay.promise;
+      return Response.json({ token: 'refreshed-token', refreshToken: 'r2', expiresIn: 3600 });
+    });
+    // The request that follows never settles: only its deadline can end it.
+    fetchMock.mockImplementation(() => Promise.withResolvers<Response>().promise);
+    // Stubbed before the module graph loads, so the link's captured fetch is
+    // the same mock the refresh uses.
+    vi.stubGlobal('fetch', fetchMock);
+    const headers = await loadHeaders();
+    const { deadlineFetch } = await import('./trpc');
+    vi.useFakeTimers();
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(10_000);
+      const sent = await pending;
+      expect(sent).toMatchObject({ Authorization: 'Bearer refreshed-token' });
+      // The refresh spent its ten seconds, not the request's: no stamp means
+      // the fetch gets the whole deadline.
+      expect(sent).not.toHaveProperty('x-kilo-request-budget-start');
+
+      const request = deadlineFetch('https://api.example.com/api/trpc', { headers: sent });
+      const outcome = (async () => {
+        try {
+          await request;
+          return 'resolved';
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+      })();
+      // Ten seconds in, the request is still inside its own budget.
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expect(Promise.race([outcome, Promise.resolve('still waiting')])).resolves.toBe(
+        'still waiting'
+      );
+      await vi.advanceTimersByTimeAsync(5_001);
+      await expect(outcome).resolves.toBe('Request timed out after 15000ms');
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
     }
   });
 });

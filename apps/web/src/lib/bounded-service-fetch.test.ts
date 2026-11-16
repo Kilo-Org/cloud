@@ -6,6 +6,7 @@ import {
   CONTROL_PLANE_UPSTREAM_BUDGET_MS,
   ServiceFetchTimeoutError,
   fetchWithinBudget,
+  readJsonWithinBudget,
 } from './bounded-service-fetch';
 import { CONTROL_PLANE_PROCEDURE_BUDGET_MS } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
@@ -151,5 +152,65 @@ describe('fetchWithinBudget', () => {
     expect(rendered).not.toContain('?session=');
     expect(rendered).not.toContain(INTERNAL_SERVICE_TOKEN);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('readJsonWithinBudget', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  test('reads a body the upstream delivers inside the remaining budget', async () => {
+    const response = new Response(JSON.stringify({ sessions: [] }), { status: 200 });
+
+    await expect(readJsonWithinBudget(response, 1_000)).resolves.toEqual({ sessions: [] });
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('abandons and cancels a body that never arrives', async () => {
+    // Headers only: the upstream accepted the connection and then stalled.
+    const cancel = jest.fn(async () => undefined);
+    const response = {
+      json: () => new Promise<never>(() => {}),
+      body: { locked: false, cancel },
+    } as unknown as Response;
+
+    const outcome = readJsonWithinBudget(response, 500).catch((error: unknown) => error);
+
+    let settledEarly = false;
+    void outcome.then(() => {
+      settledEarly = true;
+    });
+
+    await jest.advanceTimersByTimeAsync(499);
+    expect(settledEarly).toBe(false);
+
+    await jest.advanceTimersByTimeAsync(1);
+
+    const error = await outcome;
+    expect(error).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect((error as ServiceFetchTimeoutError).budgetMs).toBe(500);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('leaves a body a reader already holds alone', async () => {
+    // Cancelling a locked stream throws, so a mid-read body is abandoned.
+    const cancel = jest.fn(async () => undefined);
+    const response = {
+      json: () => new Promise<never>(() => {}),
+      body: { locked: true, cancel },
+    } as unknown as Response;
+
+    const outcome = readJsonWithinBudget(response, 100).catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(100);
+
+    expect(await outcome).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect(cancel).not.toHaveBeenCalled();
   });
 });

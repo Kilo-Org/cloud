@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { timestampToIso } from '@kilocode/app-shared/utils';
 import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
-import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import { fetchWithinBudget, readJsonWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -471,7 +471,10 @@ export async function listActiveSessions({
       // `SESSION_INGEST_READ_BUDGET_MS` and rejects with
       // `ServiceFetchTimeoutError`, which the catch below already degrades
       // exactly as any other upstream failure does. The cap leaves the merge
-      // its own share of the answer's budget.
+      // its own share of the answer's budget, and the body is read inside what
+      // the headers left of it: a worker that sends headers and then stalls the
+      // body must not hold the answer open either.
+      const readDeadlineAt = Date.now() + SESSION_INGEST_READ_BUDGET_MS;
       const response = await fetchWithinBudget(
         url,
         {
@@ -498,7 +501,7 @@ export async function listActiveSessions({
         // runs".
         upstreamReadFailed = true;
       } else {
-        const raw = await response.json();
+        const raw = await readJsonWithinBudget(response, readDeadlineAt - Date.now());
         parsed = activeSessionsResponseSchema.parse(raw);
       }
     } catch (error) {

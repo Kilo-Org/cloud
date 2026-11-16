@@ -117,3 +117,39 @@ export async function fetchWithinBudget(
     }
   });
 }
+
+/**
+ * Read a bounded fetch's JSON body inside the budget the fetch already spent
+ * part of.
+ *
+ * {@link fetchWithinBudget} settles as soon as the upstream answers with its
+ * headers and then disarms its timer, so an upstream that accepts the
+ * connection and stalls the body would hold the caller open with no bound at
+ * all. The body is therefore read under what is left of the budget and the read
+ * is abandoned when that runs out, rejecting with the same
+ * {@link ServiceFetchTimeoutError} the fetch raises so one caller handles both.
+ */
+export async function readJsonWithinBudget<T = unknown>(
+  response: Response,
+  budgetMs: number
+): Promise<T> {
+  const budgetError = new ServiceFetchTimeoutError(budgetMs);
+  const expired = Promise.withResolvers<never>();
+  const timer = setTimeout(
+    () => {
+      // A stream a reader already holds cannot be cancelled, so a body that is
+      // mid-read is simply abandoned: either way the caller stops waiting.
+      if (response.body && !response.body.locked) {
+        void response.body.cancel().catch(() => undefined);
+      }
+      expired.reject(budgetError);
+    },
+    Math.max(0, budgetMs)
+  );
+
+  try {
+    return await Promise.race([response.json() as Promise<T>, expired.promise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}

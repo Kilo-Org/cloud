@@ -17,6 +17,13 @@ const liveSessions = [{ id: 'live-1', status: 'busy', title: 'Live', connectionI
  */
 const ANSWER_BUDGET_MS = 7_000;
 
+/**
+ * The session-ingest read's share of that budget
+ * (`SESSION_INGEST_READ_BUDGET_MS` in the module under test), which covers the
+ * response body as well as the headers.
+ */
+const READ_BUDGET_MS = 4_500;
+
 const limitCalls = jest.fn();
 
 /**
@@ -63,11 +70,14 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateBoundedInternalServiceToken: () => 'test-token',
 }));
 
+const workerAnswer = () => ({ ok: true, json: async () => ({ sessions: liveSessions }) });
+const mockFetchWithinBudget = jest.fn(async () => workerAnswer());
+
 jest.mock('@/lib/bounded-service-fetch', () => ({
-  fetchWithinBudget: jest.fn(async () => ({
-    ok: true,
-    json: async () => ({ sessions: liveSessions }),
-  })),
+  // The real body reader stays in place: the answer must bound the body read
+  // as well as the fetch, so the tests drive it through the real helper.
+  ...jest.requireActual('@/lib/bounded-service-fetch'),
+  fetchWithinBudget: (...args: unknown[]) => mockFetchWithinBudget(...args),
 }));
 
 jest.mock('@/lib/session-associated-pr', () => {
@@ -104,6 +114,7 @@ beforeEach(() => {
   selectMock.mockReset();
   selectMock.mockImplementation(() => fakeQuery('stall'));
   limitCalls.mockClear();
+  mockFetchWithinBudget.mockClear();
 });
 
 describe('listActiveSessions budgets', () => {
@@ -161,6 +172,40 @@ describe('listActiveSessions budgets', () => {
         '[active-sessions] cloud candidates db query failed:',
         expect.anything()
       );
+    } finally {
+      warn.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it('answers a worker read whose body never arrives as retryable', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      // Headers arrived, the body never does. The read's own budget must end
+      // the wait, or this answer hangs past the point the caller can use it.
+      mockFetchWithinBudget.mockResolvedValueOnce({
+        ok: true,
+        json: () => new Promise<never>(() => {}),
+      });
+      selectMock.mockImplementation(() => fakeQuery([]));
+
+      const pending = listActiveSessions({
+        userId: 'user-1',
+        organizationId: undefined,
+        includeCloudAgentSessions: true,
+      });
+      const assertion = expect(pending).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+      const { settled } = trackSettled(pending);
+
+      await jest.advanceTimersByTimeAsync(READ_BUDGET_MS - 1);
+      expect(settled()).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
+      await assertion;
     } finally {
       warn.mockRestore();
       jest.useRealTimers();

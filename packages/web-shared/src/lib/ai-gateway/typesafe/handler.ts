@@ -35,6 +35,7 @@ import type {
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
+  computeOpenRouterCosts,
   computeVercelCostFields,
   extractVercelIsByok,
   parseUsageWithRecovery,
@@ -79,6 +80,10 @@ import {
 const VERCEL_TYPESAFE_API_URL = 'https://ai-gateway.vercel.sh/typesafe/v1';
 
 const generationIdSchema = z.object({ id: z.string().min(1) });
+const openRouterByokCostSchema = z.object({
+  is_byok: z.boolean().nullish(),
+  cost_details: z.object({ upstream_inference_cost: z.number().nullish() }).nullish(),
+});
 const vercelGenerationIdSchema = z.object({
   provider_metadata: z.object({ gateway: z.object({ generationId: z.string().min(1) }) }),
 });
@@ -587,7 +592,16 @@ export async function handleSystemOneRequest(request: NextRequest) {
     stats.cost_mUsd = vercelCostFields.cost_mUsd;
     stats.nonInferenceCost_mUsd = vercelCostFields.nonInferenceCost_mUsd;
   } else {
-    stats.cost_mUsd = toMicrodollars(answer.usage.cost);
+    // An owner's OpenRouter key reports only OpenRouter's BYOK fee as `usage.cost`; the inference
+    // cost is `cost_details.upstream_inference_cost`, as on chat. Kilo's own account is never BYOK,
+    // whatever the body claims.
+    const byokCost = isByok ? openRouterByokCostSchema.safeParse(answer.usage) : undefined;
+    const costFields = computeOpenRouterCosts(
+      { cost: answer.usage.cost, ...(byokCost?.success && byokCost.data) },
+      route.provider.type
+    );
+    stats.cost_mUsd = costFields.cost_mUsd;
+    stats.nonInferenceCost_mUsd = costFields.nonInferenceCost_mUsd;
   }
   stats.market_cost = stats.cost_mUsd;
   // Keeps the provider cost as `market_cost`, then applies custom pricing and zeroes a free model.

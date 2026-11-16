@@ -1906,6 +1906,32 @@ describe('handleSystemOneRequest', () => {
       );
     });
 
+    it("records the upstream inference cost of the owner's OpenRouter key as the market cost", async () => {
+      jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({
+        provider: userOpenRouterProvider,
+        userByok: [userOpenRouterKey],
+      });
+      mockedFetch.mockImplementation(async () =>
+        Response.json({
+          ...upstreamBody,
+          usage: {
+            input_tokens: 23,
+            output_tokens: 7,
+            cost: 0.0000062,
+            is_byok: true,
+            cost_details: { upstream_inference_cost: 0.000124 },
+          },
+        })
+      );
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
+
+      await runAfter();
+      const [stats] = jest.mocked(logMicrodollarUsageAndReportToBouncer).mock.calls[0];
+      expect(stats).toMatchObject({ cost_mUsd: 0, is_byok: true });
+      expect(stats.market_cost).toBeGreaterThanOrEqual(124);
+    });
+
     it("passes the owner's provider key through Kilo's Vercel account, exempt from the region", async () => {
       setEnterpriseRegion('eu');
       jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({

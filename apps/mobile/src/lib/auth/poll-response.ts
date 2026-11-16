@@ -43,12 +43,15 @@ export function classifyPollResponse(
 }
 
 /**
- * The device-auth start refusal, read from its stable code. The server's own
- * sentence is never shown: the catalog owns the copy in the active language.
+ * The device-auth start refusal, read from its HTTP status and stable code. A
+ * 429 is a rate-limit refusal whether or not its body names the code: an edge
+ * or proxy that answers before the route still means too many attempts. The
+ * server's own sentence is never shown; the catalog owns the copy in the active
+ * language.
  */
-export function getDeviceAuthStartRefusalError(body: unknown): DeviceAuthError {
+export function getDeviceAuthStartRefusalError(body: unknown, status: number): DeviceAuthError {
   return deviceAuthErrorKey(
-    parseAuthError(body)?.code === 'RATE_LIMITED'
+    status === 429 || parseAuthError(body)?.code === 'RATE_LIMITED'
       ? 'authErrors.tooManySignInAttempts'
       : 'authErrors.startSignInFailed'
   );

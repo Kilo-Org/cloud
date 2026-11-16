@@ -1,3 +1,4 @@
+import { hasVisibleGlyph } from '@kilocode/app-shared/display-text';
 import { sessionDisplayLine } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 
@@ -21,7 +22,9 @@ export const REQUESTING_CLIENT_FIELD_MAX = 200;
  * characters so it cannot break a line or a shell-style record, and normalized
  * through the repository's display-text rule so a layout format control cannot
  * reorder what the approver confirms. The value is normalized after the raw
- * checks, so what is stored and echoed is the display text the approver reads.
+ * checks, so what is stored and echoed is the display text the approver reads,
+ * and a value that draws nothing is refused: the approver cannot confirm a
+ * blank client.
  */
 const displayField = z
   .string()
@@ -30,7 +33,7 @@ const displayField = z
   .max(REQUESTING_CLIENT_FIELD_MAX)
   .refine(value => !/\p{Cc}/u.test(value), 'must not contain control characters')
   .transform(value => sessionDisplayLine(value).trim())
-  .refine(value => value.length >= 1, 'must not contain only invisible characters');
+  .refine(hasVisibleGlyph, 'must not contain only invisible characters');
 
 /**
  * Schemes a browser handles itself. A bare scheme is only accepted for a native

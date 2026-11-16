@@ -39,6 +39,33 @@ export function displaySafeText(raw: string): string {
  */
 const INVISIBLE = /^(?:\p{Cf}|\p{Zl}|\p{Zp}|[\u115F\u1160\u2800\u3164\uFFA0])$/u;
 
+/**
+ * Whether the code point draws nothing and takes no room: a control character
+ * or a separator. A format character is covered by {@link INVISIBLE} instead.
+ */
+const NOT_DRAWN = /^(?:\p{Cc}|\p{Z})$/u;
+
+/**
+ * Whether the value draws at least one glyph. A value made only of code points
+ * that draw nothing — a format character, a separator, a filler, a control
+ * character — reads as blank, so a surface that shows it as the thing a person
+ * confirms would be confirming nothing.
+ *
+ * A lone joiner U+200C or U+200D counts as invisible: it shapes the letters
+ * around it but draws nothing itself, so a value of only joiners is blank. A
+ * combining mark is not excluded: it draws through the letter it follows, and
+ * even without one it still paints a mark.
+ */
+export function hasVisibleGlyph(raw: string): boolean {
+  // Iterating code points keeps a surrogate pair whole, so an astral character
+  // is judged as the one code point it is.
+  for (const char of raw) {
+    if (INVISIBLE.test(char) || NOT_DRAWN.test(char)) continue;
+    return true;
+  }
+  return false;
+}
+
 function escapeChar(char: string, code: number): string {
   // A backslash prints as two, so the printed text keeps one reading: the
   // characters it names are the characters of the value.

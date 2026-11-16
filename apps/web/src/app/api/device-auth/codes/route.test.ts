@@ -303,6 +303,16 @@ describe('POST /api/device-auth/codes', () => {
       { client_id: 'client-abc', client_name: '\u202e\u2066', redirect_origin: 'https://a.test' },
       'INVALID_REQUESTING_CLIENT',
     ],
+    [
+      'a name of only a soft hyphen',
+      { client_id: 'client-abc', client_name: '\u00ad', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a name of only a Hangul filler',
+      { client_id: 'client-abc', client_name: '\u3164', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
   ])('refuses a client description with %s', async (_label, requesting_client, code) => {
     const response = await POST(
       new NextRequest('http://localhost:3000/api/device-auth/codes', {

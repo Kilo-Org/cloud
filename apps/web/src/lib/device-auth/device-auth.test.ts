@@ -65,6 +65,13 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => {
 const mockedIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockedGenerateApiToken = jest.mocked(generateApiToken);
 
+/**
+ * Remaining life of the oldest pending row in the retry-advisory test. Well
+ * inside the code lifetime, so the advisory it produces is distinguishable from
+ * both the full-lifetime default and every later row's expiry.
+ */
+const OLDEST_ROW_REMAINING_MS = 120_000;
+
 describe('Device Auth', () => {
   const testUserId = 'test-user-' + Date.now();
   const testUserEmail = `test-${Date.now()}@example.com`;
@@ -271,6 +278,14 @@ describe('Device Auth', () => {
         const { userCode } = await createDeviceAuthRequest({ ipAddress });
         return userCode;
       })();
+      // The oldest row is pulled well inside the code lifetime, so its remaining
+      // life differs from both the full lifetime and every other row: a read of
+      // this row cannot be confused with the default fallback, and a read of the
+      // newest row instead of the oldest would report a much larger wait.
+      await db
+        .update(device_auth_requests)
+        .set({ expires_at: new Date(Date.now() + OLDEST_ROW_REMAINING_MS).toISOString() })
+        .where(eq(device_auth_requests.user_code, firstUserCode));
       for (let i = 0; i < 4; i++) {
         const { userCode } = await createDeviceAuthRequest({ ipAddress });
         // Push each later row past the first one's expiry in the same live state.
@@ -301,6 +316,10 @@ describe('Device Auth', () => {
       // promises a longer or shorter wait than the block allows.
       expect(retryAfterSeconds).toBeGreaterThanOrEqual(Math.floor(oldestRemainingMs / 1000) - 5);
       expect(retryAfterSeconds).toBeLessThanOrEqual(Math.ceil(oldestRemainingMs / 1000) + 5);
+      // It is a read of a row, not the default that applies when no row can be
+      // read, and not a read of a later row: both would report a longer wait.
+      expect(retryAfterSeconds).not.toBe(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
+      expect(retryAfterSeconds).toBeLessThan(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
         DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );

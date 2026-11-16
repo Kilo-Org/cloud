@@ -63,28 +63,35 @@ describe('device-auth polling request', () => {
 
 // --- Device-auth start refusals ---
 
-describe('use-device-auth start path — 429 rate-limit refusal', () => {
+describe('use-device-auth start path — rate-limit refusal', () => {
   it('reads the stable RATE_LIMITED code and ignores the server sentence', () => {
     const serverBody = {
       error: 'RATE_LIMITED',
       message: 'x',
       retryAfterSeconds: 30,
     };
-    expect(getDeviceAuthStartRefusalError(serverBody)).toEqual({
+    expect(getDeviceAuthStartRefusalError(serverBody, 429)).toEqual({
       kind: 'key',
       key: 'authErrors.tooManySignInAttempts',
     });
   });
 
-  it('falls back to the generic start failure when the body has no error field', () => {
-    expect(getDeviceAuthStartRefusalError({ message: 'x' })).toEqual({
+  it('keeps the rate-limit copy for a 429 whose body names no code', () => {
+    expect(getDeviceAuthStartRefusalError(undefined, 429)).toEqual({
       kind: 'key',
-      key: 'authErrors.startSignInFailed',
+      key: 'authErrors.tooManySignInAttempts',
     });
   });
 
-  it('falls back to the generic start failure when the body is unparseable', () => {
-    expect(getDeviceAuthStartRefusalError(undefined)).toEqual({
+  it('keeps the rate-limit copy for a 429 whose body names another code', () => {
+    expect(getDeviceAuthStartRefusalError({ error: 'SOMETHING_ELSE' }, 429)).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
+  });
+
+  it('falls back to the generic start failure for a non-429 refusal', () => {
+    expect(getDeviceAuthStartRefusalError({ error: 'INVALID_REQUESTING_CLIENT' }, 400)).toEqual({
       kind: 'key',
       key: 'authErrors.startSignInFailed',
     });

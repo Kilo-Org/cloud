@@ -171,7 +171,11 @@ export function useDeviceAuth(): DeviceAuthResult {
           if (response.status === 429) {
             const body = await response.json().catch(() => undefined);
             setState(
-              errorDeviceAuthState(undefined, getDeviceAuthStartRefusalError(body), undefined)
+              errorDeviceAuthState(
+                undefined,
+                getDeviceAuthStartRefusalError(body, response.status),
+                undefined
+              )
             );
             return;
           }

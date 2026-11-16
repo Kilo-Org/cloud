@@ -236,7 +236,10 @@ export async function createDeviceAuthRequest(params: {
             and(
               eq(device_auth_requests.ip_address, ipAddress),
               eq(device_auth_requests.status, 'pending'),
-              gt(device_auth_requests.expires_at, new Date().toISOString())
+              // The same clock as the advisory below: a row that counts as live
+              // here is one the advisory can measure, so the count and the
+              // remaining time always describe one set of rows.
+              gt(device_auth_requests.expires_at, sql`now()`)
             )
           );
 

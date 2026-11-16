@@ -26,13 +26,57 @@ const READ_BUDGET_MS = 4_500;
 
 const limitCalls = jest.fn();
 
+/** Organization the filtered caller asks for; both fixture rows belong to it. */
+const ORGANIZATION_ID = '123e4567-e89b-42d3-a456-426614174000';
+
+/** One enriched `cli_sessions_v2` row for the heartbeat `live-1`. */
+function enrichmentRow(): Record<string, unknown> {
+  return {
+    session_id: 'live-1',
+    created_on_platform: 'cli',
+    created_at: '2026-11-01T00:00:00.000Z',
+    updated_at: '2026-11-01T00:05:00.000Z',
+    status: null,
+    title: null,
+    organization_id: ORGANIZATION_ID,
+    organization_is_accessible: true,
+    git_url: null,
+    last_activity_at: null,
+    status_updated_at: null,
+    total_cost_microdollars: null,
+  };
+}
+
+/** One live cloud-agent candidate the answer merges after the heartbeat rows. */
+function cloudCandidateRow(): Record<string, unknown> {
+  return {
+    session_id: 'cloud-1',
+    created_on_platform: 'cloud',
+    created_at: '2026-11-01T00:10:00.000Z',
+    updated_at: '2026-11-01T00:20:00.000Z',
+    status: 'busy',
+    title: 'Cloud',
+    organization_id: ORGANIZATION_ID,
+    git_url: null,
+    git_branch: null,
+    last_activity_at: null,
+    status_updated_at: null,
+    total_cost_microdollars: null,
+    cloud_agent_session_id: 'cas-1',
+    run_open: true,
+  };
+}
+
 /**
  * One fake Drizzle select chain. `rows` resolves the terminal await, `'stall'`
  * never settles, and `'fail'` rejects, so one phase can be stalled while the
  * other still settles. Every builder method — `orderBy`/`limit` included, as the
- * cloud query ends with them — returns the same thenable.
+ * cloud query ends with them — returns the same thenable. `resolveAfterMs`
+ * makes the read slow instead of instant, for tests that need one phase to
+ * consume part of the answer's budget; fake timers drive that delay, so no
+ * test waits on the real clock.
  */
-function fakeQuery(outcome: unknown[] | 'stall' | 'fail'): unknown {
+function fakeQuery(outcome: unknown[] | 'stall' | 'fail', resolveAfterMs = 0): unknown {
   const query: Record<string, unknown> = {
     from: () => query,
     leftJoinLateral: () => query,
@@ -47,6 +91,10 @@ function fakeQuery(outcome: unknown[] | 'stall' | 'fail'): unknown {
     if (outcome === 'stall') return;
     if (outcome === 'fail') {
       reject(new Error('read failed'));
+      return;
+    }
+    if (resolveAfterMs > 0) {
+      setTimeout(() => resolve(outcome), resolveAfterMs);
       return;
     }
     resolve(outcome);
@@ -177,6 +225,40 @@ describe('listActiveSessions budgets', () => {
       );
     } finally {
       warn.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it('gives the cloud read its own time when the enrichment read is slow but inside the budget', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+    try {
+      // The enrichment read spends 6,500 ms of the 7,000 ms answer budget and
+      // the cloud read answers in 1,500 ms. Read one after the other, the cloud
+      // read would only have the 500 ms the enrichment left, expire before its
+      // (fast) query answered, and degrade an organization-filtered answer to
+      // SERVICE_UNAVAILABLE. Started together, both fit.
+      const ENRICHMENT_DELAY_MS = 6_500;
+      const CLOUD_DELAY_MS = 1_500;
+      selectMock
+        .mockReturnValueOnce(fakeQuery([enrichmentRow()], ENRICHMENT_DELAY_MS))
+        .mockReturnValueOnce(fakeQuery([cloudCandidateRow()], CLOUD_DELAY_MS));
+
+      const pending = listActiveSessions({
+        userId: 'user-1',
+        organizationId: ORGANIZATION_ID,
+        includeCloudAgentSessions: true,
+      });
+      const { settled } = trackSettled(pending);
+
+      await jest.advanceTimersByTimeAsync(ENRICHMENT_DELAY_MS - 1);
+      expect(settled()).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
+      const { sessions } = await pending;
+      expect(sessions.map(session => session.id)).toEqual(['live-1', 'cloud-1']);
+      expect(sessions[0]).toMatchObject({ organizationId: ORGANIZATION_ID, title: 'Live' });
+      expect(sessions[1]).toMatchObject({ connectionId: 'cloud-agent', status: 'busy' });
+    } finally {
       jest.useRealTimers();
     }
   });

@@ -382,12 +382,16 @@ class ActiveSessionsBudgetError extends Error {
 }
 
 /**
- * Await one Postgres read inside the answer's remaining budget. The abandoned
+ * Await one Postgres read inside the answer's remaining budget.
+ *
+ * `work` is a thunk, not the built query: building a Drizzle query can throw
+ * before any SQL runs, and that failure belongs to this phase, so it must
+ * degrade like a rejected read instead of escaping the answer. The abandoned
  * query keeps its handlers, so a late settle is consumed instead of surfacing
  * as an unhandled rejection.
  */
 async function withinRemainingBudget<T>(
-  work: PromiseLike<T>,
+  work: () => PromiseLike<T>,
   deadlineAt: number,
   label: string
 ): Promise<T> {
@@ -397,9 +401,30 @@ async function withinRemainingBudget<T>(
   const expired = Promise.withResolvers<never>();
   const timer = setTimeout(() => expired.reject(budgetError), budgetMs);
   try {
-    return await Promise.race([Promise.resolve(work), expired.promise]);
+    return await Promise.race([Promise.resolve(work()), expired.promise]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** One read's result: the rows it returned, or the error that kept it from answering. */
+type PhaseOutcome<T> = { ok: true; rows: T } | { ok: false; error: unknown };
+
+/**
+ * Start one read and settle it into a {@link PhaseOutcome}. This is what lets
+ * two independent reads run concurrently: neither failure is a rejection its
+ * caller must catch at the same await, and a phase that already decided the
+ * answer never leaves the other read's rejection unhandled.
+ */
+async function startPhase<T>(
+  work: () => PromiseLike<T>,
+  deadlineAt: number,
+  label: string
+): Promise<PhaseOutcome<T>> {
+  try {
+    return { ok: true, rows: await withinRemainingBudget(work, deadlineAt, label) };
+  } catch (error) {
+    return { ok: false, error };
   }
 }
 
@@ -526,142 +551,120 @@ export async function listActiveSessions({
     }
   }
 
-  // Phase 2a — Query 1: enrich heartbeat sessions from cli_sessions_v2.
-  // Independent try/catch from Query 2 (D16). Skipped when there are no
-  // heartbeat ids (never an empty inArray).
+  // Phases 2a (heartbeat enrichment) and 2b (cloud candidates) are independent
+  // Postgres reads over the same user's rows: neither consumes the other's
+  // output, and the one merge dependency — `heartbeatIds`, which keeps a
+  // CLI-adopted row from being merged twice — is applied after both settle.
+  // They therefore run concurrently under the answer's single deadline.
+  // Sequentially, the enrichment read spent that deadline first and the cloud
+  // read started with whatever was left; at ~0 ms it failed as a budget
+  // timeout before its (fast) query could answer, which turned an
+  // organization-filtered list into SERVICE_UNAVAILABLE for a reason the user
+  // could not act on.
+  //
+  // Concurrency costs one extra pool connection per answer while both run. The
+  // alternative — reserving a slice for the second read — only bounds the loss
+  // and would still add the two reads' latencies together.
   const ids = parsed.sessions.map(s => s.id);
-  let enrichmentRows: EnrichmentRow[] = [];
-  let enrichmentFailed = false;
 
-  if (ids.length > 0) {
-    try {
-      enrichmentRows = await withinRemainingBudget(
-        db
-          .select({
-            session_id: cli_sessions_v2.session_id,
-            created_on_platform: cli_sessions_v2.created_on_platform,
-            created_at: cli_sessions_v2.created_at,
-            updated_at: cli_sessions_v2.updated_at,
-            status: cli_sessions_v2.status,
-            title: cli_sessions_v2.title,
-            organization_id: cli_sessions_v2.organization_id,
-            organization_is_accessible: activeOrganizationAccessSql(
-              cli_sessions_v2.organization_id,
-              userId
-            ),
-            git_url: cli_sessions_v2.git_url,
-            last_activity_at: cli_sessions_v2.last_activity_at,
-            status_updated_at: cli_sessions_v2.status_updated_at,
-            total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
-            session_pr_platform: cli_sessions_v2.platform,
-            session_pr_url: cli_sessions_v2.pr_url,
-            session_pr_number: cli_sessions_v2.pr_number,
-            session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
-            pr_url: sessionAssociatedPr.pr_url,
-            pr_number: sessionAssociatedPr.pr_number,
-            pr_state: sessionAssociatedPr.pr_state,
-            pr_title: sessionAssociatedPr.pr_title,
-            pr_head_sha: sessionAssociatedPr.pr_head_sha,
-            pr_observations: sessionAssociatedPr.pr_observations,
-            pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
-            pr_review_decision: sessionAssociatedPr.pr_review_decision,
-            review_decision_pending: sessionAssociatedPr.review_decision_pending,
-            pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
-          })
-          .from(cli_sessions_v2)
-          .leftJoinLateral(sessionAssociatedPr, sql`true`)
-          .where(
-            and(eq(cli_sessions_v2.kilo_user_id, userId), inArray(cli_sessions_v2.session_id, ids))
-          ),
-        mergeDeadlineAt,
-        'active-session enrichment'
-      );
-    } catch (error) {
-      console.warn('[active-sessions] enrichment db query failed:', error);
-      // Attribution is unknowable without the join. An unfiltered caller (web,
-      // `resolveSession`) keeps the existing best-effort unenriched passthrough —
-      // a DB blip must not collapse its list. A filtered caller cannot be
-      // answered at all: calling every row personal would lie (breaking AC 1)
-      // and returning an empty list would silently blank the tray with no
-      // explanation. So fail the query and let the client's already-shipped
-      // retryable state handle it (D11).
-      if (organizationId === undefined) {
-        enrichmentFailed = true;
-        if (!includeCloudAgentSessions) {
-          return parsed;
-        }
-      } else {
-        throwOrgContextFailure(error);
-      }
-    }
-  } else if (!includeCloudAgentSessions) {
+  if (ids.length === 0 && !includeCloudAgentSessions) {
     // Flag-off empty heartbeats: today's short-circuit (no DB).
     return parsed;
   }
 
-  let sessions: ActiveSession[];
-  if (enrichmentFailed) {
-    // Unfiltered + flag on: keep wire rows unenriched, still attempt cloud.
-    sessions = [...parsed.sessions];
-  } else {
-    const byId = new Map(enrichmentRows.map(r => [r.session_id, r]));
-    sessions = [];
-    for (const session of parsed.sessions) {
-      const row = byId.get(session.id);
-      // No `cli_sessions_v2` row → unattributable → personal. Filtering in SQL
-      // cannot tell that case apart from "belongs to an organization the caller
-      // can no longer access", so the access decision is made after enrichment:
-      // a former-organization row must be dropped, not relabelled personal.
-      const rowOrganizationId = row?.organization_id ?? null;
-      if (organizationId !== undefined && rowOrganizationId !== organizationId) {
-        continue;
-      }
-      if (organizationId === undefined && row && !row.organization_is_accessible) {
-        continue;
-      }
-      sessions.push(mapEnrichedHeartbeatSession(session, row));
-    }
-  }
+  // Phase 2a — Query 1: enrich heartbeat sessions from cli_sessions_v2.
+  // Independent outcome from Query 2 (D16). Skipped when there are no
+  // heartbeat ids (never an empty inArray).
+  const enrichmentRead =
+    ids.length > 0
+      ? startPhase(
+          () =>
+            db
+              .select({
+                session_id: cli_sessions_v2.session_id,
+                created_on_platform: cli_sessions_v2.created_on_platform,
+                created_at: cli_sessions_v2.created_at,
+                updated_at: cli_sessions_v2.updated_at,
+                status: cli_sessions_v2.status,
+                title: cli_sessions_v2.title,
+                organization_id: cli_sessions_v2.organization_id,
+                organization_is_accessible: activeOrganizationAccessSql(
+                  cli_sessions_v2.organization_id,
+                  userId
+                ),
+                git_url: cli_sessions_v2.git_url,
+                last_activity_at: cli_sessions_v2.last_activity_at,
+                status_updated_at: cli_sessions_v2.status_updated_at,
+                total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
+                session_pr_platform: cli_sessions_v2.platform,
+                session_pr_url: cli_sessions_v2.pr_url,
+                session_pr_number: cli_sessions_v2.pr_number,
+                session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
+                pr_url: sessionAssociatedPr.pr_url,
+                pr_number: sessionAssociatedPr.pr_number,
+                pr_state: sessionAssociatedPr.pr_state,
+                pr_title: sessionAssociatedPr.pr_title,
+                pr_head_sha: sessionAssociatedPr.pr_head_sha,
+                pr_observations: sessionAssociatedPr.pr_observations,
+                pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+                pr_review_decision: sessionAssociatedPr.pr_review_decision,
+                review_decision_pending: sessionAssociatedPr.review_decision_pending,
+                pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
+              })
+              .from(cli_sessions_v2)
+              .leftJoinLateral(sessionAssociatedPr, sql`true`)
+              .where(
+                and(
+                  eq(cli_sessions_v2.kilo_user_id, userId),
+                  inArray(cli_sessions_v2.session_id, ids)
+                )
+              ),
+          mergeDeadlineAt,
+          'active-session enrichment'
+        )
+      : undefined;
 
-  // Phase 2b — Query 2: live cloud-agent candidates (flag-on only).
-  // Own try/catch; failure semantics mirror Query 1 (D16).
+  // Phase 2b — Query 2: live cloud-agent candidates (flag-on only). Started
+  // here, before phase 2a is awaited, so neither read queues behind the other.
+  // Own outcome; failure semantics mirror Query 1 (D16).
+  let cloudRead: Promise<PhaseOutcome<CloudCandidateRow[]>> | undefined;
   if (includeCloudAgentSessions) {
-    try {
-      const orgPredicate =
-        organizationId === null
-          ? isNull(cli_sessions_v2.organization_id)
-          : typeof organizationId === 'string'
-            ? eq(cli_sessions_v2.organization_id, organizationId)
-            : undefined;
+    const orgPredicate =
+      organizationId === null
+        ? isNull(cli_sessions_v2.organization_id)
+        : typeof organizationId === 'string'
+          ? eq(cli_sessions_v2.organization_id, organizationId)
+          : undefined;
 
-      // Three proofs of life, because no single one covers a cloud session's
-      // whole working life:
-      // 1. An open run. `cloud_agent_session_runs` is written per message turn,
-      //    so this is the strongest proof, and it is unbounded in time.
-      // 2. A warm `idle` status. The status syncs asynchronously and reads
-      //    `idle` while the agent works, so it is only a proof once the session
-      //    has settled and within the recency window.
-      // 3. Recorded session activity. A session between turns — or one whose
-      //    current turn never got a run row — keeps a non-idle status (`busy`,
-      //    `question`, `permission`) with no open run, so proofs 1 and 2 both
-      //    fail while the agent is demonstrably working: `last_activity_at` is
-      //    seconds old. Without this branch Active now drops such a session
-      //    until it flips to idle and reappears in the warm-idle window, i.e.
-      //    it shows up only "temporarily when finished".
-      const livePredicate = or(
-        sql`EXISTS (
-          SELECT 1 FROM ${cloud_agent_session_runs}
-          WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
-            AND ${cloud_agent_session_runs.terminal_at} IS NULL
-        )`,
-        and(
-          eq(cli_sessions_v2.status, 'idle'),
-          gt(cli_sessions_v2.status_updated_at, CLOUD_AGENT_LIVE_CUTOFF)
-        ),
-        gt(cli_sessions_v2.last_activity_at, CLOUD_AGENT_LIVE_CUTOFF)
-      );
+    // Three proofs of life, because no single one covers a cloud session's
+    // whole working life:
+    // 1. An open run. `cloud_agent_session_runs` is written per message turn,
+    //    so this is the strongest proof, and it is unbounded in time.
+    // 2. A warm `idle` status. The status syncs asynchronously and reads
+    //    `idle` while the agent works, so it is only a proof once the session
+    //    has settled and within the recency window.
+    // 3. Recorded session activity. A session between turns — or one whose
+    //    current turn never got a run row — keeps a non-idle status (`busy`,
+    //    `question`, `permission`) with no open run, so proofs 1 and 2 both
+    //    fail while the agent is demonstrably working: `last_activity_at` is
+    //    seconds old. Without this branch Active now drops such a session
+    //    until it flips to idle and reappears in the warm-idle window, i.e.
+    //    it shows up only "temporarily when finished".
+    const livePredicate = or(
+      sql`EXISTS (
+        SELECT 1 FROM ${cloud_agent_session_runs}
+        WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
+          AND ${cloud_agent_session_runs.terminal_at} IS NULL
+      )`,
+      and(
+        eq(cli_sessions_v2.status, 'idle'),
+        gt(cli_sessions_v2.status_updated_at, CLOUD_AGENT_LIVE_CUTOFF)
+      ),
+      gt(cli_sessions_v2.last_activity_at, CLOUD_AGENT_LIVE_CUTOFF)
+    );
 
-      const cloudRows: CloudCandidateRow[] = await withinRemainingBudget(
+    cloudRead = startPhase(
+      () =>
         db
           .select({
             session_id: cli_sessions_v2.session_id,
@@ -727,22 +730,80 @@ export async function listActiveSessions({
           // matches instead of walking every orphaned candidate.
           .orderBy(desc(cli_sessions_v2.created_at))
           .limit(CLOUD_AGENT_CANDIDATE_LIMIT),
-        mergeDeadlineAt,
-        'live cloud-agent candidates'
-      );
+      mergeDeadlineAt,
+      'live cloud-agent candidates'
+    );
+  }
 
+  // Phase 2a outcome: enrich the heartbeat rows, or degrade exactly as before.
+  let enrichmentRows: EnrichmentRow[] = [];
+  let enrichmentFailed = false;
+  if (enrichmentRead) {
+    const enrichment = await enrichmentRead;
+    if (enrichment.ok) {
+      enrichmentRows = enrichment.rows;
+    } else {
+      console.warn('[active-sessions] enrichment db query failed:', enrichment.error);
+      // Attribution is unknowable without the join. An unfiltered caller (web,
+      // `resolveSession`) keeps the existing best-effort unenriched passthrough —
+      // a DB blip must not collapse its list. A filtered caller cannot be
+      // answered at all: calling every row personal would lie (breaking AC 1)
+      // and returning an empty list would silently blank the tray with no
+      // explanation. So fail the query and let the client's already-shipped
+      // retryable state handle it (D11).
+      if (organizationId === undefined) {
+        enrichmentFailed = true;
+        if (!includeCloudAgentSessions) {
+          return parsed;
+        }
+      } else {
+        throwOrgContextFailure(enrichment.error);
+      }
+    }
+  }
+
+  let sessions: ActiveSession[];
+  if (enrichmentFailed) {
+    // Unfiltered + flag on: keep wire rows unenriched, still attempt cloud.
+    sessions = [...parsed.sessions];
+  } else {
+    const byId = new Map(enrichmentRows.map(r => [r.session_id, r]));
+    sessions = [];
+    for (const session of parsed.sessions) {
+      const row = byId.get(session.id);
+      // No `cli_sessions_v2` row → unattributable → personal. Filtering in SQL
+      // cannot tell that case apart from "belongs to an organization the caller
+      // can no longer access", so the access decision is made after enrichment:
+      // a former-organization row must be dropped, not relabelled personal.
+      const rowOrganizationId = row?.organization_id ?? null;
+      if (organizationId !== undefined && rowOrganizationId !== organizationId) {
+        continue;
+      }
+      if (organizationId === undefined && row && !row.organization_is_accessible) {
+        continue;
+      }
+      sessions.push(mapEnrichedHeartbeatSession(session, row));
+    }
+  }
+
+  // Phase 2b outcome: merge the candidates read started before phase 2a was
+  // awaited. An unfiltered caller keeps its heartbeat rows when this read
+  // fails; a filtered caller cannot be answered without it (D16).
+  if (cloudRead) {
+    const cloud = await cloudRead;
+    if (!cloud.ok) {
+      console.warn('[active-sessions] cloud candidates db query failed:', cloud.error);
+      if (organizationId !== undefined) {
+        throwOrgContextFailure(cloud.error);
+      }
+      // Unfiltered: skip cloud merge, return heartbeat rows as built.
+    } else {
       const heartbeatIds = new Set(sessions.map(s => s.id));
-      for (const row of cloudRows) {
+      for (const row of cloud.rows) {
         // CLI adoption wins: keep the worker row's real connectionId/status.
         if (heartbeatIds.has(row.session_id)) continue;
         sessions.push(mapCloudCandidateRow(row));
       }
-    } catch (error) {
-      console.warn('[active-sessions] cloud candidates db query failed:', error);
-      if (organizationId !== undefined) {
-        throwOrgContextFailure(error);
-      }
-      // Unfiltered: skip cloud merge, return heartbeat rows as built.
     }
   }
 

@@ -66,7 +66,13 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   // organization, so the header names it without a second lookup.
   const organizationName = scope === 'organization' ? boundary.org?.organizationName : undefined;
 
-  useRouteForegroundRefresh([[['platformIntegrations']], [['githubApps', 'listIntegrations']]]);
+  useRouteForegroundRefresh([
+    [['platformIntegrations']],
+    [['githubApps', 'listIntegrations']],
+    // The Bitbucket status read names the connection its row disconnects, so a
+    // read that failed here recovers when the route regains foreground.
+    [['organizations', 'bitbucket', 'getStatus']],
+  ]);
 
   const statuses = useIntegrationStatuses(organizationId, scopeResolved);
   const githubConnections = useGitHubConnections(organizationId, scopeResolved);
@@ -212,6 +218,8 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
                   onManageOnWeb={() => {
                     manageRowOnWeb(row.provider);
                   }}
+                  onRetryConnection={() => void bitbucket.refetch()}
+                  retryingConnection={bitbucket.isFetching}
                   last={index === rows.length - 1}
                 />
               ))}

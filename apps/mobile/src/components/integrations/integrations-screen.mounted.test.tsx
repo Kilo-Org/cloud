@@ -47,6 +47,7 @@ const calls = vi.hoisted(() => ({
   refetch: vi.fn<() => void>(),
   openExternal: vi.fn<(url: string) => void>(),
   push: vi.fn<(href: unknown) => void>(),
+  bitbucketRefetch: vi.fn<() => void>(),
 }));
 
 function statusState(overrides: Partial<typeof state.statuses> = {}): typeof state.statuses {
@@ -72,7 +73,14 @@ vi.mock('@/lib/hooks/use-integrations', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-bitbucket', () => ({
-  useBitbucketIntegrationStatus: () => state.bitbucket,
+  // The screen repeats a Bitbucket read that failed to name its connection, so
+  // the row's Retry reaches this spy instead of a live client.
+  useBitbucketIntegrationStatus: () => ({
+    data: state.bitbucket.data,
+    isPending: state.bitbucket.isPending,
+    isFetching: false,
+    refetch: calls.bitbucketRefetch,
+  }),
 }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
@@ -351,6 +359,25 @@ describe('IntegrationsScreen', () => {
       provider: 'bitbucket',
       integrationId: 'bitbucket-1',
     });
+  });
+
+  it('offers the Bitbucket connection read again when it named no connection', () => {
+    state.role = 'owner';
+    state.statuses.data = [
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    // The integration read failed, so the row knows a workspace is installed but
+    // not the connection its Disconnect would remove. Before the row offered the
+    // read again, that state rendered no action at all.
+    state.bitbucket = { data: undefined, isPending: false };
+    const renderer = mount('org-1');
+
+    const retry = actionOf(rowTitled(renderer.root, 'Bitbucket'));
+    expect(retry?.props.accessibilityLabel).toBe('Retry. Bitbucket');
+    press(retry);
+
+    expect(calls.bitbucketRefetch).toHaveBeenCalledOnce();
+    expect(calls.confirm).not.toHaveBeenCalled();
   });
 
   it('disconnects an organization connection after the destructive confirmation', () => {

@@ -18,6 +18,7 @@ const calls = vi.hoisted(() => ({
   connect: vi.fn<() => void>(),
   disconnect: vi.fn<() => void>(),
   manageOnWeb: vi.fn<() => void>(),
+  retryConnection: vi.fn<() => void>(),
 }));
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
@@ -61,6 +62,7 @@ function renderRow(props: {
   scope: IntegrationScope;
   role?: string;
   connecting?: boolean;
+  retryingConnection?: boolean;
 }): TestRenderer.ReactTestInstance {
   act(() => {
     renderer = TestRenderer.create(
@@ -70,9 +72,11 @@ function renderRow(props: {
         role: props.role,
         connecting: props.connecting ?? false,
         disconnecting: false,
+        retryingConnection: props.retryingConnection ?? false,
         onConnect: calls.connect,
         onDisconnect: calls.disconnect,
         onManageOnWeb: calls.manageOnWeb,
+        onRetryConnection: calls.retryConnection,
       })
     );
   });
@@ -194,5 +198,50 @@ describe('IntegrationProviderRow body press', () => {
 
     expect(bodyPresses(root)).toHaveLength(0);
     expect(root.findAllByType('Skeleton')).toHaveLength(1);
+  });
+
+  it('offers the failed connection read again on an installed row it cannot name', () => {
+    // Bitbucket reads its integration separately from the setup status, so a
+    // failed read leaves an installed row with no connection to disconnect:
+    // the row repeats that read instead of falling silent.
+    const root = renderRow({
+      row: integrationRow({
+        provider: 'bitbucket',
+        installed: true,
+        accountLabel: 'acme-workspace',
+        disconnectIntegrationId: null,
+        canDisconnectNatively: false,
+        webManaged: false,
+      }),
+      scope: 'organization',
+      role: 'owner',
+    });
+
+    expect(bodyPresses(root)).toHaveLength(0);
+    const [retry] = root.findAll(node => String(node.type) === 'Button');
+    if (!retry) {
+      throw new Error('the unnamed row rendered no retry');
+    }
+    expect(retry.props.accessibilityLabel).toBe('Retry. Bitbucket');
+    expect(retry.props.loading).toBe(false);
+    press(retry);
+    expect(calls.retryConnection).toHaveBeenCalledOnce();
+  });
+
+  it('draws the retried connection read as busy', () => {
+    const root = renderRow({
+      row: integrationRow({
+        provider: 'bitbucket',
+        installed: true,
+        canDisconnectNatively: false,
+        webManaged: false,
+      }),
+      scope: 'organization',
+      role: 'owner',
+      retryingConnection: true,
+    });
+
+    const [retry] = root.findAll(node => String(node.type) === 'Button');
+    expect(retry?.props.loading).toBe(true);
   });
 });

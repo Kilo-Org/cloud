@@ -9,6 +9,7 @@ import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import { handleModelValidationRequest } from './model-validation';
 
@@ -26,6 +27,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
 jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-models', () => ({
+  addAutoRoutingModels: jest.fn(async (models: unknown[]) => models),
+}));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
 
 const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
@@ -35,6 +39,7 @@ const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModel
 const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser);
 const mockedListUsableCustomRouters = jest.mocked(listUsableCustomRouters);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
+const mockedAddAutoRoutingModels = jest.mocked(addAutoRoutingModels);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -74,6 +79,7 @@ describe('POST /api/openrouter/models/validate', () => {
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
     mockedListUsableCustomRouters.mockResolvedValue([]);
     mockedGetAvailableModelsForOrganization.mockResolvedValue({ data: [] } as never);
+    mockedAddAutoRoutingModels.mockImplementation(async models => models);
   });
 
   test('confirms a Kilo-eligible catalog model', async () => {

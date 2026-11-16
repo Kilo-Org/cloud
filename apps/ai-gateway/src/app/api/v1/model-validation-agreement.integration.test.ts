@@ -46,6 +46,9 @@ import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/or
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateApiToken, generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { auto_routing_custom_routers } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 const { getEnhancedOpenRouterModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
@@ -121,6 +124,41 @@ describe('model validation agrees with the catalog for one credential', () => {
       status: 200,
       body: { valid: false, reason: 'unavailable' },
     });
+  });
+
+  test('an organization custom router agrees with the catalog', async () => {
+    const member = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+    const organization = await createTestOrganization(
+      'model validation router',
+      member.id,
+      0,
+      {},
+      false
+    );
+    await addUserToOrganization(organization.id, member.id, 'member');
+    const slug = `router-${crypto.randomUUID()}`;
+    await db.insert(auto_routing_custom_routers).values({
+      owned_by_organization_id: organization.id,
+      slug,
+      name: 'Router',
+      base_router: 'efficient',
+      mode: 'best_accuracy',
+      entries: [{ kind: 'gateway', model: allowedModel }],
+      default_entry_key: `gateway:${allowedModel}`,
+    });
+    const { token } = generateOrganizationApiToken(member, organization.id, 'member');
+    currentHeaders = new Headers({ authorization: `Bearer ${token}` });
+
+    const routerModelId = `kilo-auto/custom/org/${slug}`;
+    const availableIds = await catalogModelIds();
+    expect(availableIds).toContain(routerModelId);
+
+    await expect(validate(routerModelId)).resolves.toEqual({
+      status: 200,
+      body: { valid: true },
+    });
+
+    await db.delete(auto_routing_custom_routers).where(eq(auto_routing_custom_routers.slug, slug));
   });
 
   test('a personal credential keeps the personal answer', async () => {

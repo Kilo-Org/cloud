@@ -12,6 +12,7 @@ import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { TRPCError } from '@trpc/server';
@@ -78,8 +79,11 @@ async function validateForOrganizationMember(params: {
   if (!result) {
     return validationResult(false);
   }
-  // The catalog lists a custom router as a virtual model, so the model id is not
-  // in `data`; it is usable when the router is usable in this context.
+  // The catalog passes the same list through the auto-routing step, which can withhold an
+  // auto id, so membership is read from that result rather than the raw list.
+  const models = await addAutoRoutingModels(result.data);
+  // The catalog lists a custom router as a virtual model, so the model id is not in
+  // `data`; it is usable when the router is usable in this context.
   const customRouters = isCustomRouterModelId(params.modelId)
     ? await listUsableCustomRouters({
         userId: params.kiloUserId,
@@ -87,7 +91,7 @@ async function validateForOrganizationMember(params: {
       })
     : [];
   return validationResult(
-    result.data.some(model => model.id === params.modelId) ||
+    models.some(model => model.id === params.modelId) ||
       customRouters.some(
         router => customRouterModelId(router.ownerType, router.slug) === params.modelId
       )

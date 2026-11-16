@@ -1,3 +1,5 @@
+import { type TFunction } from 'i18next';
+
 import {
   AGENT_DESCRIPTION_MAX_LENGTH,
   AGENT_NAME_MAX_LENGTH,
@@ -12,9 +14,9 @@ const ERROR_KEYS = {
   'name-required': 'profiles.agents.nameRequired',
   'name-too-long': 'profiles.tooLong',
   'description-too-long': 'profiles.tooLong',
-} satisfies Record<AgentFormError, string>;
+} as const satisfies Record<AgentFormError, string>;
 
-type Translate = (key: string, options?: { max: number }) => string;
+type Translate = TFunction;
 
 /**
  * The localized message for a refused field. A length refusal names the

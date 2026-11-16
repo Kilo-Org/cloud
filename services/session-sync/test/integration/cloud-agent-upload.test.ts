@@ -63,6 +63,8 @@ describe('Cloud Agent upload-only access', () => {
       expect(
         (await f.request('POST', '/v1/auth/exchange', { version: 1 }, originProof)).status
       ).toBe(401);
+      if (originProof === null)
+        expect(f.authorizeUpload.mock.calls[0]?.[0]).not.toHaveProperty('originProof');
       expect(
         (
           await f.request(

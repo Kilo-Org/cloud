@@ -1638,6 +1638,8 @@ another sandbox. Allocations that started before this check are exempt until the
 HTTP development facade (`http://host.docker.internal:<port>`) is also exempt: local workerd
 intercepts container egress only on ports 80 and 443, so local facade requests never get a proof.
 HTTPS local facades still require a proof. The facade removes the header before the upstream call.
+Deploy Session Sync proof forwarding before the Cloud Agent origin gate. Requests without a
+proof omit the new binding field, so older Cloud Agent bindings still accept their request shape.
 
 Because the handle is scope-wide, revoking one member's handle no longer stops another member's
 in-flight model calls while a surviving member can still serve; that member's **new** sends are still

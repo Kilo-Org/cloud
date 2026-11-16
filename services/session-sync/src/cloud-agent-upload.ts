@@ -33,9 +33,14 @@ async function resolve(
 ) {
   if (!env.CLOUD_AGENT_SYNC_AUTH)
     return failure(503, 'auth_unavailable', 'Cloud Agent upload authorization is unavailable');
+  const { originProof, ...credential } = input;
   try {
     const result = await withTimeout(
-      env.CLOUD_AGENT_SYNC_AUTH.authorizeUpload(input),
+      env.CLOUD_AGENT_SYNC_AUTH.authorizeUpload({
+        ...credential,
+        // Older Cloud Agent bindings reject unknown fields, including undefined ones.
+        ...(originProof === undefined ? {} : { originProof }),
+      }),
       5_000,
       'Cloud Agent upload authorization timed out'
     );

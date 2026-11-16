@@ -118,7 +118,7 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
           </div>
           <p id={`${id}-openrouter-help`} className="text-muted-foreground ml-12 text-sm">
             {regionName
-              ? `OpenRouter is off while an inference region is selected, because it cannot keep requests in ${regionName}.`
+              ? 'OpenRouter is off while an inference region is selected, because it cannot keep requests in a region.'
               : 'When off, requests go through the Vercel AI Gateway. A model the Vercel AI Gateway does not offer returns an error.'}
           </p>
         </div>

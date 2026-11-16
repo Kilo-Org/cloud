@@ -16,7 +16,7 @@ catalog:
   # Workers-compatible JSON Schema validator for the kilo-mcp call tool.
   # AJV cannot run on Workerd: it compiles schemas with `new Function`, which
   # the Workers runtime forbids. Pinned exactly.
-  '@cfworker/json-schema': 4.1.1
+  '@cfworker/json-schema': 4.1.6
   '@octokit/auth-app': 8.2.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
@@ -38,7 +38,7 @@ catalog:
   drizzle-kit: 0.31.11
   drizzle-orm: 0.45.2
   hono: 4.13.13
-  jose: 6.2.12
+  jose: 6.2.17
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
   # apps/web builds its CSS with this and the workspace override below forces one

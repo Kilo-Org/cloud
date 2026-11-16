@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@cfworker/json-schema':
-      specifier: 4.1.1
-      version: 4.1.1
+      specifier: 4.1.6
+      version: 4.1.6
     '@cloudflare/vitest-pool-workers':
       specifier: 0.16.13
       version: 0.16.13
@@ -67,8 +67,8 @@ catalogs:
       specifier: 0.31.11
       version: 0.31.11
     jose:
-      specifier: 6.2.12
-      version: 6.2.12
+      specifier: 6.2.17
+      version: 6.2.17
     jsonwebtoken:
       specifier: 9.0.3
       version: 9.0.3
@@ -406,7 +406,7 @@ importers:
         version: link:../../packages/trpc
       '@modelcontextprotocol/sdk':
         specifier: 1.32.1
-        version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+        version: 1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7)
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.3(react@19.2.6)
@@ -701,7 +701,7 @@ importers:
         version: 58.1.4(patch_hash=687bb2bde9480b90d31b004373e3edb3fb699a99eac3b65d2e85aa5e76572e9e)(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
       expo-router:
         specifier: ~58.0.19
-        version: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(aa9e0f2e012d774790f9138f88c7e186)
+        version: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(e1785eaf3ba8f0e6ea6f52250c29f619)
       expo-secure-store:
         specifier: ~58.0.2
         version: 58.0.2(expo@58.0.10)
@@ -827,7 +827,7 @@ importers:
         version: 5.1.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       sonner-native:
         specifier: 0.27.0
-        version: 0.27.0(7b6976084ac3c6dac7dc30eb63706c21)
+        version: 0.27.0(394e4e0ffdd243edf42ad09e0a4f72c7)
       tailwind-merge:
         specifier: 3.7.0
         version: 3.7.0
@@ -1000,7 +1000,7 @@ importers:
         version: 3.1.0
       '@assistant-ui/react':
         specifier: 0.15.31
-        version: 0.15.31(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(ai@7.0.29(zod@4.6.7))(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(use-sync-external-store@1.7.0(react@19.2.6))
+        version: 0.15.31(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(ai@7.0.29(zod@4.6.7))(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(use-sync-external-store@1.7.0(react@19.2.6))
       '@aws-sdk/client-s3':
         specifier: 3.1009.0
         version: 3.1009.0
@@ -1243,7 +1243,7 @@ importers:
         version: 3.4.6(@aws-sdk/credential-provider-web-identity@3.972.20)
       '@vercel/otel':
         specifier: 2.1.2
-        version: 2.1.2(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.212.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))
+        version: 2.1.2(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.1)(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/resources@2.12.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.212.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))
       '@workos-inc/node':
         specifier: 'catalog:'
         version: 11.0.0
@@ -1324,7 +1324,7 @@ importers:
         version: 10.6.2
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
       jotai:
         specifier: 2.18.1
         version: 2.18.1(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6)
@@ -1759,10 +1759,10 @@ importers:
     dependencies:
       '@modelcontextprotocol/ext-apps':
         specifier: 1.7.5
-        version: 1.7.5(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)
+        version: 1.7.5(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)
       '@modelcontextprotocol/sdk':
         specifier: 1.32.1
-        version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+        version: 1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7)
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
@@ -2154,7 +2154,7 @@ importers:
         version: 3.4.6(@aws-sdk/credential-provider-web-identity@3.972.20)
       '@vercel/otel':
         specifier: 2.1.2
-        version: 2.1.2(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.212.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))
+        version: 2.1.2(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.1)(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/resources@2.12.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.212.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))
       aws4fetch:
         specifier: 'catalog:'
         version: 1.0.20
@@ -2178,7 +2178,7 @@ importers:
         version: 10.6.2
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.3
@@ -2263,7 +2263,7 @@ importers:
     dependencies:
       '@cfworker/json-schema':
         specifier: 'catalog:'
-        version: 4.1.1
+        version: 4.1.6
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../app-shared
@@ -2290,7 +2290,7 @@ importers:
         version: 4.13.13
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2480,7 +2480,7 @@ importers:
         version: link:../../packages/worker-utils
       '@sentry/cloudflare':
         specifier: 10.69.0
-        version: 10.69.0(patch_hash=8b0dd1b1c534b6ac3e13b1a85cbf1d5ab5b7ad5dda6c74a65d3b7b3f6a975802)(@cloudflare/workers-types@4.20260605.1)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 10.69.0(patch_hash=8b0dd1b1c534b6ac3e13b1a85cbf1d5ab5b7ad5dda6c74a65d3b7b3f6a975802)(@cloudflare/workers-types@4.20260605.1)(wrangler@4.158.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@sentry/core':
         specifier: 10.69.0
         version: 10.69.0
@@ -2762,7 +2762,7 @@ importers:
         version: 4.13.13
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2860,7 +2860,7 @@ importers:
     dependencies:
       '@cfworker/json-schema':
         specifier: 'catalog:'
-        version: 4.1.1
+        version: 4.1.6
       '@cloudflare/workers-oauth-provider':
         specifier: 'catalog:'
         version: 0.10.3
@@ -2906,7 +2906,7 @@ importers:
         version: 4.13.13
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -2955,7 +2955,7 @@ importers:
         version: 4.13.13
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3001,7 +3001,7 @@ importers:
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
       workers-tagged-logger:
         specifier: 'catalog:'
         version: 1.0.0
@@ -3092,7 +3092,7 @@ importers:
         version: 0.28.2
       openclaw:
         specifier: 2026.7.1
-        version: 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@cfworker/json-schema@4.1.6)(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest:
         specifier: 'catalog:'
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
@@ -3116,7 +3116,7 @@ importers:
         version: 0.28.2
       openclaw:
         specifier: 2026.7.1
-        version: 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@cfworker/json-schema@4.1.6)(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest:
         specifier: 'catalog:'
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
@@ -3438,7 +3438,7 @@ importers:
         version: 4.13.13
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3484,7 +3484,7 @@ importers:
         version: 4.13.13
       jose:
         specifier: 'catalog:'
-        version: 6.2.12
+        version: 6.2.17
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -4753,8 +4753,8 @@ packages:
   '@bytecodealliance/preview2-shim@0.17.6':
     resolution: {integrity: sha512-n3cM88gTen5980UOBAD6xDcNNL3ocTK8keab21bpx1ONdA+ARj7uD1qoFxOWCyKlkpSi195FH+GeAut7Oc6zZw==}
 
-  '@cfworker/json-schema@4.1.1':
-    resolution: {integrity: sha512-gAmrUZSGtKc3AiBL71iNWxDsyUC5uMaKKGdvzYsBoTW/xi42JQHl7eKV2OYzCUqvc+D2RCcf7EXY2iCyFIk6og==}
+  '@cfworker/json-schema@4.1.6':
+    resolution: {integrity: sha512-YzVGTHXf4bzlyAL5KAvHYCdNbbt6zM5cYkAgxqxQPDQM6aZ4ShIIN5yJ+6q7YeonnevxT8k/LmD2tJi/jOiKkg==}
 
   '@chat-adapter/github@4.36.0':
     resolution: {integrity: sha512-uAM3qM7W8RPQc859SgSdfK1UYm/eX33QJW7c0ej4tp+XxSDp5hBF6iNiUFLAEqcQ0anBy1U8D8r6+K/ewllmOA==}
@@ -17709,6 +17709,9 @@ packages:
   jose@6.2.12:
     resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
+  jose@6.2.17:
+    resolution: {integrity: sha512-wOuK9V1yujQFH5S0ZWmLcDZN7+IKh9bUCC2ZPCf2HDlol3WWHy+PPyNjEI75FXRLMp3vDKQcupP59xhVU95hcg==}
+
   jotai-family@1.0.2:
     resolution: {integrity: sha512-U1aTMGxmsmz2Z8gaJD1/ljmMnsmG4/dqrcsfwGbjWV7p6boB9Vy3+75YwUpwPj7GbLNJk9O8rl1VNi8d7+6Rxw==}
     engines: {node: '>=12.20.0'}
@@ -18873,6 +18876,7 @@ packages:
 
   node-abort-controller@3.1.1:
     resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
+    deprecated: This package is no longer needed on supported Node.js versions. Node.js 16+ includes AbortController and AbortSignal as built-in globals. All Node.js versions requiring this polyfill are end-of-life. Use the built-in globals instead.
 
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
@@ -22944,11 +22948,11 @@ snapshots:
 
   '@asamuzakjp/nwsapi@2.3.9': {}
 
-  '@assistant-ui/core@0.3.31(@assistant-ui/store@0.3.22(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))(@types/react@19.2.14)(ai@7.0.29(zod@4.6.7))(react@19.2.6)':
+  '@assistant-ui/core@0.3.31(@assistant-ui/store@0.3.22(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))(@types/react@19.2.14)(ai@7.0.29(zod@4.6.7))(react@19.2.6)':
     dependencies:
       '@assistant-ui/store': 0.3.22(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6)
       '@assistant-ui/tap': 0.9.24(@types/react@19.2.14)(react@19.2.6)
-      assistant-cloud: 0.2.8(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))(ai@7.0.29(zod@4.6.7))
+      assistant-cloud: 0.2.8(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))(ai@7.0.29(zod@4.6.7))
       assistant-stream: 0.3.54(ai@7.0.29(zod@4.6.7))
       nanoid: 6.0.2
     optionalDependencies:
@@ -22962,12 +22966,12 @@ snapshots:
       - ioredis
       - redis
 
-  '@assistant-ui/react@0.15.31(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(ai@7.0.29(zod@4.6.7))(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(use-sync-external-store@1.7.0(react@19.2.6))':
+  '@assistant-ui/react@0.15.31(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(ai@7.0.29(zod@4.6.7))(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(use-sync-external-store@1.7.0(react@19.2.6))':
     dependencies:
-      '@assistant-ui/core': 0.3.31(@assistant-ui/store@0.3.22(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))(@types/react@19.2.14)(ai@7.0.29(zod@4.6.7))(react@19.2.6)
+      '@assistant-ui/core': 0.3.31(@assistant-ui/store@0.3.22(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))(@types/react@19.2.14)(ai@7.0.29(zod@4.6.7))(react@19.2.6)
       '@assistant-ui/store': 0.3.22(@assistant-ui/tap@0.9.24(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6)
       '@assistant-ui/tap': 0.9.24(@types/react@19.2.14)(react@19.2.6)
-      assistant-cloud: 0.2.8(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))(ai@7.0.29(zod@4.6.7))
+      assistant-cloud: 0.2.8(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))(ai@7.0.29(zod@4.6.7))
       assistant-stream: 0.3.54(ai@7.0.29(zod@4.6.7))
       radix-ui: 1.8.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react: 19.2.6
@@ -24391,7 +24395,7 @@ snapshots:
 
   '@bytecodealliance/preview2-shim@0.17.6': {}
 
-  '@cfworker/json-schema@4.1.1': {}
+  '@cfworker/json-schema@4.1.6': {}
 
   '@chat-adapter/github@4.36.0(ai@7.0.29(zod@4.6.7))(zod@4.6.7)':
     dependencies:
@@ -25459,7 +25463,7 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(c3e45dcd5d1508362f3d19799505262f)
+      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(d0c60bfe1ae7b062c3702a5681853354)
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@expo/metro-runtime'
@@ -25541,7 +25545,7 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(11d1521f2e7c56a7a15c40f73aa03776)
+      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(08dd87a8d511148a86e8e4635a04d6a4)
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@expo/metro-runtime'
@@ -25623,7 +25627,7 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(aa9e0f2e012d774790f9138f88c7e186)
+      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(e1785eaf3ba8f0e6ea6f52250c29f619)
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@expo/metro-runtime'
@@ -26290,7 +26294,7 @@ snapshots:
       react: 19.2.6
     optionalDependencies:
       '@expo/metro-runtime': 58.0.14(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
-      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(c3e45dcd5d1508362f3d19799505262f)
+      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(d0c60bfe1ae7b062c3702a5681853354)
       react-dom: 19.2.6(react@19.2.6)
     transitivePeerDependencies:
       - supports-color
@@ -26306,7 +26310,7 @@ snapshots:
       react: 19.2.6
     optionalDependencies:
       '@expo/metro-runtime': 58.0.14(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
-      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(11d1521f2e7c56a7a15c40f73aa03776)
+      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(08dd87a8d511148a86e8e4635a04d6a4)
       react-dom: 19.2.6(react@19.2.6)
     transitivePeerDependencies:
       - supports-color
@@ -26322,7 +26326,7 @@ snapshots:
       react: 19.3.0
     optionalDependencies:
       '@expo/metro-runtime': 58.0.14(expo@58.0.10)(react-dom@19.2.6(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(aa9e0f2e012d774790f9138f88c7e186)
+      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(e1785eaf3ba8f0e6ea6f52250c29f619)
       react-dom: 19.2.6(react@19.3.0)
     transitivePeerDependencies:
       - supports-color
@@ -26503,14 +26507,14 @@ snapshots:
 
   '@fregante/relaxed-json@2.0.0': {}
 
-  '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
+  '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       google-auth-library: 10.6.2
       p-retry: 4.6.2
       protobufjs: 7.6.5
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -27855,16 +27859,16 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@modelcontextprotocol/ext-apps@1.7.5(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)':
+  '@modelcontextprotocol/ext-apps@1.7.5(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7)
       '@standard-schema/spec': 1.1.0
       zod: 4.6.7
     optionalDependencies:
       react: 19.3.0
       react-dom: 19.2.6(react@19.3.0)
 
-  '@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)':
+  '@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7)':
     dependencies:
       '@hono/node-server': 2.0.10(hono@4.13.13)
       ajv: 8.20.0
@@ -27884,7 +27888,7 @@ snapshots:
       zod: 4.6.7
       zod-to-json-schema: 3.25.1(zod@4.6.7)
     optionalDependencies:
-      '@cfworker/json-schema': 4.1.1
+      '@cfworker/json-schema': 4.1.6
     transitivePeerDependencies:
       - supports-color
 
@@ -28260,10 +28264,10 @@ snapshots:
 
   '@open-draft/deferred-promise@2.2.0': {}
 
-  '@openclaw/ai@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)':
+  '@openclaw/ai@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)':
     dependencies:
       '@anthropic-ai/sdk': 0.109.1(zod@4.6.7)
-      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@mistralai/mistralai': 2.4.0(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)
       partial-json: 0.1.7
@@ -31684,7 +31688,7 @@ snapshots:
       '@sentry/cli-win32-i686': 3.8.0
       '@sentry/cli-win32-x64': 3.8.0
 
-  '@sentry/cloudflare@10.69.0(patch_hash=8b0dd1b1c534b6ac3e13b1a85cbf1d5ab5b7ad5dda6c74a65d3b7b3f6a975802)(@cloudflare/workers-types@4.20260605.1)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@sentry/cloudflare@10.69.0(patch_hash=8b0dd1b1c534b6ac3e13b1a85cbf1d5ab5b7ad5dda6c74a65d3b7b3f6a975802)(@cloudflare/workers-types@4.20260605.1)(wrangler@4.158.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@sentry/core': 10.69.0
@@ -31692,7 +31696,7 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260605.1
-      wrangler: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      wrangler: 4.158.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - supports-color
 
@@ -31895,7 +31899,7 @@ snapshots:
       '@expo/env': 2.5.2
       dotenv: 18.0.8
       expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
-      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(aa9e0f2e012d774790f9138f88c7e186)
+      expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(e1785eaf3ba8f0e6ea6f52250c29f619)
       metro-config: 0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-resolver: 0.87.1
       open: 11.0.0
@@ -34230,14 +34234,15 @@ snapshots:
 
   '@vercel/oidc@3.3.1': {}
 
-  '@vercel/otel@2.1.2(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.212.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))':
+  '@vercel/otel@2.1.2(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.1)(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/resources@2.12.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.212.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/api-logs': 0.208.0
-      '@opentelemetry/resources': 2.6.1(@opentelemetry/api@1.9.1)
+      '@opentelemetry/instrumentation': 0.220.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/resources': 2.12.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-logs': 0.212.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-metrics': 2.6.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-base': 2.2.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-trace-base': 2.12.0(@opentelemetry/api@1.9.1)
 
   '@vercel/prepare-flags-definitions@0.2.1': {}
 
@@ -34901,12 +34906,12 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
-  assistant-cloud@0.2.8(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.1))(ai@7.0.29(zod@4.6.7)):
+  assistant-cloud@0.2.8(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))(ai@7.0.29(zod@4.6.7)):
     dependencies:
       assistant-stream: 0.3.54(ai@7.0.29(zod@4.6.7))
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
-      '@opentelemetry/sdk-trace-base': 2.2.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-trace-base': 2.12.0(@opentelemetry/api@1.9.1)
       ai: 7.0.29(zod@4.6.7)
     transitivePeerDependencies:
       - ioredis
@@ -37617,7 +37622,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-router@58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(11d1521f2e7c56a7a15c40f73aa03776):
+  expo-router@58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(08dd87a8d511148a86e8e4635a04d6a4):
     dependencies:
       '@expo/log-box': 58.0.12(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
       '@expo/metro-runtime': 58.0.14(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
@@ -37654,43 +37659,7 @@ snapshots:
       - '@types/react-dom'
     optional: true
 
-  expo-router@58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(aa9e0f2e012d774790f9138f88c7e186):
-    dependencies:
-      '@expo/log-box': 58.0.12(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      '@expo/metro-runtime': 58.0.14(expo@58.0.10)(react-dom@19.2.6(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      '@expo/schema-utils': 58.0.2
-      '@radix-ui/react-slot': 1.2.4(@types/react@19.3.0)(react@19.3.0)
-      '@radix-ui/react-tabs': 1.1.13(@types/react-dom@19.2.3(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.6(react@19.3.0))(react@19.3.0)
-      '@react-native-masked-view/masked-view': 0.3.2(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      '@react-native/normalize-colors': 0.88.0-rc.4
-      client-only: 0.0.1
-      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
-      expo-constants: 58.0.12(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(typescript@7.0.2)
-      expo-glass-effect: 58.0.3(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      expo-linking: 58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
-      expo-server: 58.0.5
-      nanoid: 3.3.20
-      react: 19.3.0
-      react-fast-compare: 3.2.2
-      react-is: 19.2.8
-      react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
-      react-native-drawer-layout: 4.2.9(react-native-gesture-handler@3.3.0(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-reanimated@4.7.1(@types/react@19.3.0)(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      react-native-safe-area-context: 5.10.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      react-native-screens: 4.30.0(patch_hash=04f5928887daf68beb893363b4c73966d285f320360048c4555ed0bdfa66432a)(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      server-only: 0.0.1
-      sf-symbols-typescript: 2.2.0
-      standard-navigation: 0.0.5
-    optionalDependencies:
-      '@expo/ui': 58.0.17(patch_hash=26c40c3395b22f61322a5dc90aac41c92702076ab0fd3ce0da78a58583dd384e)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      react-dom: 19.2.6(react@19.3.0)
-      react-native-gesture-handler: 3.3.0(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      react-native-reanimated: 4.7.1(@types/react@19.3.0)(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      react-native-worklets: 0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-    transitivePeerDependencies:
-      - '@types/react'
-      - '@types/react-dom'
-
-  expo-router@58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(c3e45dcd5d1508362f3d19799505262f):
+  expo-router@58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(d0c60bfe1ae7b062c3702a5681853354):
     dependencies:
       '@expo/log-box': 58.0.12(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
       '@expo/metro-runtime': 58.0.14(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
@@ -37726,6 +37695,42 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
     optional: true
+
+  expo-router@58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(e1785eaf3ba8f0e6ea6f52250c29f619):
+    dependencies:
+      '@expo/log-box': 58.0.12(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      '@expo/metro-runtime': 58.0.14(expo@58.0.10)(react-dom@19.2.6(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      '@expo/schema-utils': 58.0.2
+      '@radix-ui/react-slot': 1.2.4(@types/react@19.3.0)(react@19.3.0)
+      '@radix-ui/react-tabs': 1.1.13(@types/react-dom@19.2.3(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.6(react@19.3.0))(react@19.3.0)
+      '@react-native-masked-view/masked-view': 0.3.2(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      '@react-native/normalize-colors': 0.88.0-rc.4
+      client-only: 0.0.1
+      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
+      expo-constants: 58.0.12(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(typescript@7.0.2)
+      expo-glass-effect: 58.0.3(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      expo-linking: 58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
+      expo-server: 58.0.5
+      nanoid: 3.3.20
+      react: 19.3.0
+      react-fast-compare: 3.2.2
+      react-is: 19.2.8
+      react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
+      react-native-drawer-layout: 4.2.9(react-native-gesture-handler@3.3.0(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-reanimated@4.7.1(@types/react@19.3.0)(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      react-native-safe-area-context: 5.10.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      react-native-screens: 4.30.0(patch_hash=04f5928887daf68beb893363b4c73966d285f320360048c4555ed0bdfa66432a)(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      server-only: 0.0.1
+      sf-symbols-typescript: 2.2.0
+      standard-navigation: 0.0.5
+    optionalDependencies:
+      '@expo/ui': 58.0.17(patch_hash=26c40c3395b22f61322a5dc90aac41c92702076ab0fd3ce0da78a58583dd384e)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      react-dom: 19.2.6(react@19.3.0)
+      react-native-gesture-handler: 3.3.0(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      react-native-reanimated: 4.7.1(@types/react@19.3.0)(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      react-native-worklets: 0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+    transitivePeerDependencies:
+      - '@types/react'
+      - '@types/react-dom'
 
   expo-secure-store@58.0.2(expo@58.0.10):
     dependencies:
@@ -40360,6 +40365,8 @@ snapshots:
 
   jose@6.2.12: {}
 
+  jose@6.2.17: {}
+
   jotai-family@1.0.2(jotai@2.18.1(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6)):
     dependencies:
       jotai: 2.18.1(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6)
@@ -42227,22 +42234,22 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.6.7
 
-  openclaw@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  openclaw@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@cfworker/json-schema@4.1.6)(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@agentclientprotocol/sdk': 1.1.0(zod@4.6.7)
       '@anthropic-ai/sdk': 0.109.1(zod@4.6.7)
       '@clack/core': 1.4.2
       '@clack/prompts': 1.6.0
       '@earendil-works/pi-tui': 0.80.3
-      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@grammyjs/runner': 2.0.3(grammy@1.44.0)
       '@grammyjs/transformer-throttler': 1.2.1(grammy@1.44.0)
       '@homebridge/ciao': 1.3.9
       '@lydell/node-pty': 1.2.0-beta.12
       '@mistralai/mistralai': 2.4.0(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7)
       '@mozilla/readability': 0.6.0
-      '@openclaw/ai': 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)
+      '@openclaw/ai': 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.6)(zod@4.6.7))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)
       '@openclaw/fs-safe': 0.4.1
       '@openclaw/proxyline': 0.3.3(undici@8.12.2)
       '@silvia-odwyer/photon-node': 0.3.4
@@ -44897,7 +44904,7 @@ snapshots:
     dependencies:
       atomic-sleep: 1.0.0
 
-  sonner-native@0.27.0(7b6976084ac3c6dac7dc30eb63706c21):
+  sonner-native@0.27.0(394e4e0ffdd243edf42ad09e0a4f72c7):
     dependencies:
       react: 19.3.0
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)

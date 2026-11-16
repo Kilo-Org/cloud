@@ -108,6 +108,7 @@ function modernContext(
   organizationId?: string
 ): SessionRegistrationContext {
   ctx.env.NEXTAUTH_SECRET = 'registration-test-secret';
+  ctx.env.ENVIRONMENT = 'development';
   ctx.authToken = jwt.sign(
     {
       kiloUserId: ctx.userId,

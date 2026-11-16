@@ -2,9 +2,10 @@
  * The deployment environment that the runtime admission check binds control
  * tokens to, matching the `env` claim the token minters set
  * (`process.env.NODE_ENV`): `production` for the deployed Worker and
- * `development` for local dev (`env.dev` / `.dev.vars`). Any other configured
- * value would refuse every admission, so normalize the two supported values.
+ * `development` only when the configuration names it. Anything else resolves
+ * to `production`, so a missing or misspelled value refuses development-labeled
+ * tokens rather than admitting them.
  */
 export function tokenEnvironment(env: { ENVIRONMENT?: string }): 'production' | 'development' {
-  return env.ENVIRONMENT === 'production' ? 'production' : 'development';
+  return env.ENVIRONMENT === 'development' ? 'development' : 'production';
 }

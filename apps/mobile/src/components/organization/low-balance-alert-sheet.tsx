@@ -62,12 +62,12 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       (thresholdError(thresholdRef.current) == null && emailsError(emailsRef.current) == null)
   );
 
-  // A stored amount outside the field's bounds would otherwise leave Save
-  // disabled with nothing under the field; the mount names it, and the first
-  // edit hands the field back to its own live rule.
-  const [storedThresholdError, setStoredThresholdError] = useState<string | null>(() =>
-    thresholdRef.current.trim() === '' ? null : thresholdError(thresholdRef.current)
-  );
+  // The field's own rule runs on change and blur, so opening the form — or
+  // switching the alert back on — would otherwise show a disabled Save with
+  // nothing under a value that is already out of bounds.
+  const seededThresholdError = () =>
+    thresholdRef.current.trim() === '' ? null : thresholdError(thresholdRef.current);
+  const [storedThresholdError, setStoredThresholdError] = useState(seededThresholdError);
 
   const revalidate = (nextEnabled: boolean, thresholdValue: string, emailsValue: string) => {
     setCanSave(
@@ -118,6 +118,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           onValueChange={value => {
             selectionHaptic();
             setEnabled(value);
+            setStoredThresholdError(value ? seededThresholdError() : null);
             revalidate(value, thresholdRef.current, emailsRef.current);
             clearSaveError();
           }}

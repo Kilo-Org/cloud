@@ -264,6 +264,21 @@ describe('low balance alert sheet', () => {
       (threshold.props.onChangeText as (value: string) => void)('250');
     });
     expect(saveButtonOf(renderer).props.disabled).toBe(false);
+
+    // Switching the alert off unmounts the field and switching it back on
+    // remounts it with the draft still above the ceiling, so the field names
+    // the cap again instead of leaving Save disabled with no reason.
+    await act(() => {
+      (threshold.props.onChangeText as (value: string) => void)('1000000001');
+    });
+    await act(() => {
+      (toggle.props.onValueChange as (value: boolean) => void)(false);
+    });
+    await act(() => {
+      (toggle.props.onValueChange as (value: boolean) => void)(true);
+    });
+    expect(thresholdFieldOf(renderer).props.error).toBe(capSentence);
+    expect(saveButtonOf(renderer).props.disabled).toBe(true);
     unmount();
 
     // A stored amount above the ceiling names itself at the mount, with no

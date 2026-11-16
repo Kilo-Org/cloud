@@ -72,9 +72,8 @@ export async function handleModelsByProviderRequest() {
     );
   }
 
-  // The response now varies by authenticated organization, so a shared-cache
-  // entry could otherwise be served to an org member and bypass filtering.
-  // Keep this catalog per-client rather than shared (`s-maxage`).
+  // Organization members receive a filtered body from this route, so the
+  // catalog responses stay out of shared caches.
   return NextResponse.json(snapshot, {
     headers: CATALOG_CACHE_HEADERS.shared,
   });

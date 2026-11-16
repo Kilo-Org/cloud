@@ -1449,8 +1449,16 @@ test('a Pages pin move deploys the output shell beside Pages', t => {
   commit({ 'services/pages/source.json': '{"tag":"pages-111111111111"}' }, 'pin');
   const both = ['services/pages', 'services/pages-output'];
   // The source.json rule selects the shell whatever the workspace rule says.
-  assert.deepEqual(detected('pin'), both, 'the broad rule deploys the shell on a pin move');
-  assert.deepEqual(detected('pin', ['services/pages']), both, 'so does the workspace rule');
+  assert.deepEqual(
+    detected('pin'),
+    both,
+    'a pin move deploys the shell when workspace detection is unavailable'
+  );
+  assert.deepEqual(
+    detected('pin', ['services/pages']),
+    both,
+    'a pin move deploys the shell when the workspace rule selected only Pages'
+  );
 
   // A change to the shared archive code reaches the shell through the
   // workspace rule alone: the shell's build imports ../pages/scripts/, so

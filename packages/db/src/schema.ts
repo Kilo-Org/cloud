@@ -143,7 +143,6 @@ import type {
   KiloClawScheduledActionNotificationKind,
   DirectByokModel,
   ByokApiKeySettings,
-  ByokEndpointDefinition,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -7635,9 +7634,6 @@ export const byok_api_keys = pgTable(
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
     settings: jsonb().$type<ByokApiKeySettings>().default({}).notNull(),
-    /** Set exactly for endpoint keys (`BYOK_ENDPOINT_PROVIDER_ID_PREFIX`), which only
-     * organizations own. The encrypted envelope then holds `ByokEndpointCredentials` JSON. */
-    endpoint: jsonb().$type<ByokEndpointDefinition>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -7665,11 +7661,6 @@ export const byok_api_keys = pgTable(
         (${table.kilo_user_id} IS NOT NULL AND ${table.organization_id} IS NULL) OR
         (${table.kilo_user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
       )`
-    ),
-    check(
-      'byok_api_keys_endpoint_check',
-      sql`(${table.endpoint} IS NOT NULL) = (${table.provider_id} LIKE 'endpoint-%')
-        AND (${table.endpoint} IS NULL OR ${table.organization_id} IS NOT NULL)`
     ),
   ]
 );

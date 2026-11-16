@@ -2771,20 +2771,6 @@ export const ReasoningOptionSchema = z.discriminatedUnion('type', [
 
 export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
 
-/**
- * Per-key BYOK settings. Every field is optional so new settings need no backfill.
- * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
- * ids, so organization model policies apply to it.
- * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
- * same request. Keys without one keep their default order after every prioritized key.
- */
-export const ByokApiKeySettingsSchema = z.object({
-  serve_catalog_models: z.boolean().optional(),
-  priority: z.number().int().nonnegative().optional(),
-});
-
-export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
-
 export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
@@ -2806,13 +2792,17 @@ export const DirectByokModelEndpointSchema = z.enum([
 
 export type DirectByokModelEndpoint = z.infer<typeof DirectByokModelEndpointSchema>;
 
-export const DirectByokModelSchema = z.object({
-  id: z.string(),
+/** What model lists show about a BYOK model, shared by direct BYOK providers and endpoints. */
+export const ByokModelBaseSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
+});
+
+export const DirectByokModelSchema = ByokModelBaseSchema.extend({
+  id: z.string(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
   /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
   catalog_model_id: z.string().optional(),
@@ -3027,16 +3017,17 @@ const ByokEndpointModelOverridesSchema = z.object({
   reasoning_format: ByokEndpointReasoningFormatSchema.optional(),
 });
 
-export const ByokEndpointModelSchema = ByokEndpointModelOverridesSchema.extend({
-  /** The id clients use after the provider id; in catalog mode, the Kilo catalog id it serves. */
-  id: ByokEndpointModelIdSchema,
-  /** The id the upstream knows the model by. */
-  internal_id: z.string().trim().min(1).max(500),
-  name: z.string().trim().min(1).max(200).optional(),
-  context_length: z.number().int().positive(),
-  max_completion_tokens: z.number().int().positive(),
-  supports_image_input: z.boolean().optional(),
-});
+export const ByokEndpointModelSchema = ByokModelBaseSchema.omit({ description: true })
+  .extend({
+    /** The id clients use after the provider id; in catalog mode, the Kilo catalog id it serves. */
+    id: ByokEndpointModelIdSchema,
+    /** The id the upstream knows the model by. */
+    internal_id: z.string().trim().min(1).max(500),
+    name: z.string().trim().min(1).max(200).optional(),
+    context_length: z.number().int().positive(),
+    max_completion_tokens: z.number().int().positive(),
+  })
+  .extend(ByokEndpointModelOverridesSchema.shape);
 
 export type ByokEndpointModel = z.infer<typeof ByokEndpointModelSchema>;
 
@@ -3055,10 +3046,6 @@ export const ByokEndpointDefinitionSchema = z
     /** The API clients use: `anthropic` Messages, `openai` Responses, `openrouter` Chat Completions. */
     client_provider: CustomLlmProviderSchema,
     reasoning_format: ByokEndpointReasoningFormatSchema,
-    /** Forward OpenRouter's `provider` routing object, which only OpenRouter-compatible upstreams accept. */
-    forward_provider_routing: z.boolean().optional(),
-    /** Forward the hashed user and session ids Kilo adds (`user`, `safety_identifier`, ...). */
-    forward_tracking_ids: z.boolean().optional(),
     models: z.array(ByokEndpointModelSchema).min(1).max(BYOK_ENDPOINT_MAX_MODELS),
   })
   .superRefine((definition, ctx) => {
@@ -3096,6 +3083,23 @@ export const ByokEndpointCredentialsSchema = z.discriminatedUnion('type', [
 ]);
 
 export type ByokEndpointCredentials = z.infer<typeof ByokEndpointCredentialsSchema>;
+
+/**
+ * Per-key BYOK settings. Every field is optional so new settings need no backfill.
+ * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
+ * ids, so organization model policies apply to it.
+ * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
+ * same request. Keys without one keep their default order after every prioritized key.
+ * `endpoint`: set exactly for an organization's endpoint key (`BYOK_ENDPOINT_PROVIDER_ID_PREFIX`),
+ * whose encrypted envelope then holds `ByokEndpointCredentials` JSON.
+ */
+export const ByokApiKeySettingsSchema = z.object({
+  serve_catalog_models: z.boolean().optional(),
+  priority: z.number().int().nonnegative().optional(),
+  endpoint: ByokEndpointDefinitionSchema.optional(),
+});
+
+export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
 
 export const GatewayModelIdSchema = z
   .string()

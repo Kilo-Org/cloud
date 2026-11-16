@@ -45,14 +45,9 @@ vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
 }));
-vi.mock('expo-router', () => ({
-  useRouter: () => router,
-}));
-// The model row hands the picker the screen's guarded push, which forwards to
-// the router spy.
-vi.mock('@/lib/hooks/use-single-push-route', () => ({
-  useSinglePushRoute: () => router.push,
-}));
+vi.mock('expo-router', () => ({ useRouter: () => router }));
+// The model row hands the picker the screen's guarded push (the router spy).
+vi.mock('@/lib/hooks/use-single-push-route', () => ({ useSinglePushRoute: () => router.push }));
 vi.mock('@/components/ui/icons', () => ({
   Cpu: 'Cpu',
   WandSparkles: 'WandSparkles',

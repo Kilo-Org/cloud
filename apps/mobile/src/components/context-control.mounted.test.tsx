@@ -57,7 +57,7 @@ const pushMock = vi.hoisted(() => vi.fn());
 // The picker opener registers its press-burst reset through `useFocusEffect`.
 // Collecting the registered effects lets one case prove the guard really holds
 // a second press back inside a burst and really releases it on a return.
-type FocusEffect = () => void | (() => void);
+type FocusEffect = () => (() => void) | undefined;
 const focusEffects = vi.hoisted(() => [] as FocusEffect[]);
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: pushMock, back: vi.fn() }),

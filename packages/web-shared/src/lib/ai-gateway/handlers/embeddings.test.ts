@@ -1062,6 +1062,26 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
         user_byok: true,
       });
     });
+
+    it('keeps the caller’s provider routing on a personal Vercel AI Gateway key', async () => {
+      setUserAuth();
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: createUserVercelAiGatewayProvider('vck-owner'),
+        userByok: [{ providerId: 'vercel-ai-gateway', decryptedAPIKey: 'vck-owner' }],
+        isFree: false,
+      });
+      mockedMapModelIdToVercel.mockResolvedValue('openai/vercel-embedding-model');
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ provider: { only: ['azure'], order: ['azure'] } })
+      );
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toEqual({
+        gateway: { only: ['azure'], order: ['azure'] },
+      });
+    });
   });
 
   describe('ledger and response cost', () => {

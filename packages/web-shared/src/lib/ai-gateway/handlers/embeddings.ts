@@ -108,6 +108,9 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
 
   async buildUpstreamBody(input) {
     const { body, provider, userByok, dataRegion } = input;
+    // The organization's provider preferences replace the request's own, as on OpenRouter.
+    const routingPreferences =
+      input.organizationProvider ?? providerPreferencesSchema.optional().parse(body.provider);
     if (input.organizationProvider) body.provider = input.organizationProvider;
     body.safety_identifier = input.safetyIdentifier;
 
@@ -135,9 +138,15 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
       input.requestedModelLowerCased
     );
     upstreamBody.providerOptions = {
-      gateway: getUsageEndpointGatewayOptions({
+      gateway: await getUsageEndpointGatewayOptions({
+        vercelModelId: body.model,
         userByok,
-        provider: { ...input.organizationProvider, ...effectivePrivacy },
+        provider: {
+          only: routingPreferences?.only ?? undefined,
+          ignore: routingPreferences?.ignore ?? undefined,
+          order: routingPreferences?.order ?? undefined,
+          ...effectivePrivacy,
+        },
         dataRegion,
       }),
     };

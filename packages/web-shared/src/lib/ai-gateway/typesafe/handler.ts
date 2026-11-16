@@ -467,19 +467,21 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
+  const vercelModelId = isVercelRoute ? await mapModelIdToVercel(resolvedModel) : null;
   const upstream = await fetchUpstream({
     provider: isVercelRoute
       ? { ...route.provider, apiUrl: VERCEL_TYPESAFE_API_URL }
       : route.provider,
     path: '/systemone',
     method: 'POST',
-    body: isVercelRoute
+    body: vercelModelId
       ? {
-          model: await mapModelIdToVercel(resolvedModel),
+          model: vercelModelId,
           state: parsed.data.state,
           questions: parsed.data.questions,
           providerOptions: {
-            gateway: getUsageEndpointGatewayOptions({
+            gateway: await getUsageEndpointGatewayOptions({
+              vercelModelId,
               userByok,
               provider: providerPolicy,
               dataRegion,

@@ -2032,7 +2032,7 @@ describe('handleSystemOneRequest', () => {
       expect(response.status).toBe(200);
       const { gateway } = upstreamRequest(VERCEL_TYPESAFE_URL).body.providerOptions;
       expect(gateway.zeroDataRetention).toBe(true);
-      expect(gateway.only).toEqual(['typesafe']);
+      expect(gateway.only).toEqual(['typesafe-ai']);
     });
 
     it('normalizes a Vercel response to the OpenRouter-compatible shape and bills its cost', async () => {

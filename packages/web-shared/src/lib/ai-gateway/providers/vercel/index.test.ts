@@ -1121,3 +1121,72 @@ describe('isVercelRoutingOptOut', () => {
     expect(isVercelRoutingOptOut('moonshotai/kimi-k3-fast', optOutModels)).toBe(false);
   });
 });
+
+describe('getUsageEndpointGatewayOptions', () => {
+  async function loadGetOptions(vercelInferenceProviders: string[] | null) {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
+      getVercelModelsFromDatabase: jest.fn(),
+    }));
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
+      .getUsageEndpointGatewayOptions;
+  }
+
+  it("applies the request's ignore list to Kilo's route", async () => {
+    const getOptions = await loadGetOptions(['openai', 'azure']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { ignore: ['openai'], order: ['azure'] },
+        dataRegion: 'eu',
+      })
+    ).resolves.toEqual({
+      only: ['azure'],
+      order: ['azure'],
+      zeroDataRetention: undefined,
+      disallowPromptTraining: undefined,
+      inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+    });
+  });
+
+  it("translates TypeSafe's OpenRouter slug in the provider allow-list", async () => {
+    const getOptions = await loadGetOptions(['typesafe-ai', 'digitalocean']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'typesafe-ai/jev',
+        userByok: null,
+        provider: { only: ['typesafe'] },
+        dataRegion: null,
+      })
+    ).resolves.toMatchObject({ only: ['typesafe-ai'] });
+  });
+
+  it('drops an ignored provider key unless it is the last one', async () => {
+    const getOptions = await loadGetOptions(null);
+    const userByok = [
+      { decryptedAPIKey: 'sk-openai', providerId: 'openai' },
+      { decryptedAPIKey: 'sk-mistral', providerId: 'mistral' },
+    ] as const;
+
+    const some = await getOptions({
+      vercelModelId: 'openai/text-embedding-3-small',
+      userByok: [...userByok],
+      provider: { ignore: ['openai'] },
+      dataRegion: 'eu',
+    });
+    expect(some.only).toEqual(['mistral']);
+    expect(some).not.toHaveProperty('inferenceRegion');
+
+    const all = await getOptions({
+      vercelModelId: 'openai/text-embedding-3-small',
+      userByok: [userByok[0]],
+      provider: { ignore: ['openai'] },
+      dataRegion: null,
+    });
+    expect(all.only).toEqual(['openai']);
+  });
+});

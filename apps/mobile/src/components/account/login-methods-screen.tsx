@@ -131,8 +131,8 @@ function ProviderRow({
  * control is disabled and carries that sentence as its hint, and the same
  * sentence sits under the row, so the reader learns why without asking the
  * server. Because the row already says it, the status stays silent for a
- * last-method answer on a one-method list and speaks it only once the list has
- * gained a second method.
+ * last-method answer while the list still shows one method, and the answer's
+ * refresh hands this screen the one-method list that makes the rows agree.
  *
  * Adding a method is the web's round trip (the OAuth callback needs the browser
  * session that starts it), so the row opens the connected-accounts page in the
@@ -164,6 +164,10 @@ export function LoginMethodsScreen() {
         const knownRefusal = signInMethodRefusalForCode(readTrpcErrorField(error, 'upstreamCode'));
         if (knownRefusal === 'lastMethod') {
           setRefusal({ kind: 'lastMethod' });
+          // The server only declines a one-method account, so a list that
+          // still draws two rows is stale: refresh it, and the row note owns
+          // the sentence instead of a status that the rows contradict.
+          void queryClient.invalidateQueries({ queryKey: trpc.user.getAuthProviders.queryKey() });
           return;
         }
         if (knownRefusal === 'notLinked') {

@@ -220,11 +220,14 @@ describe('LoginMethodsScreen', () => {
     });
 
     expect(statusMessages(root)).toEqual([LAST_METHOD]);
-    expect(state.invalidateQueries).not.toHaveBeenCalled();
+    // The answer contradicts the two-method list this render drew, so the
+    // refresh reconciles it before the reader taps again.
+    expect(state.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['user', 'getAuthProviders'],
+    });
   });
 
-  it('leaves the status silent for a server last-method answer on a one-method list', async () => {
-    state.providers = [{ provider: 'github', email: 'ada@example.test' }];
+  it('refreshes a stale two-method list a server last-method answer contradicts', async () => {
     const root = await mount();
 
     act(() => {
@@ -232,28 +235,32 @@ describe('LoginMethodsScreen', () => {
         Object.assign(new Error('Cannot unlink the last authentication method'), {
           data: { upstreamCode: 'last_sign_in_method' },
         }),
-        { provider: 'github' }
+        { provider: 'google' }
       );
     });
 
-    // The row note already states the rule; the status stays quiet.
-    expect(noteTexts(root)).toHaveLength(1);
-    expect(statusMessages(root)).toEqual([null]);
-    expect(state.invalidateQueries).not.toHaveBeenCalled();
+    // The server only declines a one-method account, so the two-method list
+    // this render drew is stale: the refresh reconciles it.
+    expect(state.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['user', 'getAuthProviders'],
+    });
+    expect(statusMessages(root)).toEqual([LAST_METHOD]);
 
-    // Once a second method exists the rows no longer state the rule, so the
-    // standing server answer is the list's only copy of it and is spoken.
-    state.providers = [
-      { provider: 'github', email: 'ada@example.test' },
-      { provider: 'google', email: 'ada@example.test' },
-    ];
+    // The refreshed list holds one method: the row draws disabled with its
+    // note, and the status stays silent instead of speaking above enabled rows.
+    state.providers = [{ provider: 'github', email: 'ada@example.test' }];
     rerender();
     if (!renderer) {
       throw new Error('missing mounted tree');
     }
-    expect(unlinkButtons(renderer.root)).toHaveLength(2);
-    expect(noteTexts(renderer.root)).toHaveLength(0);
-    expect(statusMessages(renderer.root)).toEqual([LAST_METHOD]);
+    const [github] = unlinkButtons(renderer.root);
+    if (!github) {
+      throw new Error('missing GitHub unlink button');
+    }
+    expect(github.props.disabled).toBe(true);
+    expect(github.props.accessibilityHint).toBe(LAST_METHOD);
+    expect(noteTexts(renderer.root)).toHaveLength(1);
+    expect(statusMessages(renderer.root)).toEqual([null]);
   });
 
   it('names the provider a stale row still shows and reloads the list', async () => {

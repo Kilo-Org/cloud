@@ -43,6 +43,10 @@ export function InputGuardrailsSection({
 }>) {
   const { t } = useTranslation();
   const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+  // Apply Kilo Default rewrites the policy text, and the field below reads it
+  // only on mount: the sub-form is remounted so the text on screen is the
+  // draft's.
+  const [policyGeneration, setPolicyGeneration] = useState(0);
   const policy = draft.detectors.policy_violation;
 
   const setPolicy = (patch: {
@@ -104,9 +108,10 @@ export function InputGuardrailsSection({
             }}
           >
             {id === 'policy_violation' && policy.enabled ? (
-              <View className="gap-3">
+              <View key={`policy-${policyGeneration}`} className="gap-3">
                 <PolicyFormatField
                   format={policy.format}
+                  disabled={disabled}
                   onChange={format => {
                     setPolicy({ format });
                   }}
@@ -143,6 +148,7 @@ export function InputGuardrailsSection({
             ...current,
             detectors: applyKiloDefaultPreset(current.detectors),
           }));
+          setPolicyGeneration(generation => generation + 1);
         }}
       >
         <Text>{t('organizationGuardrails.applyKiloDefault')}</Text>
@@ -164,7 +170,7 @@ export function InputGuardrailsSection({
         cancelLabel={t('common.cancel')}
         onSelect={index => {
           const groupId = index === 0 ? null : (groups[index - 1]?.id ?? null);
-          onChange(current => ({ ...current, group_id: groupId }));
+          onChange(current => ({ ...current, groupId }));
           setGroupPickerOpen(false);
         }}
         onClose={() => {

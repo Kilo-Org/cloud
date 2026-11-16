@@ -65,6 +65,7 @@ export function DetectorCard({
         options={options}
         value={choice}
         onChange={onChoiceChange}
+        disabled={disabled}
         accessibilityLabel={label}
       />
       {choice === 'off' ? null : (
@@ -156,9 +157,11 @@ export function LineListField({
 export function PolicyFormatField({
   format,
   onChange,
+  disabled,
 }: Readonly<{
   format: PolicyFormat;
   onChange: (next: PolicyFormat) => void;
+  disabled: boolean;
 }>) {
   const { t } = useTranslation();
   return (
@@ -173,6 +176,7 @@ export function PolicyFormatField({
         ]}
         value={format}
         onChange={onChange}
+        disabled={disabled}
         accessibilityLabel={t('organizationGuardrails.policyFormat')}
       />
       <Text className="text-xs text-muted-foreground">

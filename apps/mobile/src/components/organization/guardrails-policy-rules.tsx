@@ -29,6 +29,18 @@ import {
 import { createPolicyRule } from '@/lib/organization/guardrails-issues';
 
 /**
+ * A key that follows one rule through the list's edits. Rule boxes hold
+ * uncontrolled fields, so a box has to keep its own rule through a deletion; a
+ * positional key would leave the deleted rule's text in the shifted rule's box.
+ */
+let nextRuleKey = 0;
+
+function mintRuleKey(): string {
+  nextRuleKey += 1;
+  return `rule-${nextRuleKey}`;
+}
+
+/**
  * The policy violation detector's structured rules: one box per rule with its
  * id, name, text, category, applicability, severity, and the frameworks it
  * cites. Capped at `GUARDRAILS_LIMITS.rules`, the same cap the save applies.
@@ -45,6 +57,12 @@ export function PolicyRulesEditor({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
+  // Reminted only when the array is replaced from outside the editor; the
+  // editor's own add and remove keep every surviving rule's key.
+  const [ruleKeys, setRuleKeys] = useState<readonly string[]>(() => rules.map(() => mintRuleKey()));
+  if (ruleKeys.length !== rules.length) {
+    setRuleKeys(rules.map(() => mintRuleKey()));
+  }
 
   const updateRule = (index: number, patch: Partial<OrgPolicyRule>) => {
     onChange(rules.map((rule, at) => (at === index ? { ...rule, ...patch } : rule)));
@@ -66,6 +84,7 @@ export function PolicyRulesEditor({
         at === openMenu.index ? withMenuChoice(current, openMenu, optionIndex) : current
       )
     );
+    setOpenMenu(null);
   };
 
   return (
@@ -76,9 +95,7 @@ export function PolicyRulesEditor({
         </Text>
       ) : (
         rules.map((rule, index) => (
-          // Keyed by position: the rule id is an editable field, so keying by it
-          // would remount the box (and drop the caret) on every keystroke.
-          <View key={index} className="gap-3 rounded-lg bg-background p-3">
+          <View key={ruleKeys[index] ?? index} className="gap-3 rounded-lg bg-background p-3">
             <View className="flex-row items-center justify-between gap-2">
               <Text className="text-sm font-medium text-foreground">
                 {t('organizationGuardrails.ruleNumber', { number: index + 1 })}
@@ -91,6 +108,7 @@ export function PolicyRulesEditor({
                   number: index + 1,
                 })}
                 onPress={() => {
+                  setRuleKeys(keys => keys.filter((_key, at) => at !== index));
                   onChange(rules.filter((_rule, at) => at !== index));
                 }}
               >
@@ -187,6 +205,7 @@ export function PolicyRulesEditor({
         className="self-start"
         disabled={disabled || rules.length >= GUARDRAILS_LIMITS.rules}
         onPress={() => {
+          setRuleKeys(keys => [...keys, mintRuleKey()]);
           onChange([...rules, createPolicyRule(rules)]);
         }}
       >

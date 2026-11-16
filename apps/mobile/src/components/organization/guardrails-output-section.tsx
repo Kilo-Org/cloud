@@ -118,6 +118,7 @@ export function OutputGuardrailsSection({
               <View className="gap-3">
                 <PolicyFormatField
                   format={policy.format}
+                  disabled={disabled}
                   onChange={format => {
                     setDetectors(current => ({
                       ...current,

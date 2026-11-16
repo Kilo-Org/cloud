@@ -156,6 +156,14 @@ function GuardrailsForm({
   const [syncedKey, setSyncedKey] = useState(serverKey);
   const [baseline, setBaseline] = useState(() => toDraft(config));
   const [draft, setDraft] = useState(() => toDraft(config));
+  // Both sections' text fields are uncontrolled: they read their `defaultValue`
+  // on mount, so replacing the whole draft (a rebase, a save's answer, Cancel)
+  // remounts them rather than leaving text the draft no longer holds.
+  const [draftGeneration, setDraftGeneration] = useState(0);
+  const replaceDraft = (next: GuardrailsDraft) => {
+    setDraft(next);
+    setDraftGeneration(generation => generation + 1);
+  };
 
   // A refetch that moved the server's configuration rebases the form, unless
   // the form holds edits of its own: those win, and the next save replaces the
@@ -166,7 +174,7 @@ function GuardrailsForm({
     const clean = draftsEqual(draft, baseline, outputAvailable);
     setBaseline(next);
     if (clean) {
-      setDraft(next);
+      replaceDraft(next);
     }
   }
 
@@ -200,7 +208,7 @@ function GuardrailsForm({
       };
       setSyncedKey(configKey(saved, outputAvailable));
       setBaseline(toDraft(saved));
-      setDraft(toDraft(saved));
+      replaceDraft(toDraft(saved));
       attempt.succeed();
     } catch (error) {
       attempt.fail({
@@ -241,6 +249,7 @@ function GuardrailsForm({
       ) : null}
 
       <InputGuardrailsSection
+        key={`input-${draftGeneration}`}
         draft={draft}
         groups={groups}
         disabled={saving}
@@ -248,7 +257,12 @@ function GuardrailsForm({
       />
 
       {outputAvailable ? (
-        <OutputGuardrailsSection draft={draft} disabled={saving} onChange={editDraft} />
+        <OutputGuardrailsSection
+          key={`output-${draftGeneration}`}
+          draft={draft}
+          disabled={saving}
+          onChange={editDraft}
+        />
       ) : null}
 
       <View className="gap-2">
@@ -268,7 +282,7 @@ function GuardrailsForm({
             disabled={!dirty || saving}
             onPress={() => {
               clearWhere(() => true);
-              setDraft(baseline);
+              replaceDraft(baseline);
             }}
           >
             <Text>{t('common.cancel')}</Text>

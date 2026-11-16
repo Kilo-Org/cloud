@@ -141,6 +141,20 @@ describe('classifyAuthResponse', () => {
     ).toEqual({ kind: 'terminal', status: 403, clearCredential: false });
   });
 
+  it('treats a 403 carrying the 400-only INVALID_REQUEST body as an intermediary refusal', () => {
+    // The refresh route writes `INVALID_REQUEST` only alongside a 400 (its
+    // frozen contract has no other use for the code), so a 403 carrying it is
+    // an edge or gateway answering with the same generic word. Matching it
+    // would end a session the route never refused.
+    expect(
+      classifyAuthResponse({
+        path: '/api/auth/native/refresh',
+        status: 403,
+        body: { error: 'INVALID_REQUEST' },
+      })
+    ).toEqual({ kind: 'retry', status: 403, retryAfterMs: undefined });
+  });
+
   it.each([400, 403, 404, 409, 425])(
     'classifies a 4xx with no retry guidance (%i) as terminal and never retries it',
     status => {

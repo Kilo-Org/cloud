@@ -31,13 +31,18 @@ import { captureTelemetry } from '@/lib/telemetry/error-sink';
 const STORED_CREDENTIAL_ROUTE = '/api/auth/native/refresh';
 
 /**
- * The refusal bodies the frozen native refresh contract lets that route write:
- * `401 { error: 'INVALID_REFRESH_TOKEN' | 'SESSION_REVOKED' | 'USER_BLOCKED' }`
- * and `400 { error: 'INVALID_REQUEST' }`. The route has no other status, so a
- * body outside this schema did not come from it.
+ * The refusal bodies the frozen native refresh contract lets that route write
+ * beside a refusal of the *stored* credential:
+ * `401 { error: 'INVALID_REFRESH_TOKEN' | 'SESSION_REVOKED' | 'USER_BLOCKED' }`.
+ * The route's fourth body, `400 { error: 'INVALID_REQUEST' }`, is its
+ * unreadable-body answer: it says nothing about a stored pair, and a 400 is
+ * already terminal here, so it has no place in a 403 discriminator — a gateway
+ * that answers 403 with the same generic word would otherwise end a session the
+ * route never refused. The route has no other status, so a body outside this
+ * schema did not come from it.
  */
 const RefreshRefusalBodySchema = z.object({
-  error: z.enum(['INVALID_REFRESH_TOKEN', 'SESSION_REVOKED', 'USER_BLOCKED', 'INVALID_REQUEST']),
+  error: z.enum(['INVALID_REFRESH_TOKEN', 'SESSION_REVOKED', 'USER_BLOCKED']),
 });
 
 /** True when a response body is one the native refresh route writes for a refusal. */

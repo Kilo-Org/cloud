@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 import * as z from 'zod';
 
 import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
+import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 
 /**
  * Client for the bouncer worker (https://bouncer.kiloapps.io, repo Kilo-Org/bouncer).
@@ -446,7 +446,9 @@ function compact<T extends Record<string, unknown>>(body: T): Record<string, unk
 
 type PostResult =
   | { ok: true; status: number; response: Response }
-  | { ok: false; status: number | null; error: string };
+  /** The endpoint or the key is absent, or the endpoint is not one this client sends to. */
+  | { ok: false; kind: 'unconfigured' }
+  | { ok: false; kind: 'failed'; status: number | null; error: string };
 
 /**
  * One POST to the worker with an explicit result. Never throws: a transport error, timeout, or
@@ -454,6 +456,11 @@ type PostResult =
  * the raw `Response` and never reads the body, so a body-less or non-JSON success (for example a
  * 204) is still a real delivery and cannot fail a financial report. The error name is preserved
  * because an abort reason is a DOMException, which is not always `instanceof Error`.
+ *
+ * The request URL comes from the shared endpoint helper, so it derives from the value the transport
+ * rule accepted instead of from concatenation. A configured endpoint that carries a trailing
+ * separator therefore still reaches the worker's own path, and a value outside the rule, or a
+ * missing key, is `unconfigured` and sends nothing.
  */
 async function postWithResult(
   path: string,
@@ -461,9 +468,11 @@ async function postWithResult(
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<PostResult> {
+  const endpoint = parseInternalServiceEndpoint(BOUNCER_URL, path);
+  if (!endpoint || !INTERNAL_API_SECRET) return { ok: false, kind: 'unconfigured' };
   const timeout = AbortSignal.timeout(timeoutMs);
   try {
-    const response = await fetch(`${BOUNCER_URL}${path}`, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-internal-api-key': INTERNAL_API_SECRET },
       body: JSON.stringify(body),
@@ -471,13 +480,19 @@ async function postWithResult(
       cache: 'no-store',
     });
     if (!response.ok) {
-      return { ok: false, status: response.status, error: `http_${response.status}` };
+      return {
+        ok: false,
+        kind: 'failed',
+        status: response.status,
+        error: `http_${response.status}`,
+      };
     }
     return { ok: true, status: response.status, response };
   } catch (error) {
     const name = (error as { name?: unknown } | null)?.name;
     return {
       ok: false,
+      kind: 'failed',
       status: null,
       error: typeof name === 'string' ? name : String(error),
     };
@@ -485,7 +500,8 @@ async function postWithResult(
 }
 
 /**
- * Best-effort POST for usage/decide: resolves to null on any failure and logs it. Only these
+ * Best-effort POST for usage/decide: resolves to null on any failure and logs it, except an
+ * unconfigured client, which returns null without a log line because nothing was sent. Only these
  * verdict-shaped callers read a JSON body; a body-less/non-JSON success resolves to null.
  */
 async function post(
@@ -494,7 +510,6 @@ async function post(
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<unknown> {
-  if (!BOUNCER_URL || !INTERNAL_API_SECRET || !parseInternalServiceUrl(BOUNCER_URL)) return null;
   const result = await postWithResult(path, body, timeoutMs, signal);
   if (result.ok) {
     try {
@@ -503,6 +518,8 @@ async function post(
       return null;
     }
   }
+  // An unconfigured client has already sent nothing, so it is not a failed request.
+  if (result.kind === 'unconfigured') return null;
   // A decide timeout is expected on a slow call; it is not worth an error line each time.
   const timedOutVerdict =
     result.error === 'TimeoutError' && (path === DECIDE_PATH || path === CHARGE_DECIDE_PATH);
@@ -646,15 +663,15 @@ async function deliverWireBody(
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<BouncerDeliveryResult> {
-  if (!BOUNCER_URL || !INTERNAL_API_SECRET || !parseInternalServiceUrl(BOUNCER_URL)) {
-    return { delivered: false, permanent: true, status: null, error: 'bouncer_not_configured' };
-  }
   const result = await postWithResult(path, body, timeoutMs, signal);
   if (result.ok) {
     // Drain the tiny acknowledgement body so the connection is reusable. The 2xx status is
     // authoritative for delivery; a read error is ignored and never causes a redelivery.
     await result.response.arrayBuffer().catch(() => undefined);
     return { delivered: true, status: result.status };
+  }
+  if (result.kind === 'unconfigured') {
+    return { delivered: false, permanent: true, status: null, error: 'bouncer_not_configured' };
   }
   return { delivered: false, permanent: false, status: result.status, error: result.error };
 }

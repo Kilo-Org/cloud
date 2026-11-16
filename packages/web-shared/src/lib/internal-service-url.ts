@@ -10,7 +10,7 @@ const LOOPBACK_HOSTNAMES: Record<string, true> = {
   '[::1]': true,
 };
 
-export function parseInternalServiceUrl(value: string | undefined): URL | null {
+export function parseInternalServiceUrl(value: string | null | undefined): URL | null {
   if (!value) return null;
   try {
     const url = new URL(value);
@@ -31,7 +31,10 @@ export function parseInternalServiceUrl(value: string | undefined): URL | null {
  * unconfigured, and the resolved URL must keep the endpoint's origin, so the request URL
  * always derives from the value the rule accepted.
  */
-export function parseInternalServiceEndpoint(value: string | undefined, path: string): URL | null {
+export function parseInternalServiceEndpoint(
+  value: string | null | undefined,
+  path: string
+): URL | null {
   const base = parseInternalServiceUrl(value);
   if (!base) return null;
   if (!path.startsWith('/') || path.startsWith('//') || path.startsWith('/\\')) return null;

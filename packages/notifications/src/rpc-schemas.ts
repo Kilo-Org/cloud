@@ -66,7 +66,7 @@ function payloadFreeOutcome<
 export const sendPushForConversationInputSchema = z.object({
   conversationId: nonEmptyStringSchema,
   sandboxId: nonEmptyStringSchema,
-  senderUserId: z.union([nonEmptyStringSchema, z.null()]),
+  senderUserId: nonEmptyStringSchema.nullable(),
   recipientUserIds: z.array(nonEmptyStringSchema).min(1),
   title: z.string().max(200),
   bodyPreview: z.string().max(200),

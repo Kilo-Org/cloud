@@ -171,7 +171,7 @@ it('prepares the real prompt and persists import metadata with only GitHub HTTP 
       repository_review_instructions_used: true,
       repository_review_instructions_ref: 'release',
       repository_review_instructions_truncated: false,
-      repository_review_instruction_imports: [
+      repository_review_instructions_imports: [
         { source: 'acme/guidelines:frontend.md', sha: SOURCE_SHA, status: 'imported' },
         { source: 'acme/guidelines:backend/api.md', sha: SOURCE_SHA, status: 'imported' },
         { source: 'acme/guidelines:missing.md', sha: SOURCE_SHA, status: 'not_found' },
@@ -218,15 +218,19 @@ it('prepares the real prompt and persists import metadata with only GitHub HTTP 
       agentConfig: { config },
     });
     expect(manualPayload.sessionInput.prompt).not.toContain('Shared frontend rules.');
+    expect(manualPayload.sessionInput.prompt).toContain('Repository-specific rules.');
     const [savedManual] = await db
       .select()
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, manual.id));
-    expect(
-      savedManual.repository_review_instruction_imports?.every(
-        entry => entry.status === 'not_allowed' || entry.status === 'invalid'
-      )
-    ).toBe(true);
+    expect(savedManual.repository_review_instructions_imports?.map(entry => entry.status)).toEqual([
+      'not_allowed',
+      'not_allowed',
+      'not_allowed',
+      'not_allowed',
+      'not_allowed',
+      'invalid',
+    ]);
     expect(requests.filter(url => url.pathname === '/repos/acme/guidelines')).toHaveLength(1);
   } finally {
     http.mockRestore();

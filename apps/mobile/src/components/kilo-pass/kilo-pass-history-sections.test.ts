@@ -70,10 +70,7 @@ const BILLING_ENTRY: KiloPassBillingEntry = {
 /** The first-page failure codes the section classifies. */
 const RETRYABLE_ERROR = { data: { code: 'INTERNAL_SERVER_ERROR' } };
 // A refused read and an unprocessable one can never succeed on a second ask.
-const PERMANENT_ERRORS = [
-  { code: 'FORBIDDEN' },
-  { code: 'BAD_REQUEST' },
-] as const;
+const PERMANENT_ERRORS = [{ code: 'FORBIDDEN' }, { code: 'BAD_REQUEST' }] as const;
 
 async function renderElement(element: ReactElement): Promise<TestRenderer.ReactTestRenderer> {
   const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };

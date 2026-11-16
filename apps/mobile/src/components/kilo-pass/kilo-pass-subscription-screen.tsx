@@ -230,8 +230,7 @@ export function KiloPassSubscriptionScreen() {
   // has answered: a ledger or a scheduled plan change that landed afterwards
   // would push the blocks under it. An ended page waits on its own ledgers the
   // same way, so its last row does not move once it prints.
-  const hasDetail =
-    (detail.kind === 'active' || detail.kind === 'ended') && subscription != null;
+  const hasDetail = (detail.kind === 'active' || detail.kind === 'ended') && subscription != null;
   const activeDetail = detail.kind === 'active' && subscription != null;
   const storeManaged = subscription != null && isStoreManagedPass(subscription);
   const creditHistory = useKiloPassCreditHistory(hasDetail);

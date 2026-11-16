@@ -1,6 +1,8 @@
+import { createAwsCloudformationClient } from '@kilocode/worker-utils/aws-cloudformation';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
 import {
   assumeAwsRole,
+  type AwsFetch,
   awsCredentialsSchema,
   AwsRequestError,
   readAwsResponse,
@@ -126,15 +128,12 @@ export async function resolveAwsByocConfiguration(
   return configuration;
 }
 
-export async function awsRuntimeAccess(
-  env: Env,
-  configuration: AwsByocConfiguration
-): Promise<
-  AwsRuntimeAccess & {
-    expiresAt: number;
-    readProxyMetadata: ReturnType<typeof createAwsEgressMetadataReader>;
-  }
-> {
+/** Runtime and onboarding use the same platform role and credential configuration. */
+export async function assumeAwsKiloRole(
+  env: Pick<Env, 'AWS_BYOC_CREDENTIALS' | 'AWS_BYOC_KILO_ROLE_ARN'>,
+  fetch?: AwsFetch,
+  signal?: AbortSignal
+) {
   let bootstrap;
   try {
     bootstrap = awsCredentialsSchema.parse(JSON.parse(env.AWS_BYOC_CREDENTIALS ?? ''));
@@ -142,12 +141,27 @@ export async function awsRuntimeAccess(
     throw new ByocAwsProviderError('byoc_aws_not_ready');
   }
   if (!env.AWS_BYOC_KILO_ROLE_ARN) throw new ByocAwsProviderError('byoc_aws_not_ready');
+  return assumeAwsRole({
+    credentials: bootstrap,
+    region: 'us-east-1',
+    roleArn: env.AWS_BYOC_KILO_ROLE_ARN,
+    fetch,
+    signal,
+  });
+}
+
+export async function awsRuntimeAccess(
+  env: Env,
+  configuration: AwsByocConfiguration
+): Promise<
+  AwsRuntimeAccess & {
+    expiresAt: number;
+    readStack: ReturnType<typeof createAwsCloudformationClient>['describeStack'];
+    readProxyMetadata: ReturnType<typeof createAwsEgressMetadataReader>;
+  }
+> {
   try {
-    const kilo = await assumeAwsRole({
-      credentials: bootstrap,
-      region: configuration.region,
-      roleArn: env.AWS_BYOC_KILO_ROLE_ARN,
-    });
+    const kilo = await assumeAwsKiloRole(env);
     const credentials = await assumeAwsRole({
       credentials: kilo,
       region: configuration.region,
@@ -155,10 +169,15 @@ export async function awsRuntimeAccess(
       externalId: configuration.externalId,
     });
     if (credentials.expiresAt === undefined) throw new ByocAwsProviderError('byoc_aws_not_ready');
+    const cloudformation = createAwsCloudformationClient({
+      credentials,
+      region: configuration.region,
+    });
     return {
       config: configuration,
       expiresAt: credentials.expiresAt,
       client: createMicrovmClient({ credentials, region: configuration.region }),
+      readStack: (identity, signal) => cloudformation.describeStack(identity, signal),
       readProxyMetadata: createAwsEgressMetadataReader({
         credentials,
         region: configuration.region,

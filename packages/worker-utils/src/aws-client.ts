@@ -94,8 +94,11 @@ export function createAwsClient(input: {
   };
 }
 
-export async function readAwsResponse(response: Response, maximumBytes = 65_536): Promise<string> {
-  if (!response.body) return '';
+export async function readAwsResponseBytes(
+  response: Response,
+  maximumBytes = 65_536
+): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array();
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -119,7 +122,11 @@ export async function readAwsResponse(response: Response, maximumBytes = 65_536)
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder().decode(bytes);
+  return bytes;
+}
+
+export async function readAwsResponse(response: Response, maximumBytes = 65_536): Promise<string> {
+  return new TextDecoder().decode(await readAwsResponseBytes(response, maximumBytes));
 }
 
 export async function assumeAwsRole(input: {
@@ -128,6 +135,7 @@ export async function assumeAwsRole(input: {
   roleArn: string;
   externalId?: string;
   fetch?: AwsFetch;
+  signal?: AbortSignal;
 }): Promise<AwsCredentials> {
   const roleArn = z
     .string()
@@ -146,6 +154,7 @@ export async function assumeAwsRole(input: {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
+    signal: input.signal,
   });
   const xml = await readAwsResponse(response);
   function field(name: string): string {

@@ -52,14 +52,15 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   byoc_aws_not_ready: 'AWS compute setup is not ready',
   byoc_aws_forbidden:
     'AWS rejected access to your compute account. Check the customer role and ExternalId.',
-  byoc_aws_stack_outdated: 'The AWS stack needs an update. Open Compute settings to update it.',
+  byoc_aws_stack_outdated:
+    'The AWS stack needs an update. Contact Kilo to update the existing connection.',
   byoc_aws_proxy_unavailable:
-    'AWS security proxy is unavailable. Try again, or check Compute settings.',
+    'The AWS security proxy is unavailable. Try again. If it remains unavailable, contact Kilo.',
   byoc_aws_proxy_expired:
-    'The AWS proxy certificate needs replacement. Open Compute settings to update the stack.',
+    'The AWS proxy certificate needs replacement. Contact Kilo to update the existing connection.',
   byoc_aws_scm_host_unsupported: 'AWS compute supports managed SCM on standard public hosts only.',
   byoc_aws_connection_changed:
-    'AWS proxy configuration changed. Open Compute settings to verify the connection.',
+    'The AWS proxy configuration changed. Contact Kilo to repair the existing connection.',
   byoc_vercel_not_ready: 'Vercel compute setup is not ready',
   byoc_vercel_forbidden: 'Vercel rejected access to your compute account',
   byoc_vercel_capacity: 'Vercel compute capacity is unavailable',

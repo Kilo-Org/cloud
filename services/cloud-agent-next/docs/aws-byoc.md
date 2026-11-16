@@ -169,11 +169,120 @@ Existing allocations and replacement proxy tasks use the certificate until its a
 
 The proxy image is an immutable ECR digest supplied to the template. This exploratory stack has no automatic image or CA update.
 A generation change requires draining old allocations, replacing deployment material, and saving the new connection pins.
-The operator must perform this before certificate expiry. Onboarding and the final update flow remain P7 work.
+The operator must perform this before certificate expiry. The onboarding preview checks these pins. Ready release updates require an operator.
 
 Local tests cover actual CONNECT/TLS transport, constrained-CA rejection in Node, Bun, Git and gh, policy expiry,
 allocation races, audit effects, and metadata admission through actual Sandbox DO RPC. A 1 MiB SCM stream stays in the Worker route.
 They do not prove the final security groups, DNS Firewall, task replacement or private repository push on AWS.
+
+## Customer onboarding preview
+
+The Compute tab contains one AWS settings card for personal owners and organization admins.
+The backend, not the browser, selects ownership, generates ExternalId, and validates the role.
+Draft setup and runtime configuration use separate encrypted envelope purposes. Drafts also bind their generation.
+The connection becomes ready only after live role, stack, release and proxy validation.
+The browser receives public account, role, stack and version fields. It never receives encrypted credentials or proxy identity.
+
+Operators must publish one immutable release before enabling setup. Set `AWS_BYOC_RELEASE` on the Worker
+with this shape; replace the sample object hashes and repositories with the published release values:
+
+```json
+{
+  "format": 1,
+  "templateVersion": 2,
+  "proxyProtocolVersion": 1,
+  "template": {
+    "bucket": "kilo-releases",
+    "key": "aws/<sha256>/template.json",
+    "sha256": "<sha256>"
+  },
+  "runtime": {
+    "bucket": "kilo-releases",
+    "key": "aws/<sha256>/runtime.zip",
+    "sha256": "<sha256>",
+    "repositoryArn": "arn:aws:ecr:us-east-1:123456789012:repository/runtime"
+  },
+  "proxy": {
+    "imageUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/proxy@sha256:<sha256>",
+    "repositoryArn": "arn:aws:ecr:us-east-1:123456789012:repository/proxy"
+  },
+  "customerAccounts": ["999999999999"]
+}
+```
+
+The runtime and proxy repositories must belong to the configured Kilo role account.
+Grant that role `s3:GetObject` on the exact template object. Before authorizing a customer account,
+grant its `BuildRole` access to the runtime ZIP and runtime ECR repository.
+Grant its `ProxyExecutionRole` access to the proxy ECR repository.
+These grants require source bucket and repository policies. Customer IAM permissions alone cannot grant cross-account access.
+Onboarding does not modify release policies. It refuses account IDs outside `customerAccounts`.
+Keep published object keys and image digests immutable. A release variable change does not replace an existing draft's pins.
+
+Also configure the existing `AWS_BYOC_CREDENTIALS`, `AWS_BYOC_KILO_ROLE_ARN`, `AGENT_ENV_VARS_PRIVATE_KEY`,
+HTTPS root `WORKER_URL`, and `BYOC_AWS_IDS` cohort. The web service uses its existing public encryption key
+and authenticated Worker connection. No new web AWS credentials are required.
+
+The customer enters its account ID, prepares setup, and opens **Launch stack**.
+The AWS identity that launches the stack needs permission to create IAM roles.
+Kilo hash-checks the named template object before signing its download link. The link expires within 15 minutes.
+After CloudFormation completes, the customer copies `RoleArn` from Outputs and selects **Validate connection**.
+Validation requires correct-ExternalId success and omitted/wrong-ExternalId denial. It reads only the generated named stack.
+It checks completed state, account, versions, exact release parameters, resource outputs and public proxy metadata.
+Each failed step returns fixed recovery text. A failed check preserves the draft for another attempt.
+Discarding a draft removes only its Kilo record. The customer must delete any unused AWS stack separately.
+
+**Check connection** validates a ready connection without replacing its configuration or proxy pins.
+The displayed check time records the last successful validation; it does not claim continuous availability.
+A changed ready release requires an operator update. Self-service upgrades and automatic CA rotation remain outside this preview.
+New allocation startup checks the live stack version and persisted resource pins before issuing launch credentials.
+Transient reads retry within a bound. Known old versions fail immediately with a specific update reason.
+Cleanup and existing allocation recovery retain their persisted configuration.
+
+Local tests verify the shared parsers, encryption, HTTP boundary, database races and settings states.
+The AWS read test confirms that the live version-1 stack fails the new startup gate after one read.
+Final proxy deployment, prepared environment activation and two-account onboarding remain unverified.
+
+
+
+## Operator repair of a ready connection
+
+The preview has no ready-connection update or removal API. **Check connection** only validates the saved configuration.
+Do not ask a customer to delete and reconnect. A new draft creates a different stack name and ExternalId.
+Do not set a ready row back to pending to bypass this boundary.
+
+An operator must obtain approval for the customer AWS changes and the connection record update before this procedure.
+This repository has validation and encryption helpers, but no ready-connection repair command.
+Prepare and review a maintenance script for the selected connection before changing its stack.
+
+1. Identify the owner, provider, connection ID, generation, account, role and stack from the existing record.
+   Retain a protected backup of its encrypted configuration and public metadata.
+   Do not place decrypted configuration, ExternalId, proxy identity or signed URLs in logs or tickets.
+2. Stop new allocation requests for this connection. Drain its sessions and builds, then confirm physical compute termination.
+   Reconcile uncertain launches before continuing. Removing enrollment alone does not prove existing compute stopped.
+   Keep the existing connection available for cleanup until termination is confirmed.
+3. Plan the update against the existing stack and role. Preserve its account, connection ID, stack identity and ExternalId.
+   Use the approved immutable release and retain its cross-account source permissions.
+   Review replacement resources and certificate generation changes before applying the update.
+   Do not delete the artifacts bucket or connection record as a repair step.
+4. Validate the updated stack before saving new pins.
+   Require correct-ExternalId role access and refusal with omitted or wrong ExternalId.
+   Check completed stack state, approved release parameters, versions, resource outputs, and proxy metadata.
+   Use the checks in `aws-stack-validation.ts` and `createAwsSetupService`.
+   A repair script must retain the existing setup identities when it builds validation input; `prepare` creates new identities.
+   Require sufficient certificate validity for a new allocation. Do not accept changed pins from an unverified read.
+5. Encrypt the validated configuration with the existing configuration envelope scheme and owner/connection AAD.
+   Follow the encryption and public projection in `apps/web/src/lib/byoc/aws-connection.ts`.
+   Update `credentials_encrypted`, public `config`, and successful verification metadata together.
+   Guard the write with the exact owner, provider, connection ID, generation, ready status and prior record version.
+   Require exactly one updated row. Abort on a concurrent change; do not overwrite it.
+   Preserve unrelated runtime metadata and retain the same connection ID.
+6. Run ready-connection revalidation against the saved envelope, then start one disposable allocation through normal admission.
+   Verify wrapper readiness, enforced egress and cleanup before restoring new requests.
+   Check each configuration or proxy generation change against the saved pins.
+
+If a check fails, keep new allocations disabled and retain the diagnostic reason without credential values.
+Do not restore old pins against changed AWS resources. Rollback requires matching and revalidating both sides.
+This procedure is a maintenance contract. A live repair and rollback have not been verified in this preview.
 
 
 ## Prepared archive restore failures

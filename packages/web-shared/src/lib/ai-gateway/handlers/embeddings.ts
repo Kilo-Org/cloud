@@ -32,6 +32,7 @@ import {
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
+  organizationGatewayPolicy,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
@@ -71,6 +72,7 @@ import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 /**
@@ -214,6 +216,7 @@ export async function handleEmbeddingsRequest(
   let accountBalance = 0;
   let accountPlan: OrganizationPlan | undefined;
   let accountPayer: BalancePayer | undefined;
+  let dataRegion: OrganizationDataRegion | null = null;
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
@@ -223,6 +226,10 @@ export async function handleEmbeddingsRequest(
     accountPlan = plan;
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
+
+    const gatewayPolicy = await organizationGatewayPolicy({ organizationId, settings, provider });
+    if (gatewayPolicy.kind === 'rejected') return gatewayPolicy.response;
+    dataRegion = gatewayPolicy.dataRegion;
 
     const creditsBlocked = paidUsageRejection({
       user,
@@ -318,8 +325,11 @@ export async function handleEmbeddingsRequest(
         byok: byokProviders,
         zeroDataRetention: effectivePrivacy.zdr,
         disallowPromptTraining: effectivePrivacy.data_collection === 'deny' || undefined,
+        // Vercel fails the request instead of leaving the region, as on chat.
+        ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
       },
     };
+    usageContext.inference_region = dataRegion;
   }
 
   const bouncerVerdict = await bouncerVerdictPromise;

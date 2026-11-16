@@ -48,6 +48,7 @@ import {
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
+  organizationGatewayPolicy,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
@@ -246,6 +247,11 @@ export async function handleAudioTranscriptionsRequest(
   // The usage row reports the payer the balance check resolved: the root organization for an
   // organization member.
   usageContext.bouncer = await bouncer.usage(bouncerUsageFields, payer);
+
+  // Transcriptions only route to OpenRouter, which no data region pins, so only a
+  // disabled gateway applies here.
+  const gatewayPolicy = await organizationGatewayPolicy({ organizationId, settings, provider });
+  if (gatewayPolicy.kind === 'rejected') return gatewayPolicy.response;
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).

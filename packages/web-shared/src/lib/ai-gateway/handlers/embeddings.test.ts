@@ -27,6 +27,8 @@ import {
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('@sentry/nextjs', () => ({
@@ -70,6 +72,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
   ...jest.requireActual<Record<string, unknown>>(
@@ -166,6 +174,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       isFree: false,
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     mockedGetKiloEmbeddingModelCatalogFromDatabase.mockResolvedValue(null);
     jest.mocked(countAndStoreEmbeddingUsage).mockReturnValue({
       // Metrics are mocked, so the parsed stats never need to settle.
@@ -661,6 +670,81 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
       is_free: false,
       user_byok: true,
+    });
+  });
+
+  describe('organization gateway settings', () => {
+    const vercelByok = {
+      provider: VERCEL_AI_GATEWAY,
+      userByok: [{ providerId: 'openai' as const, decryptedAPIKey: 'test-byok-key' }],
+      isFree: false,
+    };
+
+    function enableGatewaySettings() {
+      jest
+        .mocked(getRuntimeOrganizationFeatures)
+        .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-123'] });
+    }
+
+    it('rejects an OpenRouter-routed request when the organization disabled OpenRouter', async () => {
+      setUserAuth({ disable_openrouter: true });
+      enableGatewaySettings();
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'This request would be routed through OpenRouter, which your organization has disabled.',
+        error_type: ProxyErrorType.provider_not_allowed,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('ignores a disabled gateway while the organization feature is off', async () => {
+      setUserAuth({ disable_openrouter: true });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves Vercel BYOK requests when OpenRouter is disabled, pinned to the data region', async () => {
+      setUserAuth({ disable_openrouter: true, data_region: 'eu' });
+      enableGatewaySettings();
+      mockedGetEmbeddingProvider.mockResolvedValue(vercelByok);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toEqual({
+        gateway: {
+          only: ['openai'],
+          byok: { openai: [{ apiKey: 'test-byok-key' }] },
+          inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+        },
+      });
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region).toBe(
+        'eu'
+      );
+    });
+
+    it('keeps OpenRouter requests unpinned when a data region is set', async () => {
+      setUserAuth({ data_region: 'eu' });
+      enableGatewaySettings();
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toBeUndefined();
+      expect(
+        jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region
+      ).toBeNull();
     });
   });
 

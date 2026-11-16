@@ -18,6 +18,8 @@ import {
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import {
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
@@ -106,6 +108,12 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
   ...jest.requireActual<Record<string, unknown>>(
@@ -340,6 +348,7 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
       .mocked(getOpenRouterSystemOneModelsFromDatabase)
@@ -707,6 +716,35 @@ describe('handleSystemOneRequest', () => {
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { features: ['org-123'], status: 403 },
+    { features: [], status: 200 },
+  ])(
+    'rejects a request when the organization disabled OpenRouter, with feature organizations $features',
+    async ({ features, status }) => {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1_000_000,
+        settings: { disable_openrouter: true },
+      });
+      jest
+        .mocked(getRuntimeOrganizationFeatures)
+        .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: features });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(status);
+      if (status === 403) {
+        await expect(response.json()).resolves.toMatchObject({
+          error:
+            'This request would be routed through OpenRouter, which your organization has disabled.',
+          error_type: 'provider_not_allowed',
+        });
+      }
+      expect(mockedFetch).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
+    }
+  );
 
   it('does not count a paid System One model against the free-model limit', async () => {
     jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);

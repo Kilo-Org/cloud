@@ -27,6 +27,8 @@ import {
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
@@ -57,6 +59,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
   ...jest.requireActual<Record<string, unknown>>(
@@ -168,6 +176,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     globalThis.fetch = mockedFetch;
     mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(countAndStoreTranscriptionUsage).mockReturnValue({
       // Metrics are mocked, so the parsed stats never need to settle.
       statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
@@ -246,6 +255,34 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     expect(response.status).toBe(200);
     expect(isFreeModelRateLimited).not.toHaveBeenCalled();
+  });
+
+  it('rejects a transcription when the organization disabled OpenRouter', async () => {
+    setOrganizationMemberAuth(new Set(['openai']));
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { disable_openrouter: true } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+    jest
+      .mocked(getRuntimeOrganizationFeatures)
+      .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-123'] });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error:
+        'This request would be routed through OpenRouter, which your organization has disabled.',
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('never forwards a custom LLM id to a transcription upstream', async () => {

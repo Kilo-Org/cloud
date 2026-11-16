@@ -13,6 +13,7 @@ import {
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
+  organizationGatewayPolicy,
   organizationProviderPreferences,
   paidUsageRejection,
   resolveGatewayCaller,
@@ -132,6 +133,13 @@ export async function handleSystemOneRequest(request: NextRequest) {
   // blocks them at a zero balance too.
   const account = await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
   const { balance, settings, plan, payer } = account;
+  // System One is served by OpenRouter only, which no data region pins.
+  const gatewayPolicy = await organizationGatewayPolicy({
+    organizationId,
+    settings,
+    provider: OPENROUTER,
+  });
+  if (gatewayPolicy.kind === 'rejected') return gatewayPolicy.response;
   const creditsBlocked = paidUsageRejection({ user, organizationId, account, exempt: false });
   if (creditsBlocked) return await creditsBlocked();
 

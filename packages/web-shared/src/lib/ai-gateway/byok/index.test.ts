@@ -24,18 +24,20 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getByokCredentials,
+  getByokKeyPriority,
   getByokKeyStates,
   getEnabledByokProviders,
   getOrganizationByokProviderIds,
   getStoredByokKeys,
   getUserByokProviderIds,
+  readByokEndpointDefinition,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { byok_api_keys, kilocode_users, organizations } from '@kilocode/db/schema';
-import type { ByokApiKeySettings } from '@kilocode/db/schema-types';
+import type { ByokApiKeySettings, ByokEndpointDefinition } from '@kilocode/db/schema-types';
 import {
   testByokEnvelope,
   useFakeByokKms,
@@ -273,6 +275,53 @@ describe('servesCatalogModels', () => {
     expect(servesCatalogModels({})).toBe(false);
     expect(servesCatalogModels(null)).toBe(false);
     expect(servesCatalogModels({ serve_catalog_models: 'true' })).toBe(false);
+  });
+
+  test('ignores an endpoint definition that no longer parses', () => {
+    const settings = { serve_catalog_models: true, priority: 2, endpoint: { name: 'Broken' } };
+    expect(servesCatalogModels(settings)).toBe(true);
+    expect(getByokKeyPriority(settings)).toBe(2);
+  });
+});
+
+describe('readByokEndpointDefinition', () => {
+  const definition: ByokEndpointDefinition = {
+    name: 'Acme',
+    base_url: 'https://llm.acme.example/v1',
+    api_kinds: ['chat_completions'],
+    client_provider: 'openrouter',
+    reasoning_format: 'reasoning-details',
+    models: [
+      { id: 'acme/coder', internal_id: 'coder', context_length: 10, max_completion_tokens: 5 },
+    ],
+  };
+
+  test('reads the definition of an organization endpoint key only', () => {
+    const row = {
+      provider_id: 'endpoint-a1b2c3d4e5',
+      organization_id: 'org-id',
+      settings: { priority: 1, endpoint: definition },
+    };
+    expect(readByokEndpointDefinition(row)).toEqual(definition);
+    expect(readByokEndpointDefinition({ ...row, organization_id: null })).toBeNull();
+    expect(readByokEndpointDefinition({ ...row, provider_id: 'anthropic' })).toBeNull();
+  });
+
+  test('drops a definition that no longer parses and logs it', () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const read = readByokEndpointDefinition({
+      provider_id: 'endpoint-a1b2c3d4e5',
+      organization_id: 'org-id',
+      settings: { endpoint: { name: 'Broken' } },
+    });
+
+    expect(read).toBeNull();
+    expect(error).toHaveBeenCalledWith(
+      '[byok] Ignoring an endpoint key with an invalid definition',
+      expect.objectContaining({ providerId: 'endpoint-a1b2c3d4e5' })
+    );
+    error.mockRestore();
   });
 });
 

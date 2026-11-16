@@ -105,11 +105,14 @@ async function organizationWithKeys(user: User, keys: KeyRow[]): Promise<string>
     keys.map(key => ({
       organization_id: organization.id,
       provider_id: key.providerId,
-      endpoint: key.endpoint ?? null,
       encrypted_api_key_envelope: testByokEnvelope(key.secret ?? CREDENTIALS),
       created_by: user.id,
       is_enabled: key.isEnabled ?? true,
-      settings: { serve_catalog_models: key.catalogMode ?? false, priority: key.priority },
+      settings: {
+        serve_catalog_models: key.catalogMode ?? false,
+        priority: key.priority,
+        endpoint: key.endpoint,
+      },
     }))
   );
   return organization.id;

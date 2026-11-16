@@ -60,6 +60,7 @@ import {
   decryptByokRow,
   getByokKmsContext,
   getModelGatewayUserByokProviders,
+  readByokEndpointDefinition,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -94,12 +95,7 @@ import {
   parseByokEndpointCredentials,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
-import {
-  BYOK_ENDPOINT_MAX_MODELS,
-  ByokEndpointDefinitionSchema,
-  type ByokEndpointCredentials,
-  type ByokEndpointDefinition,
-} from '@kilocode/db/schema-types';
+import { BYOK_ENDPOINT_MAX_MODELS, type ByokEndpointCredentials } from '@kilocode/db/schema-types';
 import {
   ByokEndpointRequestError,
   fetchByokEndpointModels,
@@ -160,7 +156,7 @@ const BYOK_KEY_COLUMNS = {
   management_source: byok_api_keys.management_source,
   is_enabled: byok_api_keys.is_enabled,
   settings: byok_api_keys.settings,
-  endpoint: byok_api_keys.endpoint,
+  organization_id: byok_api_keys.organization_id,
 };
 
 function inRouteOrder<T extends { provider_id: string; settings: unknown }>(keys: T[]): T[] {
@@ -198,7 +194,7 @@ type BYOKKeyRow = Omit<
   | 'can_change_catalog_mode'
   | 'is_endpoint'
   | 'endpoint'
-> & { settings: unknown; endpoint: ByokEndpointDefinition | null };
+> & { settings: unknown; organization_id: string | null };
 
 /**
  * Catalog mode decides whether organization model and provider policies apply to the key, so on organization
@@ -216,26 +212,21 @@ function canReadEndpointDefinition(organizationRole: OrganizationRole | null) {
   );
 }
 
-/** A stored definition that no longer parses is listed without it, so the rest of the list still loads. */
-function readEndpointDefinition(keyId: string, endpoint: unknown): ByokEndpointDefinition | null {
-  const parsed = ByokEndpointDefinitionSchema.safeParse(endpoint);
-  if (!parsed.success) {
-    logByokWarning('Stored BYOK endpoint definition is invalid', { keyId });
-    return null;
-  }
-  return parsed.data;
-}
-
 async function supportsCatalogMode(providerId: string) {
   return isByokEndpointProviderId(providerId) || offersCatalogMode(providerId);
 }
 
 async function toBYOKApiKeyResponse(
-  { settings, endpoint, ...key }: BYOKKeyRow,
+  { settings, organization_id, ...key }: BYOKKeyRow,
   organizationRole: OrganizationRole | null
 ): Promise<BYOKApiKeyResponse> {
   const isEndpoint = isByokEndpointProviderId(key.provider_id);
-  const definition = isEndpoint ? readEndpointDefinition(key.id, endpoint) : null;
+  // A stored definition that no longer parses is listed without it, so the rest of the list still loads.
+  const definition = readByokEndpointDefinition({
+    provider_id: key.provider_id,
+    organization_id,
+    settings,
+  });
   const supportsCatalog = await supportsCatalogMode(key.provider_id);
   const serveCatalogModels = servesCatalogModels(settings);
   return {
@@ -283,7 +274,7 @@ async function findOrganizationEndpointKey(organizationId: string, id: string) {
       provider_id: byok_api_keys.provider_id,
       encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
       management_source: byok_api_keys.management_source,
-      endpoint: byok_api_keys.endpoint,
+      settings: byok_api_keys.settings,
     })
     .from(byok_api_keys)
     .where(and(eq(byok_api_keys.id, id), eq(byok_api_keys.organization_id, organizationId)));
@@ -294,9 +285,12 @@ async function findOrganizationEndpointKey(organizationId: string, id: string) {
 }
 
 /** Stored credentials may only be sent to the host they were saved for. */
-function rejectEndpointHostChange(storedEndpoint: unknown, baseUrl: string) {
-  const stored = ByokEndpointDefinitionSchema.safeParse(storedEndpoint);
-  if (!stored.success || endpointOriginChanged(stored.data.base_url, baseUrl)) {
+function rejectEndpointHostChange(
+  key: Parameters<typeof readByokEndpointDefinition>[0],
+  baseUrl: string
+) {
+  const stored = readByokEndpointDefinition(key);
+  if (!stored || endpointOriginChanged(stored.base_url, baseUrl)) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: ENDPOINT_HOST_CHANGED_MESSAGE });
   }
 }
@@ -846,7 +840,7 @@ export const byokRouter = createTRPCRouter({
           provider_id: byok_api_keys.provider_id,
           encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
           management_source: byok_api_keys.management_source,
-          endpoint: byok_api_keys.endpoint,
+          settings: byok_api_keys.settings,
         })
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, id));
@@ -885,7 +879,7 @@ export const byokRouter = createTRPCRouter({
       }
 
       if (isByokEndpointProviderId(existingKey.provider_id)) {
-        const definition = readEndpointDefinition(existingKey.id, existingKey.endpoint);
+        const definition = readByokEndpointDefinition(existingKey);
         const credentials = parseByokEndpointCredentials(decryptedKey.decryptedAPIKey);
         if (!definition || !credentials) {
           return {
@@ -1064,7 +1058,7 @@ export const byokRouter = createTRPCRouter({
           organization_id: organizationId,
           provider_id: providerId,
           encrypted_api_key_envelope: envelope,
-          endpoint: definition,
+          settings: { endpoint: definition },
           created_by: ctx.user.id,
         })
         .returning(BYOK_KEY_COLUMNS);
@@ -1094,7 +1088,7 @@ export const byokRouter = createTRPCRouter({
       );
       const existingKey = await findOrganizationEndpointKey(organizationId, id);
       rejectManagedKeyMutation(existingKey.management_source);
-      if (!credentials) rejectEndpointHostChange(existingKey.endpoint, definition.base_url);
+      if (!credentials) rejectEndpointHostChange(existingKey, definition.base_url);
       await rejectDisallowedEndpointUrl(definition.base_url);
 
       const envelope = credentials
@@ -1106,7 +1100,11 @@ export const byokRouter = createTRPCRouter({
         : undefined;
       const [updatedKey] = await db
         .update(byok_api_keys)
-        .set({ endpoint: definition, ...(envelope && { encrypted_api_key_envelope: envelope }) })
+        .set({
+          // Merged like the other settings writes, so priority and catalog mode stay.
+          settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ endpoint: definition })}::jsonb`,
+          ...(envelope && { encrypted_api_key_envelope: envelope }),
+        })
         .where(and(eq(byok_api_keys.id, id), eq(byok_api_keys.organization_id, organizationId)))
         .returning(BYOK_KEY_COLUMNS);
       if (!updatedKey) {
@@ -1139,7 +1137,7 @@ export const byokRouter = createTRPCRouter({
       let credentials = input.credentials;
       if (!credentials && id) {
         const key = await findOrganizationEndpointKey(organizationId, id);
-        rejectEndpointHostChange(key.endpoint, base_url);
+        rejectEndpointHostChange(key, base_url);
         const stored = await decryptEndpointCredentials(key);
         if (!stored) {
           throw new TRPCError({

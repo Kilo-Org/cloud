@@ -7,6 +7,7 @@ import {
   type ByokEndpointDefinition,
 } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
@@ -157,15 +158,43 @@ function ownerColumn(owner: ByokOwner): ByokOwnerColumn {
   return owner.type === 'organization' ? byok_api_keys.organization_id : byok_api_keys.kilo_user_id;
 }
 
+// Each reader parses only its own setting, so an invalid endpoint definition cannot hide the rest.
+const CatalogModeSettingsSchema = ByokApiKeySettingsSchema.pick({ serve_catalog_models: true });
+const PrioritySettingsSchema = ByokApiKeySettingsSchema.pick({ priority: true });
+const EndpointSettingsSchema = z.object({ endpoint: z.unknown() });
+
 /** Whether stored key settings put the key in catalog mode. */
 export function servesCatalogModels(settings: unknown): boolean {
-  const parsed = ByokApiKeySettingsSchema.safeParse(settings);
-  return parsed.success && parsed.data.serve_catalog_models === true;
+  return CatalogModeSettingsSchema.safeParse(settings).data?.serve_catalog_models === true;
 }
 
 /** The owner's chosen priority of a key, or undefined when the key keeps its default order. */
 export function getByokKeyPriority(settings: unknown): number | undefined {
-  return ByokApiKeySettingsSchema.safeParse(settings).data?.priority;
+  return PrioritySettingsSchema.safeParse(settings).data?.priority;
+}
+
+/**
+ * The definition of an organization's endpoint key, stored in its settings. Null for every other
+ * key, so a definition in the settings of a personal or provider key is never honoured, and for a
+ * definition that no longer parses, which is logged.
+ */
+export function readByokEndpointDefinition(row: {
+  provider_id: string;
+  organization_id: string | null;
+  settings: unknown;
+}): ByokEndpointDefinition | null {
+  if (!isByokEndpointProviderId(row.provider_id) || !row.organization_id) return null;
+  const parsed = ByokEndpointDefinitionSchema.safeParse(
+    EndpointSettingsSchema.safeParse(row.settings).data?.endpoint
+  );
+  if (!parsed.success) {
+    console.error('[byok] Ignoring an endpoint key with an invalid definition', {
+      providerId: row.provider_id,
+      issues: parsed.error.issues.map(issue => ({ path: issue.path, code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
 }
 
 const byokKeyPriority = sql`case when jsonb_typeof(${byok_api_keys.settings}->'priority') = 'number' then (${byok_api_keys.settings}->>'priority')::numeric end`;
@@ -205,29 +234,16 @@ function reportByokDecryptFailure(keyId: string, error: unknown): void {
 
 const byokKeyStateColumns = {
   provider_id: byok_api_keys.provider_id,
+  organization_id: byok_api_keys.organization_id,
   settings: byok_api_keys.settings,
   is_enabled: byok_api_keys.is_enabled,
-  endpoint: byok_api_keys.endpoint,
 };
-
-/** The stored definition of an endpoint key, or null when it no longer parses. */
-function parseStoredByokEndpoint(providerId: string, endpoint: unknown) {
-  const parsed = ByokEndpointDefinitionSchema.safeParse(endpoint);
-  if (!parsed.success) {
-    console.error('[byok] Ignoring an endpoint key with an invalid definition', {
-      providerId,
-      issues: parsed.error.issues.map(issue => ({ path: issue.path, code: issue.code })),
-    });
-    return null;
-  }
-  return parsed.data;
-}
 
 function toByokKeyState(row: {
   provider_id: string;
+  organization_id: string | null;
   settings: unknown;
   is_enabled: boolean;
-  endpoint: unknown;
 }): ByokKeyState | null {
   const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
   if (!providerId.success) return null;
@@ -238,7 +254,7 @@ function toByokKeyState(row: {
     priority: getByokKeyPriority(row.settings),
   };
   if (!isByokEndpointProviderId(providerId.data)) return state;
-  const endpoint = parseStoredByokEndpoint(providerId.data, row.endpoint);
+  const endpoint = readByokEndpointDefinition(row);
   return endpoint ? { ...state, endpoint } : null;
 }
 

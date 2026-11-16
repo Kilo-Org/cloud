@@ -127,7 +127,7 @@ describe('BYOK endpoints', () => {
         serve_catalog_models: false,
       });
       const row = await storedRow(created.id);
-      expect(row.endpoint).toEqual(DEFINITION);
+      expect(row.settings.endpoint).toEqual(DEFINITION);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(API_KEY_CREDENTIALS);
 
       const caller = await createCallerForUser(member.id);
@@ -225,8 +225,33 @@ describe('BYOK endpoints', () => {
 
       expect(updated).toMatchObject({ provider_name: 'Renamed', endpoint: definition });
       const row = await storedRow(created.id);
-      expect(row.endpoint).toEqual(definition);
+      expect(row.settings.endpoint).toEqual(definition);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(API_KEY_CREDENTIALS);
+    });
+
+    test('keeps catalog mode and the priority', async () => {
+      const created = await createEndpoint();
+      const caller = await createCallerForUser(owner.id);
+      await caller.byok.setCatalogMode({
+        organizationId: organization.id,
+        id: created.id,
+        serve_catalog_models: true,
+      });
+      await caller.byok.reorder({ organizationId: organization.id, keyIds: [created.id] });
+      const definition = { ...DEFINITION, name: 'Renamed' };
+
+      const updated = await caller.byok.updateEndpoint({
+        organizationId: organization.id,
+        id: created.id,
+        definition,
+      });
+
+      expect(updated).toMatchObject({ serve_catalog_models: true, endpoint: definition });
+      expect((await storedRow(created.id)).settings).toEqual({
+        serve_catalog_models: true,
+        priority: 0,
+        endpoint: definition,
+      });
     });
 
     test('replaces the credentials when given', async () => {
@@ -255,7 +280,7 @@ describe('BYOK endpoints', () => {
         code: 'BAD_REQUEST',
         message: 'Enter the credentials again to use a different host',
       });
-      expect((await storedRow(created.id)).endpoint).toEqual(DEFINITION);
+      expect((await storedRow(created.id)).settings.endpoint).toEqual(DEFINITION);
 
       const credentials: ByokEndpointCredentials = { type: 'api_key', api_key: 'new-host-secret' };
       await caller.byok.updateEndpoint({
@@ -265,7 +290,7 @@ describe('BYOK endpoints', () => {
         credentials,
       });
       const row = await storedRow(created.id);
-      expect(row.endpoint).toEqual(definition);
+      expect(row.settings.endpoint).toEqual(definition);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(credentials);
     });
 
@@ -281,7 +306,7 @@ describe('BYOK endpoints', () => {
       });
 
       const row = await storedRow(created.id);
-      expect(row.endpoint).toEqual(definition);
+      expect(row.settings.endpoint).toEqual(definition);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(API_KEY_CREDENTIALS);
     });
 
@@ -307,6 +332,40 @@ describe('BYOK endpoints', () => {
           definition: DEFINITION,
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+  });
+
+  describe('stored definitions', () => {
+    test('lists an endpoint whose definition no longer parses without it', async () => {
+      const created = await createEndpoint();
+      await db
+        .update(byok_api_keys)
+        .set({ settings: { priority: 3, endpoint: { name: 'Broken' } } as never })
+        .where(eq(byok_api_keys.id, created.id));
+      const caller = await createCallerForUser(owner.id);
+
+      const [listed] = await caller.byok.list({ organizationId: organization.id });
+
+      expect(listed).toMatchObject({ id: created.id, is_endpoint: true, endpoint: null });
+      expect(listed.provider_name).not.toBe('Broken');
+    });
+
+    test('ignores an endpoint definition in the settings of a provider key', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const providerKey = await caller.byok.create({
+        organizationId: organization.id,
+        provider_id: 'anthropic',
+        api_key: 'k',
+      });
+      await db
+        .update(byok_api_keys)
+        .set({ settings: { endpoint: DEFINITION } })
+        .where(eq(byok_api_keys.id, providerKey.id));
+
+      const [listed] = await caller.byok.list({ organizationId: organization.id });
+
+      expect(listed).toMatchObject({ id: providerKey.id, is_endpoint: false, endpoint: null });
+      expect(listed.provider_name).not.toBe(DEFINITION.name);
     });
   });
 

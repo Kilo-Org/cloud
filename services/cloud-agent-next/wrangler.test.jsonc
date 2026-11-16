@@ -73,6 +73,7 @@
     },
   ],
   "r2_buckets": [
+    { "binding": "R2_BUCKET", "bucket_name": "cloud-agent-test-logs" },
     { "binding": "RUNTIME_RELEASE_BUCKET", "bucket_name": "cloud-agent-runtime-test" },
   ],
   "queues": {

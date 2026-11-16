@@ -12,12 +12,16 @@ export type ContainersOutboundProps = {
   containerId: string;
   egressAllowlist?: string[];
   egressAudit?: boolean;
+  githubAuthorization?: 'task';
   allocationRef?: string;
 };
 
 export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, ContainersOutboundProps> {
   async fetch(request: Request): Promise<Response> {
-    const { containerId, egressAllowlist, egressAudit, allocationRef } = this.ctx.props;
+    const { containerId, egressAllowlist, egressAudit, allocationRef, githubAuthorization } =
+      this.ctx.props;
+    if (githubAuthorization !== undefined && githubAuthorization !== 'task')
+      return new Response('GitHub authorization unavailable', { status: 502 });
     if (
       (egressAudit !== undefined && typeof egressAudit !== 'boolean') ||
       (egressAudit === true &&
@@ -90,6 +94,9 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       }
       return this.env.SESSION_SYNC.fetch(request);
     }
-    return handleManagedScmOutbound(request, this.env, { containerId });
+    return handleManagedScmOutbound(request, this.env, {
+      containerId,
+      ...(githubAuthorization ? { githubAuthorization } : {}),
+    });
   }
 }

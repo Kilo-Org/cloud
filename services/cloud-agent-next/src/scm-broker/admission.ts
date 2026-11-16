@@ -155,7 +155,18 @@ export async function admitScmRequest<C extends ScmAdmissionContext>(
     }
     const grants = await currentGrants();
     if (!grants) return deny('target_denied');
-    if (authorization.type === 'unmanaged') return { ok: true, authority: { type: 'unmanaged' } };
+    if (authorization.type === 'unmanaged')
+      return {
+        ok: true,
+        authority: {
+          type: 'unmanaged',
+          ...(grants.some(grant =>
+            grantScmEntries(grant).some(entry => entry.scm.githubTaskGrant !== undefined)
+          )
+            ? { githubAuthorization: 'task' as const }
+            : {}),
+        },
+      };
     const alias = authorization.value.capability;
     const parsedAlias = parseControlPlaneCredential(alias);
     if (parsedAlias?.sandboxId !== context.sandboxId) return deny('credential_denied');

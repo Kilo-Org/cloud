@@ -13,6 +13,24 @@ import {
   type CredentialGrantPreparation,
 } from './session-credentials.js';
 
+/** The broker answers a task scope with the grant that it signs into a v3 capability. */
+function taskGrantFor(params: unknown) {
+  const scope = (
+    params as { taskScope: { scopeId: string; taskRef: string; repositoryId?: number } }
+  ).taskScope;
+  return {
+    revision: 1,
+    scopeId: scope.scopeId,
+    taskRef: scope.taskRef,
+    repository: {
+      id: scope.repositoryId ?? 101,
+      nodeId: 'R_fixture',
+      owner: 'acme',
+      name: 'widgets',
+    },
+  };
+}
+
 function preparation(): CredentialGrantPreparation {
   return {
     env: {
@@ -22,6 +40,7 @@ function preparation(): CredentialGrantPreparation {
       KILO_SESSION_INGEST_URL: 'https://ingest.kilosessions.ai',
     } as CredentialGrantPreparation['env'],
     source: {
+      githubAuthorization: 'task',
       userId: 'user-1',
       kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
       kiloToken: 'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln',
@@ -45,9 +64,10 @@ describe('Vercel GitHub capabilities with a synthetic verified contract', () => 
     async allowUserAuthorization => {
       const input = preparation();
       input.source.createdOnPlatform = allowUserAuthorization ? 'cloud-agent-web' : 'automation';
-      const issue = vi.fn(async () => ({
+      const issue = vi.fn(async (params: unknown) => ({
         success: true,
-        capability: 'kgh2.synthetic',
+        capability: 'kgh3.synthetic',
+        taskGrant: taskGrantFor(params),
         source: allowUserAuthorization ? 'user' : 'installation',
         installationId: '123',
         accountLogin: 'acme',
@@ -62,11 +82,12 @@ describe('Vercel GitHub capabilities with a synthetic verified contract', () => 
         accessPurpose: 'workflow',
         allowUserAuthorization,
         outboundContainerId: 'ses-abcdef',
+        taskScope: { scopeId: 'test-scope', taskRef: 'refs/heads/session/test-scope' },
       });
       expect(grant.repository).toMatchObject({ allowUserAuthorization });
-      expect(grant.scm?.capability?.credential).toBe('kgh2.synthetic');
+      expect(grant.scm?.capability?.credential).toBe('kgh3.synthetic');
       expect(grant.scm?.nativeToken).toBeUndefined();
-      expect(JSON.stringify(payload)).not.toContain('kgh2.synthetic');
+      expect(JSON.stringify(payload)).not.toContain('kgh3.synthetic');
       expect(
         buildControlNetworkPolicy([grant], undefined, input.env).allow['api.github.com']
       ).toEqual([{ forwardURL: 'https://worker.test/scm/vercel/ses-abcdef' }]);
@@ -78,7 +99,17 @@ describe('Vercel GitHub capabilities with a synthetic verified contract', () => 
         refreshBacking: true,
       });
       expect(issue).toHaveBeenCalledTimes(2);
-      expect(issue.mock.calls[0]).toEqual(issue.mock.calls[1]);
+      // A renewal pins the repository that the first task grant named.
+      expect(issue.mock.calls[1]).toEqual([
+        {
+          ...(issue.mock.calls[0]?.[0] as object),
+          taskScope: {
+            scopeId: 'test-scope',
+            taskRef: 'refs/heads/session/test-scope',
+            repositoryId: 101,
+          },
+        },
+      ]);
       expect(renewed.grant.scm?.alias).toBe(grant.scm?.alias);
       expect(renewed.grant.repository).toEqual(grant.repository);
 
@@ -115,6 +146,7 @@ describe('Vercel GitHub capabilities with a synthetic verified contract', () => 
       accessPurpose: 'workflow',
       allowUserAuthorization: false,
       outboundContainerId: 'ses-abcdef',
+      taskScope: { scopeId: 'test-scope', taskRef: 'refs/heads/session/test-scope' },
     });
     expect(legacyToken).not.toHaveBeenCalled();
   });

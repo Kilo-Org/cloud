@@ -53,7 +53,12 @@ type StoredRecord = {
   billingConfigured?: true;
   wrapperAttempt?: string;
   repositoryStartFailures?: { snapshotId: string; attempts: number };
-  egressPolicy?: { allocationRef: string; allowlist?: string[]; egressAudit?: boolean };
+  egressPolicy?: {
+    allocationRef: string;
+    allowlist?: string[];
+    egressAudit?: boolean;
+    githubAuthorization?: 'task';
+  };
 };
 
 const idleRecord: StoredRecord = {
@@ -516,6 +521,43 @@ function sleepPreExec(record?: StoredRecord) {
 }
 
 describe('SandboxContainers egress enforcement', () => {
+  it.each([undefined, 'task'] as const)(
+    'retains GitHub authorization %s after reconstruction',
+    async githubAuthorization => {
+      const initial = setup();
+      const outbound = attachOutbound(initial.instance);
+      const input = {
+        command: supervisorStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-3' as const,
+        containment: true,
+        githubAuthorization,
+      };
+      await initial.instance.launchWrapper(input);
+      expect(outbound).toHaveBeenCalledWith({
+        props: {
+          containerId: 'do-id',
+          ...(githubAuthorization ? { githubAuthorization } : {}),
+        },
+      });
+      expect(initial.readRecord().egressPolicy?.githubAuthorization).toBe(githubAuthorization);
+      const restored = initial.reconstruct();
+      const restoredOutbound = attachOutbound(restored);
+      await restored.launchWrapper(input);
+      if (githubAuthorization)
+        expect(restoredOutbound).toHaveBeenCalledWith({
+          props: { containerId: 'do-id', githubAuthorization },
+        });
+      await expect(
+        restored.launchWrapper({
+          ...input,
+          githubAuthorization: githubAuthorization ? undefined : 'task',
+        })
+      ).rejects.toThrow('egress policy cannot change');
+    }
+  );
+
   it.each([undefined, ['example.com']])(
     'binds audit identity and retains it after reconstruction and stop with allowlist %j',
     async egressAllowlist => {

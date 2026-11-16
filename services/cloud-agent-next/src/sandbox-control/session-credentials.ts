@@ -1,3 +1,4 @@
+import { githubTaskGrantSchema, isGitHubTaskRef } from '@kilocode/worker-utils/github-task-grant';
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -59,6 +60,7 @@ import {
 import {
   CAPABILITY_FAMILY_PATTERN_SOURCE,
   CURRENT_CAPABILITY_PREFIX,
+  GITHUB_TASK_CAPABILITY_PREFIX,
   hasCurrentCapabilityPrefix,
   LEGACY_CAPABILITY_PREFIX,
 } from '@kilocode/worker-utils/scm-capability-contract';
@@ -163,6 +165,8 @@ const scmSchema = z
     gitUrl: z.string().url(),
     author: gitAuthorSchema.optional(),
     githubAppType: z.enum(['standard', 'lite']).optional(),
+    githubAuthSource: z.enum(['user', 'installation']).optional(),
+    githubTaskGrant: githubTaskGrantSchema.optional(),
     capability: capabilitySchema.optional(),
     nativeToken: realTokenSchema.optional(),
     gitlab: z
@@ -201,6 +205,7 @@ const sessionCredentialGrantShape = z
     version: z.literal(1),
     containmentEnabled: z.boolean().optional(),
     scopeId: scopeIdSchema,
+    githubTaskRef: z.string().refine(isGitHubTaskRef).optional(),
     sandboxId: z
       .string()
       .refine(isValidSandboxId)
@@ -339,8 +344,15 @@ function refinePersistedSessionCredentialGrant(
     sandboxId: grant.sandboxId,
     outboundContainerId: grant.outboundContainerId,
     orgId: grant.orgId,
+    scopeId: grant.scopeId,
   };
-  assertScmGrantValid(grant.scm, grant.repository, scmContext, reject, options);
+  assertScmGrantValid(
+    grant.scm,
+    grant.repository,
+    { ...scmContext, githubTaskRef: grant.githubTaskRef },
+    reject,
+    options
+  );
   if (grant.additionalRepositories) {
     // Only a contained grant that the outbound proxy serves can hold several
     // repositories. Vercel forwards the launch capability only.
@@ -375,11 +387,29 @@ function assertScmGrantValid(
     sandboxId: string;
     outboundContainerId: string | undefined;
     orgId: string | undefined;
+    scopeId: string;
+    /** The launch repository's task ref. An additional repository carries its own. */
+    githubTaskRef?: string | undefined;
   },
   reject: () => void,
   options?: { allowStaleCapabilityBinding?: boolean }
 ): void {
   if ((scm.author || scm.githubAppType) && scm.purpose !== 'github') reject();
+  const taskGrant = scm.githubTaskGrant;
+  if (
+    taskGrant &&
+    (scm.purpose !== 'github' ||
+      repository.type !== 'github' ||
+      taskGrant.scopeId !== context.scopeId ||
+      (context.githubTaskRef !== undefined && taskGrant.taskRef !== context.githubTaskRef) ||
+      `${taskGrant.repository.owner}/${taskGrant.repository.name}` !==
+        repository.repo.toLowerCase())
+  ) {
+    reject();
+  }
+  const capabilityPrefix = taskGrant
+    ? GITHUB_TASK_CAPABILITY_PREFIX
+    : CURRENT_CAPABILITY_PREFIX[scm.purpose];
   if (!context.contained) {
     if (
       scm.alias !== undefined ||
@@ -397,7 +427,7 @@ function assertScmGrantValid(
     alias.sandboxId !== context.sandboxId ||
     alias.purpose !== scm.purpose ||
     scm.nativeToken ||
-    !scm.capability?.credential.startsWith(CURRENT_CAPABILITY_PREFIX[scm.purpose]) ||
+    !scm.capability?.credential.startsWith(capabilityPrefix) ||
     !context.outboundContainerId ||
     (!options?.allowStaleCapabilityBinding &&
       scm.capability?.outboundContainerId !== context.outboundContainerId) ||
@@ -751,6 +781,32 @@ function isCapabilityCurrent(
   );
 }
 
+function allowGitHubUserAuthorization(
+  repository: Extract<CredentialRepository, { type: 'github' }>,
+  existing: ScmGrant | undefined
+): boolean {
+  return repository.allowUserAuthorization && existing?.githubAuthSource !== 'installation';
+}
+
+/** Credential renewal must preserve the actor selected for this worktree. */
+function requireSameGitHubIdentity(
+  existing: ScmGrant | undefined,
+  next: Pick<ScmGrant, 'author' | 'githubAppType' | 'githubAuthSource'>
+): void {
+  if (!existing) return;
+  if (
+    (existing.githubAuthSource !== undefined &&
+      existing.githubAuthSource !== next.githubAuthSource) ||
+    (existing.githubAppType !== undefined && existing.githubAppType !== next.githubAppType) ||
+    (existing.author !== undefined &&
+      (existing.author.name !== next.author?.name || existing.author.email !== next.author?.email))
+  ) {
+    throw new Error(
+      'GitHub identity changed. Reconnect your GitHub account or start a new worktree.'
+    );
+  }
+}
+
 async function refreshScmCapability(
   env: CredentialEnv,
   grant: SessionCredentialGrant,
@@ -759,7 +815,9 @@ async function refreshScmCapability(
   now: number,
   refresh = false,
   existingScm: ScmGrant | undefined = undefined,
-  diagnostic?: GrantDiagnostic
+  diagnostic?: GrantDiagnostic,
+  /** The ref a new GitHub task grant covers. A renewal keeps the ref of its existing grant. */
+  githubTaskRef?: string
 ): Promise<ScmGrant> {
   if (repository.type === 'git') {
     throw new Error('A git repository carries no contained capability');
@@ -793,11 +851,23 @@ async function refreshScmCapability(
     existingScm?.alias ?? createControlPlaneCredential(grant.sandboxId, repository.type);
   let scm: ScmGrant;
   if (repository.type === 'github') {
+    const taskRef = existingScm?.githubTaskGrant?.taskRef ?? githubTaskRef;
     const issued = await issueCloudAgentGitHubSessionCapability(env, {
       ...common,
       githubRepo: repository.repo,
       accessPurpose: repository.accessPurpose ?? 'workflow',
-      allowUserAuthorization: repository.allowUserAuthorization,
+      allowUserAuthorization: allowGitHubUserAuthorization(repository, existingScm),
+      ...(taskRef
+        ? {
+            taskScope: {
+              scopeId: grant.scopeId,
+              taskRef,
+              ...(existingScm?.githubTaskGrant
+                ? { repositoryId: existingScm.githubTaskGrant.repository.id }
+                : {}),
+            },
+          }
+        : {}),
       ...(repository.expectedIntegrationId
         ? { expectedIntegrationId: repository.expectedIntegrationId }
         : {}),
@@ -812,20 +882,31 @@ async function refreshScmCapability(
       );
       throw new Error('GitHub capability issuance is unavailable');
     }
+    const taskGrant = githubTaskGrantSchema.safeParse(issued.value.taskGrant);
+    if (
+      taskRef &&
+      (!taskGrant.success ||
+        taskGrant.data.scopeId !== grant.scopeId ||
+        taskGrant.data.taskRef !== taskRef)
+    )
+      throw new Error('GitHub task policy is unavailable');
     scm = {
       purpose: 'github',
       alias,
       gitUrl: `https://github.com/${repository.repo}.git`,
       author: issued.value.gitAuthor,
       githubAppType: issued.value.appType,
+      ...(taskRef ? { githubAuthSource: issued.value.source } : {}),
       capability: cachedCapability(
         issued.value.capability,
-        CURRENT_CAPABILITY_PREFIX.github,
+        taskRef ? GITHUB_TASK_CAPABILITY_PREFIX : CURRENT_CAPABILITY_PREFIX.github,
         outboundContainerId,
         now,
         diagnostic
       ),
+      ...(taskRef && taskGrant.success ? { githubTaskGrant: taskGrant.data } : {}),
     };
+    requireSameGitHubIdentity(existingScm, scm);
   } else if (repository.type === 'gitlab') {
     const issued = await issueCloudAgentGitLabSessionCapability(env, {
       ...common,
@@ -1200,9 +1281,18 @@ export async function prepareCredentialGrant(
     diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_grant' });
     invalidCredentials();
   }
+  // An existing scope keeps its policy when another session joins or its grant renews.
+  const taskAuthorization = existing
+    ? existing.githubTaskRef !== undefined ||
+      existing.scm?.githubTaskGrant !== undefined ||
+      existing.additionalRepositories?.some(entry => entry.scm.githubTaskGrant !== undefined) ===
+        true
+    : source.githubAuthorization === 'task';
   const additionalEntries = additionalMembers.map(member => ({
     repoFullName: member.repoFullName,
     repository: additionalRepositoryOf(member, existing, source, diagnostic),
+    // Each member checks out its own branch, so each GitHub member gets its own task ref.
+    ...(taskAuthorization && member.branch ? { githubTaskRef: `refs/heads/${member.branch}` } : {}),
   }));
   const additionalRepositories = additionalEntries.map(entry => entry.repository);
   if (repository !== undefined) diagnostic?.fact({ repositoryKind: repository.type });
@@ -1228,6 +1318,11 @@ export async function prepareCredentialGrant(
     });
     invalidCredentials();
   }
+  const githubTaskRef =
+    taskAuthorization && repository?.type === 'github'
+      ? `refs/heads/${input.payload.branch ?? `session/${scopeId.data}`}`
+      : undefined;
+  if (existing?.githubTaskRef && existing.githubTaskRef !== githubTaskRef) invalidCredentials();
   const members = existing?.members ?? [];
   if (
     members.some(
@@ -1256,6 +1351,7 @@ export async function prepareCredentialGrant(
   let grant: SessionCredentialGrant = {
     version: 1,
     scopeId: scopeId.data,
+    ...(githubTaskRef ? { githubTaskRef } : {}),
     directory,
     sandboxId,
     userId: source.userId,
@@ -1301,7 +1397,8 @@ export async function prepareCredentialGrant(
         now,
         input.refreshBacking,
         existing?.scm,
-        diagnostic
+        diagnostic,
+        grant.githubTaskRef
       );
       grant = { ...grant, scm: launchScm };
       if (additionalRepositories.length > 0) {
@@ -1310,7 +1407,7 @@ export async function prepareCredentialGrant(
           members: additionalEntries,
           launchScm,
           existing: existing?.additionalRepositories,
-          refresh: (member, existingScm) =>
+          refresh: (member, existingScm, githubTaskRef) =>
             refreshScmCapability(
               env,
               grant,
@@ -1319,7 +1416,8 @@ export async function prepareCredentialGrant(
               now,
               input.refreshBacking,
               existingScm,
-              diagnostic
+              diagnostic,
+              githubTaskRef
             ),
         });
         grant = { ...grant, additionalRepositories: resolved };
@@ -1427,6 +1525,9 @@ export function credentialSourceFromMetadata(
       : { workspaceId: metadata.workspace.worktreeId }),
     kiloSessionId,
     kiloToken,
+    ...(metadata.workspace?.githubAuthorization
+      ? { githubAuthorization: metadata.workspace.githubAuthorization }
+      : {}),
     ...(metadata.identity.orgId === undefined ? {} : { orgId: metadata.identity.orgId }),
     ...(metadata.identity.createdOnPlatform === undefined
       ? {}
@@ -1638,7 +1739,9 @@ export async function resolveSessionCredential(input: {
       input.outboundContainerId,
       now,
       false,
-      entry.scm
+      entry.scm,
+      undefined,
+      entry.additionalIndex === undefined ? grant.githubTaskRef : undefined
     );
     grant = withEntryScm(grant, entry.additionalIndex, scm);
     const refreshed = sessionCredentialGrantSchema.safeParse(grant);

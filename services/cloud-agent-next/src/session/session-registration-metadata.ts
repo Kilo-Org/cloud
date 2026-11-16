@@ -270,6 +270,7 @@ export async function buildSessionMetadataFromRegistration(
     callback: input.callback,
     workspace: {
       ...input.workspace,
+      githubAuthorization: 'task',
       ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
       sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
       branchName,

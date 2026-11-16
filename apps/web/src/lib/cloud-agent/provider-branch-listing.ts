@@ -195,24 +195,19 @@ const githubBranchesUnavailableMessage = 'GitHub did not answer the branch list.
  * repository refusal. The callers handle 403 and 404 themselves, because only
  * they know whether another installation may still see the repository.
  *
- * A 5xx, a transport failure (no status), and any other answer Kilo cannot act
- * on are provider-side: they stay retryable so the caller sees a state it can
- * retry instead of an opaque internal error. A 401 is the installation
- * credential itself being refused, which a reconnect fixes; a 451 is GitHub
- * blocking the repository for legal reasons, which is a refusal like 403.
+ * A 5xx is provider-side and stays retryable; Octokit also reports a request
+ * that got no response as a 500. A 401 is the installation credential itself
+ * being refused, which a reconnect fixes; a 451 is GitHub blocking the
+ * repository for legal reasons, which is a refusal like 403. Anything else,
+ * including an error with no HTTP status, is a Kilo-side defect and is
+ * rethrown unchanged so it is not presented as a provider state.
  */
-function githubBranchesErrorToTrpcError(error: unknown): TRPCError {
+function githubBranchesErrorToTrpcError(error: unknown): unknown {
   // The list call's own refusals (a vanished integration, an incomplete
   // installation) are already classified and keep their specific code.
   if (error instanceof TRPCError) return error;
   const status = refusalStatus(error);
-  if (status === 401) {
-    return new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: githubCredentialRefusedMessage,
-      cause: error,
-    });
-  }
+  if (status === 401) return githubCredentialRefusedTrpcError(error);
   if (status === 451) {
     return new TRPCError({
       code: 'FORBIDDEN',
@@ -220,9 +215,20 @@ function githubBranchesErrorToTrpcError(error: unknown): TRPCError {
       cause: error,
     });
   }
+  if (typeof status === 'number' && status >= 500) {
+    return new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: githubBranchesUnavailableMessage,
+      cause: error,
+    });
+  }
+  return error;
+}
+
+function githubCredentialRefusedTrpcError(error: unknown): TRPCError {
   return new TRPCError({
-    code: 'SERVICE_UNAVAILABLE',
-    message: githubBranchesUnavailableMessage,
+    code: 'PRECONDITION_FAILED',
+    message: githubCredentialRefusedMessage,
     cause: error,
   });
 }
@@ -269,6 +275,7 @@ async function listOrganizationGitHubBranches(
   ];
   let lastError: unknown;
   let rateLimitError: unknown;
+  let credentialError: unknown;
   for (const integration of candidates) {
     try {
       const { branches } = await githubAppsService.listBranches(
@@ -288,6 +295,12 @@ async function listOrganizationGitHubBranches(
         rateLimitError ??= error;
         continue;
       }
+      // A refused credential belongs to one installation; another may still
+      // list the repository, so the reconnect state wins only if none does.
+      if (refusalStatus(error) === 401) {
+        credentialError ??= error;
+        continue;
+      }
       if (!isRepositoryUnreachable(error)) throw githubBranchesErrorToTrpcError(error);
       lastError = error;
     }
@@ -296,6 +309,7 @@ async function listOrganizationGitHubBranches(
   // rather than show the install message for a repository a limited
   // installation may well list once the limit clears.
   if (rateLimitError) throw githubRateLimitTrpcError(rateLimitError);
+  if (credentialError) throw githubCredentialRefusedTrpcError(credentialError);
   throw new TRPCError({
     code: 'NOT_FOUND',
     message:

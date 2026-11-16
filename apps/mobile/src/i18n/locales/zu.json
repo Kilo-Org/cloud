@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Phatha kuwebhu",
     "creditHistory": "Umlando wamakhredithi",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Khansela",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Ukuthenga, amarisidi, nomsebenzi wamakhredithi",
     "invoicesSubtitle": "Landa ama-invoyisi okuthenga kwakho",
-    "manageBilling": "Phatha ukukhokha ku-kilo.ai",
-    "manageBillingIosNote": "Izindlela zokukhokha, ukugcwalisa okuzenzakalelayo, nemininingwane yokukhokha kuphathwa ku-kilo.ai.",
     "codeReviewerSubtitle": "Ukuhlolwa kwe-PR okuzenzakalelayo",
     "securityAgentSubtitle": "Thola futhi ulungise ubungozi",
     "reviews": "Ukuhlolwa",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "Izokhanselwa ngo-{{date}}",
       "cancelScheduledChange": "Khansela ushintsho oluhleliwe",
       "cancelled": "Ukubhalisa kukhanseliwe",
-      "changePlan": "Shintsha uhlelo ku-kilo.ai",
-      "changePlanIosNote": "Ukushintsha izinhlelo ezikhokhelwayo kuyatholakala ku-kilo.ai.",
       "creditHistoryEmpty": "Awukabi namakhredithi e-Kilo Pass.",
-      "manageInStore": "Phatha ku-{{store}}",
       "resume": "Qhubeka nokubhalisa",
       "resumeCancelledDescription": "I-Kilo Pass yakho izophinde iqale ukuvuselelwa ngokuzenzakalelayo.",
       "resumePausedDescription": "I-Kilo Pass yakho iyaqhubeka manje, ngaphambi kosuku obekwe ukuthi iqhubeke ngalo.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "Ibhonasi yamahhala",
     "bonusReferral": "Ibhonasi yokubhekisa",
     "bonusAvailable": "Ibhonasi yamahhala etholakalayo",
-    "kiloPassManagement": "Ukuphathwa kwe-Kilo Pass",
-    "kiloPassSetup": "Ukusethwa kwe-Kilo Pass",
-    "opensManagementOnWeb": "Ivula ukuphathwa kwe-Kilo Pass kuwebhu.",
     "loadFailedRetry": "Hlola uxhumano lwakho, bese uzama futhi.",
     "legalTermsOfUse": "Imigomo yokusetshenziswa (EULA)",
     "purchaseDifferentAccount": "Lokhu kuthengwa kwe-App Store akuxhunyiwe ku-akhawunti yakho ye-Kilo. Ngena nge-Apple Account esetshenziselwe ukuthenga, bese uzama futhi.",
@@ -3304,7 +3294,6 @@
       "buySeats": "Thenga izikhala",
       "setupAutoTopUp": "Setha ukugcwalisa okuzenzakalelayo",
       "manageAutoTopUp": "Phatha ukugcwalisa okuzenzakalelayo",
-      "webAddress": "Ikheli lewebhu {{url}}",
       "opensOnWeb": "Kuvuleka kuwebhu"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "Amaqembu",
       "guardrails": "Izivikelo",
       "byok": "Sebenzisa ukhiye wakho",
-      "ssoAndDomain": "I-SSO nesizinda",
-      "emailPreferences": "Okuncamelayo kwe-imeyili",
-      "dataCollection": "Ukuqoqwa kwedatha",
       "auditLogs": "Amarekhodi okucwaninga",
       "requestLogs": "Amarekhodi ezicelo",
       "subOrganizations": "Izinhlangano ezingaphansi",
@@ -3488,8 +3474,7 @@
       "paymentPending": "Inkokhelo ilindile",
       "processingBlocked": "Ukucutshungulwa kuvinjiwe",
       "processingNeedsReview": "Ukucutshungulwa kudinga ukuhlolwa",
-      "retryHint": "Iphinda izame ukulayisha isimo se-Kilo Pass.",
-      "setupHint": "Ivula ukusethwa kwe-Kilo Pass kuwebhu."
+      "retryHint": "Iphinda izame ukulayisha isimo se-Kilo Pass."
     }
   },
   "authErrors": {

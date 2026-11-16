@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "مدیریت در وب",
     "creditHistory": "تاریخچهٔ اعتبار",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "لغو",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "خریدها، رسیدها و فعالیت اعتبار",
     "invoicesSubtitle": "فاکتورهای خریدهایتان را دانلود کنید",
-    "manageBilling": "مدیریت صورتحساب در kilo.ai",
-    "manageBillingIosNote": "روش‌های پرداخت، شارژ خودکار و جزئیات صورتحساب در kilo.ai مدیریت می‌شوند.",
     "codeReviewerSubtitle": "بازبینی خودکار PR",
     "securityAgentSubtitle": "یافتن و رفع آسیب‌پذیری‌ها",
     "reviews": "بازبینی‌ها",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "در {{date}} لغو می‌شود",
       "cancelScheduledChange": "لغو تغییر زمان‌بندی‌شده",
       "cancelled": "اشتراک لغو شد",
-      "changePlan": "تغییر طرح در kilo.ai",
-      "changePlanIosNote": "تغییر طرح‌های پولی در kilo.ai امکان‌پذیر است.",
       "creditHistoryEmpty": "هنوز اعتباری از Kilo Pass وجود ندارد.",
-      "manageInStore": "مدیریت در {{store}}",
       "resume": "ازسرگیری اشتراک",
       "resumeCancelledDescription": "Kilo Pass شما دوباره به‌طور خودکار تمدید می‌شود.",
       "resumePausedDescription": "Kilo Pass شما هم‌اکنون، پیش از تاریخ ازسرگیری زمان‌بندی‌شده، از سر گرفته می‌شود.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "پاداش رایگان",
     "bonusReferral": "پاداش معرفی",
     "bonusAvailable": "پاداش رایگان در دسترس",
-    "kiloPassManagement": "مدیریت Kilo Pass",
-    "kiloPassSetup": "راه‌اندازی Kilo Pass",
-    "opensManagementOnWeb": "مدیریت Kilo Pass را در وب باز می‌کند.",
     "loadFailedRetry": "اتصال خود را بررسی کنید، سپس دوباره تلاش کنید.",
     "legalTermsOfUse": "شرایط استفاده (EULA)",
     "purchaseDifferentAccount": "این خرید از App Store به حساب Kilo شما متصل نیست. وارد همان Apple Account شوید که با آن خرید کرده‌اید، سپس دوباره تلاش کنید.",
@@ -3304,7 +3294,6 @@
       "buySeats": "خرید مجوز کاربری",
       "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
       "manageAutoTopUp": "مدیریت شارژ خودکار",
-      "webAddress": "نشانی وب {{url}}",
       "opensOnWeb": "در وب باز می‌شود"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "گروه‌ها",
       "guardrails": "محدودیت‌های ایمنی",
       "byok": "استفاده از کلید خودتان",
-      "ssoAndDomain": "SSO و دامنه",
-      "emailPreferences": "تنظیمات ایمیل",
-      "dataCollection": "جمع‌آوری داده",
       "auditLogs": "گزارش‌های حسابرسی",
       "requestLogs": "گزارش‌های درخواست",
       "subOrganizations": "زیرسازمان‌ها",
@@ -3488,8 +3474,7 @@
       "paymentPending": "در انتظار پرداخت",
       "processingBlocked": "پردازش متوقف شده است",
       "processingNeedsReview": "پردازش نیاز به بررسی دارد",
-      "retryHint": "دوباره برای بارگذاری وضعیت Kilo Pass تلاش می‌کند.",
-      "setupHint": "صفحهٔ راه‌اندازی Kilo Pass را در وب باز می‌کند."
+      "retryHint": "دوباره برای بارگذاری وضعیت Kilo Pass تلاش می‌کند."
     }
   },
   "authErrors": {

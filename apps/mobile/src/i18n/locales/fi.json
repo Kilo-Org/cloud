@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Hallinnoi verkossa",
     "creditHistory": "Krediittihistoria",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Peruuta",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Ostot, kuitit ja krediittitapahtumat",
     "invoicesSubtitle": "Lataa ostojesi laskut",
-    "manageBilling": "Hallinnoi laskutusta osoitteessa kilo.ai",
-    "manageBillingIosNote": "Maksutapoja, automaattista saldon täydennystä ja laskutustietoja hallinnoidaan osoitteessa kilo.ai.",
     "codeReviewerSubtitle": "Automaattiset PR-katselmoinnit",
     "securityAgentSubtitle": "Etsi ja korjaa haavoittuvuuksia",
     "reviews": "Katselmoinnit",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "Päättyy {{date}}",
       "cancelScheduledChange": "Peru ajoitettu muutos",
       "cancelled": "Tilaus peruttu",
-      "changePlan": "Vaihda pakettia osoitteessa kilo.ai",
-      "changePlanIosNote": "Maksullisia pakettimuutoksia voi tehdä osoitteessa kilo.ai.",
       "creditHistoryEmpty": "Ei vielä Kilo Pass -krediittejä.",
-      "manageInStore": "Hallinnoi palvelussa {{store}}",
       "resume": "Jatka tilausta",
       "resumeCancelledDescription": "Kilo Pass alkaa taas uusiutua automaattisesti.",
       "resumePausedDescription": "Kilo Pass jatkuu nyt, ennen ajoitettua jatkamispäivää.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "Ilmainen bonus",
     "bonusReferral": "Suosittelubonus",
     "bonusAvailable": "Saatavilla oleva ilmainen bonus",
-    "kiloPassManagement": "Kilo Passin hallinta",
-    "kiloPassSetup": "Kilo Passin käyttöönotto",
-    "opensManagementOnWeb": "Avaa Kilo Pass -hallinnan verkossa.",
     "loadFailedRetry": "Tarkista verkkoyhteytesi ja yritä sitten uudelleen.",
     "legalTermsOfUse": "Käyttöehdot (EULA)",
     "purchaseDifferentAccount": "Tämä App Store -osto ei ole liitetty Kilo-tiliisi. Kirjaudu sisään ostoon käytetylle Apple-tilille ja yritä uudelleen.",
@@ -3304,7 +3294,6 @@
       "buySeats": "Osta käyttäjäpaikkoja",
       "setupAutoTopUp": "Ota automaattinen täydennys käyttöön",
       "manageAutoTopUp": "Hallinnoi automaattista täydennystä",
-      "webAddress": "Verkko-osoite {{url}}",
       "opensOnWeb": "Avautuu verkossa"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "Ryhmät",
       "guardrails": "Suojakaiteet",
       "byok": "Oma avain",
-      "ssoAndDomain": "SSO ja verkkotunnus",
-      "emailPreferences": "Sähköpostiasetukset",
-      "dataCollection": "Tiedonkeruu",
       "auditLogs": "Tarkastuslokit",
       "requestLogs": "Pyyntölokit",
       "subOrganizations": "Alaorganisaatiot",
@@ -3488,8 +3474,7 @@
       "paymentPending": "Odottaa maksua",
       "processingBlocked": "Käsittely estetty",
       "processingNeedsReview": "Käsittely vaatii tarkistusta",
-      "retryHint": "Yrittää ladata Kilo Passin tilan uudelleen.",
-      "setupHint": "Avaa Kilo Passin käyttöönoton selaimessa."
+      "retryHint": "Yrittää ladata Kilo Passin tilan uudelleen."
     }
   },
   "authErrors": {

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Spravovat na webu",
     "creditHistory": "Historie kreditů",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Zrušit",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Nákupy, účtenky a pohyby kreditů",
     "invoicesSubtitle": "Stáhněte si faktury ke svým nákupům",
-    "manageBilling": "Spravovat fakturaci na kilo.ai",
-    "manageBillingIosNote": "Platební metody, automatické dobíjení a fakturační údaje se spravují na kilo.ai.",
     "codeReviewerSubtitle": "Automatické kontroly PR",
     "securityAgentSubtitle": "Vyhledávat a odstraňovat zranitelnosti",
     "reviews": "Kontroly kódu",
@@ -3187,10 +3183,7 @@
       "cancelScheduled": "Zruší se {{date}}",
       "cancelScheduledChange": "Zrušit naplánovanou změnu",
       "cancelled": "Předplatné zrušeno",
-      "changePlan": "Změnit tarif na kilo.ai",
-      "changePlanIosNote": "Změny placeného tarifu jsou k dispozici na kilo.ai.",
       "creditHistoryEmpty": "Zatím žádné kredity z Kilo Pass.",
-      "manageInStore": "Spravovat v {{store}}",
       "resume": "Obnovit předplatné",
       "resumeCancelledDescription": "Váš Kilo Pass se bude opět automaticky obnovovat.",
       "resumePausedDescription": "Váš Kilo Pass se znovu aktivuje hned, ještě před plánovaným datem obnovení.",
@@ -3227,9 +3220,6 @@
     "bonusFree": "Bonus zdarma",
     "bonusReferral": "Bonus za doporučení",
     "bonusAvailable": "Dostupný bonus zdarma",
-    "kiloPassManagement": "Správa Kilo Pass",
-    "kiloPassSetup": "Nastavení Kilo Pass",
-    "opensManagementOnWeb": "Otevře správu Kilo Pass na webu.",
     "loadFailedRetry": "Zkontrolujte připojení a zkuste to znovu.",
     "legalTermsOfUse": "Podmínky použití (EULA)",
     "purchaseDifferentAccount": "Tento nákup v App Store není propojený s vaším účtem Kilo. Přihlaste se k účtu Apple Account, který jste použili při nákupu, a zkuste to znovu.",
@@ -3414,7 +3404,6 @@
       "buySeats": "Koupit uživatelská místa",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
-      "webAddress": "Webová adresa {{url}}",
       "opensOnWeb": "Otevře se na webu"
     },
     "boundary": {
@@ -3556,9 +3545,6 @@
       "groups": "Skupiny",
       "guardrails": "Ochranná pravidla",
       "byok": "Vlastní klíč",
-      "ssoAndDomain": "SSO a doména",
-      "emailPreferences": "Předvolby e-mailů",
-      "dataCollection": "Shromažďování dat",
       "auditLogs": "Auditní protokoly",
       "requestLogs": "Protokoly požadavků",
       "subOrganizations": "Podorganizace",
@@ -3599,7 +3585,6 @@
       "processingBlocked": "Zpracování blokováno",
       "processingNeedsReview": "Zpracování vyžaduje kontrolu",
       "retryHint": "Znovu načte stav Kilo Pass.",
-      "setupHint": "Otevře nastavení Kilo Pass na webu.",
       "paidSeat_few": "{{displayCount}} placená místa",
       "paidSeat_many": "{{displayCount}} placeného místa"
     }

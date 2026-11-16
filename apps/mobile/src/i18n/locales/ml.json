@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "വെബിൽ നിയന്ത്രിക്കുക",
     "creditHistory": "ക്രെഡിറ്റ് ചരിത്രം",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "റദ്ദാക്കുക",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "വാങ്ങലുകൾ, രസീതുകൾ, ക്രെഡിറ്റ് പ്രവർത്തനങ്ങൾ",
     "invoicesSubtitle": "നിങ്ങളുടെ വാങ്ങലുകളുടെ ഇൻവോയ്‌സുകൾ ഡൗൺലോഡ് ചെയ്യുക",
-    "manageBilling": "kilo.ai-ൽ ബില്ലിംഗ് നിയന്ത്രിക്കുക",
-    "manageBillingIosNote": "പേയ്‌മെന്റ് രീതികൾ, ഓട്ടോ ടോപ്പ്-അപ്പ്, ബില്ലിംഗ് വിശദാംശങ്ങൾ എന്നിവ kilo.ai-ലാണ് നിയന്ത്രിക്കുന്നത്.",
     "codeReviewerSubtitle": "സ്വയമേവയുള്ള PR അവലോകനങ്ങൾ",
     "securityAgentSubtitle": "സുരക്ഷാ ദൗർബല്യങ്ങൾ കണ്ടെത്തി പരിഹരിക്കുക",
     "reviews": "അവലോകനങ്ങൾ",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "{{date}}-ന് റദ്ദാകും",
       "cancelScheduledChange": "ഷെഡ്യൂൾ ചെയ്ത മാറ്റം റദ്ദാക്കുക",
       "cancelled": "സബ്‌സ്‌ക്രിപ്‌ഷൻ റദ്ദാക്കി",
-      "changePlan": "kilo.ai-ൽ പ്ലാൻ മാറ്റുക",
-      "changePlanIosNote": "പണമടച്ചുള്ള പ്ലാൻ മാറ്റങ്ങൾ kilo.ai-ൽ ലഭ്യമാണ്.",
       "creditHistoryEmpty": "ഇതുവരെ Kilo Pass ക്രെഡിറ്റുകളൊന്നുമില്ല.",
-      "manageInStore": "{{store}}-ൽ നിയന്ത്രിക്കുക",
       "resume": "സബ്‌സ്‌ക്രിപ്‌ഷൻ പുനരാരംഭിക്കുക",
       "resumeCancelledDescription": "നിങ്ങളുടെ Kilo Pass വീണ്ടും സ്വയമേവ പുതുക്കാൻ തുടങ്ങും.",
       "resumePausedDescription": "ഷെഡ്യൂൾ ചെയ്ത പുനരാരംഭ തീയതിക്ക് മുമ്പായി, നിങ്ങളുടെ Kilo Pass ഇപ്പോൾ പുനരാരംഭിക്കും.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "സൗജന്യ ബോണസ്",
     "bonusReferral": "റെഫറൽ ബോണസ്",
     "bonusAvailable": "ലഭ്യമായ സൗജന്യ ബോണസ്",
-    "kiloPassManagement": "Kilo Pass നിയന്ത്രണം",
-    "kiloPassSetup": "Kilo Pass സജ്ജീകരണം",
-    "opensManagementOnWeb": "Kilo Pass നിയന്ത്രിക്കാനുള്ള പേജ് വെബ്സൈറ്റിൽ തുറക്കുന്നു.",
     "loadFailedRetry": "നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
     "legalTermsOfUse": "ഉപയോഗ നിബന്ധനകൾ (EULA)",
     "purchaseDifferentAccount": "ഈ App Store വാങ്ങൽ നിങ്ങളുടെ Kilo അക്കൗണ്ടുമായി ബന്ധിപ്പിച്ചിട്ടില്ല. വാങ്ങാൻ ഉപയോഗിച്ച Apple Account-ൽ സൈൻ ഇൻ ചെയ്ത ശേഷം വീണ്ടും ശ്രമിക്കുക.",
@@ -3304,7 +3294,6 @@
       "buySeats": "സീറ്റുകൾ വാങ്ങുക",
       "setupAutoTopUp": "ഓട്ടോ ടോപ്പ്-അപ്പ് സജ്ജമാക്കുക",
       "manageAutoTopUp": "ഓട്ടോ ടോപ്പ്-അപ്പ് നിയന്ത്രിക്കുക",
-      "webAddress": "വെബ് വിലാസം {{url}}",
       "opensOnWeb": "വെബിൽ തുറക്കും"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "ഗ്രൂപ്പുകൾ",
       "guardrails": "ഗാർഡ്‌റെയിലുകൾ",
       "byok": "സ്വന്തം കീ ഉപയോഗിക്കുക",
-      "ssoAndDomain": "SSO-യും ഡൊമെയ്‌നും",
-      "emailPreferences": "ഇമെയിൽ മുൻഗണനകൾ",
-      "dataCollection": "ഡാറ്റ ശേഖരണം",
       "auditLogs": "ഓഡിറ്റ് ലോഗുകൾ",
       "requestLogs": "അഭ്യർത്ഥന ലോഗുകൾ",
       "subOrganizations": "ഉപ-ഓർഗനൈസേഷനുകൾ",
@@ -3488,8 +3474,7 @@
       "paymentPending": "പണമടയ്ക്കൽ പൂർത്തിയായിട്ടില്ല",
       "processingBlocked": "പ്രോസസ്സിംഗ് തടഞ്ഞു",
       "processingNeedsReview": "പ്രോസസ്സിംഗ് പരിശോധിക്കണം",
-      "retryHint": "Kilo Pass നില ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുന്നു.",
-      "setupHint": "വെബിൽ Kilo Pass സജ്ജീകരണം തുറക്കുന്നു."
+      "retryHint": "Kilo Pass നില ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുന്നു."
     }
   },
   "authErrors": {

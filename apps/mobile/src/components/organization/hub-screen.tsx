@@ -15,7 +15,6 @@ import {
   Users,
   Wallet,
 } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -45,6 +44,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
@@ -112,6 +112,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     organizationId,
     isMoneyRole(role) && parentLink === null
   );
+  // The storefront rule that decides whether the plan-ended banner may link to
+  // the web billing page. Read with the other hooks, before the boundary's
+  // early return.
+  const canLinkBilling = useCanLinkExternalPurchase();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
   const { t } = useTranslation();
@@ -141,8 +145,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         isError: kiloPassSummary.isError || kiloPassLinkUnavailable,
       })
     : null;
-  const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;
-  const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
   // The row shows a placeholder line, not loading copy, until the membership
   // payload supplies the value: the settled subtitle is one short phrase
@@ -258,7 +260,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <OrganizationPlanRefusal
             message={planMessage}
             action={
-              showMoney
+              showMoney && canLinkBilling
                 ? {
                     label: t('organization.hub.manageBilling'),
                     onPress: () => {
@@ -382,16 +384,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               {kiloPassRowState != null && (
                 <OrgKiloPassRow
                   state={kiloPassRowState}
-                  onManage={() => {
-                    void openExternalUrl(kiloPassManagementUrl, {
-                      label: t('kiloPass.kiloPassManagement'),
-                    });
-                  }}
-                  onSetup={() => {
-                    void openExternalUrl(kiloPassSetupUrl, {
-                      label: t('kiloPass.kiloPassSetup'),
-                    });
-                  }}
                   onRetry={() => {
                     // While the link is unknown the summary never fired, so the
                     // retry asks the payload that decides whether it should.
@@ -508,39 +500,28 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
 
 type OrgKiloPassRowProps = Readonly<{
   state: OrgKiloPassRowState;
-  onManage: () => void;
-  onSetup: () => void;
   onRetry: () => void;
 }>;
 
 /**
  * Compact Kilo Pass for Orgs row in the billing configuration group. Mirrors
  * ConfigureRow's layout and divider, but renders KiloPassIcon directly (it is
- * a plain function component, not a LucideIcon) and sets explicit
- * accessibility roles/labels for the manage, setup, and retry actions. Never
- * the last row — "Low balance alert" always follows it — so the divider is
- * permanent. Its icon tile follows ConfigureRow's rule too: the shared neutral
- * tile unless the state needs attention (warn), never a hue hashed from the
- * title.
+ * a plain function component, not a LucideIcon) and sets an explicit
+ * accessibility role and label for the one action it can offer, the retry.
+ * Never the last row — "Low balance alert" always follows it — so the divider
+ * is permanent. Its icon tile follows ConfigureRow's rule too: the shared
+ * neutral tile unless the state needs attention (warn), never a hue hashed from
+ * the title.
+ *
+ * The row opens nothing else: Kilo Pass is no longer sold in either store, so
+ * it has no setup or management page to send the reader to and carries no
+ * chevron.
  */
-function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowProps) {
+function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const tint: Tint = state.attention ? toneColor('warn') : NEUTRAL_TINT;
-  let onPress: (() => void) | null = null;
-  if (state.action === 'manage') {
-    onPress = onManage;
-  } else if (state.action === 'setup') {
-    onPress = onSetup;
-  } else if (state.action === 'retry') {
-    onPress = onRetry;
-  }
-  // Every settled state of this row but the retryable error opens the Kilo Pass
-  // management page on the web. The unresolved status (`action: 'none'`, shown
-  // while the summary query is in flight) keeps that chevron too: it lasts one
-  // request, and a momentary row without it reads as broken beside the rows
-  // above and below it.
-  const showsChevron = state.action !== 'retry';
+  const onPress = state.action === 'retry' ? onRetry : null;
   const accessibilityLabel = state.actionLabel
     ? `${t('kiloPass.title')}. ${state.subtitle}. ${state.actionLabel}`
     : `${t('kiloPass.title')}. ${state.subtitle}`;
@@ -574,7 +555,6 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       {state.action === 'retry' ? (
         <Text className="shrink-0 text-xs font-medium text-primary">{state.actionLabel}</Text>
       ) : null}
-      {showsChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
     </View>
   );
 

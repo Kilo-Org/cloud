@@ -124,6 +124,13 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.test' }));
 
+/** Whether the storefront rule lets the lapsed-plan banner link to the web. */
+const storefrontRule = vi.hoisted(() => ({ linkAllowed: true }));
+
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => storefrontRule.linkAllowed,
+}));
+
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }));
 
 vi.mock('@/lib/format', () => ({
@@ -143,7 +150,7 @@ const kiloPassRowState = vi.hoisted(() => ({
   current: null as null | {
     subtitle: string;
     attention: boolean;
-    action: 'manage' | 'setup' | 'retry' | 'none';
+    action: 'retry' | 'none';
     actionLabel: string | null;
     accessibilityHint: string | null;
     loading: boolean;
@@ -296,6 +303,7 @@ beforeEach(() => {
   boundary.balance = 5_000_000;
   boundary.plan = 'teams';
   boundary.isTrialExpiredForEnforcement = false;
+  storefrontRule.linkAllowed = true;
   hideBalancePref.hideBalance = false;
   hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
@@ -438,6 +446,18 @@ describe('Organization hub plan', () => {
       'https://app.kilo.test/organizations/org-1/subscriptions',
       { label: i18n.t('organization.hub.manageBilling') }
     );
+    unmount();
+  });
+
+  it('drops the billing action when the storefront rule refuses the link', async () => {
+    storefrontRule.linkAllowed = false;
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const [refusal] = refusals(renderer);
+    expect(refusal?.props.action).toBeUndefined();
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -682,7 +702,7 @@ describe('Organization hub Kilo Pass placeholder', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
-      action: 'setup',
+      action: 'none',
       actionLabel: null,
       accessibilityHint: null,
       loading: false,
@@ -952,7 +972,7 @@ describe('Organization hub Kilo Pass icon tile', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
-      action: 'setup',
+      action: 'none',
       actionLabel: 'Set up',
       accessibilityHint: 'Opens Kilo Pass setup on web.',
       loading: false,

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ",
     "creditHistory": "ಕ್ರೆಡಿಟ್ ಇತಿಹಾಸ",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ರದ್ದುಮಾಡಿ",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "ಖರೀದಿಗಳು, ರಸೀದಿಗಳು ಮತ್ತು ಕ್ರೆಡಿಟ್ ಚಟುವಟಿಕೆ",
     "invoicesSubtitle": "ನಿಮ್ಮ ಖರೀದಿಗಳ ಇನ್‌ವಾಯ್ಸ್‌ಗಳನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
-    "manageBilling": "kilo.ai ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಹಿಸಿ",
-    "manageBillingIosNote": "ಪಾವತಿ ವಿಧಾನಗಳು, ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ವಿವರಗಳನ್ನು kilo.ai ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
     "codeReviewerSubtitle": "ಸ್ವಯಂಚಾಲಿತ PR ಪರಿಶೀಲನೆಗಳು",
     "securityAgentSubtitle": "ಭದ್ರತಾ ದೋಷಗಳನ್ನು ಹುಡುಕಿ ಸರಿಪಡಿಸಿ",
     "reviews": "ಪರಿಶೀಲನೆಗಳು",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "{{date}} ರಂದು ರದ್ದಾಗುತ್ತದೆ",
       "cancelScheduledChange": "ನಿಗದಿತ ಬದಲಾವಣೆಯನ್ನು ರದ್ದುಮಾಡಿ",
       "cancelled": "ಚಂದಾದಾರಿಕೆ ರದ್ದುಗೊಂಡಿದೆ",
-      "changePlan": "kilo.ai ನಲ್ಲಿ ಪ್ಲಾನ್ ಬದಲಾಯಿಸಿ",
-      "changePlanIosNote": "ಪಾವತಿಸಿದ ಪ್ಲಾನ್ ಬದಲಾವಣೆಗಳು kilo.ai ನಲ್ಲಿ ಲಭ್ಯವಿವೆ.",
       "creditHistoryEmpty": "ಇನ್ನೂ ಯಾವುದೇ Kilo Pass ಕ್ರೆಡಿಟ್‌ಗಳಿಲ್ಲ.",
-      "manageInStore": "{{store}} ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ",
       "resume": "ಚಂದಾದಾರಿಕೆ ಪುನರಾರಂಭಿಸಿ",
       "resumeCancelledDescription": "ನಿಮ್ಮ Kilo Pass ಮತ್ತೆ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಣಗೊಳ್ಳಲು ಪ್ರಾರಂಭಿಸುತ್ತದೆ.",
       "resumePausedDescription": "ನಿಮ್ಮ Kilo Pass ಅದರ ನಿಗದಿತ ಪುನರಾರಂಭ ದಿನಾಂಕಕ್ಕಿಂತ ಮೊದಲೇ ಈಗ ಪುನರಾರಂಭವಾಗುತ್ತದೆ.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "ಉಚಿತ ಬೋನಸ್",
     "bonusReferral": "ರೆಫರಲ್ ಬೋನಸ್",
     "bonusAvailable": "ಲಭ್ಯವಿರುವ ಉಚಿತ ಬೋನಸ್",
-    "kiloPassManagement": "Kilo Pass ನಿರ್ವಹಣೆ",
-    "kiloPassSetup": "Kilo Pass ಸೆಟಪ್",
-    "opensManagementOnWeb": "ವೆಬ್‌ನಲ್ಲಿ Kilo Pass ನಿರ್ವಹಣೆಯನ್ನು ತೆರೆಯುತ್ತದೆ.",
     "loadFailedRetry": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "legalTermsOfUse": "ಬಳಕೆಯ ನಿಯಮಗಳು (EULA)",
     "purchaseDifferentAccount": "ಈ App Store ಖರೀದಿಯು ನಿಮ್ಮ Kilo ಖಾತೆಗೆ ಲಿಂಕ್ ಆಗಿಲ್ಲ. ಖರೀದಿಗೆ ಬಳಸಿದ Apple Account ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -3304,7 +3294,6 @@
       "buySeats": "ಸೀಟ್‌ಗಳನ್ನು ಖರೀದಿಸಿ",
       "setupAutoTopUp": "ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ಹೊಂದಿಸಿ",
       "manageAutoTopUp": "ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ನಿರ್ವಹಿಸಿ",
-      "webAddress": "ವೆಬ್ ವಿಳಾಸ {{url}}",
       "opensOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ತೆರೆಯುತ್ತದೆ"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "ಗುಂಪುಗಳು",
       "guardrails": "ಗಾರ್ಡ್‌ರೇಲ್‌ಗಳು",
       "byok": "ನಿಮ್ಮ ಸ್ವಂತ ಕೀ ಬಳಸಿ",
-      "ssoAndDomain": "SSO ಮತ್ತು ಡೊಮೇನ್",
-      "emailPreferences": "ಇಮೇಲ್ ಆದ್ಯತೆಗಳು",
-      "dataCollection": "ಡೇಟಾ ಸಂಗ್ರಹಣೆ",
       "auditLogs": "ಆಡಿಟ್ ಲಾಗ್‌ಗಳು",
       "requestLogs": "ವಿನಂತಿ ಲಾಗ್‌ಗಳು",
       "subOrganizations": "ಉಪ-ಸಂಸ್ಥೆಗಳು",
@@ -3488,8 +3474,7 @@
       "paymentPending": "ಪಾವತಿ ಬಾಕಿ ಇದೆ",
       "processingBlocked": "ಸಂಸ್ಕರಣೆ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
       "processingNeedsReview": "ಸಂಸ್ಕರಣೆಯನ್ನು ಪರಿಶೀಲಿಸಬೇಕು",
-      "retryHint": "Kilo Pass ಸ್ಥಿತಿಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತದೆ.",
-      "setupHint": "ವೆಬ್‌ನಲ್ಲಿ Kilo Pass ಸೆಟಪ್ ಪುಟವನ್ನು ತೆರೆಯುತ್ತದೆ."
+      "retryHint": "Kilo Pass ಸ್ಥಿತಿಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತದೆ."
     }
   },
   "authErrors": {

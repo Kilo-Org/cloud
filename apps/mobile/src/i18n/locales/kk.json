@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Вебте басқару",
     "creditHistory": "Кредиттер тарихы",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Болдырмау",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Сатып алулар, түбіртектер және кредит әрекеттері",
     "invoicesSubtitle": "Сатып алуларыңыздың шот-фактураларын жүктеп алыңыз",
-    "manageBilling": "Төлемдерді kilo.ai сайтында басқару",
-    "manageBillingIosNote": "Төлем әдістері, автоматты толтыру және төлем деректері kilo.ai сайтында басқарылады.",
     "codeReviewerSubtitle": "PR сұрауларын автоматты тексеру",
     "securityAgentSubtitle": "Осалдықтарды табу және жою",
     "reviews": "Тексерулер",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "{{date}} күні тоқтатылады",
       "cancelScheduledChange": "Жоспарланған өзгерісті болдырмау",
       "cancelled": "Жазылымнан бас тартылды",
-      "changePlan": "Жоспарды kilo.ai сайтында өзгерту",
-      "changePlanIosNote": "Ақылы жоспарды өзгерту kilo.ai сайтында қолжетімді.",
       "creditHistoryEmpty": "Kilo Pass кредиттері әзірге жоқ.",
-      "manageInStore": "{{store}} арқылы басқару",
       "resume": "Жазылымды жалғастыру",
       "resumeCancelledDescription": "Kilo Pass қайтадан автоматты түрде ұзартыла бастайды.",
       "resumePausedDescription": "Kilo Pass жоспарланған жалғасу күнін күтпей, қазір жалғасады.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "Тегін бонус",
     "bonusReferral": "Шақыру бонусы",
     "bonusAvailable": "Қолжетімді тегін бонус",
-    "kiloPassManagement": "Kilo Pass жазылымын басқару",
-    "kiloPassSetup": "Kilo Pass баптау",
-    "opensManagementOnWeb": "Kilo Pass жазылымын басқару бетін браузерде ашады.",
     "loadFailedRetry": "Байланысыңызды тексеріп, қайталап көріңіз.",
     "legalTermsOfUse": "Пайдалану шарттары (EULA)",
     "purchaseDifferentAccount": "App Store дүкеніндегі бұл сатып алу Kilo тіркелгіңізге байланыстырылмаған. Сатып алу кезінде қолданылған Apple Account тіркелгісіне кіріп, қайталап көріңіз.",
@@ -3304,7 +3294,6 @@
       "buySeats": "Орын сатып алу",
       "setupAutoTopUp": "Автотолықтыруды баптау",
       "manageAutoTopUp": "Автотолықтыруды басқару",
-      "webAddress": "Веб-мекенжай: {{url}}",
       "opensOnWeb": "Вебте ашылады"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "Топтар",
       "guardrails": "Қорғаныс шектеулері",
       "byok": "Өз кілтіңізді пайдалану",
-      "ssoAndDomain": "SSO және домен",
-      "emailPreferences": "Электрондық пошта параметрлері",
-      "dataCollection": "Деректер жинау",
       "auditLogs": "Аудит журналдары",
       "requestLogs": "Сұраныс журналдары",
       "subOrganizations": "Еншілес ұйымдар",
@@ -3488,8 +3474,7 @@
       "paymentPending": "Төлем күтілуде",
       "processingBlocked": "Өңдеу бұғатталған",
       "processingNeedsReview": "Өңдеуді тексеру қажет",
-      "retryHint": "Kilo Pass күйін жүктеуді қайталайды.",
-      "setupHint": "Kilo Pass баптау бетін браузерде ашады."
+      "retryHint": "Kilo Pass күйін жүктеуді қайталайды."
     }
   },
   "authErrors": {

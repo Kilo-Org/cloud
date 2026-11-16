@@ -91,8 +91,6 @@
   "common": {
     "manageOnWeb": "Manage on the web",
     "creditHistory": "Credit history",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancel",
@@ -319,8 +317,6 @@
   "profile": {
     "creditHistorySubtitle": "Purchases, receipts, and credit activity",
     "invoicesSubtitle": "Download invoices for your purchases",
-    "manageBilling": "Manage billing on kilo.ai",
-    "manageBillingIosNote": "Payment methods, auto top-up, and billing details are managed on kilo.ai.",
     "codeReviewerSubtitle": "Automatic PR reviews",
     "securityAgentSubtitle": "Find and remediate vulnerabilities",
     "reviews": "Reviews",
@@ -3157,10 +3153,7 @@
       "cancelScheduled": "Cancels on {{date}}",
       "cancelScheduledChange": "Cancel scheduled change",
       "cancelled": "Cancelled subscription",
-      "changePlan": "Change plan on kilo.ai",
-      "changePlanIosNote": "Paid plan changes are available on kilo.ai.",
       "creditHistoryEmpty": "No Kilo Pass credits yet.",
-      "manageInStore": "Manage in {{store}}",
       "resume": "Resume subscription",
       "resumeCancelledDescription": "Your Kilo Pass starts renewing automatically again.",
       "resumePausedDescription": "Your Kilo Pass resumes now, before its scheduled resume date.",
@@ -3197,9 +3190,6 @@
     "bonusFree": "Free bonus",
     "bonusReferral": "Referral bonus",
     "bonusAvailable": "Available free bonus",
-    "kiloPassManagement": "Kilo Pass management",
-    "kiloPassSetup": "Kilo Pass setup",
-    "opensManagementOnWeb": "Opens Kilo Pass management on web.",
     "loadFailedRetry": "Check your connection, then try again.",
     "legalTermsOfUse": "Terms of Use (EULA)",
     "purchaseDifferentAccount": "This App Store purchase isn't linked to your Kilo account. Sign in to the Apple Account used for the purchase, then try again.",
@@ -3384,7 +3374,6 @@
       "buySeats": "Buy seats",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
-      "webAddress": "Web address {{url}}",
       "opensOnWeb": "Opens on the web"
     },
     "boundary": {
@@ -3526,9 +3515,6 @@
       "groups": "Groups",
       "guardrails": "Guardrails",
       "byok": "Bring your own key",
-      "ssoAndDomain": "SSO and domain",
-      "emailPreferences": "Email preferences",
-      "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
       "requestLogs": "Request logs",
       "subOrganizations": "Sub-organizations",
@@ -3568,8 +3554,7 @@
       "paymentPending": "Payment pending",
       "processingBlocked": "Processing blocked",
       "processingNeedsReview": "Processing needs review",
-      "retryHint": "Retries loading Kilo Pass status.",
-      "setupHint": "Opens Kilo Pass setup on web."
+      "retryHint": "Retries loading Kilo Pass status."
     }
   },
   "authErrors": {

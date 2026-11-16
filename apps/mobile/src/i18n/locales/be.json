@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Кіраваць у вэб-версіі",
     "creditHistory": "Гісторыя крэдытаў",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Адмяніць",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Пакупкі, чэкі і аперацыі з крэдытамі",
     "invoicesSubtitle": "Спампуйце рахункі за свае пакупкі",
-    "manageBilling": "Кіраваць аплатай на kilo.ai",
-    "manageBillingIosNote": "Спосабамі аплаты, аўтапапаўненнем і плацёжнымі данымі можна кіраваць на kilo.ai.",
     "codeReviewerSubtitle": "Аўтаматычныя праверкі PR",
     "securityAgentSubtitle": "Знаходзіць і ліквідаваць уразлівасці",
     "reviews": "Праверкі кода",
@@ -3187,10 +3183,7 @@
       "cancelScheduled": "Будзе скасавана {{date}}",
       "cancelScheduledChange": "Скасаваць запланаваную змену",
       "cancelled": "Падпіска скасавана",
-      "changePlan": "Змяніць тарыф на kilo.ai",
-      "changePlanIosNote": "Змяніць платны тарыф можна на kilo.ai.",
       "creditHistoryEmpty": "Крэдытаў Kilo Pass пакуль няма.",
-      "manageInStore": "Кіраваць у {{store}}",
       "resume": "Аднавіць падпіску",
       "resumeCancelledDescription": "Kilo Pass зноў будзе падаўжацца аўтаматычна.",
       "resumePausedDescription": "Kilo Pass адновіцца зараз, раней за запланаваную дату аднаўлення.",
@@ -3227,9 +3220,6 @@
     "bonusFree": "Бясплатны бонус",
     "bonusReferral": "Бонус за рэкамендацыю",
     "bonusAvailable": "Даступны бясплатны бонус",
-    "kiloPassManagement": "Кіраванне Kilo Pass",
-    "kiloPassSetup": "Наладжванне Kilo Pass",
-    "opensManagementOnWeb": "Адкрывае кіраванне падпіскай Kilo Pass на сайце.",
     "loadFailedRetry": "Праверце падключэнне да сеткі, затым паспрабуйце яшчэ раз.",
     "legalTermsOfUse": "Умовы выкарыстання (EULA)",
     "purchaseDifferentAccount": "Гэтая пакупка ў App Store не звязана з вашым уліковым запісам Kilo. Увайдзіце ў Apple Account, які выкарыстоўваўся для пакупкі, і паспрабуйце яшчэ раз.",
@@ -3414,7 +3404,6 @@
       "buySeats": "Купіць месцы",
       "setupAutoTopUp": "Наладзіць аўтапапаўненне",
       "manageAutoTopUp": "Кіраваць аўтапапаўненнем",
-      "webAddress": "Вэб-адрас {{url}}",
       "opensOnWeb": "Адкрываецца ў вэб-версіі"
     },
     "boundary": {
@@ -3556,9 +3545,6 @@
       "groups": "Групы",
       "guardrails": "Абмежаванні бяспекі",
       "byok": "Уласны ключ",
-      "ssoAndDomain": "SSO і дамен",
-      "emailPreferences": "Налады электроннай пошты",
-      "dataCollection": "Збор даных",
       "auditLogs": "Журналы аўдыту",
       "requestLogs": "Журналы запытаў",
       "subOrganizations": "Падарганізацыі",
@@ -3599,7 +3585,6 @@
       "processingBlocked": "Апрацоўка заблакаваная",
       "processingNeedsReview": "Апрацоўка патрабуе праверкі",
       "retryHint": "Паўтарае загрузку статусу Kilo Pass.",
-      "setupHint": "Адкрывае налады Kilo Pass у браўзеры.",
       "paidSeat_few": "{{displayCount}} аплачаныя месцы",
       "paidSeat_many": "{{displayCount}} аплачаных месцаў"
     }

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Administrer på nettet",
     "creditHistory": "Kreditthistorikk",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Avbryt",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Kjøp, kvitteringer og kredittaktivitet",
     "invoicesSubtitle": "Last ned fakturaer for kjøpene dine",
-    "manageBilling": "Administrer fakturering på kilo.ai",
-    "manageBillingIosNote": "Betalingsmåter, automatisk påfylling og faktureringsdetaljer administreres på kilo.ai.",
     "codeReviewerSubtitle": "Automatiske PR-gjennomganger",
     "securityAgentSubtitle": "Finn og utbedre sårbarheter",
     "reviews": "Kodegjennomganger",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "Avsluttes {{date}}",
       "cancelScheduledChange": "Avbryt planlagt endring",
       "cancelled": "Abonnementet er sagt opp",
-      "changePlan": "Bytt plan på kilo.ai",
-      "changePlanIosNote": "Endringer av betalte planer er tilgjengelige på kilo.ai.",
       "creditHistoryEmpty": "Ingen Kilo Pass-kreditter ennå.",
-      "manageInStore": "Administrer i {{store}}",
       "resume": "Gjenoppta abonnement",
       "resumeCancelledDescription": "Kilo Pass fornyes automatisk igjen.",
       "resumePausedDescription": "Kilo Pass gjenopptas nå, før den planlagte datoen for gjenopptakelse.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "Gratis bonus",
     "bonusReferral": "Vervebonus",
     "bonusAvailable": "Tilgjengelig gratis bonus",
-    "kiloPassManagement": "Administrasjon av Kilo Pass",
-    "kiloPassSetup": "Oppsett av Kilo Pass",
-    "opensManagementOnWeb": "Åpner administrasjonen av Kilo Pass i nettleseren.",
     "loadFailedRetry": "Sjekk tilkoblingen din, og prøv igjen.",
     "legalTermsOfUse": "Bruksvilkårene (EULA)",
     "purchaseDifferentAccount": "Dette App Store-kjøpet er ikke koblet til Kilo-kontoen din. Logg inn på Apple-kontoen som ble brukt til kjøpet, og prøv igjen.",
@@ -3304,7 +3294,6 @@
       "buySeats": "Kjøp brukerplasser",
       "setupAutoTopUp": "Sett opp automatisk påfylling",
       "manageAutoTopUp": "Administrer automatisk påfylling",
-      "webAddress": "Nettadresse {{url}}",
       "opensOnWeb": "Åpnes på nettet"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "Grupper",
       "guardrails": "Sikkerhetsrammer",
       "byok": "Bruk din egen nøkkel",
-      "ssoAndDomain": "SSO og domene",
-      "emailPreferences": "E-postinnstillinger",
-      "dataCollection": "Datainnsamling",
       "auditLogs": "Revisjonslogger",
       "requestLogs": "Forespørselslogger",
       "subOrganizations": "Underorganisasjoner",
@@ -3488,8 +3474,7 @@
       "paymentPending": "Venter på betaling",
       "processingBlocked": "Behandling blokkert",
       "processingNeedsReview": "Behandlingen må kontrolleres",
-      "retryHint": "Prøver å laste inn status for Kilo Pass på nytt.",
-      "setupHint": "Åpner oppsettet for Kilo Pass i nettleseren."
+      "retryHint": "Prøver å laste inn status for Kilo Pass på nytt."
     }
   },
   "authErrors": {

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Bestuur op die web",
     "creditHistory": "Kredietgeskiedenis",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kanselleer",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Aankope, kwitansies en kredietaktiwiteit",
     "invoicesSubtitle": "Laai fakture vir jou aankope af",
-    "manageBilling": "Bestuur fakturering op kilo.ai",
-    "manageBillingIosNote": "Betaalmetodes, outomatiese aanvulling en faktureringsbesonderhede word op kilo.ai bestuur.",
     "codeReviewerSubtitle": "Outomatiese PR-hersienings",
     "securityAgentSubtitle": "Vind en verhelp kwesbaarhede",
     "reviews": "Hersienings",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "Word op {{date}} gekanselleer",
       "cancelScheduledChange": "Kanselleer geskeduleerde verandering",
       "cancelled": "Intekening gekanselleer",
-      "changePlan": "Verander plan op kilo.ai",
-      "changePlanIosNote": "Veranderinge aan betaalde planne is op kilo.ai beskikbaar.",
       "creditHistoryEmpty": "Nog geen Kilo Pass-krediete nie.",
-      "manageInStore": "Bestuur in {{store}}",
       "resume": "Hervat intekening",
       "resumeCancelledDescription": "Jou Kilo Pass sal weer outomaties hernu.",
       "resumePausedDescription": "Jou Kilo Pass word nou hervat, voor die geskeduleerde hervattingsdatum.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "Gratis bonus",
     "bonusReferral": "Verwysingsbonus",
     "bonusAvailable": "Beskikbare gratis bonus",
-    "kiloPassManagement": "Kilo Pass-bestuur",
-    "kiloPassSetup": "Kilo Pass-opstelling",
-    "opensManagementOnWeb": "Maak Kilo Pass-bestuur op die web oop.",
     "loadFailedRetry": "Kontroleer jou verbinding en probeer dan weer.",
     "legalTermsOfUse": "Gebruiksvoorwaardes (EULA)",
     "purchaseDifferentAccount": "Hierdie App Store-aankoop is nie aan jou Kilo-rekening gekoppel nie. Meld aan by die Apple Account wat vir die aankoop gebruik is en probeer dan weer.",
@@ -3304,7 +3294,6 @@
       "buySeats": "Koop gebruikersplekke",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
       "manageAutoTopUp": "Bestuur outomatiese aanvulling",
-      "webAddress": "Webadres {{url}}",
       "opensOnWeb": "Maak op die web oop"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "Groepe",
       "guardrails": "Veiligheidsreëls",
       "byok": "Gebruik jou eie sleutel",
-      "ssoAndDomain": "SSO en domein",
-      "emailPreferences": "E-posvoorkeure",
-      "dataCollection": "Data-insameling",
       "auditLogs": "Ouditlogs",
       "requestLogs": "Versoeklogs",
       "subOrganizations": "Sub-organisasies",
@@ -3488,8 +3474,7 @@
       "paymentPending": "Betaling hangend",
       "processingBlocked": "Verwerking geblokkeer",
       "processingNeedsReview": "Verwerking vereis hersiening",
-      "retryHint": "Probeer weer om die Kilo Pass-status te laai.",
-      "setupHint": "Maak Kilo Pass-opstelling op die web oop."
+      "retryHint": "Probeer weer om die Kilo Pass-status te laai."
     }
   },
   "authErrors": {

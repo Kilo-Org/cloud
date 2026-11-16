@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Управлявай в уеб",
     "creditHistory": "История на кредитите",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Откажи",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Покупки, разписки и активност по кредитите",
     "invoicesSubtitle": "Изтеглете фактури за покупките си",
-    "manageBilling": "Управление на плащанията в kilo.ai",
-    "manageBillingIosNote": "Методите на плащане, автоматичното зареждане и данните за плащане се управляват в kilo.ai.",
     "codeReviewerSubtitle": "Автоматични прегледи на PR",
     "securityAgentSubtitle": "Откривай и отстранявай уязвимости",
     "reviews": "Прегледи",
@@ -3077,10 +3073,7 @@
       "cancelScheduled": "Анулира се на {{date}}",
       "cancelScheduledChange": "Отмяна на планираната промяна",
       "cancelled": "Абонаментът е анулиран",
-      "changePlan": "Смяна на плана в kilo.ai",
-      "changePlanIosNote": "Промени в платените планове са достъпни в kilo.ai.",
       "creditHistoryEmpty": "Все още няма кредити от Kilo Pass.",
-      "manageInStore": "Управление в {{store}}",
       "resume": "Възобновяване на абонамента",
       "resumeCancelledDescription": "Вашият Kilo Pass отново ще се подновява автоматично.",
       "resumePausedDescription": "Вашият Kilo Pass се възобновява сега, преди планираната дата за възобновяване.",
@@ -3117,9 +3110,6 @@
     "bonusFree": "Безплатен бонус",
     "bonusReferral": "Бонус за препоръка",
     "bonusAvailable": "Наличен безплатен бонус",
-    "kiloPassManagement": "Управление на Kilo Pass",
-    "kiloPassSetup": "Настройка на Kilo Pass",
-    "opensManagementOnWeb": "Отваря управлението на Kilo Pass в сайта.",
     "loadFailedRetry": "Провери връзката си, след което опитай отново.",
     "legalTermsOfUse": "Условията за ползване (EULA)",
     "purchaseDifferentAccount": "Тази покупка от App Store не е свързана с акаунта ти в Kilo. Влез в Apple Account, използван за покупката, и опитай отново.",
@@ -3304,7 +3294,6 @@
       "buySeats": "Купи места",
       "setupAutoTopUp": "Настрой автоматично зареждане",
       "manageAutoTopUp": "Управлявай автоматично зареждане",
-      "webAddress": "Уеб адрес {{url}}",
       "opensOnWeb": "Отваря се в уеб версията"
     },
     "boundary": {
@@ -3446,9 +3435,6 @@
       "groups": "Групи",
       "guardrails": "Защитни ограничения",
       "byok": "Използвай собствен ключ",
-      "ssoAndDomain": "SSO и домейн",
-      "emailPreferences": "Предпочитания за имейл",
-      "dataCollection": "Събиране на данни",
       "auditLogs": "Одитни журнали",
       "requestLogs": "Журнали на заявките",
       "subOrganizations": "Подорганизации",
@@ -3488,8 +3474,7 @@
       "paymentPending": "Плащането е в изчакване",
       "processingBlocked": "Обработката е блокирана",
       "processingNeedsReview": "Нужна е проверка на обработката",
-      "retryHint": "Повтаря зареждането на статуса на Kilo Pass.",
-      "setupHint": "Отваря настройките на Kilo Pass в браузъра."
+      "retryHint": "Повтаря зареждането на статуса на Kilo Pass."
     }
   },
   "authErrors": {

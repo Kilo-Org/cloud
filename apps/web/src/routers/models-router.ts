@@ -22,6 +22,10 @@ export const modelsRouter = createTRPCRouter({
       supportsVision: model.architecture.input_modalities.includes('image'),
       isPreferred: preferredSet.has(model.id),
       variants: Object.keys(model.opencode?.variants ?? {}),
+      // The providers that can serve this model. This catalog is the whole
+      // gateway's, unlike an organization's filtered list, so a client without
+      // the providers snapshot (the mobile app) can still name every provider.
+      inference_provider_ids: model.inference_provider_ids ?? [],
       ...(model.alias_target ? { alias_target: model.alias_target } : {}),
     }));
   }),

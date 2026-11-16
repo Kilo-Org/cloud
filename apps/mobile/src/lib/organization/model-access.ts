@@ -13,7 +13,7 @@ export type AvailableModel =
  */
 export type CatalogModel = Readonly<{
   id: string;
-  name?: string;
+  name: string;
   inference_provider_ids?: readonly string[];
 }>;
 
@@ -47,6 +47,27 @@ function sortedUnique(values: readonly string[]): string[] {
 export function catalogProviderSlugs(models: readonly CatalogModel[]): string[] {
   const slugs = models.flatMap(model => model.inference_provider_ids ?? []);
   return sortedUnique(slugs);
+}
+
+/**
+ * The provider rows the Providers tab shows, and the set an absent
+ * `provider_allow_list` expands to on its first save. The rows come from the
+ * whole gateway catalog, never the organization's own usable models alone: that
+ * list drops every model of a provider the organization may not use, so a
+ * provider an admin turned off would lose its row and could never be turned
+ * back on. The organization's models only add the providers that serve a model
+ * the whole catalog lacks, and a saved slug no model serves any more still gates
+ * routing, so it stays visible and removable.
+ */
+export function providerRows(params: {
+  catalog: readonly CatalogModel[];
+  available: readonly CatalogModel[];
+  savedAllowList: readonly string[] | undefined;
+}): string[] {
+  return sortedUnique([
+    ...catalogProviderSlugs([...params.catalog, ...params.available]),
+    ...(params.savedAllowList ?? []),
+  ]);
 }
 
 /** One row of the deny list: a model an admin may allow or deny, by its bare id. */

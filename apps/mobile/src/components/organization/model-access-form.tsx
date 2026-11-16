@@ -15,12 +15,12 @@ import {
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import {
   type AvailableModel,
-  catalogProviderSlugs,
-  type DenyListModel,
+  type CatalogModel,
   denyListModels,
   draftsEqual,
   initialDraft,
   type ModelAccessDraft,
+  providerRows,
 } from '@/lib/organization/model-access';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
 
@@ -46,7 +46,7 @@ export function ModelAccessForm({
   organizationId: string;
   canEdit: boolean;
   models: readonly AvailableModel[];
-  catalog: readonly DenyListModel[];
+  catalog: readonly CatalogModel[];
   providerAllowList: readonly string[] | undefined;
   modelDenyList: readonly string[] | undefined;
   gateway: OrgGatewaySettings | undefined;
@@ -60,10 +60,15 @@ export function ModelAccessForm({
   const [tab, setTab] = useState<Tab>('models');
   // A provider saved in the allow list but no longer served by any catalog model
   // still gates routing, so the list keeps it instead of hiding a value the
-  // admin can then never remove.
-  const providers = [
-    ...new Set([...catalogProviderSlugs(models), ...(providerAllowList ?? [])]),
-  ].sort((a, b) => a.localeCompare(b));
+  // admin can then never remove. The rows themselves come from the whole
+  // gateway catalog, because the organization's own model list omits every model
+  // of a provider it may not use: a provider turned off would otherwise lose its
+  // row and could never be turned back on.
+  const providers = providerRows({
+    catalog,
+    available: models,
+    savedAllowList: providerAllowList,
+  });
   const serverDraft = initialDraft(
     { provider_allow_list: providerAllowList, model_deny_list: modelDenyList },
     providers

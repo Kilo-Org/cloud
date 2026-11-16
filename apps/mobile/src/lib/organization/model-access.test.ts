@@ -8,6 +8,7 @@ import {
   initialDraft,
   matchesSearch,
   normalizeModelId,
+  providerRows,
   setModelsAllowed,
   setProvidersAllowed,
   toggleModel,
@@ -41,6 +42,36 @@ describe('catalog derivation', () => {
       'azure',
       'openai',
     ]);
+  });
+});
+
+describe('providerRows', () => {
+  // The organization's own catalog carries only the models its policy admits,
+  // so with `anthropic` off it has none of that provider's models at all.
+  const AVAILABLE_WITHOUT_ANTHROPIC = [model('openai/gpt', ['openai'])];
+
+  it('keeps a provider the organization policy filtered out, so it can be turned back on', () => {
+    expect(
+      providerRows({
+        catalog: MODELS,
+        available: AVAILABLE_WITHOUT_ANTHROPIC,
+        savedAllowList: ['azure', 'openai'],
+      })
+    ).toEqual(['amazon-bedrock', 'anthropic', 'azure', 'openai']);
+  });
+
+  it('adds a saved provider no catalog model serves any more, so it stays removable', () => {
+    expect(
+      providerRows({ catalog: [], available: [], savedAllowList: ['retired-provider'] })
+    ).toEqual(['retired-provider']);
+  });
+
+  it('expands an absent allow list to every provider of the whole catalog', () => {
+    const draft = initialDraft(
+      {},
+      providerRows({ catalog: MODELS, available: AVAILABLE_WITHOUT_ANTHROPIC, savedAllowList: [] })
+    );
+    expect(draft.providerAllowList).toEqual(['amazon-bedrock', 'anthropic', 'azure', 'openai']);
   });
 });
 

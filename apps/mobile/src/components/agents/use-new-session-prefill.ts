@@ -71,12 +71,19 @@ export type UseNewSessionPrefillTargetsInput = {
    * loading, whether or not it errored and whether or not any rows came back.
    * A paused or disabled query counts as resolved.
    *
+   * This is the ACTUAL answers signal, never the bounded one
+   * (`providerQueriesResolved`, which turns true after
+   * `PROVIDER_QUERY_SETTLE_BOUND_MS` while the lists are still loading): a
+   * prefill can still land while a list is in flight, so the seed gate must
+   * stay pending until the lists answer or the region would be declared final
+   * and the seeded repository would mount late, moving a settled screen.
+   *
    * This is not `reposSettled`, which also requires no error and at least one
    * row: a prefill can only seed in the render `reposSettled` turns true, so a
    * repo the lists cannot satisfy must let the repository region settle
    * instead of holding it — and the form's rows below it — forever.
    */
-  providerQueriesResolved: boolean;
+  providerAnswersResolved: boolean;
   models: { id: string; variants: string[] }[];
   // !isLoadingModels && !isModelsError && models.length > 0
   modelsSettled: boolean;
@@ -104,7 +111,7 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
   const {
     repositories,
     reposSettled,
-    providerQueriesResolved,
+    providerAnswersResolved,
     models,
     modelsSettled,
     storedRepo = null,
@@ -160,7 +167,7 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
       prefillRepo: prefill.repo,
       applied: hasAppliedRepo.current,
       selectedRepo,
-      providerQueriesResolved,
+      providerAnswersResolved,
     }),
   };
 }

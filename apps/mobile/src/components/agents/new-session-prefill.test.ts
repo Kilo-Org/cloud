@@ -345,7 +345,7 @@ describe('isRepoSeedPending', () => {
     prefillRepo: 'owner/repo',
     applied: false,
     selectedRepo: '',
-    providerQueriesResolved: false,
+    providerAnswersResolved: false,
   };
 
   it('reports a seed pending while a provider query is still in flight', () => {
@@ -363,7 +363,7 @@ describe('isRepoSeedPending', () => {
     // arrive now, so reporting pending here would keep the region unsettled
     // forever: the screen would lose the rows below the section and the
     // section's own retry and reconnect controls.
-    expect(isRepoSeedPending({ ...base, providerQueriesResolved: true })).toBe(false);
+    expect(isRepoSeedPending({ ...base, providerAnswersResolved: true })).toBe(false);
   });
 
   it('settles when the form already holds a selection', () => {
@@ -375,7 +375,7 @@ describe('isRepoSeedPending', () => {
     // seed is coming, so the form must not wait for one before it paints the
     // rows below the repository section.
     expect(
-      isRepoSeedPending({ ...base, prefillRepo: undefined, providerQueriesResolved: true })
+      isRepoSeedPending({ ...base, prefillRepo: undefined, providerAnswersResolved: true })
     ).toBe(false);
   });
 });

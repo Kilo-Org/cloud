@@ -459,6 +459,7 @@ export function NewSessionScreenBody() {
     isRetrying,
     reposSettled,
     providerQueriesResolved,
+    providerAnswersResolved,
     openIntegration,
     connectingProvider,
     refreshReposForceFresh,
@@ -479,7 +480,10 @@ export function NewSessionScreenBody() {
   const { selectedRepo, setSelectedRepo, repoSeedPending } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
-    providerQueriesResolved,
+    // The seed gate needs the ACTUAL answers, not the bounded signal: a prefill
+    // that lands after the bound would mount a repository the repository region
+    // was already declared final without.
+    providerAnswersResolved,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
     storedRepo: repositoryDraft.settled ? repositoryDraft.value : null,

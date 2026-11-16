@@ -444,6 +444,35 @@ describe('useNewSessionRepos provider settle bound', () => {
       vi.useRealTimers();
     }
   });
+
+  it('keeps the answers signal false while a list is still loading', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+
+      expect(mounted.result().providerAnswersResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+
+      // The bound releases the form's rows, but no list has answered: the seed
+      // gate stays pending, because a prefill can still land and mount a
+      // repository this region would otherwise have been declared final without.
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+      expect(mounted.result().providerAnswersResolved).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports the answers signal once every list has finished', () => {
+    const mounted = mountReposScoped('org-1');
+
+    expect(mounted.result().providerAnswersResolved).toBe(true);
+    expect(mounted.result().providerQueriesResolved).toBe(true);
+  });
 });
 
 describe('useNewSessionRepos connect busy state', () => {

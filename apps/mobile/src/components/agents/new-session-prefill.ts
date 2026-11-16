@@ -307,14 +307,20 @@ export function isRepoSeedPending(input: {
   /**
    * Whether every provider query finished its first load; a paused or disabled
    * query counts as resolved.
+   *
+   * This is the ACTUAL answers signal, never a bounded one. A bounding timer
+   * that turns the signal true while a list is still loading would let the
+   * region settle, and a late answer would then seed a repository the region
+   * was declared final without — remounting the branch and Environment rows
+   * and raising the keyboard on a screen already treated as final.
    */
-  providerQueriesResolved: boolean;
+  providerAnswersResolved: boolean;
 }): boolean {
   return (
     input.prefillRepo !== undefined &&
     !input.applied &&
     input.selectedRepo === '' &&
-    !input.providerQueriesResolved
+    !input.providerAnswersResolved
   );
 }
 

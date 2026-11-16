@@ -14,6 +14,7 @@ import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
@@ -25,7 +26,6 @@ import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-sess
 import { liveDeviceSessionCondition } from '@kilocode/web-shared/lib/auth/device-session-condition';
 import {
   isApiTokenPepperCurrent,
-  isEmailBlacklistedByDomain,
   isOrganizationMember,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
@@ -69,11 +69,6 @@ import {
   verifyKiloTokenForPolicy,
   type KiloCredentialExchangeEligibilityPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
-
-import {
-  getBlockedSignupTlds,
-  isEmailBlacklisted,
-} from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
 // and its debug payloads contain sensitive data (tokens, secrets, provider config).
@@ -797,29 +792,6 @@ async function readActiveDeviceSession(
   });
   return session !== undefined;
 }
-
-export function isUserBlacklistedByDomain(
-  existingUser: Pick<User, 'google_user_email'>,
-  fromDb: typeof db = db
-): Promise<boolean> {
-  return isEmailBlacklisted(existingUser.google_user_email, fromDb);
-}
-
-/**
- * Pure TLD gate used by the async {@link isBlockedTLD}. Entries are bare
- * labels (`asia`), so an entry matches every address on that TLD.
- */
-export function isEmailOnBlockedTld(email: string, blockedTlds: readonly string[]): boolean {
-  return isEmailBlacklistedByDomain(email, blockedTlds);
-}
-
-/**
- * New-signup TLD gate. The TLD list is admin-configurable in Redis, so a cheap
- * TLD can be blocked without a deploy. Only new accounts are refused; an
- * existing account on a blocked TLD keeps signing in.
- */
-export const isBlockedTLD = async (email: string): Promise<boolean> =>
-  isEmailOnBlockedTld(email, await getBlockedSignupTlds());
 
 export const uuidSchema = z.uuid();
 const uuid = uuidSchema;

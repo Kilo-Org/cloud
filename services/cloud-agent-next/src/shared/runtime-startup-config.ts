@@ -4,9 +4,9 @@ export const runtimeStartupConfigSchema = z
   .object({
     mode: z.literal('downloaded'),
     image: z.literal('runtime-free'),
-    /** New cloud-agent-web sandboxes of these orgs run the Kilo v2 release. */
+    /** `*` includes personal accounts; origin and native isolation checks still apply. */
     kilo2: z
-      .object({ orgIds: z.array(z.uuid()).min(1) })
+      .object({ orgIds: z.union([z.literal('*'), z.array(z.uuid()).min(1)]) })
       .strict()
       .optional(),
   })

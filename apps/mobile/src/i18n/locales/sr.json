@@ -2232,7 +2232,6 @@
       "attachmentUploadingToStart": "Prilog se još otprema. Ukloni ga da započneš bez njega.",
       "modelMissingToStart": "Izaberi model da započneš.",
       "staleRepositoryToStart": "Izabrani repozitorijum više nije dostupan. Ponovo izaberi repozitorijum da započneš.",
-      "connectProviderToStart": "Repozitorijumi dolaze sa povezanog GitHub, GitLab ili Bitbucket naloga.",
       "promptPlaceholder": "Na čemu želiš da radiš?",
       "couldNotLoadModels": "Učitavanje modela nije uspelo.",
       "prefillRepoAndModelUnavailable": "Repozitorijum i model izvorne sesije više nisu dostupni. Izaberi druge ispod.",

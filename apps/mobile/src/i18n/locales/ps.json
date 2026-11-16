@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "یوه ضمیمه لا پورته کېږي. پرته له دې د پیل لپاره یې لرې کړئ.",
       "modelMissingToStart": "د پیل لپاره یو ماډل وټاکئ.",
       "staleRepositoryToStart": "ټاکل شوی زېرمتون نور نشته. د پیل لپاره بیا یو زېرمتون وټاکئ.",
-      "connectProviderToStart": "زېرمتونونه د GitHub، GitLab یا Bitbucket له نښلول شوي حسابه راځي.",
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",
       "prefillRepoAndModelUnavailable": "د اصلي ناستې زېرمتون او ماډل نور د لاسرسي وړ نه دي. لاندې یې غوره کړئ.",

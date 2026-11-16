@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Mbola ampidirina ny rakitra ampiarahina. Esory izy raha hanombohana tsy misy azy.",
       "modelMissingToStart": "Misafidiana modely hanombohana.",
       "staleRepositoryToStart": "Tsy azo ampiasaina intsony ny tahirin-kaody voafidy. Misafidiana tahirin-kaody indray hanombohana.",
-      "connectProviderToStart": "Avy amin'ny kaonty GitHub, GitLab na Bitbucket voampifandraisina ny tahirin-kaody.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",
       "prefillRepoAndModelUnavailable": "Tsy azo ampiasaina intsony ny tahirin-kaody sy ny modelin'ny fotoam-piasana niandohana. Misafidiana etsy ambany.",

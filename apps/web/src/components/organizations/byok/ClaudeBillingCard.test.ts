@@ -123,8 +123,28 @@ describe('ClaudeBillingCardView', () => {
       expect(details[0].textContent).toContain('Kilo does not fall back to Kilo credits.');
       expect(details[0].textContent).toContain('owner, admin, or billing admin');
       expect(details[0].textContent).toContain('Claude API organizations only');
+      expect(details[0].textContent).toContain(
+        'You can set a monthly spend limit for Kilo when you link'
+      );
+      expect(details[0].textContent).toContain('credits from Anthropic partner, VC, or startup');
+      expect(details[0].textContent).toContain('and billing members when Kilo is linked');
+      expect(details[0].textContent).toContain('data retention settings do not apply');
     }
   );
+
+  it.each([
+    ['linked_organization_spend_limit_reached', 'A Claude spend limit was reached'],
+    ['linked_organization_billing_unavailable', 'Anthropic cannot bill your Claude organization'],
+    ['billing_error', 'Anthropic cannot bill your Claude organization'],
+  ] as const)('explains the %s refusal', (code, copy) => {
+    expect(render({ status: { ...status('connected'), lastRefusalCode: code } })).toContain(copy);
+  });
+
+  it('points an unavailable link at Linked platforms in Claude Console', () => {
+    expect(render({ status: status('billing_unavailable') })).toContain(
+      'Check Linked platforms in Claude Console, link it again if needed'
+    );
+  });
 
   it('shows a status badge only once a link exists', () => {
     expect(render({ status: status('not_connected') })).not.toContain('Not linked');
@@ -132,7 +152,7 @@ describe('ClaudeBillingCardView', () => {
     expect(render({ status: status('billing_unavailable') })).toContain('Billing unavailable');
   });
 
-  it('reports a link that needs a reconnect and offers the owner the action', () => {
+  it('reports a link that needs linking again and offers the owner the action', () => {
     const html = render({
       status: { ...status('reconnect_required'), connectedAt: '2026-09-16T12:00:00.000Z' },
       scope: 'shared_services',
@@ -141,7 +161,7 @@ describe('ClaudeBillingCardView', () => {
     });
     const { document } = parseHTML(html);
 
-    expect(html).toContain('Reconnect required');
+    expect(html).toContain('New link required');
     expect(html).not.toContain('>Linked<');
     expect(html).toContain('is no longer available');
     expect(
@@ -150,16 +170,16 @@ describe('ClaudeBillingCardView', () => {
         scope: 'shared_services',
         onConnect: () => undefined,
       }).map(button => button.textContent)
-    ).toEqual(['Reconnect Claude billing', 'Remove from Kilo']);
+    ).toEqual(['Link Claude billing again', 'Remove from Kilo']);
     expect(document.querySelectorAll('button')).toHaveLength(2);
   });
 
-  it('shows the reconnect state to a member without the action', () => {
+  it('shows the link-again state to a member without the action', () => {
     const html = render({
       status: { ...status('reconnect_required'), canManage: false },
       scope: 'shared_services',
     });
-    expect(html).toContain('Reconnect required');
+    expect(html).toContain('New link required');
     expect(html).toContain('is no longer available');
     expect(html).toContain(
       'Ask a Kilo organization owner or admin to manage Claude shared services.'
@@ -172,7 +192,10 @@ describe('ClaudeBillingCardView', () => {
       const { document } = parseHTML(render({ status: status(state) }));
       const links = Array.from(document.querySelectorAll('a'));
       expect(links).toHaveLength(1);
-      expect(links[0].textContent).toBe('Set a spend limit or unlink in Claude Console');
+      expect(links[0].textContent).toBe(
+        'Set a spend limit or unlink under Linked platforms in Claude Console'
+      );
+      expect(links[0].getAttribute('href')).toBe('https://platform.claude.com/linked-platforms');
       expect(links[0].closest('details')).toBeNull();
     }
   );

@@ -622,6 +622,20 @@ export async function drainSseStream(
   return { wasAborted, malformedEventCount, timing: timer.timing(requestStartedAt) };
 }
 
+/** The parsed JSON of a response body, or why the body is not JSON. */
+export type ParsedJson = { value: unknown } | { error: unknown };
+
+export function parseJson(text: string): ParsedJson {
+  try {
+    return { value: JSON.parse(text) };
+  } catch (error) {
+    return { error };
+  }
+}
+
+/** A non-streamed response body, read and parsed once for both the ledger and the response. */
+export type ReadResponseBody = { text: string; json: ParsedJson };
+
 /**
  * Reads a non-streamed response body as text, timing its non-whitespace chunks.
  * Rejects with the body's own error when the read fails.

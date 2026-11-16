@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Et vedlegg lastes fortsatt opp. Fjern det for å starte uten det.",
       "modelMissingToStart": "Velg en modell for å starte.",
       "staleRepositoryToStart": "Det valgte kodelageret er ikke lenger tilgjengelig. Velg et kodelager på nytt for å starte.",
-      "connectProviderToStart": "Kodelagre kommer fra en tilkoblet GitHub-, GitLab- eller Bitbucket-konto.",
       "promptPlaceholder": "Hva vil du jobbe med?",
       "couldNotLoadModels": "Kunne ikke laste inn modellene.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den opprinnelige økten er ikke lenger tilgjengelige. Velg nye nedenfor.",

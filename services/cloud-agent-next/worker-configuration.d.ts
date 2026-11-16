@@ -50,6 +50,7 @@ interface __BaseEnv_Env {
 	NOTIFICATIONS: Service /* entrypoint NotificationsService from notifications */;
 	CONTAINER_USAGE_METER: Service /* entrypoint ContainerUsageMeter from container-usage-meter */;
 	AI?: Ai;
+	CF_VERSION_METADATA?: WorkerVersionMetadata;
 	TOOL_CGROUP_RESERVE_MB?: "2048";
 	TOOL_CGROUP_CPU_WEIGHT?: "50";
 	TOOL_CGROUP_SERVER_CPU_WEIGHT?: "75";

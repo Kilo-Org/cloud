@@ -2316,7 +2316,6 @@
       "attachmentUploadingToStart": "Tá ceangaltán fós á uaslódáil. Bain é chun tosú gan é.",
       "modelMissingToStart": "Roghnaigh samhail chun tosú.",
       "staleRepositoryToStart": "Níl an stór roghnaithe ar fáil a thuilleadh. Roghnaigh stór arís chun tosú.",
-      "connectProviderToStart": "Tagann stórtha ó chuntas GitHub, GitLab nó Bitbucket atá ceangailte.",
       "promptPlaceholder": "Cad ar mhaith leat oibriú air?",
       "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",
       "prefillRepoAndModelUnavailable": "Níl stór ná samhail an tseisiúin bhunaidh ar fáil a thuilleadh. Roghnaigh stór agus samhail thíos.",

@@ -861,9 +861,10 @@ async function updateConnectedClaudeBillingConnection(
 }
 
 /**
- * Anthropic refused a request for this profile with `user_profile_not_billable`.
- * Later requests fail without an upstream call until an admin acts. Only a
- * connected row changes, so a removal or a newer reconnect is never undone.
+ * Anthropic refused a request for this profile with `user_profile_not_billable`
+ * or `user_profile_billing_not_authorized`. Later requests fail without an
+ * upstream call until an admin acts. Only a connected row changes, so a removal
+ * or a newer reconnect is never undone.
  */
 export async function markClaudeBillingUnavailable(
   userProfileId: string,

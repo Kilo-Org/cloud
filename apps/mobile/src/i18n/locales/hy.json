@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Կցումը դեռ վերբեռնվում է։ Առանց դրա սկսելու համար հեռացրեք այն։",
       "modelMissingToStart": "Սկսելու համար ընտրեք մոդել։",
       "staleRepositoryToStart": "Ընտրված պահոցն այլևս հասանելի չէ։ Սկսելու համար կրկին ընտրեք պահոց։",
-      "connectProviderToStart": "Պահոցները գալիս են միացված GitHub, GitLab կամ Bitbucket հաշվից։",
       "promptPlaceholder": "Ինչի՞ վրա եք ուզում աշխատել",
       "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",
       "prefillRepoAndModelUnavailable": "Սկզբնական նստաշրջանի պահոցն ու մոդելն այլևս հասանելի չեն։ Ստորև ընտրեք պահոց և մոդել։",

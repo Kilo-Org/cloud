@@ -2190,7 +2190,6 @@
       "attachmentUploadingToStart": "Liite latautuu yhä. Poista se jatkaaksesi ilman sitä.",
       "modelMissingToStart": "Valitse malli aloittaaksesi.",
       "staleRepositoryToStart": "Valittu koodivarasto ei ole enää saatavilla. Valitse koodivarasto uudelleen aloittaaksesi.",
-      "connectProviderToStart": "Koodivarastot tulevat yhdistetystä GitHub-, GitLab- tai Bitbucket-tilistä.",
       "promptPlaceholder": "Mitä haluaisit tehdä?",
       "couldNotLoadModels": "Malleja ei voitu ladata.",
       "prefillRepoAndModelUnavailable": "Alkuperäisen istunnon koodivarasto ja malli eivät ole enää käytettävissä. Valitse uudet alta.",

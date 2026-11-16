@@ -117,15 +117,32 @@ export function NotificationHistoryScreen() {
   // A page can be nothing but retired rows. Rather than report an account with
   // no notifications, the list reads on until it has a row to show or the
   // retention window ends.
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const { fetchNextPage, hasNextPage, isFetchNextPageError, isFetchingNextPage } = query;
   const readingOn = items.length === 0 && (hasNextPage || isFetchingNextPage);
-  const hasListContent = items.length > 0 || readingOn || query.isFetchNextPageError;
+  const hasListContent = items.length > 0 || readingOn || isFetchNextPageError;
   useEffect(() => {
-    if (authToken == null || items.length > 0 || !hasNextPage || isFetchingNextPage) {
+    // A failed next page keeps the cursor and clears the fetching flag, so an
+    // unguarded read-on would re-request the same page for as long as the list
+    // stays empty; the footer's Retry is the single recovery, as `onEndReached`
+    // already assumes.
+    if (
+      authToken == null ||
+      items.length > 0 ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      isFetchNextPageError
+    ) {
       return;
     }
     void fetchNextPage();
-  }, [authToken, fetchNextPage, hasNextPage, isFetchingNextPage, items.length]);
+  }, [
+    authToken,
+    fetchNextPage,
+    hasNextPage,
+    isFetchNextPageError,
+    isFetchingNextPage,
+    items.length,
+  ]);
   // A query that is disabled never leaves `pending`; only a signed-in read can.
   // The push banner and the filter chips both sit above the list, so the list
   // waits for the same reads they do: a row that settles first is pushed down

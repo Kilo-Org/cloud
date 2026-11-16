@@ -631,7 +631,7 @@ function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, Organizati
  * only live organizations contribute rows). Organizations without such a role
  * are absent from the returned map.
  *
- * The batch path reads membership rows only. Support grants are resolved per
+ * This batch path never consults a support grant. Grants are resolved per
  * organization by {@link resolveOrganizationAccess} against the procedure
  * allowlist, and no procedure that gates on this helper is on that allowlist.
  */
@@ -715,7 +715,7 @@ export async function getOrganizationsAccessRoles(
 /**
  * Batched access check over {@link getOrganizationsAccessRoles}: throws
  * `UNAUTHORIZED` unless every requested organization carries one of the allowed
- * roles. It resolves memberships only, as that helper documents.
+ * roles. It consults no support grant, as that helper documents.
  */
 export async function ensureOrganizationsAccess(
   ctx: TRPCContext,

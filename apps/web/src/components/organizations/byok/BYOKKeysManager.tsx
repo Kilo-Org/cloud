@@ -666,6 +666,21 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setPendingFocus(null);
   }, [pendingFocus, listedKeyOrder]);
 
+  // The "Sign in with ChatGPT" connection is stored in this table under its own
+  // provider id, but it is not a pasted key: the card above the list owns it, so
+  // it never appears here with edit, toggle, test or delete controls.
+  const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
+  const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
+  const catalogModeEndpointModelIds =
+    listedKeys
+      ?.filter(key => key.is_endpoint && key.serve_catalog_models)
+      .flatMap(key => key.endpoint?.models.map(model => model.id) ?? []) ?? [];
+  const endpointCatalogModelIds = useEndpointCatalogModelIds(
+    organizationId ?? '',
+    catalogModeEndpointModelIds,
+    !!organizationId && catalogModeEndpointModelIds.length > 0
+  );
+
   if (keysLoading) {
     return (
       <div className="space-y-4">
@@ -687,20 +702,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     );
   }
 
-  // The "Sign in with ChatGPT" connection is stored in this table under its own
-  // provider id, but it is not a pasted key: the card above the list owns it, so
-  // it never appears here with edit, toggle, test or delete controls.
-  const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
-  const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
-  const catalogModeEndpointModelIds =
-    listedKeys
-      ?.filter(key => key.is_endpoint && key.serve_catalog_models)
-      .flatMap(key => key.endpoint?.models.map(model => model.id) ?? []) ?? [];
-  const endpointCatalogModelIds = useEndpointCatalogModelIds(
-    organizationId ?? '',
-    catalogModeEndpointModelIds,
-    !!organizationId && catalogModeEndpointModelIds.length > 0
-  );
   const canReorder = listedKeyIds.length > 1;
 
   // A key in catalog mode serves catalog ids instead of the provider's prefixed ids.

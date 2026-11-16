@@ -847,15 +847,26 @@ function ByokEndpointForm({
           <Alert>
             <Info className="size-4" />
             <AlertDescription className="space-y-1">
-              <p>
-                Clients select these models as <code>endpoint-…/&lt;model ID&gt;</code>. The
-                upstream model ID is what the endpoint receives.
-              </p>
-              <p>
-                {editingKey?.serve_catalog_models
-                  ? 'This endpoint uses Kilo catalog model IDs: each model ID must be a Kilo catalog ID, such as anthropic/claude-sonnet-4.5, and requests for that catalog model are served by this endpoint. Organization model restrictions apply.'
-                  : 'With Kilo catalog model IDs turned on in the key list, each model ID must instead be a Kilo catalog ID, such as anthropic/claude-sonnet-4.5, and requests for that catalog model are served by this endpoint.'}
-              </p>
+              {editingKey?.serve_catalog_models ? (
+                <p>
+                  This endpoint uses Kilo catalog model IDs: each model ID must be a Kilo catalog
+                  ID, such as <code>anthropic/claude-sonnet-4.5</code>, and requests for that
+                  catalog model are served by this endpoint with the upstream model ID. Organization
+                  model restrictions apply.
+                </p>
+              ) : (
+                <>
+                  <p>
+                    Clients select these models as <code>endpoint-…/&lt;model ID&gt;</code>. The
+                    upstream model ID is what the endpoint receives.
+                  </p>
+                  <p>
+                    With Kilo catalog model IDs turned on in the key list, each model ID must
+                    instead be a Kilo catalog ID, such as <code>anthropic/claude-sonnet-4.5</code>,
+                    and requests for that catalog model are served by this endpoint.
+                  </p>
+                </>
+              )}
             </AlertDescription>
           </Alert>
           <ModelsTable

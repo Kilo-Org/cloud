@@ -55,7 +55,6 @@ const config = BenchmarkConfigSchema.parse({
   deciderModels: [{ id: 'model' }],
   minAccuracy: 0.9,
   benchmarkUserId: null,
-  switchCostFactor: 3,
   updatedAt: null,
   updatedBy: null,
 });
@@ -65,8 +64,8 @@ describe('router contracts and database isolation', () => {
     expect(config).toMatchObject({
       router: 'efficient',
       accuracyNoiseBand: 0.05,
-      frontierMinAccuracyDelta: 0,
     });
+    expect(config).not.toHaveProperty('frontierMinAccuracyDelta');
     expect(StartBenchmarkRunRequestSchema.parse({ kind: 'decider' }).router).toBe('efficient');
     expect(RequeueBenchmarkRegistryRequestSchema.parse({ scope: 'platform' }).router).toBe(
       'efficient'
@@ -109,14 +108,8 @@ describe('router contracts and database isolation', () => {
         {
           min_accuracy: config.minAccuracy,
           accuracy_noise_band: config.accuracyNoiseBand,
-          frontier_min_accuracy_delta: config.frontierMinAccuracyDelta,
-          switch_cost_factor: config.switchCostFactor,
-          best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
           benchmark_user_id: null,
           benchmark_org_id: null,
-          classifier_repetitions: 1,
-          decider_repetitions: 1,
-          classifier_max_p95_latency_ms: 1000,
           updated_at: 'now',
           updated_by: null,
         },
@@ -140,6 +133,9 @@ describe('router contracts and database isolation', () => {
         query => query.sql.startsWith('insert') && query.sql.includes('"benchmark_config"')
       );
       expect(configInsert?.params).toEqual(expect.arrayContaining([80, 40]));
+      // The legacy fixed policy columns are written with the canonical value so
+      // the still-deployed worker reads valid settings.
+      expect(configInsert?.params).toEqual(expect.arrayContaining([3, 0.05, 0, 1, null]));
     }
   );
 

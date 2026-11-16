@@ -8,7 +8,6 @@ const config = BenchmarkConfigSchema.parse({
   minAccuracy: 0.7,
   benchmarkUserId: 'bot-internal-benchmark-user',
   benchmarkOrgId: 'benchmark-org',
-  switchCostFactor: 3,
   updatedAt: null,
   updatedBy: null,
 });

@@ -23,6 +23,7 @@ import {
   type BenchmarkIdentity,
   resolveBenchmarkIdentity,
   resolvePolicySettings,
+  resolveEffectivePolicy,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
   type BenchmarkSchedulerConfigResponse,
@@ -289,7 +290,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     const current = {
       router,
       engineIdentity: computeEngineIdentity('decider', router),
-      repetitions: config.deciderRepetitions,
+      repetitions: resolveEffectivePolicy(config).deciderRepetitions,
     };
     const [platform, user, platformEntries] = await Promise.all([
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform'),
@@ -332,7 +333,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           await planPromptTransportRemeasure(c.env.BENCH_DB, {
             router: selected,
             engineIdentity: computeEngineIdentity('decider', selected),
-            repetitions: config.deciderRepetitions,
+            repetitions: resolveEffectivePolicy(config).deciderRepetitions,
             action,
             prices,
           })
@@ -360,7 +361,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         {
           router,
           engineIdentity: computeEngineIdentity('decider', router),
-          repetitions: config.deciderRepetitions,
+          repetitions: resolveEffectivePolicy(config).deciderRepetitions,
         },
         c.req.valid('json').scope
       );

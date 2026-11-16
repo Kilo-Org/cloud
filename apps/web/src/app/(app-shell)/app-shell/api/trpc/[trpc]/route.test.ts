@@ -13,8 +13,9 @@ jest.mock('@/lib/app-shell/session', () => ({
 // The root router builds service clients at import time; this suite only needs a
 // router that answers one query.
 jest.mock('@/routers/root-router', () => {
-  const { createTRPCRouter, baseProcedure } =
-    jest.requireActual<typeof TrpcInitModule>('@kilocode/web-shared/lib/trpc/init');
+  const { createTRPCRouter, baseProcedure } = jest.requireActual<typeof TrpcInitModule>(
+    '@kilocode/web-shared/lib/trpc/init'
+  );
   return {
     rootRouter: createTRPCRouter({
       user: createTRPCRouter({

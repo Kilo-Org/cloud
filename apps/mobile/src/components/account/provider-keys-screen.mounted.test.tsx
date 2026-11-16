@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite covers the personal and organization scopes, the row controls and every list state, against one mocked data layer. */
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,7 @@ import type * as ReactQuery from '@tanstack/react-query';
 
 type Key = {
   id: string;
+  provider_id: string;
   provider_name: string;
   is_enabled: boolean;
   management_source: string;
@@ -23,6 +25,8 @@ type MutationOptions = {
 const state = vi.hoisted(() => ({
   keys: [] as Key[],
   error: false,
+  errorCause: null as unknown,
+  role: 'owner' as string | undefined,
   confirm: vi.fn(),
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
@@ -47,6 +51,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
       data: state.keys,
       isPending: false,
       isError: state.error,
+      error: state.errorCause,
       isFetching: false,
       refetch: vi.fn(),
     }),
@@ -57,6 +62,9 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     useQueryClient: () => state.client,
   };
 });
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: () => ({ role: state.role, isResolving: false }),
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
@@ -91,8 +99,10 @@ const BUTTON = 'Button' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
-async function mount() {
-  const view = await renderWithProviders(createElement(ProviderKeysScreen));
+async function mount(organizationId?: string) {
+  const view = await renderWithProviders(
+    createElement(ProviderKeysScreen, organizationId === undefined ? {} : { organizationId })
+  );
   renderer = view.renderer;
   return view.renderer.root;
 }
@@ -145,6 +155,7 @@ beforeEach(() => {
   state.keys = [
     {
       id: 'key-1',
+      provider_id: 'anthropic',
       provider_name: 'Anthropic',
       is_enabled: true,
       management_source: 'user',
@@ -153,12 +164,15 @@ beforeEach(() => {
     // state, so the row has no state line to go stale when the key is toggled.
     {
       id: 'key-2b',
+      provider_id: 'groq',
       provider_name: 'Groq',
       is_enabled: false,
       management_source: 'user',
     },
   ];
   state.error = false;
+  state.errorCause = null;
+  state.role = 'owner';
   state.mutations = [];
   state.mutate.mockClear();
   state.confirm.mockClear();
@@ -220,7 +234,13 @@ describe('ProviderKeysScreen', () => {
 
   it('closes every control on a key the coding plan manages', async () => {
     state.keys = [
-      { id: 'key-2', provider_name: 'OpenAI', is_enabled: true, management_source: 'coding_plan' },
+      {
+        id: 'key-2',
+        provider_id: 'openai',
+        provider_name: 'OpenAI',
+        is_enabled: true,
+        management_source: 'coding_plan',
+      },
     ];
     const root = await mount();
 
@@ -244,5 +264,112 @@ describe('ProviderKeysScreen', () => {
       (button(root, 'Add key').props.onPress as () => void)();
     });
     expect(state.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/provider-key-add');
+  });
+
+  it('opens the form on the key it edits, ready to replace the value', async () => {
+    const root = await mount();
+
+    act(() => {
+      (button(root, 'Edit key').props.onPress as () => void)();
+    });
+
+    expect(state.push).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-key-new',
+      params: { provider: 'anthropic', id: 'key-1' },
+    });
+  });
+
+  it('sends the organization with every write when it shows an organization’s keys', async () => {
+    const root = await mount('org_1');
+
+    act(() => {
+      (switchFor(root, 'Anthropic').props.onValueChange as (value: boolean) => void)(false);
+    });
+    act(() => {
+      (button(root, 'Test key').props.onPress as () => void)();
+    });
+    act(() => {
+      (button(root, 'Remove').props.onPress as () => void)();
+    });
+    act(() => {
+      lastConfirm().onConfirm();
+    });
+
+    expect(state.mutate).toHaveBeenCalledWith({
+      organizationId: 'org_1',
+      id: 'key-1',
+      is_enabled: false,
+    });
+    expect(state.mutate).toHaveBeenCalledWith({ organizationId: 'org_1', id: 'key-1' });
+  });
+
+  it('opens the organization’s add form with its scope', async () => {
+    state.keys = [];
+    const root = await mount('org_1');
+
+    act(() => {
+      (button(root, 'Add key').props.onPress as () => void)();
+    });
+
+    expect(state.push).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-key-add',
+      params: { org: 'org_1' },
+    });
+  });
+
+  it('reads an organization’s keys without offering a member any write', async () => {
+    state.role = 'member';
+    const root = await mount('org_1');
+
+    expect(switchFor(root, 'Anthropic').props.disabled).toBe(true);
+    expect(button(root, 'Test key').props.disabled).toBe(true);
+    expect(
+      root.findAll(
+        node =>
+          Object.is(node.type, BUTTON) &&
+          node.findAll(child => child.props.children === 'Add key').length > 0
+      )
+    ).toHaveLength(0);
+    expect(
+      root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
+    ).toContain('Only an organization owner, admin, or billing manager can change its keys.');
+  });
+
+  it('refuses an organization the caller is not a member of, with no retry', async () => {
+    state.role = undefined;
+    const root = await mount('org_1');
+
+    const [queryError] = root.findAll(node => Object.is(node.type, 'QueryError'));
+    if (!queryError) {
+      throw new Error('missing the refusal state');
+    }
+    expect(queryError.props.variant).toBe('permission');
+    expect(queryError.props.onRetry).toBeUndefined();
+  });
+
+  it('offers a retry when the list failed for a reason that can change', async () => {
+    state.error = true;
+    state.errorCause = new Error('The network dropped the request');
+    const root = await mount();
+
+    const [queryError] = root.findAll(node => Object.is(node.type, 'QueryError'));
+    if (!queryError) {
+      throw new Error('missing the failure state');
+    }
+    expect(queryError.props.variant).toBe('server');
+    expect(typeof queryError.props.onRetry).toBe('function');
+  });
+
+  it('offers no retry when the server refuses the list itself', async () => {
+    state.error = true;
+    state.errorCause = { data: { code: 'FORBIDDEN', message: 'Not a member' } };
+    const root = await mount();
+
+    const [queryError] = root.findAll(node => Object.is(node.type, 'QueryError'));
+    if (!queryError) {
+      throw new Error('missing the failure state');
+    }
+    expect(queryError.props.variant).toBe('permission');
+    expect(queryError.props.onRetry).toBeUndefined();
   });
 });

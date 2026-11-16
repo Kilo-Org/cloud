@@ -44,6 +44,7 @@ export default defineProject({
       'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
+      'src/lib/byok/**/*.test.ts',
       'src/lib/chat/**/*.test.ts',
       'src/lib/design-gate/**/*.test.ts',
       'src/lib/auth/**/*.test.tsx',

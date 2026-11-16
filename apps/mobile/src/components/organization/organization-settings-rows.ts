@@ -23,6 +23,7 @@ import {
   Wallet,
 } from '@/components/ui/icons';
 import { i18n } from '@/i18n';
+import { providerKeysHref } from '@/lib/byok/provider-key-scope';
 import { WEB_BASE_URL } from '@/lib/config';
 
 /**
@@ -55,6 +56,10 @@ import { WEB_BASE_URL } from '@/lib/config';
  * The audit log is the exception neither table shares with the other: the app
  * reads it natively, so it is an in-app destination, and its gate is the one
  * its procedure applies (billing role and the enterprise plan).
+ *
+ * BYOK is the second in-app destination: the app's own provider-keys screen
+ * reads and writes an organization's keys, so its row opens that screen with
+ * the organization's scope instead of the web page.
  */
 type OrgSettingsArea =
   | 'usageDetails'
@@ -62,7 +67,6 @@ type OrgSettingsArea =
   | 'customModes'
   | 'groups'
   | 'guardrails'
-  | 'byok'
   | 'ssoAndDomain'
   | 'emailPreferences'
   | 'dataCollection'
@@ -88,8 +92,11 @@ export type OrgSettingsRow = Readonly<{
   url: string;
 }>;
 
-/** The one area the app reads itself instead of opening its web page. */
-type OrgInAppSettingsArea = 'auditLogs';
+/**
+ * The areas the app reads and writes itself, each opening its own screen
+ * instead of a web page.
+ */
+type OrgInAppSettingsArea = 'auditLogs' | 'byok';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
@@ -137,14 +144,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     icon: Shield,
     suffix: '/guardrails',
     visible: gate => canManageOrganization(gate.role) && gate.guardrailsEnabled,
-  },
-  // "Bring Your Own Key (BYOK)": billing role. The ChatGPT connection the
-  // sidebar also counts is personal, so it does not make this row apply.
-  {
-    area: 'byok',
-    icon: KeyRound,
-    suffix: '/byok',
-    visible: gate => canManageOrganizationBilling(gate.role),
   },
   // The SSO card renders only on an enterprise dashboard.
   {
@@ -195,7 +194,6 @@ const TITLE_KEYS = {
   customModes: 'agentChat.modePicker.customModes',
   groups: 'organization.settingsOnWeb.groups',
   guardrails: 'organization.settingsOnWeb.guardrails',
-  byok: 'organization.settingsOnWeb.byok',
   ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
   emailPreferences: 'organization.settingsOnWeb.emailPreferences',
   dataCollection: 'organization.settingsOnWeb.dataCollection',
@@ -222,7 +220,8 @@ export function canViewOrgAuditLog(
 type OrgInAppSettingsRowSpec = Readonly<{
   area: OrgInAppSettingsArea;
   icon: LucideIcon;
-  href: Href;
+  /** The screen that owns the area, scoped to the organization it was opened for. */
+  href: (organizationId: string) => Href;
   visible: (gate: OrgInAppSettingsGate) => boolean;
 }>;
 
@@ -232,13 +231,22 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
   {
     area: 'auditLogs',
     icon: ScrollText,
-    href: '/(app)/(tabs)/(3_profile)/organization/audit-log',
+    href: () => '/(app)/(tabs)/(3_profile)/organization/audit-log',
     visible: gate => canViewOrgAuditLog(gate.role, gate.plan),
+  },
+  // BYOK: the sidebar's billing-role gate, and the app's own provider-keys
+  // screen with this organization's scope.
+  {
+    area: 'byok',
+    icon: KeyRound,
+    href: organizationId => providerKeysHref({ kind: 'organization', organizationId }),
+    visible: gate => canManageOrganizationBilling(gate.role),
   },
 ];
 
 const IN_APP_TITLE_KEYS = {
   auditLogs: 'organization.settingsOnWeb.auditLogs',
+  byok: 'organization.settingsOnWeb.byok',
 } satisfies Record<OrgInAppSettingsArea, string>;
 
 /**
@@ -260,7 +268,7 @@ export function visibleOrgSettingsRows(
 
 /**
  * The in-app rows this role and plan may open, in the order the card shows
- * them.
+ * them, each already carrying the organization it was opened for.
  *
  * The gate reads only the role and the plan, both of which arrive on the
  * organization row that decides whether the hub renders at all. So the hub
@@ -269,12 +277,13 @@ export function visibleOrgSettingsRows(
  * under it, which the design gate's layout-shift rule refuses.
  */
 export function visibleInAppSettingsRows(
-  gate: OrgInAppSettingsGate
+  gate: OrgInAppSettingsGate,
+  organizationId: string
 ): readonly OrgInAppSettingsRow[] {
   return IN_APP_ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => ({
     area: spec.area,
     title: i18n.t(IN_APP_TITLE_KEYS[spec.area]),
     icon: spec.icon,
-    href: spec.href,
+    href: spec.href(organizationId),
   }));
 }

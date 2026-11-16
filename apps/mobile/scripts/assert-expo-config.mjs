@@ -393,9 +393,10 @@ check(
 const extra = config.extra ?? {};
 for (const key of Object.keys(ENV_KEYS)) {
   const value = extra[key];
-  if (value === undefined || value === null || value === '') {
-    failures.push(`extra.${key} must be present and non-empty`);
-  }
+  check(
+    value !== undefined && value !== null && value !== '',
+    `extra.${key} must be present and non-empty`
+  );
 }
 
 // Admission contract: the server issues native credentials only to an attested

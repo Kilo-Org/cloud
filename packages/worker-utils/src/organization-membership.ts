@@ -1,4 +1,7 @@
-import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_PARENT_ACCESS_ROLES,
+  ORGANIZATION_ROLE_PRIORITY,
+} from '@kilocode/app-shared/organizations';
 import type { WorkerDb } from '@kilocode/db/client';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
@@ -126,13 +129,19 @@ export function parentOrganizationJoinCondition(): SQL {
 /**
  * Join condition for the caller's parent-organization membership. Add it after
  * {@link parentOrganizationJoinCondition}; only the roles allowed to inherit
- * child-organization access match.
+ * child-organization access match, and only while the parent join found the
+ * live parent row.
  */
 export function parentOrganizationMembershipJoinCondition(kiloUserId: string | AnyPgColumn): SQL {
-  return inheritedParentMembershipJoinCondition(
-    parentOrganizationMembershipsTable,
-    organizations,
-    kiloUserId
+  return (
+    and(
+      inheritedParentMembershipJoinCondition(
+        parentOrganizationMembershipsTable,
+        organizations,
+        kiloUserId
+      ),
+      isNotNull(parentOrganizationsTable.id)
+    ) ?? sql`false`
   );
 }
 
@@ -266,47 +275,40 @@ export async function hasOrganizationAccess(
 }
 
 /**
- * The caller's role for acting for the organization. This is the one rule for
- * acting for an organization: the direct membership role in the live
- * organization, otherwise a permitted role (`ORGANIZATION_PARENT_ACCESS_ROLES`)
- * in its live parent organization, otherwise `null`.
- * {@link activeOrganizationAccessSql} holds the same conditions in SQL form for
- * predicates that must stay inside one statement.
- *
- * Both reads run together, so a caller pays one round trip for the pair.
+ * The caller's role for acting for the organization. One statement reads the
+ * direct membership role in the live organization and the inherited role from
+ * its live parent organization, then {@link ORGANIZATION_ROLE_PRIORITY} picks
+ * the stronger of the two. A caller with no membership yields `null`.
+ * {@link activeOrganizationAccessSql} holds the same conditions in predicate
+ * form.
  */
 export async function findEffectiveOrganizationMemberRole(
   db: OrganizationMembershipDb,
   params: { kiloUserId: string; organizationId: string }
 ): Promise<OrganizationRole | null> {
-  const [directRows, inheritedRows] = await Promise.all([
-    db
-      .select({ role: organization_memberships.role })
-      .from(organization_memberships)
-      .innerJoin(
-        organizations,
-        activeOrganizationJoinCondition(organization_memberships.organization_id)
-      )
-      .where(
-        and(
-          eq(organization_memberships.organization_id, params.organizationId),
-          eq(organization_memberships.kilo_user_id, params.kiloUserId)
-        )
-      )
-      .limit(1),
-    db
-      .select({ role: parentOrganizationMembershipsTable.role })
-      .from(organizations)
-      .innerJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
-      .innerJoin(
-        parentOrganizationMembershipsTable,
-        parentOrganizationMembershipJoinCondition(params.kiloUserId)
-      )
-      .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
-      .limit(1),
-  ]);
+  const rows = await db
+    .select({
+      directRole: organization_memberships.role,
+      inheritedRole: parentOrganizationMembershipsTable.role,
+    })
+    .from(organizations)
+    .leftJoin(
+      organization_memberships,
+      organizationMembershipJoinCondition(params.kiloUserId, organizations.id)
+    )
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(params.kiloUserId)
+    )
+    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
 
-  return directRows[0]?.role ?? inheritedRows[0]?.role ?? null;
+  const row = rows[0];
+  if (!row) return null;
+
+  const heldRoles = [row.directRole, row.inheritedRole];
+  return ORGANIZATION_ROLE_PRIORITY.find(role => heldRoles.includes(role)) ?? null;
 }
 
 /**

@@ -8,6 +8,7 @@ import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-u
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
+  ORGANIZATION_ROLE_PRIORITY,
 } from '@kilocode/app-shared/organizations';
 import { baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
@@ -134,16 +135,15 @@ async function selectCallerRoleRows(
   return [...directRows, ...inheritedRows];
 }
 
-const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
-
 export function effectiveMembershipRole(
   rows: { role: OrganizationRole }[],
   roles?: OrganizationRole[]
 ): OrganizationRole | null {
-  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
   return (
-    rolePriority.find(role => allowedRoles.includes(role) && rows.some(row => row.role === role)) ??
-    null
+    ORGANIZATION_ROLE_PRIORITY.find(
+      role => allowedRoles.includes(role) && rows.some(row => row.role === role)
+    ) ?? null
   );
 }
 
@@ -648,7 +648,7 @@ export async function getOrganizationsAccessRoles(
       )
     );
     for (const [organizationId, roles] of rolesByOrg) {
-      const best = rolePriority.find(role => roles.includes(role));
+      const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
       if (best) result.set(organizationId, best);
     }
     return result;
@@ -700,7 +700,7 @@ export async function getOrganizationsAccessRoles(
     await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
   );
   for (const [organizationId, roles] of rolesByOrg) {
-    const best = rolePriority.find(role => roles.includes(role));
+    const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
     if (best) result.set(organizationId, best);
   }
   return result;
@@ -717,7 +717,7 @@ export async function ensureOrganizationsAccess(
   roles?: OrganizationRole[]
 ): Promise<void> {
   const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
-  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
   for (const organizationId of new Set(organizationIds)) {
     const role = accessByOrg.get(organizationId);
     if (!role || !allowedRoles.includes(role)) {

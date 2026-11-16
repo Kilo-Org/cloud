@@ -1,12 +1,8 @@
 import { inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDrizzleClient, type DrizzleClient } from '@kilocode/db/client';
-import {
-  kilocode_users,
-  organization_memberships,
-  organizations,
-  type OrganizationRole,
-} from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
+import type { OrganizationRole } from '@kilocode/db/schema-types';
 import {
   findEffectiveOrganizationMemberRole,
   hasEffectiveOrganizationAccess,
@@ -122,6 +118,26 @@ describe('findEffectiveOrganizationMemberRole', () => {
       await expectEffectiveRole({ kiloUserId, organizationId: childOrganizationId }, role);
     }
   );
+
+  it('returns the inherited owner role over a direct member role', async () => {
+    const kiloUserId = await insertUser();
+    const parentOrganizationId = await insertOrganization();
+    const childOrganizationId = await insertOrganization(parentOrganizationId);
+    await insertMembership(childOrganizationId, kiloUserId, 'member');
+    await insertMembership(parentOrganizationId, kiloUserId, 'owner');
+
+    await expectEffectiveRole({ kiloUserId, organizationId: childOrganizationId }, 'owner');
+  });
+
+  it('returns the inherited admin role over a direct billing manager role', async () => {
+    const kiloUserId = await insertUser();
+    const parentOrganizationId = await insertOrganization();
+    const childOrganizationId = await insertOrganization(parentOrganizationId);
+    await insertMembership(childOrganizationId, kiloUserId, 'billing_manager');
+    await insertMembership(parentOrganizationId, kiloUserId, 'admin');
+
+    await expectEffectiveRole({ kiloUserId, organizationId: childOrganizationId }, 'admin');
+  });
 
   it('returns null for a parent role that cannot inherit', async () => {
     const kiloUserId = await insertUser();

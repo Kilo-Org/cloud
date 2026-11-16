@@ -1,5 +1,12 @@
 import { describe, expect, test } from '@jest/globals';
-import { describeResult, describeStep, describeUnsentResult, gatewayName } from './routing-labels';
+import {
+  byokSkipReasonLabel,
+  describeResult,
+  describeStep,
+  describeUnsentResult,
+  gatewayName,
+  rejectedResultLabel,
+} from './routing-labels';
 
 describe('describeStep', () => {
   test('shows the key that served over another API as selected', () => {
@@ -78,7 +85,111 @@ describe('describeStep', () => {
   });
 });
 
+describe('endpoint steps', () => {
+  const endpoint = 'endpoint-a1b2c3d4e5';
+
+  test('names the endpoint that served the endpoint model ID', () => {
+    expect(
+      describeStep({ step: 'byok-endpoint-model', outcome: 'selected', provider_id: endpoint })
+    ).toEqual({
+      title: 'Endpoint model ID',
+      detail: 'Served with the Endpoint a1b2c3d4e5.',
+      tone: 'selected',
+    });
+  });
+
+  test.each([
+    ['no-organization', 'Endpoints are only available to organizations.'],
+    ['no-key', 'This organization has no Endpoint a1b2c3d4e5.'],
+    ['disabled', 'The Endpoint a1b2c3d4e5 is disabled.'],
+    ['unknown-model', 'The Endpoint a1b2c3d4e5 does not offer the requested model.'],
+    ['invalid-credentials', "The Endpoint a1b2c3d4e5's credentials could not be used."],
+  ])('explains the %s rejection', (reason, detail) => {
+    expect(
+      describeStep({
+        step: 'byok-endpoint-model',
+        outcome: 'rejected',
+        provider_id: endpoint,
+        reason,
+      })
+    ).toEqual({ title: 'Endpoint model ID', detail, tone: 'rejected' });
+  });
+
+  test('tells which catalog model ID an endpoint that only serves catalog IDs needs', () => {
+    expect(
+      describeStep({
+        step: 'byok-endpoint-model',
+        outcome: 'rejected',
+        provider_id: endpoint,
+        reason: 'catalog-only',
+        catalog_model_id: 'openai/gpt-5',
+      }).detail
+    ).toBe(
+      'The Endpoint a1b2c3d4e5 only serves Kilo catalog model IDs; request openai/gpt-5 instead.'
+    );
+    expect(
+      describeStep({
+        step: 'byok-endpoint-model',
+        outcome: 'rejected',
+        provider_id: endpoint,
+        reason: 'catalog-only',
+        catalog_model_id: null,
+      }).detail
+    ).toBe('The Endpoint a1b2c3d4e5 only serves Kilo catalog model IDs.');
+  });
+
+  test('does not call an endpoint a key in the BYOK key step', () => {
+    expect(
+      describeStep({
+        step: 'byok-key',
+        outcome: 'selected',
+        route: 'endpoint-byok',
+        provider_id: endpoint,
+      }).detail
+    ).toBe('Served with the Endpoint a1b2c3d4e5.');
+  });
+
+  test('says an endpoint candidate is disabled rather than its key', () => {
+    expect(byokSkipReasonLabel('disabled', 'endpoint-byok')).toBe('Endpoint disabled');
+    expect(byokSkipReasonLabel('disabled', 'direct-byok')).toBe('Key disabled');
+    expect(byokSkipReasonLabel('unsupported-api-kind', 'endpoint-byok')).toBe(
+      'Does not support this API'
+    );
+  });
+
+  test.each([
+    ['byok-endpoint-unavailable', 'Rejected: the endpoint is unavailable'],
+    ['byok-endpoint-catalog-only', 'Rejected: the endpoint only serves Kilo catalog model IDs'],
+  ])('labels the %s result', (kind, label) => {
+    expect(rejectedResultLabel({ kind })).toBe(label);
+  });
+});
+
 describe('describeResult', () => {
+  test('names the endpoint and its payer', () => {
+    expect(
+      describeResult({
+        kind: 'provider',
+        route: 'byok-endpoint-model',
+        provider_type: 'byok-endpoint',
+        byok_provider_ids: ['endpoint-a1b2c3d4e5'],
+        payer: 'owner-byok-key',
+        is_free: false,
+      })
+    ).toEqual({ title: 'Sent to Endpoint a1b2c3d4e5', paidBy: 'Endpoint a1b2c3d4e5' });
+  });
+
+  test('falls back to a generic name when the endpoint was not recorded', () => {
+    expect(
+      describeResult({
+        kind: 'provider',
+        provider_type: 'byok-endpoint',
+        byok_provider_ids: [],
+        payer: 'owner-byok-key',
+      })
+    ).toEqual({ title: 'Sent to the endpoint', paidBy: 'BYOK key' });
+  });
+
   test('names the direct BYOK provider and its key as payer', () => {
     expect(
       describeResult({
@@ -147,6 +258,22 @@ describe('describeUnsentResult', () => {
         'enkrypt-block'
       ).detail
     ).toBe('Would have been sent to Amazon Bedrock (direct).');
+  });
+
+  test('names the endpoint that would have served', () => {
+    expect(
+      describeUnsentResult(
+        {
+          kind: 'provider',
+          route: 'endpoint-byok',
+          provider_type: 'byok-endpoint',
+          byok_provider_ids: ['endpoint-a1b2c3d4e5'],
+          payer: 'owner-byok-key',
+          is_free: false,
+        },
+        'enkrypt-block'
+      ).detail
+    ).toBe('Would have been sent to Endpoint a1b2c3d4e5.');
   });
 
   test('omits the detail when the provider was not recorded', () => {

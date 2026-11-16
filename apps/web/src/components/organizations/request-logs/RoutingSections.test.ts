@@ -167,3 +167,120 @@ describe('RoutingSections BYOK failover', () => {
     expect(attempts[1]).not.toContain('via Vercel AI Gateway');
   });
 });
+
+describe('RoutingSections endpoints', () => {
+  const endpointId = 'endpoint-a1b2c3d4e5';
+
+  function endpointRouting(
+    overrides: Partial<RequestLogRoutingDetails>,
+    attempts: RequestLogByokFailoverAttempt[] = []
+  ): RequestLogRoutingDetails {
+    return {
+      ...routing(attempts),
+      requested_model: `${endpointId}/my-model`,
+      steps: [{ step: 'byok-endpoint-model', outcome: 'selected', provider_id: endpointId }],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'byok-endpoint-model',
+        provider_type: 'byok-endpoint',
+        byok_provider_ids: [endpointId],
+        payer: 'owner-byok-key',
+        is_free: false,
+      },
+      ...overrides,
+    };
+  }
+
+  it('shows the endpoint that served an endpoint model ID', () => {
+    const text = render(endpointRouting({})).body.textContent ?? '';
+
+    expect(text).toContain('Endpoint model ID');
+    expect(text).toContain('Served with the Endpoint a1b2c3d4e5.');
+    expect(text).toContain('Sent to Endpoint a1b2c3d4e5');
+    expect(text).toContain('Paid by: Endpoint a1b2c3d4e5');
+    expect(text).not.toMatch(/custom/i);
+  });
+
+  it('shows why an endpoint model ID was rejected', () => {
+    const text =
+      render(
+        endpointRouting({
+          steps: [
+            {
+              step: 'byok-endpoint-model',
+              outcome: 'rejected',
+              provider_id: endpointId,
+              reason: 'disabled',
+            },
+          ],
+          result: { kind: 'byok-endpoint-unavailable' },
+        })
+      ).body.textContent ?? '';
+
+    expect(text).toContain('The Endpoint a1b2c3d4e5 is disabled.');
+    expect(text).toContain('Rejected: the endpoint is unavailable');
+  });
+
+  it('names endpoint candidates and their skip reason', () => {
+    const document = render(
+      endpointRouting({
+        steps: [
+          { step: 'byok-key', outcome: 'selected', route: 'vercel-byok', provider_id: 'openai' },
+        ],
+        byok_candidates: [
+          {
+            route: 'endpoint-byok',
+            provider_id: endpointId,
+            route_order: 0,
+            outcome: 'skipped',
+            reason: 'disabled',
+          },
+          { route: 'vercel-byok', provider_id: 'openai', route_order: 1, outcome: 'selected' },
+        ],
+        result: {
+          kind: 'provider',
+          route: 'vercel-byok',
+          provider_type: 'vercel',
+          byok_provider_ids: ['openai'],
+          payer: 'owner-byok-key',
+          is_free: false,
+        },
+      })
+    );
+
+    expect(candidateRows(document)).toEqual([
+      expect.stringContaining('Endpoint a1b2c3d4e5Skipped'),
+      expect.stringContaining('OpenAI API keyvia Vercel AI GatewaySelected'),
+    ]);
+    expect(candidateRows(document)[0]).toContain('Endpoint disabled');
+  });
+
+  it('names an endpoint that failed over to the next key', () => {
+    const document = render(
+      endpointRouting({}, [
+        {
+          provider_type: 'byok-endpoint',
+          byok_provider_ids: [endpointId],
+          status: 502,
+          duration_ms: 300,
+          outcome: 'failed-over',
+        },
+        {
+          provider_type: 'openrouter',
+          byok_provider_ids: ['openrouter'],
+          status: 200,
+          duration_ms: 900,
+          outcome: 'served',
+        },
+      ])
+    );
+
+    const attempts = [...document.querySelectorAll('[aria-label="BYOK failover attempts"] li')].map(
+      row => row.textContent ?? ''
+    );
+    expect(attempts[0]).toContain('Endpoint a1b2c3d4e5');
+    expect(attempts[0]).not.toContain('via Vercel AI Gateway');
+    expect(document.body.textContent).toContain('Sent to OpenRouter');
+  });
+});

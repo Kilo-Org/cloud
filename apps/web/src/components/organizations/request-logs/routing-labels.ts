@@ -1,5 +1,6 @@
 import { apiKindLabel } from '@/lib/api-kind-labels';
 import { byokKeyLabel, getByokProviderDisplayName } from '@/lib/byok/provider-names';
+import { isByokEndpointProviderId } from '@kilocode/db/schema-types';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import type {
   RequestLogNotSentReason,
@@ -39,6 +40,10 @@ const BYOK_SKIP_REASON_LABELS: Record<string, string> = {
   'ignored-by-request': 'Provider ignored by the request',
 };
 
+const ENDPOINT_SKIP_REASON_LABELS: Record<string, string> = {
+  disabled: 'Endpoint disabled',
+};
+
 const BYOK_OUTCOME_LABELS: Record<string, string> = {
   selected: 'Selected',
   skipped: 'Skipped',
@@ -71,6 +76,8 @@ const REJECTED_RESULT_LABELS: Record<string, string> = {
   'claude-billing-unavailable': 'Rejected: Claude organization billing is unavailable',
   'claude-billing-reconnect': 'Rejected: the Claude organization link must be reconnected',
   'custom-llm-unavailable': 'Rejected: the promotional model is unavailable',
+  'byok-endpoint-unavailable': 'Rejected: the endpoint is unavailable',
+  'byok-endpoint-catalog-only': 'Rejected: the endpoint only serves Kilo catalog model IDs',
   'direct-byok-catalog-only': 'Rejected: the key only serves Kilo catalog model IDs',
 };
 
@@ -95,15 +102,23 @@ export function gatewayName(provider: string): string | null {
   return Object.hasOwn(GATEWAY_NAMES, provider) ? GATEWAY_NAMES[provider] : null;
 }
 
+/** An endpoint is named by its provider id alone; every other BYOK provider is a key. */
 function keyLabel(providerIds: string[]): string {
-  return byokKeyLabel(providerIds.map(getByokProviderDisplayName));
+  const endpoints = providerIds.filter(isByokEndpointProviderId);
+  const keys = providerIds.filter(providerId => !isByokEndpointProviderId(providerId));
+  const labels = endpoints.map(getByokProviderDisplayName);
+  if (keys.length > 0) labels.push(byokKeyLabel(keys.map(getByokProviderDisplayName)));
+  return listOf(labels);
 }
 
 function listOf(names: string[]): string {
   return names.join(', ');
 }
 
-export function byokSkipReasonLabel(reason: string): string {
+export function byokSkipReasonLabel(reason: string, route?: string): string {
+  if (route === 'endpoint-byok' && Object.hasOwn(ENDPOINT_SKIP_REASON_LABELS, reason)) {
+    return ENDPOINT_SKIP_REASON_LABELS[reason];
+  }
   return lookup(BYOK_SKIP_REASON_LABELS, reason);
 }
 
@@ -135,11 +150,10 @@ function paidByLabel(result: RequestLogRoutingResult): string | null {
 function selectedProviderName(result: RequestLogRoutingResult): string | null {
   const providerType = result.provider_type;
   if (!providerType) return null;
-  if (providerType === 'direct-byok') {
+  if (providerType === 'direct-byok' || providerType === 'byok-endpoint') {
     const providerIds = result.byok_provider_ids ?? [];
-    return providerIds.length > 0
-      ? listOf(providerIds.map(getByokProviderDisplayName))
-      : 'the BYOK provider';
+    if (providerIds.length > 0) return listOf(providerIds.map(getByokProviderDisplayName));
+    return providerType === 'byok-endpoint' ? 'the endpoint' : 'the BYOK provider';
   }
   return lookup(SENT_TO_LABELS, providerType);
 }
@@ -196,6 +210,28 @@ function describeProviderModelId(step: RequestLogRoutingStep): string {
   return "The requested model is not a BYOK provider's own model ID.";
 }
 
+const ENDPOINT_REJECTION_LABELS: Record<string, (endpoint: string) => string> = {
+  'no-organization': () => 'Endpoints are only available to organizations.',
+  'no-key': endpoint => `This organization has no ${endpoint}.`,
+  disabled: endpoint => `The ${endpoint} is disabled.`,
+  'unknown-model': endpoint => `The ${endpoint} does not offer the requested model.`,
+  'invalid-credentials': endpoint => `The ${endpoint}'s credentials could not be used.`,
+};
+
+function describeEndpointModelId(step: RequestLogRoutingStep): string {
+  const endpoint = step.provider_id ? keyLabel([step.provider_id]) : 'endpoint';
+  if (step.outcome === 'selected') return `Served with the ${endpoint}.`;
+  if (step.reason === 'catalog-only') {
+    return step.catalog_model_id
+      ? `The ${endpoint} only serves Kilo catalog model IDs; request ${step.catalog_model_id} instead.`
+      : `The ${endpoint} only serves Kilo catalog model IDs.`;
+  }
+  if (step.reason && Object.hasOwn(ENDPOINT_REJECTION_LABELS, step.reason)) {
+    return ENDPOINT_REJECTION_LABELS[step.reason](endpoint);
+  }
+  return `The ${endpoint} cannot serve the requested model.`;
+}
+
 function describeChatGpt(step: RequestLogRoutingStep): string {
   switch (step.outcome) {
     case 'selected':
@@ -244,6 +280,8 @@ export function describeStep(
       return { title: 'Promotional model', detail: describePromotionalModel(step), tone };
     case 'direct-byok-model':
       return { title: 'Provider model ID', detail: describeProviderModelId(step), tone };
+    case 'byok-endpoint-model':
+      return { title: 'Endpoint model ID', detail: describeEndpointModelId(step), tone };
     case 'organization-policy': {
       const excluded = step.excluded_provider_ids ?? [];
       return {

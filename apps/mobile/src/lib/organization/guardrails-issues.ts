@@ -4,6 +4,7 @@ import {
   type GuardrailsDraft,
   type GuardrailsIssue,
   INPUT_DETECTOR_IDS,
+  type OrgGuardrailsConfig,
   type OrgPolicyRule,
   OUTPUT_DETECTOR_IDS,
 } from '@/lib/organization/guardrails-draft';
@@ -29,6 +30,76 @@ export function createPolicyRule(existingRules: readonly OrgPolicyRule[]): OrgPo
 }
 
 /**
+ * The refusals `refineEnkryptDetectors` raises for one detector set, input or
+ * output: the lists a detector needs while it is on, their caps, and the policy
+ * requirement its format carries.
+ */
+function detectorIssues(
+  detectors: OrgGuardrailsConfig['detectors'] | OrgGuardrailsConfig['output']['detectors'],
+  issues: GuardrailsIssue[]
+): void {
+  if (detectors.pii.enabled && detectors.pii.entities.length === 0) {
+    issues.push('piiEntityRequired');
+  }
+
+  const keywords = detectors.keyword_detector.banned_keywords;
+  if (detectors.keyword_detector.enabled && keywords.length === 0) {
+    issues.push('keywordRequired');
+  }
+  if (keywords.length > GUARDRAILS_LIMITS.keywords) {
+    issues.push('keywordsTooMany');
+  }
+  if (keywords.some(keyword => keyword.length > GUARDRAILS_LIMITS.keywordLength)) {
+    issues.push('keywordTooLong');
+  }
+
+  const topics = detectors.topic_detector.topic;
+  if (detectors.topic_detector.enabled && topics.length === 0) {
+    issues.push('topicRequired');
+  }
+  if (topics.length > GUARDRAILS_LIMITS.topics) {
+    issues.push('topicsTooMany');
+  }
+  if (topics.some(topic => topic.length > GUARDRAILS_LIMITS.topicLength)) {
+    issues.push('topicTooLong');
+  }
+
+  const policy = detectors.policy_violation;
+  if (policy.enabled && policy.format === 'policy_text' && policy.policy_text.trim().length === 0) {
+    issues.push('policyTextRequired');
+  }
+  if (policy.enabled && policy.format === 'rules' && policy.rules.length === 0) {
+    issues.push('ruleRequired');
+  }
+  // The server validates every stored rule, whichever format is in force.
+  ruleIssues(policy.rules, issues);
+}
+
+/** An id the server accepts, a description, and an id no other rule reuses. */
+function ruleIssues(rules: readonly OrgPolicyRule[], issues: GuardrailsIssue[]): void {
+  const seenIds = new Set<string>();
+  for (const rule of rules) {
+    const id = rule.id.trim();
+    if (id.length === 0) {
+      issues.push('ruleIdRequired');
+    } else if (!RULE_ID_PATTERN.test(id)) {
+      issues.push('ruleIdInvalid');
+    } else if (seenIds.has(id)) {
+      issues.push('ruleIdDuplicate');
+    }
+    if (id.length > 0) {
+      seenIds.add(id);
+    }
+    if (rule.text.trim().length === 0) {
+      issues.push('ruleTextRequired');
+    }
+  }
+  if (rules.length > GUARDRAILS_LIMITS.rules) {
+    issues.push('rulesTooMany');
+  }
+}
+
+/**
  * Everything the server refuses, checked here first so Save can stay disabled
  * with the reason beside it instead of failing the round trip.
  */
@@ -49,26 +120,9 @@ export function guardrailsIssues(
   }
 
   const config = fromDraft(draft);
-  for (const rule of draft.detectors.policy_violation.rules) {
-    if (rule.id.trim().length === 0) {
-      issues.push('ruleIdRequired');
-    } else if (!RULE_ID_PATTERN.test(rule.id.trim())) {
-      issues.push('ruleIdInvalid');
-    }
-    if (rule.text.trim().length === 0) {
-      issues.push('ruleTextRequired');
-    }
-  }
-  if (config.detectors.policy_violation.rules.length > GUARDRAILS_LIMITS.rules) {
-    issues.push('rulesTooMany');
-  }
-  const outputKeywords = config.output.detectors.keyword_detector.banned_keywords;
-  if (outputKeywords.some(keyword => keyword.length > GUARDRAILS_LIMITS.keywordLength)) {
-    issues.push('keywordTooLong');
-  }
-  const outputTopics = config.output.detectors.topic_detector.topic;
-  if (outputTopics.some(topic => topic.length > GUARDRAILS_LIMITS.topicLength)) {
-    issues.push('topicTooLong');
+  detectorIssues(config.detectors, issues);
+  if (outputAvailable) {
+    detectorIssues(config.output.detectors, issues);
   }
   return issues;
 }

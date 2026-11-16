@@ -98,6 +98,25 @@ describe('draft round trip', () => {
     const changed = { ...baseline, inputEnabled: true };
     expect(draftsEqual(changed, baseline, true)).toBe(false);
   });
+
+  it('treats a detector action change as an edit, on both guards', () => {
+    const saved = config();
+    saved.detectors.pii = { enabled: true, action: 'log', entities: ['secrets'] };
+    saved.output.detectors.keyword_detector = {
+      enabled: true,
+      action: 'log',
+      banned_keywords: ['alpha'],
+    };
+    const baseline = toDraft(saved);
+
+    const blockedInput = structuredClone(baseline);
+    blockedInput.detectors.pii.action = 'block';
+    expect(draftsEqual(blockedInput, baseline, true)).toBe(false);
+
+    const blockedOutput = structuredClone(baseline);
+    blockedOutput.outputDetectors.keyword_detector.action = 'block';
+    expect(draftsEqual(blockedOutput, baseline, true)).toBe(false);
+  });
 });
 
 describe('detector choices', () => {
@@ -189,6 +208,58 @@ describe('guardrailsIssues', () => {
       banned_keywords: ['x'.repeat(101)],
     };
     expect(guardrailsIssues(toDraft(saved), true)).toContain('keywordTooLong');
+  });
+
+  it('rejects a detector list past its cap, a duplicate rule id, and an empty entity list', () => {
+    const saved = config();
+    saved.output.detectors.keyword_detector = {
+      enabled: true,
+      action: 'block',
+      banned_keywords: Array.from({ length: 201 }, (_unused, index) => `keyword-${index}`),
+    };
+    saved.output.detectors.topic_detector = {
+      enabled: true,
+      action: 'block',
+      topic: Array.from({ length: 51 }, (_unused, index) => `topic-${index}`),
+    };
+    const issues = guardrailsIssues(toDraft(saved), true);
+    expect(issues).toContain('keywordsTooMany');
+    expect(issues).toContain('topicsTooMany');
+
+    saved.detectors.policy_violation = {
+      ...saved.detectors.policy_violation,
+      enabled: true,
+      action: 'log',
+      rules: [rule({ id: 'rule-1', text: 'No PII' }), rule({ id: 'rule-1', text: 'No PII' })],
+    };
+    expect(guardrailsIssues(toDraft(saved), true)).toContain('ruleIdDuplicate');
+
+    saved.detectors.pii = { enabled: true, action: 'block', entities: [] };
+    expect(guardrailsIssues(toDraft(saved), true)).toContain('piiEntityRequired');
+  });
+
+  it('requires the list and the policy text a turned-on detector saves', () => {
+    const saved = config();
+    saved.detectors.keyword_detector = { enabled: true, action: 'block', banned_keywords: [] };
+    saved.detectors.topic_detector = { enabled: true, topic: [] };
+    saved.detectors.policy_violation = {
+      ...saved.detectors.policy_violation,
+      enabled: true,
+      action: 'log',
+      format: 'policy_text',
+      policy_text: '   ',
+    };
+    const issues = guardrailsIssues(toDraft(saved), true);
+    expect(issues).toContain('keywordRequired');
+    expect(issues).toContain('topicRequired');
+    expect(issues).toContain('policyTextRequired');
+
+    saved.detectors.policy_violation = {
+      ...saved.detectors.policy_violation,
+      format: 'rules',
+      rules: [],
+    };
+    expect(guardrailsIssues(toDraft(saved), true)).toContain('ruleRequired');
   });
 });
 

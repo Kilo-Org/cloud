@@ -140,16 +140,29 @@ export type GuardrailsDraft = {
   outputDetectors: OutputDetectorsDraft;
 };
 
-/** The reasons a draft cannot be saved, in the order the screen reports them. */
+/**
+ * The reasons a draft cannot be saved, in the order the screen reports them.
+ * They name the server's own refusals (`EnkryptInputDetectorsSchema` and
+ * `EnkryptOutputDetectorsSchema` in `packages/db/src/schema-types.ts`), so a
+ * refused save never reaches the round trip.
+ */
 export type GuardrailsIssue =
   | 'inputDetectorRequired'
   | 'outputDetectorRequired'
+  | 'piiEntityRequired'
+  | 'keywordRequired'
+  | 'topicRequired'
+  | 'keywordTooLong'
+  | 'keywordsTooMany'
+  | 'topicTooLong'
+  | 'topicsTooMany'
+  | 'policyTextRequired'
+  | 'ruleRequired'
   | 'rulesTooMany'
   | 'ruleIdRequired'
   | 'ruleIdInvalid'
-  | 'ruleTextRequired'
-  | 'keywordTooLong'
-  | 'topicTooLong';
+  | 'ruleIdDuplicate'
+  | 'ruleTextRequired';
 
 /** One keyword or topic per line, trimmed, without blank lines or repeats. */
 export function parseLineList(text: string): string[] {

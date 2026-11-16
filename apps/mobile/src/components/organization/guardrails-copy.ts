@@ -49,23 +49,39 @@ export const OUTPUT_DETECTOR_COPY = {
 const ISSUE_KEYS = {
   inputDetectorRequired: 'organizationGuardrails.inputDetectorRequired',
   outputDetectorRequired: 'organizationGuardrails.outputDetectorRequired',
+  piiEntityRequired: 'organizationGuardrails.piiEntityRequired',
+  keywordRequired: 'organizationGuardrails.keywordRequired',
+  topicRequired: 'organizationGuardrails.topicRequired',
+  keywordTooLong: 'organizationGuardrails.keywordTooLong',
+  keywordsTooMany: 'organizationGuardrails.keywordsTooMany',
+  topicTooLong: 'organizationGuardrails.topicTooLong',
+  topicsTooMany: 'organizationGuardrails.topicsTooMany',
+  policyTextRequired: 'organizationGuardrails.policyTextRequired',
+  ruleRequired: 'organizationGuardrails.ruleRequired',
   rulesTooMany: 'organizationGuardrails.rulesTooMany',
   ruleIdRequired: 'organizationGuardrails.ruleIdRequired',
   ruleIdInvalid: 'organizationGuardrails.ruleIdInvalid',
+  ruleIdDuplicate: 'organizationGuardrails.ruleIdDuplicate',
   ruleTextRequired: 'organizationGuardrails.ruleTextRequired',
-  keywordTooLong: 'organizationGuardrails.keywordTooLong',
-  topicTooLong: 'organizationGuardrails.topicTooLong',
 } satisfies Record<GuardrailsIssue, string>;
 
 /** The issues whose sentence names the cap it enforces. */
 const ISSUE_LIMITS = {
   rulesTooMany: GUARDRAILS_LIMITS.rules,
+  keywordsTooMany: GUARDRAILS_LIMITS.keywords,
+  topicsTooMany: GUARDRAILS_LIMITS.topics,
   keywordTooLong: GUARDRAILS_LIMITS.keywordLength,
   topicTooLong: GUARDRAILS_LIMITS.topicLength,
   inputDetectorRequired: null,
   outputDetectorRequired: null,
+  piiEntityRequired: null,
+  keywordRequired: null,
+  topicRequired: null,
+  policyTextRequired: null,
+  ruleRequired: null,
   ruleIdRequired: null,
   ruleIdInvalid: null,
+  ruleIdDuplicate: null,
   ruleTextRequired: null,
 } satisfies Record<GuardrailsIssue, number | null>;
 

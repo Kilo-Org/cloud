@@ -10,6 +10,7 @@ import {
   type ProviderAdapter,
   type ProviderLaunchResult,
   type ProviderStartup,
+  type ProviderDeadline,
 } from './provider.js';
 import { uploadAwsLaunchDocument, type AwsLaunchEnvelope } from './aws-launch-document.js';
 import { logger } from '../logger.js';
@@ -38,7 +39,7 @@ export type AwsComputeStorage<Record> = {
 };
 export type AwsComputeAdapter = ProviderAdapter & {
   reconcileLaunch(ref: string): Promise<ProviderLaunchResult | undefined>;
-  lifetimeDeadlineAt(ref: string): Promise<number | undefined>;
+  allocationDeadline(ref: string): Promise<ProviderDeadline | undefined>;
   confirmAdmission(ref: string): Promise<void>;
   validateWrapperAdmission(ref: string): Promise<void>;
 };
@@ -182,6 +183,7 @@ export function createAwsComputeLifecycle<
       ref: Ref,
       envelope: AwsLaunchEnvelope
     ): Promise<{ request: Request; deadlineAt?: number }>;
+    deadline?(value: AwsComputeOperation<Config, Ref, Request>): ProviderDeadline | undefined;
     discover?(value: AwsComputeOperation<Config, Ref, Request>): Promise<string | undefined>;
     runner(config: Config): Promise<(request: Request) => Promise<string>>;
     isDefiniteRunRejection(error: unknown): boolean;
@@ -492,8 +494,12 @@ export function createAwsComputeLifecycle<
       if (value.deadlineAt !== undefined && now() + ms >= value.deadlineAt)
         throw new Error('AWS allocation lifetime cannot be extended');
     },
-    async lifetimeDeadlineAt(ref) {
-      return (await operation(ref)).deadlineAt;
+    async allocationDeadline(ref) {
+      const value = await operation(ref);
+      if (deps.engine.deadline) return deps.engine.deadline(value);
+      return value.deadlineAt === undefined
+        ? undefined
+        : { at: value.deadlineAt, reason: 'provider_lifetime_exhausted' };
     },
     async validateWrapperAdmission(ref) {
       let value = await operation(ref);

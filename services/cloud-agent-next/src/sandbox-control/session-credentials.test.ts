@@ -507,10 +507,10 @@ describe('hosted multi-repository grants', () => {
   });
 });
 
-describe('AWS managed SCM certificate scope', () => {
+describe.each(['aws', 'aws-ecs'] as const)('%s managed SCM certificate scope', provider => {
   it('rejects a custom additional repository before issuing any capability', async () => {
     const input = localPreparation();
-    input.provider = 'aws';
+    input.provider = provider;
     input.source.repository = { type: 'github', repo: 'acme/widgets' };
     input.environment = {
       repositories: [
@@ -540,7 +540,7 @@ describe('AWS managed SCM certificate scope', () => {
   });
   it('rejects a custom managed GitLab host before credential issuance', async () => {
     const input = localPreparation();
-    input.provider = 'aws';
+    input.provider = provider;
     input.source.repository = {
       type: 'gitlab',
       url: 'https://custom.gitlab.example/acme/repo.git',

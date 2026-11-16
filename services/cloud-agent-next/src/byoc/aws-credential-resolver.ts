@@ -1,12 +1,7 @@
-import { createAwsCloudformationClient } from '@kilocode/worker-utils/aws-cloudformation';
+import { ByocAwsProviderError } from './aws-errors.js';
+import { awsAccountAccess } from './aws-account-access.js';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
-import {
-  assumeAwsRole,
-  type AwsFetch,
-  awsCredentialsSchema,
-  AwsRequestError,
-  readAwsResponse,
-} from '@kilocode/worker-utils/aws-client';
+import { readAwsResponse } from '@kilocode/worker-utils/aws-client';
 import {
   AWS_BYOC_ENVELOPE_KEY_ID,
   AWS_BYOC_ENVELOPE_SCHEME,
@@ -15,13 +10,13 @@ import {
   type AwsByocConfiguration,
 } from '@kilocode/worker-utils/aws-byoc';
 import { z } from 'zod';
-import { createAwsEgressMetadataReader } from '@kilocode/worker-utils/aws-egress-store';
 import { byocOwnerKey, byocOwnerSchema, type ByocOwner, type ByocSource } from './owner.js';
 import type { Env } from '../types.js';
 import { createMicrovmClient } from '../agent-sandbox/aws/microvm-client.js';
-import { createAwsObjectStore } from '../agent-sandbox/aws/object-store.js';
-import type { AwsRuntimeAccess } from '../sandbox-control/aws-provider.js';
 import { logger } from '../logger.js';
+
+export { ByocAwsProviderError } from './aws-errors.js';
+export { assumeAwsKiloRole } from './aws-account-access.js';
 
 const connectionSchema = z
   .object({
@@ -31,38 +26,30 @@ const connectionSchema = z
   })
   .and(byocOwnerSchema);
 
-export class ByocAwsProviderError extends Error {
-  constructor(
-    readonly reason:
-      | 'byoc_credential_missing'
-      | 'byoc_aws_not_ready'
-      | 'byoc_aws_forbidden'
-      | 'byoc_aws_stack_outdated'
-      | 'byoc_aws_stack_unavailable'
-      | 'byoc_aws_proxy_unavailable'
-      | 'byoc_aws_proxy_expired'
-      | 'byoc_aws_connection_changed'
-  ) {
-    super(reason);
-    this.name = 'ByocAwsProviderError';
-  }
-}
-
 function lookupFailure(
+  provider: 'aws' | 'aws-ecs',
   stage: 'configuration' | 'internal_auth' | 'request' | 'response' | 'contract',
   status?: number
 ) {
   logger
-    .withFields({ provider: 'aws', stage, ...(status === undefined ? {} : { httpStatus: status }) })
+    .withFields({ provider, stage, ...(status === undefined ? {} : { httpStatus: status }) })
     .warn('AWS BYOC connection lookup failed');
   return new ByocAwsProviderError('byoc_aws_not_ready');
 }
 
-export async function fetchAwsByocConnection(env: Env, owner: ByocOwner, credentialId?: string) {
+export function fetchAwsByocConnection(env: Env, owner: ByocOwner, credentialId?: string) {
+  return fetchAwsProviderConnection(env, owner, 'aws', credentialId);
+}
+export async function fetchAwsProviderConnection(
+  env: Env,
+  owner: ByocOwner,
+  provider: 'aws' | 'aws-ecs',
+  credentialId?: string
+) {
   const base = env.KILOCODE_BACKEND_BASE_URL?.replace(/\/+$/, '');
-  if (!base) throw lookupFailure('configuration');
+  if (!base) throw lookupFailure(provider, 'configuration');
   const query = new URLSearchParams({
-    provider: 'aws',
+    provider,
     ...(owner.organizationId !== undefined
       ? { organizationId: owner.organizationId }
       : { userId: owner.userId }),
@@ -74,7 +61,7 @@ export async function fetchAwsByocConnection(env: Env, owner: ByocOwner, credent
     secret = await env.INTERNAL_API_SECRET_PROD.get();
     if (!secret) throw new Error('missing internal authentication');
   } catch {
-    throw lookupFailure('internal_auth');
+    throw lookupFailure(provider, 'internal_auth');
   }
   try {
     response = await fetch(`${base}/api/internal/byoc/connections?${query.toString()}`, {
@@ -84,15 +71,15 @@ export async function fetchAwsByocConnection(env: Env, owner: ByocOwner, credent
       cache: 'no-store',
     });
   } catch {
-    throw lookupFailure('request');
+    throw lookupFailure(provider, 'request');
   }
   if (response.status === 404) throw new ByocAwsProviderError('byoc_credential_missing');
-  if (!response.ok) throw lookupFailure('response', response.status);
+  if (!response.ok) throw lookupFailure(provider, 'response', response.status);
   let parsed: ReturnType<typeof connectionSchema.safeParse>;
   try {
     parsed = connectionSchema.safeParse(JSON.parse(await readAwsResponse(response)));
   } catch {
-    throw lookupFailure('contract');
+    throw lookupFailure(provider, 'contract');
   }
   if (
     !parsed.success ||
@@ -129,71 +116,8 @@ export async function resolveAwsByocConfiguration(
   return configuration;
 }
 
-/** Runtime and onboarding use the same platform role and credential configuration. */
-export async function assumeAwsKiloRole(
-  env: Pick<Env, 'AWS_BYOC_CREDENTIALS' | 'AWS_BYOC_KILO_ROLE_ARN'>,
-  fetch?: AwsFetch,
-  signal?: AbortSignal
-) {
-  let bootstrap;
-  try {
-    bootstrap = awsCredentialsSchema.parse(JSON.parse(env.AWS_BYOC_CREDENTIALS ?? ''));
-  } catch {
-    throw new ByocAwsProviderError('byoc_aws_not_ready');
-  }
-  if (!env.AWS_BYOC_KILO_ROLE_ARN) throw new ByocAwsProviderError('byoc_aws_not_ready');
-  return assumeAwsRole({
-    credentials: bootstrap,
-    region: 'us-east-1',
-    roleArn: env.AWS_BYOC_KILO_ROLE_ARN,
-    fetch,
-    signal,
-  });
-}
-
-export async function awsRuntimeAccess(
-  env: Env,
-  configuration: AwsByocConfiguration
-): Promise<
-  AwsRuntimeAccess & {
-    expiresAt: number;
-    readStack: ReturnType<typeof createAwsCloudformationClient>['describeStack'];
-    readProxyMetadata: ReturnType<typeof createAwsEgressMetadataReader>;
-  }
-> {
-  try {
-    const kilo = await assumeAwsKiloRole(env);
-    const credentials = await assumeAwsRole({
-      credentials: kilo,
-      region: configuration.region,
-      roleArn: configuration.roleArn,
-      externalId: configuration.externalId,
-    });
-    if (credentials.expiresAt === undefined) throw new ByocAwsProviderError('byoc_aws_not_ready');
-    const cloudformation = createAwsCloudformationClient({
-      credentials,
-      region: configuration.region,
-    });
-    return {
-      config: configuration,
-      expiresAt: credentials.expiresAt,
-      client: createMicrovmClient({ credentials, region: configuration.region }),
-      readStack: (identity, signal) => cloudformation.describeStack(identity, signal),
-      readProxyMetadata: createAwsEgressMetadataReader({
-        credentials,
-        region: configuration.region,
-        bucket: configuration.bucket,
-        stackId: configuration.stackId,
-      }),
-      objects: createAwsObjectStore({
-        credentials,
-        region: configuration.region,
-        bucket: configuration.bucket,
-      }),
-    };
-  } catch (error) {
-    if (error instanceof AwsRequestError && error.status === 403)
-      throw new ByocAwsProviderError('byoc_aws_forbidden');
-    throw error;
-  }
+/** The MicroVM adapter adds only its compute client to shared AWS access. */
+export async function awsRuntimeAccess(env: Env, configuration: AwsByocConfiguration) {
+  const { credentials, ...access } = await awsAccountAccess(env, configuration);
+  return { ...access, client: createMicrovmClient({ credentials, region: configuration.region }) };
 }

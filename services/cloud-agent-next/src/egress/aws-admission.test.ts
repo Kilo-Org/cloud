@@ -3,14 +3,35 @@ import {
   AWS_EGRESS_POLICY_REFRESH_MS,
   awsEgressPolicySchema,
 } from '@kilocode/worker-utils/aws-egress';
-import { awsEgressFixture as fixture } from '../../test/fixtures/aws-egress.js';
+import { awsEgressFixture } from '../../test/fixtures/aws-egress.js';
+import { logicalId } from '../scm-broker/test-fixtures.js';
 const generation = '22222222-2222-4222-8222-222222222222';
 const allocationId = '11111111-1111-4111-8111-111111111111';
-import { logicalId } from '../scm-broker/test-fixtures.js';
 afterEach(() => vi.unstubAllGlobals());
-describe('AWS deployment and allocation admission', () => {
+const fixture = (provider: 'aws' | 'aws-ecs', options: { now?: () => number } = {}) =>
+  awsEgressFixture({ ...options, provider });
+describe.each(['aws', 'aws-ecs'] as const)('%s deployment and allocation admission', provider => {
+  it('keeps engine identity exact and requires a compute deadline only for MicroVM', async () => {
+    const f = await fixture(provider);
+    if (!f.context.operation) throw new Error('Missing operation');
+    delete f.context.operation.deadlineAt;
+    expect((await f.api.policy(f.proof)).status).toBe(provider === 'aws' ? 403 : 200);
+    f.context.provider = provider === 'aws' ? 'aws-ecs' : 'aws';
+    expect((await f.api.policy(f.proof)).status).toBe(403);
+  });
+  it('bounds policy validity by the credential, certificate and optional compute lifetime', async () => {
+    const f = await fixture(provider);
+    f.setNow(f.now + 9 * 3_600_000);
+    const response = await f.api.policy(f.proof);
+    expect(response.status).toBe(provider === 'aws' ? 403 : 200);
+    if (response.status === 200) {
+      const value = awsEgressPolicySchema.parse(await response.json());
+      expect(value.validUntil).toBe(f.now + 9 * 3_600_000 + 30_000);
+      expect(f.resolveConfiguration).toHaveBeenCalledWith(f.context.byoc, 'aws-ecs');
+    }
+  });
   it('admits an issued launch before wrapper welcome and projects current managed hosts', async () => {
-    const f = await fixture();
+    const f = await fixture(provider);
     f.context.allowlist = ['github.com'];
     const response = await f.api.policy(f.proof);
     expect(response.status).toBe(200);
@@ -35,7 +56,7 @@ describe('AWS deployment and allocation admission', () => {
   it.each(['credential', 'allocation', 'generation', 'stopped', 'unissued'])(
     'rejects %s before backend or AWS reads',
     async change => {
-      const f = await fixture();
+      const f = await fixture(provider);
       if (change === 'credential') f.context.credentialHash = 'f'.repeat(64);
       if (change === 'allocation')
         f.context.allocation.allocationId = '33333333-3333-4333-8333-333333333333';
@@ -49,7 +70,7 @@ describe('AWS deployment and allocation admission', () => {
     }
   );
   it('reuses deployment metadata across policy, audit and SCM while reauthorizing each request', async () => {
-    const f = await fixture();
+    const f = await fixture(provider);
     expect((await f.api.policy(f.proof)).status).toBe(200);
     expect(
       (
@@ -81,7 +102,7 @@ describe('AWS deployment and allocation admission', () => {
 
   it('expires deployment metadata, fails closed on refresh failure and retries the next request', async () => {
     let clock = Date.now();
-    const f = await fixture({ now: () => clock });
+    const f = await fixture(provider, { now: () => clock });
     expect((await f.api.policy(f.proof)).status).toBe(200);
     clock += AWS_EGRESS_POLICY_REFRESH_MS - 1;
     expect((await f.api.policy(f.proof)).status).toBe(200);
@@ -95,7 +116,7 @@ describe('AWS deployment and allocation admission', () => {
   });
 
   it('coalesces concurrent metadata reads and rechecks the allocation after they settle', async () => {
-    const f = await fixture();
+    const f = await fixture(provider);
     const started = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     const read = f.readMetadata.getMockImplementation()!;
@@ -118,7 +139,7 @@ describe('AWS deployment and allocation admission', () => {
 
   it('does not extend a cached deployment beyond its certificate expiry', async () => {
     let clock = Date.now();
-    const f = await fixture({ now: () => clock });
+    const f = await fixture(provider, { now: () => clock });
     f.metadata.deployment.expiresAt = new Date(clock + 1000).toISOString();
     const policy = awsEgressPolicySchema.parse(await (await f.api.policy(f.proof)).json());
     expect(policy.validUntil).toBe(clock + 1000);
@@ -130,11 +151,11 @@ describe('AWS deployment and allocation admission', () => {
   it.each(['source', 'configuration'])(
     'does not reuse deployment metadata after a %s change',
     async change => {
-      const f = await fixture();
+      const f = await fixture(provider);
       expect((await f.api.policy(f.proof)).status).toBe(200);
       if (change === 'source')
         f.context.byoc!.credentialId = '33333333-3333-4333-8333-333333333333';
-      else f.config.imageVersion = '2.0';
+      else f.config.bucket = 'replacement-artifacts';
       expect((await f.api.policy(f.proof)).status).toBe(200);
       expect(f.readMetadata).toHaveBeenCalledTimes(2);
       expect(f.resolveConfiguration).toHaveBeenCalledTimes(2);
@@ -142,7 +163,7 @@ describe('AWS deployment and allocation admission', () => {
   );
 
   it('does not let an older failed read remove a replacement deployment cache entry', async () => {
-    const f = await fixture();
+    const f = await fixture(provider);
     const started = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     f.readMetadata.mockImplementationOnce(async () => {
@@ -152,7 +173,7 @@ describe('AWS deployment and allocation admission', () => {
     });
     const old = f.api.policy(f.proof);
     await started.promise;
-    f.config.imageVersion = '2.0';
+    f.config.bucket = 'replacement-artifacts';
     expect((await f.api.policy(f.proof)).status).toBe(200);
     release.resolve();
     expect((await old).status).toBe(503);
@@ -161,7 +182,7 @@ describe('AWS deployment and allocation admission', () => {
   });
 
   it('requires deployment identity and rechecks exact current connection on every request', async () => {
-    const f = await fixture();
+    const f = await fixture(provider);
     expect((await f.api.policy({ ...f.proof, identity: 'f'.repeat(64) })).status).toBe(401);
     expect((await f.api.policy(f.proof)).status).toBe(200);
     f.resolveConfiguration.mockRejectedValueOnce(new Error('connection revoked'));
@@ -172,7 +193,7 @@ describe('AWS deployment and allocation admission', () => {
   it.each(['allocation', 'credential', 'connection', 'stop'])(
     'rechecks %s after remote identity reads',
     async change => {
-      const f = await fixture();
+      const f = await fixture(provider);
       const read = f.readMetadata.getMockImplementation()!;
       f.readMetadata.mockImplementationOnce(async () => {
         const result = await read();
@@ -187,7 +208,7 @@ describe('AWS deployment and allocation admission', () => {
     }
   );
   it('stores only an authenticated allocation audit and acknowledges the persisted effect', async () => {
-    const f = await fixture();
+    const f = await fixture(provider);
     const row = {
       requestId: '33333333-3333-4333-8333-333333333333',
       allocationRef: f.context.allocation.providerRef!,
@@ -205,7 +226,7 @@ describe('AWS deployment and allocation admission', () => {
     expect(f.recordEgressRequest).toHaveBeenCalledTimes(1);
   });
   it('returns authority without redeeming credentials or forwarding', async () => {
-    const f = await fixture();
+    const f = await fixture(provider);
     const forwarded = vi.fn();
     vi.stubGlobal('fetch', forwarded);
     const input = {

@@ -29,6 +29,15 @@ const RETIRED = 'The retired runtime starts no new compute.';
  * shrinks: a provider reaches parity when it has no `gap` entry.
  */
 const PROVIDER_GAPS: readonly ProviderGap[] = [
+  ...SANDBOX_PROVIDER_FEATURES.map(feature => ({
+    provider: 'aws-ecs' as const,
+    feature,
+    class: feature === 'meteredBilling' ? ('intentional' as const) : ('gap' as const),
+    reason:
+      feature === 'meteredBilling'
+        ? 'The customer pays AWS.'
+        : 'ECS MVP integration and live acceptance remain in progress.',
+  })),
   {
     provider: 'aws',
     feature: 'workspaceSnapshots',

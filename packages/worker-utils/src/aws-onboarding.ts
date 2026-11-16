@@ -5,6 +5,9 @@ import {
   awsByocConfigurationSchema,
 } from './aws-byoc';
 
+export const awsSetupProviderSchema = z.enum(['aws', 'aws-ecs']);
+export type AwsSetupProvider = z.infer<typeof awsSetupProviderSchema>;
+
 export const AWS_BYOC_SETUP_ENVELOPE_SCHEME = 'byoc-aws-setup-rsa-aes-256-gcm';
 const accountId = z.string().regex(/^\d{12}$/);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -25,6 +28,20 @@ const releaseObject = z
   .strict()
   .refine(value => value.key.includes(value.sha256));
 
+export const awsReleaseImageSchema = z
+  .object({ imageUri, repositoryArn })
+  .strict()
+  .superRefine((value, ctx) => {
+    const expected = `${value.repositoryArn.split(':')[4]}.dkr.ecr.us-east-1.amazonaws.com/${value.repositoryArn.split(':repository/')[1]}`;
+    if (value.imageUri.split('@')[0] !== expected)
+      ctx.addIssue({ code: 'custom', message: 'Invalid AWS image pins' });
+  });
+export const awsReleaseCustomerAccountsSchema = z
+  .array(accountId)
+  .min(1)
+  .max(500)
+  .refine(value => new Set(value).size === value.length);
+
 /** Operator-published assets. Account access must exist before the customer creates its stack. */
 export const awsByocReleaseSchema = z
   .object({
@@ -33,21 +50,13 @@ export const awsByocReleaseSchema = z
     proxyProtocolVersion: z.literal(AWS_BYOC_PROXY_PROTOCOL_VERSION),
     template: releaseObject.refine(value => value.key.endsWith('.json')),
     runtime: releaseObject.safeExtend({ repositoryArn }),
-    proxy: z.object({ imageUri, repositoryArn }).strict(),
-    customerAccounts: z.array(accountId).min(1).max(500),
+    proxy: awsReleaseImageSchema,
+    customerAccounts: awsReleaseCustomerAccountsSchema,
   })
   .strict()
   .superRefine((release, ctx) => {
-    const proxy = release.proxy.imageUri.split('@')[0];
-    const repository = release.proxy.repositoryArn;
-    const expectedProxy = `${repository.split(':')[4]}.dkr.ecr.us-east-1.amazonaws.com/${repository.split(':repository/')[1]}`;
-    if (
-      proxy !== expectedProxy ||
-      !release.runtime.key.endsWith('.zip') ||
-      new Set(release.customerAccounts).size !== release.customerAccounts.length
-    ) {
+    if (!release.runtime.key.endsWith('.zip'))
       ctx.addIssue({ code: 'custom', message: 'Invalid AWS release pins' });
-    }
   });
 export type AwsByocRelease = z.infer<typeof awsByocReleaseSchema>;
 
@@ -86,16 +95,28 @@ export const awsSetupIntentSchema = z
     release: awsByocReleaseSchema,
   })
   .strict()
-  .superRefine((intent, ctx) => {
-    const account = intent.kiloRoleArn.split(':')[4];
-    if (
-      !intent.release.customerAccounts.includes(intent.accountId) ||
-      intent.release.runtime.repositoryArn.split(':')[4] !== account ||
-      intent.release.proxy.repositoryArn.split(':')[4] !== account
-    ) {
-      ctx.addIssue({ code: 'custom', message: 'AWS setup account is not enabled' });
-    }
-  });
+  .superRefine(validateAwsSetupAccounts);
+
+export function validateAwsSetupAccounts(
+  intent: {
+    accountId: string;
+    kiloRoleArn: string;
+    release: {
+      customerAccounts: string[];
+      runtime: { repositoryArn: string };
+      proxy: { repositoryArn: string };
+    };
+  },
+  ctx: z.RefinementCtx
+): void {
+  const account = intent.kiloRoleArn.split(':')[4];
+  if (
+    !intent.release.customerAccounts.includes(intent.accountId) ||
+    intent.release.runtime.repositoryArn.split(':')[4] !== account ||
+    intent.release.proxy.repositoryArn.split(':')[4] !== account
+  )
+    ctx.addIssue({ code: 'custom', message: 'AWS setup account is not enabled' });
+}
 export type AwsSetupIntent = z.infer<typeof awsSetupIntentSchema>;
 
 /** A separate purpose and generation prevent a draft envelope from becoming runtime authority. */

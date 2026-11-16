@@ -1,0 +1,1445 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Kilo AWS ECS MVP: Nitro isolated tasks, shared authenticated proxy, private artifacts and two-hop customer access.",
+  "Metadata": {
+    "KiloTemplateVersion": 1,
+    "KiloProvider": "aws-ecs",
+    "KiloSharedInfrastructureVersion": 2
+  },
+  "Parameters": {
+    "KiloRoleArn": {
+      "Type": "String",
+      "Description": "The fixed Kilo backend role. Do not enter an IAM user ARN.",
+      "AllowedPattern": "arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+"
+    },
+    "ExternalId": {
+      "Type": "String",
+      "Description": "The owner-bound ExternalId supplied by Kilo.",
+      "AllowedPattern": "[A-Za-z0-9_-]{32,128}"
+    },
+    "RuntimeRepositoryArn": {
+      "Type": "String",
+      "Description": "The private ECR repository that contains the pinned runtime image.",
+      "AllowedPattern": "arn:aws:ecr:[a-z0-9-]+:[0-9]{12}:repository/[a-z0-9_./-]+"
+    },
+    "ProxyImageUri": {
+      "Type": "String",
+      "Description": "Immutable AMD64 Kilo egress image in ECR, pinned by digest.",
+      "AllowedPattern": "[0-9]{12}[.]dkr[.]ecr[.]us-east-1[.]amazonaws[.]com/[a-z0-9._/-]+@sha256:[a-f0-9]{64}"
+    },
+    "ProxyRepositoryArn": {
+      "Type": "String",
+      "Description": "The one ECR repository that contains the egress image.",
+      "AllowedPattern": "arn:aws:ecr:us-east-1:[0-9]{12}:repository/[a-z0-9_./-]+"
+    },
+    "ControlPlaneUrl": {
+      "Type": "String",
+      "Description": "The HTTPS Kilo Cloud Agent Worker origin. No path, query or credentials.",
+      "AllowedPattern": "https://[a-z0-9][a-z0-9.-]*[a-z0-9]"
+    },
+    "RuntimeImageUri": {
+      "Type": "String",
+      "Description": "Immutable AMD64 Kilo runtime image in private ECR, pinned by digest.",
+      "AllowedPattern": "[0-9]{12}[.]dkr[.]ecr[.]us-east-1[.]amazonaws[.]com/[a-z0-9._/-]+@sha256:[a-f0-9]{64}"
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.84.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          }
+        ]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {}
+    },
+    "GatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "PublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.84.0.0/24",
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": false
+      }
+    },
+    "PrivateSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.84.1.0/24",
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": false
+      }
+    },
+    "PublicRoutes": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        }
+      }
+    },
+    "PublicAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "RouteTableId": {
+          "Ref": "PublicRoutes"
+        }
+      }
+    },
+    "InternetRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PublicRoutes"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        }
+      },
+      "DependsOn": "GatewayAttachment"
+    },
+    "NatAddress": {
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+    "NatGateway": {
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "AllocationId": {
+          "Fn::GetAtt": ["NatAddress", "AllocationId"]
+        }
+      },
+      "DependsOn": "InternetRoute"
+    },
+    "PrivateRoutes": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        }
+      }
+    },
+    "PrivateAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PrivateSubnet"
+        },
+        "RouteTableId": {
+          "Ref": "PrivateRoutes"
+        }
+      }
+    },
+    "NatRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PrivateRoutes"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Ref": "NatGateway"
+        }
+      }
+    },
+    "Artifacts": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "ExpireLaunchDocuments",
+              "Status": "Enabled",
+              "Prefix": "kilo/launch/",
+              "ExpirationInDays": 1,
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 1
+              }
+            },
+            {
+              "Id": "ExpirePreparedArchives",
+              "Status": "Enabled",
+              "Prefix": "kilo/archives/environments/",
+              "ExpirationInDays": 30
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "ArtifactPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "Artifacts"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["Artifacts", "Arn"]
+                },
+                {
+                  "Fn::Sub": "${Artifacts.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Logs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/kilo/byoc/${AWS::StackName}"
+        },
+        "RetentionInDays": 7
+      }
+    },
+    "SandboxSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Sandbox egress reaches only the private authenticated proxy",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 3128,
+            "ToPort": 3128,
+            "DestinationSecurityGroupId": {
+              "Ref": "ProxyLoadBalancerSecurityGroup"
+            }
+          }
+        ]
+      }
+    },
+    "CustomerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "KiloRoleArn"
+                }
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "sts:ExternalId": {
+                    "Ref": "ExternalId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "KiloSandboxLifecycle",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/launch/*"
+                    },
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/archives/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "cloudformation:DescribeStacks",
+                  "Resource": {
+                    "Ref": "AWS::StackId"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:GetObject",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/proxy/public/deployment.json"
+                    },
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/proxy/shared/auth.json"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "ecs:RunTask",
+                  "Resource": {
+                    "Ref": "SandboxTask"
+                  },
+                  "Condition": {
+                    "ArnEquals": {
+                      "ecs:cluster": {
+                        "Fn::GetAtt": ["SandboxCluster", "Arn"]
+                      }
+                    },
+                    "ForAllValues:ArnEquals": {
+                      "ecs:capacity-provider": {
+                        "Fn::Sub": "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:capacity-provider/${SandboxCapacity}"
+                      }
+                    },
+                    "Null": {
+                      "ecs:capacity-provider": "false"
+                    },
+                    "StringEquals": {
+                      "ecs:enable-execute-command": "false"
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "ecs:DescribeTaskDefinition",
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:RequestedRegion": {
+                        "Ref": "AWS::Region"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "ecs:ListTasks",
+                  "Resource": "*",
+                  "Condition": {
+                    "ArnEquals": {
+                      "ecs:cluster": {
+                        "Fn::GetAtt": ["SandboxCluster", "Arn"]
+                      }
+                    },
+                    "StringEquals": {
+                      "aws:RequestedRegion": {
+                        "Ref": "AWS::Region"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["ecs:DescribeTasks", "ecs:StopTask"],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/${SandboxCluster}/*"
+                  },
+                  "Condition": {
+                    "ArnEquals": {
+                      "ecs:cluster": {
+                        "Fn::GetAtt": ["SandboxCluster", "Arn"]
+                      }
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "iam:PassRole",
+                  "Resource": {
+                    "Fn::GetAtt": ["SandboxExecutionRole", "Arn"]
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "iam:PassedToService": "ecs-tasks.amazonaws.com"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ProxySecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Egress proxy tasks: upstream HTTPS only",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "ProxyLoadBalancerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Private proxy listener: sandbox traffic only",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 3128,
+            "ToPort": 3128,
+            "DestinationSecurityGroupId": {
+              "Ref": "ProxySecurityGroup"
+            }
+          }
+        ]
+      }
+    },
+    "ProxyListenerIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ProxyLoadBalancerSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "SandboxSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 3128,
+        "ToPort": 3128
+      }
+    },
+    "ProxyTaskIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ProxySecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ProxyLoadBalancerSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 3128,
+        "ToPort": 3128
+      }
+    },
+    "ProxyCluster": {
+      "Type": "AWS::ECS::Cluster",
+      "Properties": {}
+    },
+    "ProxyExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                },
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:*"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "PullProxyAndWriteLogs",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "ecr:GetAuthorizationToken",
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage"
+                  ],
+                  "Resource": {
+                    "Ref": "ProxyRepositoryArn"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                  "Resource": {
+                    "Fn::GetAtt": ["Logs", "Arn"]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ProxyTaskRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                },
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:*"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DeploymentMaterialOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:ListBucket",
+                  "Resource": {
+                    "Fn::GetAtt": ["Artifacts", "Arn"]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["s3:GetObject", "s3:PutObject"],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/proxy/private/material.json"
+                    },
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/proxy/public/deployment.json"
+                    },
+                    {
+                      "Fn::Sub": "${Artifacts.Arn}/kilo/proxy/shared/auth.json"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ProxyTask": {
+      "Type": "AWS::ECS::TaskDefinition",
+      "Properties": {
+        "RequiresCompatibilities": ["FARGATE"],
+        "NetworkMode": "awsvpc",
+        "Cpu": "512",
+        "Memory": "1024",
+        "RuntimePlatform": {
+          "CpuArchitecture": "X86_64",
+          "OperatingSystemFamily": "LINUX"
+        },
+        "ExecutionRoleArn": {
+          "Fn::GetAtt": ["ProxyExecutionRole", "Arn"]
+        },
+        "TaskRoleArn": {
+          "Fn::GetAtt": ["ProxyTaskRole", "Arn"]
+        },
+        "ContainerDefinitions": [
+          {
+            "Name": "egress",
+            "Image": {
+              "Ref": "ProxyImageUri"
+            },
+            "Essential": true,
+            "ReadonlyRootFilesystem": true,
+            "PortMappings": [
+              {
+                "ContainerPort": 3128,
+                "Protocol": "tcp"
+              }
+            ],
+            "LinuxParameters": {
+              "InitProcessEnabled": true,
+              "Capabilities": {
+                "Drop": ["ALL"]
+              }
+            },
+            "Ulimits": [
+              {
+                "Name": "nofile",
+                "SoftLimit": 2048,
+                "HardLimit": 2048
+              }
+            ],
+            "Environment": [
+              {
+                "Name": "AWS_REGION",
+                "Value": {
+                  "Ref": "AWS::Region"
+                }
+              },
+              {
+                "Name": "AWS_STACK_ID",
+                "Value": {
+                  "Ref": "AWS::StackId"
+                }
+              },
+              {
+                "Name": "AWS_ARTIFACT_BUCKET",
+                "Value": {
+                  "Ref": "Artifacts"
+                }
+              },
+              {
+                "Name": "PROXY_HOSTNAME",
+                "Value": "egress.kilo.internal"
+              },
+              {
+                "Name": "KILO_CONTROL_PLANE_URL",
+                "Value": {
+                  "Ref": "ControlPlaneUrl"
+                }
+              }
+            ],
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "Logs"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "egress"
+              }
+            },
+            "MountPoints": [
+              {
+                "SourceVolume": "temporary",
+                "ContainerPath": "/tmp",
+                "ReadOnly": false
+              }
+            ]
+          }
+        ],
+        "Volumes": [
+          {
+            "Name": "temporary"
+          }
+        ]
+      }
+    },
+    "ProxyLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Type": "network",
+        "Scheme": "internal",
+        "IpAddressType": "ipv4",
+        "Subnets": [
+          {
+            "Ref": "PrivateSubnet"
+          }
+        ],
+        "SecurityGroups": [
+          {
+            "Ref": "ProxyLoadBalancerSecurityGroup"
+          }
+        ],
+        "LoadBalancerAttributes": [
+          {
+            "Key": "load_balancing.cross_zone.enabled",
+            "Value": "true"
+          }
+        ]
+      }
+    },
+    "ProxyTargets": {
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "Port": 3128,
+        "Protocol": "TCP",
+        "TargetType": "ip",
+        "HealthCheckProtocol": "HTTP",
+        "HealthCheckPath": "/health",
+        "HealthCheckPort": "traffic-port",
+        "HealthCheckIntervalSeconds": 10,
+        "HealthyThresholdCount": 2,
+        "UnhealthyThresholdCount": 2,
+        "TargetGroupAttributes": [
+          {
+            "Key": "deregistration_delay.timeout_seconds",
+            "Value": "15"
+          },
+          {
+            "Key": "preserve_client_ip.enabled",
+            "Value": "false"
+          }
+        ]
+      }
+    },
+    "ProxyListener": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "LoadBalancerArn": {
+          "Ref": "ProxyLoadBalancer"
+        },
+        "Port": 3128,
+        "Protocol": "TCP",
+        "DefaultActions": [
+          {
+            "Type": "forward",
+            "TargetGroupArn": {
+              "Ref": "ProxyTargets"
+            }
+          }
+        ]
+      }
+    },
+    "ProxyService": {
+      "Type": "AWS::ECS::Service",
+      "Properties": {
+        "Cluster": {
+          "Ref": "ProxyCluster"
+        },
+        "TaskDefinition": {
+          "Ref": "ProxyTask"
+        },
+        "LaunchType": "FARGATE",
+        "PlatformVersion": "1.4.0",
+        "DesiredCount": 2,
+        "EnableExecuteCommand": false,
+        "HealthCheckGracePeriodSeconds": 60,
+        "DeploymentConfiguration": {
+          "MinimumHealthyPercent": 100,
+          "MaximumPercent": 200,
+          "DeploymentCircuitBreaker": {
+            "Enable": true,
+            "Rollback": true
+          }
+        },
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "Subnets": [
+              {
+                "Ref": "PrivateSubnet"
+              }
+            ],
+            "SecurityGroups": [
+              {
+                "Ref": "ProxySecurityGroup"
+              }
+            ],
+            "AssignPublicIp": "DISABLED"
+          }
+        },
+        "LoadBalancers": [
+          {
+            "ContainerName": "egress",
+            "ContainerPort": 3128,
+            "TargetGroupArn": {
+              "Ref": "ProxyTargets"
+            }
+          }
+        ]
+      },
+      "DependsOn": ["ProxyListener", "ProxyTaskIngress", "ProxyListenerIngress", "NatRoute"]
+    },
+    "ProxyZone": {
+      "Type": "AWS::Route53::HostedZone",
+      "Properties": {
+        "Name": "kilo.internal",
+        "VPCs": [
+          {
+            "VPCId": {
+              "Ref": "Vpc"
+            },
+            "VPCRegion": {
+              "Ref": "AWS::Region"
+            }
+          }
+        ]
+      }
+    },
+    "ProxyDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "ProxyZone"
+        },
+        "Name": "egress.kilo.internal",
+        "Type": "A",
+        "AliasTarget": {
+          "DNSName": {
+            "Fn::GetAtt": ["ProxyLoadBalancer", "DNSName"]
+          },
+          "HostedZoneId": {
+            "Fn::GetAtt": ["ProxyLoadBalancer", "CanonicalHostedZoneID"]
+          },
+          "EvaluateTargetHealth": true
+        }
+      }
+    },
+    "BootstrapDnsDomains": {
+      "Type": "AWS::Route53Resolver::FirewallDomainList",
+      "Properties": {
+        "Domains": [
+          "egress.kilo.internal",
+          {
+            "Fn::Select": [
+              0,
+              {
+                "Fn::Split": [
+                  "/",
+                  {
+                    "Ref": "ProxyImageUri"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Fn::Sub": "api.ecr.${AWS::Region}.amazonaws.com"
+          },
+          {
+            "Fn::Sub": "prod-${AWS::Region}-starport-layer-bucket.s3.${AWS::Region}.amazonaws.com"
+          },
+          {
+            "Fn::Sub": "s3.${AWS::Region}.amazonaws.com"
+          },
+          {
+            "Fn::Sub": "${Artifacts}.s3.${AWS::Region}.amazonaws.com"
+          },
+          {
+            "Fn::Sub": "logs.${AWS::Region}.amazonaws.com"
+          }
+        ]
+      }
+    },
+    "AllDnsDomains": {
+      "Type": "AWS::Route53Resolver::FirewallDomainList",
+      "Properties": {
+        "Domains": ["*"]
+      }
+    },
+    "DnsRules": {
+      "Type": "AWS::Route53Resolver::FirewallRuleGroup",
+      "Properties": {
+        "FirewallRules": [
+          {
+            "Action": "ALLOW",
+            "Priority": 50,
+            "FirewallDomainListId": {
+              "Ref": "EcsBootstrapDnsDomains"
+            },
+            "FirewallDomainRedirectionAction": "TRUST_REDIRECTION_DOMAIN"
+          },
+          {
+            "Action": "ALLOW",
+            "Priority": 100,
+            "FirewallDomainListId": {
+              "Ref": "BootstrapDnsDomains"
+            },
+            "FirewallDomainRedirectionAction": "TRUST_REDIRECTION_DOMAIN"
+          },
+          {
+            "Action": "BLOCK",
+            "Priority": 200,
+            "FirewallDomainListId": {
+              "Ref": "AllDnsDomains"
+            },
+            "BlockResponse": "NODATA"
+          }
+        ]
+      }
+    },
+    "DnsFirewall": {
+      "Type": "AWS::Route53Resolver::FirewallRuleGroupAssociation",
+      "Properties": {
+        "FirewallRuleGroupId": {
+          "Ref": "DnsRules"
+        },
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "Priority": 101,
+        "MutationProtection": "DISABLED"
+      }
+    },
+    "SandboxCluster": {
+      "Type": "AWS::ECS::Cluster"
+    },
+    "SandboxHostSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Managed host control traffic; isolated tasks use their own proxy-only security group",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "EcsEndpointSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Only managed hosts can reach ECS control endpoints",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "SourceSecurityGroupId": {
+              "Ref": "SandboxHostSecurityGroup"
+            }
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "EcsEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "VpcEndpointType": "Interface",
+        "PrivateDnsEnabled": true,
+        "ServiceName": {
+          "Fn::Sub": "com.amazonaws.${AWS::Region}.ecs"
+        },
+        "SubnetIds": [
+          {
+            "Ref": "PrivateSubnet"
+          }
+        ],
+        "SecurityGroupIds": [
+          {
+            "Ref": "EcsEndpointSecurityGroup"
+          }
+        ]
+      }
+    },
+    "EcsAgentEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "VpcEndpointType": "Interface",
+        "PrivateDnsEnabled": true,
+        "ServiceName": {
+          "Fn::Sub": "com.amazonaws.${AWS::Region}.ecs-agent"
+        },
+        "SubnetIds": [
+          {
+            "Ref": "PrivateSubnet"
+          }
+        ],
+        "SecurityGroupIds": [
+          {
+            "Ref": "EcsEndpointSecurityGroup"
+          }
+        ]
+      }
+    },
+    "EcsTelemetryEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "VpcEndpointType": "Interface",
+        "PrivateDnsEnabled": true,
+        "ServiceName": {
+          "Fn::Sub": "com.amazonaws.${AWS::Region}.ecs-telemetry"
+        },
+        "SubnetIds": [
+          {
+            "Ref": "PrivateSubnet"
+          }
+        ],
+        "SecurityGroupIds": [
+          {
+            "Ref": "EcsEndpointSecurityGroup"
+          }
+        ]
+      }
+    },
+    "EcsBootstrapDnsDomains": {
+      "Type": "AWS::Route53Resolver::FirewallDomainList",
+      "Properties": {
+        "Domains": [
+          {
+            "Fn::Sub": "ecs.${AWS::Region}.amazonaws.com"
+          },
+          {
+            "Fn::Sub": "ecs-a.${AWS::Region}.amazonaws.com"
+          },
+          {
+            "Fn::Sub": "ecs-t.${AWS::Region}.amazonaws.com"
+          },
+          {
+            "Fn::Select": [
+              0,
+              {
+                "Fn::Split": [
+                  "/",
+                  {
+                    "Ref": "RuntimeImageUri"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "SandboxInstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/AmazonECSInstanceRolePolicyForManagedInstances"
+          }
+        ]
+      }
+    },
+    "SandboxInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "SandboxInstanceRole"
+          }
+        ]
+      }
+    },
+    "SandboxInfrastructureRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/AmazonECSInfrastructureRolePolicyForManagedInstances"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "PassOnlyThisInstanceRole",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "iam:PassRole",
+                  "Resource": {
+                    "Fn::GetAtt": ["SandboxInstanceRole", "Arn"]
+                  },
+                  "Condition": {
+                    "StringLike": {
+                      "iam:PassedToService": "ec2.*"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SandboxCapacity": {
+      "Type": "AWS::ECS::CapacityProvider",
+      "DependsOn": [
+        "NatRoute",
+        "EcsEndpoint",
+        "EcsAgentEndpoint",
+        "EcsTelemetryEndpoint",
+        "DnsFirewall"
+      ],
+      "Properties": {
+        "ClusterName": {
+          "Ref": "SandboxCluster"
+        },
+        "ManagedInstancesProvider": {
+          "InfrastructureRoleArn": {
+            "Fn::GetAtt": ["SandboxInfrastructureRole", "Arn"]
+          },
+          "InstanceLaunchTemplate": {
+            "Ec2InstanceProfileArn": {
+              "Fn::GetAtt": ["SandboxInstanceProfile", "Arn"]
+            },
+            "CapacityOptionType": "ON_DEMAND",
+            "NitroEnclavesEnabled": true,
+            "NetworkConfiguration": {
+              "Subnets": [
+                {
+                  "Ref": "PrivateSubnet"
+                }
+              ],
+              "SecurityGroups": [
+                {
+                  "Ref": "SandboxHostSecurityGroup"
+                }
+              ]
+            },
+            "InstanceRequirements": {
+              "VCpuCount": {
+                "Min": 8,
+                "Max": 8
+              },
+              "MemoryMiB": {
+                "Min": 32768,
+                "Max": 32768
+              },
+              "AllowedInstanceTypes": ["m7i.2xlarge"]
+            },
+            "StorageConfiguration": {
+              "StorageSizeGiB": 80
+            }
+          },
+          "InfrastructureOptimization": {
+            "ScaleInAfter": 60
+          }
+        }
+      }
+    },
+    "SandboxCapacityAssociation": {
+      "Type": "AWS::ECS::ClusterCapacityProviderAssociations",
+      "Properties": {
+        "Cluster": {
+          "Ref": "SandboxCluster"
+        },
+        "CapacityProviders": [
+          {
+            "Ref": "SandboxCapacity"
+          }
+        ],
+        "DefaultCapacityProviderStrategy": [
+          {
+            "CapacityProvider": {
+              "Ref": "SandboxCapacity"
+            },
+            "Weight": 1
+          }
+        ]
+      }
+    },
+    "SandboxExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "PullRuntimeAndWriteLogs",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "ecr:GetAuthorizationToken",
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage"
+                  ],
+                  "Resource": {
+                    "Ref": "RuntimeRepositoryArn"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                  "Resource": {
+                    "Fn::GetAtt": ["Logs", "Arn"]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SandboxTask": {
+      "Type": "AWS::ECS::TaskDefinition",
+      "Properties": {
+        "Cpu": "2048",
+        "Memory": "8192",
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": ["MANAGED_INSTANCES"],
+        "RuntimePlatform": {
+          "CpuArchitecture": "X86_64",
+          "OperatingSystemFamily": "LINUX"
+        },
+        "TrustedExecutionConfiguration": {
+          "IsolationMode": "ISOLATED_SANDBOX"
+        },
+        "ExecutionRoleArn": {
+          "Fn::GetAtt": ["SandboxExecutionRole", "Arn"]
+        },
+        "ContainerDefinitions": [
+          {
+            "Name": "sandbox",
+            "Image": {
+              "Ref": "RuntimeImageUri"
+            },
+            "Essential": true,
+            "EntryPoint": ["/usr/local/bin/node"],
+            "Command": ["-e", "console.error(\"Missing Kilo launch capability\");process.exit(1)"],
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "Logs"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "sandbox",
+                "mode": "non-blocking",
+                "max-buffer-size": "1m"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "TemplateVersion": {
+      "Value": "1"
+    },
+    "ProxyProtocolVersion": {
+      "Value": "1"
+    },
+    "RoleArn": {
+      "Value": {
+        "Fn::GetAtt": ["CustomerRole", "Arn"]
+      }
+    },
+    "Bucket": {
+      "Value": {
+        "Ref": "Artifacts"
+      }
+    },
+    "Vpc": {
+      "Value": {
+        "Ref": "Vpc"
+      }
+    },
+    "PrivateSubnet": {
+      "Value": {
+        "Ref": "PrivateSubnet"
+      }
+    },
+    "SandboxSecurityGroup": {
+      "Value": {
+        "Ref": "SandboxSecurityGroup"
+      }
+    },
+    "ProxyHostname": {
+      "Value": "egress.kilo.internal"
+    },
+    "ProxyService": {
+      "Value": {
+        "Ref": "ProxyService"
+      }
+    },
+    "ProxyCluster": {
+      "Value": {
+        "Ref": "ProxyCluster"
+      }
+    },
+    "ProxyLoadBalancerArn": {
+      "Value": {
+        "Ref": "ProxyLoadBalancer"
+      }
+    },
+    "Provider": {
+      "Value": "aws-ecs"
+    },
+    "ClusterArn": {
+      "Value": {
+        "Fn::GetAtt": ["SandboxCluster", "Arn"]
+      }
+    },
+    "TaskDefinitionArn": {
+      "Value": {
+        "Ref": "SandboxTask"
+      }
+    },
+    "CapacityProvider": {
+      "Value": {
+        "Ref": "SandboxCapacity"
+      }
+    },
+    "ExecutionRoleArn": {
+      "Value": {
+        "Fn::GetAtt": ["SandboxExecutionRole", "Arn"]
+      }
+    },
+    "RuntimeImage": {
+      "Value": {
+        "Ref": "RuntimeImageUri"
+      }
+    }
+  }
+}

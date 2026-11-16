@@ -487,7 +487,7 @@ import { nativeEgressAllowlistSchema } from '../../sandbox-control/egress-policy
 import { ByocVercelProviderError, type ByocVercelSource } from '../../byoc/vercel-provider.js';
 import { createProviderAdapter, type StoredProviderPin } from './provider-adapters.js';
 import {
-  providerLifetimeAt,
+  providerDeadline,
   validateProviderHello,
   reconcileProviderLaunch,
   type ProviderHelloAdmission,
@@ -3146,12 +3146,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.expireUnboundSockets(Date.now());
       this.redispatchPendingWorkspaceStops();
       let state = await this.readAllocation();
-      const lifetimeAt = await providerLifetimeAt(this.provider, state);
-      if (lifetimeAt !== undefined && Date.now() >= lifetimeAt) {
+      const deadline = await providerDeadline(this.provider, state);
+      if (deadline !== undefined && Date.now() >= deadline.at) {
         await this.applyEvent({
-          type: 'stop-requested',
+          type: 'provider-failed',
           at: Date.now(),
-          reason: 'provider_lifetime_exhausted',
+          reason: deadline.reason,
         });
         state = await this.readAllocation();
       }
@@ -8215,7 +8215,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // preparation deadlines, so a hung wrapper's route cannot outlive its
     // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
-    const lifetimeAt = await providerLifetimeAt(this.provider, state);
+    const deadline = await providerDeadline(this.provider, state);
     const routeAt = await earliestRouteDeadlineAt(this.db);
     const renewalAt = nextCredentialRenewalAt(
       await listRoutes(this.db),
@@ -8282,7 +8282,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           )
         : undefined;
     const candidates = [
-      lifetimeAt ?? null,
+      deadline?.at ?? null,
       admissionAt ?? null,
       allocationAt,
       routeAt,

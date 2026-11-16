@@ -1,14 +1,21 @@
 # AWS BYOC MVP
 
-The MVP uses AMD64 Lambda MicroVMs. The customer owns the VPC, compute and archive bucket.
+The AWS MVP keeps Lambda MicroVMs and adds EC2-backed ECS isolated tasks as separate providers.
+The customer owns the VPC, compute and archive bucket. ECS integration remains in progress and is not selectable.
 The Worker owns session admission, lifecycle and credential exchange. Real SCM tokens stay in the Worker.
 Workspace disk persistence is outside the MVP.
 
 ## Compute decision
 
-The November 2026 spike tested the runtime-free image on Lambda MicroVMs. An ECS Managed Instances
-Graviton task failed before host creation with AWS `PendingVerification`. No ECS performance comparison is available.
-Lambda is the available MVP path. ARM64 tool execution passed locally; full ARM64 Kilo execution remains unverified.
+The November 2026 spike tested the runtime-free image on Lambda MicroVMs. A later private EC2 launch
+reached `RUNNING`, then confirmed `TERMINATED`. An ECS Managed Instances Graviton task with
+`ISOLATED_SANDBOX` reached `RUNNING` and exited with code zero. Its task stopped and its managed host terminated.
+The initial `PendingVerification` account restriction no longer blocks these probes.
+
+The ECS probe proves isolated task launch, not Cloud Agent runtime, preview or credential isolation.
+Its CloudWatch stream had no persisted result events. Full ECS runtime acceptance remains required.
+The initial product allocation uses AMD64, two vCPUs, 8 GiB memory and the fixed 20 GiB task disk.
+ARM64 tool execution passed locally; full ARM64 Kilo execution remains unverified.
 
 The Lambda spike used an 8 GiB baseline and a 32 GiB disk. The guest reported 30.8 GB free before archive tests.
 Guest memory reported burst capacity, so it does not measure baseline memory overhead.
@@ -64,20 +71,84 @@ The provider registry constructs AWS operation storage; the Sandbox DO supplies 
 Recovery without a physical ID replays only within five minutes. AWS does not document permanent client-token retention.
 After that bound, `provider_cleanup_required` fails affected work promptly. The Worker retains the exact request
 and blocks replacement allocations. An operator must identify
-and terminate the MicroVM before repairing that allocation. Automatic recovery after this bound remains unsupported.
+and terminate the physical allocation before repairing that allocation. MicroVM automatic recovery after this bound remains unsupported; ECS uses the exact intent lookup described below.
 A known physical ID can still be stopped after the replay window.
 
 Lambda limits total lifetime to eight hours. The shared control plane stops active work two minutes before that limit
 with `provider_lifetime_exhausted`. Renewable leases cannot extend the deadline. Suspend and resume are unused.
 
+## Bootstrap credential access
+
+The MVP permits the allocation-scoped proxy token in the ECS `RunTask` request.
+The token appears in the launch envelope command and in `HTTP_PROXY` and `HTTPS_PROXY`.
+The sandbox needs it to reach S3 before downloading the full startup environment.
+
+Customer principals with `ecs:DescribeTasks` access can read the task command and environment overrides.
+Principals with access to CloudTrail records can read recorded `RunTask` request data.
+Treat these records as sensitive bootstrap data. Restrict access to trusted operators.
+Do not copy task overrides or complete request records into support tickets or application logs.
+
+A holder with network access to the customer proxy can use that allocation's permitted egress destinations.
+Traffic uses that allocation's audit identity and policy.
+Access depends on current allocation admission and policy refresh, and ends no later than token expiry.
+ECS proxy tokens expire with the verified proxy deployment certificate.
+The proxy token alone cannot authenticate a wrapper WebSocket connection.
+Managed Git and SCM API requests also need a current repository alias and grant.
+Kilo resolves managed SCM credentials through Cloudflare; the proxy token contains no SCM token.
+
+The launch envelope also contains a short-lived S3 download URL.
+That URL grants temporary read access to the startup environment, including the separate wrapper launch credential.
+A principal that obtains the document while it remains accessible can obtain those startup credentials.
+Kilo deletes the document after wrapper admission or confirmed compute termination; deletion can require a retry.
+The signed URL also has a bounded lifetime. Its authority is separate from the proxy token's authority.
+
+## Shared AWS components
+
+`aws-compute-lifecycle.ts` owns reservation, exact-request checkpoints, recovery, stop fences and cleanup.
+`aws-launch-document.ts` owns the immutable S3 launch document used by both engines.
+Engine adapters own request construction, API state mapping and runtime identity checks.
+MicroVM records retain their original schema, storage prefix and `microvmId`. ECS records use a separate schema and `taskArn`.
+
+Both engines share two-hop role assumption, S3 and proxy metadata access, role-session caching, and proxy startup.
+Connections and envelope purposes stay separate. An ECS lookup never falls back to a MicroVM connection.
+The internal connection endpoint selects the exact provider, owner and credential ID.
+
+ECS has no eight-hour compute deadline. Its proxy credential expires at the verified certificate deadline.
+The Sandbox DO reads that expiry from its saved RunTask request and schedules its existing alarm.
+It does not poll AWS for this deadline or persist a second expiry value.
+At expiry, preparing and active work fail with `byoc_aws_proxy_expired`, and compute cleanup starts.
+The failure does not wait for wrapper heartbeat loss or confirmed physical termination.
+MicroVM allocations retain their compute lifetime and `provider_lifetime_exhausted` reason.
+Both engines require eight hours of certificate validity before a new allocation starts.
+This reserve checks certificate health; it does not set an ECS compute deadline.
+Proxy policy refresh still checks current allocation, owner, connection, generation and lifecycle authority.
+Policy admission and durable storage now support both engines through shared components.
+ECS onboarding, public selection and full runtime acceptance remain in progress.
+
+Certificate renewal and allocation draining remain operator tasks. This MVP does not promise uninterrupted sessions across certificate rotation.
+A session's practical remaining lifetime depends on the current deployment certificate expiry and managed-host maintenance.
+AWS starts host draining at day 14 and terminates hosts no later than day 21. Earlier maintenance can occur.
+See [ECS managed-instance patching](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/managed-instances-patching.html).
+Standalone tasks do not receive automatic replacement.
+
+ECS adds three private endpoints for API, agent and telemetry traffic. Private discovery uses exact DNS names.
+Two fresh ARM64 managed hosts reached `RUNNING`, exited with code zero, and terminated under the closed DNS policy.
+Resolver logs confirmed fixed private endpoint names and a `BLOCK` decision for a task DNS query.
+Runtime probe stdout remained unavailable. These checks do not establish complete Cloud Agent acceptance.
+
 ## Template and permission boundary
 
 `deploy/aws/template.json` version 2 includes the authenticated proxy and DNS controls.
-AWS remains enrolled for internal testing. Customer enablement still requires M2, M3, M4 and cross-account proof.
+`build:aws-ecs-template` generates `deploy/aws/template.ecs.json` from that shared infrastructure and replaces compute resources.
+`test:aws-templates` checks generated output, compute isolation and shared resource contracts.
+DNS associations use priority 101 because AWS reserves priority 100.
+Both templates use AWS's default fail-closed DNS behavior. CloudFormation rejects a resource that explicitly sets that unmanaged default.
+AWS remains enrolled for internal testing. Same-account runtime and security acceptance remains required.
+Cross-account proof is deferred because the MVP test setup has one AWS account.
 
 The customer role trusts one fixed Kilo role ARN and an owner-bound ExternalId. It does not trust an IAM user.
 Compute operations target one MicroVM image. The role has no image mutation, connector mutation, shell-token or
-`iam:PassRole` authority. Same-account live checks verified the configured connector permission and rejected other connectors,
+`iam:PassRole` authority for MicroVM compute. Same-account live checks verified the configured connector permission and rejected other connectors,
 public egress, an execution role and another image. Cross-account verification remains outstanding.
 The trusted adapter always selects the configured VPC connector and `NO_INGRESS`, with no execution role or idle policy.
 It verifies the networking and role fields returned by AWS before accepting an allocation.
@@ -312,3 +383,37 @@ The RPC carries no request or response body. The Worker route owns header cleanu
 A denied request leaves the body unread. An ambiguous push failure never retries the upstream write.
 The local proxy flow test connects real CONNECT/TLS handling and the control client to this route and admission implementation.
 That test simulates AWS metadata and the broker; it does not prove customer VPC or live provider behavior.
+
+
+## Shared compute recovery and failure handling
+
+MicroVM and ECS use the same durable lifecycle rules. Each engine retains its own stored reference and request codec.
+A new request records whether submission is prepared, pending or uncertain. Legacy records without this field remain uncertain.
+The first Run request claims the prepared record atomically, after runtime access resolves.
+A concurrent claim makes rejection uncertain. A late refusal cannot retire a concurrent successful launch.
+
+A definite first refusal can retire its own uncontested pending request without physical cleanup.
+For ECS, this requires HTTP 403 or HTTP 400 with an `AccessDeniedException` or `InvalidParameterException` typed header.
+An untyped response, transport failure, server failure or token conflict does not establish this result.
+The same error from a later inspection does not prove that Run failed.
+Known physical identities remain available for cleanup after the replay bound.
+After five minutes, ECS calls `ListTasks` with the pinned cluster and saved `startedBy` value, without replaying `RunTask`.
+One complete result must match the task ARN, cluster and `startedBy` returned by `DescribeTasks`.
+The lifecycle saves that identity before checking mutable runtime metadata. Stop can then terminate a task that fails admission.
+The customer role grants read-only `ecs:ListTasks` access restricted to the stack cluster and region.
+Existing customer stacks need the updated role policy before using this recovery path.
+
+Discovery reads one bounded page. Empty, partial, ambiguous or temporarily missing results never prove termination.
+They retain `provider_cleanup_required` and block replacement. A later attempt can recover when exact identity becomes available.
+MicroVM has no corresponding intent lookup; unidentified requests still require operator repair after five minutes.
+See [ListTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html)
+and [ECS IAM actions](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ecs.html).
+
+The lifecycle persists confirmed compute termination before deleting the launch document.
+If S3 cleanup fails, a recreated adapter retries that deletion without repeating the compute launch or stop.
+Task identity and configuration failures preserve their specific reason through provider coordination.
+Wrapper admission performs provider reads outside the Sandbox DO queue, then checks the allocation and connection again before binding.
+ECS retains its issued proxy-token deadline. It does not inherit the MicroVM lifetime cap.
+
+Local regressions verify both engines, concurrent refusal/success, interrupted cleanup, hello races and deadline handling.
+AWS responses are simulated. Live uncertain recovery and customer deployment acceptance remain unverified.

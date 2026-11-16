@@ -36,6 +36,8 @@ import type { SessionCredentialGrant } from './session-credentials.js';
 import { buildControlNetworkPolicy } from './session-credentials.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { leaseAtLeastMs } from './deadlines.js';
+import { ecsProviderFixture } from '../../test/fixtures/aws-ecs.js';
+import { encodeAwsEcsProviderRef } from './aws-ecs-operation.js';
 import { awsProviderFixture } from '../../test/fixtures/aws-provider.js';
 import { encodeAwsProviderRef } from './aws-operation.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -87,7 +89,7 @@ const vercelConfig: VercelSandboxRuntimeConfig = {
  */
 type ContractHarness = {
   expectedRuntime?: CloudAgentRunContainer;
-  leaseModel?: 'fixed';
+  leaseModel?: 'fixed' | 'unbounded';
   name: AgentSandboxProvider;
   adapter: ProviderAdapter;
   /** Resolve a fresh owned ref through the adapter's own `create`. */
@@ -394,11 +396,46 @@ function awsHarness(): ContractHarness {
   };
 }
 
+function awsEcsHarness(): ContractHarness {
+  const fixture = ecsProviderFixture(SANDBOX);
+  const adapter = fixture.adapter();
+  return {
+    name: 'aws-ecs',
+    adapter,
+    create: () => requireRef(adapter),
+    foreignRef: () =>
+      encodeAwsEcsProviderRef({
+        provider: 'aws-ecs',
+        sandboxId: FOREIGN,
+        intentId: intent.intentId,
+        createdAt: 0,
+      }),
+    setRunning: fixture.setRunning,
+    failObserve: fixture.failObserve,
+    failStop: fixture.failStop,
+    failCreate: () => fixture.failRuntime(new ProviderCreationError('invalid_configuration')),
+    launchedEnv: () => fixture.launchedDocument().env,
+    launchSupervisor: () => undefined,
+    launchInvocation: () => fixture.launchedDocument().argv,
+    leaseCalls: () => 0,
+    leaseMs: () => [],
+    leaseModel: 'unbounded',
+    expectedRuntime: {
+      provider: 'aws-ecs',
+      sandboxId: SANDBOX,
+      instanceId: intent.intentId,
+      region: 'us-east-1',
+      instanceType: 'ecs-8g',
+    },
+  };
+}
+
 const harnessFactories: Record<
   Exclude<AgentSandboxProvider, 'cloudflare'>,
   () => ContractHarness
 > = {
   aws: awsHarness,
+  'aws-ecs': awsEcsHarness,
   'cloudflare-containers': () => containersHarness(),
   vercel: vercelHarness,
 };
@@ -527,7 +564,7 @@ describe.each(Object.values(harnessFactories).map(factory => [factory().name, fa
       const ref = await harness.create();
 
       await harness.adapter.ensureLeaseAtLeast(ref, OWNED_LEASE_MS);
-      if (harness.leaseModel === 'fixed') expect(harness.leaseCalls()).toBe(0);
+      if (harness.leaseModel !== undefined) expect(harness.leaseCalls()).toBe(0);
       else expect(harness.leaseCalls()).toBeGreaterThan(0);
     });
 

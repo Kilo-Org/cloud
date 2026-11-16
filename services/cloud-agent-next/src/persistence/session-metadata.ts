@@ -294,6 +294,7 @@ const SANDBOX_ALLOCATION_ID_CLASS: Record<
   'vercel-small': 'isolated-small',
   'vercel-large': 'isolated-small',
   'aws-microvm-8g': 'isolated-small',
+  'aws-ecs-8g': 'isolated-small',
 };
 
 function sandboxIdentityMatchesAllocation(

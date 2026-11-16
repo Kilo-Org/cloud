@@ -4,8 +4,14 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { allocation, routes } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { env, evictDurableObject, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
+import { ecsProviderFixture } from '../fixtures/aws-ecs.js';
+import { AWS_LAUNCH_RECOVERY_MS } from '../../src/sandbox-control/aws-compute-lifecycle.js';
+import { awsEcsOperationSchema } from '../../src/sandbox-control/aws-ecs-operation.js';
 import { awsProviderFixture } from '../fixtures/aws-provider.js';
-import { awsOperationStorage } from '../../src/control-plane/sandbox/aws-operation-storage.js';
+import {
+  awsOperationStorage,
+  awsEcsOperationStorage,
+} from '../../src/control-plane/sandbox/aws-operation-storage.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 
 const namespace = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2> })
@@ -15,6 +21,44 @@ afterEach(async () => {
 });
 
 describe('AWS durable launch checkpoint', () => {
+  it('discovers an expired ECS launch after eviction and persists its identity for cleanup', async () => {
+    const sandboxId = 'sbx_ecs_durable_discovery';
+    const fixture = ecsProviderFixture(sandboxId);
+    const stub = namespace.getByName(sandboxId);
+    const ref = await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      const storage = awsEcsOperationStorage(state.storage);
+      const adapter = fixture.adapter(storage);
+      const created = await adapter.create({ intentId: 'durable-ecs', createdAt: 10_000 });
+      if (!('providerRef' in created)) throw new Error('Missing provider reference');
+      fixture.loseNextReply();
+      await expect(
+        adapter.launch(created.providerRef, { command: { argv: ['/bin/true'] }, env: {} })
+      ).rejects.toThrow('TransportError');
+      expect(awsEcsOperationSchema.parse(await storage.get('durable-ecs')).taskArn).toBeUndefined();
+      return created.providerRef;
+    });
+    fixture.setNow(10_001 + AWS_LAUNCH_RECOVERY_MS);
+    await evictDurableObject(stub);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      const storage = awsEcsOperationStorage(state.storage);
+      await fixture.adapter(storage).reconcileLaunch(ref);
+      expect(awsEcsOperationSchema.parse(await storage.get('durable-ecs'))).toMatchObject({
+        phase: 'running',
+        taskArn: [...fixture.tasks.values()][0].taskArn,
+      });
+      expect(await fixture.adapter(storage).stop(ref)).toBe('terminal');
+      expect(awsEcsOperationSchema.parse(await storage.get('durable-ecs')).phase).toBe(
+        'terminated'
+      );
+    });
+    expect(fixture.submitted).toHaveLength(1);
+    expect(fixture.discoveries).toHaveLength(1);
+    expect([...fixture.tasks.values()][0].lastStatus).toBe('STOPPED');
+    expect(fixture.documents.size).toBe(0);
+  });
+
   it.each([403, 503])(
     'keeps AWS failure %s semantics through the real DO alarm and route state',
     async status => {

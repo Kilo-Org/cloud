@@ -648,6 +648,7 @@ export const controlPlaneCredentialSourceSchema = z
     /** Worker-owned origin; client platform claims do not select runtime harnesses. */
     billingOrigin: z.string().max(100).optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
+    githubAuthorization: z.literal('task').optional(),
     /**
      * Worker-encrypted `profile.mcpServers` snapshot. Persisted only inside this
      * DO-private source; the Sandbox DO re-validates it and decrypts it only when
@@ -761,7 +762,7 @@ export type ControlPlaneScmForwardAdmissionResult =
   | {
       ok: true;
       authority:
-        | { type: 'unmanaged' }
+        | { type: 'unmanaged'; githubAuthorization?: 'task' }
         | {
             type: 'managed';
             provider: ControlPlaneGitPlatform;

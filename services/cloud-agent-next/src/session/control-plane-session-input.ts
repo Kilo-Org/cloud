@@ -181,6 +181,9 @@ export function buildControlPlaneSandboxSelection(
     binding?.kind === 'vercel' && binding.source.kind === 'byoc'
       ? { ...byocVercelOwnerFields(binding.source), credentialId: binding.source.credentialId }
       : undefined;
+  const githubPolicy = metadata.workspace?.githubAuthorization
+    ? { githubAuthorization: metadata.workspace.githubAuthorization }
+    : {};
   if (provider === 'vercel') {
     if (!byoc) throw new ControlPlaneRegistrationError(VERCEL_BYOC_REQUIRED_MESSAGE);
     const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
@@ -188,12 +191,14 @@ export function buildControlPlaneSandboxSelection(
       provider,
       configuration: resources === undefined ? { provider } : { provider, resources },
       byoc,
+      ...githubPolicy,
       ...(sandboxKind ? { sandboxKind } : {}),
     };
   }
   const billing = buildSandboxBillingInput(metadata, sandboxId);
   const pinned = {
     billing,
+    ...githubPolicy,
     ...(sandboxKind ? { sandboxKind } : {}),
     ...(metadata.workspace?.egressMode === undefined
       ? {}

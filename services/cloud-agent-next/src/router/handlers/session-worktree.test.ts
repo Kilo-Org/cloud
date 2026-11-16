@@ -1092,6 +1092,23 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
+  it.each([undefined, 'task'] as const)(
+    'inherits workspace GitHub authorization %s',
+    async githubAuthorization => {
+      const metadata = sourceMetadata();
+      metadata.workspace = {
+        ...metadata.workspace,
+        ...(githubAuthorization ? { githubAuthorization } : {}),
+      };
+      const { caller, input, destinationStub } = fixture({ metadata });
+      await caller.createWorktreeChat(input);
+      expect(
+        destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0]?.metadata.workspace
+          ?.githubAuthorization
+      ).toBe(githubAuthorization);
+    }
+  );
+
   it('rejects a new destination before recording ownership when runtime admission is missing', async () => {
     const { caller, input, destinationStub } = fixture();
     verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { tokenPurpose: 'control' } });

@@ -1,3 +1,4 @@
+import type { GitHubTaskGrant } from '@kilocode/worker-utils/github-task-grant';
 import type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import type { RuntimeSkillInput } from './runtime-profile.js';
@@ -146,6 +147,7 @@ export type WrapperWorkspaceReady = {
   branchName: string;
   kiloSessionId: string;
   githubInstallationId?: string;
+  githubTaskGrant?: GitHubTaskGrant;
   githubAppType?: 'standard' | 'lite';
   gitToken?: string;
   gitlabTokenManaged?: boolean;

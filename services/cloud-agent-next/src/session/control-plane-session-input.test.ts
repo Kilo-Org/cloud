@@ -147,6 +147,7 @@ describe('buildControlPlaneCreateInput', () => {
     });
     expect(input.sandboxSelection).toEqual({
       provider: 'vercel',
+      githubAuthorization: 'task',
       configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
       byoc: { ...owner, credentialId: source.credentialId },
     });

@@ -191,6 +191,7 @@ describe('generateTrpcOpenApiDocument', () => {
                         'provider',
                         'project',
                         'autoModel',
+                        'inferenceProvider',
                       ],
                     },
                   },

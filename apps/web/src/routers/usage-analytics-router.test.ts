@@ -181,12 +181,14 @@ describe('usage analytics filter bounds', () => {
     'modes',
     'userIds',
     'providers',
+    'inferenceProviders',
     'projects',
     'excludedFeatures',
     'excludedModels',
     'excludedModes',
     'excludedUserIds',
     'excludedProviders',
+    'excludedInferenceProviders',
     'excludedProjects',
   ] as const;
 
@@ -279,6 +281,38 @@ describe('usage analytics organization breakdown', () => {
 
   it('maps the organization dimension to the Snowflake organization column', () => {
     expect(dimensionColumn('organization')).toBe('organization_id');
+  });
+});
+
+describe('usage analytics inference provider dimension', () => {
+  it('keeps provider mapped to the adapter column', () => {
+    expect(dimensionColumn('provider')).toBe('provider');
+  });
+
+  it('maps inferenceProvider to the underlying inference_provider column', () => {
+    expect(dimensionColumn('inferenceProvider')).toBe('inference_provider');
+  });
+
+  it('accepts inferenceProvider as a timeseries split and table group', () => {
+    expect(
+      TimeseriesInputSchema.safeParse({
+        ...baseFilters,
+        metric: 'cost',
+        splitBy: 'inferenceProvider',
+      }).success
+    ).toBe(true);
+    expect(
+      TableInputSchema.safeParse({ ...baseFilters, groupBy: ['inferenceProvider'] }).success
+    ).toBe(true);
+  });
+
+  it('caps groupBy at three dimensions even with inferenceProvider', () => {
+    expect(
+      TableInputSchema.safeParse({
+        ...baseFilters,
+        groupBy: ['provider', 'inferenceProvider', 'project', 'feature'],
+      }).success
+    ).toBe(false);
   });
 });
 
@@ -442,6 +476,126 @@ describe('usage analytics procedures', () => {
     expect(mockExecuteSnowflakeStatement.mock.calls[0][0].statement).toContain('GROUP BY 1, 3');
     expect(mockExecuteSnowflakeStatement.mock.calls[1][0].statement).toContain('GROUP BY 1');
     expect(mockExecuteSnowflakeStatement.mock.calls[2][0].statement).toContain('dim_feature');
+  });
+
+  it('keeps the default table SELECT free of the inference provider column', async () => {
+    await caller().getTable({ ...baseFilters, groupBy: ['provider'] });
+
+    const statement = mockExecuteSnowflakeStatement.mock.calls[0][0].statement;
+    expect(statement).toContain('dim_provider');
+    expect(statement).not.toContain('dim_inference_provider');
+    expect(statement).toContain('COALESCE(SUM(error_count), 0)');
+  });
+
+  it('appends the inference provider column and groups by it when requested', async () => {
+    mockExecuteSnowflakeStatement.mockResolvedValueOnce([
+      ['2026-06-04', '', '', '', '', 'vercel', '', '10', '2', '3', '4', '5', '6', '7', 'bedrock'],
+    ]);
+
+    await expect(
+      caller().getTable({ ...baseFilters, groupBy: ['provider', 'inferenceProvider'] })
+    ).resolves.toEqual({
+      rows: [
+        {
+          datetime: '2026-06-04',
+          dimensions: { provider: 'vercel', inferenceProvider: 'bedrock' },
+          costMicrodollars: 10,
+          requestCount: 2,
+          inputTokens: 3,
+          outputTokens: 4,
+          cacheWriteTokens: 5,
+          cacheHitTokens: 6,
+          errorCount: 7,
+        },
+      ],
+      effectiveGranularity: 'day',
+    });
+
+    const request = mockExecuteSnowflakeStatement.mock.calls[0][0];
+    expect(request.statement).toContain('inference_provider AS dim_inference_provider');
+    expect(request.statement).toContain('provider AS dim_provider');
+    expect(request.statement).toContain('GROUP BY 1, provider, inference_provider');
+  });
+
+  it('composes autoModel and inferenceProvider trailing offsets without collision', async () => {
+    mockExecuteSnowflakeStatement.mockResolvedValueOnce([
+      [
+        '2026-06-04',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '10',
+        '2',
+        '3',
+        '4',
+        '5',
+        '6',
+        '7',
+        'balanced',
+        'bedrock',
+      ],
+    ]);
+
+    await expect(
+      caller().getTable({ ...baseFilters, groupBy: ['autoModel', 'inferenceProvider'] })
+    ).resolves.toEqual({
+      rows: [
+        {
+          datetime: '2026-06-04',
+          dimensions: { autoModel: 'balanced', inferenceProvider: 'bedrock' },
+          costMicrodollars: 10,
+          requestCount: 2,
+          inputTokens: 3,
+          outputTokens: 4,
+          cacheWriteTokens: 5,
+          cacheHitTokens: 6,
+          errorCount: 7,
+        },
+      ],
+      effectiveGranularity: 'day',
+    });
+
+    const request = mockExecuteSnowflakeStatement.mock.calls[0][0];
+    expect(request.statement).toContain('auto_model AS dim_auto_model');
+    expect(request.statement).toContain('inference_provider AS dim_inference_provider');
+    expect(request.statement).toContain('GROUP BY 1, auto_model, inference_provider');
+  });
+
+  it('binds inference provider filters to the inference_provider column while provider stays adapter', async () => {
+    mockExecuteSnowflakeStatement.mockResolvedValueOnce([
+      ['2026-06-04', '', '', '', '', 'vercel', '', '10', '2', '3', '4', '5', '6', '7'],
+    ]);
+
+    await caller().getTable({
+      ...baseFilters,
+      groupBy: ['provider'],
+      providers: ['vercel'],
+      inferenceProviders: ['bedrock'],
+    });
+
+    const request = mockExecuteSnowflakeStatement.mock.calls[0][0];
+    const values = (request.bindings ?? []).map(binding => binding.value);
+    expect(values).toEqual(expect.arrayContaining(['bedrock', 'vercel']));
+    expect(request.statement).toContain('\n  AND provider IN (?)');
+    expect(request.statement).toContain('\n  AND inference_provider IN (?)');
+  });
+
+  it('retains NULL inference_provider rows when excluding named serving providers', async () => {
+    mockExecuteSnowflakeStatement.mockResolvedValueOnce([]);
+
+    await caller().getTable({
+      ...baseFilters,
+      groupBy: [],
+      excludedInferenceProviders: ['bedrock'],
+    });
+
+    const request = mockExecuteSnowflakeStatement.mock.calls[0][0];
+    expect(request.statement).toContain(
+      '(inference_provider NOT IN (?) OR inference_provider IS NULL)'
+    );
   });
 
   it('allows successful empty results for every Snowflake procedure', async () => {

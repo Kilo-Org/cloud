@@ -23,7 +23,7 @@ import type { ClaudeBillingOwnerInput } from '@kilocode/web-shared/lib/ai-gatewa
 import type { ClaudeBillingStatus } from '@/routers/claude-billing-router';
 
 const subscribeHydration = () => () => {};
-const CONNECTED_PLATFORMS_URL = 'https://platform.claude.com/connected-platforms';
+const LINKED_PLATFORMS_URL = 'https://platform.claude.com/linked-platforms';
 
 /**
  * Which connection the card shows: the person's personal account, their own
@@ -37,6 +37,14 @@ const ELIGIBILITY_NOTE =
   'Linked billing works with Claude API organizations only. Claude Pro and Max subscriptions and cloud marketplace billing do not qualify.';
 const APPROVAL_NOTE =
   'To link, sign in to Claude Console and approve the link there. Only an owner, admin, or billing admin of the Claude organization can approve.';
+const SPEND_LIMIT_NOTE =
+  'You can set a monthly spend limit for Kilo when you link, or later under Linked platforms in Claude Console. At the limit, Claude requests pause until you raise it or the month resets on the 1st (UTC). The limit counts usage at list price, before any discount.';
+const CREDITS_NOTE =
+  'Usage is billed to your purchased credit balance or your monthly invoice. Monthly API credits from Max, Ultra, or Team plans and credits from Anthropic partner, VC, or startup programs cannot pay.';
+const EMAIL_NOTE =
+  'Anthropic usually emails your Claude organization’s owners, admins, and billing members when Kilo is linked or unlinked, and emails admins when usage reaches 80% and 100% of a spend limit.';
+const DATA_NOTE =
+  'Linking changes only who pays. Requests still run in Kilo’s Anthropic organization under Kilo’s data terms with Anthropic, so your organization’s BAA, customer-managed keys, and data retention settings do not apply.';
 const REFUSED_BILLING_NOTE =
   'If Anthropic declines billing, Claude requests pause. Kilo does not fall back to Kilo credits.';
 
@@ -72,7 +80,7 @@ function ClaudeConsoleLink({ children }: { children: ReactNode }) {
   return (
     <a
       className="text-foreground underline underline-offset-4"
-      href={CONNECTED_PLATFORMS_URL}
+      href={LINKED_PLATFORMS_URL}
       target="_blank"
       rel="noreferrer"
     >
@@ -93,7 +101,7 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
         ? 'Linking did not complete. An owner, admin, or billing admin of that Claude organization must approve it, or remove the current link first to link a different Claude organization.'
         : 'Linking did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
     case 'already_linked':
-      return 'This Claude organization is already linked in Kilo. Use an existing link below if you control it, or ask its owner to share it.';
+      return 'This Claude organization is already linked in Kilo. Use an existing link below if you control it, or ask its owner to share it. To move the link, unlink Kilo under Linked platforms in Claude Console first, then link again.';
     case 'forbidden':
       if (scope === 'shared_services') {
         return 'Only a Kilo organization owner or admin with access to this feature can link it.';
@@ -108,17 +116,17 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
 
 function refusalMessage(status: ClaudeBillingStatus) {
   if (status.state === 'reconnect_required') {
-    return 'The account that linked Claude billing for this organization is no longer available. An organization owner must reconnect Claude billing before Kilo shared services can bill this organization again.';
+    return 'The account that linked Claude billing for this organization is no longer available. An organization owner must link Claude billing again before Kilo shared services can bill this organization again.';
   }
   if (status.state === 'billing_unavailable') {
-    return 'Claude billing is unavailable. The link may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Claude Console, link it again if needed, or contact Kilo support.';
+    return 'Claude billing is unavailable. The link may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Linked platforms in Claude Console, link it again if needed, or contact Kilo support.';
   }
   switch (status.lastRefusalCode) {
     case 'linked_organization_spend_limit_reached':
-      return 'A Claude spend limit was reached. Check both the Kilo linked billing cap and the organization’s monthly spend limit in Claude Console.';
+      return 'A Claude spend limit was reached, or your Claude organization has no credit that can pay. Check the spend limit for Kilo and your organization’s monthly spend limit under Linked platforms in Claude Console, and check your balance.';
     case 'linked_organization_billing_unavailable':
     case 'billing_error':
-      return 'Anthropic cannot bill your Claude organization. Check its billing status and spend limits in Claude Console.';
+      return 'Anthropic cannot bill your Claude organization. Check its spend limits, balance, and account in Claude Console.';
     case 'permission_error':
       return 'Claude refused the request. Check model access and billing in Claude Console, or contact Kilo support.';
     default:
@@ -171,7 +179,7 @@ export function ClaudeBillingCardView({
         ) : status.state === 'connected' ? (
           <Badge variant="new">Linked</Badge>
         ) : status.state === 'reconnect_required' ? (
-          <Badge variant="destructive">Reconnect required</Badge>
+          <Badge variant="destructive">New link required</Badge>
         ) : status.state === 'billing_unavailable' ? (
           <Badge variant="destructive">Billing unavailable</Badge>
         ) : null}
@@ -226,7 +234,7 @@ export function ClaudeBillingCardView({
                     {connecting
                       ? 'Redirecting to Claude…'
                       : reconnectRequired
-                        ? 'Reconnect Claude billing'
+                        ? 'Link Claude billing again'
                         : connected
                           ? 'Link your Claude organization again'
                           : 'Link your Claude organization'}
@@ -305,7 +313,9 @@ export function ClaudeBillingCardView({
               </p>
             ) : null}
             <p className="type-body">
-              <ClaudeConsoleLink>Set a spend limit or unlink in Claude Console</ClaudeConsoleLink>
+              <ClaudeConsoleLink>
+                Set a spend limit or unlink under Linked platforms in Claude Console
+              </ClaudeConsoleLink>
             </p>
             <details>
               <summary className="type-body text-muted-foreground hover:text-foreground w-fit cursor-pointer">
@@ -314,6 +324,10 @@ export function ClaudeBillingCardView({
               <ul className="type-body text-muted-foreground mt-2 list-disc space-y-1 pl-5">
                 <li>{ELIGIBILITY_NOTE}</li>
                 <li>{APPROVAL_NOTE}</li>
+                <li>{SPEND_LIMIT_NOTE}</li>
+                <li>{CREDITS_NOTE}</li>
+                <li>{EMAIL_NOTE}</li>
+                <li>{DATA_NOTE}</li>
                 {copy.coverageNote ? <li>{copy.coverageNote}</li> : null}
                 <li>{REFUSED_BILLING_NOTE}</li>
                 {connected && status.canManage ? <li>{copy.removeNote}</li> : null}

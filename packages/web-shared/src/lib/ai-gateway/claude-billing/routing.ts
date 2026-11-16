@@ -24,7 +24,7 @@ import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 export const CLAUDE_BILLING_REQUIRED_MESSAGE =
-  'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/connected-platforms.';
+  'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/linked-platforms.';
 
 /**
  * Shown when the account that linked an organization's shared-services

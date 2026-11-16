@@ -313,7 +313,10 @@ export type UpstreamFetchResult =
     };
 
 type UpstreamFetchInput = {
-  provider: Provider;
+  provider: Pick<
+    Provider,
+    'type' | 'apiUrl' | 'apiKey' | 'apiKeyHeader' | 'secureProxy' | 'awsBedrock'
+  >;
   method: string;
   /** Sent as JSON, or as multipart when it is `FormData`, which lets fetch set the boundary. */
   body: object;

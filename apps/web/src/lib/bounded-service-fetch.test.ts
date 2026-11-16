@@ -172,13 +172,25 @@ describe('readJsonWithinBudget', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  test('abandons and cancels a body that never arrives', async () => {
-    // Headers only: the upstream accepted the connection and then stalled.
+  test('cancels a real response body that never finishes', async () => {
+    // A real `Response`, because the interesting state only a real body
+    // produces is the one `response.json()` leaves behind: it locks the stream,
+    // and a locked stream cannot be cancelled. The upstream here sends a
+    // partial body and then stalls, so an expiry that did not cancel its own
+    // reader would keep the transfer alive after the caller gave up.
     const cancel = jest.fn(async () => undefined);
-    const response = {
-      json: () => new Promise<never>(() => {}),
-      body: { locked: false, cancel },
-    } as unknown as Response;
+    let bursts = 0;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        bursts += 1;
+        if (bursts === 1) {
+          controller.enqueue(encoder.encode('{"sessions":'));
+        }
+      },
+      cancel,
+    });
+    const response = new Response(stream, { status: 200 });
 
     const outcome = readJsonWithinBudget(response, 500).catch((error: unknown) => error);
 
@@ -189,6 +201,7 @@ describe('readJsonWithinBudget', () => {
 
     await jest.advanceTimersByTimeAsync(499);
     expect(settledEarly).toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
 
     await jest.advanceTimersByTimeAsync(1);
 

@@ -128,6 +128,13 @@ export async function fetchWithinBudget(
  * all. The body is therefore read under what is left of the budget and the read
  * is abandoned when that runs out, rejecting with the same
  * {@link ServiceFetchTimeoutError} the fetch raises so one caller handles both.
+ *
+ * The read goes through a reader this function owns rather than
+ * `response.json()`. `json()` locks the body stream for the whole read, and a
+ * locked stream cannot be cancelled, so an expired read of a real `Response`
+ * would leave the abandoned body being buffered for as long as the upstream
+ * kept trickling it. Cancelling a reader we hold tears the stream down and ends
+ * the transfer.
  */
 export async function readJsonWithinBudget<T = unknown>(
   response: Response,
@@ -135,12 +142,14 @@ export async function readJsonWithinBudget<T = unknown>(
 ): Promise<T> {
   const budgetError = new ServiceFetchTimeoutError(budgetMs);
   const expired = Promise.withResolvers<never>();
+  // A body another reader already holds cannot be taken over; the wait is
+  // still bounded, only the cancellation is out of reach.
+  const body = response.body;
+  const reader = body && !body.locked && !response.bodyUsed ? body.getReader() : undefined;
   const timer = setTimeout(
     () => {
-      // A stream a reader already holds cannot be cancelled, so a body that is
-      // mid-read is simply abandoned: either way the caller stops waiting.
-      if (response.body && !response.body.locked) {
-        void response.body.cancel().catch(() => undefined);
+      if (reader) {
+        void reader.cancel().catch(() => undefined);
       }
       expired.reject(budgetError);
     },
@@ -148,8 +157,29 @@ export async function readJsonWithinBudget<T = unknown>(
   );
 
   try {
-    return await Promise.race([response.json() as Promise<T>, expired.promise]);
+    if (!reader) {
+      return await Promise.race([response.json() as Promise<T>, expired.promise]);
+    }
+    return JSON.parse(await Promise.race([readAllText(reader), expired.promise])) as T;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Read a streamed body to its end as text. Cancellation belongs to the caller:
+ * the reader it passed in is the only thing that can end a stalled transfer.
+ */
+async function readAllText(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<string> {
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    chunks.push(decoder.decode(value, { stream: true }));
+  }
+  chunks.push(decoder.decode());
+  return chunks.join('');
 }

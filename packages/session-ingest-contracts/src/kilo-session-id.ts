@@ -9,13 +9,18 @@ export const KILO_SESSION_ID_RANDOM_LENGTH = 14;
 export const KILO_SESSION_ID_LENGTH =
   KILO_SESSION_ID_PREFIX.length + KILO_SESSION_ID_TIME_LENGTH + KILO_SESSION_ID_RANDOM_LENGTH;
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * `ses_`, a descending 12-hex-character time prefix, then 14 base62 characters.
  * Every other reader of the id shape derives from the declarations above, so a
  * change to the prefix or a length cannot leave one of them on the old shape.
+ * The prefix escapes for regex use so a future metacharacter stays a literal.
  */
 export const KILO_SESSION_ID_PATTERN = new RegExp(
-  `^${KILO_SESSION_ID_PREFIX}[0-9a-f]{${KILO_SESSION_ID_TIME_LENGTH}}[0-9A-Za-z]{${KILO_SESSION_ID_RANDOM_LENGTH}}$`
+  `^${escapeRegExp(KILO_SESSION_ID_PREFIX)}[0-9a-f]{${KILO_SESSION_ID_TIME_LENGTH}}[0-9A-Za-z]{${KILO_SESSION_ID_RANDOM_LENGTH}}$`
 );
 
 /**

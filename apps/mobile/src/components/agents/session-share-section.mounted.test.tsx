@@ -38,6 +38,7 @@ describe('SessionShareSection state gates', () => {
 
     expect(findByTestID(renderer.root, 'session-share-create')).toHaveLength(1);
     expect(findByTestID(renderer.root, 'session-share-state-loading')).toHaveLength(0);
+    expect(textContent(renderer.root)).not.toContain(i18n.t('sessionShare.replacementSettings'));
   });
 
   it('shows the existing-link state with the controls a replacement uses', () => {
@@ -46,6 +47,7 @@ describe('SessionShareSection state gates', () => {
 
     expect(findByTestID(renderer.root, 'session-share-existing')).toHaveLength(1);
     expect(textContent(renderer.root)).toContain(i18n.t('sessionShare.existingTitle'));
+    expect(textContent(renderer.root)).toContain(i18n.t('sessionShare.replacementSettings'));
     // The replacement takes the person's choice, so the duration and scope
     // controls stay on screen beside the replace action.
     expect(

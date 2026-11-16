@@ -98,6 +98,9 @@ function ReplacementActions({
   const { t } = useTranslation();
   return (
     <>
+      <Text variant="muted" className="text-xs">
+        {t('sessionShare.replacementSettings')}
+      </Text>
       <ShareConfiguration choice={choice} busy={busy} />
       <Button
         variant="outline"

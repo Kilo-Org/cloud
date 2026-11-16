@@ -3447,7 +3447,6 @@
       "guardrails": "Suojakaiteet",
       "byok": "Oma avain",
       "ssoAndDomain": "SSO ja verkkotunnus",
-      "emailPreferences": "Sähköpostiasetukset",
       "dataCollection": "Tiedonkeruu",
       "auditLogs": "Tarkastuslokit",
       "requestLogs": "Pyyntölokit",

@@ -16,8 +16,7 @@ Object.assign(globalThis, { React });
 
 // This repo's transform does not hoist `jest.mock` above the static imports, so
 // the layout is required after the provider mock is registered.
-const AppShellLayout =
-  jest.requireActual<typeof LayoutModule>('./layout').default;
+const AppShellLayout = jest.requireActual<typeof LayoutModule>('./layout').default;
 
 const SHELL_ROOT = join(__dirname, '..', 'app-shell');
 const WEB_SRC = join(__dirname, '..', '..', '..');

@@ -3452,7 +3452,6 @@
       "guardrails": "Guardrails",
       "byok": "Eigenen Schlüssel verwenden",
       "ssoAndDomain": "SSO und Domain",
-      "emailPreferences": "E-Mail-Einstellungen",
       "dataCollection": "Datenerfassung",
       "auditLogs": "Audit-Logs",
       "requestLogs": "Anfrage-Logs",

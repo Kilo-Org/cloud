@@ -13,8 +13,9 @@ jest.mock('@/lib/app-shell/handoff-token', () => ({
 
 // This repo's transform does not hoist `jest.mock` above the static imports, so
 // the mocked module and the modules under test are required here.
-const { consumeAppShellHandoff } =
-  jest.requireMock<typeof HandoffTokenModule>('@/lib/app-shell/handoff-token');
+const { consumeAppShellHandoff } = jest.requireMock<typeof HandoffTokenModule>(
+  '@/lib/app-shell/handoff-token'
+);
 const { APP_SHELL_SESSION_COOKIE, verifyAppShellSessionToken } =
   jest.requireActual<typeof SessionModule>('@/lib/app-shell/session');
 const { GET } = jest.requireActual<typeof HandoffRouteModule>('./route');

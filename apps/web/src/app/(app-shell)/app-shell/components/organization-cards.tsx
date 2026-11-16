@@ -24,7 +24,8 @@ export function AppShellSsoCard({ organizationId, role }: CardProps) {
   const { data, isLoading, error, refetch } = useOrganizationWithMembers(organizationId);
 
   if (isLoading) return <Skeleton className="h-40 w-full" />;
-  if (error) return <CardLoadFailure title="Could not load SSO settings" onRetry={() => refetch()} />;
+  if (error)
+    return <CardLoadFailure title="Could not load SSO settings" onRetry={() => refetch()} />;
   if (!data) return <Skeleton className="h-40 w-full" />;
 
   return (

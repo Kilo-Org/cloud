@@ -3527,7 +3527,6 @@
       "guardrails": "Guardrails",
       "byok": "Bring your own key",
       "ssoAndDomain": "SSO and domain",
-      "emailPreferences": "Email preferences",
       "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
       "requestLogs": "Request logs",

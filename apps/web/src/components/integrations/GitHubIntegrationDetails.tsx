@@ -949,7 +949,9 @@ function GitHubIntegrationDetailsContent({
       {!organizationId ? (
         // The identity link round trip completes on the full web app (its
         // callback requires a web session), so the shell does not offer it.
-        appReturnPath ? null : <GitHubIdentityCard isInstalled={Boolean(isInstalled)} />
+        appReturnPath ? null : (
+          <GitHubIdentityCard isInstalled={Boolean(isInstalled)} />
+        )
       ) : (
         !appReturnPath && (
           <Card>
@@ -997,7 +999,13 @@ function GitHubIntegrationDetailsContent({
                     </p>
                   </div>
                   <Button asChild className="mt-2">
-                    <Link href={buildAppReturnHref('github_install=success', organizationId, appBasePath)}>
+                    <Link
+                      href={buildAppReturnHref(
+                        'github_install=success',
+                        organizationId,
+                        appBasePath
+                      )}
+                    >
                       Continue
                     </Link>
                   </Button>
@@ -1013,7 +1021,13 @@ function GitHubIntegrationDetailsContent({
                     </p>
                   </div>
                   <Button asChild variant="outline" className="mt-2">
-                    <Link href={buildAppReturnHref('github_pending_approval=true', organizationId, appBasePath)}>
+                    <Link
+                      href={buildAppReturnHref(
+                        'github_pending_approval=true',
+                        organizationId,
+                        appBasePath
+                      )}
+                    >
                       Done
                     </Link>
                   </Button>
@@ -1030,7 +1044,11 @@ function GitHubIntegrationDetailsContent({
                   </div>
                   <Button asChild variant="outline" className="mt-2">
                     <Link
-                      href={buildAppReturnHref('error=install_state_user_mismatch', organizationId, appBasePath)}
+                      href={buildAppReturnHref(
+                        'error=install_state_user_mismatch',
+                        organizationId,
+                        appBasePath
+                      )}
                     >
                       Back
                     </Link>

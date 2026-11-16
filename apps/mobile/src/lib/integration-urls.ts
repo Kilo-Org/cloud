@@ -2,15 +2,15 @@ function trimTrailingSlash(webBaseUrl: string): string {
   return webBaseUrl.endsWith('/') ? webBaseUrl.slice(0, -1) : webBaseUrl;
 }
 
-/** The platforms whose connect flow starts on the web (OAuth callbacks land
- *  there, never in the app), so the app hands the browser the page that owns it. */
+/** The providers that have a full-web `/integrations/...` page. Only Bitbucket
+ *  still opens one; the app shell hosts every other provider's page. */
 type IntegrationPagePlatform = 'github' | 'slack' | 'gitlab' | 'discord' | 'linear' | 'bitbucket';
 
 /**
- * The web path that owns a platform's connect flow: `apps/web`'s
+ * The full-web path that owns a platform's connect flow: `apps/web`'s
  * `integrations/[platform]` and `organizations/[id]/integrations/[platform]`
- * routes. Returned as a path so callers can hand it to a procedure's
- * `returnTo` as well as build a full URL from it.
+ * routes. Only Bitbucket reaches these; every other provider has an app-shell
+ * page and is opened through `app-shell-handoff`.
  */
 export function getIntegrationPagePath(
   platform: IntegrationPagePlatform,
@@ -28,10 +28,6 @@ export function getIntegrationPageUrl(
   organizationId?: string
 ): string {
   return `${trimTrailingSlash(webBaseUrl)}${getIntegrationPagePath(platform, organizationId)}`;
-}
-
-export function getGitLabIntegrationUrl(webBaseUrl: string, organizationId?: string): string {
-  return getIntegrationPageUrl(webBaseUrl, 'gitlab', organizationId);
 }
 
 // The BYOK key editor has no mobile screen, so a reviewer blocked by a broken

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   getBitbucketIntegrationUrl,
   getByokUrl,
-  getGitLabIntegrationUrl,
   getIntegrationPagePath,
   getIntegrationPageUrl,
 } from './integration-urls';
@@ -33,17 +32,6 @@ describe('getIntegrationPageUrl', () => {
     );
     expect(getIntegrationPageUrl('https://app.kilo.ai/', 'bitbucket', 'org_123')).toBe(
       'https://app.kilo.ai/organizations/org_123/integrations/bitbucket'
-    );
-  });
-});
-
-describe('getGitLabIntegrationUrl', () => {
-  it('builds personal and organization GitLab integration URLs', () => {
-    expect(getGitLabIntegrationUrl('https://app.kilo.ai')).toBe(
-      'https://app.kilo.ai/integrations/gitlab'
-    );
-    expect(getGitLabIntegrationUrl('https://app.kilo.ai/', 'org_123')).toBe(
-      'https://app.kilo.ai/organizations/org_123/integrations/gitlab'
     );
   });
 });

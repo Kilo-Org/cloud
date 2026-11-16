@@ -13,7 +13,6 @@ import {
   LineChart,
   Lock,
   type LucideIcon,
-  Mail,
   Plug,
   ScrollText,
   Server,
@@ -23,6 +22,7 @@ import {
   Wallet,
 } from '@/components/ui/icons';
 import { i18n } from '@/i18n';
+import { type AppShellTarget } from '@/lib/app-shell-handoff';
 import { WEB_BASE_URL } from '@/lib/config';
 
 /**
@@ -48,9 +48,10 @@ import { WEB_BASE_URL } from '@/lib/config';
  *   `usage-details` render for every member;
  * - `data-collection` is the dashboard card a teams plan shows where an
  *   enterprise plan shows providers and models;
- * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
- *   the organization dashboard rather than pages of their own, so they open
- *   `/organizations/<id>`.
+ * - `sso-and-domain` and `data-collection` are dashboard cards on the full web,
+ *   but the app shell owns both, so those two rows hand off to shell pages
+ *   instead of the full-web dashboard. Email preferences is a card with no
+ *   shell page, so it has no row: the dashboard is a billing surface.
  *
  * The audit log is the exception neither table shares with the other: the app
  * reads it natively, so it is an in-app destination, and its gate is the one
@@ -64,7 +65,6 @@ type OrgSettingsArea =
   | 'guardrails'
   | 'byok'
   | 'ssoAndDomain'
-  | 'emailPreferences'
   | 'dataCollection'
   | 'requestLogs'
   | 'integrations'
@@ -80,12 +80,17 @@ export type OrgSettingsGate = Readonly<{
   guardrailsEnabled: boolean;
 }>;
 
+/** Where a row opens: a full-web page, or a shell page reached by hand-off. */
+type OrgSettingsRowTarget =
+  | Readonly<{ kind: 'web'; url: string }>
+  | Readonly<{ kind: 'app-shell'; target: AppShellTarget }>;
+
 export type OrgSettingsRow = Readonly<{
   area: OrgSettingsArea;
   title: string;
   icon: LucideIcon;
-  /** The web page that owns the setting. */
-  url: string;
+  /** The destination that owns the setting. */
+  target: OrgSettingsRowTarget;
 }>;
 
 /** The one area the app reads itself instead of opening its web page. */
@@ -107,10 +112,22 @@ export type OrgInAppSettingsGate = Readonly<{
 type OrgSettingsRowSpec = Readonly<{
   area: OrgSettingsArea;
   icon: LucideIcon;
-  /** The page's path after `/organizations/<id>`. Empty for a dashboard card. */
-  suffix: string;
   visible: (gate: OrgSettingsGate) => boolean;
-}>;
+}> &
+  (
+    | {
+        /** The page's path after `/organizations/<id>`. Empty for a dashboard card. */
+        readonly suffix: string;
+      }
+    | {
+        /**
+         * The shell page that owns this card. The full web shows these two only
+         * inside the app shell, so the row hands off to that page instead of a
+         * full-web path.
+         */
+        readonly shellPage: 'organization-sso' | 'organization-data-collection';
+      }
+  );
 
 const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
   // The sidebar lists Usage under Dashboard for every member.
@@ -146,23 +163,23 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/byok',
     visible: gate => canManageOrganizationBilling(gate.role),
   },
-  // The SSO card renders only on an enterprise dashboard.
+  // The SSO card renders only on an enterprise dashboard. It is a card rather
+  // than a page of its own, and the app shell owns it, so the row opens the
+  // shell page.
   {
     area: 'ssoAndDomain',
     icon: Lock,
-    suffix: '',
+    shellPage: 'organization-sso',
     visible: gate => gate.plan === 'enterprise',
   },
-  // Email preferences card: owner/admin.
-  {
-    area: 'emailPreferences',
-    icon: Mail,
-    suffix: '',
-    visible: gate => canManageOrganization(gate.role),
-  },
   // Data collection card: the teams dashboard shows it in place of providers
-  // and models.
-  { area: 'dataCollection', icon: Server, suffix: '', visible: gate => gate.plan === 'teams' },
+  // and models, and the app shell owns the card.
+  {
+    area: 'dataCollection',
+    icon: Server,
+    shellPage: 'organization-data-collection',
+    visible: gate => gate.plan === 'teams',
+  },
   // "Request Logs": billing role.
   {
     area: 'requestLogs',
@@ -197,7 +214,6 @@ const TITLE_KEYS = {
   guardrails: 'organization.settingsOnWeb.guardrails',
   byok: 'organization.settingsOnWeb.byok',
   ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
-  emailPreferences: 'organization.settingsOnWeb.emailPreferences',
   dataCollection: 'organization.settingsOnWeb.dataCollection',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
   // The in-app organization Integrations row opens the app's own screen; this
@@ -250,11 +266,14 @@ export function visibleOrgSettingsRows(
   gate: OrgSettingsGate,
   organizationId: string
 ): readonly OrgSettingsRow[] {
-  return ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => ({
+  return ROW_SPECS.filter(spec => spec.visible(gate)).map((spec): OrgSettingsRow => ({
     area: spec.area,
     title: i18n.t(TITLE_KEYS[spec.area]),
     icon: spec.icon,
-    url: `${WEB_BASE_URL}/organizations/${organizationId}${spec.suffix}`,
+    target:
+      'shellPage' in spec
+        ? { kind: 'app-shell', target: { page: spec.shellPage, organizationId } }
+        : { kind: 'web', url: `${WEB_BASE_URL}/organizations/${organizationId}${spec.suffix}` },
   }));
 }
 

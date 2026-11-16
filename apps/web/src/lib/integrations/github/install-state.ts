@@ -165,9 +165,7 @@ export async function consumeInstallStateWithoutSession(
 }
 
 /** Why a token could not be used, for the caller's log and the user's copy. */
-async function describeUnusableInstallState(
-  token: string
-): Promise<InstallStateRejectionReason> {
+async function describeUnusableInstallState(token: string): Promise<InstallStateRejectionReason> {
   const [diagnostic] = await db
     .select({
       consumed: sql<boolean>`${github_install_states.consumed_at} IS NOT NULL`,

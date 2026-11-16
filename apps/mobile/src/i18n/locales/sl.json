@@ -3557,7 +3557,6 @@
       "guardrails": "Varovala",
       "byok": "Uporaba lastnega ključa",
       "ssoAndDomain": "SSO in domena",
-      "emailPreferences": "E-poštne nastavitve",
       "dataCollection": "Zbiranje podatkov",
       "auditLogs": "Revizijski dnevniki",
       "requestLogs": "Dnevniki zahtev",

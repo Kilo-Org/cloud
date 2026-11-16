@@ -7,6 +7,7 @@ import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
 import { cloudEnvironmentsRouter } from '@/routers/cloud-environments-router';
+import { appShellRouter } from '@/routers/app-shell-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
 import { slackRouter } from '@/routers/slack-router';
@@ -50,6 +51,7 @@ const mobileRouter = createTRPCRouter({
   cloudAgentSettings: cloudAgentSettingsRouter,
   cloudEnvironments: cloudEnvironmentsRouter,
   githubApps: githubAppsRouter,
+  appShell: appShellRouter,
   platformIntegrations: platformIntegrationsRouter,
   slack: slackRouter,
   linear: linearRouter,

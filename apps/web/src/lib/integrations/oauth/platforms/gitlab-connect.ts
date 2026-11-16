@@ -267,7 +267,14 @@ function buildGitLabDetailCallbackPath(organizationId: string | null): string {
 
 async function buildGitLabConnectOAuthUrl(
   user: AuthenticatedOAuthUser,
-  { organizationId, instanceUrl, clientId, clientSecret, returnTo, appShell }: GitLabOAuthConnectOptions
+  {
+    organizationId,
+    instanceUrl,
+    clientId,
+    clientSecret,
+    returnTo,
+    appShell,
+  }: GitLabOAuthConnectOptions
 ): Promise<{ url: string; state: string }> {
   const owner = await resolveGitLabOAuthOwner(user, organizationId);
   const customCredentials = clientId && clientSecret ? { clientId, clientSecret } : undefined;

@@ -129,4 +129,3 @@ export function buildAppReturnOutcomeView(input: {
     href: buildAppReturnHref(returnQuery, input.organizationId, input.appBasePath),
   };
 }
-

@@ -41,12 +41,12 @@ export async function GET(request: NextRequest) {
   let token: string;
   let appType: GitHubAppType;
   try {
-    ({ token, appType } = await beginGitHubAppInstall(
-      { user },
-      { organizationId, returnTo }
-    ));
+    ({ token, appType } = await beginGitHubAppInstall({ user }, { organizationId, returnTo }));
   } catch (error) {
-    if (error instanceof TRPCError && (error.code === 'FORBIDDEN' || error.code === 'UNAUTHORIZED')) {
+    if (
+      error instanceof TRPCError &&
+      (error.code === 'FORBIDDEN' || error.code === 'UNAUTHORIZED')
+    ) {
       return NextResponse.redirect(
         new URL(
           `${SHELL_RETURN_PATH}?${new URLSearchParams({

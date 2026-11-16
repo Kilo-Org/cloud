@@ -40,9 +40,9 @@ describe('buildAppShellTargetPath', () => {
     expect(buildAppShellTargetPath({ page: 'connected-accounts' })).toBe(
       '/app-shell/connected-accounts'
     );
-    expect(buildAppShellTargetPath({ page: 'organization-sso', organizationId: ORGANIZATION_ID })).toBe(
-      `/app-shell/organizations/${ORGANIZATION_ID}/sso`
-    );
+    expect(
+      buildAppShellTargetPath({ page: 'organization-sso', organizationId: ORGANIZATION_ID })
+    ).toBe(`/app-shell/organizations/${ORGANIZATION_ID}/sso`);
     expect(
       buildAppShellTargetPath({
         page: 'organization-data-collection',
@@ -74,17 +74,18 @@ describe('appShellTargetSchema', () => {
   });
 
   it('refuses a provider the shell does not host', () => {
-    expect(appShellTargetSchema.safeParse({ page: 'integration', platform: 'bitbucket' }).success).toBe(
-      false
-    );
-    expect(appShellTargetSchema.safeParse({ page: 'integration', platform: 'dolthub' }).success).toBe(
-      false
-    );
+    expect(
+      appShellTargetSchema.safeParse({ page: 'integration', platform: 'bitbucket' }).success
+    ).toBe(false);
+    expect(
+      appShellTargetSchema.safeParse({ page: 'integration', platform: 'dolthub' }).success
+    ).toBe(false);
   });
 
   it('refuses a malformed organization id', () => {
     expect(
-      appShellTargetSchema.safeParse({ page: 'github-app', organizationId: '../../credits' }).success
+      appShellTargetSchema.safeParse({ page: 'github-app', organizationId: '../../credits' })
+        .success
     ).toBe(false);
   });
 });

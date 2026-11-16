@@ -16,7 +16,10 @@ import {
   upsertLinearInstallation,
 } from '@/lib/integrations/linear-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { oauthCallbackRedirectPath, resolveOAuthCallbackActor } from '@/lib/integrations/oauth/common';
+import {
+  oauthCallbackRedirectPath,
+  resolveOAuthCallbackActor,
+} from '@/lib/integrations/oauth/common';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { linkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';

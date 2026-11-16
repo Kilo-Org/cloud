@@ -231,8 +231,14 @@ export async function startStatefulOAuthConnect(
   request: NextRequest,
   options: StartStatefulOAuthConnectOptions
 ): Promise<Response> {
-  const { user, appShell, platform, buildOAuthUrl, organizationRoles, requireActiveOrganizationSubscription } =
-    options;
+  const {
+    user,
+    appShell,
+    platform,
+    buildOAuthUrl,
+    organizationRoles,
+    requireActiveOrganizationSubscription,
+  } = options;
   const organizationId = request.nextUrl.searchParams.get('organizationId');
   const { owner } = await resolveOAuthConnectOwner(request, user, {
     organizationRoles,

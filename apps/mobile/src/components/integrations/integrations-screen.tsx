@@ -11,6 +11,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { openExternalUrl } from '@/lib/external-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import {
@@ -131,10 +132,24 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
         })
     );
 
+  // Bitbucket's controls live on the full web page; every other provider has an
+  // app-shell page, reached through a one-time hand-off token.
   const openProviderPage = (provider: IntegrationProvider) => {
-    void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {
-      label: t(providerLabelKey(provider)),
-    });
+    const label = t(providerLabelKey(provider));
+    if (provider === 'bitbucket') {
+      void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {
+        label,
+      });
+      return;
+    }
+    void openAppShellHandoff(
+      {
+        page: 'integration',
+        platform: provider,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      { label }
+    );
   };
 
   const requestDisconnect = (row: IntegrationRow) => {

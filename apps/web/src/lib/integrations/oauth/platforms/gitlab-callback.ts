@@ -81,7 +81,11 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
 
     // The caller is the web session, or — only for a state the app shell
     // minted — the shell's signed state plus its flow cookie.
-    const actor = await resolveOAuthCallbackActor({ request, rawState: state, verified: verifiedState });
+    const actor = await resolveOAuthCallbackActor({
+      request,
+      rawState: state,
+      verified: verifiedState,
+    });
     if (actor.status === 'unauthenticated') {
       return NextResponse.redirect(new URL(oauthCallbackRedirectPath(request, '/'), APP_URL));
     }

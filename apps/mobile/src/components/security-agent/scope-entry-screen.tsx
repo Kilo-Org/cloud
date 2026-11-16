@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import {
-  isInstallStateRefusal,
+  isHandoffRefusal,
   selectScopeEntryLoadFailure,
   selectScopeEntryView,
 } from '@/components/security-agent/scope-entry-render';
@@ -19,9 +19,7 @@ import {
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
-import { trpcClient } from '@/lib/trpc';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -121,23 +119,20 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     isEnabled,
   });
 
-  // Pre-mint a C1 install state token so the web /github-app page
-  // receives it and does not mint a second token.  The return path is
-  // /cloud/sessions — a claimed universal-link route that maps to the
-  // agents tab.
+  // Pre-mint the shell hand-off so the press opens a URL the screen already
+  // holds, and a mount-time failure never replaces the setup screen. Reading
+  // the return edge is what brings the outcome back to this screen.
   const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
   const [mintUrl, setMintUrl] = useState<string | null>(null);
   const [isMinting, setIsMinting] = useState(false);
   const cancelledRef = useRef(false);
   const mintUrlRef = useRef<string | null>(null);
-  // Starting a GitHub installation for an organization is an organization-manage
-  // role's action, and the server is the only authority on that role:
-  // `githubApps.mintInstallState` resolves the caller through
-  // `ensureOrganizationAccess`, which also elevates a Kilo admin and accepts a
-  // parent-organization role — neither is visible in the device's membership
-  // read. So the press is offered until the server answers, and its
-  // `UNAUTHORIZED` answer retires the press for the role notice.
-  const [installRefused, setInstallRefused] = useState(false);
+  // The hand-off mint resolves the caller's organization membership on the
+  // server, which is also where an elevated (Kilo admin) or inherited
+  // (parent-organization) membership is known — neither is visible in the
+  // device's membership read. So the press is offered until the server answers,
+  // and its `UNAUTHORIZED` answer retires the press for the owner notice.
+  const [handoffRefused, setHandoffRefused] = useState(false);
 
   // A failed mint must not replace the setup screen with an error-only page:
   // the setup state (with the audit-report action) stays usable and the press
@@ -152,25 +147,24 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         setMintUrl(null);
         mintUrlRef.current = null;
         setIsMinting(true);
-        setInstallRefused(false);
+        setHandoffRefused(false);
       }
       try {
-        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-          organizationId: orgId ?? undefined,
-          returnTo: '/cloud/sessions',
+        const url = await appShellHandoffUrl({
+          page: 'github-app',
+          ...(orgId ? { organizationId: orgId } : {}),
         });
-        const url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token);
         mintUrlRef.current = url;
         if (!cancelledRef.current) {
           setMintUrl(url);
-          setInstallRefused(false);
+          setHandoffRefused(false);
         }
         return true;
       } catch (error) {
-        // A refused role is the answer this screen acts on; a transport or
+        // A refused membership is the answer this screen acts on; a transport or
         // server failure leaves the press in place to retry.
-        if (!cancelledRef.current && isInstallStateRefusal(error)) {
-          setInstallRefused(true);
+        if (!cancelledRef.current && isHandoffRefusal(error)) {
+          setHandoffRefused(true);
         }
         return false;
       } finally {
@@ -324,10 +318,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
               // The Code Reviewer's connect gate shows the same role rule, but
               // its sentence also restates that the provider is unconnected,
               // which this heading already says; the narrower notice leaves one
-              // message on the screen. It is a personal scope's mint that takes
-              // no organization role, so only the server's refusal sets it.
+              // message on the screen. It is a personal scope's mint that asks
+              // no organization for access, so only the server's refusal sets
+              // it.
               readOnlyNotice={
-                installRefused
+                handoffRefused
                   ? t('securityAgent.scopeEntry.connectOwnerOnly', { platform: t('common.github') })
                   : undefined
               }

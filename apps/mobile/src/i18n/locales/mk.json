@@ -3447,7 +3447,6 @@
       "guardrails": "Заштитни ограничувања",
       "byok": "Сопствен клуч (BYOK)",
       "ssoAndDomain": "SSO и домен",
-      "emailPreferences": "Поставки за е-пошта",
       "dataCollection": "Собирање податоци",
       "auditLogs": "Дневници за ревизија",
       "requestLogs": "Дневници на барања",

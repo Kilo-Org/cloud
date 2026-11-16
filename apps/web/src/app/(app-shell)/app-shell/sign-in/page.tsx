@@ -23,7 +23,10 @@ const ALLOWED_CALLBACK_ROOTS = [APP_SHELL_PREFIX, '/device-auth'];
 function isAllowedCallbackPath(callbackPath: string | null): callbackPath is string {
   if (!callbackPath) return false;
   return ALLOWED_CALLBACK_ROOTS.some(
-    root => callbackPath === root || callbackPath.startsWith(`${root}/`) || callbackPath.startsWith(`${root}?`)
+    root =>
+      callbackPath === root ||
+      callbackPath.startsWith(`${root}/`) ||
+      callbackPath.startsWith(`${root}?`)
   );
 }
 

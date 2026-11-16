@@ -14,10 +14,9 @@ jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({ findUserById
 // the mocked modules and the module under test are required here, after the
 // mocks are registered.
 const { cookies } = jest.requireMock<typeof NextHeaders>('next/headers');
-const { findUserById } =
-  jest.requireMock<typeof FindUserById>(
-    '@kilocode/web-shared/lib/user/find-user-by-id'
-  );
+const { findUserById } = jest.requireMock<typeof FindUserById>(
+  '@kilocode/web-shared/lib/user/find-user-by-id'
+);
 const {
   APP_SHELL_SESSION_COOKIE,
   APP_SHELL_SESSION_TTL_SECONDS,

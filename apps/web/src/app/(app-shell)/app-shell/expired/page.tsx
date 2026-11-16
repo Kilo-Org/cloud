@@ -1,6 +1,9 @@
 import { ShellOutcome } from '../components/shell-outcome';
 
-export const metadata = { title: 'Return to the Kilo App', robots: { index: false, follow: false } };
+export const metadata = {
+  title: 'Return to the Kilo App',
+  robots: { index: false, follow: false },
+};
 
 /**
  * A hand-off that cannot be opened. The URL that got here carries no usable

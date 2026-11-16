@@ -15,7 +15,10 @@ import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { oauthCallbackRedirectPath, resolveOAuthCallbackActor } from '@/lib/integrations/oauth/common';
+import {
+  oauthCallbackRedirectPath,
+  resolveOAuthCallbackActor,
+} from '@/lib/integrations/oauth/common';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -137,8 +140,8 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {
         return NextResponse.redirect(
-        new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
-      );
+          new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+        );
       }
     }
 

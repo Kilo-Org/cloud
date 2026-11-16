@@ -57,7 +57,6 @@ describe('visibleOrgSettingsRows', () => {
       'guardrails',
       'byok',
       'ssoAndDomain',
-      'emailPreferences',
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -90,7 +89,6 @@ describe('visibleOrgSettingsRows', () => {
       'customModes',
       'guardrails',
       'byok',
-      'emailPreferences',
       'dataCollection',
       'requestLogs',
       'integrations',
@@ -113,32 +111,37 @@ describe('visibleOrgSettingsRows', () => {
   it('drops the owner-only rows for a billing manager', () => {
     const rows = areas({ role: 'billing_manager' });
     expect(rows).not.toContain('guardrails');
-    expect(rows).not.toContain('emailPreferences');
     expect(rows).toContain('providersAndModels');
   });
 
   it('opens the web page that owns each setting', () => {
     const rows = visibleOrgSettingsRows(gate(), 'org_1');
     const byArea = new Map(rows.map(row => [row.area, row]));
+    const webUrl = (area: 'usageDetails' | 'subOrganizations' | 'distributeFunds') => {
+      const target = byArea.get(area)?.target;
+      return target?.kind === 'web' ? target.url : undefined;
+    };
     expect(
-      byArea.get('usageDetails')?.url.endsWith('/organizations/org_1/usage-details?view=ai-usage')
+      webUrl('usageDetails')?.endsWith('/organizations/org_1/usage-details?view=ai-usage')
     ).toBe(true);
+    expect(webUrl('subOrganizations')?.endsWith('/organizations/org_1/sub-organizations')).toBe(
+      true
+    );
     expect(
-      byArea.get('subOrganizations')?.url.endsWith('/organizations/org_1/sub-organizations')
+      webUrl('distributeFunds')?.endsWith('/organizations/org_1/sub-organizations/distribute-funds')
     ).toBe(true);
-    expect(
-      byArea
-        .get('distributeFunds')
-        ?.url.endsWith('/organizations/org_1/sub-organizations/distribute-funds')
-    ).toBe(true);
-    // A dashboard card rather than a page of its own.
-    expect(byArea.get('ssoAndDomain')?.url.endsWith('/organizations/org_1')).toBe(true);
+    // The two dashboard cards the app shell owns hand off to their shell pages.
+    expect(byArea.get('ssoAndDomain')?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-sso', organizationId: 'org_1' },
+    });
     // Data collection is the teams dashboard's card, in place of providers and
     // models, so it appears on that plan only.
     const teams = visibleOrgSettingsRows(gate({ plan: 'teams' }), 'org_1');
-    expect(
-      teams.find(row => row.area === 'dataCollection')?.url.endsWith('/organizations/org_1')
-    ).toBe(true);
+    expect(teams.find(row => row.area === 'dataCollection')?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-data-collection', organizationId: 'org_1' },
+    });
   });
 
   it('keeps every in-app area out of the web group', () => {

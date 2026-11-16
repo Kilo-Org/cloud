@@ -3452,7 +3452,6 @@
       "guardrails": "防護機制",
       "byok": "自備金鑰",
       "ssoAndDomain": "SSO 與網域",
-      "emailPreferences": "電子郵件偏好設定",
       "dataCollection": "資料收集",
       "auditLogs": "稽核記錄",
       "requestLogs": "請求記錄",

@@ -3502,7 +3502,6 @@
       "guardrails": "Zaštitna ograničenja",
       "byok": "Vlastiti ključ",
       "ssoAndDomain": "SSO i domena",
-      "emailPreferences": "Postavke e-pošte",
       "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Revizijski zapisnici",
       "requestLogs": "Zapisnici zahtjeva",

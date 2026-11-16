@@ -46,6 +46,7 @@ const calls = vi.hoisted(() => ({
   confirm: vi.fn<(request: { title: string; onConfirm: () => void }) => void>(),
   refetch: vi.fn<() => void>(),
   openExternal: vi.fn<(url: string) => void>(),
+  handoff: vi.fn<(target: unknown) => void>(),
 }));
 
 function statusState(overrides: Partial<typeof state.statuses> = {}): typeof state.statuses {
@@ -117,6 +118,12 @@ vi.mock('@/lib/trpc-error', () => ({
   trpcErrorVariant: () => 'server',
 }));
 
+vi.mock('@/lib/app-shell-handoff', () => ({
+  openAppShellHandoff: (target: unknown) => {
+    calls.handoff(target);
+    return Promise.resolve();
+  },
+}));
 vi.mock('@/lib/external-link', () => ({
   openExternalUrl: (url: string) => {
     calls.openExternal(url);
@@ -304,6 +311,13 @@ describe('IntegrationsScreen', () => {
     expect(actionOf(rowTitled(root, 'GitHub'))?.props.accessibilityLabel).toBe(
       'Manage on the web. GitHub'
     );
+    const github = actionOf(rowTitled(root, 'GitHub'));
+    press(github);
+    expect(calls.handoff).toHaveBeenCalledWith({
+      page: 'integration',
+      platform: 'github',
+      organizationId: 'org-1',
+    });
     const bitbucket = actionOf(rowTitled(root, 'Bitbucket'));
     expect(bitbucket?.props.accessibilityLabel).toBe('Manage on the web. Bitbucket');
     press(bitbucket);

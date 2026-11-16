@@ -15,12 +15,13 @@ jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
 // This repo's transform does not hoist `jest.mock` above the static imports, so
 // the mocked modules and the module under test are required here, after the
 // mocks are registered.
-const { ensureMemberOrganizationAccess } =
-  jest.requireMock<typeof OrganizationsUtils>('@kilocode/web-shared/routers/organizations/utils');
-const { createAppShellHandoff } =
-  jest.requireMock<typeof HandoffTokenModule>('@/lib/app-shell/handoff-token');
-const { appShellRouter } =
-  jest.requireActual<typeof AppShellRouterModule>('./app-shell-router');
+const { ensureMemberOrganizationAccess } = jest.requireMock<typeof OrganizationsUtils>(
+  '@kilocode/web-shared/routers/organizations/utils'
+);
+const { createAppShellHandoff } = jest.requireMock<typeof HandoffTokenModule>(
+  '@/lib/app-shell/handoff-token'
+);
+const { appShellRouter } = jest.requireActual<typeof AppShellRouterModule>('./app-shell-router');
 
 const mockMint = jest.mocked(createAppShellHandoff);
 const mockEnsureMember = jest.mocked(ensureMemberOrganizationAccess);
@@ -81,7 +82,9 @@ describe('appShell.mintHandoff', () => {
   });
 
   test('does not mint for a caller outside the organization', async () => {
-    mockEnsureMember.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'UNAUTHORIZED' }));
+    mockEnsureMember.mockRejectedValueOnce(
+      Object.assign(new Error('denied'), { code: 'UNAUTHORIZED' })
+    );
     const caller = createCaller({ user });
 
     await expect(

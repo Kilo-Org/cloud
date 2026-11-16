@@ -26,8 +26,7 @@ jest.mock('@/routers/root-router', () => {
 
 // This repo's transform does not hoist `jest.mock` above the static imports, so
 // the mocked module and the module under test are required here.
-const { requireAppShellUser } =
-  jest.requireMock<typeof SessionModule>('@/lib/app-shell/session');
+const { requireAppShellUser } = jest.requireMock<typeof SessionModule>('@/lib/app-shell/session');
 const { GET } = jest.requireActual<typeof TrpcRouteModule>('./route');
 
 const mockRequireUser = jest.mocked(requireAppShellUser);

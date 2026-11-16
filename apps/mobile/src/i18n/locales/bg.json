@@ -3447,7 +3447,6 @@
       "guardrails": "Защитни ограничения",
       "byok": "Използвай собствен ключ",
       "ssoAndDomain": "SSO и домейн",
-      "emailPreferences": "Предпочитания за имейл",
       "dataCollection": "Събиране на данни",
       "auditLogs": "Одитни журнали",
       "requestLogs": "Журнали на заявките",

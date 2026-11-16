@@ -13,7 +13,9 @@ export const maxDuration = 800;
  * caller, so a shell page can read and write the same procedures the full web
  * page does without widening the credential beyond the shell.
  */
-async function createAppShellTRPCContext({ req }: FetchCreateContextFnOptions): Promise<TRPCContext> {
+async function createAppShellTRPCContext({
+  req,
+}: FetchCreateContextFnOptions): Promise<TRPCContext> {
   const origin = req.headers.get('origin');
   if (origin && origin !== new URL(req.url).origin) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Cross-origin app-shell request' });

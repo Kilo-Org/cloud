@@ -3447,7 +3447,6 @@
       "guardrails": "Guardrails",
       "byok": "ใช้คีย์ของคุณเอง",
       "ssoAndDomain": "SSO และโดเมน",
-      "emailPreferences": "การตั้งค่าอีเมล",
       "dataCollection": "การเก็บรวบรวมข้อมูล",
       "auditLogs": "บันทึกการตรวจสอบ",
       "requestLogs": "บันทึกคำขอ",

@@ -121,10 +121,9 @@ export async function handlePlatformOAuthConnectForAppShell(
   user: User
 ): Promise<Response> {
   if (platform === PLATFORM.GITLAB) {
-    return (await import('@/lib/integrations/oauth/platforms/gitlab-connect')).startGitLabOAuthConnect(
-      request,
-      { user, appShell: true }
-    );
+    return (
+      await import('@/lib/integrations/oauth/platforms/gitlab-connect')
+    ).startGitLabOAuthConnect(request, { user, appShell: true });
   }
 
   if (!isStatefulOAuthConnectPlatform(platform)) {

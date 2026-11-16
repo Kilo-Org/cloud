@@ -3452,7 +3452,6 @@
       "guardrails": "Guardrail",
       "byok": "Gunakan kunci sendiri",
       "ssoAndDomain": "SSO dan domain",
-      "emailPreferences": "Preferensi email",
       "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
       "requestLogs": "Log permintaan",

@@ -3447,7 +3447,6 @@
       "guardrails": "Sikkerhedsgrænser",
       "byok": "Brug din egen nøgle",
       "ssoAndDomain": "SSO og domæne",
-      "emailPreferences": "E-mailpræferencer",
       "dataCollection": "Dataindsamling",
       "auditLogs": "Revisionslogs",
       "requestLogs": "Anmodningslogs",

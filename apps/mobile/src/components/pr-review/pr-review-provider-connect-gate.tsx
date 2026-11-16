@@ -17,12 +17,13 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import {
@@ -162,11 +163,17 @@ export function ProviderConnectGate({
     setConnecting(true);
     try {
       // The provider connections are web-side integrations: open the
-      // existing integration page and re-check the status when the app
-      // returns (pattern: `launchConnectGateBrowser`).
+      // integration shell page and re-check the status when the app returns
+      // (pattern: `launchConnectGateBrowser`). GitLab's page is reached through
+      // a one-time hand-off token; Bitbucket has no shell page and keeps the
+      // full web page it always opened.
       const integrationUrl =
         platform === 'gitlab'
-          ? getGitLabIntegrationUrl(WEB_BASE_URL, organizationId ?? undefined)
+          ? await appShellHandoffUrl({
+              page: 'integration',
+              platform: 'gitlab',
+              ...(organizationId ? { organizationId } : {}),
+            })
           : getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId ?? '');
       await launchConnectGateBrowser(integrationUrl, {
         signal: controller.signal,
@@ -183,10 +190,13 @@ export function ProviderConnectGate({
         },
       });
     } catch {
-      // `launchConnectGateBrowser` reports a failed launch through
-      // `onOpenFailure`; this keeps `void handleConnect()` from rejecting if the
-      // refresh helper throws before that. The status read's own error state
-      // renders the retryable QueryError.
+      // A mint that failed never reached the browser, so nothing else reported
+      // it. `launchConnectGateBrowser` reports a failed launch through
+      // `onOpenFailure`, and the status read's own error state renders the
+      // retryable QueryError.
+      if (!controller.signal.aborted) {
+        void toast.error(t('authErrors.couldNotOpenBrowser'));
+      }
     } finally {
       if (!controller.signal.aborted) {
         setConnecting(false);

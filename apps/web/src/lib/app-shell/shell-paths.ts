@@ -116,10 +116,7 @@ export function isAppShellPath(path: string): boolean {
  * yet when it starts a device-auth sign-in, so it cannot mint a hand-off token;
  * this page is opened directly and keeps the user inside the shell.
  */
-export function buildAppShellSignInPath(options: {
-  email?: string;
-  callbackPath: string;
-}): string {
+export function buildAppShellSignInPath(options: { email?: string; callbackPath: string }): string {
   const params = new URLSearchParams({ callbackPath: options.callbackPath });
   if (options.email) params.set('email', options.email);
   return `${APP_SHELL_PREFIX}/sign-in?${params.toString()}`;

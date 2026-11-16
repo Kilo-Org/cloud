@@ -137,8 +137,8 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {
         return NextResponse.redirect(
-        new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
-      );
+          new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+        );
       }
     }
 

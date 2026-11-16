@@ -71,8 +71,11 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
 }));
 
 vi.mock('@/lib/integration-urls', () => ({
-  getGitLabIntegrationUrl: vi.fn(() => 'gitlab-url'),
   getBitbucketIntegrationUrl: vi.fn(() => 'bitbucket-url'),
+}));
+
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: vi.fn(() => Promise.resolve('gitlab-handoff-url')),
 }));
 
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({

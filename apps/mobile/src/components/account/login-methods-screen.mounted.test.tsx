@@ -21,7 +21,7 @@ const state = vi.hoisted(() => ({
   confirm: vi.fn(),
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
-  openExternalUrl: vi.fn(),
+  openAppShellHandoff: vi.fn(),
   invalidateQueries: vi.fn(),
 }));
 
@@ -53,7 +53,9 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: state.confirm, dialog: null }),
 }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
+vi.mock('@/lib/app-shell-handoff', () => ({
+  openAppShellHandoff: state.openAppShellHandoff,
+}));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/trpc', () => ({
@@ -131,7 +133,7 @@ beforeEach(() => {
   state.mutations = [];
   state.mutate.mockClear();
   state.confirm.mockClear();
-  state.openExternalUrl.mockClear();
+  state.openAppShellHandoff.mockClear();
   state.invalidateQueries.mockClear();
 });
 
@@ -325,8 +327,8 @@ describe('LoginMethodsScreen', () => {
       (firstRow.props.onPress as () => void)();
     });
 
-    expect(state.openExternalUrl).toHaveBeenCalledWith(
-      'https://app.example.test/connected-accounts',
+    expect(state.openAppShellHandoff).toHaveBeenCalledWith(
+      { page: 'connected-accounts' },
       expect.objectContaining({ retryOnError: true })
     );
   });

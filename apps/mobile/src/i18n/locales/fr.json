@@ -3507,7 +3507,6 @@
       "guardrails": "Garde-fous",
       "byok": "Utiliser votre propre clé",
       "ssoAndDomain": "SSO et domaine",
-      "emailPreferences": "Préférences d'e-mail",
       "dataCollection": "Collecte de données",
       "auditLogs": "Journaux d'audit",
       "requestLogs": "Journaux des requêtes",

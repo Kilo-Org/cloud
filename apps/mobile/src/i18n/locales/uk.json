@@ -3562,7 +3562,6 @@
       "guardrails": "Запобіжники",
       "byok": "Власний ключ",
       "ssoAndDomain": "SSO і домен",
-      "emailPreferences": "Налаштування електронної пошти",
       "dataCollection": "Збір даних",
       "auditLogs": "Журнали аудиту",
       "requestLogs": "Журнали запитів",

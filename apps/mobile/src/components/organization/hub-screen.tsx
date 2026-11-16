@@ -69,26 +69,30 @@ type OrganizationHubScreenProps = Readonly<{
 }>;
 
 /** Whether the rename control offers the dialog, or states why it cannot. */
-type RenameControl =
-  | { kind: 'ready'; onPress: () => void }
-  | { kind: 'blocked'; reason: string };
+type RenameControl = { kind: 'ready'; onPress: () => void } | { kind: 'blocked'; reason: string };
 
 /**
  * The rename control's props for its state. A blocked control keeps the same
  * box and therefore the same header width: the title beside it cannot reflow to
  * another line. It is dimmed the way the shared Button dims a disabled
- * non-primary control, and the reason travels as the control's hint, so the
- * node reads its label, its disabled state, then the explanation the plan
- * refusal block above already paints.
+ * non-primary control, and the reason joins the control's own name, in the
+ * shape this screen's other composed labels use. A hint would not reach Android:
+ * React Native maps `accessibilityHint` to the platform's tooltip text, which
+ * TalkBack does not announce with the node, so the reason would be spoken on one
+ * platform only.
  */
-function renameControlProps(control: RenameControl) {
+function renameControlProps(control: RenameControl, label: string) {
   if (control.kind === 'ready') {
-    return { onPress: control.onPress };
+    return { accessibilityLabel: label, onPress: control.onPress };
   }
+  // Built outside the props object: the shared screen-reader name is the
+  // control's title followed by the reason, the shape the rest of this screen
+  // composes its labels with.
+  const blockedLabel = `${label}. ${control.reason}`;
   return {
     disabled: true,
     className: 'opacity-50',
-    accessibilityHint: control.reason,
+    accessibilityLabel: blockedLabel,
     accessibilityState: { disabled: true },
   };
 }
@@ -269,10 +273,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         titleNumberOfLines={2}
         headerRight={
           showMoney ? (
-            <IconButton
-              accessibilityLabel={t('organization.hub.renameTitle')}
-              {...renameControlProps(renameControl)}
-            >
+            <IconButton {...renameControlProps(renameControl, t('organization.hub.renameTitle'))}>
               <Pencil size={16} color={colors.mutedForeground} />
             </IconButton>
           ) : undefined

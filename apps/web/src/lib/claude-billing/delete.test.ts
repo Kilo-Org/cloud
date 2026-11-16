@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { claude_billing_connections } from '@kilocode/db/schema';
+import { claude_billing_connection_grants, claude_billing_connections } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   getClaudeBillingConnection,
@@ -205,6 +205,45 @@ describe('Personal Claude profile erasure', () => {
     await cleanupRemovedClaudeProfilesForUser(user.id);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })).toBeNull();
+  });
+
+  it('retires a removed payer whose only active grant belongs to the retired member scope', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Claude retired grant cleanup', user.id, 0);
+    const [removed] = await db
+      .insert(claude_billing_connections)
+      .values({
+        organization_id: organization.id,
+        user_profile_id: `uprof_leftover_${user.id}`,
+        status: 'removed',
+        created_by: user.id,
+      })
+      .returning();
+    if (!removed) throw new Error('Missing removed payer fixture');
+    await db.insert(claude_billing_connection_grants).values({
+      payer_connection_id: removed.id,
+      kilo_user_id: user.id,
+      organization_id: organization.id,
+      created_by: user.id,
+    });
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await retireUnreferencedClaudeBillingPayer({
+      id: removed.id,
+      userProfileId: removed.user_profile_id,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      await db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, removed.id))
+    ).toEqual([]);
   });
 
   it('continues retiring remaining removed rows when one remote delete fails', async () => {

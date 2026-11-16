@@ -110,9 +110,23 @@ export function claudeBillingGrantOwnerWhere(owner: ClaudeBillingOwner) {
 }
 
 /**
- * The oldest still-active grant on this payer becomes its next owner. A grant
- * that names both a person and an organization belongs to a scope Kilo no
- * longer offers, so it never becomes an owner again.
+ * The grants that still give their payer to a scope Kilo offers: active, and
+ * naming a person or an organization but not both. Only the retired member
+ * scope named both, so such a grant holds no payer and never keeps a row or an
+ * Anthropic profile alive.
+ */
+export function liveClaudeBillingGrantWhere() {
+  return and(
+    isNull(claude_billing_connection_grants.removed_at),
+    or(
+      isNull(claude_billing_connection_grants.kilo_user_id),
+      isNull(claude_billing_connection_grants.organization_id)
+    )
+  );
+}
+
+/**
+ * The oldest live grant on this payer becomes its next owner.
  */
 async function selectNextActiveGrant(
   onDb: DrizzleConnection,
@@ -129,11 +143,7 @@ async function selectNextActiveGrant(
     .where(
       and(
         eq(claude_billing_connection_grants.payer_connection_id, payerConnectionId),
-        isNull(claude_billing_connection_grants.removed_at),
-        or(
-          isNull(claude_billing_connection_grants.kilo_user_id),
-          isNull(claude_billing_connection_grants.organization_id)
-        ),
+        liveClaudeBillingGrantWhere(),
         ...(excludeWhere ? [not(excludeWhere)] : [])
       )
     )

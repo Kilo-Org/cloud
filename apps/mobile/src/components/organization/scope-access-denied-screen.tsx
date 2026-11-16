@@ -24,7 +24,7 @@ export function ScopeAccessDeniedScreen({
   kind,
   onRetry,
   isRetrying = false,
-  backFallback = PROFILE_TAB_HREF,
+  backFallback,
 }: Readonly<{
   /** ScreenHeader's title: the product name, or the organization's name. */
   title: string;
@@ -33,8 +33,7 @@ export function ScopeAccessDeniedScreen({
   kind: Exclude<OrganizationScopeAccess, 'granted'>;
   onRetry: () => void;
   isRetrying?: boolean;
-  /** Where the header's Back lands when this state has no history to pop.
-   * Defaults to the Profile tab root, the route that opened the scope. */
+  /** Where the header's Back lands when this state has no history to pop. */
   backFallback?: Href;
 }>) {
   const router = useRouter();

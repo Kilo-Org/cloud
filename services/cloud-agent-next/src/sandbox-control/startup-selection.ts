@@ -102,7 +102,8 @@ function startupTarget(
   provider: AgentSandboxProvider
 ): { mode: 'downloaded'; image: 'runtime-free' } {
   if (PROVIDER_DESCRIPTORS[provider].retired) throw new RetiredSandboxProviderError('create');
-  if (provider === 'vercel') return { mode: 'downloaded', image: 'runtime-free' };
+  if (PROVIDER_DESCRIPTORS[provider].requiresCustomerCredential)
+    return { mode: 'downloaded', image: 'runtime-free' };
   if (env.RUNTIME_INTERACTIVE_ORG_IDS !== undefined)
     throw new ProviderCreationError('invalid_configuration');
   const selected = runtimeStartupConfigSchema.safeParse({

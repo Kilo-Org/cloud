@@ -204,6 +204,9 @@ function sourceMetadataWithPreset(sandboxAllocation: SandboxAllocation): Session
       sandboxId,
       sandboxProvider,
       ...(sandboxProvider === 'vercel' ? { sandboxProviderBinding: BYOC_PROVIDER_BINDING } : {}),
+      ...(sandboxProvider === 'aws'
+        ? { sandboxProviderBinding: { ...BYOC_PROVIDER_BINDING, kind: 'aws' as const } }
+        : {}),
       sandboxAllocation,
       sandboxRoute:
         sandboxAllocation === 'cloudflare-shared'

@@ -64,6 +64,7 @@
     "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
     "./r2-client": "./src/r2-client.ts",
     "./aws-client": "./src/aws-client.ts",
+    "./aws-byoc": "./src/aws-byoc.ts",
     "./direct-byok-model": "./src/direct-byok-model.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
     "./github-task-grant": "./src/github-task-grant.ts",

@@ -22,9 +22,10 @@ function ruleKey(rule: OrgPolicyRule) {
 function inputDetectorsKey(detectors: OrgGuardrailsInputDetectors) {
   return {
     injection_attack: [detectors.injection_attack.enabled, detectors.injection_attack.action],
-    pii: [detectors.pii.enabled, detectors.pii.entities],
+    pii: [detectors.pii.enabled, detectors.pii.action, detectors.pii.entities],
     keyword_detector: [
       detectors.keyword_detector.enabled,
+      detectors.keyword_detector.action,
       detectors.keyword_detector.banned_keywords,
     ],
     topic_detector: [detectors.topic_detector.enabled, detectors.topic_detector.topic],
@@ -44,9 +45,10 @@ function inputDetectorsKey(detectors: OrgGuardrailsInputDetectors) {
 
 function outputDetectorsKey(detectors: OrgGuardrailsOutputDetectors) {
   return {
-    pii: [detectors.pii.enabled, detectors.pii.entities],
+    pii: [detectors.pii.enabled, detectors.pii.action, detectors.pii.entities],
     keyword_detector: [
       detectors.keyword_detector.enabled,
+      detectors.keyword_detector.action,
       detectors.keyword_detector.banned_keywords,
     ],
     topic_detector: [

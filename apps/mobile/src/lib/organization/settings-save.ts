@@ -8,7 +8,10 @@ export type SettingsSaveFailure = Readonly<{ kind: 'save-failed'; message: strin
 /**
  * The one line under an organization settings form: the first thing blocking a
  * save, then the save's own phase. A failure outranks the draft's own state
- * because the person's last action is what did not land.
+ * because the person's last action is what did not land. A completed save is
+ * only reported while the draft is still what was saved: an edit after it, or a
+ * blocking issue it introduced (`clearWhere` retires a failure, never a
+ * success), replaces "Saved" with what the form needs next.
  */
 export function settingsSaveStatus({
   t,
@@ -26,7 +29,12 @@ export function settingsSaveStatus({
       return t('organizationGuardrails.statusSaving');
     }
     case 'succeeded': {
-      return t('organizationGuardrails.statusSaved');
+      if (blockingIssue !== null) {
+        return blockingIssue;
+      }
+      return draftIsDirty
+        ? t('securityAgent.settingsSave.unsavedTitle')
+        : t('organizationGuardrails.statusSaved');
     }
     case 'failed': {
       return feedback.failure.message;

@@ -389,18 +389,11 @@ export type BenchmarkConfigFormState = {
   deciderModels: DeciderModelRow[];
   minAccuracy: number;
   accuracyNoiseBand: number;
-  frontierMinAccuracyDelta: number;
-  switchCostFactor: number;
-  bestAccuracySwitchThreshold: number;
   benchmarkUserId: string;
   benchmarkOrgId: string;
-  classifierRepetitions: number;
-  deciderRepetitions: number;
-  classifierMaxP95LatencyMs: string;
   uncachedInputTokens: string;
   cachedInputTokens: string;
   switchHorizonTurns: string;
-  lowConfidenceThreshold: string;
   policyOverrides: PolicyOverrideForm;
 };
 
@@ -416,18 +409,11 @@ export function configToFormState(
       deciderModels: [{ id: DEFAULT_BENCHMARK_DECIDER_MODEL_IDS[router] }],
       minAccuracy: 0.7,
       accuracyNoiseBand: 0.05,
-      frontierMinAccuracyDelta: 0,
-      switchCostFactor: 3,
-      bestAccuracySwitchThreshold: 0.05,
       benchmarkUserId: '',
       benchmarkOrgId: '',
-      classifierRepetitions: 1,
-      deciderRepetitions: 1,
-      classifierMaxP95LatencyMs: '1000',
       uncachedInputTokens: '',
       cachedInputTokens: '',
       switchHorizonTurns: '',
-      lowConfidenceThreshold: '',
       policyOverrides: overrideFormFromConfig(null),
     };
   }
@@ -436,19 +422,11 @@ export function configToFormState(
     deciderModels: config.deciderModels.map(({ id }) => ({ id })),
     minAccuracy: config.minAccuracy,
     accuracyNoiseBand: config.accuracyNoiseBand,
-    frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
-    switchCostFactor: config.switchCostFactor,
-    bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     benchmarkUserId: config.benchmarkUserId ?? '',
     benchmarkOrgId: config.benchmarkOrgId ?? '',
-    classifierRepetitions: config.classifierRepetitions,
-    deciderRepetitions: config.deciderRepetitions,
-    classifierMaxP95LatencyMs:
-      config.classifierMaxP95LatencyMs !== null ? String(config.classifierMaxP95LatencyMs) : '',
     uncachedInputTokens: optionalNumberText(config.productionTokenProfile?.uncachedInputTokens),
     cachedInputTokens: optionalNumberText(config.productionTokenProfile?.cachedInputTokens),
     switchHorizonTurns: optionalNumberText(config.switchHorizonTurns),
-    lowConfidenceThreshold: optionalNumberText(config.lowConfidenceThreshold),
     policyOverrides: overrideFormFromConfig(config),
   };
 }
@@ -463,25 +441,16 @@ export function formStateToConfig(
     .map(row => ({ id: row.id.trim() }));
   const benchmarkUserId = state.benchmarkUserId.trim();
   const benchmarkOrgId = state.benchmarkOrgId.trim();
-  const rawLatency = state.classifierMaxP95LatencyMs.trim();
-  const classifierMaxP95LatencyMs = rawLatency.length > 0 ? parseInt(rawLatency, 10) || null : null;
   return {
     router: base?.router ?? DEFAULT_AUTO_ROUTER,
     classifierModels,
     deciderModels,
     minAccuracy: state.minAccuracy,
     accuracyNoiseBand: state.accuracyNoiseBand,
-    frontierMinAccuracyDelta: state.frontierMinAccuracyDelta,
-    switchCostFactor: state.switchCostFactor,
-    bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
     productionTokenProfile: parseTokenProfile(state),
     switchHorizonTurns: parseOptionalNumber(state.switchHorizonTurns),
-    lowConfidenceThreshold: parseOptionalNumber(state.lowConfidenceThreshold),
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
     benchmarkOrgId: benchmarkOrgId.length > 0 ? benchmarkOrgId : null,
-    classifierRepetitions: state.classifierRepetitions,
-    deciderRepetitions: state.deciderRepetitions,
-    classifierMaxP95LatencyMs,
     policyOverrides: policyOverridesFromForm(state.policyOverrides),
     updatedAt: base?.updatedAt ?? null,
     updatedBy: base?.updatedBy ?? null,
@@ -725,15 +694,8 @@ function BenchmarkConfigEditor({
       resolvePolicySettings({
         minAccuracy: form.minAccuracy,
         accuracyNoiseBand: form.accuracyNoiseBand,
-        frontierMinAccuracyDelta: form.frontierMinAccuracyDelta,
         productionTokenProfile: parseTokenProfile(form),
         switchHorizonTurns: parseOptionalNumber(form.switchHorizonTurns),
-        switchCostFactor: form.switchCostFactor,
-        bestAccuracySwitchThreshold: form.bestAccuracySwitchThreshold,
-        lowConfidenceThreshold: parseOptionalNumber(form.lowConfidenceThreshold),
-        classifierRepetitions: form.classifierRepetitions,
-        deciderRepetitions: form.deciderRepetitions,
-        classifierMaxP95LatencyMs: parseOptionalNumber(form.classifierMaxP95LatencyMs),
         policyOverrides: policyOverridesFromForm(form.policyOverrides),
         policyComputed: config?.policyComputed ?? null,
       }),
@@ -1061,7 +1023,7 @@ function BenchmarkConfigEditor({
 
         <ConfigSectionHeading
           title="Benchmark runs"
-          description="Container budget, repetitions, run identity, and the latency gate."
+          description="Shared container budget, run identity, and the fixed repetition and latency values the worker uses."
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5 sm:col-span-2">

@@ -16,6 +16,11 @@ vi.mock('react-i18next', async importOriginal => {
 });
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+// The selector is called as a plain function here, so no hook can run: stub the
+// guarded push the trigger uses.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
+}));
 
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: vi.fn() },

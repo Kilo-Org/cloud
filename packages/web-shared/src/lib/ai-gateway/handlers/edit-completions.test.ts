@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from '@jest/globals';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -17,7 +17,12 @@ import {
   emitGatewayApiMetrics,
 } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  UpstreamTimeoutError,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
@@ -62,12 +67,9 @@ jest.mock('@kilocode/web-shared/lib/debugUtils', () => ({
   debugSaveProxyResponseStream: jest.fn(),
 }));
 
-// Run `after()` work inline so we can assert on the usage write the same tick.
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
-  after: jest.fn((work: Promise<unknown> | (() => Promise<unknown>)) => {
-    void (typeof work === 'function' ? work() : work);
-  }),
+  after: jest.fn(),
 }));
 
 // Capture the persisted usage row instead of round-tripping through the DB.
@@ -184,9 +186,10 @@ function makeUpstreamErrorResponse(status: number) {
 }
 
 async function flushAfter() {
-  // `after()` invocations are scheduled as microtasks; let them settle before
-  // asserting on what `logMicrodollarUsage` received.
   await new Promise(resolve => setImmediate(resolve));
+  const pending = jest.mocked(after).mock.calls.map(([work]) => work);
+  jest.mocked(after).mockClear();
+  await Promise.all(pending.map(work => (typeof work === 'function' ? work() : work)));
 }
 
 describe('POST /api/edit/completions', () => {
@@ -199,6 +202,11 @@ describe('POST /api/edit/completions', () => {
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     jest.mocked(isFreeModel).mockReturnValue(false);
+  });
+
+  afterEach(async () => {
+    await flushAfter();
+    jest.restoreAllMocks();
   });
 
   afterAll(() => {
@@ -325,6 +333,12 @@ describe('POST /api/edit/completions', () => {
     expect(response.status).toBe(200);
     const [url, init] = mockedFetch.mock.calls[0];
     expect(url).toBe('https://api.inceptionlabs.ai/v1/edit/completions');
+    const headers = new Headers(init?.headers);
+    expect(headers.get('authorization')).toBe('Bearer system-inception-key');
+    expect(headers.get('content-type')).toBe('application/json');
+    for (const [name, value] of Object.entries(ATTRIBUTION_HEADERS)) {
+      expect(headers.get(name)).toBe(value);
+    }
     expect(JSON.parse(init?.body as string).messages).toEqual(requestBody.messages);
     expect(await response.json()).toMatchObject({
       choices: [{ message: { role: 'assistant', content: 'edited' } }],
@@ -509,6 +523,111 @@ describe('POST /api/edit/completions', () => {
     );
   });
 
+  describe('upstream duration and cancellation', () => {
+    let budgetTimer: AbortController;
+
+    beforeEach(() => {
+      setOrganizationAuth();
+      budgetTimer = new AbortController();
+      jest.spyOn(AbortSignal, 'timeout').mockReturnValue(budgetTimer.signal);
+    });
+
+    it.each([
+      ['network', 503, ProxyErrorType.upstream_disconnect],
+      ['budget', 503, ProxyErrorType.upstream_disconnect],
+      ['client', 499, ProxyErrorType.client_disconnect],
+    ])(
+      'classifies a %s failure before headers without accounting',
+      async (failure, status, errorType) => {
+        const client = new AbortController();
+        const started = Promise.withResolvers<void>();
+        mockedFetch.mockImplementation((_input, init) => {
+          const signal = init?.signal;
+          if (!signal) throw new Error('Expected an upstream signal');
+          started.resolve();
+          if (failure === 'network') return Promise.reject(new TypeError('fetch failed'));
+          return new Promise<Response>((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+          });
+        });
+
+        const { handleEditCompletionsRequest } = await import('./edit-completions');
+        const pending = handleEditCompletionsRequest(
+          new Request(
+            makeRequest(makeValidRequestBody(), { 'x-vercel-id': 'sfo1::edit-timeout' }),
+            {
+              signal: client.signal,
+            }
+          ) as never
+        );
+        await started.promise;
+        if (failure === 'budget') budgetTimer.abort();
+        if (failure === 'client') {
+          const reason = new Error('The response was aborted');
+          reason.name = 'ResponseAborted';
+          client.abort(reason);
+        }
+        const response = await pending;
+
+        expect(UPSTREAM_DURATION_BUDGET_MS).toBe(600_000);
+        expect(AbortSignal.timeout).toHaveBeenCalledWith(600_000);
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toMatchObject({
+          error_type: errorType,
+          vercel_request_id: 'sfo1::edit-timeout',
+        });
+        expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+        expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
+        expect(emitGatewayApiMetrics).toHaveBeenCalledTimes(1);
+        expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+          expect.objectContaining({ statusCode: status, completeRequestMs: expect.any(Number) })
+        );
+        expect(captureException).toHaveBeenCalledTimes(failure === 'client' ? 0 : 1);
+      }
+    );
+
+    it('keeps the deadline armed after headers and settles accounting when the body aborts', async () => {
+      mockedFetch.mockImplementation(async (_input, init) => {
+        const signal = init?.signal;
+        if (!signal) throw new Error('Expected an upstream signal');
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              signal.addEventListener('abort', () => controller.error(signal.reason), {
+                once: true,
+              });
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        );
+      });
+
+      const { handleEditCompletionsRequest } = await import('./edit-completions');
+      const response = await handleEditCompletionsRequest(
+        makeRequest(makeValidRequestBody()) as never
+      );
+      expect(response.status).toBe(200);
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+      const bodyRead = expect(response.text()).rejects.toBeInstanceOf(UpstreamTimeoutError);
+      budgetTimer.abort();
+      await bodyRead;
+      await flushAfter();
+
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ hasError: true, cost_mUsd: 0, inputTokens: 0, outputTokens: 0 }),
+        expect.objectContaining({ api_kind: 'edit_completions', status_code: 200 })
+      );
+      expect(emitGatewayApiMetrics).not.toHaveBeenCalled();
+      expect(emitApiMetricsForResponse).toHaveBeenCalledTimes(1);
+      await expect(jest.mocked(emitApiMetricsForResponse).mock.calls[0][1]).resolves.toMatchObject({
+        hasError: true,
+        cost_mUsd: 0,
+      });
+      expect(captureException).not.toHaveBeenCalled();
+    });
+  });
+
   it('bills non-BYOK requests and records the cache discount', async () => {
     setOrganizationAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
@@ -557,8 +676,8 @@ describe('POST /api/edit/completions', () => {
 
     // Sanity: BYOK requests use the user's API key, not the system one.
     const [, init] = mockedFetch.mock.calls[0];
-    const headers = init?.headers as Record<string, string>;
-    expect(headers.Authorization).toBe('Bearer user-supplied-key');
+    const headers = new Headers(init?.headers);
+    expect(headers.get('authorization')).toBe('Bearer user-supplied-key');
   });
 
   it('persists a zero-cost row when the upstream response omits usage', async () => {

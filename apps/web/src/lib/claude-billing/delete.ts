@@ -8,7 +8,10 @@ import {
   getClaudeOperatorToken,
   isClaudeOperatorConfigured,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
-import type { UnreferencedClaudeBillingPayer } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import {
+  liveClaudeBillingGrantWhere,
+  type UnreferencedClaudeBillingPayer,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { CLAUDE_API_BASE_URL } from '@kilocode/web-shared/lib/auth/claude/config';
 import { classifyHttpStatus } from '@/lib/user/deletion-queue/deletion-http';
 
@@ -67,7 +70,7 @@ export async function retireUnreferencedClaudeBillingPayer(
           .where(
             and(
               eq(claude_billing_connection_grants.payer_connection_id, payer.id),
-              isNull(claude_billing_connection_grants.removed_at)
+              liveClaudeBillingGrantWhere()
             )
           )
       )
@@ -117,7 +120,7 @@ export async function cleanupRemovedClaudeProfilesForUser(
                   claude_billing_connection_grants.payer_connection_id,
                   claude_billing_connections.id
                 ),
-                isNull(claude_billing_connection_grants.removed_at)
+                liveClaudeBillingGrantWhere()
               )
             )
         )
@@ -173,7 +176,7 @@ export async function deleteUserClaudeProfiles(userId: string): Promise<void> {
                   claude_billing_connection_grants.payer_connection_id,
                   claude_billing_connections.id
                 ),
-                isNull(claude_billing_connection_grants.removed_at),
+                liveClaudeBillingGrantWhere(),
                 or(
                   isNull(claude_billing_connection_grants.kilo_user_id),
                   ne(claude_billing_connection_grants.kilo_user_id, userId)

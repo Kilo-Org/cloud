@@ -6,6 +6,13 @@ import type { CloudAgentSettingsData } from '@/hooks/useCloudAgentSettings';
 import type { CloudAgentSettingsDialog as CloudAgentSettingsDialogComponent } from './CloudAgentSettingsDialog';
 
 const mockUseCloudAgentSettings = jest.fn();
+const mockUseAwsComputeAccess = jest.fn();
+jest.mock('@/hooks/useAwsComputeAccess', () => ({
+  useAwsComputeAccess: (options: unknown) => mockUseAwsComputeAccess(options),
+}));
+jest.mock('./AwsComputeSettings', () => ({
+  AwsComputeSettings: () => createElement('div', { 'data-section': 'aws-compute' }),
+}));
 const mockUseVercelComputeEnrollment = jest.fn();
 const mockUseVercelComputeStatus = jest.fn();
 
@@ -158,6 +165,8 @@ const localStorageStub = {
   },
   clear: (): void => {
     storage.clear();
+    mockUseAwsComputeAccess.mockReset();
+    mockUseAwsComputeAccess.mockReturnValue(false);
   },
 };
 
@@ -236,6 +245,8 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
 
   beforeEach(() => {
     storage.clear();
+    mockUseAwsComputeAccess.mockReset();
+    mockUseAwsComputeAccess.mockReturnValue(false);
     mockUseCloudAgentSettings.mockReset();
     mockUseVercelComputeEnrollment.mockReset();
     mockUseVercelComputeEnrollment.mockReturnValue({
@@ -267,6 +278,20 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
       );
     });
   }
+
+  it.each([undefined, 'org-1'])(
+    'shows compute for an AWS-only manager in %s scope',
+    organizationId => {
+      mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
+      mockUseAwsComputeAccess.mockReturnValue(true);
+      renderDialog(organizationId, 'compute');
+      expect(domDocument.querySelector('[data-section="aws-compute"]')).not.toBeNull();
+      expect(domDocument.querySelector('[role="tab"][data-state="active"]')?.textContent).toBe(
+        'Compute'
+      );
+      expect(mockUseAwsComputeAccess).toHaveBeenCalledWith({ organizationId, enabled: true });
+    }
+  );
 
   it.each([undefined, 'org-1'])(
     'shows compute for an enrolled manager in %s scope',
@@ -364,6 +389,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
         organizationId,
         enabled: false,
       });
+      expect(mockUseAwsComputeAccess).toHaveBeenCalledWith({ organizationId, enabled: false });
       expect(section('session-defaults-heading').textContent).toContain('Default sandbox');
     }
   );

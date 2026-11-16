@@ -567,6 +567,8 @@ export type Env = {
   /** Bootstrap principal credentials. Its only permission is assuming the fixed Kilo role. */
   AWS_BYOC_CREDENTIALS?: string;
   AWS_BYOC_KILO_ROLE_ARN?: string;
+  /** Pinned operator release and preauthorized customer accounts for AWS onboarding. */
+  AWS_BYOC_RELEASE?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
   /**

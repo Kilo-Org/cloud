@@ -32,6 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { getModelGatewayAvailability } from '@kilocode/web-shared/lib/ai-gateway/providers/model-gateway-availability';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   MAX_ORGANIZATION_AUTO_ROUTES,
@@ -344,6 +345,11 @@ const GatewaySettingsResponseSchema = z.object({
   data_region: OrganizationDataRegionSchema.nullable(),
 });
 
+const ModelGatewayAvailabilityResponseSchema = z.object({
+  vercel: z.object({ available: z.boolean(), regions: z.array(OrganizationDataRegionSchema) }),
+  openrouter: z.object({ available: z.boolean() }),
+});
+
 /**
  * The advanced gateway policies are an enterprise feature, rolled out per organization through the
  * `gateway_settings` organization feature. The gateway ignores them on any other plan.
@@ -390,6 +396,23 @@ export const organizationsSettingsRouter = createTRPCRouter({
         disable_openrouter: organization.settings.disable_openrouter ?? false,
         data_region: organization.settings.data_region ?? null,
       };
+    }),
+
+  getModelGatewayAvailability: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.extend({ modelId: z.string().min(1) }))
+    .output(ModelGatewayAvailabilityResponseSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (!(await isGatewaySettingsAvailable(input.organizationId, organization.plan))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Advanced policies are not available for this organization.',
+        });
+      }
+      return getModelGatewayAvailability(input.modelId);
     }),
 
   updateGatewaySettings: organizationAdminMutationProcedure

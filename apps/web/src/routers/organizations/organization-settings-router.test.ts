@@ -1505,6 +1505,46 @@ describe('organizations settings trpc router', () => {
       ).resolves.toMatchObject({ available: false });
     });
 
+    it('reports model gateway availability while the feature is enabled', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).resolves.toEqual({
+        vercel: { available: false, regions: [] },
+        openrouter: { available: false },
+      });
+    });
+
+    it('rejects model gateway availability while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects model gateway availability for a non-enterprise organization in the feature', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
     it('rejects gateway settings while the feature is not enabled', async () => {
       await enableGatewaySettings([orgWithSettings.id]);
       const caller = await createCallerForUser(owner.id);

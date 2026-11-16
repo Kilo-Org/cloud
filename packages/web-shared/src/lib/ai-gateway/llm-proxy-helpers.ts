@@ -617,7 +617,7 @@ export function claudeBillingReconnectResponse(
   const settings = organizationId
     ? `${APP_URL}/organizations/${organizationId}/byok`
     : `${APP_URL}/byok`;
-  const error = `${message} An organization owner must reconnect Claude billing at ${settings}.`;
+  const error = `${message} An organization owner must link Claude billing again at ${settings}.`;
   return NextResponse.json(
     { error, error_type: ProxyErrorType.byok_error, message: error },
     { status: 400 }

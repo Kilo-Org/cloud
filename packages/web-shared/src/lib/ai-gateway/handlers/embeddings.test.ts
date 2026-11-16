@@ -43,6 +43,7 @@ import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/cust
 import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import type { CustomPricingConfig } from '@kilocode/db/schema-types';
 import type * as LlmProxyHelpers from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 
 const actualLlmProxyHelpers = jest.requireActual<typeof LlmProxyHelpers>(
   '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'
@@ -1241,15 +1242,14 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       expectFailureMetrics(503);
     });
 
-    it('stops the upstream call within the route duration and answers a classified 503', async () => {
-      const { EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS, handleEmbeddingsRequest } =
-        await import('./embeddings');
+    it('uses the ten-minute upstream budget and answers a classified 503 on expiry', async () => {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
       const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
       const budgetTimer = new AbortController();
       const timeoutSpy = jest
         .spyOn(AbortSignal, 'timeout')
         .mockImplementation(ms =>
-          ms === EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS ? budgetTimer.signal : originalTimeout(ms)
+          ms === UPSTREAM_DURATION_BUDGET_MS ? budgetTimer.signal : originalTimeout(ms)
         );
       mockedFetch.mockImplementation(
         (_input, init) =>
@@ -1263,7 +1263,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       try {
         const response = await handleEmbeddingsRequest(makeRequest());
 
-        expect(timeoutSpy).toHaveBeenCalledWith(EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS);
+        expect(timeoutSpy).toHaveBeenCalledWith(600_000);
         expect(response.status).toBe(503);
         await expect(response.json()).resolves.toMatchObject({
           error_type: ProxyErrorType.upstream_disconnect,

@@ -27,24 +27,17 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getUsageEndpointGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import { UPSTREAM_POST_RESPONSE_HEADROOM_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   handleUsageEndpointRequest,
   type UsageEndpoint,
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/usage-endpoint-pipeline';
 
-/**
- * The embeddings route's `maxDuration` is 300s. The upstream call gets what is
- * left after the post-response headroom chat reserves for its usage work.
- */
-export const EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS =
-  300 * 1000 - UPSTREAM_POST_RESPONSE_HEADROOM_MS;
-
 const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
   apiKind: 'embeddings',
   spanPrefix: 'embedding',
   path: '/embeddings',
-  durationBudgetMs: EMBEDDINGS_UPSTREAM_DURATION_BUDGET_MS,
+  durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   defaultFeature: 'embeddings',
   allowAnonymousFreeModels: true,
 

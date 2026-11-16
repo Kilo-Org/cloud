@@ -829,8 +829,9 @@ export type ImpactAdvocateRewardRedemptionState =
 /**
  * - `pending`: the owner's Anthropic user profile exists; no approval completed yet.
  * - `connected`: Anthropic issued a connection; Claude requests bill the customer.
- * - `billing_unavailable`: Anthropic answered `user_profile_not_billable`; requests
- *   fail without an upstream call until an admin reconnects or removes it.
+ * - `billing_unavailable`: Anthropic answered `user_profile_not_billable` or
+ *   `user_profile_billing_not_authorized`; requests fail without an upstream
+ *   call until an admin reconnects or removes it.
  * - `removed`: removed in Kilo; the profile is kept so a reconnect reuses it.
  */
 export const ClaudeBillingConnectionStatus = {
@@ -3347,6 +3348,8 @@ export const VercelModelSchema = ModelSchema.extend({
     .optional()
     .catch(undefined),
   supported_parameters: z.array(z.string()).optional().catch(undefined),
+  /** The inference regions the model can be pinned to; absent when it has no regional inference. */
+  regions: z.array(z.string()).optional().catch(undefined),
   pricing: z
     .object({
       input: z.string(),

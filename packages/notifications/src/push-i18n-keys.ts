@@ -27,7 +27,5 @@ const SHARED_BODY_I18N_KEYS: ReadonlySet<string> = new Set(
  * under `<i18nKey>.body` and the security-finding kinds read the shared entry.
  */
 export function pushBodyCatalogKey(i18nKey: string): string {
-  return SHARED_BODY_I18N_KEYS.has(i18nKey)
-    ? SECURITY_FINDING_PUSH_BODY_KEY
-    : `${i18nKey}.body`;
+  return SHARED_BODY_I18N_KEYS.has(i18nKey) ? SECURITY_FINDING_PUSH_BODY_KEY : `${i18nKey}.body`;
 }

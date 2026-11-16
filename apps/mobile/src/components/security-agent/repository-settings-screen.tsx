@@ -1,17 +1,15 @@
-import {
-  getSettingsDirtyState,
-  isPersonalSecurityScope,
-} from '@kilocode/app-shared/security-agent';
+import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { FolderGit2 } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
+import { RoleRefusalNotice } from '@/components/security-agent/role-refusal-notice';
+import { useRepositoryAccess } from '@/components/security-agent/use-repository-access';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
@@ -27,10 +25,6 @@ import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
-import { trpcClient } from '@/lib/trpc';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -84,6 +78,12 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const { accessRefused, manageAccess } = useRepositoryAccess({
+    scope,
+    refetch: async () => {
+      await repositories.refetch();
+    },
+  });
   // The saved baseline the draft is compared against. State rather than a ref:
   // a successful save must re-render, so `dirty` (and the back guard that
   // reads it) reflects the saved values by the time the header action leaves.
@@ -210,49 +210,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // cached `[]` under a failed read cannot render a label with no control.
   const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
 
-  // The GitHub settings page is where installation access is widened on the
-  // web, and `openExternalUrl` resolves when that page closes — on both
-  // platforms it awaits the browser's own dismissal (a launch it could not open
-  // is toasted by that helper and still resolves). Reading the repository list
-  // again on that return edge is what makes a grant show up here: without it the
-  // cached empty answer stays fresh for the whole stale window, and the disabled
-  // agent's enable rule counts exactly these repositories.
-  //
-  // The mint is only the hand-off token. An organization's mint needs
-  // `ORGANIZATION_MANAGE_ROLES` (`owner`/`admin`), which is narrower than this
-  // screen's `canManage` (`canManageOrganizationBilling` admits
-  // `billing_manager`), and `ensureOrganizationAccess` refuses the role with
-  // `UNAUTHORIZED`; an organization whose installation cannot take a second one
-  // is refused with `FORBIDDEN`. Both are ordinary states here, and both are
-  // exactly the empty-grant case this screen exists for. The web page mints
-  // its own state for the signed-in user, so any organization refusal falls
-  // back to the plain settings URL instead of leaving the control inert — the
-  // same rule the Code Reviewer's GitHub recovery control applies. A personal
-  // mint failure has no such page-level fallback to reach, so it keeps the
-  // toast.
-  const manageAccess = async () => {
-    const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
-    const open = async (url: string) => {
-      await openExternalUrl(url, {
-        label: t('securityAgent.repositories.githubAppSettings'),
-      });
-    };
-    try {
-      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-        organizationId: orgId ?? undefined,
-        returnTo: '/cloud/sessions',
-      });
-      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
-    } catch {
-      if (!orgId) {
-        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
-        return;
-      }
-      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId));
-    }
-    await repositories.refetch();
-  };
-
   // Everything above the rows (permission note, mode choice, and — in selected
   // mode — the loading / error / empty branches) rides on the list header so
   // the rendered order and paddings are unchanged from the ScrollView version.
@@ -317,20 +274,31 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               description={t('securityAgent.repositories.noRepositoriesDescription')}
               iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
-                <Button
-                  className={STATE_ACTION_CLASS}
-                  // Widening the grant is the only way out of this state, and
-                  // the header's Save is quiet while the screen has nothing to
-                  // save. The action therefore carries the filled primary
-                  // style instead of an outlined one that recedes into the
-                  // page beside it.
-                  variant="default"
-                  onPress={() => {
-                    void manageAccess();
-                  }}
-                >
-                  <Text>{t('securityAgent.repositories.manageAccess')}</Text>
-                </Button>
+                // The server decides who may start an installation, so its
+                // answer is presented where the control was rather than as a
+                // page the reader cannot act on.
+                accessRefused ? (
+                  <RoleRefusalNotice
+                    message={t('securityAgent.scopeEntry.connectOwnerOnly', {
+                      platform: t('common.github'),
+                    })}
+                  />
+                ) : (
+                  <Button
+                    className={STATE_ACTION_CLASS}
+                    // Widening the grant is the only way out of this state, and
+                    // the header's Save is quiet while the screen has nothing to
+                    // save. The action therefore carries the filled primary
+                    // style instead of an outlined one that recedes into the
+                    // page beside it.
+                    variant="default"
+                    onPress={() => {
+                      void manageAccess();
+                    }}
+                  >
+                    <Text>{t('securityAgent.repositories.manageAccess')}</Text>
+                  </Button>
+                )
               }
             />
           ) : null}

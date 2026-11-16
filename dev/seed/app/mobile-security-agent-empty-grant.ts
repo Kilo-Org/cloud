@@ -7,6 +7,10 @@
  * and a manual sync is refused for having nothing in scope. Reaching it by hand
  * needs a real GitHub App installation with no repository access, so the two
  * surfaces that explain it are otherwise untestable end to end.
+ *
+ * The member's organization role defaults to `member`; `--member-role` accepts
+ * any other non-managing organization role. Roles that manage the organization
+ * are refused, since the fixture needs a member without that authority.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -20,14 +24,23 @@ import {
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 
+import {
+  ORGANIZATION_ROLES,
+  canManageOrganization,
+  type OrganizationRole,
+} from '../../../packages/app-shared/src/organizations/roles';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import type { SeedResult } from '../index';
 
-export const usage = '<owner-email> <member-email>';
+export const usage = '<owner-email> <member-email> [--member-role <role>]';
 
 const SETTINGS_MARKER = 'security-agent-empty-grant';
 const ORGANIZATION_NAME = 'Northwind Traders';
+const DEFAULT_MEMBER_ROLE: OrganizationRole = 'member';
+const MEMBER_ROLES: readonly OrganizationRole[] = ORGANIZATION_ROLES.filter(
+  role => !canManageOrganization(role)
+);
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:mobile-security-agent-empty-grant ${usage}`);
@@ -35,8 +48,15 @@ function printUsage(): void {
   console.log('Creates an organization whose GitHub App grant holds no repositories, with an');
   console.log('owner and a member: the grant is an active integration whose repository');
   console.log('snapshot is a settled empty list, and the Security Agent is enabled over all');
-  console.log('repositories. The member can read the agent and start a sync but cannot change');
-  console.log('repository policy.');
+  console.log('repositories. A non-managing member can read the agent and start a sync but');
+  console.log('cannot change repository policy.');
+  console.log('');
+  console.log('Options:');
+  console.log(
+    `  --member-role <role>  Organization role of the seeded member (default: ${DEFAULT_MEMBER_ROLE}).`
+  );
+  console.log(`                        One of: ${MEMBER_ROLES.join(', ')}.`);
+  console.log('                        Organization-managing roles are refused.');
   console.log('');
   console.log('Usage:');
   console.log('  pnpm dev:seed app:create-user "Agent Owner" owner@example.com');
@@ -44,12 +64,73 @@ function printUsage(): void {
   console.log(
     '  pnpm dev:seed app:mobile-security-agent-empty-grant owner@example.com member@example.com'
   );
+  console.log(
+    '  pnpm dev:seed app:mobile-security-agent-empty-grant owner@example.com member@example.com \\'
+  );
+  console.log('    --member-role billing_manager');
   console.log('');
   console.log('Open the organization voices with:');
   console.log('  adb shell "am start -a android.intent.action.VIEW \\');
   console.log(
     "    -d 'kiloapp:///(app)/security-agent/<organizationId>/settings' com.kilocode.kiloapp\""
   );
+}
+
+function parseMemberRole(value: string): OrganizationRole {
+  const role = ORGANIZATION_ROLES.find(candidate => candidate === value);
+  if (!role) {
+    printUsage();
+    throw new Error(
+      `unknown organization role: ${value} (expected one of: ${MEMBER_ROLES.join(', ')})`
+    );
+  }
+  if (canManageOrganization(role)) {
+    printUsage();
+    throw new Error(
+      `--member-role must not be an organization-managing role: ${role} (expected one of: ${MEMBER_ROLES.join(', ')})`
+    );
+  }
+  return role;
+}
+
+function parseArguments(args: string[]): {
+  ownerEmail: string;
+  memberEmail: string;
+  memberRole: OrganizationRole;
+} {
+  const positionals: string[] = [];
+  let memberRoleValue: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--member-role') {
+      const value = args[index + 1];
+      if (value === undefined) {
+        printUsage();
+        throw new Error('--member-role expects a role value');
+      }
+      memberRoleValue = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('-')) {
+      printUsage();
+      throw new Error(`unknown option: ${arg}`);
+    }
+    positionals.push(arg);
+  }
+
+  const [ownerEmail, memberEmail, ...rest] = positionals;
+  if (!ownerEmail || !memberEmail) {
+    printUsage();
+    throw new Error('expected an owner email and a member email');
+  }
+  if (rest.length > 0) {
+    throw new Error(`unexpected arguments: ${rest.join(' ')}`);
+  }
+
+  const memberRole =
+    memberRoleValue === undefined ? DEFAULT_MEMBER_ROLE : parseMemberRole(memberRoleValue);
+  return { ownerEmail, memberEmail, memberRole };
 }
 
 async function findUser(email: string): Promise<string> {
@@ -95,14 +176,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     return;
   }
 
-  const [ownerEmail, memberEmail, ...rest] = args;
-  if (!ownerEmail || !memberEmail) {
-    printUsage();
-    throw new Error('expected an owner email and a member email');
-  }
-  if (rest.length > 0) {
-    throw new Error(`unexpected arguments: ${rest.join(' ')}`);
-  }
+  const { ownerEmail, memberEmail, memberRole } = parseArguments(args);
   assertLocalSeedDatabase('app:mobile-security-agent-empty-grant');
 
   const ownerUserId = await findUser(ownerEmail);
@@ -129,7 +203,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   await db.insert(organization_memberships).values([
     { organization_id: organizationId, kilo_user_id: ownerUserId, role: 'owner' },
-    { organization_id: organizationId, kilo_user_id: memberUserId, role: 'member' },
+    { organization_id: organizationId, kilo_user_id: memberUserId, role: memberRole },
   ]);
 
   // An active installation with the security-review permission and a
@@ -167,7 +241,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const scope = organizationId;
   console.log('This fixture represents:');
   console.log('  An organization whose GitHub App grant holds no repositories, with an owner');
-  console.log('  and a member, and Security Agent enabled over every repository.');
+  console.log(`  and a ${memberRole} member, and Security Agent enabled over every repository.`);
   console.log('Suggested next step:');
   console.log(`  Sign in as the member and open /security-agent/${scope}/settings.`);
 
@@ -175,6 +249,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     organizationId,
     ownerUserId,
     memberUserId,
+    memberRole,
     settingsLink: `kiloapp:///(app)/security-agent/${scope}/settings`,
     dashboardLink: `kiloapp:///(app)/security-agent/${scope}`,
   };

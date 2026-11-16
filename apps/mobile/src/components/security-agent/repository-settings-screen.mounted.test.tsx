@@ -42,6 +42,8 @@ const manageAccess = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  // The shared refusal notice reads the theme's ink for its icon.
+  useColorScheme: () => 'light',
   View: 'View',
   Pressable: 'Pressable',
 }));
@@ -126,7 +128,13 @@ vi.mock('@/components/security-agent/orphaned-findings-card', () => ({
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The stub mounts the screen's own `action` element under the named host, so a
+// state handed over there (the Manage access button, or the refusal notice that
+// replaces it) actually renders and its copy is observable.
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactNode; placement?: string }) =>
+    createElement('EmptyState', props, props.action),
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 // `headerRight` is a prop, not a child: the stub renders it so the Save button
 // (the screen's only save path) actually mounts.
@@ -134,7 +142,7 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: ReactNode }) =>
     createElement(Fragment, null, props.headerRight),
 }));
-vi.mock('@/components/ui/icons', () => ({ FolderGit2: 'FolderGit2' }));
+vi.mock('@/components/ui/icons', () => ({ FolderGit2: 'FolderGit2', Info: 'Info' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
@@ -146,6 +154,12 @@ const THREE_REPOS: readonly [RepoRow, RepoRow, RepoRow] = [
   { id: 2, fullName: 'acme/two', private: true },
   { id: 3, fullName: 'acme/three', private: false },
 ];
+
+// The shape a tRPC client rejection carries: the error code and its `data`
+// payload travel on the error object, not in the message.
+function mintFailure(code: string, data: Record<string, unknown> = {}): Error {
+  return Object.assign(new Error('mint refused'), { data: { code, ...data } });
+}
 
 function configData(mode: 'all' | 'selected', selectedRepositoryIds: number[] = []) {
   return { isEnabled: true, repositorySelectionMode: mode, selectedRepositoryIds };
@@ -413,30 +427,83 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(repositories.refetch).not.toHaveBeenCalled();
   });
 
-  // An organization's mint is refused for a role that may edit these settings
-  // but not manage the installation (`UNAUTHORIZED`) and for an organization
-  // that already holds an installation and cannot take a second one
-  // (`FORBIDDEN`). The settings page mints its own state for the signed-in web
-  // user, so the control still opens it instead of going inert.
-  it.each(['UNAUTHORIZED', 'FORBIDDEN'])(
-    'opens the organization settings page without a minted state on %s',
-    async code => {
-      repositories.data = [];
-      manageAccess.mintInstallState.mockRejectedValueOnce(
-        Object.assign(new Error('mint refused'), { data: { code, httpStatus: 403 } })
-      );
-      const { renderer } = await mount('org_123');
+  // The server decides whether this reader may start an installation, and its
+  // answer stands where the control was: nothing opens, and the list is not
+  // read again.
+  it('shows the role notice in place of the action when the server answers for the role', async () => {
+    repositories.data = [];
+    manageAccess.mintInstallState.mockRejectedValueOnce(mintFailure('UNAUTHORIZED'));
+    const { renderer } = await mount('org_123');
 
-      await pressEmptyStateAction(renderer);
+    await pressEmptyStateAction(renderer);
 
-      expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-        'https://settings.test/github-app?organizationId=org_123'
-      );
-      await vi.waitFor(() => {
-        expect(repositories.refetch).toHaveBeenCalledTimes(1);
-      });
-    }
-  );
+    const notice = i18n.t('securityAgent.scopeEntry.connectOwnerOnly', {
+      platform: i18n.t('common.github'),
+    });
+    await vi.waitFor(() => {
+      expect(textContents(renderer)).toContain(notice);
+    });
+    const action = renderer.root.find(node => String(node.type) === 'EmptyState').props.action as {
+      type: unknown;
+      props: Record<string, unknown>;
+    };
+    expect(action.type).not.toBe('Button');
+    expect(action.props).not.toHaveProperty('onPress');
+    expect(manageAccess.openExternalUrl).not.toHaveBeenCalled();
+    expect(repositories.refetch).not.toHaveBeenCalled();
+  });
+
+  // The single-installation guard is a different answer: the plain settings page
+  // mints its own state for the signed-in user, so the control still opens it.
+  it('opens the plain organization settings page on FORBIDDEN', async () => {
+    repositories.data = [];
+    manageAccess.mintInstallState.mockRejectedValueOnce(mintFailure('FORBIDDEN'));
+    const { renderer } = await mount('org_123');
+
+    await pressEmptyStateAction(renderer);
+
+    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
+      'https://settings.test/github-app?organizationId=org_123'
+    );
+    await vi.waitFor(() => {
+      expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // A missing or invalid session is flagged `authRequired` and is not the role
+  // answer, so it keeps the plain-page fallback.
+  it('opens the plain organization settings page for a session auth failure', async () => {
+    repositories.data = [];
+    manageAccess.mintInstallState.mockRejectedValueOnce(
+      mintFailure('UNAUTHORIZED', { authRequired: true })
+    );
+    const { renderer } = await mount('org_123');
+
+    await pressEmptyStateAction(renderer);
+
+    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
+      'https://settings.test/github-app?organizationId=org_123'
+    );
+    await vi.waitFor(() => {
+      expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // A failure that never reached the server keeps the plain-page fallback.
+  it('opens the plain organization settings page on a transport failure', async () => {
+    repositories.data = [];
+    manageAccess.mintInstallState.mockRejectedValueOnce(new TypeError('Network request failed'));
+    const { renderer } = await mount('org_123');
+
+    await pressEmptyStateAction(renderer);
+
+    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
+      'https://settings.test/github-app?organizationId=org_123'
+    );
+    await vi.waitFor(() => {
+      expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    });
+  });
 
   it('keeps the EmptyState out while the repository query has no data yet', async () => {
     // TanStack Query reports this shape while an enabled query is paused (the

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WebMcpToolDescriptor } from './tab-debugger';
-import { buildWebMcpToolDefinitions } from './web-mcp-tools';
+import { buildWebMcpDefinitionSignature, buildWebMcpToolDefinitions } from './web-mcp-tools';
 
 const objectSchema = {
   additionalProperties: false,
@@ -157,8 +157,30 @@ describe('webMCP tools', () => {
     expect(result.warning).toContain('the limit is 128');
   });
 
-  it('builds the definition signature from the ordered array', () => {
+  it('builds the definition signature from the tool definition', () => {
     const result = build([createTool()]);
+
+    expect(result.routes.get('search_page')?.definitionSignature).toBe(
+      JSON.stringify([
+        'search_page',
+        'Search Page',
+        'Search the page for a term.',
+        'https://example.com',
+        objectSchema,
+      ])
+    );
+  });
+
+  it('signs the same definition regardless of JSON key order', () => {
+    // The page rebuilds this signature itself, and key order changes through extension messaging.
+    const reorderedSchema = {
+      additionalProperties: false,
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+      type: 'object',
+    };
+
+    const result = build([createTool({ inputSchema: reorderedSchema })]);
 
     expect(result.routes.get('search_page')?.definitionSignature).toBe(
       JSON.stringify([
@@ -202,5 +224,22 @@ describe('webMCP tools', () => {
 
     expect(result.tools.map(tool => tool.function.name)).toStrictEqual(['ok_tool']);
     expect(result.warning).toContain('Omitted 3');
+  });
+});
+
+describe('web mcp definition signature', () => {
+  // eslint-disable-next-line typescript/no-unsafe-type-assertion -- page-supplied descriptor fields arrive typed as strings but are untrusted.
+  const untrustedText = (value: unknown): string => value as string;
+
+  it('normalizes non-string descriptor fields before comparing', () => {
+    const signature = buildWebMcpDefinitionSignature({
+      description: untrustedText(42),
+      inputSchema: { type: 'object' },
+      name: 'do_thing',
+      origin: untrustedText(null),
+      title: untrustedText({}),
+    });
+
+    expect(signature).toBe('["do_thing","","","",{"type":"object"}]');
   });
 });

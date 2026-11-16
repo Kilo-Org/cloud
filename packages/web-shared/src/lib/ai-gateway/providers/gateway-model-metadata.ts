@@ -6,7 +6,7 @@ import {
   EndpointsSchema,
   ModelArchitectureSchema,
   ModelSchema,
-  ModelsSchema,
+  VercelModelSchema,
   type Endpoint,
   type GatewayModel,
 } from '@kilocode/db/schema-types';
@@ -27,7 +27,12 @@ export type GatewayModelMap = Record<string, GatewayModelWithEndpoints>;
 export const NO_ENDPOINTS_RESOURCE = 'no-endpoints-resource';
 const NoEndpointsResourceSchema = z.strictObject({ status: z.literal(404) });
 
-export type GatewayModelList = z.infer<typeof ModelsSchema>;
+export type GatewayModelList = { data: GatewayModel[] };
+
+/** A gateway's model list source. Reading it back from the cache keeps only `modelKeys`. */
+export type GatewayModelsSource = MetadataSource<GatewayModelList> & {
+  modelKeys: readonly string[];
+};
 export type GatewayModelEndpoints = Endpoint[] | typeof NO_ENDPOINTS_RESOURCE;
 
 const MINIMUM_GATEWAY_MODEL_COUNT = 100;
@@ -42,14 +47,17 @@ function gatewayHeaders(gateway: Provider) {
 
 export function gatewayModelsSource(
   gateway: Provider,
-  modelsPath: string
-): MetadataSource<GatewayModelList> {
+  modelsPath: string,
+  modelSchema: typeof ModelSchema | typeof VercelModelSchema = ModelSchema
+): GatewayModelsSource {
   const url = `${gateway.apiUrl}${modelsPath}`;
+  const listSchema = z.object({ data: z.array(modelSchema) });
   return {
     url,
     headers: () => gatewayHeaders(gateway),
+    modelKeys: modelSchema.keyof().options,
     parse: raw => {
-      const models = ModelsSchema.parse(raw);
+      const models: GatewayModelList = listSchema.parse(raw);
       assertMinimumCount(url, models.data.length, MINIMUM_GATEWAY_MODEL_COUNT);
       return models;
     },
@@ -61,7 +69,12 @@ export const openRouterGatewayModelsSource = gatewayModelsSource(
   OPENROUTER,
   '/models?output_modalities=all'
 );
-export const vercelGatewayModelsSource = gatewayModelsSource(VERCEL_AI_GATEWAY, '/models');
+// Vercel's list also describes each model, which Kilo needs to list models only Vercel serves.
+export const vercelGatewayModelsSource = gatewayModelsSource(
+  VERCEL_AI_GATEWAY,
+  '/models',
+  VercelModelSchema
+);
 
 function gatewayModelEndpointsUrlPrefix(gateway: Provider) {
   return `${gateway.apiUrl}/models/`;
@@ -153,7 +166,7 @@ function parseStoredGatewayModelEndpoints(raw: unknown): GatewayModelEndpoints |
  */
 export async function readStoredGatewayModels(
   gateway: Provider,
-  source: MetadataSource<GatewayModelList>,
+  source: GatewayModelsSource,
   fromDb: MetadataDb
 ): Promise<ListedGatewayModel[] | null> {
   const item = sql`items.item`;
@@ -172,7 +185,7 @@ export async function readStoredGatewayModels(
     CROSS JOIN LATERAL (
       SELECT
         jsonb_agg(
-          ${pickJsonbKeys(item, ModelSchema.keyof().options, {
+          ${pickJsonbKeys(item, source.modelKeys, {
             architecture: ModelArchitectureSchema.keyof().options,
           })}
           ORDER BY items.ordinality
@@ -252,7 +265,8 @@ export function joinGatewayModelEndpoints(
  * briefly list models it cannot serve yet. A listed model without usable stored endpoints keeps its
  * previous entry. An alias retargeted to a model that is not usable yet keeps its previous entry
  * while that entry's target is still in the catalog, and is left out otherwise, so the alias never
- * resolves to a model the catalog leaves out.
+ * resolves to a model the catalog leaves out. A restored previous entry is checked by the same rule,
+ * so an alias whose target disappears in the same refresh is left out too.
  */
 export function retainPreviousEntries(
   joined: JoinedGatewayModels,
@@ -262,16 +276,24 @@ export function retainPreviousEntries(
   for (const modelId of joined.withoutStoredEndpoints) {
     if (Object.hasOwn(previous, modelId)) models[modelId] = previous[modelId];
   }
-  const unusable = new Set(joined.withoutStoredEndpoints.filter(id => !Object.hasOwn(models, id)));
-  for (const [modelId, model] of Object.entries(models)) {
-    const target = model.alias_target?.slug;
-    if (target === undefined || !unusable.has(target)) continue;
-    const previousEntry = Object.hasOwn(previous, modelId) ? previous[modelId] : undefined;
-    const previousTarget = previousEntry?.alias_target?.slug;
-    if (previousEntry && (previousTarget === undefined || Object.hasOwn(models, previousTarget))) {
-      models[modelId] = previousEntry;
-    } else {
-      delete models[modelId];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [modelId, model] of Object.entries(models)) {
+      const target = model.alias_target?.slug;
+      if (target === undefined || Object.hasOwn(models, target)) continue;
+      const previousEntry = Object.hasOwn(previous, modelId) ? previous[modelId] : undefined;
+      const previousTarget = previousEntry?.alias_target?.slug;
+      if (
+        previousEntry !== undefined &&
+        previousEntry !== model &&
+        (previousTarget === undefined || Object.hasOwn(models, previousTarget))
+      ) {
+        models[modelId] = previousEntry;
+      } else {
+        delete models[modelId];
+      }
+      changed = true;
     }
   }
   return models;

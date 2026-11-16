@@ -4,9 +4,9 @@ import type { AgentWorkflow } from '@/src/shared/agent-workflows';
 import {
   deriveWorkflowRunDisabledReason,
   deriveWorkflowSettingsView,
-  formatWorkflowListDate,
   toWorkflowSettingsListItem,
 } from './workflow-settings-state';
+import { formatLocalListDate } from './format-local-date';
 
 const workflow = (overrides: Partial<AgentWorkflow> = {}): AgentWorkflow => ({
   id: 'wf-1',
@@ -17,12 +17,6 @@ const workflow = (overrides: Partial<AgentWorkflow> = {}): AgentWorkflow => ({
   createdAt: 1_700_000_000_000,
   updatedAt: 1_700_000_000_000,
   ...overrides,
-});
-
-describe('workflow list date formatting', () => {
-  it('formats UTC YYYY-MM-DD', () => {
-    expect(formatWorkflowListDate(Date.UTC(2024, 5, 10, 12, 0, 0))).toBe('2024-06-10');
-  });
 });
 
 describe('workflow settings list item mapping', () => {
@@ -105,7 +99,7 @@ describe('workflow settings view selection', () => {
       kind: 'list',
       items: [
         {
-          dateLabel: formatWorkflowListDate(200),
+          dateLabel: formatLocalListDate(200),
           deleteAriaLabel: 'Delete workflow "Newer"',
           description: 'A test workflow',
           id: 'newer',
@@ -115,7 +109,7 @@ describe('workflow settings view selection', () => {
           scope: 'https://example.com',
         },
         {
-          dateLabel: formatWorkflowListDate(100),
+          dateLabel: formatLocalListDate(100),
           deleteAriaLabel: 'Delete workflow "Older"',
           description: 'A test workflow',
           id: 'older',
@@ -159,7 +153,11 @@ describe('workflow run disabled reason', () => {
       isApproved: false,
       isDangerousMode: true,
     });
-    expect(reason).toStrictEqual({ reason: 'notApproved', label: 'Needs approval' });
+    expect(reason).toStrictEqual({
+      hint: 'This version is not approved yet. Ask Kilo to save the workflow again to approve it.',
+      label: 'Needs approval',
+      reason: 'notApproved',
+    });
   });
 
   it('disables when safe mode toggle is off in safe mode', () => {
@@ -170,8 +168,9 @@ describe('workflow run disabled reason', () => {
       isDangerousMode: false,
     });
     expect(reason).toStrictEqual({
-      reason: 'safeModeDisabled',
+      hint: "Workflows can't run in safe mode until you allow them.",
       label: 'Safe mode workflows disabled',
+      reason: 'safeModeDisabled',
     });
   });
 
@@ -194,8 +193,9 @@ describe('workflow run disabled reason', () => {
       isDangerousMode: true,
     });
     expect(reason).toStrictEqual({
-      reason: 'conversationRunning',
+      hint: 'Wait for the conversation to finish, then run it.',
       label: 'Conversation is running',
+      reason: 'conversationRunning',
     });
   });
 

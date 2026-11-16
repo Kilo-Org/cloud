@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ئەجێنتە چالاکەکان نوێکارییەکیان هەیە"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ئەرکەکە تەواو بوو"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "سەرکەوتوو نەبوو: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "گۆڕدرا: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "ئاگادارکردنەوەی خەرج",
       "body": "خەرجی {{scopeName}} لە ${{amountUsd}} تێپەڕی"
     },
-    "securityFindingNew": {
-      "title": "دۆزینەوەی ئاسایشی نوێ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} لە {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "دۆزینەوەی ئاسایشی نوێ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "ئاگادارکردنەوەی SLA",
-      "body": "{{findingTitle}} لە {{repoFullName}}"
+      "title": "ئاگادارکردنەوەی SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "پێشێلکردنی SLA",
-      "body": "{{findingTitle}} لە {{repoFullName}}"
+      "title": "پێشێلکردنی SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

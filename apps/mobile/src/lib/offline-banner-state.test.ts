@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { OFFLINE_BANNER_HEIGHT, offlineHeaderReservation } from './offline-banner-state';
+import {
+  OFFLINE_BANNER_HEIGHT,
+  offlineHeaderReservation,
+  phaseBlocksWrites,
+  projectBannerState,
+} from './offline-banner-state';
 import {
   createStore,
   offlineState,
@@ -145,6 +150,68 @@ describe('createOfflineBannerStore', () => {
     expect(store.state()).toBe(newer);
     expect(changes).toEqual([newer]);
     expect(probe).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the committed online state while the first disconnect is confirmed', () => {
+    const { store, source, timer, changes, probe } = createStore();
+    source.emit(onlineState);
+    expect(changes).toEqual(['online']);
+
+    source.emit(offlineState);
+
+    // The 5 s window is not evidence of a working transport, but it keeps painting online.
+    expect(store.phase().kind).toBe('confirming-offline');
+    expect(store.state()).toBe('online');
+    expect(store.isOffline()).toBe(false);
+    expect(changes).toEqual(['online']);
+    expect(phaseBlocksWrites(store.phase())).toBe(true);
+    expect(probe).not.toHaveBeenCalled();
+    timer.advanceBy(5000);
+  });
+
+  it('keeps the committed state across repeated disconnect reports', () => {
+    const { store, source, changes } = createStore();
+    source.emit(onlineState);
+    source.emit(offlineState);
+    source.emit(offlineState);
+
+    expect(projectBannerState(store.phase())).toBe('online');
+    expect(store.state()).toBe('online');
+    expect(changes).toEqual(['online']);
+  });
+
+  it('keeps a confirmed offline banner for the whole confirmation window', async () => {
+    const { store, source, timer, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+    expect(changes).toEqual(['offline']);
+
+    source.emit(offlineState);
+
+    // A repeated disconnect copies the state it found: the banner stays offline.
+    expect(store.phase().kind).toBe('confirming-offline');
+    expect(store.state()).toBe('offline');
+    expect(store.isOffline()).toBe(true);
+    expect(changes).toEqual(['offline']);
+    expect(phaseBlocksWrites(store.phase())).toBe(true);
+
+    timer.advanceBy(5000);
+    await settle(1, 'online');
+
+    expect(store.state()).toBe('online');
+    expect(store.isOffline()).toBe(false);
+    expect(changes).toEqual(['offline', 'online']);
+  });
+
+  it('refuses a write while a disconnect report is being confirmed', () => {
+    const { store, source } = createStore();
+    expect(phaseBlocksWrites(store.phase())).toBe(false);
+    source.emit(onlineState);
+    expect(phaseBlocksWrites(store.phase())).toBe(false);
+
+    source.emit(offlineState);
+    expect(phaseBlocksWrites(store.phase())).toBe(true);
   });
 
   it('preserves confirmed offline on unknown and avoids duplicate offline notifications', async () => {

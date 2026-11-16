@@ -64,6 +64,7 @@ import {
   type RepositoryModelOverrideValue,
 } from './RepositoryModelOverrides';
 import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
+import { CodeReviewComputeNotice } from './CodeReviewComputeNotice';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -789,6 +790,7 @@ export function ReviewConfigForm({
       </CardHeader>
       <CardContent>
         <div className="space-y-8">
+          <CodeReviewComputeNotice organizationId={organizationId} />
           {configData?.actionRequired && (
             <CodeReviewActionRequiredAlert
               actionRequired={configData.actionRequired}

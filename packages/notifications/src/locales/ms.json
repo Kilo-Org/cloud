@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Ejen aktif ada kemas kini"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tugas selesai"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Gagal: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Diganggu: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Amaran perbelanjaan",
       "body": "Perbelanjaan {{scopeName}} melebihi ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Penemuan keselamatan baharu ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} dalam {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Penemuan keselamatan baharu ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Amaran SLA",
-      "body": "{{findingTitle}} dalam {{repoFullName}}"
+      "title": "Amaran SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Pelanggaran SLA",
-      "body": "{{findingTitle}} dalam {{repoFullName}}"
+      "title": "Pelanggaran SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

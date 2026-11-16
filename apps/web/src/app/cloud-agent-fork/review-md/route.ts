@@ -22,12 +22,13 @@ import { TRPCError } from '@trpc/server';
 
 import { createCallerFactory, createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
+import { isSameOriginNavigation } from '@/lib/auth/same-origin';
 import {
-  CODE_REVIEW_MD_CONVERSION_FLAG,
   DEFAULT_CODE_REVIEW_MODE,
   REVIEW_MD_CONVERSION_RATE_LIMIT,
   REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS,
 } from '@/lib/code-reviews/core/constants';
+import { CODE_REVIEW_MD_CONVERSION_FLAG } from '@kilocode/app-shared/feature-flags';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { buildReviewMdConversionPrompt } from '@/lib/code-reviews/prompts/review-md-conversion-prompt';
 import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
@@ -109,13 +110,13 @@ export async function GET(request: NextRequest) {
 
   const { platform, repo, organizationId } = parsed.data;
 
-  // CSRF defense for this mutating, credit-spending GET. Fail CLOSED: allow only same-origin dialog
-  // clicks (`same-origin`/`same-site`) and deliberate direct navigation (`none`, e.g. typing the URL
-  // or a bookmark). A `cross-site` value OR a MISSING header (older browsers, embedded webviews,
-  // header-stripping proxies) is rejected, since a forged top-level navigation carries the session
-  // cookie and would otherwise start a billable session.
-  const secFetchSite = request.headers.get('sec-fetch-site');
-  if (secFetchSite !== 'same-origin' && secFetchSite !== 'same-site' && secFetchSite !== 'none') {
+  // CSRF defense for this mutating, credit-spending GET. Fail CLOSED: accept only a navigation the
+  // app itself started (`Sec-Fetch-Site: same-origin`, or an `Origin` header that names this host)
+  // and a deliberate direct navigation (`Sec-Fetch-Site: none`, e.g. typing the URL or a
+  // bookmark). Every other value names a page outside this origin, and so does a MISSING header
+  // (older browsers, embedded webviews, header-stripping proxies): such a navigation carries the
+  // session cookie and would otherwise start a billable session on the user's behalf.
+  if (!isSameOriginNavigation(request)) {
     return redirectToError(organizationId, 'invalid_conversion_request');
   }
 

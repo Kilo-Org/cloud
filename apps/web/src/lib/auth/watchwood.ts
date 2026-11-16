@@ -22,7 +22,7 @@ end
 return count
 `;
 const identitySchema = z.object({ safetyIdentifier: z.uuid() });
-const turnstileSchema = z.object({ guid: z.uuid(), watchwoodIp: z.string() });
+const turnstileSchema = z.object({ guid: z.uuid(), ip: z.string() });
 const assessmentBase = z.object({
   safetyIdentifier: z.uuid().optional(),
   latencyMs: z.number().finite().nonnegative(),
@@ -267,8 +267,7 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
       verify(request.cookies.get('turnstile_jwt')?.value)
     );
     const ip = getTrustedSignupClientIp(request.headers);
-    if (!session.success || !turnstile.success || !ip || turnstile.data.watchwoodIp !== ip)
-      return result;
+    if (!session.success || !turnstile.success || !ip || turnstile.data.ip !== ip) return result;
     safetyIdentifier = session.data.safetyIdentifier;
     turnstileGuid = turnstile.data.guid;
     const declaredLength = request.headers.get('content-length');

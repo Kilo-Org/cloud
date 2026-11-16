@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "งานเสร็จสมบูรณ์"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ล้มเหลว: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ถูกขัดจังหวะ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "การแจ้งเตือนค่าใช้จ่าย",
       "body": "ค่าใช้จ่ายของ {{scopeName}} เกิน ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "พบปัญหาความปลอดภัยใหม่ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ใน {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "พบปัญหาความปลอดภัยใหม่ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "คำเตือน SLA",
-      "body": "{{findingTitle}} ใน {{repoFullName}}"
+      "title": "คำเตือน SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "ละเมิด SLA",
-      "body": "{{findingTitle}} ใน {{repoFullName}}"
+      "title": "ละเมิด SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

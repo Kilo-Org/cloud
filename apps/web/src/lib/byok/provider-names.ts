@@ -1,6 +1,9 @@
 import {
   DirectUserByokInferenceProviderIdSchema,
+  GatewayUserByokProviderIdSchema,
+  VercelUserByokInferenceProviderIdSchema,
   type GatewayUserByokProviderId,
+  type UserByokProviderId,
   type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
@@ -34,29 +37,69 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   zai: 'Z.ai (pay as you go)',
 } satisfies Record<VercelUserByokInferenceProviderId, string>;
 
-const VERCEL_BYOK_PROVIDERS = [
-  ...Object.entries(VERCEL_BYOK_PROVIDER_NAMES).map(([id, name]) => ({ id, name })),
-  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Legacy Codestral-only key' },
-];
+/**
+ * One row of a provider picker. The id carries the provider union rather than a
+ * bare string, because it is the value a key is created with: the lists are built
+ * from the enum itself, so a provider added to the schema appears here without a
+ * second edit and an id the create procedure rejects cannot be produced.
+ */
+export type ByokProviderOption = { readonly id: UserByokProviderId; readonly name: string };
 
-export const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(
-  ([id, name]) => ({ id, name })
-);
+/**
+ * Keys that exist but cannot be added: each serves a key created before its
+ * provider was retired. They are listed so an existing key keeps its name, and
+ * every addable list subtracts them.
+ */
+const LEGACY_ONLY_BYOK_PROVIDERS = [
+  { id: 'codestral', name: 'Legacy Codestral-only key' },
+] as const satisfies readonly ByokProviderOption[];
+
+type LegacyOnlyByokProviderId = (typeof LEGACY_ONLY_BYOK_PROVIDERS)[number]['id'];
+
+function isLegacyOnlyByokProviderId(providerId: string): providerId is LegacyOnlyByokProviderId {
+  return LEGACY_ONLY_BYOK_PROVIDERS.some(provider => provider.id === providerId);
+}
+
+const VERCEL_BYOK_PROVIDERS: readonly ByokProviderOption[] =
+  VercelUserByokInferenceProviderIdSchema.options.map(id => ({
+    id,
+    name: VERCEL_BYOK_PROVIDER_NAMES[id],
+  }));
+
+export const DIRECT_BYOK_PROVIDERS_LIST: readonly ByokProviderOption[] =
+  DirectUserByokInferenceProviderIdSchema.options.flatMap(id => {
+    // A legacy-only key is not a direct provider and has no direct-BYOK display name.
+    if (isLegacyOnlyByokProviderId(id)) return [];
+    return [{ id, name: DIRECT_BYOK_PROVIDERS_META[id] }];
+  });
 
 const GATEWAY_BYOK_PROVIDER_NAMES = {
   'vercel-ai-gateway': 'Vercel AI Gateway',
   openrouter: 'OpenRouter',
 } satisfies Record<GatewayUserByokProviderId, string>;
 
-const GATEWAY_BYOK_PROVIDERS_LIST = Object.entries(GATEWAY_BYOK_PROVIDER_NAMES).map(
-  ([id, name]) => ({ id, name })
-);
+const GATEWAY_BYOK_PROVIDERS_LIST: readonly ByokProviderOption[] =
+  GatewayUserByokProviderIdSchema.options.map(id => ({
+    id,
+    name: GATEWAY_BYOK_PROVIDER_NAMES[id],
+  }));
 
-export const BYOK_PROVIDERS = [
+export const BYOK_PROVIDERS: readonly ByokProviderOption[] = [
   ...DIRECT_BYOK_PROVIDERS_LIST,
+  ...LEGACY_ONLY_BYOK_PROVIDERS,
   ...VERCEL_BYOK_PROVIDERS,
   ...GATEWAY_BYOK_PROVIDERS_LIST,
 ].toSorted((a, b) => a.name.localeCompare(b.name));
+
+/**
+ * The providers a key can be added for, in the order the pickers show them: every
+ * provider except the legacy-only keys, which only serve a key that already
+ * exists. The experimental direct providers are filtered per owner at the
+ * call site, because their entitlement belongs to the organization.
+ */
+export const ADD_BYOK_PROVIDERS: readonly ByokProviderOption[] = BYOK_PROVIDERS.filter(
+  provider => !isLegacyOnlyByokProviderId(provider.id)
+);
 
 export function getByokProviderDisplayName(providerId: string): string {
   const provider = BYOK_PROVIDERS.find(p => p.id === providerId);

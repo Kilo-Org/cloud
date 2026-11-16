@@ -18,15 +18,18 @@ const legacyTriggerConfig = sqliteTable('trigger_config', {
   model: text('model'),
 });
 
-describe('trigger body schema migration', () => {
-  it('preserves saved configuration and captured requests and defaults validation off', async () => {
+describe('trigger config migrations', () => {
+  it('preserves saved configuration and requests and defaults validation and environment selection off', async () => {
     const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/migration/preservation'));
     await runInDurableObject(stub, async (instance, state) => {
       await state.storage.deleteAll();
       const db = drizzle(state.storage);
       await migrate(db, {
         ...migrations,
-        journal: { ...migrations.journal, entries: migrations.journal.entries.slice(0, -1) },
+        journal: {
+          ...migrations.journal,
+          entries: migrations.journal.entries.filter(entry => entry.idx < 6),
+        },
       });
       db.insert(legacyTriggerConfig)
         .values({
@@ -56,6 +59,7 @@ describe('trigger body schema migration', () => {
         triggerId: 'preserved',
         profileId: 'saved-profile',
         bodySchema: null,
+        environmentId: null,
         githubRepo: 'owner/repo',
       });
       expect(await instance.getRequest('saved-request')).toMatchObject({

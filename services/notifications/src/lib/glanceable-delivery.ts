@@ -14,9 +14,9 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   aggregateLiveActivityRelevance,
+  genericPushContentForPushData,
   type GlanceableLiveActivityContentState,
   type PushData,
-  translatePush,
 } from '@kilocode/notifications';
 
 import type { LiveActivityAlert, LiveActivityEvent } from './apns-live-activity';
@@ -280,15 +280,9 @@ export async function deliverGlanceableSnapshot(
     await deps.sendIosLiveActivity(
       iosSends,
       contentState,
-      {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.activeAgentsGlanceable',
-          undefined,
-          'Active agents have an update'
-        ),
-      },
+      // The aggregate banner is the agent-briefing generic copy, so it renders
+      // from the one catalog-backed source instead of restating it here.
+      genericPushContentForPushData({ type: 'agent_briefing', url: '/agent-briefing' }, locale),
       timestampSeconds,
       deps.isCurrent,
       deps.beforeIosEnd,

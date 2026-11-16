@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກມີການອັບເດດ"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ວຽກສຳເລັດແລ້ວ"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ລົ້ມເຫລວ: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ຖືກຂັດຈັງຫວະ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "ການແຈ້ງເຕືອນລາຍຈ່າຍ",
       "body": "ລາຍຈ່າຍ {{scopeName}} ໄດ້ເກີນ ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "ຄຳເຕືອນ SLA",
-      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+      "title": "ຄຳເຕືອນ SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "ການລະເມີດ SLA",
-      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+      "title": "ການລະເມີດ SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

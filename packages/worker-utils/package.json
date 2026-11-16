@@ -37,10 +37,11 @@
     "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts",
     "./kilo-pass-bonus-projection": "./src/kilo-pass-bonus-projection.ts",
     "./git-url": "./src/git-url.ts",
+    "./gitlab-url": "./src/gitlab-url.ts",
     "./callback-token": "./src/callback-token.ts",
-    "./cf-access": "./src/cf-access.ts",
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./cloud-agent-session-access": "./src/cloud-agent-session-access.ts",
+    "./cloud-agent-session-sync": "./src/cloud-agent-session-sync.ts",
     "./cloud-agent-worktree-changes": "./src/cloud-agent-worktree-changes.ts",
     "./cloud-agent-worktree-operations": "./src/cloud-agent-worktree-operations.ts",
     "./cloud-agent-commits": "./src/cloud-agent-commits.ts",
@@ -61,19 +62,22 @@
     "./direct-byok-model": "./src/direct-byok-model.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
     "./github-authorization": "./src/github-authorization.ts",
+    "./pr-observations": "./src/pr-observations.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
     "./usage-writer-client": "./src/usage-writer-client.ts",
     "./vercel-execution-region": "./src/vercel-execution-region.ts",
     "./organization-membership": "./src/organization-membership.ts",
     "./webhook-body-validation": "./src/webhook-body-validation.ts",
     "./organization-usage": "./src/organization-usage.ts",
-    "./organization-consumption": "./src/organization-consumption.ts"
+    "./organization-consumption": "./src/organization-consumption.ts",
+    "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts"
   },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src packages/worker-utils/test/postgres"
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",

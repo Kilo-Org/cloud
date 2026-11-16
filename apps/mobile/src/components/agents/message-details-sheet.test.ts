@@ -191,7 +191,7 @@ describe('getMessageDetailsContent — happy', () => {
     expect(content.copyableText).toBe('assistant reply');
     // Routed stamp preferred; catalog-friendly name.
     expect(content.modelLabel).toBe('Claude Sonnet 4');
-    expect(content.costLabel).toBe('$0.0123');
+    expect(content.costLabel).toBe('\u2066$0.0123\u2069');
     expect(content.tokenRows).toEqual([
       { label: 'Input', value: 100 },
       { label: 'Output', value: 50 },

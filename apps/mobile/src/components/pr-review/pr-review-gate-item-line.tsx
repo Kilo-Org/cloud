@@ -11,8 +11,8 @@ import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
  * The reader reached this gate from a specific link, and the gate's copy is
  * provider-generic ("Connect GitHub", "… to review pull requests on mobile"),
  * so without this line a teammate's PR is indistinguishable from any other
- * while the user decides whether to connect. No ref means no known item (the
- * entry route's pass-through mount), and the gate stays exactly as it was.
+ * while the user decides whether to connect. No ref means no known item: a mount
+ * that names none prints no line, and the gate stays exactly as it was.
  *
  * One line: a long nested GitLab project path must not wrap and push the copy
  * and the CTA down. The ellipsis sits in the middle, because the number and

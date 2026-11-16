@@ -3,11 +3,20 @@ import type { ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { TRPCError } from '@trpc/server';
-import { sessionConfigFromFetchedSession, type KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import {
+  sessionConfigFromFetchedSession,
+  type CachedSessionSnapshotPage,
+  type CloudAgentSessionId,
+  type KiloSessionId,
+} from '@kilocode/cloud-agent-sdk';
+import { cloudSessionMessagesPageSchema } from '@kilocode/cloud-agent-sdk/schemas';
 import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { toFetchedSessionData } from '../fetched-session-data';
-import { fetchWebSessionSnapshotPage } from '../session-page-adapter';
+import {
+  fetchWebCloudSessionSnapshotPage,
+  fetchWebSessionSnapshotPage,
+} from '../session-page-adapter';
 import {
   toCachedTranscriptPage,
   transcriptCacheKey,
@@ -51,6 +60,58 @@ function isExpectedSessionReadError(error: unknown): boolean {
   );
 }
 
+type RootCaller = ReturnType<typeof rootRouter.createCaller>;
+
+/**
+ * Reads the same first page the browser transport reads, so a Cloud Agent chat
+ * is seeded with bounded tool previews rather than complete tool bodies.
+ */
+async function readFirstPage(
+  caller: RootCaller,
+  sessionId: KiloSessionId,
+  cloudAgentSessionId: string | null,
+  organizationId: string | null
+): Promise<CachedSessionSnapshotPage | null> {
+  if (cloudAgentSessionId?.startsWith('workspace_')) {
+    const wirePage = await fetchWebCloudSessionSnapshotPage(
+      {
+        cloudAgentNext: {
+          getSessionMessagesPage: { query: caller.cloudAgentNext.getSessionMessagesPage },
+        },
+        organizations: {
+          cloudAgentNext: {
+            getSessionMessagesPage: {
+              query: caller.organizations.cloudAgentNext.getSessionMessagesPage,
+            },
+          },
+        },
+      },
+      cloudAgentSessionId as CloudAgentSessionId,
+      organizationId ? { organizationId } : {}
+    );
+    const page = cloudSessionMessagesPageSchema.parse(wirePage);
+    if (!page) return null;
+    return {
+      info: page.info,
+      messages: page.messages,
+      nextCursor: page.nextCursor,
+      omittedItemCount: page.omittedItemCount,
+    };
+  }
+  const outcome = await fetchWebSessionSnapshotPage(
+    {
+      cliSessionsV2: {
+        getSessionMessagesPage: { query: caller.cliSessionsV2.getSessionMessagesPage },
+      },
+    },
+    sessionId,
+    {}
+  );
+  if (outcome.kind !== 'success') return null;
+  const { kind: _kind, ...page } = outcome;
+  return page;
+}
+
 async function seedCachedTranscript(
   queryClient: QueryClient,
   sessionId: KiloSessionId,
@@ -58,21 +119,16 @@ async function seedCachedTranscript(
 ): Promise<void> {
   const context = await createTRPCContext();
   const caller = rootRouter.createCaller(context);
-  const [outcome, session] = await Promise.all([
-    fetchWebSessionSnapshotPage(
-      {
-        cliSessionsV2: {
-          getSessionMessagesPage: { query: caller.cliSessionsV2.getSessionMessagesPage },
-        },
-      },
-      sessionId,
-      {}
-    ),
-    caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId }),
-  ]);
-  if (outcome.kind !== 'success' || session.organization_id !== organizationId) return;
+  const session = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId });
+  if (session.organization_id !== organizationId) return;
+  const page = await readFirstPage(
+    caller,
+    sessionId,
+    session.cloud_agent_session_id,
+    organizationId
+  );
+  if (!page) return;
 
-  const { kind: _kind, ...page } = outcome;
   const data = toFetchedSessionData(sessionId, session);
   // Settings are cached only for Cloud Agent sessions, as the SDK caches them.
   const isCloudAgent = data.cloudAgentSessionId !== null && session.runtimeState !== null;

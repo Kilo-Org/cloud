@@ -23,6 +23,7 @@ import {
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from './predicates';
+import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-errors';
 
 /**
  * Exact app-type scope. The writers below must not reach a row whose app type
@@ -32,6 +33,26 @@ import {
  */
 function exactAppTypeCondition(appType: GitHubAppType) {
   return eq(platform_integrations.github_app_type, appType);
+}
+
+/**
+ * Scope of one owner's association: owner, platform, and — when the caller
+ * knows them — the exact app type and installation row. Shared by every
+ * owner-scoped suspend, unsuspend and delete so row selection cannot drift
+ * between the entry points.
+ */
+function ownerIntegrationScope(
+  owner: Owner,
+  platform: string,
+  githubAppType?: GitHubAppType,
+  installationId?: string
+) {
+  const conditions = [ownerCondition(owner), eq(platform_integrations.platform, platform)];
+  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
+  if (installationId) {
+    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
+  }
+  return conditions;
 }
 
 /**
@@ -539,11 +560,8 @@ export async function updateRepositoriesForIntegration(
         .where(eq(platform_integrations.id, integrationId));
     });
   } catch (error) {
-    const code =
-      error && typeof error === 'object' && 'cause' in error
-        ? (error.cause as { code?: string } | undefined)?.code
-        : (error as { code?: string } | undefined)?.code;
-    if (code === '40P01' || code === '55P03' || code === '57014') {
+    const code = getPostgresErrorCode(error);
+    if (code !== null && RETRYABLE_TRANSACTION_SQLSTATES.has(code)) {
       throw new Error('Repository refresh temporarily unavailable; retry', { cause: error });
     }
     throw error;
@@ -617,24 +635,13 @@ export async function suspendIntegration(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const conditions = [
-    eq(platform_integrations.owned_by_organization_id, organizationId),
-    eq(platform_integrations.platform, platform),
-  ];
-  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
-  if (installationId) {
-    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
-  }
-
-  await db
-    .update(platform_integrations)
-    .set({
-      integration_status: INTEGRATION_STATUS.SUSPENDED,
-      suspended_at: new Date().toISOString(),
-      suspended_by: suspendedBy,
-      updated_at: new Date().toISOString(),
-    })
-    .where(and(...conditions));
+  await suspendIntegrationForOwner(
+    { type: 'org', id: organizationId },
+    platform,
+    suspendedBy,
+    githubAppType,
+    installationId
+  );
 }
 
 /**
@@ -651,24 +658,12 @@ export async function unsuspendIntegration(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const conditions = [
-    eq(platform_integrations.owned_by_organization_id, organizationId),
-    eq(platform_integrations.platform, platform),
-  ];
-  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
-  if (installationId) {
-    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
-  }
-
-  await db
-    .update(platform_integrations)
-    .set({
-      integration_status: INTEGRATION_STATUS.ACTIVE,
-      suspended_at: null,
-      suspended_by: null,
-      updated_at: new Date().toISOString(),
-    })
-    .where(and(...conditions));
+  await unsuspendIntegrationForOwner(
+    { type: 'org', id: organizationId },
+    platform,
+    githubAppType,
+    installationId
+  );
 }
 
 /**
@@ -684,16 +679,12 @@ export async function deleteIntegration(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const conditions = [
-    eq(platform_integrations.owned_by_organization_id, organizationId),
-    eq(platform_integrations.platform, platform),
-  ];
-  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
-  if (installationId) {
-    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
-  }
-
-  await db.delete(platform_integrations).where(and(...conditions));
+  await deleteIntegrationForOwner(
+    { type: 'org', id: organizationId },
+    platform,
+    githubAppType,
+    installationId
+  );
 }
 
 export async function deleteGitHubInstallationRecords(
@@ -1132,31 +1123,19 @@ export type GitHubConnectionStatus = {
  * connected only when the integration is healthy, matching what the
  * repository picker, Security Agent, and every operational caller require.
  *
+ * The lookup goes through `getIntegrationForOwner`, so the connection-status
+ * surface and the operational callers select the same row: a personal owner's
+ * associations are ordered by `personalGitHubIntegrationOrder` — healthy
+ * workflow rows first, then the most recently updated row, then a
+ * deterministic ascending `id` tie-break — never an unordered `limit(1)`.
  * A user can hold more than one workflow row (a locally disconnected row is
  * retained on disconnect, and reconnecting a different installation inserts
- * another), so the user lookup orders healthy rows first — the same rule
- * `getInstallation` applies — instead of trusting an unordered `limit(1)`.
+ * another).
  */
 export async function getGitHubConnectionStatusForOwner(
   owner: Owner
 ): Promise<GitHubConnectionStatus> {
-  const integration =
-    owner.type === 'org'
-      ? await getPrimaryGitHubIntegrationForOrganization(owner.id)
-      : ((
-          await db
-            .select()
-            .from(platform_integrations)
-            .where(
-              and(
-                eq(platform_integrations.owned_by_user_id, owner.id),
-                eq(platform_integrations.platform, PLATFORM.GITHUB),
-                eq(platform_integrations.github_connection_role, 'workflow')
-              )
-            )
-            .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
-            .limit(1)
-        )[0] ?? null);
+  const integration = await getIntegrationForOwner(owner, PLATFORM.GITHUB);
 
   if (!isPlatformIntegrationHealthy(integration)) {
     return { connected: false, integration: null };
@@ -1196,13 +1175,7 @@ export async function deleteIntegrationForOwner(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const ownershipCondition = ownerCondition(owner);
-
-  const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
-  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
-  if (installationId) {
-    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
-  }
+  const conditions = ownerIntegrationScope(owner, platform, githubAppType, installationId);
 
   await db.delete(platform_integrations).where(and(...conditions));
 }
@@ -1221,13 +1194,7 @@ export async function suspendIntegrationForOwner(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const ownershipCondition = ownerCondition(owner);
-
-  const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
-  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
-  if (installationId) {
-    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
-  }
+  const conditions = ownerIntegrationScope(owner, platform, githubAppType, installationId);
 
   await db
     .update(platform_integrations)
@@ -1254,13 +1221,7 @@ export async function unsuspendIntegrationForOwner(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const ownershipCondition = ownerCondition(owner);
-
-  const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
-  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
-  if (installationId) {
-    conditions.push(eq(platform_integrations.platform_installation_id, installationId));
-  }
+  const conditions = ownerIntegrationScope(owner, platform, githubAppType, installationId);
 
   await db
     .update(platform_integrations)
@@ -1348,7 +1309,7 @@ export async function upsertPlatformIntegrationForOwner(
 
   // Preserve exclusive behavior for old callback/refresh paths after the
   // database-level global uniqueness constraint is removed.
-  if (data.platform === 'github') {
+  if (data.platform === PLATFORM.GITHUB) {
     const execute = async (tx: DrizzleTransaction): Promise<UpsertPlatformIntegrationResult> => {
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${data.platformInstallationId}`}))`

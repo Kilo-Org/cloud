@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { parseTimestamp, timestampMs } from './utils';
+import { parseTimestamp, timestampMs, timestampToIso } from './utils';
 
 function inTimeZone<T>(timeZone: string, run: () => T): T {
   vi.stubEnv('TZ', timeZone);
@@ -87,5 +87,28 @@ describe('timestampMs', () => {
     expect(timestampMs('')).toBeNull();
     expect(timestampMs('2026-02-30')).toBeNull();
     expect(timestampMs('not-a-timestamp')).toBeNull();
+  });
+});
+
+describe('timestampToIso', () => {
+  it('rewrites a backend time as the ISO instant every payload carries', () => {
+    expect(timestampToIso('2026-03-16 15:21:40.957+00')).toBe('2026-03-16T15:21:40.957Z');
+    expect(timestampToIso('2026-03-16T15:21:40.957Z')).toBe('2026-03-16T15:21:40.957Z');
+  });
+
+  it('keeps a date-only value on the same calendar day', () => {
+    inTimeZone('America/Los_Angeles', () => {
+      // The stored date is a calendar day: the ISO form of its local midnight,
+      // not the previous day in UTC.
+      expect(timestampToIso('2026-09-26')).toBe('2026-09-26T07:00:00.000Z');
+    });
+  });
+
+  it('returns null for a missing or unparsable time so the field is absent', () => {
+    expect(timestampToIso(null)).toBeNull();
+    expect(timestampToIso(undefined)).toBeNull();
+    expect(timestampToIso('')).toBeNull();
+    expect(timestampToIso('2026-02-30')).toBeNull();
+    expect(timestampToIso('not-a-timestamp')).toBeNull();
   });
 });

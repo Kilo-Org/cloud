@@ -206,6 +206,18 @@ describe('agent conversation events', () => {
     });
   });
 
+  it('groups an in-flight tool call as a running exchange', () => {
+    const toolCall = createToolCall({
+      arguments: { url: 'https://example.com' },
+      name: 'kilo_browser_navigate',
+      tabId: 7,
+    });
+
+    expect(groupConversationEvents([toolCall])).toStrictEqual([
+      { toolCall, type: 'tool-exchange' },
+    ]);
+  });
+
   it('groups workflow tool calls and results into one transcript item', () => {
     const toolCall = createWorkflowToolCall({
       arguments: { workflowId: 'wf-1' },

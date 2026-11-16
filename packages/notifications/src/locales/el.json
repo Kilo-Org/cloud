@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Οι ενεργοί πράκτορες έχουν μια ενημέρωση"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Η εργασία ολοκληρώθηκε"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Απέτυχε: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Διακόπηκε: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Ειδοποίηση δαπάνης",
       "body": "Οι δαπάνες του {{scopeName}} ξεπέρασαν τα ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Νέο εύρημα ασφαλείας ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} στο {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Νέο εύρημα ασφαλείας ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Προειδοποίηση SLA",
-      "body": "{{findingTitle}} στο {{repoFullName}}"
+      "title": "Προειδοποίηση SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Παραβίαση SLA",
-      "body": "{{findingTitle}} στο {{repoFullName}}"
+      "title": "Παραβίαση SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

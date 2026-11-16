@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktivní agenti mají aktualizaci"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Úkol dokončen"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Selhání: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Přerušeno: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Upozornění na útratu",
       "body": "Útrata {{scopeName}} překročila ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nový nález zabezpečení ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nový nález zabezpečení ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Varování o SLA",
-      "body": "{{findingTitle}} v {{repoFullName}}"
+      "title": "Varování o SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Porušení SLA",
-      "body": "{{findingTitle}} v {{repoFullName}}"
+      "title": "Porušení SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

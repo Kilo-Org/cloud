@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ülesanne lõpetatud"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ebaõnnestus: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Katkestatud: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Kulutuste hoiatus",
       "body": "{{scopeName}} kulutused ületasid ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Uus turbetuvastus ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} hoidlas {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Uus turbetuvastus ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA hoiatus",
-      "body": "{{findingTitle}} hoidlas {{repoFullName}}"
+      "title": "SLA hoiatus"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA rikkumine",
-      "body": "{{findingTitle}} hoidlas {{repoFullName}}"
+      "title": "SLA rikkumine"
     },
     "securityLifecycle": {
       "title": "Kilo",

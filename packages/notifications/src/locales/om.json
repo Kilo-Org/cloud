@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Hojii xumurameera"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Hin milkoofne: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Ni ceeceefame: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Akeekkachiisa baasii",
       "body": "Baasiin {{scopeName}} ${{amountUsd}} darbee"
     },
-    "securityFindingNew": {
-      "title": "Arganni nagaa haaraa ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} keessa {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Arganni nagaa haaraa ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Akeekkachiisa SLA",
-      "body": "{{findingTitle}} keessa {{repoFullName}}"
+      "title": "Akeekkachiisa SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Diinqii SLA",
-      "body": "{{findingTitle}} keessa {{repoFullName}}"
+      "title": "Diinqii SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

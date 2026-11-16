@@ -79,6 +79,15 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
 }
 
+/**
+ * A Slack block field for a value that comes from telemetry or configuration
+ * rather than this Worker's source. Plain text renders the value exactly as it
+ * is given.
+ */
+function plainTextField(label: string, value: string): object {
+  return { type: 'plain_text', text: `${label}:\n${value}` };
+}
+
 function formatSeverityLabel(severity: AlertSeverity): string {
   switch (severity) {
     case 'page':
@@ -127,8 +136,8 @@ function buildSloSlackBlocks(alert: SloAlertPayload): object[] {
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Provider:*\n${alert.provider}` },
-        { type: 'mrkdwn', text: `*Model:*\n${alert.model}` },
+        plainTextField('Provider', alert.provider),
+        plainTextField('Model', alert.model),
         {
           type: 'mrkdwn',
           text: `*Burn rate:*\n${alert.burnRate.toFixed(1)}x (threshold: ${alert.burnRateThreshold}x)`,
@@ -159,7 +168,7 @@ function buildCapacitySlackBlocks(
       {
         type: 'section',
         fields: [
-          { type: 'mrkdwn', text: `*Application:*\n${alert.model}` },
+          plainTextField('Application', alert.model),
           { type: 'mrkdwn', text: `*Allocated containers:*\n${alert.allocatedInstances}` },
           { type: 'mrkdwn', text: `*Alert threshold:*\n${alert.thresholdCount} containers` },
           { type: 'mrkdwn', text: `*Running:*\n${alert.counts.running}` },
@@ -193,7 +202,7 @@ function buildCapacitySlackBlocks(
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Application:*\n${alert.model}` },
+        plainTextField('Application', alert.model),
         {
           type: 'mrkdwn',
           text: `*Instances:*\n${alert.usedInstances} / ${alert.maxInstances}`,
@@ -205,7 +214,7 @@ function buildCapacitySlackBlocks(
     {
       type: 'section',
       text: {
-        type: 'mrkdwn',
+        type: 'plain_text',
         text: `Container: ${alert.clientName}${healthText}`,
       },
     },
@@ -227,7 +236,7 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Queue ID:*\n${alert.model}` },
+        plainTextField('Queue ID', alert.model),
         {
           type: 'mrkdwn',
           text: `*Backlog:*\n${alert.backlogCount.toLocaleString('en-US')} messages`,

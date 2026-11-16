@@ -16,6 +16,30 @@ function failingFormat(): never {
   throw new Error('boom');
 }
 
+/**
+ * Stub the device zone the way a device that moved reports it: the production
+ * probe builds a fresh `Intl.DateTimeFormat` with no zone and reads the zone it
+ * resolved, so the stub answers `getZone()` for every formatter that pins none.
+ */
+function stubDeviceZone(getZone: () => string): void {
+  const realIntl = Intl;
+  // `Intl`'s properties are not enumerable, so a copy loses the constructors
+  // the polyfill path reads: inherit the whole object instead.
+  const stub: typeof Intl = Object.create(realIntl);
+  Object.defineProperty(stub, 'DateTimeFormat', {
+    value: function DateTimeFormat(
+      locales?: string | string[],
+      options?: Intl.DateTimeFormatOptions
+    ): Intl.DateTimeFormat {
+      return new realIntl.DateTimeFormat(locales, {
+        ...options,
+        timeZone: options?.timeZone ?? getZone(),
+      });
+    },
+  });
+  vi.stubGlobal('Intl', stub);
+}
+
 describe('intl-cache', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -52,54 +76,40 @@ describe('intl-cache', () => {
   it('formats in the new device time zone after the zone moves', () => {
     const instant = new Date('2026-11-04T01:10:00.000Z');
     const options = { hour: 'numeric', minute: '2-digit' } as const;
-    const originalZone = process.env.TZ;
-    const restoreZone = () => {
-      if (originalZone === undefined) {
-        delete process.env.TZ;
-      } else {
-        process.env.TZ = originalZone;
-      }
-    };
+    let zone = 'UTC';
+    stubDeviceZone(() => zone);
     vi.useFakeTimers();
     try {
-      process.env.TZ = 'UTC';
+      // Enough time for the probe to re-check the zone earlier tests cached.
       vi.advanceTimersByTime(2000);
-      expect(dateTimeFormat('en', options).format(instant)).toBe('1:10 AM');
+      const utcFormatter = dateTimeFormat('en', options);
+      expect(utcFormatter.format(instant)).toBe('1:10 AM');
 
       // The device zone moved, and enough time passed for the cache to notice.
-      process.env.TZ = 'Pacific/Auckland';
+      zone = 'Pacific/Auckland';
       vi.advanceTimersByTime(2000);
-      expect(dateTimeFormat('en', options).format(instant)).toBe('2:10 PM');
-
-      restoreZone();
-      vi.advanceTimersByTime(2000);
-      // Whatever zone the test host runs in: a formatter built now agrees with
-      // the zone the process is back in, not with the zone it left.
-      expect(dateTimeFormat('en', options).format(instant)).toBe(
-        new Intl.DateTimeFormat('en', options).format(instant)
-      );
+      const movedFormatter = dateTimeFormat('en', options);
+      expect(movedFormatter).not.toBe(utcFormatter);
+      expect(movedFormatter.format(instant)).toBe('2:10 PM');
     } finally {
-      restoreZone();
       vi.useRealTimers();
     }
   });
 
   it('keeps a formatter it rebuilt inside the check interval', () => {
     const options = { weekday: 'long' } as const;
-    const originalZone = process.env.TZ;
+    let zone = 'UTC';
+    stubDeviceZone(() => zone);
     vi.useFakeTimers();
     try {
-      process.env.TZ = 'UTC';
       vi.advanceTimersByTime(2000);
       const first = dateTimeFormat('en', options);
+      // The zone moved, but inside the check interval the probe does not look
+      // again, so the cache keeps the formatter it already built.
+      zone = 'Pacific/Auckland';
       vi.advanceTimersByTime(200);
       expect(dateTimeFormat('en', options)).toBe(first);
     } finally {
-      if (originalZone === undefined) {
-        delete process.env.TZ;
-      } else {
-        process.env.TZ = originalZone;
-      }
       vi.useRealTimers();
     }
   });

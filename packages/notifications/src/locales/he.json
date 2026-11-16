@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "לסוכנים הפעילים יש עדכון"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "המשימה הושלמה"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "נכשל: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "הופסק: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "התראת הוצאה",
       "body": "ההוצאה של {{scopeName}} חצתה ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "ממצא אבטחה חדש ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ב-{{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ממצא אבטחה חדש ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "אזהרת SLA",
-      "body": "{{findingTitle}} ב-{{repoFullName}}"
+      "title": "אזהרת SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "הפרת SLA",
-      "body": "{{findingTitle}} ב-{{repoFullName}}"
+      "title": "הפרת SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
-import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
 
 type StreamTicketCommon = {
   userId: string;

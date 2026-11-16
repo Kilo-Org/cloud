@@ -23,7 +23,10 @@ import { providerPreferencesSchema } from '@kilocode/web-shared/lib/ai-gateway/p
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
@@ -232,20 +235,24 @@ export async function handleAudioTranscriptionsRequest(
     user_byok: !!userByok,
     has_tools: false,
     feature,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: false,
-      samples: null,
-      // Audio carries no user text, so there is no prompt to hash.
-      promptSimHash: null,
-    }),
+  };
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: false,
+    samples: null,
+    // Audio carries no user text, so there is no prompt to hash.
+    promptSimHash: null,
   };
 
   setTag('ui.ai_model', requestedModel);
 
   const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
   const { balance, settings, plan, payer } = account;
+
+  // The usage row reports the payer the balance check resolved: the root organization for an
+  // organization member.
+  usageContext.bouncer = await bouncer.usage(bouncerUsageFields, payer);
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
@@ -331,24 +338,20 @@ export async function handleAudioTranscriptionsRequest(
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = response.status;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: false,
-      userByok: !!userByok,
-      provider: provider.type,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(requestedModelLowerCased),
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: false,
+    isStreaming: false,
+    userByok: !!userByok,
+    provider: provider.type,
+    requestedModel: requestedModelLowerCased,
+    resolvedModel: normalizeModelId(requestedModelLowerCased),
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs,
+    statusCode: response.status,
+  };
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
@@ -359,8 +362,17 @@ export async function handleAudioTranscriptionsRequest(
     organizationId,
     model: requestedModelLowerCased,
   });
-  if (upstreamErrorResponse) return upstreamErrorResponse;
+  if (upstreamErrorResponse) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
+    return upstreamErrorResponse;
+  }
 
-  countAndStoreTranscriptionUsage(response.clone(), usageContext, span);
+  const accounting = countAndStoreTranscriptionUsage(
+    response.clone(),
+    usageContext,
+    span,
+    provider
+  );
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
   return wrapInSafeNextResponse(response);
 }

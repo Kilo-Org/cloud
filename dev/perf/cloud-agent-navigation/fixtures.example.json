@@ -1,0 +1,18 @@
+{
+  "initialPath": "/cloud/chat?sessionId=REPLACE_ROOT_A",
+  "initialReadySelector": "[data-message-id=\"REPLACE_LAST_MESSAGE_A\"]",
+  "interactions": [
+    {
+      "name": "unopened-workspace",
+      "clickSelector": "[data-worktree-id=\"REPLACE_WORKTREE_B\"] button[aria-label^=\"Open worktree \"]",
+      "readySelector": "[data-message-id=\"REPLACE_LAST_MESSAGE_B\"]",
+      "budgetMs": 500
+    },
+    {
+      "name": "opened-workspace",
+      "clickSelector": "[data-worktree-id=\"REPLACE_WORKTREE_A\"] button[aria-label^=\"Open worktree \"]",
+      "readySelector": "[data-message-id=\"REPLACE_LAST_MESSAGE_A\"]",
+      "budgetMs": 150
+    }
+  ]
+}

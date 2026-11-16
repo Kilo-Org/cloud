@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the idle login screen owns every provider control, the SSO recovery block, the pending-link switch, and the email/OTP switch in one surface */
 import { isAvailableAsync as isAppleAuthAvailableAsync } from 'expo-apple-authentication';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -23,7 +23,12 @@ import { pendingLinkOptions } from '@/lib/auth/pending-link';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
-import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
+import {
+  beginLoginEmail,
+  holdLoginEmail,
+  holdSsoRecovery,
+  type SsoRecoveryDraft,
+} from '@/lib/login-draft';
 import { cn } from '@/lib/utils';
 
 /** The two links the legal sentence exposes as custom accessibility actions. */
@@ -42,6 +47,7 @@ export function IdleAuth({
   pendingLinkRefused = false,
   onPendingLink,
   onClearPendingLink,
+  onBelowFieldHeightChange,
 }: Readonly<{
   start: (mode: 'signin' | 'sso', ssoEmail?: string, pendingLinkToken?: string) => Promise<void>;
   initialEmail?: string;
@@ -57,6 +63,12 @@ export function IdleAuth({
   /** Without it a `DIFFERENT-OAUTH` refusal stays a toast, as before pending links existed. */
   onPendingLink?: (offer: PendingLinkOffer) => void;
   onClearPendingLink?: () => void;
+  /**
+   * Reports the height of what the current step renders below its focused
+   * field, for the shell's keyboard reserve. Zero means the step has no
+   * measured block; a step change resets it.
+   */
+  onBelowFieldHeightChange?: (height: number) => void;
 }>) {
   const {
     busy,
@@ -103,6 +115,40 @@ export function IdleAuth({
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
   const emailRef = useRef(initialEmail);
   const browserAuthStartingRef = useRef(false);
+
+  const reportBelowFieldHeight = useCallback(
+    (height: number) => {
+      onBelowFieldHeightChange?.(height);
+    },
+    [onBelowFieldHeightChange]
+  );
+
+  // The landing step's own frames. A message under the input lives inside the
+  // field's block, so what the keyboard can cover below the input is the block
+  // past the input plus the action under it; the two form gaps around that
+  // content belong to the shell's reserve.
+  const [emailBlockHeight, setEmailBlockHeight] = useState(0);
+  const [emailInputBottom, setEmailInputBottom] = useState(0);
+  const [emailActionHeight, setEmailActionHeight] = useState(0);
+
+  // A step's measured block describes only that step: the code step's
+  // refusal-and-action block must not size the reserve on the landing view after
+  // Back, and the landing view's block must not size the code step. Reset on
+  // every change of the rendered step; that step's own layout reports next.
+  const pendingLinkTokenForReset = pendingLink?.token;
+  useEffect(() => {
+    reportBelowFieldHeight(0);
+    setEmailBlockHeight(0);
+    setEmailInputBottom(0);
+    setEmailActionHeight(0);
+  }, [reportBelowFieldHeight, view, pendingLinkTokenForReset]);
+
+  useEffect(() => {
+    if (view !== 'main' || emailBlockHeight === 0 || emailActionHeight === 0) {
+      return;
+    }
+    reportBelowFieldHeight(Math.max(0, emailBlockHeight - emailInputBottom) + emailActionHeight);
+  }, [emailActionHeight, emailBlockHeight, emailInputBottom, reportBelowFieldHeight, view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,14 +205,14 @@ export function IdleAuth({
   // change event re-seeds the draft).
   useEffect(() => {
     if (initialEmail) {
-      setLoginEmailDraft(initialEmail);
+      holdLoginEmail(initialEmail);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot seed on mount
   }, []);
 
   // Keep the module-level draft in sync so an RTL reload can persist it.
   useEffect(() => {
-    setSsoRecoveryDraft(ssoRecovery);
+    holdSsoRecovery(ssoRecovery);
   }, [ssoRecovery]);
 
   const handleSendCode = async (email: string) => {
@@ -275,6 +321,7 @@ export function IdleAuth({
           clearPendingLinkFailure();
           setView('main');
         }}
+        onBelowFieldHeightChange={onBelowFieldHeightChange}
       />
     );
   }
@@ -406,23 +453,42 @@ export function IdleAuth({
           emailRef.current = value;
           // Clear the validation message as soon as the user starts fixing it.
           clearEmailError();
-          setLoginEmailDraft(value);
+          beginLoginEmail(value);
+        }}
+        // The field block grows when it renders a message under the input, and
+        // the input's own frame says where that message starts.
+        containerOnLayout={event => {
+          setEmailBlockHeight(event.nativeEvent.layout.height);
+        }}
+        onLayout={event => {
+          const { height, y } = event.nativeEvent.layout;
+          setEmailInputBottom(y + height);
         }}
       />
-      <Button
-        size="lg"
-        className="flex-row gap-2"
-        disabled={authBusy}
-        loading={busy === 'otp-send'}
-        onPress={() => void handleSendCode(emailRef.current)}
-        accessibilityLabel={t('login.continueWithEmail')}
+      {/* The action's own box, so what the keyboard can cover below the input is
+          the message (the field block past the input) plus this action. The
+          legal row and the remaining options stay out of it, so they never lift
+          the field. */}
+      <View
+        onLayout={event => {
+          setEmailActionHeight(event.nativeEvent.layout.height);
+        }}
       >
-        {/* The primary action's label takes the provider rows' 17pt label size;
-            at the button variant's 14pt the filled Continue read weaker than
-            the two outlined ways in below it. The variant keeps the weight
-            (`font-semibold`) and the brand fill. */}
-        <Text className="text-[17px]">{t('common.continue')}</Text>
-      </Button>
+        <Button
+          size="lg"
+          className="flex-row gap-2"
+          disabled={authBusy}
+          loading={busy === 'otp-send'}
+          onPress={() => void handleSendCode(emailRef.current)}
+          accessibilityLabel={t('login.continueWithEmail')}
+        >
+          {/* The primary action's label takes the provider rows' 17pt label size;
+              at the button variant's 14pt the filled Continue read weaker than
+              the two outlined ways in below it. The variant keeps the weight
+              (`font-semibold`) and the brand fill. */}
+          <Text className="text-[17px]">{t('common.continue')}</Text>
+        </Button>
+      </View>
       {/* The sentence is one accessible element: Android's screen reader does
             not keep the row's visual order once the line wraps (in pt-BR the
             tree read the Privacy link before Terms), so the wrapper carries the

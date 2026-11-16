@@ -45,6 +45,41 @@ const files = [
   })),
 ] satisfies PrReviewFile[];
 
+/**
+ * The `files-context` surface reads hunks that start below the file's first
+ * line, so their expand rows carry a known gap shorter than the default window:
+ * five lines on the first file and one line on the second. Every other surface
+ * keeps its leading hunk at line 1.
+ */
+const CONTEXT_SURFACE = 'files-context';
+const contextFiles = [
+  {
+    path: 'src/greeting.ts',
+    previousPath: null,
+    status: 'modified',
+    additions: 1,
+    deletions: 1,
+    patch:
+      '@@ -6,3 +6,3 @@\n export const greeting = "Hello";\n-export const name = "Hi";\n+export const name = "Hello";\n export default greeting;',
+    patchMissing: false,
+  },
+  {
+    path: 'src/greeting.test.ts',
+    previousPath: null,
+    status: 'modified',
+    additions: 1,
+    deletions: 1,
+    patch:
+      '@@ -2,2 +2,2 @@\n-const title = "greeting";\n+const title = "greeting test";\n export default title;',
+    patchMissing: false,
+  },
+] satisfies PrReviewFile[];
+
+/** The files a surface reads: the short-gap set, or the paginated full list. */
+export function filesForSurface(surface: string | undefined): readonly PrReviewFile[] {
+  return surface === CONTEXT_SURFACE ? contextFiles : files;
+}
+
 const checks = {
   checkRuns: [
     {
@@ -134,9 +169,10 @@ export function createFixtureClient(surface: string | undefined) {
               JSON.parse(new URL(url, FIXTURE_URL_BASE).searchParams.get('input') ?? '{}')
             );
             const offset = pageInput.cursor === 100 ? 100 : 0;
+            const surfaceFiles = filesForSurface(surface);
             return fixtureResponse({
-              files: files.slice(offset, offset + 100),
-              nextCursor: offset === 0 ? 100 : null,
+              files: surfaceFiles.slice(offset, offset + 100),
+              nextCursor: offset + 100 < surfaceFiles.length ? offset + 100 : null,
             } satisfies RouterOutputs['githubPrReview']['listFiles']);
           }
           if (url.includes('/user.getMe')) {

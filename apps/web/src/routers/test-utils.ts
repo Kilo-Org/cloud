@@ -50,3 +50,20 @@ export async function createBearerCallerForUser(userId: string) {
     headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
   });
 }
+
+/** Test-only caller for a native app session bound to a device session. */
+export async function createNativeCallerForUser(userId: string, deviceSessionId: string) {
+  const user = await findUserById(userId);
+  if (!user) {
+    throw new Error(`Test user not found: ${userId}`);
+  }
+  return createCaller({
+    user,
+    deviceSessionId,
+    credential: 'human_bearer',
+    authViaToken: true,
+    headersList: new Headers({
+      Authorization: `Bearer ${generateApiToken(user, { deviceSessionId })}`,
+    }),
+  });
+}

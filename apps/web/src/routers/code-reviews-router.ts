@@ -152,6 +152,9 @@ const PatchReviewConfigInputSchema = z.object({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  // GitHub only: skip automated reviews of bot-authored PRs. Omission preserves
+  // the stored value (field-merge); mobile exposes this toggle.
+  skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks. Only consulted when
   // `selectedRepositoryIds` or `selectedRepositoryDelta` is also present in
@@ -564,6 +567,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             thinkingEffort: o.thinking_effort ?? null,
           })),
           disableReviewMd: prevCfg.disable_review_md ?? true,
+          skipBotPullRequests: prevCfg.skip_bot_pull_requests ?? true,
           manuallyAddedRepositories: prevCfg.manually_added_repositories || [],
         };
 
@@ -619,11 +623,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
             manually_added_repositories: merged.manuallyAddedRepositories ?? [],
             repository_model_overrides: repositoryModelOverrides,
             disable_review_md: merged.disableReviewMd ?? true,
-            // The patch schema never carries `skipBotPullRequests` (a
-            // web-only setting from the full save). Pass the stored value
-            // through so a PATCH can't silently reset it to the default —
-            // same field-merge contract as every other omitted field.
-            skip_bot_pull_requests: prevCfg.skip_bot_pull_requests ?? true,
+            // `skipBotPullRequests` is GitHub-only. Mobile exposes it, so the
+            // patch schema accepts it; a patch that omits it keeps the stored
+            // value (field-merge), never the bare default.
+            skip_bot_pull_requests: merged.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },

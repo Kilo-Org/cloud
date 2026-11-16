@@ -24,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 
 // FlashList takes `style`/`contentContainerStyle` (never `className`), so the
 // list's `flex-1 bg-background` classes become the list style plus the themed
@@ -96,7 +97,7 @@ export default function ModePickerScreen() {
           <Text className="text-base font-medium text-foreground">{label}</Text>
           <Text className="text-sm text-muted-foreground">{description}</Text>
         </View>
-        {selected && <Check size={18} color={colors.primary} />}
+        {selected && <Check size={18} color={selectionCheckColor(colors)} />}
       </Pressable>
     );
   }

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Misy fanavaozana ny agent mavitrika"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Vita ny asa"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tsy nahomby: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Voasakana: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Fampandrenesana fandaniana",
       "body": "Nihoatra ny ${{amountUsd}} ny fandaniana tao amin'ny {{scopeName}}"
     },
-    "securityFindingNew": {
-      "title": "Hitan'ny fiarovana vaovao ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Hitan'ny fiarovana vaovao ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Fampitandremana SLA",
-      "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+      "title": "Fampitandremana SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Fanitsakitsahana SLA",
-      "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+      "title": "Fanitsakitsahana SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

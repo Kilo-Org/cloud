@@ -10,11 +10,18 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  STORE_FAILURE_KEY,
+  type StoreCreditProductsDiagnostics,
+  StoreCreditProductsError,
+} from '@/lib/credits/store-products-loader';
+import { reportAppError } from '@/lib/telemetry/app-error-reporting';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import {
   createNetworkErrorFetch,
   readTrpcResponseError,
   reportNetworkError,
+  resetNetworkErrorReports,
 } from '@/lib/telemetry/network-errors';
 import { NETWORK_BODY_CONTEXT, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { installErrorReporting } from './install-error-reporting';
@@ -40,12 +47,15 @@ afterAll(() => {
 
 beforeEach(() => {
   sentryMock.captureException.mockClear();
+  // Each case proves grouping, so every report in it is the process's first.
+  resetNetworkErrorReports();
 });
 
 /** A captured event after the real `beforeSend` (`scrubEvent`) has run. */
 type ScrubbedEvent = {
   fingerprint?: unknown;
   contexts?: Record<string, unknown>;
+  exception?: { values?: { type?: string; value?: string }[] };
 };
 
 /**
@@ -99,6 +109,9 @@ describe('fingerprint policy', () => {
         status: 401,
         durationMs: 5,
       });
+      // One event per endpoint and outcome per process, so the second port is
+      // another process's first report: grouping is what this case proves.
+      resetNetworkErrorReports();
     }
 
     const [first, second] = groupKeys();
@@ -186,6 +199,45 @@ describe('fingerprint policy', () => {
     expect(first).toBe('network-error | trpc | session.list | http.400');
     expect(second).toBe('network-error | trpc | session.list | http.500');
     expect(second).not.toBe(first);
+  });
+
+  it('separates two store failures by the store SDK failure code and titles each one', () => {
+    const diagnostics: StoreCreditProductsDiagnostics = {
+      storefront: 'app_store',
+      backendPackCount: 4,
+      storeListingCount: 0,
+      matchedCount: 0,
+      requestedProductIds: ['credits.usd10.v1'],
+      returnedProductIds: [],
+    };
+    for (const code of ['service-error', 'purchase-verification-finish-failed']) {
+      reportAppError(
+        new StoreCreditProductsError(STORE_FAILURE_KEY, diagnostics, {
+          cause: Object.assign(new Error('Failed to query product for sku'), {
+            name: '[expo-iap]: PurchaseError',
+            code,
+          }),
+        }),
+        { source: 'query', queryKey: ['credits', 'storeProducts', 'app_store'] }
+      );
+    }
+
+    const [first, second] = groupKeys();
+    expect(first).toBe(
+      'credit-catalog-query | store-error | app_store | purchase-error | service-error'
+    );
+    expect(second).toBe(
+      'credit-catalog-query | store-error | app_store | purchase-error | purchase-verification-finish-failed'
+    );
+
+    const titles = sentryMock.captureException.mock.calls.map(([error, options]) => {
+      const entry = scrubCapture(error, options).exception?.values?.[0];
+      return `${entry?.type ?? 'Error'}: ${entry?.value ?? ''}`;
+    });
+    expect(titles).toEqual([
+      'StoreCreditProductsError: Store credit pack lookup failed: purchase-error (service-error)',
+      'StoreCreditProductsError: Store credit pack lookup failed: purchase-error (purchase verification finish failed)',
+    ]);
   });
 
   it('keeps only the tRPC metadata of the body and no token in the fingerprint', () => {

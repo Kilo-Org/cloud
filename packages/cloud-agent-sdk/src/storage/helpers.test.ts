@@ -7,11 +7,11 @@ import {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  createSubscriberRegistry,
   forgetPartUpdateTime,
-  insertPartSorted,
-  insertSorted,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
+  messageIdKey,
   orderMessageIds,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
@@ -26,6 +26,65 @@ describe('orderMessageIds', () => {
       ...(parentID === undefined ? {} : { parentID }),
     } as MessageInfo;
   }
+
+  function timed(id: string, created: number, parentID?: string): MessageInfo {
+    return {
+      ...message(id, parentID),
+      time: { created },
+    } as MessageInfo;
+  }
+
+  test('orders rows by their creation time when the ids do not follow it', () => {
+    // An imported session: the ids say newest-first, the clock says otherwise.
+    const ids = ['b', 'a', 'd', 'c'];
+    const messages = new Map(
+      [timed('a', 10), timed('b', 20), timed('c', 30), timed('d', 40)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  test('keeps the id order for rows created in the same instant', () => {
+    const ids = ['b', 'a', 'c'];
+    const messages = new Map(
+      [timed('a', 5), timed('b', 5), timed('c', 9)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('keeps a reply after its prompt when the clock and the ids disagree', () => {
+    // The prompt's stored time can trail its reply: causality still wins.
+    const ids = ['reply', 'prompt', 'next'];
+    const messages = new Map(
+      [timed('prompt', 100), timed('reply', 90, 'prompt'), timed('next', 200)].map(info => [
+        info.id,
+        info,
+      ])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['prompt', 'reply', 'next']);
+  });
+
+  test('returns the same array when the clock and the ids already agree', () => {
+    const ids = ['a', 'b', 'c'];
+    const messages = new Map(
+      [timed('a', 1), timed('b', 2), timed('c', 3)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('keeps the id order while a row has no readable creation time', () => {
+    const ids = ['b', 'a'];
+    const messages = new Map([timed('a', 1), message('b')].map(info => [info.id, info]));
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('keeps an unconfirmed send below stored rows when the device clock trails them', () => {
+    // The optimistic row carries the device clock and the stored rows carry the
+    // writer's, so the two cannot be ranked until the server echoes the send.
+    const optimistic: MessageInfo = { ...timed('b-optimistic', 5), synthetic: true } as MessageInfo;
+    const ids = ['b-optimistic', 'a-stored'];
+    const messages = new Map([optimistic, timed('a-stored', 100)].map(info => [info.id, info]));
+    expect(orderMessageIds(ids, messages)).toEqual(['a-stored', 'b-optimistic']);
+  });
 
   test('keeps already causal IDs and their array identity', () => {
     const ids = ['a', 'b', 'c'];
@@ -75,13 +134,98 @@ describe('orderMessageIds', () => {
   });
 
   test('never drops rows from invalid parent cycles', () => {
-    const ids = ['a', 'b', 'c'];
+    const ids = ['c', 'a', 'b'];
     const messages = new Map([
       ['a', message('a', 'b')],
       ['b', message('b', 'a')],
       ['c', message('c')],
     ]);
-    expect(orderMessageIds(ids, messages)).toEqual(['c', 'a', 'b']);
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  describe('turns', () => {
+    function unconfirmed(id: string, created: number, queuedAt?: number): MessageInfo {
+      return {
+        ...timed(id, created),
+        synthetic: true,
+        ...(queuedAt === undefined ? {} : { queuedAt }),
+      } as MessageInfo;
+    }
+
+    function order(ids: string[], infos: MessageInfo[]): readonly string[] {
+      return orderMessageIds(ids, new Map(infos.map(info => [info.id, info])));
+    }
+
+    test('keeps a prompt queued mid-turn below later steps of the running turn', () => {
+      const infos = [
+        timed('prompt', 900),
+        timed('step-1', 1000, 'prompt'),
+        unconfirmed('queued', 1500, 1500),
+        timed('step-2', 2000, 'prompt'),
+      ];
+      expect(order(['prompt', 'queued', 'step-1', 'step-2'], infos)).toEqual([
+        'prompt',
+        'step-1',
+        'step-2',
+        'queued',
+      ]);
+    });
+
+    test('places a queued row by its server queue time, not its device time', () => {
+      const infos = [
+        unconfirmed('failed', 60_000, 100),
+        timed('retry', 200),
+        timed('answer', 300, 'retry'),
+      ];
+      expect(order(['answer', 'failed', 'retry'], infos)).toEqual(['failed', 'retry', 'answer']);
+    });
+
+    test('keeps a row without a server time after every placed turn', () => {
+      const infos = [
+        unconfirmed('sending', 5),
+        unconfirmed('queued', 9_000, 400),
+        timed('prompt', 100),
+        timed('step', 500, 'prompt'),
+      ];
+      expect(order(['sending', 'queued', 'prompt', 'step'], infos)).toEqual([
+        'prompt',
+        'step',
+        'queued',
+        'sending',
+      ]);
+    });
+
+    test('keeps a reply under its unconfirmed prompt', () => {
+      const infos = [unconfirmed('sending', 5), timed('reply', 1, 'sending'), timed('older', 2)];
+      expect(order(['older', 'reply', 'sending'], infos)).toEqual(['older', 'sending', 'reply']);
+    });
+
+    test('orders a later prompt after a turn whose steps it answers', () => {
+      // A prompt delivered between steps: the native runtime parents the later
+      // steps to it, so they belong to its turn.
+      const infos = [
+        timed('a', 100),
+        timed('a-1', 200, 'a'),
+        timed('b', 300),
+        timed('b-1', 400, 'b'),
+      ];
+      expect(order(['b-1', 'a', 'b', 'a-1'], infos)).toEqual(['a', 'a-1', 'b', 'b-1']);
+    });
+
+    test('orders the rows of a turn by time after the prompt', () => {
+      const infos = [
+        timed('p', 100),
+        timed('s-2', 300, 'p'),
+        timed('s-1', 200, 'p'),
+        timed('q', 250),
+      ];
+      expect(order(['p', 'q', 's-1', 's-2'], infos)).toEqual(['p', 's-1', 's-2', 'q']);
+    });
+
+    test('opens a turn for a reply whose prompt is on an older page', () => {
+      const infos = [timed('reply', 100, 'missing'), timed('next', 200), timed('late', 50)];
+      expect(order(['next', 'reply', 'late'], infos)).toEqual(['late', 'reply', 'next']);
+    });
   });
 });
 
@@ -163,42 +307,44 @@ function upsert(arr: Part[], part: Part, eventTime?: number): Part[] {
   return upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, orderingEvidence);
 }
 
-describe('insertSorted', () => {
-  test('inserts into empty array', () => {
-    expect(insertSorted([], 'b')).toEqual(['b']);
+describe('insertSortedBy', () => {
+  const partKey = (part: Part): string => part.id;
+
+  test('inserts a message id into an empty array', () => {
+    expect(insertSortedBy([], 'b', messageIdKey)).toEqual(['b']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = ['b', 'd'];
-    expect(insertSorted(arr, 'a')).toEqual(['a', 'b', 'd']);
-    expect(insertSorted(arr, 'c')).toEqual(['b', 'c', 'd']);
-    expect(insertSorted(arr, 'e')).toEqual(['b', 'd', 'e']);
+  test('inserts a part into an empty array', () => {
+    const part = makePart('b');
+    expect(insertSortedBy<Part>([], part, partKey)).toEqual([part]);
   });
 
-  test('does not mutate input', () => {
-    const arr = ['a', 'c'];
-    insertSorted(arr, 'b');
-    expect(arr).toEqual(['a', 'c']);
-  });
-});
-
-describe('insertPartSorted', () => {
-  test('inserts into empty array', () => {
-    const p = makePart('b');
-    expect(insertPartSorted([], p)).toEqual([p]);
+  test('inserts a message id at beginning, middle, and end', () => {
+    const ids = ['b', 'd'];
+    expect(insertSortedBy(ids, 'a', messageIdKey)).toEqual(['a', 'b', 'd']);
+    expect(insertSortedBy(ids, 'c', messageIdKey)).toEqual(['b', 'c', 'd']);
+    expect(insertSortedBy(ids, 'e', messageIdKey)).toEqual(['b', 'd', 'e']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = [makePart('b'), makePart('d')];
-    expect(insertPartSorted(arr, makePart('a')).map(p => p.id)).toEqual(['a', 'b', 'd']);
-    expect(insertPartSorted(arr, makePart('c')).map(p => p.id)).toEqual(['b', 'c', 'd']);
-    expect(insertPartSorted(arr, makePart('e')).map(p => p.id)).toEqual(['b', 'd', 'e']);
+  test('inserts a part at beginning, middle, and end', () => {
+    const parts = [makePart('b'), makePart('d')];
+    const inserted = (id: string) =>
+      insertSortedBy(parts, makePart(id), partKey).map(part => part.id);
+    expect(inserted('a')).toEqual(['a', 'b', 'd']);
+    expect(inserted('c')).toEqual(['b', 'c', 'd']);
+    expect(inserted('e')).toEqual(['b', 'd', 'e']);
   });
 
-  test('does not mutate input', () => {
-    const arr = [makePart('a'), makePart('c')];
-    insertPartSorted(arr, makePart('b'));
-    expect(arr).toHaveLength(2);
+  test('does not mutate the message id array', () => {
+    const ids = ['a', 'c'];
+    insertSortedBy(ids, 'b', messageIdKey);
+    expect(ids).toEqual(['a', 'c']);
+  });
+
+  test('does not mutate the part array', () => {
+    const parts = [makePart('a'), makePart('c')];
+    insertSortedBy(parts, makePart('b'), partKey);
+    expect(parts).toHaveLength(2);
   });
 });
 
@@ -618,10 +764,9 @@ describe('publishPartsChanged', () => {
     const snapshot = new Map<string, Part[] | null>([['msg-1', [makePart('a')]]]);
     const partsCallback = jest.fn();
     const messageCallback = jest.fn();
-    const subscribers = new Map<string, Set<() => void>>([
-      ['parts:msg-1', new Set([partsCallback])],
-      ['message:msg-1', new Set([messageCallback])],
-    ]);
+    const subscribers = createSubscriberRegistry();
+    subscribers.subscribe('parts:msg-1', partsCallback);
+    subscribers.subscribe('message:msg-1', messageCallback);
 
     publishPartsChanged(snapshot, subscribers, 'msg-1');
 
@@ -644,25 +789,28 @@ describe('createSeedTextPart', () => {
   });
 });
 
-describe('notify', () => {
+describe('createSubscriberRegistry', () => {
   test('calls all registered callbacks for matching key', () => {
     const cb1 = jest.fn();
     const cb2 = jest.fn();
-    const subs = new Map([['k', new Set([cb1, cb2])]]);
-    notify(subs, 'k');
+    const registry = createSubscriberRegistry();
+    registry.subscribe('k', cb1);
+    registry.subscribe('k', cb2);
+    registry.notify('k');
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
   });
 
   test('no-op for missing key', () => {
     const cb = jest.fn();
-    const subs = new Map([['k', new Set([cb])]]);
-    notify(subs, 'other');
+    const registry = createSubscriberRegistry();
+    registry.subscribe('k', cb);
+    registry.notify('other');
     expect(cb).not.toHaveBeenCalled();
   });
 
-  test('no-op for empty subscriber map', () => {
-    expect(() => notify(new Map(), 'k')).not.toThrow();
+  test('no-op for empty registry', () => {
+    expect(() => createSubscriberRegistry().notify('k')).not.toThrow();
   });
 });
 

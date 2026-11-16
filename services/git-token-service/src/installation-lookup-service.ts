@@ -12,6 +12,7 @@ import {
   github_app_installations,
 } from '@kilocode/db/schema';
 import { eq, and, desc, exists, isNull, isNotNull, notExists, or, sql } from 'drizzle-orm';
+import { availableAccountCondition } from './account-availability';
 
 export type FindInstallationParams = {
   githubRepo: string;
@@ -189,7 +190,7 @@ function buildAuthorizedInstallationsQuery(
     )
     .innerJoin(
       kilocode_users,
-      and(eq(kilocode_users.id, params.userId), isNull(kilocode_users.blocked_reason))
+      and(eq(kilocode_users.id, params.userId), availableAccountCondition())
     )
     .leftJoin(organizations, eq(platform_integrations.owned_by_organization_id, organizations.id))
     .where(
@@ -527,10 +528,7 @@ export class InstallationLookupService {
             ? undefined
             : eq(platform_integrations.id, expectedIntegrationId),
           or(
-            and(
-              isNotNull(platform_integrations.owned_by_user_id),
-              isNull(kilocode_users.blocked_reason)
-            ),
+            and(isNotNull(platform_integrations.owned_by_user_id), availableAccountCondition()),
             and(
               isNotNull(platform_integrations.owned_by_organization_id),
               isNull(organizations.deleted_at)
@@ -659,10 +657,7 @@ export class InstallationLookupService {
             )
           ),
           or(
-            and(
-              isNotNull(platform_integrations.owned_by_user_id),
-              isNull(kilocode_users.blocked_reason)
-            ),
+            and(isNotNull(platform_integrations.owned_by_user_id), availableAccountCondition()),
             and(
               isNotNull(platform_integrations.owned_by_organization_id),
               isNull(organizations.deleted_at)

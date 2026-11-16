@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Feladat befejezve"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Nem sikerült: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Megszakítva: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Költésfigyelmeztetés",
       "body": "{{scopeName}} költése meghaladta a(z) ${{amountUsd}} összeget"
     },
-    "securityFindingNew": {
-      "title": "Új biztonsági találat ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} itt: {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Új biztonsági találat ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA figyelmeztetés",
-      "body": "{{findingTitle}} itt: {{repoFullName}}"
+      "title": "SLA figyelmeztetés"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA megsértése",
-      "body": "{{findingTitle}} itt: {{repoFullName}}"
+      "title": "SLA megsértése"
     },
     "securityLifecycle": {
       "title": "Kilo",

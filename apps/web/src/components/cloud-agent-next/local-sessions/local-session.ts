@@ -1,4 +1,4 @@
-import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import type { CustomerBillingFailure, SessionConfig } from '@kilocode/cloud-agent-sdk';
 import type { StoredMessage, StoredSession } from '../types';
 import { getChatDisplayTitle } from '../utils/session-title';
 import type { LocalSessionAttempt, LocalSessionRequest } from './local-session-request';
@@ -18,7 +18,9 @@ export type LocalSessionSync =
     };
 
 /** The composer settings a new chat copies from the chat it was created from. */
-export type LocalComposerSettings = { mode: string; model: string; variant: string | null };
+export type LocalComposerSettings = Pick<SessionConfig, 'mode' | 'model' | 'runtimeAgents'> & {
+  variant: string | null;
+};
 
 /** The prompt a new session starts with; the server keeps its message id. */
 export type LocalFirstMessage = { id: string; prompt: string; attachmentNames: string[] };

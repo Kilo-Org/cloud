@@ -9,6 +9,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -106,7 +107,8 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
   const {
     models,
     isLoading: modelsLoading,
@@ -149,10 +151,11 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
-  const handleSave = async () => {
-    await save.mutateAsync(patch);
-    setBaseline(previous => ({ ...previous, ...patch }));
-  };
+  const handleSave = () =>
+    feedback.run(async () => {
+      await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+    });
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
@@ -226,6 +229,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
+      {feedback.node}
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Zadatak dovršen"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Nije uspjelo: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Prekinuto: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Upozorenje o potrošnji",
       "body": "Potrošnja za {{scopeName}} premašila je ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Novi sigurnosni nalaz ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} u {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Novi sigurnosni nalaz ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Upozorenje o SLA",
-      "body": "{{findingTitle}} u {{repoFullName}}"
+      "title": "Upozorenje o SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Kršenje SLA",
-      "body": "{{findingTitle}} u {{repoFullName}}"
+      "title": "Kršenje SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

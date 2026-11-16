@@ -2,7 +2,6 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminFetch } from '@/lib/admin/admin-fetch';
-import type { SafetyIdentifierStatusResponse } from '../api/safety-identifiers/route';
 import { SafetyIdentifiersBackfill } from './SafetyIdentifiersBackfill';
 
 jest.mock('@tanstack/react-query', () => ({
@@ -12,33 +11,26 @@ jest.mock('@tanstack/react-query', () => ({
 }));
 jest.mock('@/lib/admin/admin-fetch', () => ({ adminFetch: jest.fn() }));
 
+Object.assign(globalThis, { React });
+
 const mockUseQuery = jest.mocked(useQuery);
 const mockUseMutation = jest.mocked(useMutation);
 
-let status: SafetyIdentifierStatusResponse;
-
-beforeEach(() => {
-  jest.clearAllMocks();
-  status = {
-    running: false,
-    batchSize: 5_000,
-    backfill: {
-      status: 'running',
-      processed: 10,
-      total: 20,
-      cursor: 'oauth/synthetic-user',
-      startedAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:03:00.000Z',
-      completedAt: null,
-      lastBatchProcessed: 10,
-      lastError: null,
-    },
-  };
+function mockCounts(missing: number) {
   mockUseQuery.mockReturnValue({
-    data: status,
+    data: { missing },
     isLoading: false,
     error: null,
   } as ReturnType<typeof useQuery>);
+}
+
+function render() {
+  return renderToStaticMarkup(React.createElement(SafetyIdentifiersBackfill));
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockCounts(1_234);
   mockUseMutation.mockReturnValue({
     mutate: jest.fn(),
     isPending: false,
@@ -49,71 +41,54 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof useQueryClient>);
 });
 
-it('shows persisted progress and keeps manual regeneration enabled between batches', () => {
-  const html = renderToStaticMarkup(React.createElement(SafetyIdentifiersBackfill));
+it('shows the missing count and enables the backfill button', () => {
+  const html = render();
 
-  expect(html).toContain('Waiting for next batch');
-  expect(html).toContain('10 / 20');
-  expect(html).toContain('oauth/synthetic-user');
-  expect(html).toContain('Run next batch');
-  expect(html).toContain(
-    `Scheduled batches process up to ${status.batchSize.toLocaleString()} accounts.`
-  );
-  expect(html).toContain('Status refreshes every 15 seconds.');
-  expect(html).not.toMatch(/every \d+ minutes/);
+  expect(html).toContain(`${(1_234).toLocaleString()} missing`);
+  expect(html).toContain('Backfill next 50 000');
   expect(html).not.toContain('disabled=""');
-  expect(mockUseQuery).toHaveBeenCalledWith(expect.objectContaining({ refetchInterval: 15_000 }));
 });
 
-it('disables manual batches while a scheduled batch holds the lock', () => {
-  status.running = true;
+it('disables the button when every identifier is filled', () => {
+  mockCounts(0);
 
-  const html = renderToStaticMarkup(React.createElement(SafetyIdentifiersBackfill));
+  const html = render();
 
-  expect(html).toContain('Batch running');
+  expect(html).toContain('All filled');
+  expect(html).toContain('Nothing to do');
   expect(html).toContain('disabled=""');
-});
-
-it('disables manual regeneration after persistent completion', () => {
-  status.backfill.status = 'completed';
-  status.backfill.completedAt = '2026-01-01T00:06:00.000Z';
-
-  const html = renderToStaticMarkup(React.createElement(SafetyIdentifiersBackfill));
-
-  expect(html).toContain('Regeneration complete');
-  expect(html).toContain('Completed at');
-  expect(html).toContain('disabled=""');
-});
-
-it('surfaces a persisted batch failure without losing progress', () => {
-  status.backfill.lastError = 'The last batch failed. The next batch will retry.';
-
-  const html = renderToStaticMarkup(React.createElement(SafetyIdentifiersBackfill));
-
-  expect(html).toContain(status.backfill.lastError);
-  expect(html).toContain('10 / 20');
-  expect(html).not.toContain('disabled=""');
 });
 
 it('shows status errors instead of a misleading missing count', () => {
   mockUseQuery.mockReturnValue({
     data: undefined,
     isLoading: false,
-    error: new Error('Could not load backfill status'),
+    error: new Error('Could not load backfill status (HTTP 503)'),
   } as ReturnType<typeof useQuery>);
 
-  const html = renderToStaticMarkup(React.createElement(SafetyIdentifiersBackfill));
+  const html = render();
 
   expect(html).toContain('Status unavailable');
-  expect(html).toContain('Could not load backfill status');
+  expect(html).toContain('Could not load backfill status (HTTP 503)');
+  expect(html).not.toContain('missing</');
   expect(html).toContain('disabled=""');
 });
 
+it('shows the backfill request error', () => {
+  mockUseMutation.mockReturnValue({
+    mutate: jest.fn(),
+    isPending: false,
+    isError: true,
+    error: new Error('OPENROUTER_ORG_ID is not configured on this server'),
+  } as unknown as ReturnType<typeof useMutation>);
+
+  expect(render()).toContain('OPENROUTER_ORG_ID is not configured on this server');
+});
+
 it('rejects failed status requests', async () => {
-  renderToStaticMarkup(React.createElement(SafetyIdentifiersBackfill));
+  render();
   jest.mocked(adminFetch).mockResolvedValue(new Response(null, { status: 503 }));
-  const options = mockUseQuery.mock.calls[0][0];
-  const queryFn = options.queryFn;
+  const queryFn = mockUseQuery.mock.calls[0][0].queryFn;
   if (typeof queryFn !== 'function') throw new Error('Expected a status query function');
 
   await expect(queryFn({} as Parameters<typeof queryFn>[0])).rejects.toThrow(

@@ -47,7 +47,7 @@ export function buildFixReviewPrompt(input: {
   pullNumber: number;
   headRef: string;
   comments: readonly FixReviewComment[];
-  /** Comments that matched the selection but did not fit the prompt budget. */
+  /** Comments left out of the prompt: not fetched, or beyond the prompt budget. */
   omittedCommentCount: number;
   /** Per-session random token embedded in the comment markers. */
   nonce: string;
@@ -65,7 +65,7 @@ export function buildFixReviewPrompt(input: {
   if (input.omittedCommentCount > 0) {
     commentBlocks.push(
       '',
-      `${input.omittedCommentCount} earlier comments matched the selection rules but were left out to keep this prompt small; this run covers the most recent ones. Do not fetch the others yourself. List how many earlier comments were left out in the summary.`
+      `${input.omittedCommentCount} earlier comments were left out to keep this prompt small; this run covers the most recent ones. Do not fetch the others yourself. List how many earlier comments were left out in the summary.`
     );
   }
 

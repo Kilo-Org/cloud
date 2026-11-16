@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { EnkryptGuardrailDirection } from '@kilocode/db/schema-types';
-import type {
-  EnkryptGuardrailVerdict,
-  EnkryptUnavailableReason,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import type { EnkryptGuardrailVerdict } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import type { EnkryptUnavailableReason } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -38,6 +36,12 @@ type GuardrailError = {
   errorType: ProxyErrorType;
 };
 
+/** A verdict that rejects: the request is not sent, or the response is withheld. */
+export type EnkryptRejectingVerdict = Extract<
+  EnkryptGuardrailVerdict,
+  { action: 'block' | 'unavailable' }
+>;
+
 type GuardrailRejection = {
   error: GuardrailError;
   status: number;
@@ -55,10 +59,9 @@ const REVERT_GUIDANCE =
  * request.
  */
 function guardrailRejection(
-  verdict: EnkryptGuardrailVerdict,
+  verdict: EnkryptRejectingVerdict,
   guardrail: EnkryptGuardrailDirection
-): GuardrailRejection | null {
-  if (verdict.action === 'skip' || verdict.action === 'allow') return null;
+): GuardrailRejection {
   if (verdict.action === 'block') {
     return {
       error: {
@@ -133,6 +136,13 @@ function streamErrorEvent(kind: GatewayChatApiKind, error: GuardrailError): stri
   return `event: error\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
+function rejectionJson(kind: GatewayChatApiKind, rejection: GuardrailRejection): NextResponse {
+  return NextResponse.json(apiErrorBody(kind, rejection.error), {
+    status: rejection.status,
+    headers: rejection.headers,
+  });
+}
+
 /**
  * Uses the body shape of `usageLimitExceededResponse`, which Kilo clients render as a low-credit
  * prompt, but without its advice to switch to a free model: free models are scanned too.
@@ -161,32 +171,22 @@ export function enkryptGuardrailRejectionResponse(
   kind: GatewayChatApiKind,
   verdict: EnkryptGuardrailVerdict
 ): NextResponse | null {
-  const rejection = guardrailRejection(verdict, 'input');
-  if (!rejection) return null;
-  return NextResponse.json(apiErrorBody(kind, rejection.error), {
-    status: rejection.status,
-    headers: rejection.headers,
-  });
+  if (verdict.action === 'skip' || verdict.action === 'allow') return null;
+  return rejectionJson(kind, guardrailRejection(verdict, 'input'));
 }
 
 /**
- * Maps an output guardrail verdict to the response that replaces the model's, or null to release
- * it. A streamed request has not received any headers yet, but its client expects a stream, so the
- * rejection is a well-formed stream with one error event.
+ * The response that replaces the model's after the output guardrail rejected it. A streamed
+ * request has not received any headers yet, but its client expects a stream, so the rejection is a
+ * well-formed stream with one error event.
  */
 export function enkryptOutputGuardrailRejectionResponse(
   kind: GatewayChatApiKind,
-  verdict: EnkryptGuardrailVerdict,
+  verdict: EnkryptRejectingVerdict,
   stream: boolean
-): NextResponse | null {
+): NextResponse {
   const rejection = guardrailRejection(verdict, 'output');
-  if (!rejection) return null;
-  if (!stream) {
-    return NextResponse.json(apiErrorBody(kind, rejection.error), {
-      status: rejection.status,
-      headers: rejection.headers,
-    });
-  }
+  if (!stream) return rejectionJson(kind, rejection);
   return new NextResponse(streamErrorEvent(kind, rejection.error), {
     status: 200,
     headers: {

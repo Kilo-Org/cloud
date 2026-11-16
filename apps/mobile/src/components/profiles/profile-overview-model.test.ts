@@ -51,13 +51,14 @@ describe('metadataFormKey', () => {
 });
 
 describe('overviewSectionRows', () => {
-  it('returns the six sections in a fixed order with their counts', () => {
+  it('returns the seven sections in a fixed order with their counts', () => {
     const rows = overviewSectionRows({
       varCount: 3,
       commandCount: 2,
       kiloCommandCount: 4,
       mcpServerCount: 1,
       skillCount: 1,
+      instructionCount: 3,
       agentCount: 2,
     });
 
@@ -67,6 +68,7 @@ describe('overviewSectionRows', () => {
       { key: 'slashCommands', titleKey: 'profiles.slashCommands.title', count: 4 },
       { key: 'mcp', titleKey: 'profiles.mcp.title', count: 1 },
       { key: 'skills', titleKey: 'profiles.skillsTitle', count: 1 },
+      { key: 'instructions', titleKey: 'profiles.instructionsTitle', count: 3 },
       { key: 'agents', titleKey: 'profiles.agents.title', count: 2 },
     ]);
   });
@@ -79,6 +81,7 @@ describe('overviewSectionRows', () => {
         kiloCommandCount: 0,
         mcpServerCount: 0,
         skillCount: 0,
+        instructionCount: 0,
         agentCount: 0,
       })
     ).toEqual([
@@ -87,6 +90,7 @@ describe('overviewSectionRows', () => {
       { key: 'slashCommands', titleKey: 'profiles.slashCommands.title', count: 0 },
       { key: 'mcp', titleKey: 'profiles.mcp.title', count: 0 },
       { key: 'skills', titleKey: 'profiles.skillsTitle', count: 0 },
+      { key: 'instructions', titleKey: 'profiles.instructionsTitle', count: 0 },
       { key: 'agents', titleKey: 'profiles.agents.title', count: 0 },
     ]);
   });

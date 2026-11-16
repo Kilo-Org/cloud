@@ -1,10 +1,9 @@
 'use client';
 
-import type { DragEventHandler, ReactNode } from 'react';
+import { useRef, useState, type DragEventHandler, type ReactNode } from 'react';
 import {
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
   ChevronDown,
   ChevronRight,
   Folder,
@@ -13,8 +12,18 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import type { WorkspaceFolder, WorkspaceFolderSortMode } from '@/lib/cloud-agent/workspace-folders';
+import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
 import { workspaceFolderColorSchema } from '@/lib/cloud-agent/workspace-folders';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,10 +49,10 @@ export function WorkspaceFolderSection({
   dropPlacement,
   visibleCount,
   totalCount,
+  workspaceRowsTruncated = false,
   onEdit,
   onDelete,
   onMove,
-  onSortModeChange,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -59,10 +68,10 @@ export function WorkspaceFolderSection({
   dropPlacement: 'inside' | 'before' | 'after' | null;
   visibleCount: number;
   totalCount?: number;
+  workspaceRowsTruncated?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onMove: (direction: 'up' | 'down') => void;
-  onSortModeChange?: (sortMode: WorkspaceFolderSortMode) => void;
   onDragStart: DragEventHandler<HTMLDivElement>;
   onDragEnd: DragEventHandler<HTMLDivElement>;
   onDragOver: DragEventHandler<HTMLElement>;
@@ -70,6 +79,8 @@ export function WorkspaceFolderSection({
   onDrop: DragEventHandler<HTMLElement>;
   children: ReactNode;
 }) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const actionsRef = useRef<HTMLButtonElement>(null);
   const collapsed = controller.collapsedFolderIds.includes(folder.id);
   const disabled = controller.isSaving || controller.isError;
   const color = getWorkspaceFolderColor(folder.color);
@@ -129,6 +140,7 @@ export function WorkspaceFolderSection({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
+              ref={actionsRef}
               type="button"
               aria-label={`Folder actions for ${folder.name}`}
               aria-busy={controller.isSaving || undefined}
@@ -176,34 +188,6 @@ export function WorkspaceFolderSection({
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            {onSortModeChange && (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger disabled={disabled} className="gap-2">
-                  <ArrowUpDown className="text-muted-foreground size-4" />
-                  Sort workspaces
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup
-                    value={folder.sortMode}
-                    onValueChange={value => {
-                      if (value === 'manual' || value === 'created' || value === 'activity') {
-                        onSortModeChange(value);
-                      }
-                    }}
-                  >
-                    <DropdownMenuRadioItem value="manual" disabled={disabled}>
-                      Manual
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="created" disabled={disabled}>
-                      Created
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="activity" disabled={disabled}>
-                      Last activity
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled={disabled || isFirst} onSelect={() => onMove('up')}>
               <ArrowUp className="size-4" />
@@ -214,20 +198,63 @@ export function WorkspaceFolderSection({
               Move down
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" disabled={disabled} onSelect={onDelete}>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={disabled}
+              onSelect={() => {
+                if (isSmart) onDelete();
+                else setDeleteDialogOpen(true);
+              }}
+            >
               <Trash2 className="size-4" />
               {isSmart ? 'Remove from sidebar' : 'Delete folder'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent
+          onCloseAutoFocus={event => {
+            event.preventDefault();
+            actionsRef.current?.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder?</AlertDialogTitle>
+            <AlertDialogDescription className="break-words">
+              This deletes the folder{' '}
+              <span className="text-foreground font-medium">{folder.name}</span>. Its workspaces
+              will move to Ungrouped, not be deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={disabled}
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                onDelete();
+              }}
+            >
+              Delete folder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {!collapsed && (
         <div className="ml-3.5 pl-1">
           {visibleCount > 0 ? (
             children
           ) : (
             <p className="text-muted-foreground px-3 py-3 text-xs">
-              {count > 0 ? 'No matching workspaces' : 'Drop workspaces here'}
+              {isSmart
+                ? workspaceRowsTruncated
+                  ? 'Workspace list limited to 200. Use search to find matching workspaces.'
+                  : 'No matching workspaces. Workspaces appear here automatically.'
+                : count > 0
+                  ? 'No matching workspaces'
+                  : 'Drop workspaces here'}
             </p>
           )}
         </div>

@@ -32,7 +32,7 @@ import type {
   EnkryptUsageWrite,
   EnkryptUsageWriteInput,
   EnkryptUsageWriteResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+} from '@kilocode/usage-contracts';
 
 /**
  * PLACEHOLDER: Enkrypt documents Guardrails credits only as a monthly plan allowance, with no price
@@ -55,6 +55,10 @@ export type EnkryptGuardrailCall = {
    * `allowed` call with detectors here.
    */
   detectorsFired?: EnkryptDetectorId[];
+  /** The text this call sent to Enkrypt, in UTF-16 code units; see the ledger column. */
+  scannedCharacters: number;
+  /** The text the scan covers, including what the verdict cache covered; see the ledger column. */
+  totalCharacters: number;
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
@@ -269,6 +273,8 @@ export async function recordEnkryptUsageLocally(
         added_latency_ms: usageWrite.addedLatencyMs,
         guardrail_id: guardrailId,
         fired_detector_ids: firedDetectorIds,
+        scanned_characters: usageWrite.scannedCharacters ?? null,
+        total_characters: usageWrite.totalCharacters ?? null,
         created_at: occurredAt,
       })
       .onConflictDoNothing({ target: [enkrypt_usage.id, enkrypt_usage.created_at] })

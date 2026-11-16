@@ -7,7 +7,9 @@ import { Pressable, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
+import { ReviewMemoryAnalyzeSection } from '@/components/code-reviewer/review-memory-analyze-section';
 import { ReviewMemoryProposalSheet } from '@/components/code-reviewer/review-memory-proposal-sheet';
+import { ReviewMemoryToggleCard } from '@/components/code-reviewer/review-memory-toggle-card';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
@@ -15,12 +17,14 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { reviewMemoryOwnerInput } from '@/lib/hooks/use-review-memory';
+import {
+  reviewMemoryOwnerInput,
+  useTriggerReviewMemoryAnalysis,
+} from '@/lib/hooks/use-review-memory';
 import {
   ACTIVE_PROPOSAL_STATUSES,
   proposalStatusLabel,
@@ -58,6 +62,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
   const summaryQuery = useQuery(trpc.reviewMemory.getDashboardSummary.queryOptions(ownerInput));
   const setEnabled = useSetReviewMemoryEnabled(scope);
+  const triggerAnalysis = useTriggerReviewMemoryAnalysis(scope);
   const enabled = summaryQuery.data?.enabled === true;
 
   const proposalsQuery = useInfiniteQuery(
@@ -246,55 +251,24 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         eyebrow={t('common.codeReviewer')}
       />
       {enabled ? (
-        <View className="px-6 pt-4">
-          <View className="rounded-lg bg-secondary p-4">
-            <View className="flex-row items-center justify-between gap-3">
-              {/* One named control with a 44pt target: the sentence is what a
-                  tap moves, and the native Switch carries the name, hint and
-                  state. The text cannot be a switch of its own: Android ignores
-                  `accessible={false}` on a native switch, so both controls would
-                  reach the screen reader, one of them unnamed. PreferenceRow
-                  lays out the same shape. */}
-              <Pressable
-                className="min-h-11 min-w-0 flex-1 justify-center active:opacity-70"
-                disabled={!canToggle}
-                onPress={() => {
-                  setEnabled.mutate(!enabled);
-                }}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
-              >
-                <Text
-                  accessible={false}
-                  importantForAccessibility="no"
-                  className="text-sm font-medium"
-                >
-                  {t('codeReviewer.reviewMemory.on')}
-                </Text>
-              </Pressable>
-              <Switch
-                value={enabled}
-                disabled={!canToggle}
-                accessibilityLabel={t('codeReviewer.reviewMemory.title')}
-                accessibilityHint={
-                  readOnly ? t('codeReviewer.reviewMemory.readOnlyDescription') : undefined
-                }
-                accessibilityState={{
-                  disabled: !canToggle,
-                  busy: setEnabled.isPending,
-                  checked: enabled,
-                }}
-                onValueChange={value => {
-                  setEnabled.mutate(value);
-                }}
-              />
-            </View>
-            {readOnly ? (
-              <Text variant="muted" className="mt-2 text-xs">
-                {t('codeReviewer.reviewMemory.readOnlyDescription')}
-              </Text>
-            ) : null}
-          </View>
+        <View className="gap-3 px-6 pt-4">
+          <ReviewMemoryToggleCard
+            enabled={enabled}
+            readOnly={readOnly}
+            disabled={!canToggle}
+            pending={setEnabled.isPending}
+            onChange={value => {
+              setEnabled.mutate(value);
+            }}
+          />
+          <ReviewMemoryAnalyzeSection
+            repositories={summaryQuery.data?.repositories ?? []}
+            pending={triggerAnalysis.isPending}
+            disabled={readOnly}
+            onAnalyze={repoFullName => {
+              triggerAnalysis.mutate(repoFullName);
+            }}
+          />
         </View>
       ) : null}
       {body}

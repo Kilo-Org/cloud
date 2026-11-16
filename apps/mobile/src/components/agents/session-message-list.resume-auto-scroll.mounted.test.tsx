@@ -157,11 +157,31 @@ function endUserDrag(): void {
   });
 }
 
+/** The native momentum callbacks FlashList raises once the user lets a fling go. */
+function beginMomentum(): void {
+  (flashListProps?.onMomentumScrollBegin as (() => void) | undefined)?.();
+}
+
+function endMomentum(): void {
+  (flashListProps?.onMomentumScrollEnd as ((event: unknown) => void) | undefined)?.({
+    nativeEvent: {
+      contentOffset: { x: 0, y: 0 },
+      contentSize: { height: 900 },
+      layoutMeasurement: { height: 300 },
+    },
+  });
+}
+
 function emitContentSizeChange(height: number): void {
   (flashListProps?.onContentSizeChange as ((width: number, height: number) => void) | undefined)?.(
     1000,
     height
   );
+  // The tail correction is coalesced to the next frame; run it so the call
+  // list is complete when a case asserts.
+  act(() => {
+    vi.advanceTimersByTime(1);
+  });
 }
 
 describe('SessionMessageList resume anchor vs tail auto-follow', () => {
@@ -646,6 +666,69 @@ describe('SessionMessageList resume anchor vs tail auto-follow', () => {
     // content-size growth must not pull the list back to the bottom.
     emitContentSizeChange(3100);
     expect(scrollCalls).toEqual(['index:0']);
+  });
+
+  it('does not yank a fling a send interrupted when a new anchor arrives', () => {
+    vi.useFakeTimers();
+
+    const items = [resumeItem('msg-1'), resumeItem('msg-2'), resumeItem('msg-3')];
+    const mounted = mountListKeep({ items, resumeAt: 'msg-2' });
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    scrollCalls.length = 0;
+
+    // The user flings and sends while it is still moving. The send owns the
+    // position, but the viewport is still moving under the finger.
+    beginUserDrag();
+    beginMomentum();
+    updateList(mounted, { items, resumeAt: 'msg-2', followTailNonce: 1 });
+    scrollCalls.length = 0;
+
+    // A later ?at= link on the same screen releases the send's claim. The list
+    // is still mid-fling, so the immediate scroll waits for it to settle.
+    updateList(mounted, { items, resumeAt: 'msg-1', followTailNonce: 1 });
+    expect(scrollCalls).toEqual([]);
+
+    // A retry that fires mid-fling waits too.
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(scrollCalls).toEqual([]);
+
+    // Once the fling ends the next retry lands the anchor.
+    act(() => {
+      endMomentum();
+      vi.advanceTimersByTime(650);
+    });
+    expect(scrollCalls).toEqual(['index:0']);
+  });
+
+  it('ends a fling that never reports its end, so a later resume still scrolls', () => {
+    // Regression: motion was a second flag cleared only by the momentum end, so
+    // a platform that dropped that event left the list "moving" for the rest of
+    // the screen and every later ?at= resume refused to scroll.
+    vi.useFakeTimers();
+
+    const items = [resumeItem('msg-1'), resumeItem('msg-2'), resumeItem('msg-3')];
+    const mounted = mountListKeep({ items, resumeAt: 'msg-2' });
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    // A fling starts, a send takes the position, and a new anchor arrives while
+    // the list is still moving. No momentum end ever follows.
+    beginUserDrag();
+    beginMomentum();
+    updateList(mounted, { items, resumeAt: 'msg-2', followTailNonce: 1 });
+    updateList(mounted, { items, resumeAt: 'msg-1', followTailNonce: 1 });
+    scrollCalls.length = 0;
+
+    // The bound ends the motion, and the next retry lands the anchor.
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    expect(scrollCalls).toContain('index:0');
   });
 
   it('does not replay an earlier send when the list mounts following the tail', () => {

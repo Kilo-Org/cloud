@@ -101,7 +101,7 @@ describe('cloudPrepareFailureMessage', () => {
 
   it('maps PAYMENT_REQUIRED to the credits copy', () => {
     expect(cloudPrepareFailureMessage(makeError('PAYMENT_REQUIRED', 'add credits'))).toBe(
-      'Not enough credits to run Cloud Agent. Add credits and try again.'
+      'Not enough credits for this request. Add credits and try again.'
     );
   });
 

@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.text.SpannableString
@@ -53,7 +52,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     Name("ActiveAgentsLiveUpdate")
 
     Function("isPromotionCapable") {
-      isPromotionCapable()
+      PromotionGate.capable(context)
     }
 
     // The framework applies the Do Not Disturb access gate when a channel is
@@ -83,10 +82,11 @@ class ActiveAgentsLiveUpdateModule : Module() {
 
     // `update` carries the terminal `timeoutMs` instead of `start`'s `promotion`
     // flag. The flag is redundant on this path: `post` gates promotion on
-    // `isPromotionCapable()` itself, which is the value the JS side passes.
+    // `PromotionGate.capable(context)` itself, which is the value the JS side
+    // passes.
     AsyncFunction("update") { card: LiveUpdateCard, channelId: String, alerting: Boolean, timeoutMs: Double ->
       DurableWrites.durable {
-        post(card, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
+        post(card, channelId, alerting, PromotionGate.capable(context), timeoutMs.toLong())
       }
     }.runOnQueue(moduleQueue)
 
@@ -200,14 +200,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
   private val notificationState
     get() = context.getSharedPreferences("active_agents_notification", Context.MODE_PRIVATE)
 
-  private fun smallIconId(): Int =
-    context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
-
-  private fun isPromotionCapable(): Boolean =
-    Build.VERSION.SDK_INT >= 36 &&
-      Build.VERSION.SDK_INT_FULL >= 36_001_000 &&
-      notificationManager.canPostPromotedNotifications()
-
   /**
    * The channel the module last posted, or null when it has posted nothing.
    *
@@ -221,17 +213,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * would buy nothing the mirror does not already hold on every API.
    */
   private fun postedChannelId(): String? = notificationState.getString(POSTED_CHANNEL, null)
-
-  private fun newBuilder(channelId: String): Notification.Builder {
-    if (Build.VERSION.SDK_INT >= 26) {
-      // The JS side creates and names every channel before the first post.
-      return Notification.Builder(context, channelId)
-    }
-    return legacyBuilder()
-  }
-
-  @Suppress("DEPRECATION")
-  private fun legacyBuilder(): Notification.Builder = Notification.Builder(context)
 
   /**
    * A PendingIntent that deep-links the app to the URL the JS side named: the
@@ -325,9 +306,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
     (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
       Configuration.UI_MODE_NIGHT_YES
 
-  private fun action(label: String, intent: PendingIntent): Notification.Action =
-    Notification.Action.Builder(Icon.createWithResource(context, smallIconId()), label, intent).build()
-
   /**
    * The channel a card still in the shade carries, or null when no card is
    * posted. The stored marker alone can outlive the card: a terminal timeout
@@ -375,7 +353,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
     val text: CharSequence = if (card.textIsError) {
       SpannableString(card.text).apply {
         setSpan(
-          ForegroundColorSpan(Color.parseColor(if (night) ERROR_NIGHT else ERROR_DAY)),
+          ForegroundColorSpan(
+            Color.parseColor(if (night) CardStyle.ERROR_NIGHT else CardStyle.ERROR_DAY)
+          ),
           0,
           length,
           Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -384,9 +364,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
     } else {
       card.text
     }
-    val builder = newBuilder(channelId)
-      .setSmallIcon(smallIconId())
-      .setColor(Color.parseColor(if (night) PRIMARY_NIGHT else PRIMARY_DAY))
+    val icon = CardStyle.icon(context)
+    val builder = CardBuilders.builder(context, channelId)
+      .setSmallIcon(icon)
+      .setColor(Color.parseColor(if (night) CardStyle.PRIMARY_NIGHT else CardStyle.PRIMARY_DAY))
       .setContentTitle(card.title)
       .setContentText(text)
       .setSubText(card.subText)
@@ -399,10 +380,14 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // answered elsewhere or while an answer is in flight. Approve runs once the
     // device is unlocked, so it goes through the gate activity.
     card.approveLabel?.let {
-      builder.addAction(ApprovalGate.action(context, smallIconId(), it, approvePendingIntent()))
+      builder.addAction(ApprovalGate.action(context, icon, it, approvePendingIntent()))
     }
-    builder.addAction(action(card.openLabel, contentIntent))
-    card.newAgentLabel?.let { builder.addAction(action(it, newAgentPendingIntent(card.newAgentUrl))) }
+    builder.addAction(CardBuilders.action(context, icon, card.openLabel, contentIntent))
+    card.newAgentLabel?.let {
+      builder.addAction(
+        CardBuilders.action(context, icon, it, newAgentPendingIntent(card.newAgentUrl))
+      )
+    }
 
     if (needsInput) {
       // Only the first entry into the kind alerts; a later update in the same
@@ -413,12 +398,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
       builder.setOnlyAlertOnce(true)
     }
 
-    // API 36.1+ Live Update: promote only when the device reports the capability.
-    // setRequestPromotedOngoing does not exist; use the documented flag setter.
-    if (promotion && isPromotionCapable()) {
-      builder.setFlag(Notification.FLAG_PROMOTED_ONGOING, true)
-      builder.setShortCriticalText(card.compactText)
-      builder.setStyle(Notification.ProgressStyle())
+    // API 36.1+ Live Update: the one gate both Android cards request through.
+    if (promotion) {
+      PromotionGate.request(context, builder, card.compactText)
     }
 
     // Snapshot the timeout flag a failed same-channel post must restore: that
@@ -516,12 +498,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
     const val NEEDS_INPUT_CHANNEL_ID = "needs-input"
     const val APPROVE_REQUEST_CODE = 1003
     const val NEW_AGENT_REQUEST_CODE = 1004
-
-    /** The app's primary and destructive colours (`global.css`), day and night. */
-    const val PRIMARY_DAY = "#4F5A10"
-    const val PRIMARY_NIGHT = "#FFDD00"
-    const val ERROR_DAY = "#B0483A"
-    const val ERROR_NIGHT = "#F28B7A"
   }
 }
 

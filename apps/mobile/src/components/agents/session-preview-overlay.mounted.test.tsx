@@ -15,6 +15,7 @@ import {
   textWith,
 } from './session-preview-overlay.test-helpers';
 import { getSessionPreviewSnapshot } from './session-preview-state';
+import { isModalSurfacePresented } from '@/lib/modal-surface-veil';
 
 beforeEach(resetPreviewHolder);
 afterEach(resetPreviewStore);
@@ -223,7 +224,7 @@ describe('SessionPreviewOverlay', () => {
     );
 
     expect(textWith(renderer, `${i18n.t('common.working')} · $0.12`)).toHaveLength(0);
-    expect(textWith(renderer, '$0.12')).toHaveLength(1);
+    expect(textWith(renderer, '\u2066$0.12\u2069')).toHaveLength(1);
   });
 
   it('contains VoiceOver in the card and menu column on open', () => {
@@ -249,6 +250,22 @@ describe('SessionPreviewOverlay', () => {
     expect(
       modalSurface.findAllByProps({ accessibilityLabel: i18n.t('common.cancel') })
     ).toHaveLength(1);
+  });
+
+  it('takes the covered screen out of the tree while the preview is up', () => {
+    const renderer = mountOverlay();
+    openPreview(targetWith({}));
+
+    // The preview is a portal overlay inside the app window: on Android nothing
+    // hides the dimmed list and tab bar it covers (`accessibilityViewIsModal`
+    // above is ignored there), so the overlay holds the root's modal veil for as
+    // long as it is mounted.
+    expect(isModalSurfacePresented()).toBe(true);
+
+    pressByLabel(renderer, i18n.t('common.cancel'));
+    resetPreviewStore();
+
+    expect(isModalSurfacePresented()).toBe(false);
   });
 
   it('moves accessibility focus to the first menu row once the portal mounts it', () => {

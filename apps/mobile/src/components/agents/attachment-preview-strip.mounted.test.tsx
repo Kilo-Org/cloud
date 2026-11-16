@@ -1293,6 +1293,116 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
 
     renderer.unmount();
   });
+
+  // NativeWind's rem is 14, so one spacing unit is 3.5 dp.
+  const DP_PER_SPACING_UNIT = 3.5;
+
+  /** Resolved dp of one side's inset class, `px-*` counting for both sides. */
+  function sideDp(className: unknown, side: 'start' | 'end'): number {
+    const text = String(className);
+    const logical = new RegExp(
+      `(?:^|\\s)${side === 'start' ? 'ps' : 'pe'}-(\\d+(?:\\.\\d+)?)(?=\\s|$)`
+    );
+    const match = logical.exec(text) ?? /(?:^|\s)px-(\d+(?:\.\d+)?)(?=\s|$)/.exec(text);
+    return match ? Number(match[1]) * DP_PER_SPACING_UNIT : 0;
+  }
+
+  /** The document chip's filename Text. */
+  function filenameText(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    return root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === 'a-rather-long-document.pdf'
+    );
+  }
+
+  /** The document chip's filename column: the filename Text's parent. */
+  function fileColumn(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    const column = filenameText(root).parent;
+    if (!column || !String(column.props.className).includes('flex-1')) {
+      throw new Error('file column missing');
+    }
+    return column;
+  }
+
+  /** The row around the icon and the filename column. */
+  function fileRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    const row = fileColumn(root).parent;
+    if (!row || !String(row.props.className).includes('flex-row')) {
+      throw new Error('file row missing');
+    }
+    return row;
+  }
+
+  function removeBadgeRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    return root.find(
+      node =>
+        typeof node.type === 'string' &&
+        String(node.props.className).includes('items-end justify-center')
+    );
+  }
+
+  /** The chip's inset reserves, and the end inset of the Remove badge row. */
+  async function chipReserves(status: 'uploaded' | 'error'): Promise<{
+    badgeEndDp: number;
+    columnEndDp: number;
+    rowEndDp: number;
+    rowStartDp: number;
+  }> {
+    reactNativeMock.Platform.OS = 'android';
+    const attachment = makeAttachment({
+      filename: 'a-rather-long-document.pdf',
+      status,
+      // Only an explicit `terminal: false` failure offers Retry.
+      terminal: status === 'error' ? false : undefined,
+      progress: null,
+    });
+    const renderer = await mount([attachment]);
+    const badgeEndDp = sideDp(removeBadgeRow(renderer.root).props.className, 'end');
+    const result = {
+      badgeEndDp,
+      columnEndDp: sideDp(fileColumn(renderer.root).props.className, 'end'),
+      rowEndDp: sideDp(fileRow(renderer.root).props.className, 'end'),
+      rowStartDp: sideDp(fileRow(renderer.root).props.className, 'start'),
+    };
+    renderer.unmount();
+    return result;
+  }
+
+  it('keeps the text column clear of the Remove badge box', async () => {
+    const { badgeEndDp, columnEndDp, rowEndDp, rowStartDp } = await chipReserves('uploaded');
+
+    // The badge box starts `badgeEndDp` from the chip's end plus its own
+    // 28 dp, and the text ends after the row inset and the column inset. A
+    // shrunken row inset fails here even though the column reserve holds.
+    expect(rowEndDp + columnEndDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
+    // The reserve stays on the column, so the row keeps equal opposite insets.
+    expect(rowStartDp).toBe(rowEndDp);
+  });
+
+  it('keeps the text column clear of the badge on a chip that also offers Retry', async () => {
+    const { badgeEndDp, columnEndDp, rowEndDp, rowStartDp } = await chipReserves('error');
+
+    expect(rowEndDp + columnEndDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
+    // Retry's badge is 24.5 dp inside a `p-1` inset, so its box is 28 dp.
+    expect(rowStartDp).toBeGreaterThanOrEqual(28);
+  });
+
+  it('truncates the filename in the middle so the file type stays readable', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await mount([
+      makeAttachment({ filename: 'a-rather-long-document.pdf', status: 'uploaded', progress: 1 }),
+    ]);
+
+    // Android applies an ellipsis mode only to a single-line Text. A tail
+    // ellipsis would drop "document.pdf" and leave two files of one type
+    // looking alike.
+    expect(filenameText(renderer.root).props.numberOfLines).toBe(1);
+    expect(filenameText(renderer.root).props.ellipsizeMode).toBe('middle');
+
+    renderer.unmount();
+  });
 });
 
 describe('AttachmentPreviewStrip — chip render stability', () => {

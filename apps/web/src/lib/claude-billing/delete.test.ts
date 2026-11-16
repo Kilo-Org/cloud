@@ -14,7 +14,12 @@ import {
   shareClaudeBillingConnection,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
-import { ClaudeProfileDeletionError, deleteUserClaudeProfiles } from './delete';
+import {
+  ClaudeProfileDeletionError,
+  cleanupRemovedClaudeProfilesForUser,
+  deleteUserClaudeProfiles,
+  retireUnreferencedClaudeBillingPayer,
+} from './delete';
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -77,6 +82,32 @@ describe('Personal Claude profile erasure', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`uprof_${user.id}`);
+    expect(await getClaudeBillingConnection(personal)).toBeNull();
+  });
+
+  it('deletes a removed shared-services row created by the user instead of marking it billing_unavailable', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Claude removed shared erasure', user.id, 0);
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: null,
+      organization_id: organization.id,
+      user_profile_id: `uprof_removed_shared_${user.id}`,
+      status: 'removed',
+      created_by: user.id,
+    });
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await deleteUserClaudeProfiles(user.id);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`uprof_removed_shared_${user.id}`);
+    expect(
+      await getClaudeBillingConnection({ kind: 'shared_services', organizationId: organization.id })
+    ).toBeNull();
   });
 
   it.each([200, 404])('accepts deletion or authoritative absence (%s)', async status => {
@@ -149,5 +180,70 @@ describe('Personal Claude profile erasure', () => {
     expect(
       await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
     ).toMatchObject({ user_profile_id: `uprof_${user.id}` });
+  });
+
+  it('retires an unshared removed payer profile and cleans up deferred removed rows', async () => {
+    const user = await connectedUser();
+    const unreferenced = await removeClaudeBillingGrant({ kind: 'personal', kiloUserId: user.id });
+    if (!unreferenced) throw new Error('Expected unreferenced payer');
+
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await expect(retireUnreferencedClaudeBillingPayer(unreferenced)).rejects.toMatchObject({
+      retryable: true,
+    });
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ id: unreferenced.id, status: 'removed' });
+
+    await cleanupRemovedClaudeProfilesForUser(user.id);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })).toBeNull();
+  });
+
+  it('continues retiring remaining removed rows when one remote delete fails', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude partial cleanup', user.id, 0);
+    await db.insert(claude_billing_connections).values([
+      {
+        kilo_user_id: user.id,
+        organization_id: null,
+        user_profile_id: `uprof_fail_${user.id}`,
+        status: 'removed',
+        created_by: user.id,
+      },
+      {
+        kilo_user_id: user.id,
+        organization_id: org.id,
+        user_profile_id: `uprof_ok_${user.id}`,
+        status: 'removed',
+        created_by: user.id,
+      },
+    ]);
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async url =>
+        String(url).includes(`uprof_fail_${user.id}`)
+          ? new Response('{}', { status: 503 })
+          : new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await cleanupRemovedClaudeProfilesForUser(user.id);
+
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ user_profile_id: `uprof_fail_${user.id}`, status: 'removed' });
+    expect(
+      await getClaudeBillingConnection({
+        kind: 'member',
+        kiloUserId: user.id,
+        organizationId: org.id,
+      })
+    ).toBeNull();
   });
 });

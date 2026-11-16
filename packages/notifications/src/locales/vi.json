@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Các tác nhân đang hoạt động có bản cập nhật"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tác vụ đã hoàn tất"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Thất bại: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Bị gián đoạn: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Cảnh báo chi tiêu",
       "body": "Chi tiêu của {{scopeName}} đã vượt ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Phát hiện bảo mật mới ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} trong {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Phát hiện bảo mật mới ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Cảnh báo SLA",
-      "body": "{{findingTitle}} trong {{repoFullName}}"
+      "title": "Cảnh báo SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Vi phạm SLA",
-      "body": "{{findingTitle}} trong {{repoFullName}}"
+      "title": "Vi phạm SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

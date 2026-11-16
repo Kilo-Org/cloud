@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Actieve agents hebben een update"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Taak voltooid"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Mislukt: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Onderbroken: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Bestedingswaarschuwing",
       "body": "De bestedingen van {{scopeName}} overschreden ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nieuwe beveiligingsbevinding ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nieuwe beveiligingsbevinding ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA-waarschuwing",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA-waarschuwing"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA-overschrijding",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA-overschrijding"
     },
     "securityLifecycle": {
       "title": "Kilo",

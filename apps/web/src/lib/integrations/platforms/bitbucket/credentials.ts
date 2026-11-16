@@ -201,6 +201,7 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
         .where(
           and(
             eq(kilocode_users.id, input.authorizedByUserId),
+            isNull(kilocode_users.blocked_at),
             isNull(kilocode_users.blocked_reason)
           )
         )

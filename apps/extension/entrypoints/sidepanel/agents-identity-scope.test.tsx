@@ -247,10 +247,16 @@ describe('agents views render the signed-in identity data', () => {
     rerender(h(QueryClientProvider, { client: queryClient }, h(Probe)));
 
     await waitFor(() => {
-      expect(container.textContent).toContain('Failed to load active sessions');
+      expect(container.textContent).not.toContain('Alpha session');
     });
-    expect(container.textContent).toContain('Failed to load sessions');
-    expect(container.textContent).not.toContain('Alpha session');
+    /* Raw transport text must never reach the panel; each failed section offers a Retry. */
+    await waitFor(() => {
+      const retryButtons = [...container.querySelectorAll('button')].filter(
+        button => button.textContent === 'Retry'
+      );
+      expect(retryButtons.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(container.textContent).not.toContain('Failed to fetch');
     expect(container.textContent).not.toContain('Alpha history');
     expect(container.textContent).not.toContain('a-org/a-private-repo');
     expect(container.textContent).not.toContain('Alpha device');

@@ -8,23 +8,9 @@
       "scheduledAction": "Une action planifiée a une mise à jour",
       "lowBalance": "Votre solde nécessite une attention",
       "spendAlert": "Vos dépenses nécessitent une attention",
-      "securityFinding": "Un résultat de sécurité nécessite une attention",
+      "securityFinding": "Un signalement de sécurité nécessite une attention",
       "securityUpdate": "Une vérification de sécurité a une mise à jour",
       "activeAgentsGlanceable": "Les agents actifs ont une mise à jour"
-    }
-  },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tâche terminée"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Échec : {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Interrompu : {{detail}}"
     }
   },
   "agentSession": {
@@ -48,17 +34,17 @@
       "title": "Alerte de dépenses",
       "body": "Les dépenses de {{scopeName}} ont dépassé ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nouveau résultat de sécurité ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} dans {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nouveau signalement de sécurité ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Avertissement SLA",
-      "body": "{{findingTitle}} dans {{repoFullName}}"
+      "title": "Avertissement SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Violation SLA",
-      "body": "{{findingTitle}} dans {{repoFullName}}"
+      "title": "Violation SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
@@ -67,7 +53,7 @@
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} est prête",
+      "title": "{{instanceName}} est disponible",
       "body": "Appuyez pour commencer à discuter."
     },
     "startFailed": {
@@ -85,7 +71,7 @@
       "body": "Le redémarrage précédemment prévu a été annulé."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} va bientôt être mise à niveau",
+      "title": "Mise à niveau imminente pour {{instanceName}}",
       "bodyWithTag": "Mise à niveau vers {{targetImageTag}} à {{when}}.",
       "bodyWithoutTag": "Mise à niveau prévue à {{when}}."
     },

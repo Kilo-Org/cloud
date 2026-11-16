@@ -8,9 +8,16 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
-import { getLastHomeWidgetData } from './home-widget-data';
+import {
+  _flushHomeWidgetMirrorForTests,
+  getLastHomeWidgetData,
+  rememberHomeWidgetData,
+  restoreHomeWidgetData,
+} from './home-widget-data';
 import {
   _flushGlanceableMirrorForTests,
   _resetGlanceablePersistForTests,
@@ -28,6 +35,9 @@ import {
 } from './persist';
 
 const NOW = 1_750_000_000_000;
+// What iOS answers while the keychain is closed: `errSecInteractionNotAllowed`.
+const LOCKED_REFUSAL =
+  "Calling the 'getValueWithKeyAsync' function has failed: User interaction is not allowed.";
 const SNAPSHOT_KEY = 'glanceable-snapshot';
 const SCOPE_KEY = 'glanceable-scope-key';
 const HOME_WIDGET_DATA_KEY = 'home-widget-data';
@@ -93,6 +103,9 @@ beforeEach(() => {
   _resetGlanceablePersistForTests();
   _setSecureStoreForTests(secureStoreMock);
   store.clear();
+  // A keychain that has been unlocked since boot answers the probe, which is
+  // what lets an absent record read as absent instead of unreadable.
+  store.set(WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value);
   vi.clearAllMocks();
   secureStoreMock.setItemAsync.mockImplementation(defaultSetItem);
   secureStoreMock.getItemAsync.mockImplementation(defaultGetItem);
@@ -101,7 +114,9 @@ beforeEach(() => {
 afterEach(async () => {
   // Let a queued mirror write land before the next case clears the map.
   await _flushGlanceableMirrorForTests();
+  await _flushHomeWidgetMirrorForTests();
   _resetGlanceablePersistForTests();
+  setProtectedDataAvailable(true);
   store.clear();
 });
 
@@ -213,6 +228,42 @@ describe('restorePersistedGlanceable', () => {
     expect(getLastGlanceableSnapshot()).toBeNull();
     expect(isGlanceableRestoreUnavailable()).toBe(true);
     expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('reads a refused keychain as unavailable', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+
+    // The cached state the app installed at launch says the keychain answers;
+    // the device has locked since, so every call is refused.
+    setProtectedDataAvailable(false);
+    secureStoreMock.getItemAsync.mockRejectedValue(new Error(LOCKED_REFUSAL));
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toBeNull();
+    expect(getLocalScopeKey()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
+    expect(isGlanceableRestoreSettled()).toBe(true);
+    // The mirror is written AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY, so a locked
+    // device still tries the read; the refusal is what leaves the records
+    // untouched for the next unlocked start.
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalled();
+  });
+
+  it('does not read a locked null as an empty mirror', async () => {
+    // iOS can answer null for an item it will not hand over while the keychain
+    // is closed. A null snapshot is not proof that nothing owns the surface —
+    // the Live Activity sweep ends every card on one — so the restore has to
+    // flag the read instead of leaving it looking empty.
+    setProtectedDataAvailable(false);
+    secureStoreMock.getItemAsync.mockResolvedValue(null);
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
   });
 
   it('does not report a restore settled until the first read finishes', async () => {
@@ -466,7 +517,59 @@ describe('restorePersistedGlanceable', () => {
   });
 });
 
+describe('the Home-widget record while the device is locked', () => {
+  it('leaves a refused record unread while the device is locked', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+
+    setProtectedDataAvailable(false);
+    secureStoreMock.getItemAsync.mockRejectedValue(new Error(LOCKED_REFUSAL));
+    await restoreHomeWidgetData(stored.scopeKey);
+
+    // The record is still on disk for the next unlocked start: a refused read
+    // drains nothing and adopts nothing, and it is attempted rather than
+    // skipped because the item is readable while locked.
+    expect(getLastHomeWidgetData()).toBeNull();
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalled();
+    expect(store.get(HOME_WIDGET_DATA_KEY)).toBe(
+      JSON.stringify({ snapshot: stored, details: details })
+    );
+  });
+
+  it('mirrors the record while the device is locked', async () => {
+    const snapshot = snapshotFor([{ status: 'busy' }]);
+
+    setProtectedDataAvailable(false);
+    rememberHomeWidgetData({ snapshot, details });
+    await _flushHomeWidgetMirrorForTests();
+
+    // A background publish lands even with the screen locked, so the widget
+    // reads the newest record after the process dies.
+    expect(getLastHomeWidgetData()).toMatchObject({ snapshot: { scopeKey: snapshot.scopeKey } });
+    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      HOME_WIDGET_DATA_KEY,
+      JSON.stringify({ snapshot, details })
+    );
+  });
+});
+
 describe('mirror writes', () => {
+  it('mirrors the frame while the device is locked', async () => {
+    const snapshot = snapshotFor([{ status: 'busy' }]);
+
+    setProtectedDataAvailable(false);
+    persistGlanceableSink.publish(snapshot);
+    await _flushGlanceableMirrorForTests();
+
+    // The mirror is written AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY, so a locked
+    // device keeps it current instead of waiting for the next unlock.
+    expect(getLastGlanceableSnapshot()).toEqual(snapshot);
+    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      SNAPSHOT_KEY,
+      JSON.stringify(snapshot)
+    );
+  });
+
   // A publish is fire-and-forget, so without a chain the slow happy frame can
   // reach SecureStore after the terminal blank that replaced it, and the next
   // JS restart brings back a state the user already left.

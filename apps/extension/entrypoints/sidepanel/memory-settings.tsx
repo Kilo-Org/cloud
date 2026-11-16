@@ -4,7 +4,7 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteAgentMemory } from '@/src/shared/agent-memories-storage';
 import { loadMemorySettings, saveMemorySettings } from '@/src/shared/agent-memory-settings';
-import { deriveMemoriesSettingsView } from './memory-settings-state';
+import { deriveMemoriesSettingsView, MEMORY_FILTER_MIN_COUNT } from './memory-settings-state';
 import { useAgentMemories } from './use-agent-memories';
 import { createSerialAsyncChain } from './model-preferences-state';
 import { SettingsToggle } from './workflow-settings';
@@ -13,6 +13,7 @@ const EMPTY_MESSAGE =
   'No memories yet. Highlight text on any page, right-click, and choose Add to memory.';
 const LOAD_ERROR_MESSAGE = "Couldn't load memories. Try again.";
 const SETTINGS_SAVE_ERROR_MESSAGE = "Couldn't save the setting. Try again.";
+const NO_MATCHES_MESSAGE = 'No memories match that filter.';
 const AUTO_APPROVE_LABEL = 'Auto-approve memory saves';
 const AUTO_APPROVE_DESCRIPTION = 'Let Kilo save a memory without the approval card.';
 
@@ -21,7 +22,11 @@ const secondaryButtonClass =
 
 export const MemorySettings = (): JSX.Element => {
   const { isLoaded, loadError, memories, reload } = useAgentMemories();
-  const view = deriveMemoriesSettingsView({ isLoaded, loadError, memories });
+  const [query, setQuery] = useState('');
+  const view = deriveMemoriesSettingsView({ isLoaded, loadError, memories, query });
+  const showFilter =
+    memories.length >= MEMORY_FILTER_MIN_COUNT ||
+    (query !== '' && (view.kind === 'list' || view.kind === 'noMatches'));
 
   /* Undefined until the setting is read: the toggle stays disabled, so a failed
      read never presents the default as the stored value. */
@@ -98,6 +103,36 @@ export const MemorySettings = (): JSX.Element => {
 
       {view.kind === 'empty' ? (
         <p className="type-body mt-2 text-foreground-muted">{EMPTY_MESSAGE}</p>
+      ) : null}
+
+      {showFilter ? (
+        <input
+          aria-label="Filter memories"
+          className="type-body mt-2 h-8 w-full rounded-md border border-border-strong bg-input-bg px-2 text-foreground placeholder:text-foreground-subtle outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
+          onChange={event => {
+            setQuery(event.target.value);
+          }}
+          placeholder="Filter memories"
+          type="text"
+          value={query}
+        />
+      ) : null}
+
+      {view.kind === 'noMatches' ? (
+        <div className="mt-2 flex flex-col gap-2">
+          <p className="type-body text-foreground-muted">{NO_MATCHES_MESSAGE}</p>
+          <div className="flex justify-end">
+            <button
+              className={secondaryButtonClass}
+              onClick={() => {
+                setQuery('');
+              }}
+              type="button"
+            >
+              Clear filter
+            </button>
+          </div>
+        </div>
       ) : null}
 
       {view.kind === 'list' ? (

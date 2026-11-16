@@ -42,14 +42,6 @@ let member: User;
 let organization: Organization;
 let otherOrganization: Organization;
 
-async function enableRequestLogs(organizationIds: string[]) {
-  const config = { organization_features: { request_logs: organizationIds } };
-  await db
-    .insert(ai_gateway_config)
-    .values({ config })
-    .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
-}
-
 async function featureId(name: string): Promise<number> {
   await db
     .insert(feature)
@@ -299,71 +291,45 @@ describe('organizations.requestLogs trpc router', () => {
       .where(inArray(organizations.id, [organization.id, otherOrganization.id]));
   });
 
-  describe('feature availability', () => {
-    it('reports the feature as unavailable and rejects list and getDetails without it', async () => {
-      const usage = usageRow({ organization_id: organization.id });
-      await db.insert(microdollar_usage).values(usage);
-      await enableRequestLogs([otherOrganization.id]);
-      const caller = await createCallerForUser(owner.id);
+  describe('general availability', () => {
+    it.each([false, true])(
+      'allows request logs with legacy configuration present=%s',
+      async hasConfig => {
+        const usage = usageRow({ organization_id: organization.id });
+        await db.insert(microdollar_usage).values(usage);
+        if (hasConfig) {
+          await db.insert(ai_gateway_config).values({
+            config: { organization_features: { request_logs: [otherOrganization.id] } },
+          });
+        }
+        const caller = await createCallerForUser(owner.id);
 
-      await expect(
-        caller.organizations.requestLogs.isAvailable({ organizationId: organization.id })
-      ).resolves.toEqual({ available: false });
-      await expect(
-        caller.organizations.requestLogs.list({ organizationId: organization.id })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-      await expect(
-        caller.organizations.requestLogs.list({
-          organizationId: organization.id,
-          startTime: minutesAgo(10),
-          userId: owner.id,
-          modelPrefix: 'anthropic/',
-        })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-      await expect(
-        caller.organizations.requestLogs.getDetails({
-          organizationId: organization.id,
-          usageId: usage.id,
-        })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    });
-
-    it('reports the feature as unavailable when no gateway configuration exists', async () => {
-      const caller = await createCallerForUser(owner.id);
-
-      await expect(
-        caller.organizations.requestLogs.isAvailable({ organizationId: organization.id })
-      ).resolves.toEqual({ available: false });
-      await expect(
-        caller.organizations.requestLogs.list({ organizationId: organization.id })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    });
-
-    it('reports the feature as available when it is enabled for the organization', async () => {
-      await enableRequestLogs([organization.id]);
-      const caller = await createCallerForUser(owner.id);
-
-      await expect(
-        caller.organizations.requestLogs.isAvailable({ organizationId: organization.id })
-      ).resolves.toEqual({ available: true });
-      await expect(
-        caller.organizations.requestLogs.list({ organizationId: organization.id })
-      ).resolves.toEqual([]);
-    });
-
-    it('matches an organization id stored in upper case', async () => {
-      await enableRequestLogs([organization.id.toUpperCase()]);
-      const caller = await createCallerForUser(owner.id);
-
-      await expect(
-        caller.organizations.requestLogs.isAvailable({ organizationId: organization.id })
-      ).resolves.toEqual({ available: true });
-    });
+        await expect(
+          caller.organizations.requestLogs.isAvailable({ organizationId: organization.id })
+        ).resolves.toEqual({ available: true });
+        await expect(
+          caller.organizations.requestLogs.list({ organizationId: organization.id })
+        ).resolves.toMatchObject([{ id: usage.id }]);
+        await expect(
+          caller.organizations.requestLogs.list({
+            organizationId: organization.id,
+            startTime: minutesAgo(1),
+            userId: owner.id,
+            modelPrefix: 'anthropic/',
+          })
+        ).resolves.toMatchObject([{ id: usage.id }]);
+        await expect(
+          caller.organizations.requestLogs.getDetails({
+            organizationId: organization.id,
+            usageId: usage.id,
+          })
+        ).resolves.toMatchObject({ request: { model: usage.model } });
+      }
+    );
   });
 
   describe('access control', () => {
     it('rejects a plain member with UNAUTHORIZED', async () => {
-      await enableRequestLogs([organization.id]);
       const caller = await createCallerForUser(member.id);
 
       await expect(
@@ -381,10 +347,15 @@ describe('organizations.requestLogs trpc router', () => {
       await expect(
         caller.organizations.requestLogs.isAvailable({ organizationId: organization.id })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(
+        caller.organizations.requestLogs.getDetails({
+          organizationId: organization.id,
+          usageId: randomUUID(),
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
 
     it('rejects a user outside the organization with UNAUTHORIZED', async () => {
-      await enableRequestLogs([otherOrganization.id]);
       const caller = await createCallerForUser(member.id);
 
       await expect(
@@ -393,13 +364,21 @@ describe('organizations.requestLogs trpc router', () => {
         code: 'UNAUTHORIZED',
         message: 'You do not have access to this organization',
       });
+      await expect(
+        caller.organizations.requestLogs.isAvailable({ organizationId: otherOrganization.id })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(
+        caller.organizations.requestLogs.getDetails({
+          organizationId: otherOrganization.id,
+          usageId: randomUUID(),
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
 
     it.each([
       ['admin', () => admin],
       ['billing manager', () => billingManager],
     ])('allows an organization %s', async (_role, user) => {
-      await enableRequestLogs([organization.id]);
       await db.insert(microdollar_usage).values(usageRow({ organization_id: organization.id }));
       const caller = await createCallerForUser(user().id);
 
@@ -416,7 +395,6 @@ describe('organizations.requestLogs trpc router', () => {
 
   describe('list', () => {
     it("returns the organization's requests from the last hour, newest first", async () => {
-      await enableRequestLogs([organization.id, otherOrganization.id]);
       const vscodeFeatureId = await featureId('vscode-extension');
 
       const openRouter = usageRow({
@@ -524,7 +502,6 @@ describe('organizations.requestLogs trpc router', () => {
 
     describe.each(['openai-chatgpt', 'claude-billing'])('%s legacy requests', provider => {
       it.each([false, true])('returns BYOK when metadata exists=%s', async hasMetadata => {
-        await enableRequestLogs([organization.id]);
         const usage = usageRow({ organization_id: organization.id, provider });
         await db.insert(microdollar_usage).values(usage);
         if (hasMetadata) {
@@ -548,7 +525,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns null user details for a user that no longer exists', async () => {
-      await enableRequestLogs([organization.id]);
       const deletedUserId = `deleted-user-${randomUUID()}`;
       await db
         .insert(microdollar_usage)
@@ -563,7 +539,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it(`returns at most ${REQUEST_LOGS_LIMIT} requests`, async () => {
-      await enableRequestLogs([organization.id]);
       const rows = Array.from({ length: REQUEST_LOGS_LIMIT + 1 }, (_, index) =>
         usageRow({
           organization_id: organization.id,
@@ -585,7 +560,6 @@ describe('organizations.requestLogs trpc router', () => {
 
     describe('startTime', () => {
       it('returns the hour leading up to the start time, including the start and excluding the hour boundary', async () => {
-        await enableRequestLogs([organization.id]);
         const start = Date.now() - 3 * HOUR_MS - 123;
         const atStart = usageRow({ organization_id: organization.id, created_at: isoAt(start) });
         const justAfterStart = usageRow({
@@ -628,7 +602,6 @@ describe('organizations.requestLogs trpc router', () => {
       });
 
       it('interprets a start time with a non-UTC offset as the same instant', async () => {
-        await enableRequestLogs([organization.id]);
         const start = Date.now() - 4 * HOUR_MS;
         const inside = usageRow({
           organization_id: organization.id,
@@ -657,7 +630,6 @@ describe('organizations.requestLogs trpc router', () => {
         ['is older than 365 days', () => isoAt(Date.now() - 366 * DAY_MS)],
         ['is more than 5 minutes in the future', () => isoAt(Date.now() + HOUR_MS)],
       ])('rejects a start time that %s with BAD_REQUEST', async (_case, startTime) => {
-        await enableRequestLogs([organization.id]);
         const caller = await createCallerForUser(owner.id);
 
         await expect(
@@ -669,7 +641,6 @@ describe('organizations.requestLogs trpc router', () => {
       });
 
       it('accepts a start time slightly in the future and close to the 365-day limit', async () => {
-        await enableRequestLogs([organization.id]);
         const row = usageRow({ organization_id: organization.id, created_at: minutesAgo(1) });
         await db.insert(microdollar_usage).values(row);
 
@@ -682,7 +653,6 @@ describe('organizations.requestLogs trpc router', () => {
 
     describe('userId', () => {
       it("returns only the given user's requests", async () => {
-        await enableRequestLogs([organization.id]);
         const memberNewer = usageRow({
           organization_id: organization.id,
           kilo_user_id: member.id,
@@ -708,7 +678,6 @@ describe('organizations.requestLogs trpc router', () => {
       });
 
       it("does not return another organization's requests for the user", async () => {
-        await enableRequestLogs([organization.id, otherOrganization.id]);
         await db
           .insert(microdollar_usage)
           .values([
@@ -720,15 +689,12 @@ describe('organizations.requestLogs trpc router', () => {
       });
 
       it('rejects an empty user id with BAD_REQUEST', async () => {
-        await enableRequestLogs([organization.id]);
-
         await expect(listIds({ userId: '' })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
       });
     });
 
     describe('modelPrefix', () => {
       it('matches the requested model, falling back to the model when none was requested', async () => {
-        await enableRequestLogs([organization.id]);
         const anthropic = usageRow({
           organization_id: organization.id,
           requested_model: 'anthropic/claude-sonnet-4.6',
@@ -759,7 +725,6 @@ describe('organizations.requestLogs trpc router', () => {
       });
 
       it('trims the prefix and treats a blank prefix as no filter', async () => {
-        await enableRequestLogs([organization.id]);
         const anthropic = usageRow({
           organization_id: organization.id,
           requested_model: 'anthropic/claude-sonnet-4.6',
@@ -778,7 +743,6 @@ describe('organizations.requestLogs trpc router', () => {
       });
 
       it('matches LIKE wildcards and the escape character literally', async () => {
-        await enableRequestLogs([organization.id]);
         const percent = usageRow({
           organization_id: organization.id,
           requested_model: 'a%b/model',
@@ -815,7 +779,6 @@ describe('organizations.requestLogs trpc router', () => {
       });
 
       it('matches case-sensitively', async () => {
-        await enableRequestLogs([organization.id]);
         const anthropic = usageRow({
           organization_id: organization.id,
           requested_model: 'anthropic/claude-sonnet-4.6',
@@ -827,7 +790,6 @@ describe('organizations.requestLogs trpc router', () => {
       });
 
       it('accepts a 200-character prefix and rejects a longer one with BAD_REQUEST', async () => {
-        await enableRequestLogs([organization.id]);
         const longModel = 'x'.repeat(200);
         const row = usageRow({
           organization_id: organization.id,
@@ -843,7 +805,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('combines the start time, user, and model prefix filters', async () => {
-      await enableRequestLogs([organization.id]);
       const start = Date.now() - 2 * HOUR_MS;
       const match = usageRow({
         organization_id: organization.id,
@@ -885,7 +846,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it(`returns at most ${REQUEST_LOGS_LIMIT} filtered requests, newest first`, async () => {
-      await enableRequestLogs([organization.id]);
       const matching = Array.from({ length: REQUEST_LOGS_LIMIT + 1 }, (_, index) =>
         usageRow({
           organization_id: organization.id,
@@ -909,17 +869,7 @@ describe('organizations.requestLogs trpc router', () => {
   });
 
   describe('listEnkryptUsage', () => {
-    it('rejects the request when the feature is not enabled for the organization', async () => {
-      await enableRequestLogs([otherOrganization.id]);
-      const caller = await createCallerForUser(owner.id);
-
-      await expect(
-        caller.organizations.requestLogs.listEnkryptUsage({ organizationId: organization.id })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    });
-
     it('rejects a plain member with UNAUTHORIZED', async () => {
-      await enableRequestLogs([organization.id]);
       const caller = await createCallerForUser(member.id);
 
       await expect(
@@ -931,7 +881,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns an empty list without usage', async () => {
-      await enableRequestLogs([organization.id]);
       const caller = await createCallerForUser(owner.id);
 
       await expect(
@@ -940,7 +889,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it("returns the organization's guardrail calls from the last 24 hours, newest first", async () => {
-      await enableRequestLogs([organization.id, otherOrganization.id]);
       const lookups = await enkryptLookups();
       const tooOldAt = hoursAgo(25);
       const partitions = await provisionEnkryptUsagePartitions(db, new Date(tooOldAt));
@@ -1058,7 +1006,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it(`returns at most ${REQUEST_LOGS_LIMIT} calls, newest first`, async () => {
-      await enableRequestLogs([organization.id]);
       const lookups = await enkryptLookups();
       const rows = Array.from({ length: REQUEST_LOGS_LIMIT + 1 }, (_, index) =>
         enkryptRow(lookups, {
@@ -1079,7 +1026,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns the 24 hours leading up to the start time, including the start', async () => {
-      await enableRequestLogs([organization.id]);
       const lookups = await enkryptLookups();
       const startMs = Date.now() - 3 * DAY_MS;
       const partitions = await provisionEnkryptUsagePartitions(db, new Date(startMs - DAY_MS));
@@ -1109,7 +1055,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('rejects a start time older than 365 days with BAD_REQUEST', async () => {
-      await enableRequestLogs([organization.id]);
       const caller = await createCallerForUser(owner.id);
 
       await expect(
@@ -1121,7 +1066,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('filters by user, decision outcome, and guardrail', async () => {
-      await enableRequestLogs([organization.id]);
       const lookups = await enkryptLookups();
       const allowed = enkryptRow(lookups, {
         organization_id: organization.id,
@@ -1169,7 +1113,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it("does not return another organization's model for a linked request", async () => {
-      await enableRequestLogs([organization.id]);
       const lookups = await enkryptLookups();
       const otherOrgUsage = usageRow({ organization_id: otherOrganization.id });
       await db.insert(microdollar_usage).values(otherOrgUsage);
@@ -1189,20 +1132,7 @@ describe('organizations.requestLogs trpc router', () => {
   });
 
   describe('getEnkryptRequestDetails', () => {
-    it('rejects the request when the feature is not enabled for the organization', async () => {
-      await enableRequestLogs([otherOrganization.id]);
-      const caller = await createCallerForUser(owner.id);
-
-      await expect(
-        caller.organizations.requestLogs.getEnkryptRequestDetails({
-          organizationId: organization.id,
-          requestId: randomUUID(),
-        })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    });
-
     it('rejects a plain member with UNAUTHORIZED', async () => {
-      await enableRequestLogs([organization.id]);
       const caller = await createCallerForUser(member.id);
 
       await expect(
@@ -1214,7 +1144,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns NOT_FOUND for a request without Enkrypt calls in the organization', async () => {
-      await enableRequestLogs([organization.id, otherOrganization.id]);
       const lookups = await enkryptLookups();
       const otherOrgCall = enkryptRow(lookups, {
         organization_id: otherOrganization.id,
@@ -1236,7 +1165,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns the calls of a blocked request without inference usage, oldest first', async () => {
-      await enableRequestLogs([organization.id]);
       const lookups = await enkryptLookups();
       const requestId = randomUUID();
       const logOnly = enkryptRow(lookups, {
@@ -1291,7 +1219,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns the inference usage of a request that reached the model', async () => {
-      await enableRequestLogs([organization.id]);
       const lookups = await enkryptLookups();
       const usage = usageRow({
         organization_id: organization.id,
@@ -1325,7 +1252,6 @@ describe('organizations.requestLogs trpc router', () => {
 
   describe('getDetails', () => {
     it('returns NOT_FOUND for a request of another organization', async () => {
-      await enableRequestLogs([organization.id, otherOrganization.id]);
       const otherOrgRow = usageRow({ organization_id: otherOrganization.id });
       await db.insert(microdollar_usage).values(otherOrgRow);
 
@@ -1339,7 +1265,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns a request older than 24 hours', async () => {
-      await enableRequestLogs([organization.id]);
       const oldRow = usageRow({
         organization_id: organization.id,
         created_at: hoursAgo(3 * 24),
@@ -1362,7 +1287,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns NOT_FOUND for an unknown request', async () => {
-      await enableRequestLogs([organization.id]);
       const caller = await createCallerForUser(owner.id);
 
       await expect(
@@ -1374,7 +1298,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('rejects a usage id that is not a UUID', async () => {
-      await enableRequestLogs([organization.id]);
       const caller = await createCallerForUser(owner.id);
 
       await expect(
@@ -1386,7 +1309,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns the request fields and not-configured metadata without an R2 bucket', async () => {
-      await enableRequestLogs([organization.id]);
       const usage = usageRow({
         organization_id: organization.id,
         provider: 'openrouter',
@@ -1436,7 +1358,6 @@ describe('organizations.requestLogs trpc router', () => {
     });
 
     it('returns the auto model of an auto request', async () => {
-      await enableRequestLogs([organization.id]);
       const usage = usageRow({
         organization_id: organization.id,
         model: 'moonshotai/kimi-k2',

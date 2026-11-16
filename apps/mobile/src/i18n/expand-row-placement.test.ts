@@ -104,7 +104,16 @@ describe('counted expand rows', () => {
       [ALL_LINES],
     ],
     ['da nb'.split(' ') as SupportedLanguage[], [ALL_LINES, MORE_LINES, MORE_ABOVE]],
-    ['fr it'.split(' ') as SupportedLanguage[], [ALL_LINES, MORE_ABOVE]],
+    ['it'.split(' ') as SupportedLanguage[], [ALL_LINES, MORE_ABOVE]],
+    // French inflects every family: its singular rows lead the count with a
+    // singular noun ("Afficher la ligne (N)", "… N ligne supplémentaire
+    // au-dessus."), while the plural rows keep the determiner `toutes` or the
+    // verb `se trouvent` and annotate the count, which no singular numeral can
+    // follow ("Afficher toutes les lignes (N)", "… des lignes supplémentaires
+    // se trouvent au-dessus : N."). The count therefore selects a form whose
+    // wording already agrees with it, and no row renders a plural phrase beside
+    // a count of one.
+    ['fr'.split(' ') as SupportedLanguage[], []],
     ['sw'.split(' ') as SupportedLanguage[], [ALL_LINES]],
     // Zulu inflects the row for the class-3 singular noun `umugqa` instead:
     // "umugqa omunye", "umugqa womongo", "wonke umugqa". The count sits in the
@@ -236,6 +245,11 @@ describe('counted expand rows', () => {
   }
 
   const SINGULAR_ROWS = [
+    // French's own singular rows: the plural determiner `toutes` and the plural
+    // verb `se trouvent` cannot meet a count of one, so the singular forms lead
+    // a singular noun instead of annotating the count.
+    ['fr', ALL_LINES, 'Afficher la ligne (N)'],
+    ['fr', MORE_ABOVE, '… N ligne supplémentaire au-dessus'],
     ['el', MORE_ABOVE, '… υπάρχει N επιπλέον γραμμή παραπάνω.'],
     ['am', MORE_ABOVE, '… ከላይ ተጨማሪ N መስመር አለ።'],
     ['eu', MORE_ABOVE, '… Beste N lerro dago goian.'],

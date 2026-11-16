@@ -3,6 +3,10 @@ import { handleManagedScmOutbound } from '../sandbox-outbound.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
 import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
+import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
+import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
+
+const SESSION_SYNC_HOSTNAME = new URL(CLOUD_AGENT_SESSION_SYNC_ORIGIN).hostname;
 
 export type ContainersOutboundProps = {
   containerId: string;
@@ -71,6 +75,20 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       const headers = new Headers(request.headers);
       if (policy.data !== undefined) headers.set('Host', url.host);
       request = new Request(request, { headers, redirect: 'manual' });
+    }
+    // Match the allowlist's canonical form so `session-sync.kiloapps.io.` cannot skip the binding.
+    if (egressDomainSchema.safeParse(url.hostname).data === SESSION_SYNC_HOSTNAME) {
+      // The runtime handle must reach Session Sync only through its binding.
+      if (url.origin !== CLOUD_AGENT_SESSION_SYNC_ORIGIN) {
+        return new Response('Session Sync requires HTTPS', { status: 403 });
+      }
+      if (!this.env.SESSION_SYNC) {
+        return Response.json(
+          { error: { code: 'auth_unavailable', retryable: true } },
+          { status: 503 }
+        );
+      }
+      return this.env.SESSION_SYNC.fetch(request);
     }
     return handleManagedScmOutbound(request, this.env, { containerId });
   }

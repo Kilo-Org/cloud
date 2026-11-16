@@ -200,6 +200,95 @@ describe('cloudSessionMessagesPageSchema', () => {
     }
   );
 
+  it('keeps the preparation attempts and queued turns of a first v1 page', () => {
+    const attempt = {
+      id: 'attempt-1',
+      triggerMessageId: 'msg-queued',
+      status: 'failed' as const,
+      startedAt: 100,
+      completedAt: 120,
+      safeError: 'Workspace setup failed',
+      revision: 3,
+      steps: [
+        {
+          id: 'phase:workspace_setup',
+          key: 'workspace_setup',
+          kind: 'phase' as const,
+          label: 'workspace setup',
+          status: 'failed' as const,
+          startedAt: 100,
+          completedAt: 120,
+          revision: 3,
+          latestDetail: 'Preparing environment',
+          outputTail: 'last line',
+          outputTruncated: true,
+          exitCode: 1,
+        },
+      ],
+    };
+    const queued = {
+      messageId: 'msg-queued',
+      content: 'Fix the build',
+      timestamp: 100,
+      delivery: 'queued' as const,
+      terminalFailure: {
+        messageId: 'msg-queued',
+        status: 'failed',
+        delivery: 'queued' as const,
+        accepted: false,
+        error: 'Workspace setup failed',
+        reason: 'workspace_setup_failed',
+        timestamp: 120,
+      },
+    };
+
+    const parsed = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      preparationAttempts: [attempt],
+      queuedMessages: [queued],
+    });
+
+    expect(parsed?.preparationAttempts).toEqual([attempt]);
+    expect(parsed?.queuedMessages).toEqual([queued]);
+  });
+
+  it('keeps both row sets on a v2 conversation page', () => {
+    const sessionID = 'ses_12345678901234567890123456';
+    const attempt = {
+      id: 'attempt-1',
+      triggerMessageId: 'msg-queued',
+      status: 'running' as const,
+      startedAt: 100,
+      revision: 1,
+      steps: [],
+    };
+    const queued = { messageId: 'msg-queued', content: 'Fix the build', timestamp: 100 };
+
+    const parsed = cloudSessionMessagesPageSchema.parse({
+      kind: 'success',
+      source: {
+        version: 'v2',
+        session: {
+          id: sessionID,
+          location: { directory: '/workspace/app' },
+          time: { created: 1, updated: 2 },
+        },
+      },
+      info: { id: sessionID },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+      updateCursor: 3,
+      totalCostMicrodollars: 0,
+      preparationAttempts: [attempt],
+      queuedMessages: [queued],
+    });
+
+    expect(parsed?.sourceVersion).toBe('v2');
+    expect(parsed?.preparationAttempts).toEqual([attempt]);
+    expect(parsed?.queuedMessages).toEqual([queued]);
+  });
+
   it('adapts known slim native fields and accounts for malformed or cross-session rows', () => {
     const info = stubUserMessage({ id: 'msg_001', sessionID: sessionId });
     const part = {

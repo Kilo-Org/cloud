@@ -1,6 +1,6 @@
 import { lookup } from 'node:dns/promises';
 import { buildDirectProvider } from './build-direct-provider';
-import { upstreamRequest } from './upstream-request';
+import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
 
 jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
@@ -62,6 +62,7 @@ function send(provider: ReturnType<typeof directProvider>, signal?: AbortSignal)
     signal,
     vercelRequestId: 'fra1::abc',
     reasoningEffort: null,
+    durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
 }
 

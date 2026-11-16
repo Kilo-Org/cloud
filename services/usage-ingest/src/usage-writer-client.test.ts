@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usage } from './usage.test-fixture';
 import { enkryptRecord } from './enkrypt-usage.test-fixture';
+import { exaRecord } from './exa-usage.test-fixture';
 import {
   MAX_WRITER_RESPONSE_BYTES,
   recordLlmUsage,
   USAGE_WRITER_TIMEOUT_MS,
   recordEnkryptUsage,
+  recordExaUsage,
 } from '@kilocode/worker-utils/usage-writer-client';
 
 const config = {
@@ -38,6 +40,11 @@ afterEach(() => {
     enkryptRecord.kiloUserId,
     enkryptRecord.sessionId,
     enkryptRecord.organizationId,
+    exaRecord.userId,
+    exaRecord.organizationId,
+    exaRecord.occurredAt,
+    exaRecord.featureId,
+    exaRecord.type,
   ]) {
     if (sensitive) expect(logs).not.toContain(sensitive);
   }
@@ -485,6 +492,80 @@ describe('Enkrypt usage writer client', () => {
   });
 });
 
+describe('Exa usage writer client', () => {
+  const exaConfig = {
+    url: 'https://writer.example.test/api/internal/exa-usage/record',
+    secret: config.secret,
+    source: 'queue' as const,
+  };
+
+  it.each(['recorded', 'duplicate'] as const)(
+    'posts the record unchanged and accepts a %s echo of its id',
+    async status => {
+      fetchMock.mockResolvedValue(Response.json({ status, usageId: exaRecord.id }));
+      expect(await recordExaUsage(exaRecord, exaConfig)).toEqual({
+        kind: status,
+        result: { status, usageId: exaRecord.id },
+      });
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith(exaConfig.url, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': config.secret,
+          'x-usage-write-source': 'queue',
+        },
+        body: JSON.stringify(exaRecord),
+        signal: expect.any(AbortSignal),
+      });
+      expect(console.info).toHaveBeenCalledExactlyOnceWith('usage writer acknowledged', {
+        usageId: exaRecord.id,
+        usageKind: 'exa_usage',
+        outcome: status,
+      });
+    }
+  );
+
+  it.each([
+    ['another usage id', { status: 'recorded', usageId: '7b2d3f4a-5c6e-4f7a-9b8c-0d1e2f3a4b5c' }],
+    ['a missing usage id', { status: 'duplicate' }],
+    ['an LLM acknowledgement', { status: 'recorded', result: { usageId: exaRecord.id } }],
+    ['not_recorded', { status: 'not_recorded', usageId: exaRecord.id }],
+    ['an extra key', { status: 'recorded', usageId: exaRecord.id, extra: true }],
+  ])('rejects %s as an invalid response', async (_label, body) => {
+    fetchMock.mockResolvedValue(Response.json(body));
+    expect(await recordExaUsage(exaRecord, exaConfig)).toEqual({
+      kind: 'unavailable',
+      reason: 'invalid_response',
+    });
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('usage writer unavailable', {
+      usageId: exaRecord.id,
+      usageKind: 'exa_usage',
+      reason: 'invalid_response',
+    });
+  });
+
+  it('reuses the bounded admission 429 parsing', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({ error: 'Usage writer overloaded', reason: 'queue_limit' }, { status: 429 })
+    );
+    expect(await recordExaUsage(exaRecord, exaConfig)).toEqual({
+      kind: 'unavailable',
+      reason: 'http_error',
+      status: 429,
+      admissionReason: 'queue_limit',
+    });
+  });
+
+  it('does no network I/O without a writer URL', async () => {
+    expect(await recordExaUsage(exaRecord, { secret: config.secret })).toEqual({
+      kind: 'unavailable',
+      reason: 'missing_config',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('unread response release', () => {
   it.each([
     ['a truncated 429 rejection', 429],
@@ -520,6 +601,15 @@ describe('unread response release', () => {
           url: 'https://writer.example.test/api/internal/enkrypt-usage/record',
         }),
       { usageId: enkryptRecord.id, usageKind: 'enkrypt_usage' },
+    ],
+    [
+      'Exa',
+      () =>
+        recordExaUsage(exaRecord, {
+          ...config,
+          url: 'https://writer.example.test/api/internal/exa-usage/record',
+        }),
+      { usageId: exaRecord.id, usageKind: 'exa_usage' },
     ],
   ])(
     'logs only the error name when releasing a %s error body fails and keeps the outcome',

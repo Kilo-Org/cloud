@@ -189,6 +189,7 @@ it('emits a newly observed cause after the bounded failure map fills', () => {
 it('measures admission queue depth for control calls without batch bodies', async () => {
   const principal = personal(crypto.randomUUID());
   const sessionID = newSessionID();
+  expect((await client(principal).register(sessionID, crypto.randomUUID())).status).toBe(201);
   const stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
   await runInDurableObject(stub, async instance => {
     const exposed = instance as unknown as {

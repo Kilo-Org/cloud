@@ -20,6 +20,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PrivilegedActionClass } from '@kilocode/web-shared/lib/admin/privileged-access';
 import type { User } from '@kilocode/db/schema';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
   STEP_UP_CHALLENGE_TTL_MS,
   stepUpPolicyFor,
@@ -183,7 +184,7 @@ async function loadCurrentAdmin(
 
   if (
     !currentUser ||
-    currentUser.blocked_reason !== null ||
+    isBlockedAccount(currentUser) ||
     !currentUser.is_admin ||
     !isWebSessionCurrent(webSessionPepper, currentUser)
   ) {

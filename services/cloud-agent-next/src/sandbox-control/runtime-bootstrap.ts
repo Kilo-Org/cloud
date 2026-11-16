@@ -380,7 +380,6 @@ export function renderRuntimeBootstrap(input: {
   const environment = [
     '/usr/bin/env',
     '-i',
-    // Match the native image environment that preinstalled startup inherits.
     'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
     'HOME=/root',
     'LANG=en_US.UTF-8',

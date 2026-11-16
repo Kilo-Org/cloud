@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktive agenter har en opdatering"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Opgave fuldført"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Mislykkedes: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Afbrudt: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Forbrugsalert",
       "body": "{{scopeName}}s forbrug oversteg ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nyt sikkerhedsfund ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nyt sikkerhedsfund ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA-advarsel",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "SLA-advarsel"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA-overtrædelse",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "SLA-overtrædelse"
     },
     "securityLifecycle": {
       "title": "Kilo",

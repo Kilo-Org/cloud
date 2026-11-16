@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "सक्रिय एजेन्टहरूमा अद्यावधिक छ"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "कार्य सम्पन्न भयो"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "असफल: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "अवरुद्ध: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "खर्च सूचना",
       "body": "{{scopeName}} को खर्च ${{amountUsd}} नाघ्यो"
     },
-    "securityFindingNew": {
-      "title": "नयाँ सुरक्षा फेला ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} मा {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "नयाँ सुरक्षा फेला ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA चेतावनी",
-      "body": "{{repoFullName}} मा {{findingTitle}}"
+      "title": "SLA चेतावनी"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA उल्लंघन",
-      "body": "{{repoFullName}} मा {{findingTitle}}"
+      "title": "SLA उल्लंघन"
     },
     "securityLifecycle": {
       "title": "Kilo",

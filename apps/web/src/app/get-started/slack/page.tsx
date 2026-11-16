@@ -1,4 +1,5 @@
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { redirect } from 'next/navigation';
 import { getAuthPageProps } from '@/lib/auth/auth-page-wrapper';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
@@ -30,6 +31,10 @@ export default async function GetStartedSlackPage({
         </div>
       </AuthPageLayout>
     );
+  }
+
+  if (isBlockedAccount(user)) {
+    redirect('/account-blocked');
   }
 
   if (user.has_validation_stytch === null) {

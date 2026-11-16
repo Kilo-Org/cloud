@@ -5,12 +5,10 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { app_min_versions } from '@kilocode/db/schema';
 import { FAILURE_BACKOFF_MS } from '@kilocode/web-shared/lib/cached-fetch';
 import {
-  APP_CLIENT_HEADER,
   APP_PLATFORM_HEADER,
   APP_VERSION_HEADER,
   isAppVersion,
   isKnownPlatform,
-  isMobileClient as isMobileClientValue,
   type AppHeaderList,
 } from '@kilocode/web-shared/lib/app-headers';
 import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
@@ -55,10 +53,6 @@ let readStartedAt = 0;
 let readGeneration = 0;
 /** Reads still running, including abandoned ones that hold a pool connection. */
 let liveReads = 0;
-
-export function isMobileClient(headersList?: AppHeaderList | null): boolean {
-  return isMobileClientValue(headersList?.get(APP_CLIENT_HEADER));
-}
 
 /**
  * Enforce the minimum app version for a mobile client. The caller has already

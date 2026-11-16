@@ -328,6 +328,10 @@ function memberBalanceRow(overrides: Partial<OrganizationMemberBalanceRow> = {})
     auto_top_up_enabled: false,
     next_credit_expiration_at: null,
     created_at: '2026-01-01T00:00:00.000Z',
+    payerRootOrganizationId: 'org-1',
+    payerRootCreatedAt: '2026-01-01T00:00:00.000Z',
+    payerMicrodollarsUsed: 0,
+    payerTotalMicrodollarsAcquired: 10_000_000,
     ...overrides,
   } satisfies OrganizationMemberBalanceRow;
 }
@@ -732,6 +736,24 @@ describe('public custom router decide', () => {
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
     expect(res.status).toBe(403);
     expect(await errorCode(res)).toBe('forbidden');
+  });
+
+  it('refuses a user whose block timestamp is set', async () => {
+    dbRows.user = [
+      {
+        api_token_pepper: 'pepper-1',
+        blocked_at: '2026-01-15T12:00:00.000Z',
+        blocked_reason: null,
+        google_user_email: 'dev@example.com',
+        total_microdollars_acquired: 1_000_000,
+        microdollars_used: 0,
+      },
+    ];
+    const decide = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(decide.status).toBe(403);
+    expect(await errorCode(decide)).toBe('forbidden');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 
   it('admits a user whose email domain is not blocked', async () => {

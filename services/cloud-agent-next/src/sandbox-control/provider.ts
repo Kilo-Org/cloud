@@ -9,11 +9,14 @@ import {
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { z } from 'zod';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
-import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
+import type { NativeRuntimeImage } from './startup-selection.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import type { NativeCaptureResult } from '../sandbox-containers/native-capture.js';
-import type { SnapshotStartFailureReason } from '../sandbox-containers/snapshot-start-failures.js';
+import type {
+  SnapshotLaunchDiagnosticContext,
+  SnapshotStartFailureReason,
+} from '../sandbox-containers/snapshot-start-failures.js';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -91,7 +94,15 @@ export type ProviderAllocationIntent = {
 
 export type ProviderCreateIntent = ProviderAllocationIntent & {
   billing?: SandboxBillingInput;
+  snapshot?: ProviderSnapshotStart;
 };
+
+export class ProviderSnapshotCreationError extends Error {
+  constructor(readonly reason: SnapshotStartFailureReason) {
+    super(`Snapshot creation failed: ${reason}`);
+    this.name = 'ProviderSnapshotCreationError';
+  }
+}
 
 export type ProviderObservation = {
   status: ObserveResult;
@@ -109,13 +120,16 @@ export type ProviderSnapshotStart = {
   snapshotId: string;
   /** The image the snapshot was captured from. */
   baseImage: string;
+  /** The provider that captured it; absent only for callers that predate BYOC. */
+  provider?: 'cloudflare-containers' | 'vercel';
 };
 
 export type ProviderLaunchOptions = {
   /** Start from this snapshot; a provider without snapshot support ignores it. */
   snapshot?: ProviderSnapshotStart;
   deadlineAt?: number;
-  nativeImage?: RuntimeStartupConfig['image'];
+  nativeImage?: NativeRuntimeImage;
+  snapshotDiagnostic?: SnapshotLaunchDiagnosticContext;
 };
 
 export type ProviderLaunchResult = {
@@ -175,8 +189,13 @@ export type ProviderAdapter = {
   stop(ref: string | null, intent?: ProviderAllocationIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
-  /** Present on a provider that can start a session from an environment snapshot. */
-  readonly environmentSnapshots?: true;
+  /**
+   * Present on a provider that can start a session from an environment snapshot.
+   * `create` fixes the snapshot in the create request, so the lookup runs before
+   * create and a failed snapshot start retries creation. `launch` restores the
+   * snapshot when the created sandbox launches.
+   */
+  readonly environmentSnapshots?: 'create' | 'launch';
   readonly workspaceSnapshots?: {
     currentImage(image: 'all-in-one' | 'runtime-free'): Promise<string>;
     capture(ref: string, captureId: string): Promise<NativeCaptureResult>;

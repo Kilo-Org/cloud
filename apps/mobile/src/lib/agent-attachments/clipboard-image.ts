@@ -4,7 +4,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 /**
  * `getImageAsync({ format: 'png' })` re-encodes a copied JPEG as PNG.
- * A large photo can grow past the 20 MB agent cap or the 10 MiB kilo-chat cap,
+ * A large photo can grow past the 20 MB agent cap,
  * and is then rejected with the same toast as an oversized pick. Screenshots,
  * the dominant paste case, are already PNG.
  */

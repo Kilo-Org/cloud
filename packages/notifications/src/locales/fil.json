@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "May update ang mga aktibong agent"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Natapos ang task"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Nabigo: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Na-interrupt: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -41,24 +27,24 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
+      "title": "Alerto sa mababang balance",
       "body": "Bumaba sa ibaba ng ${{minimumBalanceUsd}} ang balance ng {{organizationName}}"
     },
     "spendAlert": {
       "title": "Alerto sa gastos",
       "body": "Lumampas ang gastos ng {{scopeName}} sa ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Bagong security finding ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} sa {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Bagong security finding ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Babala sa SLA",
-      "body": "{{findingTitle}} sa {{repoFullName}}"
+      "title": "Babala sa SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Paglabag sa SLA",
-      "body": "{{findingTitle}} sa {{repoFullName}}"
+      "title": "Paglabag sa SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

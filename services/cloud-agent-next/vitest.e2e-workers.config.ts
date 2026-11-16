@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 
 // e2e-surface tests in the real Workers runtime (Miniflare). This is a separate

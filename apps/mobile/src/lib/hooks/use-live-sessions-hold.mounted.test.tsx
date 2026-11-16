@@ -45,7 +45,24 @@ async function advanceBy(ms: number): Promise<void> {
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.useFakeTimers();
+  // The hook measures its hold window on `performance.now()` (a monotonic
+  // reading), not on `Date.now()`. `performance` is in the list so the tests
+  // control that same clock, and the wall-clock case below derives its
+  // arithmetic from it instead of assuming what a timer advance did.
+  vi.useFakeTimers({
+    toFake: [
+      'setTimeout',
+      'clearTimeout',
+      'setInterval',
+      'clearInterval',
+      'Date',
+      'setImmediate',
+      'clearImmediate',
+      'hrtime',
+      'performance',
+      'Intl',
+    ],
+  });
 });
 afterEach(() => {
   act(() => {
@@ -95,12 +112,18 @@ describe('useLiveSessionsHold', () => {
 
     // A device clock correction steps Date.now() backwards mid-window: the
     // hold must still end when its own window ends, not a step later.
+    const monotonicBeforeStep = performance.now();
     await advanceBy(1000);
+    const monotonicBeforeRewind = performance.now();
     vi.setSystemTime(new Date(Date.now() - 60_000));
     await render({ current: [], scopeKey: 'k1', canHold: true });
+    const monotonicAfterStep = performance.now();
+    // The `Date` rewind must not move the hook's clock.
+    expect(monotonicAfterStep).toBe(monotonicBeforeRewind);
     expect(heldIds()).toBe('a1');
 
-    await advanceBy(LIVE_SESSIONS_EMPTY_HOLD_MS - 1000);
+    // Derive the remaining window from the same reading the hook uses.
+    await advanceBy(LIVE_SESSIONS_EMPTY_HOLD_MS - (monotonicAfterStep - monotonicBeforeStep));
     expect(heldIds()).toBe('');
   });
 

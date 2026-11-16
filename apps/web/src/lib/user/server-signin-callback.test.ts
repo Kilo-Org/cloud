@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 
 const cookieStore = new Map<string, { name: string; value: string }>();
@@ -56,6 +56,7 @@ import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config'
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { user_auth_provider } from '@kilocode/db/schema';
+import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
@@ -90,6 +91,18 @@ async function setSessionCookie(userId: string, claims: Partial<JWT> = {}) {
     }),
   });
 }
+
+// These suites exercise a request the way a local run serves it: the client
+// address arrives in the forwarded header, and no platform label rewrites it.
+const originalEnv = process.env;
+beforeEach(() => {
+  process.env = { ...originalEnv };
+  delete process.env.VERCEL;
+  delete process.env.VERCEL_ENV;
+});
+afterEach(() => {
+  process.env = originalEnv;
+});
 
 describe('authOptions.callbacks.signIn auto-link wiring', () => {
   beforeEach(() => {
@@ -362,6 +375,32 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     } as never);
 
     expect(result).toContain('/users/sign_in?domain=example.com');
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a passkey sign-in for an account whose deletion is in progress', async () => {
+    // The shape `disableUserAccessForDeletion` writes.
+    const deletingUser = await insertTestUser({
+      blocked_reason: createDeletionInProgressBlockedReason(),
+      blocked_at: new Date().toISOString(),
+    });
+
+    const result = await signIn({
+      user: {
+        id: deletingUser.id,
+        email: deletingUser.google_user_email,
+        name: deletingUser.google_user_name,
+        image: '',
+      },
+      account: {
+        provider: 'passkey',
+        providerAccountId: deletingUser.id,
+        type: 'credentials',
+      },
+      profile: undefined,
+    } as never);
+
+    expect(result).toContain('/users/sign_in?error=BLOCKED');
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 

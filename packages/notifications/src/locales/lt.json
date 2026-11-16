@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktyvūs agentai turi atnaujinimą"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Užduotis baigta"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Nepavyko: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Nutraukta: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Išlaidų pranešimas",
       "body": "{{scopeName}} išlaidos viršijo ${{amountUsd}}"
     },
+    "securityFinding": {
+      "body": "{{findingTitle}} ({{repoFullName}})"
+    },
     "securityFindingNew": {
-      "title": "Naujas saugumo radinys ({{severity}})",
-      "body": "{{findingTitle}} {{repoFullName}}"
+      "title": "Naujas saugumo radinys ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA įspėjimas",
-      "body": "{{findingTitle}} {{repoFullName}}"
+      "title": "SLA įspėjimas"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA pažeidimas",
-      "body": "{{findingTitle}} {{repoFullName}}"
+      "title": "SLA pažeidimas"
     },
     "securityLifecycle": {
       "title": "Kilo",

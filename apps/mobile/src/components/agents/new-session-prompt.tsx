@@ -400,7 +400,7 @@ export function NewSessionPrompt({
       return;
     }
     if (hasAnyFailedAttachment(attachments)) {
-      toast.error(t('agentChat.composer.removeOrRetryFailed'));
+      toast.error(t('agentChat.composer.removeFailedAttachments'));
       return;
     }
     if (isAnyAttachmentUploading(attachments)) {
@@ -495,6 +495,12 @@ export function NewSessionPrompt({
         <View>
           <AnimatedPromptInput
             ref={promptInputRef}
+            // The placeholder is the field's accessible name. Android reports a
+            // TextInput's hint only while the field is empty, so without this
+            // the name became whatever was typed: the draft once it held text,
+            // and spaces when it held only spaces. The typed draft stays the
+            // field's value.
+            accessibilityLabel={t('agentChat.newSession.promptPlaceholder')}
             placeholder={t('agentChat.newSession.promptPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             multiline

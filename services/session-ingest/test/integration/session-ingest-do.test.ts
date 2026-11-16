@@ -1664,14 +1664,17 @@ describe('SessionIngestDO integration', () => {
       });
     });
 
-    it('returns bounded pages by sortable message item_id while preserving native id/time cursors', async () => {
+    it('returns bounded pages in creation order when the stored ids do not follow the clock', async () => {
       const sessionId = 'ses_sdk_page_000000000000001';
       const stub = getStub(kiloUserId, sessionId);
+      // Written as the conversation happened, with ids that descend: a session
+      // an older or foreign writer stored. The newest page is the newest turn,
+      // and the rows inside it stay chronological.
       const messages = [
-        { id: 'msg_400', created: 100 },
-        { id: 'msg_300', created: 400 },
-        { id: 'msg_100', created: 300 },
-        { id: 'msg_200', created: 200 },
+        { id: 'msg_d', created: 100 },
+        { id: 'msg_c', created: 200 },
+        { id: 'msg_b', created: 300 },
+        { id: 'msg_a', created: 400 },
       ].map(message => ({
         id: message.id,
         sessionID: sessionId,
@@ -1689,17 +1692,47 @@ describe('SessionIngestDO integration', () => {
       );
 
       const latest = await stub.readKiloSdkMessages({ limit: 2 });
-      expect(latest.messages.map(message => message.info.id)).toEqual(['msg_300', 'msg_400']);
+      expect(latest.messages.map(message => message.info.id)).toEqual(['msg_b', 'msg_a']);
       expect(latest.nextCursor).toBeTruthy();
       if (!latest.nextCursor) throw new Error('Expected cursor for an older message page');
       expect(JSON.parse(atob(latest.nextCursor.replace(/-/g, '+').replace(/_/g, '/')))).toEqual({
-        id: 'msg_300',
-        time: 400,
+        id: 'msg_b',
+        time: 300,
       });
 
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
-      expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
+      expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_d', 'msg_c']);
       expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('orders one bounded page by creation time even when arrival order disagrees', async () => {
+      const sessionId = 'ses_sdk_page_order_0000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      // Written out of order, with ids that do not sort with the clock either:
+      // the page is still chronological inside itself.
+      const messages = [
+        { id: 'msg_2', created: 300 },
+        { id: 'msg_1', created: 100 },
+        { id: 'msg_3', created: 200 },
+      ].map(message => ({
+        id: message.id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: message.created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      }));
+
+      await stub.ingest(
+        messages.map(info => ({ type: 'message' as const, data: info })),
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const page = await stub.readKiloSdkMessages({ limit: 3 });
+      expect(page.messages.map(message => message.info.id)).toEqual(['msg_1', 'msg_3', 'msg_2']);
+      expect(page.nextCursor).toBeNull();
     });
 
     it('omits a message identity outside the cursor contract from a bounded page', async () => {
@@ -4070,6 +4103,87 @@ describe('SessionIngestDO integration', () => {
       await runInDurableObject(stub, async (_instance, state) => {
         expect(readStoredTotal(state)).toBeCloseTo(0.5, 10);
         expect(readRowCosts(state)).toEqual([{ item_id: 'message/msg_legacy', cost_usd: 0.5 }]);
+      });
+
+      await stub.clear();
+    });
+
+    it('seeds a long history from its stored rows in bounded batches with an exact total', async () => {
+      const sessionId = 'ses_cost_aggregate_batched_4';
+      const stub = getStub(kiloUserId, sessionId);
+
+      // 40 stored message rows: half carry their contribution, half predate the column and
+      // need their body; one is R2-offloaded and contributes nothing; one carries a stored
+      // contribution that disagrees with its body, which must win.
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < 40; index += 1) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at, cost_usd) ' +
+              'VALUES (?, ?, ?, ?, ?)',
+            `message/b${index}`,
+            'message',
+            JSON.stringify(assistantMessage(`b${index}`, 0.02).data),
+            1_000 + index,
+            index >= 20 ? 0.01 : null
+          );
+        }
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key) ' +
+            'VALUES (?, ?, ?, ?)',
+          'message/offloaded',
+          'message',
+          '{}',
+          'items/offloaded'
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, cost_usd) VALUES (?, ?, ?, ?)',
+          'message/column_wins',
+          'message',
+          JSON.stringify(assistantMessage('column_wins', 9).data),
+          0.5
+        );
+      });
+
+      await stub.ingest([assistantMessage('msg_new', 0.05)], kiloUserId, sessionId, 1, 5_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        const [expected] = [
+          ...state.storage.sql.exec<{ total: number | null }>(
+            'SELECT SUM(CASE WHEN cost_usd IS NULL THEN json_extract(item_data, ' +
+              "'$.cost') ELSE cost_usd END) AS total FROM ingest_items " +
+              "WHERE item_type = 'message' AND item_data_r2_key IS NULL"
+          ),
+        ];
+        // 20 pre-column bodies at 0.02, 20 stored contributions at 0.01, the column row at
+        // 0.5 (its body says 9), and the batch's own message at 0.05.
+        expect(readStoredTotal(state)).toBeCloseTo(expected.total ?? 0, 10);
+        expect(readStoredTotal(state)).toBeCloseTo(20 * 0.02 + 20 * 0.01 + 0.5 + 0.05, 10);
+
+        // A batch step reads a body's size, never the body: a row with a stored contribution
+        // reports none, and a pre-column row reports the size of the body it would need.
+        const sized = [
+          ...state.storage.sql.exec<{ item_id: string; body_bytes: number }>(
+            'SELECT item_id, CASE WHEN cost_usd IS NULL THEN length(CAST(item_data AS BLOB)) ' +
+              'ELSE 0 END AS body_bytes FROM ingest_items WHERE item_id IN (?, ?) ' +
+              'ORDER BY item_id',
+            'message/b0',
+            'message/b39'
+          ),
+        ];
+        expect(sized.map(row => [row.item_id, row.body_bytes > 0])).toEqual([
+          ['message/b0', true],
+          ['message/b39', false],
+        ]);
+
+        // The body read returns the stored body of a pre-column row, which parses to that
+        // row's contribution.
+        const [body] = [
+          ...state.storage.sql.exec<{ item_data: string }>(
+            'SELECT item_data FROM ingest_items WHERE item_id = ?',
+            'message/b0'
+          ),
+        ];
+        expect(JSON.parse(body.item_data).cost).toBeCloseTo(0.02, 10);
       });
 
       await stub.clear();

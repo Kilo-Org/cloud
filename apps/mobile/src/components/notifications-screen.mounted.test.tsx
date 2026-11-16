@@ -26,16 +26,12 @@ const getDevicePushToken = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const registerTokenOptions = vi.hoisted(() => vi.fn());
 const setPreferenceOptions = vi.hoisted(() => vi.fn());
+const requestPermissionsAsync = vi.hoisted(() => vi.fn());
+const registerForPushNotifications = vi.hoisted(() => vi.fn());
 
-const useKiloClawTabVisible = vi.hoisted(() => vi.fn(() => true));
-vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({
-  useKiloClawTabVisible,
-}));
-
-// The suite runs on iOS like the real screen does, so the live-activity copy
-// stays covered. A test that needs the Android paint sets this and restores it.
+// The suite runs on iOS so the live-activity copy stays covered.
+// Tests that need Android paint restore this afterwards.
 const platform = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
-
 const { openSettings, setLiveActivityEnabled, liveActivityEnabled, systemAllowsLiveActivities } =
   vi.hoisted(() => ({
     openSettings: vi.fn(),
@@ -74,7 +70,7 @@ vi.mock('@/glanceable-ios/system-switch', () => ({
 }));
 vi.mock('expo-notifications', () => ({
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
-  requestPermissionsAsync: vi.fn(),
+  requestPermissionsAsync,
 }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.4' }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError, success: vi.fn() } }));
@@ -123,7 +119,7 @@ vi.mock('@/lib/notifications', () => ({
   getNotificationPermissionStatus,
   getDevicePushToken,
   getPlatform: () => 'android',
-  registerForPushNotifications: vi.fn(),
+  registerForPushNotifications,
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -354,7 +350,7 @@ describe('NotificationsScreen message-previews row', () => {
   });
 });
 
-describe('NotificationsScreen KiloClaw activity row', () => {
+describe('NotificationsScreen category rows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getNotificationPermissionStatus.mockResolvedValue('granted');
@@ -364,32 +360,20 @@ describe('NotificationsScreen KiloClaw activity row', () => {
     registerTokenMutationFn.mockResolvedValue({ success: true });
   });
 
-  it('happy: instance present shows the row and a toggle persists', async () => {
-    useKiloClawTabVisible.mockReturnValue(true);
+  it('keeps agent preferences editable and omits retired categories', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
-
-    await waitForEnabledSwitch(renderer, 'KiloClaw activity');
-
+    await waitForEnabledSwitch(renderer, 'Agent updates');
+    expect(switchesByLabel(renderer.root, 'KiloClaw activity')).toHaveLength(0);
+    expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(0);
     act(() => {
-      switchOnValueChange(renderer.root, 'KiloClaw activity')?.(false);
+      switchOnValueChange(renderer.root, 'Agent updates')?.(false);
     });
     await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
-    expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ kiloclawActivity: false });
+    expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ agentUpdates: false });
   });
 
-  it('empty: no instance hides the KiloClaw row and keeps the Chat messages row', async () => {
-    useKiloClawTabVisible.mockReturnValue(false);
-    prefsQueryFn.mockResolvedValue(fullPrefs());
-    const { renderer } = await renderScreen();
-
-    await waitFor(() => switchesByLabel(renderer.root, 'Chat messages').length === 1);
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity').length).toBe(0);
-    expect(switchesByLabel(renderer.root, 'Chat messages').length).toBe(1);
-  });
-
-  it('retryable unhappy: prefs error shows retry and no KiloClaw row', async () => {
-    useKiloClawTabVisible.mockReturnValue(false);
+  it('shows retry after preference loading fails', async () => {
     prefsQueryFn.mockRejectedValue(new Error('prefs boom'));
     const { renderer } = await renderScreen();
 
@@ -402,15 +386,12 @@ describe('NotificationsScreen KiloClaw activity row', () => {
             n.props.accessibilityLabel === 'Retry loading notification categories'
         ).length === 1
     );
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity').length).toBe(0);
   });
 
-  it('empty loading: pending prefs shows skeletons and no KiloClaw switch', async () => {
-    useKiloClawTabVisible.mockReturnValue(false);
+  it('shows skeletons while preferences load', async () => {
     prefsQueryFn.mockReturnValue(new Promise(() => undefined));
     const { renderer } = await renderScreen();
 
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity').length).toBe(0);
     expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
   });
 });
@@ -428,7 +409,7 @@ describe('NotificationsScreen mutation serialization (scope.id + generation guar
   it('scopes both mutations to their fixed cache entries', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     expect(registerTokenOptions).toHaveBeenCalledWith(
       expect.objectContaining({ scope: { id: 'push-tokens' } })
@@ -439,9 +420,9 @@ describe('NotificationsScreen mutation serialization (scope.id + generation guar
   });
 
   it('a failing older category mutation does not roll back while a newer one owns the cache', async () => {
-    prefsQueryFn.mockResolvedValue(fullPrefs({ chatMessages: true, agentAttention: true }));
+    prefsQueryFn.mockResolvedValue(fullPrefs({ agentUpdates: true, agentAttention: true }));
     const { renderer, queryClient } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     const opts = setPreferenceOptions.mock.calls[0]?.[0] as
       | {
@@ -453,11 +434,11 @@ describe('NotificationsScreen mutation serialization (scope.id + generation guar
       throw new Error('setNotificationPreferences options not captured');
     }
 
-    const older = await opts.onMutate({ chatMessages: false });
+    const older = await opts.onMutate({ agentUpdates: false });
     const newer = await opts.onMutate({ agentAttention: false });
 
     // The older failure must not restore its snapshot over the newer write.
-    opts.onError(new Error('boom'), { chatMessages: false }, older);
+    opts.onError(new Error('boom'), { agentUpdates: false }, older);
     const afterOlder = queryClient.getQueryData<Record<string, unknown>>([
       'getNotificationPreferences',
     ]);
@@ -526,7 +507,7 @@ describe('NotificationsScreen spend alerts row', () => {
 
     // Waiting on an available sibling proves the master gate settled, so the
     // spend row's disabled state below is the server capability, not the gate.
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(true);
     expect(
@@ -559,7 +540,6 @@ describe('NotificationsScreen spend alerts row', () => {
 describe('NotificationsScreen category availability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useKiloClawTabVisible.mockReturnValue(true);
     getNotificationPermissionStatus.mockResolvedValue('granted');
     getDevicePushToken.mockResolvedValue('device-token');
     pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
@@ -575,17 +555,17 @@ describe('NotificationsScreen category availability', () => {
   it('happy: an available category toggle flips and persists', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
-    expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.value).toBe(true);
+    expect(switchesByLabel(renderer.root, 'Agent updates')[0]?.props.value).toBe(true);
 
-    prefsQueryFn.mockResolvedValue(fullPrefs({ chatMessages: false }));
+    prefsQueryFn.mockResolvedValue(fullPrefs({ agentUpdates: false }));
     act(() => {
-      switchOnValueChange(renderer.root, 'Chat messages')?.(false);
+      switchOnValueChange(renderer.root, 'Agent updates')?.(false);
     });
     await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
-    expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ chatMessages: false });
-    await waitFor(() => switchesByLabel(renderer.root, 'Chat messages')[0]?.props.value === false);
+    expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ agentUpdates: false });
+    await waitFor(() => switchesByLabel(renderer.root, 'Agent updates')[0]?.props.value === false);
     expect(toastError).not.toHaveBeenCalled();
   });
 
@@ -610,7 +590,7 @@ describe('NotificationsScreen category availability', () => {
     // disables every row until the permission/device-token/push-token queries
     // settle, so the unavailable row is disabled from the first render. Waiting
     // on the sibling proves the gate settled and capabilities loaded.
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
     expect(
@@ -634,7 +614,7 @@ describe('NotificationsScreen category availability', () => {
       })
     );
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     const unavailable = switchPaint(renderer.root, 'Balance alerts');
     expect(unavailable?.disabled).toBe(true);
@@ -642,7 +622,7 @@ describe('NotificationsScreen category availability', () => {
     expect(unavailable?.trackColor).toEqual({ false: '#A9A39A', true: '#6F6A61' });
     expect(unavailable?.thumbColor).toBe('#fff');
 
-    const available = switchPaint(renderer.root, 'Chat messages');
+    const available = switchPaint(renderer.root, 'Agent updates');
     expect(available?.disabled).toBe(false);
     expect(available?.trackColor).toEqual({ false: '#A9A39A', true: '#4F5A10' });
     expect(available?.thumbColor).toBe('#fff');
@@ -667,7 +647,7 @@ describe('NotificationsScreen category availability', () => {
     // disables every row until the permission/device-token/push-token queries
     // settle, so the unavailable row is disabled from the first render. Waiting
     // on the sibling proves the gate settled and capabilities loaded.
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
     expect(
@@ -692,7 +672,7 @@ describe('NotificationsScreen category availability', () => {
       })
     );
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     // The catalog owns the finding's sentence.
     expect(i18n.t('notifications.category.securityFindingsUnavailable')).toBe(
@@ -728,7 +708,7 @@ describe('NotificationsScreen category availability', () => {
       })
     );
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
     expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
@@ -749,7 +729,7 @@ describe('NotificationsScreen category availability', () => {
         })
       );
       const { renderer } = await renderScreen();
-      await waitForEnabledSwitch(renderer, 'Chat messages');
+      await waitForEnabledSwitch(renderer, 'Agent updates');
 
       expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
       expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
@@ -776,7 +756,7 @@ describe('NotificationsScreen category availability', () => {
     await i18n.changeLanguage('ur');
     const { renderer, unmount } = await renderScreen();
     try {
-      await waitForEnabledSwitch(renderer, ur.notifications.channel.chat);
+      await waitForEnabledSwitch(renderer, ur.notifications.category.agentUpdatesTitle);
 
       expect(
         switchesByLabel(renderer.root, ur.notifications.channel.security)[0]?.props.disabled
@@ -799,15 +779,15 @@ describe('NotificationsScreen category availability', () => {
       message: 'boom',
     });
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     act(() => {
-      switchOnValueChange(renderer.root, 'Chat messages')?.(false);
+      switchOnValueChange(renderer.root, 'Agent updates')?.(false);
     });
     await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
     await waitFor(() => activityIndicators(renderer.root).length === 0);
 
-    expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.value).toBe(true);
+    expect(switchesByLabel(renderer.root, 'Agent updates')[0]?.props.value).toBe(true);
     expect(toastError).toHaveBeenCalledWith('boom');
   });
 
@@ -825,18 +805,18 @@ describe('NotificationsScreen category availability', () => {
       notificationPreviews: 'generic',
     });
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
-    expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Agent updates')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'KiloClaw activity')).toHaveLength(0);
   });
 
   it('retryable unhappy: a capabilities query failure keeps last good availability and shows retry', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer, queryClient } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Chat messages');
+    await waitForEnabledSwitch(renderer, 'Agent updates');
 
     prefsQueryFn.mockRejectedValue(new Error('prefs boom'));
     await act(async () => {
@@ -853,7 +833,7 @@ describe('NotificationsScreen category availability', () => {
         ).length === 1
     );
     // Last good availability is preserved: rows stay rendered and enabled.
-    expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Agent updates')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
   });
 });
@@ -880,11 +860,11 @@ describe('NotificationsScreen sections below the master gate', () => {
     try {
       expect(textWithChildren(renderer.root, 'Categories')).toHaveLength(0);
       expect(textWithChildren(renderer.root, 'Message previews')).toHaveLength(0);
-      expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(0);
+      expect(switchesByLabel(renderer.root, 'Agent updates')).toHaveLength(0);
 
       permission.resolve('denied');
       await waitFor(() => textWithChildren(renderer.root, 'Categories').length === 1);
-      expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(1);
+      expect(switchesByLabel(renderer.root, 'Agent updates')).toHaveLength(1);
       expect(textWithChildren(renderer.root, 'Message previews')).toHaveLength(1);
     } finally {
       unmount();
@@ -919,7 +899,7 @@ describe('NotificationsScreen Arabic Security findings row', () => {
       );
       const { renderer, unmount } = await renderScreen();
       try {
-        await waitForEnabledSwitch(renderer, ar.notifications.channel.chat);
+        await waitForEnabledSwitch(renderer, ar.notifications.category.agentUpdatesTitle);
 
         expect(
           switchesByLabel(renderer.root, ar.notifications.channel.security)[0]?.props.disabled
@@ -998,7 +978,7 @@ describe('NotificationsScreen Arabic Security findings row', () => {
       act(() => {
         retry.onPress();
       });
-      await waitForEnabledSwitch(renderer, ar.notifications.channel.chat);
+      await waitForEnabledSwitch(renderer, ar.notifications.category.agentUpdatesTitle);
       expect(
         textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
       ).toHaveLength(1);
@@ -1019,6 +999,51 @@ describe('NotificationsScreen Arabic Security findings row', () => {
       expect(
         textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
       ).toHaveLength(0);
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe('NotificationsScreen enable flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue(null);
+    pushTokensQueryFn.mockResolvedValue([]);
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+    requestPermissionsAsync.mockResolvedValue({ status: 'granted', granted: true });
+    registerForPushNotifications.mockResolvedValue('expo-token');
+    setPreferenceMutationFn.mockResolvedValue({});
+  });
+
+  function enableCta(root: I): I | undefined {
+    return root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        n.props.accessibilityLabel === 'Enable notifications'
+    )[0];
+  }
+
+  it('requests the permission once for two taps in the same tick', async () => {
+    const { renderer, unmount } = await renderScreen();
+    try {
+      await waitFor(() => enableCta(renderer.root) !== undefined, 200);
+      const onPress = enableCta(renderer.root)?.props.onPress as (() => void) | undefined;
+
+      // Both taps land before the first render that could disable the CTA: the
+      // permission read is the window, so only a synchronous lock closes it.
+      await act(async () => {
+        onPress?.();
+        onPress?.();
+        await Promise.resolve();
+      });
+
+      await waitFor(() => registerForPushNotifications.mock.calls.length > 0, 200);
+      expect(requestPermissionsAsync).toHaveBeenCalledTimes(1);
+      expect(registerForPushNotifications).toHaveBeenCalledTimes(1);
     } finally {
       unmount();
     }

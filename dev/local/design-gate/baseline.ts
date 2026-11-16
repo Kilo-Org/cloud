@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { evaluate, listPages, openSession, selectPage } from './cdp';
 import type { RunOutcome } from './capture';
 import { normalize, parseDump } from './tree';
-import type { Finding } from './findings';
+import { RULE_IDS, type Finding } from './findings';
 import { collapseFindings, type CollapsedFinding } from './report';
 import { baselineGit, containedProofSource } from './baseline-preflight';
 
@@ -28,7 +28,7 @@ const TargetSchema = z
       .string()
       .max(256)
       .regex(/^(?:[^/]+(?:\/[^/]+)*)?$/),
-    readyTestID: z.string().min(1).max(128),
+    readyTestID: z.string().min(1).max(128).optional(),
     diagnostic: z
       .object({
         component: SourcePath,
@@ -125,6 +125,21 @@ function trackedFile(repo: string, commit: string, file: string): string {
   }
   return git(repo, ['show', `${commit}:${file}`]);
 }
+/**
+ * The app-side probe is the gate's instrument, not product source. Both revisions
+ * must therefore be measured by the same one: a branch that repairs the probe
+ * would otherwise be compared against a base still running the old instrument,
+ * and a probe defect in the base would read as a product defect of the branch.
+ * Each revision gets the tool checkout's copy of these files, which is recorded in
+ * its `prepared` list exactly like the generated route plumbing.
+ */
+const INSTRUMENT_FILES = [
+  'apps/mobile/src/lib/design-gate/collect.ts',
+  'apps/mobile/src/lib/design-gate/paint-state.ts',
+  'apps/mobile/src/lib/design-gate/probe.ts',
+  'apps/mobile/src/lib/design-gate/sampler.ts',
+] as const;
+
 function generatedFiles(
   repo: string,
   commit: string,
@@ -134,6 +149,16 @@ function generatedFiles(
   let intent = trackedFile(repo, commit, INTENT);
   const files = new Map<string, string>();
   const branches: string[] = [];
+  for (const file of INSTRUMENT_FILES) {
+    // Only a revision that would otherwise run a different probe needs the
+    // instrument copied in, and only when that revision tracks the file at all:
+    // an unchanged probe, or a product tree without one, keeps its own source.
+    if (git(repo, ['ls-tree', commit, '--', file]).trim() === '') continue;
+    const fromTool = fs.readFileSync(containedProofSource(repo, file), 'utf8');
+    if (trackedFile(repo, commit, file) !== fromTool) {
+      files.set(file, fromTool);
+    }
+  }
   for (const target of manifest.targets) {
     const diagnostic = target.diagnostic;
     if (diagnostic === undefined) continue;
@@ -372,6 +397,8 @@ export async function verifyRuntimeSource(
 type ReadinessRun = {
   cells: { id: string; screens: { target: string; link: string; dump: string }[] }[];
   findings: { cell: string; target: string; rule: string }[];
+  /** Targets the probe could not read; a run that has any is inconclusive. */
+  skipped?: { cell: string; target: string; reason: string }[];
 };
 function artifactPath(out: string, file: string): string {
   const resolved = fs.realpathSync(path.resolve(out, file));
@@ -386,6 +413,11 @@ export function targetReadiness(
   out: string
 ): string[] {
   const failures: string[] = [];
+  const skipped = outcome.skipped ?? [];
+  // Every skip is named exactly once, including one whose cell never made it
+  // into the matrix: a cell the runner could not even start has no CellRun, and
+  // leaving it to the cell loop would hide the gap from a prepared comparison.
+  const reported = new Set<string>();
   if (outcome.cells.length === 0) failures.push('No matrix cells captured');
   if (new Set(outcome.cells.map(cell => cell.id)).size !== outcome.cells.length)
     failures.push('Duplicate matrix cells');
@@ -399,7 +431,13 @@ export function targetReadiness(
     for (const target of manifest.targets) {
       const screen = cell.screens.find(candidate => candidate.target === target.id);
       if (screen === undefined) {
-        failures.push(`${cell.id}/${target.id}: missing screen`);
+        const skip = skipped.find(entry => entry.cell === cell.id && entry.target === target.id);
+        reported.add(`${cell.id}/${target.id}`);
+        failures.push(
+          skip === undefined
+            ? `${cell.id}/${target.id}: missing screen`
+            : `${cell.id}/${target.id}: target could not be read (${skip.reason})`
+        );
         continue;
       }
       const dump = parseDump(readJson(artifactPath(out, screen.dump)));
@@ -412,22 +450,47 @@ export function targetReadiness(
       const blocked = /(?:^|\/)(?:login|sign-in|signin|splash|onboarding)(?:\/|$)/i.test(
         `${dump.env.route}/${dump.env.screen ?? ''}`
       );
-      const ready = normalize(dump).nodes.some(
-        node =>
-          node.probe.testID === target.readyTestID &&
-          node.visibleRect[2] > 0 &&
-          node.visibleRect[3] > 0
-      );
-      const warning = outcome.findings.some(
+      // A product screen need not carry a testID. Without a readiness marker the
+      // declared route and screen (checked below) plus one laid-out node identify
+      // the same prepared screen; a declared marker keeps the stricter rule that
+      // this exact node is visible.
+      const nodes = normalize(dump).nodes;
+      const ready =
+        target.readyTestID === undefined
+          ? nodes.some(node => node.visibleRect[2] > 0 && node.visibleRect[3] > 0)
+          : nodes.some(
+              node =>
+                node.probe.testID === target.readyTestID &&
+                node.visibleRect[2] > 0 &&
+                node.visibleRect[3] > 0
+            );
+      // A tab route keeps the URL at its group root, so opening it can leave the
+      // route unchanged and the runner reports `link-unopened`. For a marker-less
+      // target the declared screen identity below is what proves the link landed,
+      // so only that rule is dropped. Every other finding still fails the target:
+      // a cell config that did not apply, a language that did not switch, two
+      // targets on one screen, an unsettled or misaligned or blank capture.
+      const failed = outcome.findings.some(
         finding =>
           finding.cell === cell.id &&
           finding.target === target.id &&
-          ['env-mismatch', 'unsettled', 'capture-alignment', 'blank-frame'].includes(finding.rule)
+          ['unsettled', 'capture-alignment', 'blank-frame', 'env-mismatch'].includes(finding.rule)
       );
+      // A target that declares a marker keeps the original rule, where a link
+      // that did not open is a failure too.
+      const landingFailed =
+        target.readyTestID !== undefined &&
+        outcome.findings.some(
+          finding =>
+            finding.cell === cell.id &&
+            finding.target === target.id &&
+            finding.rule === 'link-unopened'
+        );
       if (
         blocked ||
         !ready ||
-        warning ||
+        failed ||
+        landingFailed ||
         dump.env.route !== target.route ||
         dump.env.screen !== target.screen
       ) {
@@ -445,6 +508,10 @@ export function targetReadiness(
     )
   ) {
     failures.push('Findings are outside the prepared target matrix');
+  }
+  for (const entry of skipped) {
+    const key = `${entry.cell}/${entry.target}`;
+    if (!reported.has(key)) failures.push(`${key}: target could not be read (${entry.reason})`);
   }
   return failures;
 }
@@ -506,23 +573,8 @@ const ElementSchema = z
   .passthrough();
 const ComparisonFindingSchema = z
   .object({
-    rule: z.enum([
-      'clipped',
-      'cut-off',
-      'overlap',
-      'touch-overlap',
-      'row-misaligned',
-      'ink-off-center',
-      'touch-target',
-      'inset-asymmetry',
-      'layout-shift',
-      'rtl-mirror',
-      'safe-area',
-      'unsettled',
-      'capture-alignment',
-      'blank-frame',
-      'env-mismatch',
-    ]),
+    // Shared on purpose: a new rule id cannot be forgotten here.
+    rule: z.enum(RULE_IDS),
     severity: z.enum(['error', 'warning']),
     cell: z.string(),
     target: z.string(),
@@ -535,8 +587,20 @@ const ComparisonFindingSchema = z
     count: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).default(1),
   })
   .passthrough();
+const SkippedTargetSchema = z.object({
+  cell: z.string(),
+  target: z.string(),
+  reason: z.string(),
+});
 const FindingsSchema = z.object({
-  run: z.object({ restoreError: z.string().optional() }).passthrough().optional(),
+  run: z
+    .object({
+      restoreError: z.string().optional(),
+      // `writeArtifacts` stores the skips here, beside the other run metadata.
+      skipped: z.array(SkippedTargetSchema).optional(),
+    })
+    .passthrough()
+    .optional(),
   cells: z.array(
     z.object({
       id: z.string(),
@@ -594,7 +658,13 @@ export async function compareProof(
       throw new Error('Unbound capture artifacts');
     if (run.run?.restoreError !== undefined) reasons.push(`${revision}: device restoration failed`);
     // Re-read the actual captured dumps; never trust a claimed readiness boolean.
-    const readiness = targetReadiness(run, preparation.manifest, dir);
+    // The skips live under `run` in the artifact, which is where the writer put
+    // them, so they are handed to the same readiness check the writer ran.
+    const readiness = targetReadiness(
+      { ...run, skipped: run.run?.skipped ?? [] },
+      preparation.manifest,
+      dir
+    );
     reasons.push(
       ...readiness.map(reason => `${revision}: ${reason}`),
       ...receipt.readiness.map(reason => `${revision}: ${reason}`)

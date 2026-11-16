@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Els agents actius tenen una actualització"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tasca completada"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Fallada: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Interrompuda: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Avís de despesa",
       "body": "La despesa de {{scopeName}} ha superat els ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nova troballa de seguretat ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} a {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nova troballa de seguretat ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Avís d'SLA",
-      "body": "{{findingTitle}} a {{repoFullName}}"
+      "title": "Avís d'SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Incompliment d'SLA",
-      "body": "{{findingTitle}} a {{repoFullName}}"
+      "title": "Incompliment d'SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

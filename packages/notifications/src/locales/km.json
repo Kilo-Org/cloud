@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ភ្នាក់ងារសកម្មមានការធ្វើបច្ចុប្បន្នភាព"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "បានបញ្ចប់ភារកិច្ច"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "បានបរាជ័យ: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ត្រូវបានរំខាន: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "ការជូនដំណឹងការចំណាយ",
       "body": "ការចំណាយរបស់ {{scopeName}} បានលើស ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "ការរកឃើញសុវត្ថិភាពថ្មី ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "ការរកឃើញសុវត្ថិភាពថ្មី ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "ការព្រមាន SLA",
-      "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+      "title": "ការព្រមាន SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "ការរំលោភ SLA",
-      "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+      "title": "ការរំលោភ SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

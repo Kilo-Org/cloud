@@ -43,7 +43,7 @@ import {
   environmentBuildLogsSchema,
   environmentBuildRequestResultSchema,
   environmentBuildStatusSchema,
-} from '../../../../services/cloud-agent-next/src/shared/environment-build-status';
+} from '@cloud-agent-shared/environment-build-status';
 
 // Environments store network restrictions, but auditing is a session-only option.
 const environmentEgressPolicySchema = egressPolicySchema.safeExtend({

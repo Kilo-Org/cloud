@@ -721,12 +721,56 @@ async function decideChildOrganizationMembership(
   return parentMembership ? 'permitted' : 'refused';
 }
 
+/**
+ * Refuses an address that already belongs to the organization, or that already
+ * has an invitation outstanding. It runs inside the caller's transaction, so a
+ * caller with a refusal of its own — the seat check — can raise this one first:
+ * an existing member never hears about the organization's seats.
+ */
+export async function assertInviteeAddressIsAvailable(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  email: string
+): Promise<void> {
+  const pendingInvitations = await tx
+    .select({ email: organization_invitations.email })
+    .from(organization_invitations)
+    .where(
+      and(
+        eq(organization_invitations.organization_id, organizationId),
+        isNull(organization_invitations.accepted_at),
+        gt(organization_invitations.expires_at, sql`NOW()`)
+      )
+    );
+
+  if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
+    throw new Error('User already has a pending invitation');
+  }
+
+  const existingMembers = await organizationMembersMatchingEmail(tx, organizationId, email);
+
+  if (existingMembers.length > 0) {
+    throw new Error('User is already a member of this organization');
+  }
+}
+
+export type InviteUserOptions = {
+  /**
+   * The caller already ran {@link assertInviteeAddressIsAvailable} in this
+   * transaction. Only the invite procedure sets it: it must answer a duplicate
+   * address before its seat check, so it runs the lookup itself and asks the
+   * insert not to repeat it.
+   */
+  addressAlreadyChecked?: boolean;
+};
+
 export async function inviteUserToOrganization(
   organizationId: Organization['id'],
   invitingUserId: User['id'],
   email: string,
   role: OrganizationRole,
-  txn?: DrizzleTransaction
+  txn?: DrizzleTransaction,
+  options: InviteUserOptions = {}
 ): Promise<OrganizationInvitation> {
   const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
     const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { email });
@@ -751,25 +795,8 @@ export async function inviteUserToOrganization(
       ssoSourceOrganizationId = policy.sourceOrganizationId;
     }
 
-    const pendingInvitations = await tx
-      .select({ email: organization_invitations.email })
-      .from(organization_invitations)
-      .where(
-        and(
-          eq(organization_invitations.organization_id, organizationId),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
-        )
-      );
-
-    if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
-      throw new Error('User already has a pending invitation');
-    }
-
-    const existingMembers = await organizationMembersMatchingEmail(tx, organizationId, email);
-
-    if (existingMembers.length > 0) {
-      throw new Error('User is already a member of this organization');
+    if (!options.addressAlreadyChecked) {
+      await assertInviteeAddressIsAvailable(tx, organizationId, email);
     }
 
     const [invitation] = await tx
@@ -898,6 +925,32 @@ export type InvitationAuthenticationContext = {
   ssoSourceOrganizationId?: string;
 };
 
+async function expireOrganizationInvitation(
+  tx: DrizzleTransaction,
+  invitation: OrganizationInvitation
+): Promise<void> {
+  await tx
+    .update(organization_invitations)
+    .set({ expires_at: sql`NOW()` })
+    .where(eq(organization_invitations.id, invitation.id));
+  // A delivery already recorded as delivered or failed keeps its own history;
+  // only a delivery still owed for this invitation is stopped.
+  await tx
+    .update(external_side_effect_outbox)
+    .set({
+      status: 'failed',
+      claimed_at: null,
+      next_attempt_at: null,
+      last_error: 'revoked',
+    })
+    .where(
+      and(
+        eq(external_side_effect_outbox.invitation_id, invitation.id),
+        inArray(external_side_effect_outbox.status, ['pending', 'sending'])
+      )
+    );
+}
+
 async function revokeStaleOrganizationInvitation(
   tx: DrizzleTransaction,
   invitation: OrganizationInvitation,
@@ -915,19 +968,7 @@ async function revokeStaleOrganizationInvitation(
     .limit(1);
 
   if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
-    await tx
-      .update(organization_invitations)
-      .set({ expires_at: sql`NOW()` })
-      .where(eq(organization_invitations.id, invitation.id));
-    await tx
-      .update(external_side_effect_outbox)
-      .set({
-        status: 'failed',
-        claimed_at: null,
-        next_attempt_at: null,
-        last_error: 'revoked',
-      })
-      .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    await expireOrganizationInvitation(tx, invitation);
     return true;
   }
 
@@ -1047,7 +1088,11 @@ export async function acceptOrganizationInvite(
           return failureResult(ORGANIZATION_INVITATION_SSO_AUTHENTICATION_REQUIRED);
         }
       } else if (ssoPolicy.status === 'required' && acceptingUserDomain === ssoPolicy.domain) {
-        return failureResult('Invitation requires authentication through organization SSO');
+        // The invitation predates the required policy, so it names no source
+        // organization and no session can satisfy it. Expire it so the address is
+        // free for a fresh SSO invitation.
+        await expireOrganizationInvitation(tx, invitation);
+        return failureResult('Invitation is no longer valid');
       }
 
       const existingMembership = await tx

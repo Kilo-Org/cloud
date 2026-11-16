@@ -6,6 +6,8 @@ import { impactHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { displaySafeText } from '@kilocode/app-shared/display-text';
+
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import {
@@ -18,7 +20,8 @@ import {
 import { permissionToolLabel } from '@/components/agents/permission-tool-label';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 // `metadata` is an untyped transport payload. Decode the one field that is
@@ -62,6 +65,7 @@ export function PermissionCard({
   pendingCount = 1,
 }: Readonly<PermissionCardProps>) {
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const { t } = useTranslation();
   const [activeResponse, setActiveResponse] = useState<'once' | 'always' | 'reject' | null>(null);
 
@@ -125,6 +129,11 @@ export function PermissionCard({
   // or machine payloads and must not reach the card as raw key/value rows.
   const parsedCommand = commandSchema.safeParse(metadata?.command);
   const command = parsedCommand.success ? parsedCommand.data : null;
+  // Patterns are the rule-matching form of the request, not display copy. When
+  // the verbatim command is present they repeat it in a different spelling, so
+  // the card shows the command alone and keeps the patterns for requests that
+  // have no command, such as path scopes.
+  const showPatterns = patterns.length > 0 && !command;
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
@@ -149,14 +158,14 @@ export function PermissionCard({
             {t('agentChat.permissionCard.allowQuestion', { permission: permissionDisplay })}
           </Text>
 
-          {patterns.length > 0 ? (
+          {showPatterns ? (
             <View className="gap-1 rounded-lg bg-muted p-2">
               <Text className="text-xs font-medium text-muted-foreground">
                 {t('agentChat.permissionCard.appliesTo')}
               </Text>
               {patterns.map((pattern, index) => (
                 <Text key={index} className="text-xs text-muted-foreground">
-                  • {pattern}
+                  • {isolateLtrBidiText(displaySafeText(pattern))}
                 </Text>
               ))}
             </View>
@@ -167,7 +176,9 @@ export function PermissionCard({
               <Text className="text-xs font-medium text-muted-foreground">
                 {t('profiles.commandLabel')}
               </Text>
-              <Text className="text-xs text-muted-foreground">{command}</Text>
+              <Text className="text-xs text-muted-foreground">
+                {isolateLtrBidiText(displaySafeText(command))}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -227,14 +238,9 @@ export function PermissionCard({
                   accessibilityLabel={t('agentChat.permissionCard.alwaysAllowAccessibility')}
                 >
                   {activeResponse === 'always' && isSubmitting ? (
-                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                    <ActivityIndicator size="small" color={mutedDisabledInk} />
                   ) : (
-                    <Text
-                      className={cn(
-                        'text-xs text-primary-foreground',
-                        activeResponse === 'always' && 'font-medium'
-                      )}
-                    >
+                    <Text className={cn('text-xs', activeResponse === 'always' && 'font-medium')}>
                       {t('agentChat.permissionCard.alwaysAllow')}
                     </Text>
                   )}
@@ -253,10 +259,8 @@ export function PermissionCard({
               accessibilityRole="button"
               accessibilityLabel={retryLabel}
             >
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
-              <Text className={cn('text-xs text-primary-foreground', isSubmitting && 'ml-2')}>
+              {isSubmitting ? <ActivityIndicator size="small" color={mutedDisabledInk} /> : null}
+              <Text className={cn('text-xs', isSubmitting && 'ml-2')}>
                 {isSubmitting ? t('agentChat.permissionCard.retrying') : retryLabel}
               </Text>
             </Button>

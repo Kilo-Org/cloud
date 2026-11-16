@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Hawsha waa la dhammaystiray"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Guuldarraystay: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Waa la hakiyay: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Digniinta kharashka",
       "body": "Kharashka {{scopeName}} wuxuu dhaafay ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Natiijo ammin cusub ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} gudaha {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Natiijo ammin cusub ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Digniin SLA",
-      "body": "{{findingTitle}} gudaha {{repoFullName}}"
+      "title": "Digniin SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Jebinta SLA",
-      "body": "{{findingTitle}} gudaha {{repoFullName}}"
+      "title": "Jebinta SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

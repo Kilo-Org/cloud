@@ -405,7 +405,7 @@ describe('api routes', () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     const probeOrder: string[] = [];
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
     fns.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       probeOrder.push('insert-transaction');
@@ -438,7 +438,7 @@ describe('api routes', () => {
   it('POST /session recovers when the initial ingest probe fails but the final check succeeds', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -481,7 +481,7 @@ describe('api routes', () => {
   it('POST /session emits created only for newly inserted rows', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -532,7 +532,7 @@ describe('api routes', () => {
   it('POST /session does not emit created when row already exists', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
 
     const sessionCache = {
@@ -563,7 +563,7 @@ describe('api routes', () => {
   it('POST /session rejects a tombstoned session and removes the resurrected row', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -604,7 +604,7 @@ describe('api routes', () => {
   it('POST /session rejects an existing tombstoned parent without deleting its row', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
     fns.delete.mockImplementation(() => {
       throw new Error('parent row is still referenced by descendants');
@@ -631,7 +631,7 @@ describe('api routes', () => {
   it('POST /session keeps a newly created row when the ingest tombstone is absent', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -675,7 +675,7 @@ describe('api routes', () => {
   it('POST /session removes a newly created row when the tombstone check fails', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -721,7 +721,7 @@ describe('api routes', () => {
   it('POST /session caches a newly created personal session', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -773,7 +773,7 @@ describe('api routes', () => {
   it('POST /session succeeds when cache warming is unavailable during rollout', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -829,6 +829,27 @@ describe('api routes', () => {
     expect(fns.insert).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+  });
+
+  it('POST /session returns 403 and does not insert when the block timestamp is set', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([
+      { blocked_at: '2026-01-15T12:00:00.000Z', blocked_reason: null },
+    ]);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
   it('POST /session returns 403 and does not insert when the user is missing', async () => {
@@ -1282,7 +1303,7 @@ describe('api routes', () => {
       }
     );
 
-    it('stages an empty body by value', async () => {
+    it('answers a declared zero-length body with a no-op that writes nothing', async () => {
       const { app, ingest } = prepareIngestRoute();
       const env = directIngestEnv();
       const info = vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -1294,14 +1315,47 @@ describe('api routes', () => {
       const response = await app.fetch(request, env);
 
       expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true });
       expect(ingest).not.toHaveBeenCalled();
-      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
-      expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(Uint8Array);
+      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
       expect(info).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'empty_body' })
+        expect.objectContaining({
+          event: 'direct_ingest_noop',
+          reason: 'empty_body',
+          declaredBytes: 0,
+        })
       );
       info.mockRestore();
     });
+
+    it.each([
+      ['malformed JSON', '{"data":[{"type":"message","data":{"id":"msg_1"}},broken'],
+      ['unterminated object', '{"data":['],
+    ] as const)(
+      'answers a buffered legacy body the format cannot parse with a client error',
+      async (_name, body) => {
+        const { app, ingest } = prepareIngestRoute();
+        const env = makeTestEnv();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const response = await app.fetch(ingestRequest(body), env);
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ success: false, error: 'malformed_json' });
+        expect(ingest).not.toHaveBeenCalled();
+        expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+        expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'direct_ingest_parse_reject',
+            reason: 'gate_percent',
+            declaredBytes: new TextEncoder().encode(body).byteLength,
+          })
+        );
+        warn.mockRestore();
+      }
+    );
 
     it.each([
       ['declared over cap', '4194305'],
@@ -2065,6 +2119,50 @@ describe('api routes', () => {
       },
     });
     expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
+  });
+
+  it('does not let a stalled session-metadata read hold the page open', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+      const history = { messages: [], nextCursor: null, omittedItemCount: 0 };
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => history),
+        // The best-effort metadata read never answers.
+        readKiloSdkSessionSnapshot: vi.fn(() => Promise.withResolvers<unknown>().promise),
+      } as never);
+
+      const pending = makeApiApp().fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      // Flush the request to the metadata deadline, then run past it: the page
+      // must answer with the history and no metadata rather than wait.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5_000);
+      const res = await pending;
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        success: true,
+        kiloSessionId: 'ses_12345678901234567890123456',
+        history,
+        sessionMetadata: null,
+      });
+      expect(warn).toHaveBeenCalledWith(
+        'Failed to fetch session snapshot for session ses_12345678901234567890123456:',
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it('requires a live organization when authorizing message reads', async () => {
@@ -3260,10 +3358,12 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { share_token: string };
+    const body = (await res.json()) as { share_token: string; public_id: string };
     expect(body).toMatchObject({ success: true });
     expect(body).toHaveProperty('share_token', expect.any(String));
-    expect(body).not.toHaveProperty('public_id');
+    /* The capability it wrote, so the app can tell its own link from one a later
+       rotation made. */
+    expect(body.public_id).toBe(sharedPublicId);
     expect(sharedPublicId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
@@ -3374,7 +3474,7 @@ describe('api routes', () => {
     const json: unknown = await res.json();
     expect(json).toMatchObject({ success: true });
     expect(json).toHaveProperty('share_token', expect.any(String));
-    expect(json).not.toHaveProperty('public_id');
+    expect(json).toHaveProperty('public_id', expect.any(String));
     expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
     expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(
       expect.stringMatching(
@@ -3733,6 +3833,49 @@ describe('api routes', () => {
       );
       warn.mockRestore();
     });
+
+    it('falls back to heartbeat titles when the overlay query outlives its budget', async () => {
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const connectionStub = {
+          getActiveSessions: vi.fn(async () => [
+            baseHeartbeat('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'Heartbeat A'),
+          ]),
+        };
+        vi.mocked(getUserConnectionDO).mockReturnValue(
+          connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+        );
+        const { db, fns } = makeDbFakes();
+        vi.mocked(getWorkerDb).mockReturnValue(db);
+        // A Postgres hop that never answers. The overlay is an embellishment on
+        // an answer that is already complete, so the route must return the
+        // heartbeat titles instead of holding the caller open until its own
+        // budget expires — which is what made this route a client timeout.
+        fns.selectResult.mockImplementationOnce(() => Promise.withResolvers<unknown[]>().promise);
+
+        const app = makeApiApp();
+        const pending = app.fetch(
+          new Request('http://local/sessions/active', { method: 'GET' }),
+          makeTestEnv()
+        );
+        // Flush the request to its budget timer, then run past it.
+        await vi.advanceTimersByTimeAsync(0);
+        await vi.advanceTimersByTimeAsync(5_000);
+        const res = await pending;
+
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+        expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A']);
+        expect(warn).toHaveBeenCalledWith(
+          'Failed to overlay active-session titles from Postgres (non-fatal)',
+          expect.objectContaining({ error: expect.stringContaining('exceeded its') })
+        );
+      } finally {
+        warn.mockRestore();
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('GET /user/cli returns 426 without Upgrade header', async () => {
@@ -4003,6 +4146,48 @@ describe('api routes', () => {
       );
       expect(badBody.status).toBe(400);
     });
+
+    it('returns 400 for a title over 200 characters', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce({
+        kind: 'owned',
+      } as never);
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(201) }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(400);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
+
+    it('bounds the body the route parses', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce({
+        kind: 'owned',
+      } as never);
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(2000) }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(413);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /session/:sessionId/title', () => {
@@ -4072,6 +4257,24 @@ describe('api routes', () => {
           }),
         })
       );
+    });
+
+    it('bounds the body the route parses', async () => {
+      const { db } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(2000), generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(413);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     });
 
     it('generated applies over a default-pattern title', async () => {

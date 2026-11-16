@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Görev tamamlandı"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Başarısız: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Kesildi: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Harcama uyarısı",
       "body": "{{scopeName}} harcaması ${{amountUsd}} değerini aştı"
     },
-    "securityFindingNew": {
-      "title": "Yeni güvenlik bulgusu ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} içinde {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "Yeni güvenlik bulgusu ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA uyarısı",
-      "body": "{{repoFullName}} içinde {{findingTitle}}"
+      "title": "SLA uyarısı"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA ihlali",
-      "body": "{{repoFullName}} içinde {{findingTitle}}"
+      "title": "SLA ihlali"
     },
     "securityLifecycle": {
       "title": "Kilo",

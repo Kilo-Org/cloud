@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "He whakahoutanga tā ngā māngai hohe"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Kua oti te mahi"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "I rahua: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "I haukotia: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "He whakatūpato whakapaunga",
       "body": "Kua eke te whakapaunga a {{scopeName}} ki runga ake i te ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "He kitenga haumaru hōu ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "He kitenga haumaru hōu ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Te whakatūpato SLA",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "Te whakatūpato SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Te takahitanga SLA",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "Te takahitanga SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

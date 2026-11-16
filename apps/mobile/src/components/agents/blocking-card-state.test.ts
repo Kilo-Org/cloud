@@ -55,7 +55,7 @@ describe('getBlockingCardPresentation', () => {
         kind: 'permission',
         state: 'happy',
         announcement: expect.stringMatching(/needs permission/i),
-        protocolExplanation: expect.stringMatching(/waiting for permission/i),
+        protocolExplanation: expect.stringMatching(/while this request is open/i),
         hasPrimaryCta: true,
         hasRetryCta: false,
         retryAction: null,

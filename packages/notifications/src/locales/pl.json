@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktywni agenci mają aktualizację"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Zadanie ukończone"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Niepowodzenie: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Przerwano: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Alert wydatków",
       "body": "Wydatki {{scopeName}} przekroczyły ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nowy wynik bezpieczeństwa ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} w {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nowy wynik bezpieczeństwa ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Ostrzeżenie SLA",
-      "body": "{{findingTitle}} w {{repoFullName}}"
+      "title": "Ostrzeżenie SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Naruszenie SLA",
-      "body": "{{findingTitle}} w {{repoFullName}}"
+      "title": "Naruszenie SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

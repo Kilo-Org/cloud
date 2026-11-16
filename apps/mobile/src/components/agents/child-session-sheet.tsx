@@ -226,6 +226,7 @@ export function ChildSessionSheet({
               <View className="px-4 py-1">
                 <ChildSessionMessage
                   message={item}
+                  isStreaming={isStreaming}
                   depth={0}
                   // Nested task cards are status indicators too: resolve their
                   // activity from the raw list so a reasoning stream reads

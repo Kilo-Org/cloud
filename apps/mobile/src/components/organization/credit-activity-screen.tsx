@@ -2,7 +2,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from '@/components/ui/icons';
-import { memo, type ReactNode, useCallback, useEffect, useRef } from 'react';
+import { memo, type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -17,15 +17,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { formatDate, formatMoney } from '@/lib/format';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
+import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import {
   type CreditTransaction,
   useOrgBoundary,
   useOrgCreditTransactionsPage,
 } from '@/lib/hooks/use-organization-queries';
+import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
-import { normalizeCreditActivityOrgParam, reconcileOrgDeepLink } from '@/lib/org-deep-link';
+import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
@@ -94,8 +97,12 @@ const CreditRow = memo(function CreditRow({
           {title}
         </Text>
         <Text className={cn('text-sm font-medium', isPositive ? 'text-good' : 'text-foreground')}>
-          {isPositive ? '+' : '-'}
-          {formatMoney(Math.abs(amount), i18n.language)}
+          {/* The sign and the symbol are neutral characters, which a
+              right-to-left paragraph may move behind the number; the isolate
+              keeps the amount in its own left-to-right run. */}
+          {isolateLtrBidiText(
+            `${isPositive ? '+' : '-'}${formatPrefixedMoney(Math.abs(amount), i18n.language)}`
+          )}
         </Text>
       </View>
       <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -104,11 +111,13 @@ const CreditRow = memo(function CreditRow({
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            {t('organization.creditActivity.expiresUtc', {
-              date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language, {
-                timeZone: 'UTC',
-              }),
-            })}
+            {keepZoneWithDate(
+              t('organization.creditActivity.expiresUtc', {
+                date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language, {
+                  timeZone: 'UTC',
+                }),
+              })
+            )}
           </Text>
         )}
       </View>
@@ -119,42 +128,21 @@ const CreditRow = memo(function CreditRow({
 export function OrganizationCreditActivityScreen() {
   const { t } = useTranslation();
   const { org: orgParamRaw } = useLocalSearchParams<{ org?: string | string[] }>();
-  const orgParam = normalizeCreditActivityOrgParam(orgParamRaw);
+  const orgParam = normalizeOrgQueryParam(orgParamRaw);
 
-  const { organizationId: contextOrganizationId, isLoaded, setOrganizationId } = useOrganization();
+  const { organizationId: contextOrganizationId } = useOrganization();
   // When `org` is present, resolve role/membership against the param only — never
   // the pre-tap context selection — so wrong-org data cannot render.
   const { org, orgs, isLoading: orgsLoading, isResolving, isError } = useOrgBoundary(orgParam);
 
-  // While the list is loading, pass `undefined` so reconcile marks `isResolving`.
-  // Once settled (success or error), pass the array (or empty) so a foreign param
-  // cannot fall through to the context org's transactions.
-  const reconcile = reconcileOrgDeepLink({
+  // The param's organization becomes the selection once it resolves to a
+  // membership, so the rest of the app follows the scope this link opened.
+  const reconcile = useOrgDeepLinkSelection({
     orgParam,
     contextOrganizationId,
-    orgs: orgsLoading ? undefined : (orgs ?? []),
+    orgs,
+    isOrgListLoading: orgsLoading,
   });
-
-  // The linked organization becomes the selection once per mounted screen, the
-  // same way the organization hub applies a deep-linked id. The selection's
-  // writer is memoized on the current selection, so an effect keyed on it would
-  // otherwise re-write the param after the reader switches accounts on another
-  // screen, silently reverting that switch.
-  const appliedOverrideRef = useRef<string | null>(null);
-  useEffect(() => {
-    // Wait for SecureStore hydration so the deep-link selection always wins over stored org.
-    const target = reconcile.shouldPersistOverride ? reconcile.effectiveOrganizationId : null;
-    if (!isLoaded || target == null || appliedOverrideRef.current === target) {
-      return;
-    }
-    appliedOverrideRef.current = target;
-    setOrganizationId(target);
-  }, [
-    isLoaded,
-    reconcile.shouldPersistOverride,
-    reconcile.effectiveOrganizationId,
-    setOrganizationId,
-  ]);
 
   // Key transactions only on the reconcile query id — never the pre-tap context
   // org while a deep-link param is present and unvalidated/invalid.

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "فعال اجنټان تازه معلومات لري"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "دنده بشپړه شوه"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ناکام شو: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ودرېد: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "د لګښت خبرتیا",
       "body": "د {{scopeName}} لګښت ${{amountUsd}} واوښت"
     },
-    "securityFindingNew": {
-      "title": "نوې امنیتي موندنه ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} په {{repoFullName}} کې"
+    },
+    "securityFindingNew": {
+      "title": "نوې امنیتي موندنه ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "د SLA خبرداری",
-      "body": "{{findingTitle}} په {{repoFullName}} کې"
+      "title": "د SLA خبرداری"
     },
     "securityFindingSlaBreach": {
-      "title": "د SLA سرغړونه",
-      "body": "{{findingTitle}} په {{repoFullName}} کې"
+      "title": "د SLA سرغړونه"
     },
     "securityLifecycle": {
       "title": "Kilo",

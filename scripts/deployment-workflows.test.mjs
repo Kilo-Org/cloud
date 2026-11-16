@@ -471,10 +471,38 @@ test('successful main CI selects the tested deployment SHA', () => {
   assert.match(check.run, /git merge-base --is-ancestor "\$sha" "\$ancestor_ref"/);
   assert.match(check.run, /git hash-object -t tree \/dev\/null/);
   assert.match(check.run, /git merge-base --is-ancestor "\$base_sha" "\$target_sha"/);
-  assert.match(
-    check.run,
-    /git diff --quiet "\$base_sha" "\$target_sha" -- \. ':\(exclude\)apps\/mobile'/
+  const predicate = check.run.replace(/\\\n\s*/g, ' ');
+  assert.ok(
+    predicate.includes('git diff --quiet "$base_sha" "$target_sha" -- .'),
+    'the deploy predicate must diff the whole tree'
   );
+  for (const excluded of [
+    'apps/mobile',
+    'apps/extension',
+    'apps/storybook',
+    '.github',
+    'dev',
+    'tools',
+    'scripts',
+    'script',
+    'docs',
+    '.specs',
+    '.agents',
+    '.kilo',
+    '.kfab',
+    '.vscode',
+    '.cursor',
+    '.husky',
+    '.plans',
+    '(glob)*.md',
+  ]) {
+    assert.ok(
+      predicate.includes(
+        `':(exclude${excluded === '(glob)*.md' ? ',glob' : ''})${excluded === '(glob)*.md' ? '*.md' : excluded}'`
+      ),
+      `the deploy predicate must exclude ${excluded}`
+    );
+  }
   assert.match(check.run, /should_deploy=false/);
   assert.match(
     check.run,
@@ -539,7 +567,7 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
   }
 });
 
-test('ai-gateway deploys with each scheduled release after migrations', () => {
+test('ai-gateway deploys with each scheduled release and its promotion waits for the gate', () => {
   const stageAiGateway = production.jobs['stage-ai-gateway'];
   assert.equal(stageAiGateway.needs, 'check-changes');
   assert.match(stageAiGateway.if, /should_deploy == 'true'/);
@@ -564,7 +592,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
   );
 
   const deployAiGateway = staging.jobs['deploy-ai-gateway'];
-  assert.deepEqual(deployAiGateway.needs, ['check-changes', 'db-gate']);
+  assert.equal(deployAiGateway.needs, 'check-changes');
   assert.equal(deployAiGateway.with.target_environment, 'staging');
   assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
   assert.equal(deployAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
@@ -573,13 +601,23 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
     '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
   );
 
-  for (const job of ['deploy-workers']) {
-    for (const dependency of ['stage-ai-gateway', 'promote-ai-gateway']) {
-      assert.ok(production.jobs[job].needs.includes(dependency), `${job} needs ${dependency}`);
-      assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));
-    }
+  // Neither pipeline's Workers read anything the Vercel deploys produce, so both
+  // start with the gate and the matrix lookup rather than with those deploys.
+  // record-deployment below still requires the Vercel legs and the Worker deploy.
+  for (const [name, deployment] of [
+    ['production', production],
+    ['staging', staging],
+  ]) {
+    assert.deepEqual(
+      [...deployment.jobs['deploy-workers'].needs].sort(),
+      ['check-changes', 'db-gate', 'detect-workers'],
+      `${name} Worker deploy waits only for its own inputs`
+    );
+    assert.doesNotMatch(
+      deployment.jobs['deploy-workers'].if,
+      /needs\.(stage-app|stage-ai-gateway|promote-app|promote-ai-gateway|deploy-app|deploy-ai-gateway)\.result/
+    );
   }
-  assert.ok(staging.jobs['deploy-workers'].needs.includes('deploy-ai-gateway'));
 
   for (const [deployment, jobs] of [
     [production, ['stage-ai-gateway', 'promote-ai-gateway']],
@@ -626,10 +664,11 @@ test('one database gate per deployment checks out, installs and migrates once', 
     const steps = job.steps;
     assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
     assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
-    assert.equal(
-      steps.find(step => step.uses?.startsWith('useblacksmith/checkout@')).with.ref,
-      '${{ needs.check-changes.outputs.target_sha }}'
-    );
+    const checkout = steps.find(step => step.uses?.startsWith('useblacksmith/checkout@'));
+    assert.equal(checkout.with.ref, '${{ needs.check-changes.outputs.target_sha }}');
+    // The job installs two workspaces and migrates; it never builds apps/web, so
+    // it must not pay for the LFS objects only the web build reads.
+    assert.equal(checkout.with.lfs, undefined, `${name} db-gate checkout must skip LFS`);
 
     const startupIndex = steps.findIndex(step => step.name === startupStep);
     const migrateIndex = steps.findIndex(step => step.name === migrateStep);
@@ -642,16 +681,31 @@ test('one database gate per deployment checks out, installs and migrates once', 
 
   assert.equal(production.jobs['db-gate']['timeout-minutes'], 45);
 
+  // Counterweight to the skipped LFS above: the web build itself keeps its
+  // objects, because next.config.mjs fails on the kilo-anim pointer file.
+  const buildCheckout = ci.jobs['build'].steps.find(step =>
+    step.uses?.startsWith('useblacksmith/checkout@')
+  );
+  assert.equal(buildCheckout.with.lfs, true, 'the web build checkout must keep LFS');
+
   for (const [deployment, jobs] of [
     [production, ['promote-app', 'promote-ai-gateway', 'deploy-workers', 'record-deployment']],
-    [staging, ['deploy-app', 'deploy-ai-gateway', 'deploy-workers', 'record-deployment']],
+    [staging, ['deploy-workers', 'record-deployment']],
   ]) {
     for (const job of jobs) {
       assert.ok(deployment.jobs[job].needs.includes('db-gate'), `${job} must wait for db-gate`);
     }
   }
-  // Production also tolerates skipped staging jobs, so its Worker deploy names the
-  // gate result explicitly; staging relies on the default needs-success behaviour.
+  // The staging Vercel deploys start with the SHA lookup and reach the staging
+  // target on their own: a custom environment cannot hold the traffic switch
+  // until the gate finishes, so they run beside it. The Worker deploy and the
+  // release record below keep the gate, so a failed migration still stops them.
+  for (const job of ['deploy-app', 'deploy-ai-gateway']) {
+    assert.equal(staging.jobs[job].needs, 'check-changes', `${job} must start beside db-gate`);
+  }
+  // Production names the gate result explicitly so a skipped gate cannot let the
+  // Worker deploy run ahead of the migrations; staging relies on the default
+  // needs-success behaviour for the same gate.
   for (const job of ['deploy-workers', 'record-deployment']) {
     assert.match(production.jobs[job].if, /needs\.db-gate\.result == 'success'/);
   }
@@ -751,16 +805,18 @@ test('staging and production Worker changes use independent deployment baselines
   }
 });
 
-test('Worker detection runs beside the staging chain and still gates the Worker deploy', () => {
-  // Detection reads only the SHAs check-changes publishes, so neither workflow
-  // waits for a Vercel staging deploy or a promotion before it starts.
-  for (const [name, deployment, stagingDependencies] of [
+test('Worker detection and deploy run beside the Vercel chain in both pipelines', () => {
+  // Detection reads only the SHAs check-changes publishes, and the deploy call
+  // reads only the detected matrix, so neither waits for a Vercel deploy or a
+  // promotion before it starts. record-deployment still gates the release on
+  // every leg.
+  for (const [name, deployment, chainDependencies] of [
     [
       'production',
       production,
       ['stage-app', 'stage-ai-gateway', 'promote-app', 'promote-ai-gateway'],
     ],
-    ['staging', staging, ['deploy-app', 'deploy-ai-gateway']],
+    ['staging', staging, []],
   ]) {
     const job = deployment.jobs['detect-workers'];
     assert.equal(job.needs, 'check-changes', `${name} detection starts from the lookup`);
@@ -769,15 +825,23 @@ test('Worker detection runs beside the staging chain and still gates the Worker 
     // The detection call names a baseline and no matrix, so it cannot deploy.
     assert.equal(job.with.base_sha, '${{ needs.check-changes.outputs.base_sha }}');
     assert.equal(job.with.worker_matrix, undefined);
-    for (const dependency of stagingDependencies) {
+    for (const dependency of chainDependencies) {
       assert.equal(
         [job.needs].flat().includes(dependency),
         false,
         `${name} detection must not wait for ${dependency}`
       );
-      assert.ok(
+      // The Worker deploy consumes only the detected matrix and the SHAs, so it
+      // starts beside those deploys rather than after them; record-deployment
+      // still gates the release on every one of them.
+      assert.equal(
         [deployment.jobs['deploy-workers'].needs].flat().includes(dependency),
-        `${name} Worker deploy keeps waiting for ${dependency}`
+        false,
+        `${name} Worker deploy must not wait for ${dependency}`
+      );
+      assert.ok(
+        deployment.jobs['record-deployment'].needs.includes(dependency),
+        `${name} release record still waits for ${dependency}`
       );
     }
     const deploy = deployment.jobs['deploy-workers'];
@@ -790,13 +854,14 @@ test('Worker detection runs beside the staging chain and still gates the Worker 
     assert.equal(deploy.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
     assert.equal(deploy.with.base_sha, undefined, `${name} deploy call must not run detection`);
   }
-  for (const dependency of ['db-gate', 'deploy-app', 'deploy-ai-gateway']) {
+  for (const dependency of ['db-gate', 'detect-workers']) {
     assert.ok([staging.jobs['deploy-workers'].needs].flat().includes(dependency));
   }
 
-  // The production deploy keeps every gate it had and adds the detection result:
-  // a failed or skipped detection skips the called workflow instead of running it
-  // with an empty matrix, which would deploy nothing and report success.
+  // A failed or skipped detection skips the called workflow instead of running it
+  // with an empty matrix, which would deploy nothing and report success. The
+  // database gate keeps its own explicit result check: a skipped gate must not
+  // let Workers deploy ahead of the migrations.
   const deploy = production.jobs['deploy-workers'];
   const condition = deploy.if
     .replace(/^\$\{\{|\}\}$/g, '')
@@ -816,8 +881,6 @@ test('Worker detection runs beside the staging chain and still gates the Worker 
       needs,
       github: { repository: 'Kilo-Org/cloud' },
       cancelled: () => false,
-      contains: (list, item) => Array.isArray(list) && list.includes(item),
-      fromJSON: JSON.parse,
     });
   };
   assert.equal(deployRuns({}), true, 'a healthy run deploys the detected workers');
@@ -966,6 +1029,41 @@ test('deployment gate only deploys changes since the last complete run', () => {
     writeFileSync(join(directory, 'apps/mobile/file'), 'mobile');
     commit('mobile');
     assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    // Docs-only, CI-only and scripts-only commits touch no deploy input, so
+    // each skips the release the way a mobile-only commit already did. The
+    // exclusion list lives in the check-deployment-changes.yml predicate.
+    mkdirSync(join(directory, 'docs'), { recursive: true });
+    writeFileSync(join(directory, 'docs', 'note.md'), 'docs');
+    commit('docs');
+    assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    mkdirSync(join(directory, '.github'), { recursive: true });
+    writeFileSync(join(directory, '.github', 'workflows-ci.yml'), 'ci');
+    commit('ci');
+    assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    mkdirSync(join(directory, 'scripts'), { recursive: true });
+    writeFileSync(join(directory, 'scripts', 'tool.sh'), 'scripts');
+    commit('scripts');
+    assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    // A markdown file inside apps/web is a deploy input: the web app compiles
+    // page.md and page.mdx under its app directory into routes
+    // (pageExtensions in apps/web/next.config.mjs), so only root-level
+    // markdown is excluded.
+    mkdirSync(join(directory, 'apps/web/src/app'), { recursive: true });
+    writeFileSync(join(directory, 'apps/web/src/app', 'page.md'), 'route');
+    commit('web route');
+    assert.equal(runGate(deployedSha).should_deploy, 'true');
+
+    // Root build inputs stay deploy-triggering.
+    writeFileSync(
+      join(directory, 'package.json'),
+      JSON.stringify({ name: 'kilocode-monorepo', private: true })
+    );
+    commit('root package');
+    assert.equal(runGate(deployedSha).should_deploy, 'true');
 
     writeFileSync(join(directory, 'apps/web/file'), 'web');
     commit('web');
@@ -1163,8 +1261,11 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   const deploy = ordered.steps.findIndex(step => step.name === 'Deploy cloud-agent-next');
   assert.ok(prepare >= 0 && prepare < deploy);
 
-  assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
-  assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
+  // A source SHA may not define `predeploy`; an unguarded call fails the deploy.
+  const guardedPredeploy =
+    'if [ "$(jq -r \'.scripts.predeploy // empty\' package.json)" != "" ]; then pnpm run predeploy; fi\n';
+  assert.equal(ordered.steps[deploy].with.preCommands, guardedPredeploy);
+  assert.equal(ordered.steps[deploy + 1].with.preCommands, guardedPredeploy);
 });
 
 test('the ordered production path takes both workers out of the parallel matrix', () => {

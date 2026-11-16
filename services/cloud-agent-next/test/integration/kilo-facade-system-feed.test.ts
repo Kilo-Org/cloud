@@ -22,7 +22,7 @@ import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -108,17 +108,13 @@ async function installSandbox(sandboxId: string, provider: ProviderAdapter): Pro
   const broker = createFakeCredentialBroker();
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(
-      (instance as unknown as { env: Record<string, unknown> }).env,
-      broker,
-      {
-        SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-        WORKER_URL: 'https://control.test',
-        KILOCODE_BACKEND_BASE_URL: 'https://control.test',
-        KILO_OPENROUTER_BASE: 'https://control.test',
-        KILO_SESSION_INGEST_URL: 'https://control.test',
-      }
-    );
+    installFakeSandboxEnv(instance, broker, {
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
+      WORKER_URL: 'https://control.test',
+      KILOCODE_BACKEND_BASE_URL: 'https://control.test',
+      KILO_OPENROUTER_BASE: 'https://control.test',
+      KILO_SESSION_INGEST_URL: 'https://control.test',
+    });
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
     installFakeRuntimeProxyPeer(instance);
   });

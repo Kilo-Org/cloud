@@ -16,6 +16,7 @@ const SURFACES = [
   'checks',
   'navigator',
   'files',
+  'files-context',
   'merge',
   'submit',
   'checks-not-available',

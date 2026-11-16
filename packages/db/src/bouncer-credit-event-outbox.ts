@@ -83,6 +83,12 @@ export type EnqueueBouncerCreditEventResult = {
   enqueued: boolean;
 };
 
+/**
+ * The claim token a sender holds after a claim: the row id plus the `claimed_at` the claim wrote.
+ * Every claim-fenced update matches on exactly this pair.
+ */
+export type BouncerCreditEventClaim = { id: string; claimedAt: string };
+
 export type BouncerCreditEventOutboxRetryResult =
   | { outcome: 'retried'; row: BouncerCreditEventOutboxRow }
   | { outcome: 'failed'; row: BouncerCreditEventOutboxRow };
@@ -91,6 +97,21 @@ export type PurgeBouncerCreditEventOutboxResult = {
   deliveredPurged: number;
   failedPurged: number;
 };
+
+// ----- claim fence ---------------------------------------------------------------
+
+/**
+ * The fence shared by every claim-fenced statement: the row, still `sending`, still on the claim
+ * token that `claimedAt` names. A late statement from a sender whose claim was reclaimed matches
+ * nothing, so it changes no row.
+ */
+function claimFence(claim: BouncerCreditEventClaim) {
+  return and(
+    eq(bouncer_credit_event_outbox.id, claim.id),
+    eq(bouncer_credit_event_outbox.status, 'sending'),
+    eq(bouncer_credit_event_outbox.claimed_at, claim.claimedAt)
+  );
+}
 
 // ----- enqueue ------------------------------------------------------------------
 
@@ -134,17 +155,11 @@ export async function enqueueBouncerCreditEvent(
  */
 export async function deleteBouncerCreditEvent(
   database: BouncerCreditEventOutboxDatabase,
-  input: { id: string; claimedAt: string }
+  input: BouncerCreditEventClaim
 ): Promise<boolean> {
   const deleted = await database
     .delete(bouncer_credit_event_outbox)
-    .where(
-      and(
-        eq(bouncer_credit_event_outbox.id, input.id),
-        eq(bouncer_credit_event_outbox.status, 'sending'),
-        eq(bouncer_credit_event_outbox.claimed_at, input.claimedAt)
-      )
-    )
+    .where(claimFence(input))
     .returning({ id: bouncer_credit_event_outbox.id });
   return deleted.length > 0;
 }
@@ -213,7 +228,7 @@ export async function claimBouncerCreditEventByEventId(
  */
 export async function markBouncerCreditEventDelivered(
   database: BouncerCreditEventOutboxDatabase,
-  input: { id: string; claimedAt: string }
+  input: BouncerCreditEventClaim
 ): Promise<BouncerCreditEventOutboxRow | null> {
   const [updated] = await database
     .update(bouncer_credit_event_outbox)
@@ -223,13 +238,7 @@ export async function markBouncerCreditEventDelivered(
       next_attempt_at: null,
       claimed_at: null,
     })
-    .where(
-      and(
-        eq(bouncer_credit_event_outbox.id, input.id),
-        eq(bouncer_credit_event_outbox.status, 'sending'),
-        eq(bouncer_credit_event_outbox.claimed_at, input.claimedAt)
-      )
-    )
+    .where(claimFence(input))
     .returning();
   return updated ?? null;
 }
@@ -243,7 +252,7 @@ export async function markBouncerCreditEventDelivered(
  */
 export async function markBouncerCreditEventRetry(
   database: BouncerCreditEventOutboxDatabase,
-  input: { id: string; claimedAt: string; error?: string | null }
+  input: BouncerCreditEventClaim & { error?: string | null }
 ): Promise<BouncerCreditEventOutboxRetryResult | null> {
   const [row] = await database
     .update(bouncer_credit_event_outbox)
@@ -257,13 +266,7 @@ export async function markBouncerCreditEventRetry(
       claimed_at: null,
       last_error: input.error ?? null,
     })
-    .where(
-      and(
-        eq(bouncer_credit_event_outbox.id, input.id),
-        eq(bouncer_credit_event_outbox.status, 'sending'),
-        eq(bouncer_credit_event_outbox.claimed_at, input.claimedAt)
-      )
-    )
+    .where(claimFence(input))
     .returning();
 
   if (!row) {
@@ -284,7 +287,7 @@ export async function markBouncerCreditEventRetry(
  */
 export async function markBouncerCreditEventFailed(
   database: BouncerCreditEventOutboxDatabase,
-  input: { id: string; claimedAt: string; error?: string | null }
+  input: BouncerCreditEventClaim & { error?: string | null }
 ): Promise<BouncerCreditEventOutboxRow | null> {
   const [updated] = await database
     .update(bouncer_credit_event_outbox)
@@ -295,13 +298,7 @@ export async function markBouncerCreditEventFailed(
       claimed_at: null,
       last_error: input.error ?? null,
     })
-    .where(
-      and(
-        eq(bouncer_credit_event_outbox.id, input.id),
-        eq(bouncer_credit_event_outbox.status, 'sending'),
-        eq(bouncer_credit_event_outbox.claimed_at, input.claimedAt)
-      )
-    )
+    .where(claimFence(input))
     .returning();
   return updated ?? null;
 }

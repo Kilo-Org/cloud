@@ -78,16 +78,15 @@ describe('code-review command guard policy', () => {
       expect(bashPermissions[`${deniedSortOption} *`]).toBe('deny');
     }
 
-    expect(bashPermissions['git']).toBe('allow');
-    expect(bashPermissions['git *']).toBe('allow');
+    expect(bashPermissions['git']).toBe('deny');
+    expect(bashPermissions['git *']).toBe('deny');
     expect(bashPermissions['git fetch']).toBe('allow');
     expect(bashPermissions['git fetch *']).toBe('allow');
     expect(bashPermissions['git pull']).toBe('allow');
     expect(bashPermissions['git pull *']).toBe('allow');
-    expect(bashPermissions['git push']).toBe('deny');
-    expect(bashPermissions['git push *']).toBe('deny');
-    expect(bashPermissions['git commit']).toBe('deny');
-    expect(bashPermissions['git commit *']).toBe('deny');
+    // A write subcommand carries no rule of its own; the git denial classifies it.
+    expect(bashPermissions['git push']).toBeUndefined();
+    expect(bashPermissions['git commit']).toBeUndefined();
     expect(bashPermissions['glab mr merge']).toBe('deny');
     expect(bashPermissions['glab mr merge *']).toBe('deny');
     expect(bashPermissions['glab auth']).toBe('deny');
@@ -150,6 +149,180 @@ describe('code-review command guard policy', () => {
       'git diff',
       'git show HEAD',
       'gh pr diff 42 --patch --color never',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+  });
+
+  it('resolves git by name only when the subcommand directly follows git', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    // A global option before the subcommand keeps the git denial, whichever
+    // subcommand follows.
+    for (const command of [
+      'git -C /tmp/review push',
+      'git -C /tmp/review push origin main',
+      'git -c user.name=review commit -m note',
+      'git --git-dir=/tmp/review/.git reset --hard HEAD~1',
+      'git --work-tree=/tmp/review config user.email review@example.com',
+      'git --no-pager push',
+      'git -C /tmp/review remote set-url origin https://example.com/repo.git',
+      'git -C /tmp/review branch -D main',
+      'git --no-pager update-ref -m log refs/heads/main HEAD',
+      'git -C /tmp/review update-ref -m log refs/heads/main HEAD',
+      'git -C /tmp/review log --oneline -1',
+      'git --no-pager diff --stat',
+      'git push',
+      'git commit -m note',
+      'git reset --hard HEAD~1',
+      'git config user.email review@example.com',
+      // Git accepts an unambiguous prefix of a subcommand, and a git form the
+      // policy does not name keeps the git denial.
+      'git pus origin main',
+      'git update-ref refs/heads/main HEAD',
+      'git --version',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    for (const command of [
+      'git diff',
+      'git diff HEAD~1..HEAD',
+      'git log --oneline -5',
+      'git show HEAD:src/app.ts',
+      'git status --porcelain',
+      'git rev-parse HEAD',
+      'git fetch origin',
+      'git fetch --prune origin',
+      'git pull',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+  });
+
+  it('keeps the fetch and pull read rules inside the review workflow', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    expect(permissions['git fetch *--upl*']).toBe('deny');
+    expect(permissions['git pull *--upl*']).toBe('deny');
+    expect(permissions['git fetch *ext::*']).toBe('deny');
+    expect(permissions['git pull *ext::*']).toBe('deny');
+
+    // The option is matched at any position, with `=` or a separating space, and
+    // through any accepted prefix.
+    for (const command of [
+      'git fetch --upload-pack=./fetch-helper .',
+      'git fetch --upload-pack ./fetch-helper .',
+      'git fetch --upload-pack=./fetch-helper file:///tmp/repo',
+      'git fetch origin --upload-pack=./fetch-helper',
+      'git fetch --upl=./fetch-helper /tmp/repo',
+      'git fetch --upload-p=./fetch-helper /tmp/repo',
+      'git pull --upload-pack=./fetch-helper file:///tmp/repo',
+      'git pull --upload-pack ./fetch-helper',
+      'git pull origin --upl=./fetch-helper',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    // The `ext::` remote helper runs the command carried in its URL locally.
+    for (const command of [
+      "git fetch ext::sh -c 'id > /tmp/pwned'",
+      'git fetch origin ext::sh -c id',
+      "git pull 'ext::sh -c id'",
+      'git pull origin ext::./helper',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    // The read forms of the review workflow resolve to allow.
+    for (const command of [
+      'git fetch origin',
+      'git fetch --prune origin',
+      'git fetch origin main',
+      'git fetch --unshallow origin',
+      'git fetch --update-head-ok origin',
+      'git fetch --update-shallow origin',
+      'git pull',
+      'git pull origin main',
+      'git pull --ff-only',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+  });
+
+  it('keeps the diff, log and show read rules inside the review workflow', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    for (const command of [
+      'git diff --output=.git/hooks/pre-merge-commit HEAD',
+      'git diff HEAD --output=notes.txt',
+      'git log --output=notes.txt -5',
+      'git show --output=notes.txt HEAD',
+      'git diff --ext-diff HEAD',
+      'git log --ext-diff -1',
+      'git show --ext-diff HEAD',
+      'git diff --textconv HEAD',
+      'git log --text -1',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    for (const command of [
+      'git diff',
+      'git diff HEAD~1..HEAD',
+      'git diff --no-ext-diff --no-textconv HEAD',
+      'git log --oneline -5',
+      'git show HEAD:src/app.ts',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+  });
+
+  it('keeps a review session from writing a file with an output redirect', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    for (const command of [
+      'echo "[diff]" >> .git/config',
+      'echo "	external = ./helper" >> .git/config',
+      'cat > .git/config',
+      'cat > .git/hooks/pre-merge-commit',
+      'head -20 src/app.ts > notes.txt',
+      'tail -n 40 src/app.ts >> notes.txt',
+      'grep -rn "createSession" src > matches.txt',
+      'jq . package.json > copy.json',
+      'find src -name "*.ts" > files.txt',
+      'gh pr view 1 --jq \'"[diff]"\' > .git/config',
+      'glab mr view 1 > .git/config',
+      'gh api repos/o/r/pulls/7/comments > notes.json',
+      'git diff HEAD > .git/config',
+      'git log --oneline -5 > history.txt',
+      'git show HEAD:src/app.ts > copy.ts',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    for (const command of [
+      'echo hi',
+      'cat src/app.ts',
+      'head -20 src/app.ts',
+      'jq . package.json',
+      'git diff HEAD',
+      'git log --oneline -5',
+      // Review publication keeps working. The classified text of a call is one
+      // parsed command node, so a heredoc payload is not part of it; the CLI
+      // run in the pull request covers that path.
+      'gh api repos/o/r/pulls/7/reviews --input -',
+      'gh pr view 7 --json headRefOid',
+      'glab mr diff 7',
+      'glab api --method POST projects/o%2Fr/merge_requests/7/notes',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
     }

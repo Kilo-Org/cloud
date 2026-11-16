@@ -817,6 +817,14 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 ## Changelog
 
+### 2026-11-11 -- Redeem rewards only while the local reward stands
+
+A queued Impact Advocate reward redemption now reads the local reward before it contacts Impact Advocate. When the
+local reward can no longer be fulfilled, the redemption ends in a terminal failure with no Impact Advocate call, and a
+redemption that already reached the redeemed state stays redeemed. An adverse payment that leaves applied rewards in
+review now logs and reports the anomaly to Sentry with payment and reward identifiers only, and a repeated delivery for
+the same payment reports nothing new.
+
 ### 2026-10-08 -- Keep the welcome month free of referral rewards
 
 Defined the welcome-month issuance from the Kilo Pass subscription-start schedule. A pending referral reward now waits

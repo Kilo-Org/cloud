@@ -44,9 +44,6 @@ describe('Estonian count-one copy', () => {
         max: 5,
       })
     ).toBe('Lisatakse ainult 1 fail 5 failist (kuni 5)');
-    expect(i18n.t('chat.attachment.limit', { count: 1, displayCount: '1' })).toBe(
-      'Võid lisada kuni 1 fail.'
-    );
     expect(i18n.t('prReview.checks.checksCount', { count: 1, displayCount: '1' })).toBe(
       '1 kontroll'
     );
@@ -88,9 +85,6 @@ describe('Estonian count-one copy', () => {
         max: 5,
       })
     ).toBe('Lisatakse ainult 2 faili 5 failist (kuni 5)');
-    expect(i18n.t('chat.attachment.limit', { count: 2, displayCount: '2' })).toBe(
-      'Võid lisada kuni 2 faili.'
-    );
     expect(i18n.t('prReview.checks.checksCount', { count: 2, displayCount: '2' })).toBe(
       '2 kontrolli'
     );

@@ -1,7 +1,8 @@
 import * as z from 'zod';
-import { ReasoningEffortSchema } from './reasoning';
+import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
+import { addDuplicateKeyIssues } from './duplicate-keys';
 
 /** Maximum models in one benchmark profile registration request. */
 export const MAX_POOL_ENTRIES = 10;
@@ -24,28 +25,15 @@ export function benchmarkPairKey(entry: BenchmarkPair): string {
   return JSON.stringify([entry.model, entry.variant]);
 }
 
-function addDuplicatePoolEntryIssues(entries: PoolEntry[], ctx: z.RefinementCtx): void {
-  const seen = new Set<string>();
-  entries.forEach((entry, index) => {
-    const key = poolEntryKey(entry);
-    if (seen.has(key)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [index],
-        message: `Duplicate pool entry: ${key}`,
-      });
-    }
-    seen.add(key);
-  });
-}
-
 /** The unique models of one benchmark profile registration request. */
 export const EfficientModelPoolSchema = z
   .array(PoolEntrySchema)
   .min(1)
   .max(MAX_POOL_ENTRIES)
   .superRefine((entries, ctx) => {
-    addDuplicatePoolEntryIssues(entries, ctx);
+    addDuplicateKeyIssues(entries, ctx, poolEntryKey, {
+      message: key => `Duplicate pool entry: ${key}`,
+    });
   });
 export type EfficientModelPool = z.infer<typeof EfficientModelPoolSchema>;
 
@@ -126,10 +114,7 @@ export function linkedAvgCostUsd(
   return summary.avgCostUsd * (blendedUsdPerToken(ownerPricing) / platformBlended);
 }
 /**
- * Reader precedence for candidate variant identity: prefer `variant`; when
- * absent, a valid legacy `reasoningEffort` string may be interpreted as the
- * legacy variant key. New writers emit `variant` only; old writers emitted
- * `reasoningEffort` only. Both non-null is malformed.
+ * Ranked candidate. Variant precedence: {@link refineVariantExclusivity}.
  */
 export const RankedCandidateSchema = z
   .object({
@@ -154,15 +139,7 @@ export const RankedCandidateSchema = z
     // identity than the table's. Custom routers only (ADR 0005).
     stale: z.boolean().optional(),
   })
-  .superRefine((candidate, ctx) => {
-    if (candidate.variant != null && candidate.reasoningEffort != null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['variant'],
-        message: 'Candidate must not set both variant and reasoningEffort; emit variant only',
-      });
-    }
-  });
+  .superRefine((candidate, ctx) => refineVariantExclusivity(candidate, ctx, 'Candidate'));
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 
 export const ReasoningComplexitySchema = z.enum(['low', 'medium', 'high']);
@@ -242,11 +219,11 @@ export type RoutingTable = z.infer<typeof RoutingTableSchema>;
  * Consumers must return no decision for an omitted route (balanced fallback);
  * existing `computeDecision` already does this.
  *
- * Validates the same documents as {@link RoutingTableSchema}: the platform and
- * custom difference is which routes each producer writes, not what one schema
- * accepts over the other.
+ * Validates the same documents as {@link RoutingTableSchema}: it is that same
+ * schema. The platform and custom difference is which routes each producer
+ * writes, not what the schema accepts.
  */
-export const CustomRoutingTableSchema = z.object(routingTableShape);
+export const CustomRoutingTableSchema = RoutingTableSchema;
 export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
@@ -288,34 +265,24 @@ export function effectiveLatencyMs(c: {
   return c.p50TtftMs == null ? c.p50LatencyMs : c.p50TtftMs + LATENCY_TOTAL_WEIGHT * c.p50LatencyMs;
 }
 
-export function rankValue(c: {
-  avgCostUsd: number;
+type ValueInput = {
   accuracy: number;
+  // Lowered to the small-sample bound when present, so a small sample cannot outrank a
+  // measured one.
   cases?: number | null;
   p50LatencyMs: number | null;
   p50TtftMs?: number | null;
   ignoreLatency?: boolean;
-}) {
-  const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
-  const effectiveLatency = c.ignoreLatency ? 1 : effectiveLatencyMs(c);
-  if (effectiveLatency === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
-  return (c.avgCostUsd * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
-}
+};
 
 // ADR 0005: within the accuracy band a $0 candidate beats every paid one and takes no cost
-// term. `estimatedRequestCostUsd === 0` is the only source, so observed paid cost keeps the
-// value formula.
-export function rankFreeValue(c: {
-  accuracy: number;
-  cases?: number | null;
-  p50LatencyMs: number | null;
-  p50TtftMs?: number | null;
-  ignoreLatency?: boolean;
-}) {
+// term, so it omits `avgCostUsd` and scores `effectiveLatency^1.5 / accuracy^15`. Observed paid
+// cost keeps the value formula. One guard and one pair of exponents decide every score.
+export function rankValue(c: ValueInput & { avgCostUsd?: number }): number {
   const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
   const effectiveLatency = c.ignoreLatency ? 1 : effectiveLatencyMs(c);
   if (effectiveLatency === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
-  return effectiveLatency ** LATENCY_WEIGHT / accuracy ** ACCURACY_WEIGHT;
+  return ((c.avgCostUsd ?? 1) * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
 }
 
 // Candidates within ACCURACY_NOISE_BAND of the threshold come first, best
@@ -356,22 +323,15 @@ export function rankCandidates(
         },
         competes,
         free,
-        value: free
-          ? rankFreeValue({
-              accuracy: c.accuracy,
-              cases: c.cases,
-              p50LatencyMs,
-              p50TtftMs: c.p50TtftMs,
-              ignoreLatency: options?.ignoreLatency,
-            })
-          : rankValue({
-              avgCostUsd: estimatedRequestCostUsd,
-              accuracy: c.accuracy,
-              cases: c.cases,
-              p50LatencyMs,
-              p50TtftMs: c.p50TtftMs,
-              ignoreLatency: options?.ignoreLatency,
-            }),
+        value: rankValue({
+          // ADR 0005: a $0 candidate takes no cost term.
+          avgCostUsd: free ? undefined : estimatedRequestCostUsd,
+          accuracy: c.accuracy,
+          cases: c.cases,
+          p50LatencyMs,
+          p50TtftMs: c.p50TtftMs,
+          ignoreLatency: options?.ignoreLatency,
+        }),
       };
     })
     .toSorted((a, b) => {

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "使用中的代理有更新"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "工作已完成"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "失敗：{{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "已中斷：{{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "支出提醒",
       "body": "{{scopeName}} 的支出已超過 ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "新的安全發現 ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "新的安全發現 ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA 警告",
-      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+      "title": "SLA 警告"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA 違規",
-      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+      "title": "SLA 違規"
     },
     "securityLifecycle": {
       "title": "Kilo",

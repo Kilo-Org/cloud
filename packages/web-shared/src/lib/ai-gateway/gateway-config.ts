@@ -16,9 +16,15 @@ const note = z.string().max(NOTE_MAX_LENGTH);
  */
 const vercelRoutingEnabled = z.boolean().default(DEFAULT_VERCEL_ROUTING_ENABLED);
 
+/**
+ * Saved configurations from before the field existed carry no list, so a
+ * missing value parses as an empty one.
+ */
+const storedVercelRoutingOptOutModels = z.array(z.string().min(1)).default([]);
+
 export const GatewayConfigSchema = z.object({
   vercel_routing_enabled: vercelRoutingEnabled,
-  vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
+  vercel_routing_opt_out_models: storedVercelRoutingOptOutModels,
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),
   updated_by_email: z.string().nullable(),
@@ -27,19 +33,16 @@ export const GatewayConfigSchema = z.object({
 
 export type GatewayConfig = z.infer<typeof GatewayConfigSchema>;
 
-export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
-  vercel_routing_enabled: DEFAULT_VERCEL_ROUTING_ENABLED,
-  vercel_routing_opt_out_models: [],
+export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = GatewayConfigSchema.parse({
   updated_at: null,
   updated_by: null,
   updated_by_email: null,
-  note: null,
-};
+});
 
 /** Schema for parsing the routing settings on the hot path. */
 export const GatewayRoutingConfigSchema = z.object({
   vercel_routing_enabled: vercelRoutingEnabled,
-  vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
+  vercel_routing_opt_out_models: storedVercelRoutingOptOutModels,
 });
 
 /**
@@ -73,7 +76,6 @@ export const OrganizationFeaturesSchema = z.object({
   experimental_byok: storedOrganizationIds,
   enkrypt_output_guardrail: storedOrganizationIds,
   gateway_settings: storedOrganizationIds,
-  request_logs: storedOrganizationIds,
 });
 
 export type OrganizationFeatures = z.infer<typeof OrganizationFeaturesSchema>;
@@ -95,11 +97,6 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
     label: 'Gateway settings',
     description:
       'Lets the organization turn off OpenRouter or the Vercel AI Gateway, and pin Vercel AI Gateway requests to a region, on its Providers & Models page.',
-  },
-  request_logs: {
-    label: 'Request logs',
-    description:
-      "Shows organization owners, admins, and billing managers a Request Logs page with the organization's gateway requests, one hour at a time, and how each was routed.",
   },
 } as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
 
@@ -129,5 +126,4 @@ export const OrganizationFeaturesInputSchema = z.object({
   experimental_byok: organizationIdsInput,
   enkrypt_output_guardrail: organizationIdsInput,
   gateway_settings: organizationIdsInput,
-  request_logs: organizationIdsInput,
 }) satisfies z.ZodType<OrganizationFeatures, unknown>;

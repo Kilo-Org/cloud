@@ -96,27 +96,10 @@ describe('decideScreenTracking', () => {
   });
 
   it('captures real (app) leaves that are not the redirect target', () => {
-    expect(decision({ segments: ['(app)', 'onboarding'] })).toEqual({
+    expect(decision({ segments: ['(app)', 'credits'] })).toEqual({
       capture: true,
-      screenName: '(app)/onboarding',
+      screenName: '(app)/credits',
       reason: 'captured',
-    });
-  });
-
-  it('never captures the KiloClaw tab group', () => {
-    expect(decision({ segments: ['(app)', '(tabs)', '(1_kiloclaw)'] })).toEqual({
-      capture: false,
-      screenName: '(app)/(tabs)/(1_kiloclaw)',
-      reason: 'kiloclaw-excluded',
-    });
-  });
-
-  it('never captures kiloclaw settings routes', () => {
-    const result = decision({ segments: ['(app)', 'kiloclaw', '[instance-id]', 'settings'] });
-    expect(result).toEqual({
-      capture: false,
-      screenName: '(app)/kiloclaw/[instance-id]/settings',
-      reason: 'kiloclaw-excluded',
     });
   });
 

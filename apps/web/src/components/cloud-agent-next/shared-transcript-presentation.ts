@@ -1,6 +1,7 @@
 import type { Part, StoredMessage, ToolPart } from '@/components/cloud-agent-next/types';
 import {
   isAssistantMessage,
+  isCompactionPart,
   isFilePart,
   isPatchPart,
   isReasoningPart,
@@ -12,6 +13,7 @@ import {
   shouldRenderReasoningPart,
 } from '@/components/cloud-agent-next/types';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
+import { readBackgroundResult } from '@kilocode/cloud-agent-sdk/background-result';
 
 type SnapshotMessage = {
   info: { id: string; role?: unknown; time?: unknown };
@@ -56,7 +58,9 @@ export function groupConsecutiveAssistantMessages(messages: StoredMessage[]): St
       lastTurn &&
       lastMessage &&
       isAssistantMessage(lastMessage.info) &&
-      isAssistantMessage(message.info)
+      isAssistantMessage(message.info) &&
+      !lastMessage.parts.some(isCompactionPart) &&
+      !message.parts.some(isCompactionPart)
     ) {
       lastTurn.push(message);
       continue;
@@ -142,6 +146,10 @@ export function summarizeAgentWork(parts: Part[], working = false): string {
   } else if (tools.length > 1) {
     details.push(`${tools.length} tool calls`);
   }
+  const failedTools = tools.filter(part => part.state.status === 'error');
+  if (failedTools.length > 0) {
+    details.push(`${failedTools.length} failed`);
+  }
   if (reasoning.length > 0) {
     details.push('reasoning');
   }
@@ -190,7 +198,7 @@ export function groupAssistantParts(
       (part.tool === 'question' ||
         part.tool === 'task' ||
         part.tool === 'suggest' ||
-        part.state.status === 'error');
+        readBackgroundResult(part) !== undefined);
     const toolId = producingToolPartId(part);
     // A tool's returned files stay beside that tool instead of ending its group.
     const type =

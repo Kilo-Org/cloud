@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Актыўныя агенты маюць абнаўленне"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Задача завершаная"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Не ўдалося: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Перарвана: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Апавяшчэнне аб выдатках",
       "body": "Выдаткі {{scopeName}} перавысілі ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Новая знаходка ў бяспецы ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} у {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Новая знаходка ў бяспецы ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Папярэджанне SLA",
-      "body": "{{findingTitle}} у {{repoFullName}}"
+      "title": "Папярэджанне SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Парушэнне SLA",
-      "body": "{{findingTitle}} у {{repoFullName}}"
+      "title": "Парушэнне SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",

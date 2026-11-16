@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Ama-agent asebenzayo anokubuyekezwa"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Umsebenzi uqediwe"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ihlulekile: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Iphazamisekile: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Isaziso sezindleko",
       "body": "Izindleko ze-{{scopeName}} zeqe i-${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Okutholakele okusha kokuphepha ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ku-{{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Okutholakele okusha kokuphepha ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Isixwayiso se-SLA",
-      "body": "{{findingTitle}} ku-{{repoFullName}}"
+      "title": "Isixwayiso se-SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Ukwephulwa kwe-SLA",
-      "body": "{{findingTitle}} ku-{{repoFullName}}"
+      "title": "Ukwephulwa kwe-SLA"
     },
     "securityLifecycle": {
       "title": "I-Kilo",

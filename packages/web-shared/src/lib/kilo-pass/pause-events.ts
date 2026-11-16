@@ -3,7 +3,7 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { kilo_pass_pause_events } from '@kilocode/db/schema';
 import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
-import { getPreviousIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
+import { getPreviousIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 type Db = typeof defaultDb;

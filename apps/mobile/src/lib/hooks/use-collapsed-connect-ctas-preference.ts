@@ -43,9 +43,9 @@ const store = createSecureStorePreference<RepoPlatform[]>({
   mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
 });
 
-// Warm the store as soon as this module is imported: the connect card gates
-// its first paint on `hasLoaded`, so the disk read must start before the
-// new-session screen mounts (same reason as use-trusted-hosts).
+// Warm the store as soon as this module is imported: the new-session screen
+// waits for `hasLoaded` before it paints the repository cards, so the disk read
+// must start before that screen mounts (same reason as use-trusted-hosts).
 store.preload();
 
 export function useCollapsedConnectCtas() {

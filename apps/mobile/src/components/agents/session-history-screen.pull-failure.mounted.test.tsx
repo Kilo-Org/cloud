@@ -191,6 +191,7 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 vi.mock('@/components/agents/use-session-search-input', () => ({
   useSessionSearchInput: () => ({
     searchQuery: '',
+    restorePending: false,
     searchInputRef: { current: null },
     hasText: false,
     awaitingCommit: false,

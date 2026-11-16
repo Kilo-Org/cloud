@@ -170,14 +170,19 @@ app.post('/connect-ticket', async c => {
 
   if (result.outcome !== 'ok') {
     logger.debug('connect-ticket: mint failed', { outcome: result.outcome });
+    // A deadline expiry means a hop never answered: the mint is unknown, not
+    // broken here, so it answers the retryable status and the client's
+    // reconnect-and-retry path owns it. A rejected mint stays 500 — the
+    // Durable Object did answer, and it answered with an error.
+    const status = result.outcome === 'timeout' ? 503 : 500;
     logRequestDuration({
       route: '/connect-ticket',
       method: c.req.method,
-      status: 500,
+      status,
       durationMs: Date.now() - startedAt,
       outcome: result.outcome,
     });
-    return c.json({ error: 'Ticket mint failed' }, 500);
+    return c.json({ error: 'Ticket mint failed' }, status);
   }
 
   logger.setTags({ userId: result.userId });

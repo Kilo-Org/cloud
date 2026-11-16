@@ -14,14 +14,17 @@
  * `DYNAMIC_COUNTED_KEYS` list, which names the keys each expression can
  * produce; an unlisted variable-key call is a problem of its own. With
  * `--source-only` it stops after English, which is the check the mobile app
- * owns. Without the flag it also measures every other catalog: for each family
- * and each language it looks for the categories that language's own plural
- * rules require, and prints one line per language with the number of families
- * the language is missing. That is the report the translation pass works from,
- * so the app's `check:plurals` passes `--source-only`; the locale categories
- * are gated in CI by `check:i18n` (`check-catalogs.mjs`). A catalog that cannot
- * be read, parsed, or given plural rules is one problem line naming its
- * language, and the rest of the audit still runs.
+ * owned. Without the flag it also measures every other catalog: for each family
+ * and each language it asks the rule the CI catalog gate enforces,
+ * `missingPluralCategories` in tools/lib/catalogs.mjs, and prints one line per
+ * language with the number of families that language is missing. That is the
+ * report the translation pass works from, so the app's `check:plurals` passes
+ * `--source-only`; the locale categories are gated in CI by `check:i18n`
+ * (`check-catalogs.mjs`), which asks the same rule. A locale that has not opted
+ * into an owed English family is reported by that gate as a missing parity key,
+ * not by this worklist. A catalog that cannot be read, parsed, or given plural
+ * rules is one problem line naming its language, and the rest of the audit still
+ * runs.
  *
  * A counted message whose copy owns no word whose form the count changes — a
  * participle, a bare number in parentheses, a label — needs no family, because
@@ -36,12 +39,19 @@
  *
  * Usage: node tools/i18n/check-plurals.mjs [--source-only]
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative as relativePath, sep } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { lineIndex, parseProblems, parseSourceFile, walk } from '../lib/ast.mjs';
-import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
+import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import {
+  catalogTags,
+  declaresPluralFamily,
+  flattenCatalog,
+  missingPluralCategories,
+} from '../lib/catalogs.mjs';
+import { runIfMain } from '../lib/entry-point.mjs';
+import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
@@ -75,6 +85,10 @@ export const NO_AGREEMENT = new Map([
     'ordinal position: "Setup command {{index}} of {{displayCount}}" names no inflected word',
   ],
   [
+    'agentChat.sessionChanges.reviewTitle',
+    'bare count in parentheses: "Review ({{count}})" names no inflected word',
+  ],
+  [
     'chat.reactions.accessibility',
     'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],
@@ -82,14 +96,18 @@ export const NO_AGREEMENT = new Map([
     'codeReviewer.repos.allModeCount',
     'bare count after a label: "Repositories available: {{displayCount}}" names no inflected word',
   ],
+  [
+    'securityAgent.orphanedFindings.count',
+    'bare count after a label: "Findings: {{count}}" names no inflected word',
+  ],
+  [
+    'securityAgent.orphanedFindings.cleared',
+    'bare count after a label: "Findings cleared: {{count}}" names no inflected word',
+  ],
   ['prReview.checks.pending', 'participle: "{{displayCount}} pending" has no count form'],
   [
     'prReview.discussion.reactionPill',
     'the noun is already a family: "{{emoji}} reaction, {{displayCount}} {{countLabel}}"',
-  ],
-  [
-    'securityAgent.auditReport.severityCount',
-    'bare count before a severity adjective: "{{displayCount}} Critical" has no inflected word',
   ],
   [
     'securityAgent.remediation.attemptHistory',
@@ -106,14 +124,6 @@ export const NO_AGREEMENT = new Map([
   [
     'prReview.fileList.filesViewed',
     'counts of a total, not a count of the noun: "Files · {{viewed}} of {{total}} viewed"',
-  ],
-  [
-    'prReview.fileNavigator.viewedCount',
-    'counts of a total, not a count of the noun: "{{viewed}} of {{total}} viewed"',
-  ],
-  [
-    'prReview.fileNavigator.viewedOfListed',
-    'counts of a total, not a count of the noun: "{{viewed}} of {{total}} viewed of listed files"',
   ],
   [
     'prReview.fileNavigator.loadingFiles',
@@ -156,68 +166,6 @@ export const NO_AGREEMENT = new Map([
 ]);
 
 /**
- * Whether `callee` is the audit's `t`: a bare `t`, or the initialised i18n
- * instance's `i18n.t`. A method of any other object is a different function
- * that happens to be named `t`, so its arguments say nothing about a message.
- */
-function isTranslateCallee(callee) {
-  if (callee.type === 'Identifier') {
-    return callee.name === 't';
-  }
-  if (callee.type !== 'MemberExpression' || callee.computed) {
-    return false;
-  }
-  return (
-    callee.property.type === 'Identifier' &&
-    callee.property.name === 't' &&
-    callee.object.type === 'Identifier' &&
-    callee.object.name === 'i18n'
-  );
-}
-
-/** The node a TypeScript-only wrapper holds, so `{ … } satisfies X` reads as an object. */
-const TS_WRAPPERS = new Set([
-  'TSAsExpression',
-  'TSSatisfiesExpression',
-  'TSTypeAssertion',
-  'TSNonNullExpression',
-  'TSInstantiationExpression',
-  'ParenthesizedExpression',
-]);
-
-function unwrap(node) {
-  let current = node;
-  while (TS_WRAPPERS.has(current.type)) {
-    current = current.expression;
-  }
-  return current;
-}
-
-/**
- * The property names written in key position on the options object.
- *
- * Only a property's own key counts: `{ label: count }` names `label`, and
- * `{ format: () => count }` names `format`. A computed key holds an expression,
- * which this audit cannot read, so it names nothing; the audit reports a
- * counted call only through the names it can see.
- */
-function optionNames(options) {
-  const names = new Set();
-  for (const property of options.properties) {
-    if (property.type !== 'Property' || property.computed) {
-      continue;
-    }
-    const { key } = property;
-    if (key.type === 'Identifier') {
-      names.add(key.name);
-    } else if (key.type === 'Literal' && typeof key.value === 'string') {
-      names.add(key.value);
-    }
-  }
-  return names;
-}
-
-/**
  * The call's key: a string or a template literal without an interpolation is
  * the key itself, and anything else is the expression the key comes from,
  * written the way the source writes it with its whitespace collapsed.
@@ -249,27 +197,31 @@ function countedCall(node, text) {
   if (options.type !== 'ObjectExpression') {
     return null;
   }
-  const names = optionNames(options);
+  // Only a property's own key counts: `{ label: count }` names `label`. An
+  // empty string key is a name too, so the filter keeps `''`.
+  const names = new Set(options.properties.map(propertyName).filter(name => name !== null));
   if (!COUNTED_OPTIONS.some(name => names.has(name))) {
     return null;
   }
   return countedKey(unwrap(node.arguments[0]), text);
 }
 
-/** One traversal of the source tree: every counted call, and every file the parser refused. */
-function auditTree(rootDir) {
+/**
+ * One traversal of the source tree: every counted call, and every file the
+ * parser refused. It is the one traversal the accessors below project from, so
+ * an audit that asks several questions of the same tree scans it once.
+ */
+export function auditCountedCalls(rootDir = SOURCE_DIR) {
   const calls = [];
   const problems = [];
-  for (const file of sourceFiles(rootDir, isTestArtifact)) {
-    const text = readFileSync(file, 'utf8');
-    const { program, errors } = parseSourceFile(file, text);
-    // The app's sources read the way every other diagnostic names them; a
-    // fixture tree outside the repository reads from its own root.
-    const fromRepo = relativePath(ROOT, file);
-    const path = (fromRepo.startsWith('..') ? relativePath(rootDir, file) : fromRepo)
-      .split(sep)
-      .join('/');
-    problems.push(...parseProblems(path, errors, lineIndex(text)));
+  // The app's sources read the way every other diagnostic names them; a
+  // fixture tree outside the repository reads from its own root.
+  for (const { text, program, problems: unparsed } of parseSourceTree(
+    rootDir,
+    ROOT,
+    isTestArtifact
+  )) {
+    problems.push(...unparsed);
     walk(program, node => {
       const call = countedCall(node, text);
       if (call !== null) {
@@ -280,9 +232,12 @@ function auditTree(rootDir) {
   return { calls, problems };
 }
 
-/** Every static counted key: `t('key', { … count … })` and its quoted variants. */
-export function collectCountedKeys(rootDir = SOURCE_DIR) {
-  return countedKeysFrom(auditTree(rootDir).calls);
+/**
+ * Every static counted key: `t('key', { … count … })` and its quoted variants.
+ * It projects a scan the caller made once with `auditCountedCalls`.
+ */
+export function collectCountedKeys(scan) {
+  return countedKeysFrom(scan.calls);
 }
 
 /**
@@ -290,18 +245,20 @@ export function collectCountedKeys(rootDir = SOURCE_DIR) {
  * source writes it, whitespace-normalized. A listed expression in
  * `DYNAMIC_COUNTED_KEYS` names the keys it can produce; an unlisted one is an
  * audit problem, because the audit cannot see which messages a count reaches.
+ * It projects a scan the caller made once with `auditCountedCalls`.
  */
-export function collectDynamicCountedCalls(rootDir = SOURCE_DIR) {
-  return dynamicCallsFrom(auditTree(rootDir).calls);
+export function collectDynamicCountedCalls(scan) {
+  return dynamicCallsFrom(scan.calls);
 }
 
 /**
  * Every source file the parser refused, as one problem line per error. The
  * tree of such a file is empty, so its counted messages are invisible; saying
- * so keeps a syntax error from passing as a clean audit.
+ * so keeps a syntax error from passing as a clean audit. It projects a scan the
+ * caller made once with `auditCountedCalls`.
  */
-export function findUnparsedFiles(rootDir = SOURCE_DIR) {
-  return auditTree(rootDir).problems;
+export function findUnparsedFiles(scan) {
+  return scan.problems;
 }
 
 /** The literal-key view of one collection of counted calls. */
@@ -422,70 +379,9 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
   ],
 ]);
 
-/** Flatten a catalog to dotted keys, the same shape check-catalogs.mjs uses. */
-function flatten(value, prefix = '', out = new Map()) {
-  for (const [key, child] of Object.entries(value)) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (child && typeof child === 'object' && !Array.isArray(child)) {
-      flatten(child, path, out);
-    } else {
-      out.set(path, String(child));
-    }
-  }
-  return out;
-}
-
 /** The English catalog, flattened. */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
-  return flatten(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8')));
-}
-
-const PLURAL_SUFFIX_RE = /_(?:zero|one|two|few|many|other)$/;
-
-/** The base key of a plural family, or null when the key is not a category. */
-export function pluralFamilyBase(key) {
-  return PLURAL_SUFFIX_RE.test(key) ? key.replace(PLURAL_SUFFIX_RE, '') : null;
-}
-
-/** Every plural family English declares, as its base key. */
-export function englishPluralFamilies(english = readEnglishCatalog()) {
-  return [...new Set([...english.keys()].map(pluralFamilyBase).filter(Boolean))].sort();
-}
-
-/**
- * Whether English declares a plural family for `key`. English needs the `_one`
- * and `_other` categories, so a family is complete only when both are present.
- */
-function hasFamily(english, key) {
-  return english.has(`${key}_one`) && english.has(`${key}_other`);
-}
-
-/** The variable i18next selects a plural category from, and the number itself. */
-const COUNT_PLACEHOLDER = /{{\s*count\s*}}/;
-
-/**
- * The families every locale owes the categories its own plural rules require.
- *
- * A family English declares is owed, unless English builds its copy from
- * `{{count}}` — the variable that is the count. Those families were accepted
- * with the flat-key fallback: a locale whose wording inflects no word keeps the
- * one string and renders it at every count, so it owes no categories until it
- * declares a member itself. A family built from `{{displayCount}}` or
- * `{{itemCount}}` carries the caller's formatted number instead and gets no such
- * fallback. `check-catalogs.mjs` splits the same way in its `englishCountedBases`,
- * so both gates stay in step while they read the same placeholder.
- */
-function familiesOwedByEveryLocale(english) {
-  const numeralFamilies = new Set(
-    [...english]
-      .filter(([, value]) => COUNT_PLACEHOLDER.test(value))
-      .map(([key]) => pluralFamilyBase(key) ?? key)
-  );
-  return new Set(
-    englishPluralFamilies(english).filter(
-      family => hasFamily(english, family) && !numeralFamilies.has(family)
-    )
-  );
+  return flattenCatalog(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8')));
 }
 
 /**
@@ -512,40 +408,36 @@ function unlistedDynamicCalls(calls) {
 
 /** The countless counted keys among one collection, checked against `english`. */
 function countlessFamilies(calls, english) {
-  return auditKeys(calls).filter(key => !NO_AGREEMENT.has(key) && !hasFamily(english, key));
+  return auditKeys(calls).filter(
+    key => !NO_AGREEMENT.has(key) && !declaresPluralFamily(english, key)
+  );
 }
 
 /**
  * The variable-key counted calls that are not in `DYNAMIC_COUNTED_KEYS`. Each
- * one is a call whose possible messages the audit cannot see.
+ * one is a call whose possible messages the audit cannot see. It projects a
+ * scan the caller made once with `auditCountedCalls`.
  */
-export function findUnlistedDynamicCalls(rootDir = SOURCE_DIR) {
-  return unlistedDynamicCalls(auditTree(rootDir).calls);
+export function findUnlistedDynamicCalls(scan) {
+  return unlistedDynamicCalls(scan.calls);
 }
 
 /**
  * The counted keys — literal, or produced by a reviewed dynamic call — that
  * are neither a plural family in English nor a reviewed `NO_AGREEMENT` entry.
  * Empty on a healthy tree; every entry is a message whose count cannot select
- * a form.
+ * a form. It projects a scan the caller made once with `auditCountedCalls`,
+ * and reads the English catalog per call.
  */
-export function findCountlessFamilies(rootDir = SOURCE_DIR, localesDir = LOCALES_DIR) {
-  return countlessFamilies(auditTree(rootDir).calls, readEnglishCatalog(localesDir));
-}
-
-/** The locale tags present on disk, without the `.json` extension. */
-function localeTags(localesDir = LOCALES_DIR) {
-  return readdirSync(localesDir)
-    .filter(name => name.endsWith('.json'))
-    .map(name => name.replace(/\.json$/, ''))
-    .sort();
+export function findCountlessFamilies(scan, localesDir = LOCALES_DIR) {
+  return countlessFamilies(scan.calls, readEnglishCatalog(localesDir));
 }
 
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
   const report = [];
-  const { calls, problems: unparsed } = auditTree(SOURCE_DIR);
+  const { calls, problems: unparsed } = auditCountedCalls(SOURCE_DIR);
   const english = readEnglishCatalog();
 
   for (const problem of unparsed) {
@@ -565,47 +457,26 @@ function run() {
   }
 
   if (!sourceOnly) {
-    const families = englishPluralFamilies(english);
-    const owed = familiesOwedByEveryLocale(english);
     let totalKeys = 0;
-    for (const tag of localeTags()) {
+    for (const tag of catalogTags(LOCALES_DIR)) {
       if (tag === 'en') {
         continue;
       }
       let catalog;
-      let categories;
+      let missing;
       try {
-        catalog = flatten(JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8')));
-        categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+        catalog = flattenCatalog(
+          JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8'))
+        );
+        missing = missingPluralCategories(english, catalog, tag);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         problems.push(`${tag}: cannot audit catalog: ${message}`);
         continue;
       }
-      const localeFamilyBases = new Set();
-      for (const key of catalog.keys()) {
-        const base = pluralFamilyBase(key);
-        if (base !== null) {
-          localeFamilyBases.add(base);
-        }
-      }
-      let flagged = 0;
-      for (const family of families) {
-        // A locale may keep the flat counted key and fall back to it when the
-        // copy inflects no word of its own; it only owes categories once it
-        // (or the audit's own rule) declares the family.
-        const localeDeclared = localeFamilyBases.has(family);
-        const mandatory = localeDeclared || owed.has(family);
-        if (!mandatory) {
-          continue;
-        }
-        if (categories.some(category => !catalog.has(`${family}_${category}`))) {
-          flagged++;
-        }
-      }
-      if (flagged > 0) {
-        report.push(`${tag}: ${flagged} keys`);
-        totalKeys += flagged;
+      if (missing.size > 0) {
+        report.push(`${tag}: ${missing.size} keys`);
+        totalKeys += missing.size;
       }
     }
     if (report.length > 0) {
@@ -637,8 +508,4 @@ function run() {
   );
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly) {
-  run();
-}
+runIfMain(run, import.meta.url);

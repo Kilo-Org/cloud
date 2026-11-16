@@ -1,12 +1,13 @@
 import {
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
+  pushBodyCatalogKey,
   type PushData,
   pushDataSchema,
   translatePush,
 } from '@kilocode/notifications';
 
-import { notificationPathForData } from './notification-path';
+import { type NotificationDestination, notificationDestinationForData } from './notification-path';
 
 /**
  * Pure logic for the Notification history screen: how a recorded row is read
@@ -47,9 +48,11 @@ function translatedPart(
   part: 'title' | 'body'
 ): string {
   const stored = row[part];
-  return row.i18nKey === null
-    ? stored
-    : translatePush(locale, `${row.i18nKey}.${part}`, row.i18nParams ?? undefined, stored);
+  if (row.i18nKey === null) {
+    return stored;
+  }
+  const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : `${row.i18nKey}.title`;
+  return translatePush(locale, key, row.i18nParams ?? undefined, stored);
 }
 
 /**
@@ -81,7 +84,7 @@ export function notificationHistoryCopy(
 
 export type NotificationHistoryTarget = Readonly<{
   data: PushData;
-  href: string;
+  destination: NotificationDestination;
 }>;
 
 /**
@@ -106,18 +109,30 @@ function withoutPushOrigin(href: string): string {
 
 /**
  * Where a row's tap goes, or null when the stored payload no longer resolves to
- * a destination (a producer shape this app cannot parse). A null target is the
- * one dead destination the list can detect without a request: every recorded
- * kind maps to a route.
+ * a destination or belongs to a retired product.
+ *
+ * `webBaseUrl` is the Kilo web origin a row that opens a web page — a KiloClaw
+ * conversation, which has no mobile screen — uses. An app route ignores it.
  */
 export function notificationHistoryTarget(
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  webBaseUrl: string
 ): NotificationHistoryTarget | null {
   const parsed = pushDataSchema.safeParse(payload);
   if (!parsed.success) {
     return null;
   }
-  return { data: parsed.data, href: withoutPushOrigin(notificationPathForData(parsed.data)) };
+  const destination = notificationDestinationForData(parsed.data, webBaseUrl);
+  if (destination === null) {
+    return null;
+  }
+  return {
+    data: parsed.data,
+    destination:
+      destination.kind === 'app'
+        ? { kind: 'app', href: withoutPushOrigin(destination.href) }
+        : destination,
+  };
 }
 
 export type NotificationHistoryFilter = Readonly<{
@@ -132,26 +147,25 @@ export type NotificationHistoryFilter = Readonly<{
  * catalog check can see them.
  */
 const CATEGORY_LABEL_KEYS = {
-  chatMessages: 'notifications.channel.chat',
   agentAttention: 'notifications.category.agentAttentionTitle',
   sessionStatus: 'notifications.category.sessionStatusTitle',
   balanceAlerts: 'notifications.channel.balance',
   spendAlerts: 'notifications.channel.spend',
   securityFindings: 'notifications.channel.security',
-} satisfies Record<NotificationHistoryCategory, string>;
+} satisfies Record<Exclude<NotificationHistoryCategory, 'chatMessages'>, string>;
 
 /**
- * Every chip in the order the settings screen lists the categories: "All"
- * first, then one per category the recorder can produce. A category the
- * recorder never writes (there is no recorded push kind for it) has no chip,
- * so no chip can only ever answer an empty page.
+ * Every supported recorded category behind the "All" chip, in settings order.
+ * Retired product categories have no filter.
  */
 export const NOTIFICATION_HISTORY_FILTERS: readonly NotificationHistoryFilter[] = [
   { category: null, labelKey: 'common.all' },
-  ...NOTIFICATION_HISTORY_CATEGORIES.map(category => ({
-    category,
-    labelKey: CATEGORY_LABEL_KEYS[category],
-  })),
+  ...NOTIFICATION_HISTORY_CATEGORIES.filter(category => category !== 'chatMessages').map(
+    category => ({
+      category,
+      labelKey: CATEGORY_LABEL_KEYS[category],
+    })
+  ),
 ];
 
 /**

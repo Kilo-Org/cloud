@@ -12,7 +12,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 const NOW = new Date('2026-03-01T12:00:00.000Z');
 const grant = {
   userId: 'user-1',
-  origin: 'https://pages.kiloapps.io',
+  audience: 'pages',
   state: 'A'.repeat(43),
 };
 
@@ -62,7 +62,7 @@ describe('pages-auth-code', () => {
 
   test.each([
     { ...grant, userId: '' },
-    { ...grant, origin: '' },
+    { ...grant, audience: '' },
     { ...grant, state: 'short' },
     { ...grant, state: `${'A'.repeat(42)}/` },
     { ...grant, state: 7 },

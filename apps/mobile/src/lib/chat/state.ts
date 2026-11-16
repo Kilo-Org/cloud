@@ -3,6 +3,7 @@ import { type Effort, type Turn } from '@kilocode/harness-sdk';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 
+import { type ChatFlag } from './chat-flag';
 import { type ChatRecord, NO_RECORD } from './store';
 
 /**
@@ -48,6 +49,14 @@ export type Displaced = Question &
     readonly afterTurns: number;
     /** Why it has no answer: the answer failed, or the person stopped it. */
     readonly outcome: 'failed' | 'stopped';
+    /**
+     * The fixed copy key the slot's failure had when this question left it, so
+     * the bubble states the same cause where it was said: a send the account's
+     * balance refused keeps its statement and Add credits, and no Retry that
+     * would meet the same balance. A question kept before this was recorded, or
+     * one the person stopped, says nothing about a cause.
+     */
+    readonly failureKey?: string | null;
   };
 
 /** What a chat screen draws. */
@@ -102,6 +111,15 @@ export type ChatState = {
    * last moved. Changed when a call ends, not on every word of an answer.
    */
   readonly record: ChatRecord;
+  /**
+   * The web-search switch, with the choice on disk and how far this session is
+   * from it. The two flags live here rather than in a store of their own, so a
+   * tap, its write and the move it causes are one operation of the chat, and a
+   * chat that moves carries them with it.
+   */
+  readonly webSearch: ChatFlag;
+  /** The Kilo MCP switch, the same way. */
+  readonly kiloTools: ChatFlag;
 };
 
 /**
@@ -126,8 +144,13 @@ const watchers = new Map<string, Set<() => void>>();
  */
 const movedTo = new Map<string, string>();
 
-/** Follows a chain of moves to the chat a screen should read now. */
-function resolve(sessionId: string): string {
+/**
+ * Follows a chain of moves to the chat a screen should read now.
+ *
+ * Exported for the registry's own queue, which orders operations by the chat
+ * that carried on rather than by the id the caller still holds.
+ */
+export function resolveSessionId(sessionId: string): string {
   const seen = new Set<string>();
   let current = sessionId;
   while (!seen.has(current)) {
@@ -184,6 +207,8 @@ export const NOTHING = {
   failed: null,
   failureKey: null,
   record: NO_RECORD,
+  webSearch: { kind: 'reading' },
+  kiloTools: { kind: 'reading' },
 } satisfies Omit<ChatState, 'sessionId' | 'model' | 'effort' | 'status'>;
 
 function publish(sessionId: string): void {
@@ -194,7 +219,7 @@ function publish(sessionId: string): void {
 
 /** Changes what a chat looks like, and tells whoever is watching. */
 export function change(sessionId: string, into: Partial<ChatState>): void {
-  const target = resolve(sessionId);
+  const target = resolveSessionId(sessionId);
   states.set(target, { ...snapshotOf(target), ...into });
   publish(target);
   if (target !== sessionId) {
@@ -227,7 +252,7 @@ export function moveState(from: string, to: string): void {
 
 /** The state a screen draws, whether or not the chat has opened yet. */
 export function snapshotOf(sessionId: string): ChatState {
-  const target = resolve(sessionId);
+  const target = resolveSessionId(sessionId);
   const held = states.get(target);
   if (held !== undefined) {
     return held;
@@ -264,7 +289,7 @@ export function forgetState(sessionId: string): void {
      are read before any is removed, so a chain resolves as it was. */
   const stale: string[] = [];
   for (const from of movedTo.keys()) {
-    if (resolve(from) === sessionId) {
+    if (resolveSessionId(from) === sessionId) {
       stale.push(from);
     }
   }

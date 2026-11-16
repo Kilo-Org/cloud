@@ -604,10 +604,10 @@ describe('InstructionsRoute editor', () => {
     await flush(() => {
       saveChanges?.onPress();
     });
-    // The guard's own sheet stays mounted while the removal question is
-    // presented over it (the emulator shows one native sheet, the removal
-    // one), so the save does not run straight through.
-    expect(visibleConfirmationCount(renderer)).toBe(2);
+    // The unsaved-changes sheet was dismissed as the save started, so the
+    // removal question is the one sheet on screen — not a second sheet stacked
+    // over one the reader can no longer act on — and the save has not run yet.
+    expect(visibleConfirmationCount(renderer)).toBe(1);
     expect(confirmDialog.current?.title).toBe(i18n.t('codeReviewer.instructions.clearTitle'));
     expect(confirmDialog.current?.message).toBe(i18n.t('codeReviewer.instructions.clearMessage'));
     expect(save.mutateAsync).not.toHaveBeenCalled();
@@ -615,12 +615,20 @@ describe('InstructionsRoute editor', () => {
     await flush(() => {
       confirmDialog.current?.onCancel();
     });
-    // Declining puts the unsaved-changes sheet back in front: the leave is
-    // dropped and the draft is still there to discard or save.
-    expect(confirmDialog.current?.title).toBe(i18n.t('securityAgent.settingsSave.unsavedTitle'));
+    // Declining drops the leave and leaves the reader on the screen with the
+    // dirty draft, still there to discard or save.
+    expect(visibleConfirmationCount(renderer)).toBe(0);
     expect(save.mutateAsync).not.toHaveBeenCalled();
     expect(navigation.dispatch).not.toHaveBeenCalled();
     expect(preventRemove.enabled).toBe(true);
+
+    // The next Back asks again: dismissing the sheet for a save the reader then
+    // declined must not spend the screen's only confirmation.
+    act(() => {
+      triggerPreventRemove();
+    });
+    expect(visibleConfirmationCount(renderer)).toBe(1);
+    expect(confirmDialog.current?.title).toBe(i18n.t('securityAgent.settingsSave.unsavedTitle'));
   });
 
   it('removes the stored instructions from the back guard save once it is confirmed', async () => {

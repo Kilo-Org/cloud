@@ -21,9 +21,10 @@ import type { AgentSandboxProvider, SandboxId } from './types.js';
  * reads it from there. Legacy prefixed keys store no kind and keep routing by
  * prefix.
  *
- * Every sandbox serves one workspace. `shared` is legacy decode only: stored
- * metadata of a retired owner-scoped sandbox can still carry it, but no new
- * session is placed on one ({@link PlacedSandboxKind}).
+ * A sandbox belongs to one standalone session without a workspace, or to one
+ * workspace containing multiple sessions. Independent owners never share it.
+ * `shared` is legacy decode only, not a topology new features must support
+ * ({@link PlacedSandboxKind}).
  */
 export const sandboxKindSchema = z.enum(['isolated', 'isolated-standard', 'code-review', 'shared']);
 
@@ -49,7 +50,7 @@ export type ControlPlaneSandboxDecision = {
   sandboxKind: PlacedSandboxKind;
 };
 
-/** The one sandbox decision for a new control-plane session: kind, provider and neutral key. */
+/** Fresh standalone sessions and workspace anchors get exclusive placement; workspace siblings reuse it. */
 export async function selectControlPlaneSandbox(input: {
   env: SandboxSelectionEnv;
   sessionId: string;
@@ -88,7 +89,6 @@ export async function selectControlPlaneSandbox(input: {
   };
 }
 
-/** One sandbox serves one workspace, so every new session gets its own sandbox. */
 function controlPlaneSandboxKind(input: {
   codeReview: boolean;
   sandboxAllocation?: SandboxAllocation;

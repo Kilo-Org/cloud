@@ -4,11 +4,7 @@ import {
   ENKRYPT_RULE_RISK_CATEGORIES,
   ENKRYPT_RULE_SEVERITIES,
 } from '@kilocode/db/schema-types';
-import {
-  EnkryptGuardrailReportSchema,
-  EnkryptOutputGuardrailReportSchema,
-  guardrailSettings,
-} from './report';
+import { guardrailSettings } from './report';
 
 describe('guardrailSettings', () => {
   it('reports each detector and its action, with only the size of authored text', () => {
@@ -87,30 +83,4 @@ describe('guardrailSettings', () => {
       detectors: [],
     });
   });
-});
-
-it.each([false, true])('strips legacy report scan_tool_results: %s', scan_tool_results => {
-  const settings = { status: 'ready', detectors: [] };
-  const report = {
-    settings: { ...settings, scan_tool_results },
-    verdict: 'allow',
-    unavailable_reason: null,
-    added_latency_ms: 0,
-    scans: [],
-  };
-  const input = EnkryptGuardrailReportSchema.parse(report);
-  const output = EnkryptOutputGuardrailReportSchema.parse({
-    ...report,
-    held_back: false,
-    held_bytes: null,
-    held_ms: null,
-    upstream_read_failed: false,
-    output_characters: 0,
-    not_scanned_reason: null,
-  });
-
-  expect(input.settings).toEqual(settings);
-  expect(input.settings).not.toHaveProperty('scan_tool_results');
-  expect(output.settings).toEqual(settings);
-  expect(output.settings).not.toHaveProperty('scan_tool_results');
 });

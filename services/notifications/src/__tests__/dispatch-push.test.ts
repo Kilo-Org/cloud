@@ -1649,6 +1649,39 @@ describe('NotificationChannelDO per-token locale translation', () => {
     expect(esMessage?.title).not.toBe(enMessage?.title);
   });
 
+  it('reads the shared body entry of a security finding push in the token language', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-security', token: 'tok-security', locale: 'es' }],
+      previews: 'full',
+    });
+    const stub = getDO('user-security');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-security',
+        idempotencyKey: 'k-security',
+        push: {
+          title: 'SLA warning',
+          body: 'XSS in admin in acme/api',
+          i18nKey: 'internal.securityFindingSlaWarning',
+          i18nParams: {
+            severity: 'high',
+            findingTitle: 'XSS in admin',
+            repoFullName: 'acme/api',
+          },
+          data: { type: 'security_finding', findingId: 'finding-1', scope: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Aviso de SLA');
+    expect(messages[0].body).toBe('XSS in admin en acme/api');
+    expect(messages[0].title).not.toBe('SLA warning');
+    expect(messages[0].body).not.toBe('XSS in admin in acme/api');
+  });
+
   it('treats a null locale as English', async () => {
     installDbMock({
       tokens: [{ user_id: 'user-null-locale', token: 'tok-null', locale: null }],

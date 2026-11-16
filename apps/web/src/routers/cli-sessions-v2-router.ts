@@ -27,6 +27,7 @@ import {
   cli_sessions_v2,
   cloud_agent_session_runs,
   cloud_agent_user_settings,
+  cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
@@ -44,26 +45,25 @@ import {
   fetchSessionMessagesPage,
   fetchSessionDiff,
   deleteSession as deleteSessionIngest,
+  fetchSharedSession,
   shareSession as shareSessionIngest,
   SessionShareTooLargeError,
+  sessionIngestTrpcError,
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
-  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
   WORKSPACE_REQUIRES_ROOT_SESSION,
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
   projectKnownCloudAgentPath,
-  validateKiloSdkMessagesCursor,
+  getSessionMessagesPageInputSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
-import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
+import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
@@ -79,21 +79,15 @@ import {
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
-import {
-  isGitHubOwnerName,
-  isGitHubRepositoryName,
-  parseGitHubOwnerRepo,
-} from '@/lib/integrations/platforms/github/repository-coordinates';
+import { parseGitHubOwnerRepo } from '@/lib/integrations/platforms/github/repository-coordinates';
 import {
   pullRequestUrlMatchesRepo,
   verifySessionPullRequestLink,
 } from '@/lib/integrations/platforms/github/pr-link-identity';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
 import {
-  getPrObservationSummary,
   createEmptyPrObservations,
   prObservationsSchema,
-  prObservationSummarySchema,
 } from '@/lib/integrations/platforms/github/pr-observations';
 import { fetchPullRequestObservations } from '@/lib/integrations/platforms/github/pr-status';
 import {
@@ -108,7 +102,15 @@ import {
   type WorkspaceOrder,
 } from '@/lib/cloud-agent/workspace-folders';
 import { after } from 'next/server';
-import { sessionAssociatedPr } from '@/lib/session-associated-pr';
+import {
+  sessionAssociatedPr,
+  associatedPrSchema,
+  formatAssociatedPr,
+  parseGitHubPrUrl,
+  samePullRequest,
+  type AssociatedPrRow,
+  type SessionPrFields,
+} from '@/lib/session-associated-pr';
 
 import {
   changeWatchPr,
@@ -121,37 +123,69 @@ import {
   watchPrQuerySchema,
 } from '@/lib/cloud-agent/watch-pr';
 
-/**
- * Check if an error indicates the session was not found in the cloud-agent DO.
- * This is expected for legacy sessions created before the new DO-based system.
- */
-function sessionTrpcErrorCode(err: unknown): string | undefined {
+type SessionTrpcErrorData = {
+  code?: string;
+  httpStatus?: number;
+  clientError?: { retryable?: unknown };
+};
+
+function sessionTrpcErrorData(err: unknown): SessionTrpcErrorData | undefined {
   if (!(err instanceof TRPCClientError)) return undefined;
-  const data = err.data as { code?: string } | undefined;
-  const shape = err.shape as { data?: { code?: string } } | undefined;
-  return data?.code ?? shape?.data?.code;
+  const data = err.data as SessionTrpcErrorData | undefined;
+  const shapeData = (err.shape as { data?: SessionTrpcErrorData } | undefined)?.data;
+  if (data === undefined && shapeData === undefined) return undefined;
+  return {
+    code: data?.code ?? shapeData?.code,
+    httpStatus: data?.httpStatus ?? shapeData?.httpStatus,
+    clientError: data?.clientError ?? shapeData?.clientError,
+  };
+}
+
+function sessionTrpcErrorCode(err: unknown): string | undefined {
+  return sessionTrpcErrorData(err)?.code;
 }
 
 function isSessionConflictError(err: unknown): boolean {
   return sessionTrpcErrorCode(err) === 'CONFLICT';
 }
 
+/**
+ * Check if an error indicates the session was not found in the cloud-agent DO.
+ * This is expected for legacy sessions created before the new DO-based system.
+ */
 function isSessionNotFoundError(err: unknown): boolean {
-  if (err instanceof TRPCClientError) {
-    const data = err.data as { code?: string; httpStatus?: number } | undefined;
-    const shape = err.shape as { data?: { code?: string; httpStatus?: number } } | undefined;
-    // Check TRPC error code
-    const code = data?.code ?? shape?.data?.code;
-    if (code === 'NOT_FOUND') {
-      return true;
-    }
-    // Also check HTTP status 404
-    const httpStatus = data?.httpStatus ?? shape?.data?.httpStatus;
-    if (httpStatus === 404) {
-      return true;
-    }
-  }
-  return false;
+  const errorData = sessionTrpcErrorData(err);
+  return errorData?.code === 'NOT_FOUND' || errorData?.httpStatus === 404;
+}
+
+const TRANSIENT_TRPC_CODES = new Set(['SERVICE_UNAVAILABLE', 'TIMEOUT']);
+const TRANSIENT_HTTP_STATUSES = new Set([503, 504]);
+const TRANSPORT_ERROR_NAMES = new Set([
+  'HeadersTimeoutError',
+  'BodyTimeoutError',
+  'ConnectTimeoutError',
+  'AbortError',
+  'TimeoutError',
+]);
+
+function isTransportFailure(cause: unknown, depth = 0): boolean {
+  if (typeof cause !== 'object' || cause === null || depth > 3) return false;
+  const { name, message } = cause as { name?: unknown; message?: unknown };
+  if (typeof name === 'string' && TRANSPORT_ERROR_NAMES.has(name)) return true;
+  if (cause instanceof TypeError && message === 'fetch failed') return true;
+  return isTransportFailure((cause as { cause?: unknown }).cause, depth + 1);
+}
+
+/** Worker outages, timeouts, and network failures that a later retry may resolve. */
+function isTransientRuntimeError(err: unknown): boolean {
+  if (!(err instanceof TRPCClientError)) return false;
+  const errorData = sessionTrpcErrorData(err);
+  if (errorData === undefined) return isTransportFailure(err.cause);
+  if (errorData.code && TRANSIENT_TRPC_CODES.has(errorData.code)) return true;
+  if (errorData.httpStatus && TRANSIENT_HTTP_STATUSES.has(errorData.httpStatus)) return true;
+  const retryable = errorData.clientError?.retryable === true;
+  // Internal errors stay defects even when a Worker envelope marks them retryable.
+  return retryable && errorData.code !== undefined && errorData.code !== 'INTERNAL_SERVER_ERROR';
 }
 
 function isParentLookupUnavailableError(err: unknown): boolean {
@@ -249,50 +283,18 @@ export const REFRESH_THROTTLE_MS = 60_000;
  */
 export { parseGitHubOwnerRepo };
 
-export const associatedPrSchema = z.object({
-  url: z.string(),
-  number: z.number(),
-  state: z.string(),
-  title: z.string().nullable(),
-  headSha: z.string().nullable(),
-  observations: prObservationSummarySchema.nullable(),
-  lastSyncedAt: z.string(),
-  reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
-  // True when the server has flagged this PR for an async review-decision
-  // fetch (see batch-review-decisions.ts) and the result has not landed yet.
-  // Clients can poll the list endpoint while any row reports pending=true to
-  // surface review-decision badges shortly after they become available.
-  reviewDecisionPending: z.boolean(),
-  // Host platform of the linked PR (e.g. 'github'). Always present when an
-  // associatedPr is returned.
-  platform: z.string(),
-  baseRef: z.string().nullable(),
-  stackNumber: z.number().nullable(),
-  stackPosition: z.number().nullable(),
-  stackSize: z.number().nullable(),
-});
-
-type AssociatedPrRow = {
-  pr_url: string | null;
-  pr_number: number | null;
-  pr_state: string | null;
-  pr_title: string | null;
-  pr_head_sha: string | null;
-  pr_observations?: unknown;
-  pr_last_synced_at: string | null;
-  pr_review_decision: string | null;
-  review_decision_pending: boolean | null;
-  pr_base_ref?: string | null;
-  stack_number?: number | null;
-  stack_position?: number | null;
-  stack_size?: number | null;
-  /**
-   * True when the row is the PR of the session's Cloud Agent workspace (a PR
-   * on the workspace's repository and branch) rather than the session's own
-   * reported link. See `sessionAssociatedPr`.
-   */
-  pr_from_workspace?: boolean | null;
-};
+/**
+ * The associated-PR wire schema and formatters live in
+ * `@/lib/session-associated-pr` (which owns the associated-PR query);
+ * re-exported here for the router's callers.
+ */
+export {
+  associatedPrSchema,
+  formatAssociatedPr,
+  parseGitHubPrUrl,
+  type AssociatedPrRow,
+  type SessionPrFields,
+} from '@/lib/session-associated-pr';
 
 /**
  * Flat aliases for the session's own stored PR link, produced by
@@ -312,225 +314,6 @@ type SessionPrRow = {
    */
   session_pr_verified_at: string | null;
 };
-
-/**
- * The session's stored PR link (cli_sessions_v2.platform / pr_url / pr_number)
- * plus its updated_at and verified-at, used for the pending-partial
- * lastSyncedAt and to gate the live cache fields.
- */
-type SessionPrFields = {
-  platform: string | null;
-  pr_url: string | null;
-  pr_number: number | null;
-  updated_at: string | null;
-  /**
-   * `cli_sessions_v2.git_url`. A pending link is only surfaced when it names
-   * this repository; an unparseable or mismatched link is no evidence.
-   */
-  git_url: string | null;
-  /**
-   * `cli_sessions_v2.pr_link_verified_at`. Non-null lets the read path serve
-   * the matching cache row's live fields; null means the link has not been
-   * verified against GitHub and must not be shown.
-   */
-  pr_link_verified_at: string | null;
-};
-
-/**
- * Parse a GitHub pull-request URL into `{ owner, repo, number }`. Returns
- * `null` for non-GitHub hosts, URLs that do not resolve to
- * `owner/repo/pull/N`, and owner or repo values outside GitHub's name charset.
- * Accepts a trailing subpath (e.g. `/files`), query
- * string, and fragment, matching the mobile parser so a pasted PR URL is
- * never skipped during refresh. A PR URL has more than two path segments,
- * so `parseGitHubOwnerRepo` cannot parse it.
- */
-export function parseGitHubPrUrl(
-  url: string
-): { owner: string; repo: string; number: number } | null {
-  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-  let host: string;
-  let path: string;
-  if (sshMatch) {
-    host = sshMatch[1].toLowerCase();
-    path = sshMatch[2];
-  } else {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return null;
-    }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
-      return null;
-    }
-    host = parsed.hostname.toLowerCase();
-    path = parsed.pathname.replace(/^\/+/, '');
-  }
-
-  if (host !== 'github.com' && host !== 'www.github.com') {
-    return null;
-  }
-
-  const segments = path.replace(/\/+$/, '').split('/').filter(Boolean);
-  if (segments.length < 4 || segments[2] !== 'pull') {
-    return null;
-  }
-  const [owner, repo, , numberStr] = segments;
-  const number = Number(numberStr);
-  if (!isGitHubOwnerName(owner) || !isGitHubRepositoryName(repo)) {
-    return null;
-  }
-  if (!Number.isInteger(number) || number <= 0) {
-    return null;
-  }
-  return { owner, repo, number };
-}
-
-/**
- * Format a cache row into the associatedPr shape. Returns null when the cache
- * row has no PR. `platform` is supplied by the caller.
- */
-function formatCacheRow(
-  cache: AssociatedPrRow,
-  platform: string
-): z.infer<typeof associatedPrSchema> | null {
-  if (
-    cache.pr_url === null ||
-    cache.pr_number === null ||
-    cache.pr_state === null ||
-    cache.pr_last_synced_at === null
-  ) {
-    return null;
-  }
-  const rd = cache.pr_review_decision;
-  const reviewDecision =
-    rd === 'approved' || rd === 'changes_requested' || rd === 'review_required' ? rd : null;
-  return {
-    url: cache.pr_url,
-    number: cache.pr_number,
-    state: cache.pr_state,
-    title: cache.pr_title,
-    headSha: cache.pr_head_sha,
-    observations: getPrObservationSummary(cache.pr_observations, cache.pr_head_sha),
-    lastSyncedAt: cache.pr_last_synced_at,
-    reviewDecision,
-    reviewDecisionPending: cache.review_decision_pending === true,
-    platform,
-    baseRef: cache.pr_base_ref ?? null,
-    stackNumber: cache.stack_number ?? null,
-    stackPosition: cache.stack_position ?? null,
-    stackSize: cache.stack_size ?? null,
-  };
-}
-
-/**
- * Build the pending partial for a session whose own stored link is verified but
- * whose per-PR cache row is missing or names a different PR. Carries only the
- * session's own link fields; never another PR's cache fields.
- *
- * `formatAssociatedPr` only calls this for a verified link, but the guard below
- * keeps an unverified link from ever rendering even if called directly: an
- * unverified link must name the session's repository and be a GitHub link.
- */
-function pendingPartialFromSession(
-  session: SessionPrFields,
-  reviewDecisionPending: boolean
-): z.infer<typeof associatedPrSchema> | null {
-  if (session.pr_url === null) {
-    return null;
-  }
-  if (session.pr_link_verified_at === null) {
-    // An unverified link must name the session's repository; a stored link to
-    // another repo is no evidence and is never surfaced. A verified link has
-    // already passed that check against GitHub, so it needs no re-check here.
-    if (!pullRequestUrlMatchesRepo(session.pr_url, session.git_url)) {
-      return null;
-    }
-    // Only a GitHub link has a verification path here. Another platform's
-    // unverified link would stay pending forever, so it is not shown as a PR.
-    if (session.platform != null && session.platform !== 'github') {
-      return null;
-    }
-  }
-  const url = session.pr_url;
-  const parsed = parseGitHubPrUrl(url);
-  return {
-    url,
-    number: session.pr_number ?? parsed?.number ?? 0,
-    state: 'unknown',
-    title: null,
-    headSha: null,
-    observations: null,
-    lastSyncedAt: session.updated_at
-      ? new Date(session.updated_at).toISOString()
-      : new Date().toISOString(),
-    reviewDecision: null,
-    reviewDecisionPending,
-    platform: session.platform ?? 'github',
-    baseRef: null,
-    stackNumber: null,
-    stackPosition: null,
-    stackSize: null,
-  };
-}
-
-/**
- * Compare two PR URLs as the same pull request, ignoring trailing subpath,
- * query, fragment, and trailing slash. A stored link like
- * `.../pull/7/files` names the same PR as the canonical cache URL
- * `.../pull/7`. Returns `false` when either URL is not a parseable GitHub PR
- * URL.
- */
-function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
-  if (sessionUrl === cacheUrl) return true;
-  const s = parseGitHubPrUrl(sessionUrl);
-  const c = parseGitHubPrUrl(cacheUrl);
-  return (
-    s !== null &&
-    c !== null &&
-    s.owner.toLowerCase() === c.owner.toLowerCase() &&
-    s.repo.toLowerCase() === c.repo.toLowerCase() &&
-    s.number === c.number
-  );
-}
-
-/**
- * Format the associated PR for a session. The link must be the session's own
- * stored link and it must have passed GitHub verification; otherwise no PR is
- * shown.
- *
- *   1. Verified session link matches the cache PR → live cache fields.
- *   2. Verified session link, cache missing or for a different PR → pending
- *      partial (the session's own URL/number, state `unknown`, never the other
- *      PR's cache fields).
- *   3. No stored link, or a stored link GitHub has not verified
- *      (`pr_link_verified_at` NULL) → `null`. An unverified link is a guess, so
- *      it is never surfaced as a badge or an Open-on-GitHub link; a wrong link
- *      is worse than no link.
- *
- * The one exception is a Cloud Agent workspace's PR (`pr_from_workspace`): a
- * PR on the branch the workspace has checked out belongs to every chat in it,
- * so it is shown without a link of the chat's own. Outside workspaces there is
- * no branch-name fallback: a session with no stored link shows no PR, however
- * fresh the cache row for its branch happens to be.
- */
-export function formatAssociatedPr(
-  session: SessionPrFields,
-  cache: AssociatedPrRow,
-  opts?: { partialReviewDecisionPending?: boolean }
-): z.infer<typeof associatedPrSchema> | null {
-  if (cache.pr_from_workspace === true) {
-    return formatCacheRow(cache, 'github');
-  }
-  if (session.pr_url === null || session.pr_link_verified_at === null) {
-    return null;
-  }
-  if (cache.pr_url !== null && samePullRequest(session.pr_url, cache.pr_url)) {
-    return formatCacheRow(cache, session.platform ?? 'github');
-  }
-  return pendingPartialFromSession(session, opts?.partialReviewDecisionPending ?? true);
-}
 
 export function getPrLinkVerificationKey(
   session: Pick<
@@ -805,35 +588,6 @@ const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
 
 /**
- * Input for the paginated `getSessionMessagesPage` endpoint. Mirrors the
- * worker-bound contract in `@kilocode/session-ingest-contracts` so tRPC-level
- * input validation matches the worker's access-checked RPC and HTTP route.
- * The `limit` default is applied here so the procedure body always sees a
- * positive page size and the client receives a bounded request.
- */
-const GetSessionMessagesPageInputSchema = z
-  .object({
-    session_id: sessionIdField,
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
-  })
-  .superRefine((params, ctx) => {
-    if (params.cursor === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid message cursor',
-      });
-    }
-  });
-
-/**
  * Verify the user owns the session and still has access to its organization.
  */
 async function getSessionWithAccessCheck(
@@ -1013,6 +767,15 @@ const UnshareSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
 const ShareSessionInputSchema = UnshareSessionInputSchema.extend(sessionShareOptionsSchema.shape);
+
+/**
+ * A public share token is an opaque signed capability. It is only ever an
+ * input to the worker read; the length bound keeps a garbage segment from
+ * reaching the upstream request.
+ */
+const GetSharedSessionInputSchema = z.object({
+  share_token: z.string().min(1).max(4096),
+});
 
 function addCreatedOnPlatformConditions(
   whereConditions: SQL[],
@@ -1462,6 +1225,14 @@ export const cliSessionsV2Router = createTRPCRouter({
         .select({
           sessionId: sql<string>`${cli_sessions_v2.session_id}`.as('session_id'),
           worktreeId: sql<string>`${cli_sessions_v2.cloud_agent_worktree_id}`.as('worktree_id'),
+          doneFolderEnabled: sql<boolean>`exists (
+            select 1 from ${cloud_agent_workspace_folders}
+            where ${cloud_agent_workspace_folders.kilo_user_id} = ${ctx.user.id}
+              and ${cloud_agent_workspace_folders.organization_id}
+                is not distinct from ${cli_sessions_v2.organization_id}
+              and ${cloud_agent_workspace_folders.kind} = 'smart'
+              and ${cloud_agent_workspace_folders.smart_preset} = 'done'
+          )`.as('done_folder_enabled'),
           gitUrl: sql<string | null>`${cli_sessions_v2.git_url}`.as('session_git_url'),
           gitBranch: sql<string | null>`${cli_sessions_v2.git_branch}`.as('git_branch'),
           title: sql<string | null>`${cli_sessions_v2.title}`.as('title'),
@@ -1552,6 +1323,9 @@ export const cliSessionsV2Router = createTRPCRouter({
       db
         .select({
           worktreeId: sql<string>`${scoped.worktreeId}`.as('worktree_id'),
+          doneFolderEnabled: sql<boolean>`bool_or(${scoped.doneFolderEnabled})`.as(
+            'done_folder_enabled'
+          ),
           name: sql<string | null>`${scoped.worktreeName}`.as('name'),
           folderId: sql<string | null>`${scoped.folderId}`.as('folder_id'),
           sidebarPosition: sql<string | null>`${scoped.sidebarPosition}`.as('sidebar_position'),
@@ -1664,6 +1438,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       db
         .select({
           worktreeId: sql<string>`"workspace_grouped"."worktree_id"`.as('worktree_id'),
+          doneFolderEnabled: grouped.doneFolderEnabled,
           name: sql<string | null>`${grouped.name}`.as('name'),
           folderId: sql<string | null>`${grouped.folderId}`.as('folder_id'),
           sidebarPosition: sql<string | null>`${grouped.sidebarPosition}`.as('sidebar_position'),
@@ -1791,6 +1566,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           (or(
             isNull(base.pr_state),
             inArray(base.pr_state, ['open', 'draft']),
+            base.doneFolderEnabled,
             sql`${base.lastActivityAt} >= now() - interval '5 days'`
           ) as SQL)
       )
@@ -2319,11 +2095,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           `Failed to fetch messages for session ${input.session_id}:`,
           error instanceof Error ? error.message : error
         );
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch session messages',
-          cause: error,
-        });
+        throw sessionIngestTrpcError('Failed to fetch session messages', error);
       }
     }),
 
@@ -2336,7 +2108,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * retryable from non-retryable failures without inferring retry semantics.
    */
   getSessionMessagesPage: baseProcedure
-    .input(GetSessionMessagesPageInputSchema)
+    .input(getSessionMessagesPageInputSchema)
     .query(async ({ ctx, input }) => {
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
@@ -2362,19 +2134,16 @@ export const cliSessionsV2Router = createTRPCRouter({
           });
         } catch (error) {
           // Match the existing `getSessionMessages` error contract: surface a
-          // stable INTERNAL_SERVER_ERROR so the mobile client can map the
-          // outcome without inferring retry semantics from the worker's
-          // text. The client already calls `captureException`; we do not
-          // double-capture here.
+          // stable code the mobile client can map without inferring retry
+          // semantics from the worker's text — the budget expiry as the
+          // retryable `SERVICE_UNAVAILABLE`, anything else as
+          // `INTERNAL_SERVER_ERROR`. The client already calls
+          // `captureException`; we do not double-capture here.
           console.error(
             `Failed to fetch session messages page for session ${input.session_id}:`,
             error instanceof Error ? error.message : error
           );
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to fetch session messages page',
-            cause: error,
-          });
+          throw sessionIngestTrpcError('Failed to fetch session messages page', error);
         }
       })();
 
@@ -2429,8 +2198,9 @@ export const cliSessionsV2Router = createTRPCRouter({
   /**
    * The cumulative file diff for a V2 Kilo session, from session start to its
    * latest step, as stored by session ingest. File paths are workspace
-   * relative. Read failures surface as INTERNAL_SERVER_ERROR (retryable on the
-   * client); an oversized diff is a typed `too_large` result.
+   * relative. A budget expiry surfaces as SERVICE_UNAVAILABLE and any other
+   * read failure as INTERNAL_SERVER_ERROR (both retryable on the client); an
+   * oversized diff is a typed `too_large` result.
    */
   getSessionDiff: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
@@ -2441,11 +2211,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       try {
         diff = await fetchSessionDiff(input.session_id, ctx.user.id);
       } catch (error) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch session diff',
-          cause: error,
-        });
+        throw sessionIngestTrpcError('Failed to fetch session diff', error);
       }
       if (diff === null) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
@@ -2573,6 +2339,16 @@ export const cliSessionsV2Router = createTRPCRouter({
               `Session ${session_id} not found in cloud-agent DO - treating as legacy session`
             );
             // runtimeState stays null
+          } else if (isTransientRuntimeError(error)) {
+            console.error(
+              `Session runtime state temporarily unavailable for session ${session_id}:`,
+              error instanceof Error ? error.message : error
+            );
+            throw new TRPCError({
+              code: 'SERVICE_UNAVAILABLE',
+              message: 'Session runtime state is temporarily unavailable',
+              cause: error,
+            });
           } else {
             console.error(
               `Failed to fetch runtime state for session ${session_id}:`,
@@ -2835,6 +2611,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'No GitHub integration configured for this session',
+          cause: { reason: 'no_integration' },
         });
       }
 
@@ -2843,6 +2620,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'GitHub installation ID is malformed',
+          cause: { reason: 'malformed_installation' },
         });
       }
       const appType = integration.github_app_type ?? 'standard';
@@ -2865,6 +2643,10 @@ export const cliSessionsV2Router = createTRPCRouter({
               : refreshBudget.reason === 'rate_limited'
                 ? `GitHub rate limit reached; try again after ${refreshBudget.retryAt.toISOString()}`
                 : `PR refresh was already attempted; try again after ${refreshBudget.retryAt.toISOString()}`,
+          cause: {
+            reason: refreshBudget.reason,
+            retryAt: refreshBudget.retryAt.toISOString(),
+          },
         });
       }
       const signal = AbortSignal.timeout(45_000);
@@ -2895,6 +2677,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
             message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+            cause: { reason: 'rate_limited', retryAt: rateLimit.resetAt.toISOString() },
           });
         }
         captureException(error, {
@@ -2907,6 +2690,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch pull request from GitHub',
+          cause: { reason: 'fetch_failed' },
         });
       }
 
@@ -2986,6 +2770,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
             message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+            cause: { reason: 'rate_limited', retryAt: rateLimit.resetAt.toISOString() },
           });
         }
         observations = {
@@ -3315,7 +3100,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     try {
       const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
-      return { share_token: result.share_token };
+      /* Both the token and the capability: the app compares the capability it
+         created with the one a later read reports, so a client can tell its own
+         link from one made elsewhere. */
+      return { share_token: result.share_token, public_id: result.public_id };
     } catch (error) {
       if (error instanceof SessionShareTooLargeError) {
         throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });
@@ -3359,5 +3147,27 @@ export const cliSessionsV2Router = createTRPCRouter({
         cause: error,
       });
     }
+  }),
+
+  /**
+   * Read a publicly shared session by its share token.
+   *
+   * The token is the capability: every caller holding it may read the
+   * transcript, which is exactly the rule the public `/s/<token>` web page
+   * applies. The read is therefore not owner-scoped — an owned session id is
+   * never accepted here, only the opaque token issued by `share`.
+   *
+   * An expired, revoked, rotated-out, or unknown token is NOT_FOUND. Clients
+   * treat that code as terminal: it is the dead-link state, not a failure to
+   * retry. A token whose snapshot read fails keeps its metadata and reports
+   * `transcriptUnavailable`, so a transient upstream fault never reads as a
+   * revoked link.
+   */
+  getSharedSession: baseProcedure.input(GetSharedSessionInputSchema).query(async ({ input }) => {
+    const shared = await fetchSharedSession(input.share_token);
+    if (!shared) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Shared session not found' });
+    }
+    return shared;
   }),
 });

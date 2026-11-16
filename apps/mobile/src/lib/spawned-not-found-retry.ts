@@ -1,5 +1,5 @@
 /**
- * Pure predicates driving the TanStack Query `retry` callback for the
+ * The pure predicate driving the TanStack Query `retry` callback for the
  * `cliSessionsV2.get` read on the `/(app)/agent-chat/[session-id]` route.
  *
  * The ingest row is written by the parent's own
@@ -12,74 +12,37 @@
  * itself, independent of when the CLI child actually attaches), so 8
  * attempts at ~1s is generous.
  *
- * Two entry points share that budget:
+ * Every open runs that budget: a session-row tap, a link, an app action, a
+ * notification, and the `spawned=1` route the `kilo remote` flow creates. It
+ * is not withdrawn for an open that began on the identity restored from
+ * storage either — that is the state every cold start is in before
+ * `user.getMe` confirms, and it is where the read most needs the window.
+ * What must stay immediate is the account boundary, and that boundary is an
+ * access denial (`UNAUTHORIZED`/`FORBIDDEN`), which this predicate never
+ * retries.
  *
- * - `shouldRetryNotFoundOnSpawnedRoute` gates the `spawned=1` param (the
- *   `kilo remote` happy path) on its own.
- * - `shouldRetryNotFoundOnYoungRoute` extends the same window to every
- *   other navigation into the route. The route skips it for an open that
- *   began on the restored identity, whose denial must stay immediate.
+ * A stale or deleted session reaches the same terminal "not found" state
+ * once the window closes; that state offers no Retry, because the read has
+ * already had its whole chance to settle.
  *
- * A stale or deleted session reaches the same permanent "not found"
- * state once the window closes.
- *
- * Implemented as free functions (not methods on the route component) so
- * they can be unit-tested in a plain Node vitest environment without
- * rendering the screen or mocking the router.
+ * Implemented as a free function (not a method on the route component) so it
+ * can be unit-tested in a plain Node vitest environment without rendering the
+ * screen or mocking the router.
  */
 export const SPAWNED_NOT_FOUND_MAX_ATTEMPTS = 8;
 
-export function shouldRetryNotFoundOnSpawnedRoute({
-  spawned,
-  attempt,
-  errorCode,
-}: {
-  /**
-   * The `spawned` route param, if any. `undefined` (absent) means the
-   * caller navigated here through any other path (push, deep link, tab
-   * tap, etc.) and must not get the spawned-row retry.
-   */
-  spawned: string | undefined;
-  /**
-   * 0-indexed attempt count from TanStack Query's `retry(failureCount)`
-   * callback. `attempt === 0` means the first failure (the very first
-   * request returned an error).
-   */
-  attempt: number;
-  /**
-   * The structured tRPC error code, if any. `NOT_FOUND` is the only
-   * error this helper retries; any other code is the route's problem to
-   * surface (transient, retriable by the existing QueryError UI for
-   * non-`NOT_FOUND`).
-   */
-  errorCode: string | undefined;
-}): boolean {
-  if (spawned === undefined) {
-    return false;
-  }
-  if (errorCode !== 'NOT_FOUND') {
-    return false;
-  }
-  return attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS;
-}
-
 /**
- * The same NOT_FOUND retry budget for every OTHER navigation into this route:
- * session-row pushes, deep links, app actions, and notification opens. The
- * parent ingest write is not synchronous with any of those reads either — the
- * session-detail surface answers a first-tick `NOT_FOUND` for a session that
- * genuinely exists with a permanent, no-retry screen. The same 8×1s budget
- * the spawned path uses bounds the wait; a stale or deleted session still
- * reaches the permanent state after the window closes.
- *
- * Non-NOT_FOUND codes and retries beyond the budget return false, so the
- * route's own terminal handling owns everything else.
+ * Whether one failed `cliSessionsV2.get` attempt may be repeated. Only
+ * `NOT_FOUND` is retried, and only within the shared attempt ceiling; every
+ * other code returns false, so the route's own terminal handling owns it.
  */
-export function shouldRetryNotFoundOnYoungRoute({
+export function shouldRetrySessionNotFound({
   attempt,
   errorCode,
 }: {
+  /** 0-indexed attempt count from TanStack Query's `retry(failureCount)`. */
   attempt: number;
+  /** The structured tRPC error code, if any. */
   errorCode: string | undefined;
 }): boolean {
   if (errorCode !== 'NOT_FOUND') {

@@ -1,4 +1,8 @@
 import {
+  githubBrokerRejectionProvenanceSchema,
+  type GitHubBrokerRejectionProvenance,
+} from '@kilocode/worker-utils/github-authorization';
+import {
   CONTROL_DIAGNOSTIC_STRING_CHARSET,
   CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH,
 } from './diagnostics.js';
@@ -176,6 +180,7 @@ export type GrantDiagnosticFacts = {
 export type GrantDiagnosticDecision = {
   grantPhase: GrantPhase;
   grantFailureReason: GrantFailureReason;
+  grantRejectionProvenance?: GitHubBrokerRejectionProvenance;
 };
 
 export type GrantDiagnosticSnapshot = GrantDiagnosticDecision & GrantDiagnosticFacts;
@@ -207,13 +212,21 @@ function isClosedValue(value: unknown, allowed: ReadonlySet<string>): value is s
  */
 export function brokerGrantFailure(
   kind: 'broker_authorization' | 'broker_issuance',
-  reason: string
+  reason: string,
+  rejectionProvenance?: unknown
 ): GrantDiagnosticDecision {
   if (!BROKER_SET.has(reason)) return { grantPhase: kind, grantFailureReason: 'unknown' };
   if (CONFIGURATION_OVERRIDE_SET.has(reason)) {
     return { grantPhase: 'configuration', grantFailureReason: reason as GrantFailureReason };
   }
-  return { grantPhase: kind, grantFailureReason: reason as GrantFailureReason };
+  const provenance = githubBrokerRejectionProvenanceSchema.safeParse(rejectionProvenance);
+  return {
+    grantPhase: kind,
+    grantFailureReason: reason as GrantFailureReason,
+    ...(kind === 'broker_issuance' && reason === 'no_installation_found' && provenance.success
+      ? { grantRejectionProvenance: provenance.data }
+      : {}),
+  };
 }
 
 export function createGrantDiagnostic(): GrantDiagnostic {
@@ -279,6 +292,7 @@ function pickFacts(facts: GrantDiagnosticFacts): GrantDiagnosticFacts {
 }
 
 export type GrantDiagnosticLogFields = {
+  grantRejectionProvenance?: string;
   grantPhase?: string;
   grantFailureReason?: string;
   provider?: string;
@@ -288,13 +302,23 @@ export type GrantDiagnosticLogFields = {
 };
 
 /**
- * The one picker `failRoute` copies through. It allows only the six grant field
- * names; a value outside the closed set is dropped, not copied.
+ * The one picker `failRoute` copies through. It allows only the grant field
+ * names and optional broker provenance; a value outside the closed set is dropped.
  */
 export function pickGrantDiagnosticFields(
   snapshot: GrantDiagnosticSnapshot
 ): GrantDiagnosticLogFields {
   const fields: GrantDiagnosticLogFields = {};
+  const provenance = githubBrokerRejectionProvenanceSchema.safeParse(
+    snapshot.grantRejectionProvenance
+  );
+  if (
+    snapshot.grantPhase === 'broker_issuance' &&
+    snapshot.grantFailureReason === 'no_installation_found' &&
+    provenance.success
+  ) {
+    fields.grantRejectionProvenance = provenance.data;
+  }
   if (isClosedValue(snapshot.grantPhase, PHASE_SET)) fields.grantPhase = snapshot.grantPhase;
   if (isClosedValue(snapshot.grantFailureReason, REASON_SET)) {
     fields.grantFailureReason = snapshot.grantFailureReason;

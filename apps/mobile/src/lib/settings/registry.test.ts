@@ -40,8 +40,7 @@ vi.mock('@/i18n/apply-language', () => ({ applyLanguagePreference }));
 const notificationMutation = vi.hoisted(() => ({
   mutate: vi.fn().mockResolvedValue(undefined),
   query: vi.fn().mockResolvedValue({
-    chatMessages: false,
-    agentAttention: true,
+    agentAttention: false,
     agentUpdates: true,
     sessionStatus: true,
     kiloclawActivity: true,
@@ -166,7 +165,7 @@ describe('settingsService one source of truth', () => {
   });
 
   it('loads notification preferences before reporting their current values', async () => {
-    expect(await Effect.runPromise(settingsService().read('notifications.chatMessages'))).toBe(
+    expect(await Effect.runPromise(settingsService().read('notifications.agentAttention'))).toBe(
       false
     );
     expect(await Effect.runPromise(settingsService().read('notifications.previews'))).toBe('full');

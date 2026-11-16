@@ -804,7 +804,11 @@ async function refreshScmCapability(
     });
     if (!issued.success || !('capability' in issued.value)) {
       diagnostic?.record(
-        brokerGrantFailure('broker_issuance', issued.success ? 'unknown' : issued.error.reason)
+        brokerGrantFailure(
+          'broker_issuance',
+          issued.success ? 'unknown' : issued.error.reason,
+          issued.success ? undefined : issued.error.rejectionProvenance
+        )
       );
       throw new Error('GitHub capability issuance is unavailable');
     }
@@ -1039,6 +1043,7 @@ function preparedPayload(input: {
       scopeId: grant.scopeId,
       token: kiloToken,
       targets: grant.kilo.targets,
+      ...(grant.orgId ? { organizationId: grant.orgId } : {}),
     },
   };
 }

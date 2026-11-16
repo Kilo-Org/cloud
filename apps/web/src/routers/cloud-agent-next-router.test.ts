@@ -287,6 +287,7 @@ jest.mock('@/lib/cloud-agent/stream-ticket', () => {
 });
 
 let createCaller: (ctx: { user: User; headersList?: Headers }) => {
+  getSession: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
   getSessionMessagesPage: CloudAgentNextClient['getSessionMessagesPage'];
   getSandboxSelectionOptions: (input: {
     devcontainer?: boolean;
@@ -361,6 +362,29 @@ beforeAll(async () => {
   const { createCallerFactory } = await import('@kilocode/web-shared/lib/trpc/init');
   const mod = await import('./cloud-agent-next-router');
   createCaller = createCallerFactory(mod.cloudAgentNextRouter);
+});
+
+describe('cloudAgentNextRouter.getSession concurrency', () => {
+  it('mints the request token in parallel but never contacts the Worker before ownership passes', async () => {
+    jest.clearAllMocks();
+    let resolveOwnership!: (value: null) => void;
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveOwnership = resolve;
+      })
+    );
+    const reading = createCaller({
+      user: { id: 'oauth/concurrency', is_admin: false } as User,
+      headersList: new Headers(),
+    }).getSession({ cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc' });
+    const denied = expect(reading).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(mockCreateControlTokenForRequest).toHaveBeenCalledTimes(1);
+    expect(mockGetSession).not.toHaveBeenCalled();
+    resolveOwnership(null);
+    await denied;
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
 });
 
 describe('cloudAgentNextRouter.getSessionMessagesPage', () => {

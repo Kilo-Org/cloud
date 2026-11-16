@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktiivisilla agenteilla on päivitys"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tehtävä valmis"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Epäonnistui: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Keskeytetty: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Kulutushälytys",
       "body": "{{scopeName}}n kulutus ylitti ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Uusi tietoturvalöydös ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} kohteessa {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Uusi tietoturvalöydös ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA-varoitus",
-      "body": "{{findingTitle}} kohteessa {{repoFullName}}"
+      "title": "SLA-varoitus"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA-rikkomus",
-      "body": "{{findingTitle}} kohteessa {{repoFullName}}"
+      "title": "SLA-rikkomus"
     },
     "securityLifecycle": {
       "title": "Kilo",

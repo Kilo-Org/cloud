@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକରେ ଅପଡେଟ୍ ଅଛି"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "କାର୍ଯ୍ୟ ସମାପ୍ତ"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ବିଫଳ: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ବ୍ୟାହତ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "ଖର୍ଚ୍ଚ ସତର୍କ",
       "body": "{{scopeName}} ର ଖର୍ଚ୍ଚ ${{amountUsd}} ଅତିକ୍ରମ କଲା"
     },
-    "securityFindingNew": {
-      "title": "ନୂତନ ସୁରକ୍ଷା ନିଷ୍କର୍ଷ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} {{repoFullName}} ରେ"
+    },
+    "securityFindingNew": {
+      "title": "ନୂତନ ସୁରକ୍ଷା ନିଷ୍କର୍ଷ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA ସତର୍କ",
-      "body": "{{findingTitle}} {{repoFullName}} ରେ"
+      "title": "SLA ସତର୍କ"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA ଉଲ୍ଲଂଘନ",
-      "body": "{{findingTitle}} {{repoFullName}} ରେ"
+      "title": "SLA ଉଲ୍ଲଂଘନ"
     },
     "securityLifecycle": {
       "title": "Kilo",

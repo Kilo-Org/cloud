@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useRef } from 'react';
 import { skipToken, useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
 
 export function usePreviewServices(target: PreviewTarget, organizationId: string | undefined) {
   const trpc = useTRPC();

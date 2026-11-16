@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ataza amaituta"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Huts egin du: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Etena: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
@@ -48,17 +34,17 @@
       "title": "Gastu-alerta",
       "body": "{{scopeName}} gastuak ${{amountUsd}} gainditu du"
     },
-    "securityFindingNew": {
-      "title": "Aurkitutako segurtasun-arazo berria ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} {{repoFullName}}-n"
+    },
+    "securityFindingNew": {
+      "title": "Aurkitutako segurtasun-arazo berria ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA abisua",
-      "body": "{{findingTitle}} {{repoFullName}}-n"
+      "title": "SLA abisua"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA haustura",
-      "body": "{{findingTitle}} {{repoFullName}}-n"
+      "title": "SLA haustura"
     },
     "securityLifecycle": {
       "title": "Kilo",

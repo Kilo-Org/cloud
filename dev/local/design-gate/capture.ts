@@ -746,8 +746,11 @@ export function joinPasses(
   const last = first[first.length - 1];
   const start = second[0];
   if (last === undefined || start === undefined) return [...first, ...second];
+  // `last.t` stamps the first tick of the collapsed tail, and `last.repeat` counts
+  // every tick that tail already covers, so only the ticks the tail does not
+  // account for are added.
   const gap = start.t - last.t;
-  const ticks = spacingMs > 0 ? Math.round(gap / spacingMs) - 1 : 0;
+  const ticks = spacingMs > 0 ? Math.round(gap / spacingMs) - last.repeat : 0;
   const repeats = Math.min(MAX_GAP_REPEATS, Math.max(0, ticks));
   return [
     ...first.slice(0, -1),

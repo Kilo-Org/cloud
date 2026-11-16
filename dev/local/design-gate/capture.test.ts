@@ -1168,12 +1168,13 @@ test('joinPasses counts the unsampled stretch as repeats of the first pass last 
   ];
   const second = [{ t: 2_000, repeat: 1, dump: late }];
   const joined = joinPasses(first, second, 250);
-  // The 1750 ms gap is seven spacings: six of them are repeats of the last state.
+  // The 1750 ms gap is seven spacings, and the tail's own two ticks already cover
+  // two of them, so five ticks are added and the tail spans seven.
   assert.deepEqual(
     joined.map(sample => [sample.t, sample.repeat]),
     [
       [0, 1],
-      [250, 8],
+      [250, 7],
       [2_000, 1],
     ]
   );
@@ -1357,11 +1358,12 @@ test('a late layout change on the same route is reported as a shift, not absorbe
   const timeline = JSON.parse(
     fs.readFileSync(path.join(ctx.out, 'cells/base/home.timeline.json'), 'utf8')
   ) as { samples: { t: number; repeat: number; dump: ProbeDump }[] };
-  // The first pass keeps its state and gains the repeats of the unsampled stretch.
+  // The first pass keeps its state and gains the ticks of the unsampled stretch
+  // that its own three-tick tail does not already cover.
   assert.deepEqual(
     timeline.samples.map(sample => [sample.t, sample.repeat, sample.dump.nodes[1]?.rect[1]]),
     [
-      [0, 6, 50],
+      [0, 4, 50],
       [1_000, 3, 80],
     ]
   );

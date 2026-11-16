@@ -82,6 +82,27 @@ path, enrols that traffic automatically, so such a change needs the same review
 as this contract. The [root `AGENTS.md`](../../AGENTS.md) remains the source of
 truth for which function regions actually run those deployments.
 
+## Advanced gateway policies
+
+An enterprise organization's Advanced policies (`disable_openrouter`, `data_region`;
+see `providers/organization-gateway-settings.ts`) apply only to requests Kilo pays for.
+A set inference region admits only Kilo's Vercel AI Gateway route, pinned to the region,
+and also disables OpenRouter. User BYOK routes (provider keys through Vercel, OpenRouter
+and Vercel AI Gateway keys, direct BYOK) are exempt and never get a region. FIM and edit
+completions go straight to their providers and are exempt. A disabled OpenRouter also
+lifts Kilo's Vercel opt-out list for that request, as a user's own Vercel AI Gateway key
+always does.
+
+Deliberate limitations, kept until end users ask otherwise:
+
+- The policies do not change the model lists any model endpoint returns. A listed model
+  may fail under them; do not filter catalogs by them.
+- Embeddings and System One route to Vercel (Kilo's account, provider keys, or a user's
+  Vercel AI Gateway key) only for OpenRouter catalog ids that `mapModelIdToVercel` maps to
+  a Vercel model of the right type. Models only Vercel serves are not supported there.
+- Transcriptions run only on OpenRouter, so a disabled OpenRouter or a region leaves them
+  working only through a user's OpenRouter key.
+
 ## Data collection versus ZDR
 
 `provider.data_collection: 'deny'` only excludes providers that store prompts

@@ -1218,13 +1218,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         <AlertDescription>
                           <p>
                             Once saved, this key is used for the supported models above that none of
-                            your provider keys cover. If you add both a Vercel AI Gateway key and an
-                            OpenRouter key, the Vercel AI Gateway key is used for models it serves.
+                            your provider keys cover, including embedding and System One models. If
+                            you add both a Vercel AI Gateway key and an OpenRouter key, the Vercel
+                            AI Gateway key is used for models it serves.
+                            {selectedProvider === 'openrouter'
+                              ? ' Transcription requests use only an OpenRouter key.'
+                              : ''}
                           </p>
                           {organizationId ? (
                             <p className="mt-2">
                               Organization model and provider restrictions apply to requests that
-                              use this key.
+                              use this key. The organization&apos;s Advanced policies, such as an
+                              inference region, do not.
                             </p>
                           ) : null}
                         </AlertDescription>
@@ -1237,13 +1242,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <AlertDescription>
                         <p>
                           Once saved, your key will automatically be used whenever your client
-                          requests one of the supported models above. If several of your keys can
-                          serve the same model, the one highest in your key list is used.
+                          requests one of the supported models above, including embedding and System
+                          One models served through the Vercel AI Gateway. If several of your keys
+                          can serve the same model, the one highest in your key list is used.
                         </p>
                         {organizationId ? (
                           <p className="mt-2">
                             Organization-configured model and provider restrictions apply. The key
-                            is not used when the provider allow-list excludes this provider.
+                            is not used when the provider allow-list excludes this provider. The
+                            organization&apos;s Advanced policies, such as an inference region, do
+                            not apply to requests that use the key.
                           </p>
                         ) : null}
                       </AlertDescription>

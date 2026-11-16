@@ -13,13 +13,17 @@ import {
 import {
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
+  gatewaySettingsRejection,
   gatewayUsageContextBase,
-  organizationGatewayPolicy,
   organizationProviderPreferences,
   paidUsageRejection,
   resolveGatewayCaller,
+  resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { getRouteInferenceRegion } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import { resolveUsageEndpointRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { getUsageEndpointGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   logMicrodollarUsageAndReportToBouncer,
@@ -67,7 +71,46 @@ import {
   rawClientIp,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 
+const VERCEL_TYPESAFE_API_URL = 'https://ai-gateway.vercel.sh/typesafe/v1';
+
 const generationIdSchema = z.object({ id: z.string().min(1) });
+const vercelGenerationIdSchema = z.object({
+  provider_metadata: z.object({ gateway: z.object({ generationId: z.string().min(1) }) }),
+});
+
+/**
+ * The Vercel AI Gateway's System One response: TypeSafe's shape with the cost and generation id
+ * under `provider_metadata.gateway`. Normalizes to the OpenRouter-compatible body the gateway
+ * returns to its callers, and reports the market cost separately so it never reaches them.
+ */
+const vercelSystemOneResponseSchema = z
+  .looseObject({
+    model: z.string().min(1),
+    usage: z.looseObject({ input_tokens: z.number(), output_tokens: z.number() }),
+    provider_metadata: z.looseObject({
+      gateway: z.looseObject({
+        cost: z.string(),
+        marketCost: z.string().optional(),
+        generationId: z.string().min(1),
+        routing: z.looseObject({ finalProvider: z.string().optional() }).optional(),
+      }),
+    }),
+  })
+  .transform(({ provider_metadata: { gateway }, ...body }) => ({
+    marketCost: gateway.marketCost === undefined ? undefined : Number(gateway.marketCost),
+    body: {
+      ...body,
+      id: gateway.generationId,
+      provider: gateway.routing?.finalProvider,
+      usage: { ...body.usage, cost: Number(gateway.cost) },
+    },
+  }));
+
+function generationIdOf(
+  body: z.infer<typeof generationIdSchema> | z.infer<typeof vercelGenerationIdSchema>
+) {
+  return 'id' in body ? body.id : body.provider_metadata.gateway.generationId;
+}
 
 /** A body the gateway could not use may still name the model the provider billed. */
 const providerModelSchema = z.object({ model: z.string().trim().min(1) });
@@ -134,14 +177,41 @@ export async function handleSystemOneRequest(request: NextRequest) {
   // blocks them at a zero balance too.
   const account = await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
   const { balance, settings, plan, payer } = account;
-  // System One is served by OpenRouter only, which no data region pins.
-  const gatewayPolicy = await organizationGatewayPolicy({
+  const gatewaySettings = await resolveOrganizationGatewaySettings({
     organizationId,
+    plan,
     settings,
-    provider: OPENROUTER,
   });
-  if (gatewayPolicy.kind === 'rejected') return gatewayPolicy.response;
-  const creditsBlocked = paidUsageRejection({ user, organizationId, account, exempt: false });
+  // The member's provider routes decide which of the owner's keys may serve the request.
+  const organizationDecision = organizationId
+    ? (
+        await resolveOrganizationMemberModelDecision({
+          organizationId,
+          kiloUserId: user.id,
+          modelId: resolvedModel,
+          providerLookup: getProviderSlugsForModel,
+          fromDb: readDb,
+        })
+      ).decision
+    : undefined;
+  // System One is served by OpenRouter, and by the Vercel AI Gateway when the owner's key or the
+  // organization's gateway settings route it there. Models only Vercel serves are not supported.
+  const route = await resolveUsageEndpointRoute({
+    requestedModel: resolvedModel,
+    modelType: 'evaluation',
+    user,
+    organizationId,
+    allowedProviders: organizationDecision?.eligibleProviderRoutes,
+    openRouterDisabled: gatewaySettings.openRouterDisabled,
+  });
+  const gatewayRejection = gatewaySettingsRejection(gatewaySettings, route);
+  if (gatewayRejection) return gatewayRejection;
+  const dataRegion = getRouteInferenceRegion(gatewaySettings, route);
+  const isVercelRoute = route.provider.type === 'vercel';
+  const userByok = route.userByok;
+  const isByok = !!userByok;
+  // The owner of a key pays for its requests, so a zero balance does not block them.
+  const creditsBlocked = paidUsageRejection({ user, organizationId, account, exempt: isByok });
   if (creditsBlocked) return await creditsBlocked();
 
   // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
@@ -162,7 +232,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
     return errorResponse('Service temporarily unavailable', 'temporarily_unavailable', 503);
   }
-  if (estimatedMaxCostMicrodollars > Math.floor(balance * 1_000_000)) {
+  if (!isByok && estimatedMaxCostMicrodollars > Math.floor(balance * 1_000_000)) {
     return errorResponse(
       'This request can cost more than the available balance covers. Add credits or send a smaller request.',
       'insufficient_credits',
@@ -170,17 +240,6 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
-  const organizationDecision = organizationId
-    ? (
-        await resolveOrganizationMemberModelDecision({
-          organizationId,
-          kiloUserId: user.id,
-          modelId: resolvedModel,
-          providerLookup: getProviderSlugsForModel,
-          fromDb: readDb,
-        })
-      ).decision
-    : undefined;
   const preferences = organizationProviderPreferences({
     decision: organizationDecision,
     settings,
@@ -218,9 +277,9 @@ export async function handleSystemOneRequest(request: NextRequest) {
       organizationId,
       isAnonymous: false,
       isStreaming: false,
-      userByok: false,
+      userByok: isByok,
       mode: mode || undefined,
-      provider: OPENROUTER.type,
+      provider: route.provider.type,
       inferenceProvider: inferenceProvider || undefined,
       requestedModel,
       resolvedModel: normalizeModelId(requestedModel),
@@ -251,13 +310,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const usageContextOf = (statusCode: number, ttfb: number | null): MicrodollarUsageContext => ({
     ...usageBase.context,
     api_kind: 'systemone',
-    provider: 'openrouter',
+    provider: route.provider.type,
     requested_model: requestedModel,
     is_free: isFree,
     promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
     isStreaming: false,
     status_code: statusCode,
-    user_byok: false,
+    user_byok: isByok,
+    inference_region: dataRegion,
     has_tools: false,
     feature,
     ttfb_ms: ttfb,
@@ -302,7 +362,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     outputTokens: 0,
     cacheWriteTokens: 0,
     cacheHitTokens: 0,
-    is_byok: false,
+    is_byok: isByok,
   });
 
   const deferZeroCostUsage = (
@@ -332,13 +392,13 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const deferReconciledUsage = (stats: MicrodollarUsageStats, context: MicrodollarUsageContext) => {
     after(async () => {
       const generation = stats.messageId
-        ? await fetchGeneration(stats.messageId, OPENROUTER)
+        ? await fetchGeneration(stats.messageId, route.provider)
         : undefined;
       if (!generation) {
         await logMicrodollarUsageAndReportToBouncer(stats, context);
         return;
       }
-      const reconciled = mapToUsageStats(generation, '', user.id, OPENROUTER.type);
+      const reconciled = mapToUsageStats(generation, '', user.id, route.provider.type);
       const reconciledStats: MicrodollarUsageStats = {
         ...reconciled,
         messageId: reconciled.messageId ?? stats.messageId,
@@ -390,14 +450,29 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   const upstream = await fetchUpstream({
-    provider: OPENROUTER,
+    provider: isVercelRoute
+      ? { ...route.provider, apiUrl: VERCEL_TYPESAFE_API_URL }
+      : route.provider,
     path: '/systemone',
     method: 'POST',
-    body: {
-      ...parsed.data,
-      provider: providerPolicy,
-      user: generateProviderSpecificHash(user.id, OPENROUTER),
-    },
+    body: isVercelRoute
+      ? {
+          model: await mapModelIdToVercel(resolvedModel),
+          state: parsed.data.state,
+          questions: parsed.data.questions,
+          providerOptions: {
+            gateway: getUsageEndpointGatewayOptions({
+              userByok,
+              provider: providerPolicy,
+              dataRegion,
+            }),
+          },
+        }
+      : {
+          ...parsed.data,
+          provider: providerPolicy,
+          user: generateProviderSpecificHash(user.id, route.provider),
+        },
     // No `signal`: the provider's outcome decides what this request costs, and a
     // client that leaves does not undo a generation the provider already started.
     // Only the duration bound stops the call, so a disconnect still reaches the
@@ -416,23 +491,27 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const ttfbMs = Math.max(0, Math.round(performance.now() - startedAt));
 
   if (!response.ok) {
-    if (response.status === 402) {
+    // Only Kilo's own account can run out of balance; an owner's key reports its own errors.
+    const kiloBalanceExhausted = response.status === 402 && !isByok;
+    if (kiloBalanceExhausted) {
       await response.body?.cancel();
-      errorExceptInTest('OpenRouter System One balance exhausted');
+      errorExceptInTest(
+        `${isVercelRoute ? 'Vercel AI Gateway' : 'OpenRouter'} System One balance exhausted`
+      );
     }
     emitMetrics(response.status, ttfbMs);
     // The row reports the provider's own answer, so it agrees with the metrics
     // and with the ledger of every other upstream error response.
     deferZeroCostUsage(null, response.status, ttfbMs);
-    if (response.status === 402) {
+    if (kiloBalanceExhausted) {
       return errorResponse('Service temporarily unavailable', 'upstream_error', 503);
     }
     const readableError = await makeErrorReadable({
-      provider: OPENROUTER.type,
+      provider: route.provider.type,
       requestedModel,
       request: null,
       response,
-      userByokProviderIds: null,
+      userByokProviderIds: userByok?.map(byok => byok.providerId) ?? null,
     });
     return readableError ?? wrapInSafeNextResponse(response);
   }
@@ -440,11 +519,18 @@ export async function handleSystemOneRequest(request: NextRequest) {
   let responseBody: unknown;
   let bodyRead = false;
   let answer: z.infer<typeof systemOneResponseSchema> | undefined;
+  let marketCost: number | undefined;
   const context = usageContextOf(response.status, ttfbMs);
   const stats = await parseUsageWithRecovery(response, context, async () => {
     responseBody = await response.json();
     bodyRead = true;
-    answer = systemOneResponseSchema.parse(responseBody);
+    if (isVercelRoute) {
+      const normalized = vercelSystemOneResponseSchema.parse(responseBody);
+      answer = systemOneResponseSchema.parse(normalized.body);
+      marketCost = normalized.marketCost;
+    } else {
+      answer = systemOneResponseSchema.parse(responseBody);
+    }
     const { id, model, provider, usage } = answer;
     return {
       ...zeroCostUsageStats({
@@ -463,17 +549,19 @@ export async function handleSystemOneRequest(request: NextRequest) {
   emitMetrics(response.status, ttfbMs, stats.inference_provider);
   if (stats.hasError || !answer) {
     const reportedModel = providerModelSchema.safeParse(responseBody);
-    const generationId = generationIdSchema.safeParse(responseBody);
+    const generationId = (isVercelRoute ? vercelGenerationIdSchema : generationIdSchema).safeParse(
+      responseBody
+    );
     deferReconciledUsage(
       {
         ...stats,
-        messageId: generationId.success ? generationId.data.id : stats.messageId,
+        messageId: generationId.success ? generationIdOf(generationId.data) : stats.messageId,
         model: reportedModel.success ? reportedModel.data.model : resolvedModel,
         latency: ttfbMs,
         streamed: false,
         cancelled: request.signal.aborted,
         market_cost: 0,
-        is_byok: false,
+        is_byok: isByok,
       },
       context
     );
@@ -483,7 +571,10 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   const cost = toMicrodollars(answer.usage.cost);
   stats.cost_mUsd = cost;
-  stats.market_cost = cost;
+  stats.market_cost =
+    marketCost !== undefined && Number.isFinite(marketCost) && marketCost >= 0
+      ? toMicrodollars(marketCost)
+      : cost;
   // Keeps the provider cost as `market_cost`, then applies custom pricing and zeroes a free model.
   applyUsagePricing(stats, context, customPricingConfig);
   after(async () => {

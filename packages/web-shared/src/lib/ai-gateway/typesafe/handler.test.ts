@@ -37,6 +37,9 @@ import {
   rejectDisallowedUpstreamUrls,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { resolveUsageEndpointRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getOpenRouterModelsMetadataFromDatabase,
@@ -139,6 +142,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
     apiKey: 'test-platform-openrouter-key',
   },
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider', () => ({
+  resolveUsageEndpointRoute: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
+  mapModelIdToVercel: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providerHash', () => ({
   generateProviderSpecificHash: jest.fn(),
 }));
@@ -237,6 +246,35 @@ const memberDecision = {
   },
   decision: { allowed: true },
 };
+const VERCEL_SYSTEM_ONE_MODEL = 'typesafe-ai/jev';
+const VERCEL_TYPESAFE_URL = 'https://ai-gateway.vercel.sh/typesafe/v1/systemone';
+const kiloVercelProvider = {
+  type: 'vercel',
+  apiUrl: 'https://ai-gateway.vercel.sh/v1',
+  apiKey: 'test-platform-vercel-key',
+} as Provider;
+const userOpenRouterProvider = { ...OPENROUTER, apiKey: 'test-user-openrouter-key' } as Provider;
+const userOpenRouterKey: BYOKResult = {
+  providerId: 'openrouter',
+  decryptedAPIKey: 'test-user-openrouter-key',
+};
+const userAnthropicKey: BYOKResult = {
+  providerId: 'anthropic',
+  decryptedAPIKey: 'test-user-anthropic-key',
+};
+const vercelUpstreamBody = {
+  model: VERCEL_SYSTEM_ONE_MODEL,
+  answers: upstreamBody.answers,
+  usage: { input_tokens: 23, output_tokens: 7 },
+  provider_metadata: {
+    gateway: {
+      routing: { finalProvider: 'typesafe-ai' },
+      cost: '0.0001236',
+      marketCost: '0.0002',
+      generationId: 'gen_vercel_systemone',
+    },
+  },
+};
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -302,10 +340,10 @@ function setAuth(organizationId?: string) {
   });
 }
 
-function upstreamRequest() {
+function upstreamRequest(expectedUrl = 'https://openrouter.ai/api/v1/systemone') {
   expect(mockedFetch).toHaveBeenCalledTimes(1);
   const [url, init] = mockedFetch.mock.calls[0];
-  expect(url).toBe('https://openrouter.ai/api/v1/systemone');
+  expect(url).toBe(expectedUrl);
   expect(init?.method).toBe('POST');
   if (typeof init?.body !== 'string') throw new Error('Expected a JSON upstream body');
   return { body: JSON.parse(init.body), headers: new Headers(init.headers) };
@@ -360,6 +398,14 @@ describe('handleSystemOneRequest', () => {
         modelId === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : modelId
       );
     jest.mocked(generateProviderSpecificHash).mockReturnValue('hashed-user');
+    jest
+      .mocked(resolveUsageEndpointRoute)
+      .mockResolvedValue({ provider: OPENROUTER, userByok: null });
+    jest
+      .mocked(mapModelIdToVercel)
+      .mockImplementation(async modelId =>
+        modelId === TYPESAFE_MODEL ? VERCEL_SYSTEM_ONE_MODEL : modelId
+      );
     jest.mocked(extractFraudAndProjectHeaders).mockReturnValue({
       fraudHeaders: EmptyFraudDetectionHeaders,
       projectId: 'project-123',
@@ -782,6 +828,7 @@ describe('handleSystemOneRequest', () => {
       setAuth('org-123');
       jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
         balance: 1_000_000,
+        plan: 'enterprise',
         settings: { disable_openrouter: true },
       });
       jest
@@ -1797,5 +1844,248 @@ describe('handleSystemOneRequest', () => {
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+  describe('routes', () => {
+    function setEnterpriseRegion(dataRegion?: 'eu') {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1_000_000,
+        plan: 'enterprise',
+        settings: dataRegion ? { data_region: dataRegion } : { disable_openrouter: true },
+      });
+      jest
+        .mocked(getRuntimeOrganizationFeatures)
+        .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-123'] });
+    }
+
+    it('passes the member decision provider routes to the route selection', async () => {
+      setAuth('org-123');
+      const eligibleProviderRoutes = new Set(['typesafe']);
+      jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+        ...memberDecision,
+        decision: { allowed: true, eligibleProviderRoutes },
+      });
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
+
+      expect(resolveUsageEndpointRoute).toHaveBeenCalledWith({
+        requestedModel: TYPESAFE_MODEL,
+        modelType: 'evaluation',
+        user,
+        organizationId: 'org-123',
+        allowedProviders: eligibleProviderRoutes,
+        openRouterDisabled: false,
+      });
+    });
+
+    it("sends the request through the owner's OpenRouter key without a balance check", async () => {
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0 });
+      jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({
+        provider: userOpenRouterProvider,
+        userByok: [userOpenRouterKey],
+      });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(creditsBlockedResponse).not.toHaveBeenCalled();
+      const upstream = upstreamRequest();
+      expect(upstream.headers.get('authorization')).toBe('Bearer test-user-openrouter-key');
+      expect(upstream.body.user).toBe('hashed-user');
+      expect(generateProviderSpecificHash).toHaveBeenCalledWith(user.id, userOpenRouterProvider);
+      await expect(response.json()).resolves.toMatchObject({
+        usage: { cost: 0, is_byok: true },
+      });
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ cost_mUsd: 0, market_cost: 124, is_byok: true }),
+        expect.objectContaining({ provider: 'openrouter', user_byok: true })
+      );
+      expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+        expect.objectContaining({ userByok: true, provider: 'openrouter' })
+      );
+    });
+
+    it("passes the owner's provider key through Kilo's Vercel account, exempt from the region", async () => {
+      setEnterpriseRegion('eu');
+      jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({
+        provider: kiloVercelProvider,
+        userByok: [userAnthropicKey],
+      });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      const response = await handleSystemOneRequest(
+        makeRequest({ ...requestBody, provider: { zdr: true, data_collection: 'deny' } })
+      );
+
+      expect(response.status).toBe(200);
+      const upstream = upstreamRequest(VERCEL_TYPESAFE_URL);
+      expect(upstream.headers.get('authorization')).toBe('Bearer test-platform-vercel-key');
+      expect(upstream.body).toEqual({
+        ...JSON.parse(JSON.stringify(requestBody)),
+        model: VERCEL_SYSTEM_ONE_MODEL,
+        providerOptions: {
+          gateway: {
+            only: ['anthropic'],
+            byok: { anthropic: [{ apiKey: 'test-user-anthropic-key' }] },
+            zeroDataRetention: true,
+            disallowPromptTraining: true,
+          },
+        },
+      });
+      expect(upstream.body.providerOptions.gateway).not.toHaveProperty('inferenceRegion');
+      expect(generateProviderSpecificHash).not.toHaveBeenCalled();
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ cost_mUsd: 0, is_byok: true }),
+        expect.objectContaining({ provider: 'vercel', user_byok: true, inference_region: null })
+      );
+    });
+
+    it("runs on Kilo's Vercel account in the organization's region when OpenRouter is refused", async () => {
+      setEnterpriseRegion('eu');
+      jest
+        .mocked(resolveUsageEndpointRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(resolveUsageEndpointRoute).toHaveBeenCalledWith(
+        expect.objectContaining({ openRouterDisabled: true })
+      );
+      const upstream = upstreamRequest(VERCEL_TYPESAFE_URL);
+      expect(upstream.body).toEqual({
+        ...JSON.parse(JSON.stringify(requestBody)),
+        model: VERCEL_SYSTEM_ONE_MODEL,
+        providerOptions: {
+          gateway: { inferenceRegion: { scope: 'zone', geoRegion: 'eu' } },
+        },
+      });
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ cost_mUsd: 124, is_byok: false }),
+        expect.objectContaining({
+          provider: 'vercel',
+          user_byok: false,
+          inference_region: 'eu',
+        })
+      );
+    });
+
+    it("omits the region from Kilo's Vercel route without one", async () => {
+      setEnterpriseRegion();
+      jest
+        .mocked(resolveUsageEndpointRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
+
+      expect(upstreamRequest(VERCEL_TYPESAFE_URL).body.providerOptions.gateway).not.toHaveProperty(
+        'inferenceRegion'
+      );
+    });
+
+    it('forwards the effective provider restrictions to the Vercel gateway options', async () => {
+      setAuth('org-123');
+      jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+        ...memberDecision,
+        decision: { allowed: true, eligibleProviderRoutes: new Set(['typesafe']) },
+      });
+      jest
+        .mocked(resolveUsageEndpointRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      const response = await handleSystemOneRequest(
+        makeRequest({ ...requestBody, provider: { zdr: true } })
+      );
+
+      expect(response.status).toBe(200);
+      const { gateway } = upstreamRequest(VERCEL_TYPESAFE_URL).body.providerOptions;
+      expect(gateway.zeroDataRetention).toBe(true);
+      expect(gateway.only).toEqual(['typesafe']);
+    });
+
+    it('normalizes a Vercel response to the OpenRouter-compatible shape and bills its cost', async () => {
+      jest
+        .mocked(resolveUsageEndpointRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body).toEqual({
+        id: 'gen_vercel_systemone',
+        model: TYPESAFE_MODEL,
+        provider: 'typesafe-ai',
+        answers: upstreamBody.answers,
+        usage: { input_tokens: 23, output_tokens: 7, cost: 0.000124, is_byok: false },
+      });
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: 'gen_vercel_systemone',
+          model: VERCEL_SYSTEM_ONE_MODEL,
+          inference_provider: 'typesafe-ai',
+          cost_mUsd: 124,
+          market_cost: 200,
+          inputTokens: 23,
+          outputTokens: 7,
+          hasError: false,
+        }),
+        expect.objectContaining({ provider: 'vercel' })
+      );
+    });
+
+    it('reconciles a Vercel response without a usable cost through the Vercel generation', async () => {
+      mockMeteredClock();
+      jest
+        .mocked(resolveUsageEndpointRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      const { cost: _cost, ...gateway } = vercelUpstreamBody.provider_metadata.gateway;
+      mockedFetch.mockImplementation(async () =>
+        Response.json({ ...vercelUpstreamBody, provider_metadata: { gateway } })
+      );
+      jest.mocked(fetchGeneration).mockResolvedValue({
+        data: { id: 'gen_vercel_systemone' },
+      } as OpenRouterGeneration);
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+      await runAfter();
+      expect(fetchGeneration).toHaveBeenCalledWith('gen_vercel_systemone', kiloVercelProvider);
+      expect(mapToUsageStats).toHaveBeenCalledWith(expect.anything(), '', user.id, 'vercel');
+    });
+
+    it('refuses the OpenRouter route when an inference region is set', async () => {
+      setEnterpriseRegion('eu');
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(deferredUsageCallbacks()).toHaveLength(0);
+    });
+
+    it("passes the owner's upstream balance error through instead of reporting Kilo's balance", async () => {
+      jest.mocked(resolveUsageEndpointRoute).mockResolvedValue({
+        provider: userOpenRouterProvider,
+        userByok: [userOpenRouterKey],
+      });
+      const safeResponse = NextResponse.json({ error: 'no credits' }, { status: 402 });
+      mockedFetch.mockResolvedValue(Response.json({ error: 'no credits' }, { status: 402 }));
+      jest.mocked(wrapInSafeNextResponse).mockReturnValue(safeResponse);
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(402);
+      expect(errorExceptInTest).not.toHaveBeenCalled();
+    });
   });
 });

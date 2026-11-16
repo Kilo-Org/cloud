@@ -1454,7 +1454,7 @@ describe('organizations settings trpc router', () => {
         .where(eq(organization_audit_logs.organization_id, testOrganization.id))
         .orderBy(organization_audit_logs.id);
       expect(auditLogs.map(log => log.message)).toContain(
-        'Updated gateway settings: OpenRouter disabled; Data region: European Union'
+        'Updated advanced policies: OpenRouter disabled; Inference region: European Union'
       );
     });
 

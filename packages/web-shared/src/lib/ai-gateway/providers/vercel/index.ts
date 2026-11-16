@@ -6,6 +6,7 @@ import {
   BedrockCredentialsSchema,
   getRequestIgnoredVercelProviderIds,
   getVercelProviderIdForUserByok,
+  isGatewayUserByokProviderId,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   VertexCredentialsSchema,
@@ -96,10 +97,16 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 export type VercelRoutingInput = {
   requestedModel: string;
   boundedSpending: boolean;
+  /**
+   * The organization disabled OpenRouter, directly or through an inference region. Kilo's
+   * Vercel opt-out list then does not apply, so a model Vercel serves goes there instead of
+   * failing on the disabled OpenRouter.
+   */
+  openRouterDisabled?: boolean;
 };
 
 export async function shouldRouteToVercel(
-  { requestedModel, boundedSpending }: VercelRoutingInput,
+  { requestedModel, boundedSpending, openRouterDisabled = false }: VercelRoutingInput,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
   if (boundedSpending) {
@@ -109,7 +116,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (!(await isVercelRoutingEnabledForModel(requestedModel))) {
+  if (!openRouterDisabled && !(await isVercelRoutingEnabledForModel(requestedModel))) {
     return false;
   }
 
@@ -286,6 +293,39 @@ export function convertProviderOptions(
   };
 }
 
+/**
+ * The Vercel gateway options of a non-chat request, such as embeddings or System One. Provider keys
+ * sent through Kilo's Vercel account travel as `byok`, restricted to their providers, as on chat.
+ * Kilo's own route and the owner's Vercel AI Gateway key carry the provider allow-list instead,
+ * and only Kilo's route a region (see `getRouteInferenceRegion`); Vercel fails the request instead
+ * of leaving the region. Both carry the data-handling choices.
+ */
+export function getUsageEndpointGatewayOptions(params: {
+  userByok: readonly BYOKResult[] | null;
+  provider: Pick<OpenRouterProviderConfig, 'only' | 'zdr' | 'data_collection'> | undefined;
+  dataRegion: OrganizationDataRegion | null;
+}): NonNullable<VercelProviderConfig['gateway']> {
+  const { userByok, provider, dataRegion } = params;
+  const dataHandling = {
+    zeroDataRetention: provider?.zdr,
+    disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
+  };
+  const providerKeys = userByok?.filter(byok => !isGatewayUserByokProviderId(byok.providerId));
+  if (providerKeys && providerKeys.length > 0) {
+    const byokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    for (const byokEntry of providerKeys) {
+      const [key, list] = getVercelInferenceProviderConfigForUserByok(byokEntry);
+      byokProviders[key] = [...(byokProviders[key] ?? []), ...list];
+    }
+    return { only: Object.keys(byokProviders), byok: byokProviders, ...dataHandling };
+  }
+  return {
+    only: provider?.only?.map(openRouterToVercelInferenceProviderId),
+    ...dataHandling,
+    ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
+  };
+}
+
 function parseCredentials<T>(
   input: string,
   schema: { parse(input: unknown): T },
@@ -407,8 +447,9 @@ export async function applyVercelSettings(
     );
   }
 
+  // The caller passes a region only for a route Kilo pays for (see `getRouteInferenceRegion`).
   if (dataRegion && requestToMutate.body.providerOptions?.gateway) {
-    // Vercel fails the request instead of leaving the region, for BYOK credentials too.
+    // Vercel fails the request instead of leaving the region.
     // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
     requestToMutate.body.providerOptions.gateway.inferenceRegion = {
       scope: 'zone',

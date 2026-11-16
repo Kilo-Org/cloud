@@ -184,11 +184,7 @@ export function OrganizationBillingScreen() {
     }
     return (
       <BillingCard>
-        <KvRow
-          label={t('organization.hub.plan')}
-          value={planName}
-          valueFace="text"
-        />
+        <KvRow label={t('organization.hub.plan')} value={planName} valueFace="text" />
         <KvRow
           label={t('organization.billing.state')}
           value={subscriptionState.label}
